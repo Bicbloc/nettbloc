@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Bed, AlertCircle, Clock } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 interface RoomCardProps {
   room: Room;
@@ -15,9 +15,29 @@ interface RoomCardProps {
 
 export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact = false }: RoomCardProps) {
   const [dragging, setDragging] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Add animation effect when dragging
+  useEffect(() => {
+    if (!cardRef.current) return;
+    
+    if (dragging) {
+      cardRef.current.classList.add('scale-105', 'shadow-lg');
+    } else {
+      cardRef.current.classList.remove('scale-105', 'shadow-lg');
+    }
+  }, [dragging]);
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('application/json', JSON.stringify(room));
+    e.dataTransfer.effectAllowed = 'move';
+    
+    // Create a custom drag image
+    if (cardRef.current) {
+      const rect = cardRef.current.getBoundingClientRect();
+      e.dataTransfer.setDragImage(cardRef.current, rect.width / 2, rect.height / 2);
+    }
+    
     setDragging(true);
   };
 
@@ -81,10 +101,11 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
   if (compact) {
     return (
       <div 
-        className={`px-2 py-1 text-xs border rounded flex items-center gap-1 ${
+        ref={cardRef}
+        className={`px-2 py-1 text-xs border rounded flex items-center gap-1 transition-all duration-200 ${
           dragging ? 'opacity-50' : ''
         } ${
-          room.isUrgent ? 'border-red-500' : 
+          room.isUrgent ? 'border-red-500 border-2' : 
           room.notUrgent ? 'border-green-500' : 'border-gray-200'
         }`}
         draggable={draggable}
@@ -93,7 +114,7 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
       >
         <span className="font-medium">{room.number}</span>
         {room.cleaningType !== 'none' && (
-          <span className="text-xs">
+          <span className={`text-xs font-bold ${room.cleaningType === 'full' ? 'text-purple-600' : 'text-blue-600'}`}>
             {room.cleaningType === 'full' ? '(B)' : '(R)'}
           </span>
         )}
@@ -104,11 +125,12 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
 
   return (
     <div 
-      className={`p-4 border rounded-lg shadow-sm ${
+      ref={cardRef}
+      className={`p-4 border rounded-lg transition-all duration-200 ${
         dragging ? 'opacity-50' : ''
       } ${
-        room.isUrgent ? 'border-red-500' : 
-        room.notUrgent ? 'border-green-500' : 'border-gray-200'
+        room.isUrgent ? 'border-red-500 border-2 shadow-md' : 
+        room.notUrgent ? 'border-green-500 border-2' : 'border-gray-200 shadow-sm'
       }`}
       draggable={draggable}
       onDragStart={handleDragStart}

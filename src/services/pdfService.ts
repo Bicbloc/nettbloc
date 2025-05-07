@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -140,42 +141,65 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
   let status = 'needs-cleaning';
   let cleaningType: 'full' | 'quick' | 'none' = 'none';
 
-  // RÈGLE 1: Si la colonne de gauche contient DIR → chambre à nettoyer à blanc
-  const hasDIR = /\bDIR\b/.test(context);
-  if (hasDIR) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // RÈGLE 2: Si la colonne de droite (plage) contient deux blocs ou une seule ligne avec heure → chambre à nettoyer à blanc
-  // Vérifier si deux dates sont mentionnées (arrivée/départ)
-  const hasTwoDates = /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
-  // Vérifier si une heure est mentionnée
-  const hasTimeFormat = /\b\d{1,2}:\d{2}\b/.test(context);
-  
-  if (hasTwoDates || hasTimeFormat) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // RÈGLE 3: Si la plage contient une date de départ > date du jour sélectionné → chambre recouche
-  // Vérifier si une date future est mentionnée (simplification: présence d'une date et du terme "séjour en cours")
-  const hasOngoingStay = context.includes('séjour en cours') || 
-                         context.includes('Adults') || 
-                         context.includes('Night');
-  if (hasOngoingStay) {
+  // RÈGLE: Pour détecter une recouche - une seule ligne centrée avec date de départ et date d'arrivée
+  const hasSingleLineWithDates = /\d{2}\/\d{2}\/\d{4}.*Night/.test(context) && 
+                                !context.includes("Adults.*\d{2}\/\d{2}\/\d{4}");
+                                
+  if (hasSingleLineWithDates) {
     cleaningType = 'quick';
     status = 'needs-cleaning';
     return { status, cleaningType };
   }
 
-  // RÈGLE 4: Si la plage est vide ou contient CL / INS / rien → chambre propre
-  const isCLorINS = /\bCL\b|\bINS\b/.test(context);
-  if (isCLorINS || !hasOngoingStay) {
+  // RÈGLE: Pour détecter les chambres propres - ligne vide avec statut INS ou Clean
+  const isCleanRoom = (/\bINS\b|\bCL\b/.test(context) || context.includes('Clean')) && 
+                      !context.includes('Adults') && 
+                      !context.includes('Night') &&
+                      !context.includes('séjour');
+                      
+  if (isCleanRoom) {
     cleaningType = 'none';
     status = 'clean';
+    return { status, cleaningType };
+  }
+
+  // RÈGLE: Nettoyage à blanc si départ + arrivée (deux clients différents)
+  const hasTwoClients = /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context) &&
+                        !context.includes('Night');
+                        
+  if (hasTwoClients) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
+  }
+
+  // RÈGLE: Client à gauche avec date et horaire = nettoyage à blanc
+  const hasLeftClientWithTime = /\d{1,2}:\d{2}.*Adults/.test(context);
+  
+  if (hasLeftClientWithTime) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
+  }
+
+  // RÈGLE: À droite, selon le statut
+  const hasRightStatus = /Adults.*\b(INS|DIR|CL)\b/.test(context);
+  
+  if (hasRightStatus) {
+    if (context.includes('DIR')) {
+      cleaningType = 'full';
+      status = 'needs-cleaning';
+    } else if (context.includes('INS') || context.includes('CL')) {
+      cleaningType = 'none';
+      status = 'clean';
+    }
+    return { status, cleaningType };
+  }
+
+  // Si statut DIR ailleurs dans le contexte, c'est un nettoyage à blanc
+  if (context.includes('DIR')) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
     return { status, cleaningType };
   }
 

@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Tag, Bed } from "lucide-react";
+import { UserIcon, FileText, Calendar, Tag, Bed, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
@@ -185,7 +185,7 @@ const Index = () => {
   const fullCleaningRooms = rooms.filter(r => r.cleaningType === 'full').length;
   const quickCleaningRooms = rooms.filter(r => r.cleaningType === 'quick').length;
   const priorityRooms = rooms.filter(r => r.priority === 'high').length;
-  const cleanedRooms = rooms.filter(r => r.status === 'clean').length;
+  const cleanRooms = rooms.filter(r => r.status === 'clean').length;
   const twinRooms = rooms.filter(r => r.isTwin).length;
   
   // Obtenir les chambres assignées à chaque femme de chambre
@@ -260,10 +260,11 @@ const Index = () => {
         </div>
         
         <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Tableau de Bord</TabsTrigger>
-            <TabsTrigger value="housekeeping">Femmes de Chambre</TabsTrigger>
-            <TabsTrigger value="rooms">Toutes les Chambres</TabsTrigger>
+          <TabsList className="w-full flex overflow-auto">
+            <TabsTrigger value="overview" className="flex-1">Tableau de Bord</TabsTrigger>
+            <TabsTrigger value="housekeeping" className="flex-1">Femmes de Chambre</TabsTrigger>
+            <TabsTrigger value="rooms" className="flex-1">Toutes les Chambres</TabsTrigger>
+            <TabsTrigger value="clean-rooms" className="flex-1">Chambres Propres</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview" className="space-y-4">
@@ -386,7 +387,9 @@ const Index = () => {
           <TabsContent value="housekeeping" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold">Attribution des Chambres</h2>
-              <Button onClick={redistributeRooms}>Redistribuer les Chambres</Button>
+              <Button onClick={redistributeRooms} className="bg-blue-600 hover:bg-blue-700">
+                Redistribuer les Chambres
+              </Button>
             </div>
             
             <div className="grid gap-4 md:grid-cols-2">
@@ -522,6 +525,119 @@ const Index = () => {
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
               {rooms.filter(room => room.cleaningType !== 'none' && !room.assignedTo).map(room => (
+                <RoomCard 
+                  key={room.number} 
+                  room={room} 
+                  onUpdate={handleRoomUpdate} 
+                  draggable={true}
+                />
+              ))}
+            </div>
+          </TabsContent>
+          
+          {/* New Tab for Clean Rooms */}
+          <TabsContent value="clean-rooms" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Chambres Propres</CardTitle>
+                  <CardDescription>
+                    Liste des chambres propres disponibles
+                  </CardDescription>
+                </div>
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-200 text-base py-1 px-3">
+                  {cleanRooms} Chambres
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                {cleanRooms === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Check className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                    <p className="text-lg">Aucune chambre propre disponible</p>
+                    <p className="text-sm mt-1">Toutes les chambres sont à nettoyer ou en maintenance</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Chambre</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Twin</TableHead>
+                          <TableHead>Priorité</TableHead>
+                          <TableHead>Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rooms.filter(room => room.status === 'clean').map((room) => (
+                          <TableRow key={room.number} className="hover:bg-gray-50">
+                            <TableCell className="font-medium">{room.number}</TableCell>
+                            <TableCell>{getStatusBadge(room.status)}</TableCell>
+                            <TableCell>
+                              <Checkbox 
+                                checked={room.isTwin || false}
+                                onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Checkbox 
+                                  id={`urgent-clean-${room.number}`}
+                                  checked={room.isUrgent || false}
+                                  onCheckedChange={(checked) => {
+                                    handleRoomUpdate({
+                                      ...room, 
+                                      isUrgent: !!checked,
+                                      notUrgent: false,
+                                      priority: !!checked ? 'high' : 'medium'
+                                    });
+                                  }}
+                                />
+                                <label htmlFor={`urgent-clean-${room.number}`} className="text-xs text-red-500">
+                                  Urgent
+                                </label>
+                                
+                                <Checkbox 
+                                  id={`noturgent-clean-${room.number}`}
+                                  checked={room.notUrgent || false}
+                                  onCheckedChange={(checked) => {
+                                    handleRoomUpdate({
+                                      ...room, 
+                                      notUrgent: !!checked,
+                                      isUrgent: false,
+                                      priority: !!checked ? 'low' : 'medium'
+                                    });
+                                  }}
+                                />
+                                <label htmlFor={`noturgent-clean-${room.number}`} className="text-xs text-green-500">
+                                  Pas urgent
+                                </label>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleRoomUpdate({
+                                  ...room,
+                                  status: 'needs-cleaning',
+                                  cleaningType: 'full'
+                                })}
+                              >
+                                Marquer à nettoyer
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
+              {rooms.filter(room => room.status === 'clean').map(room => (
                 <RoomCard 
                   key={room.number} 
                   room={room} 
