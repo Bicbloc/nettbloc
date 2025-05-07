@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -135,83 +134,52 @@ function parseRoomsFromText(text: string): Room[] {
   return rooms;
 }
 
-// Fonction d'analyse avancée pour déterminer le statut et le type de nettoyage selon les règles spécifiées
+// Fonction d'analyse mise à jour selon les nouvelles règles fournies
 function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // Par défaut
+  // Valeurs par défaut
   let status = 'needs-cleaning';
-  let cleaningType: 'full' | 'quick' | 'none' = 'quick';
-  
-  // Vérifier si c'est un cas DIR (salle)
-  const isDIR = /\bDIR\b/.test(context);
-  
-  // Vérifier les patterns pour différentes configurations
-  const hasTwoCases = /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context) || 
-                      /\d{1,2}:\d{2}.*\d{1,2}:\d{2}/.test(context);
-  
-  const hasLeftTimeCase = /\b\d{1,2}:\d{2}\b.*Adults/.test(context);
-  
-  const hasRightTimeCase = /Adults.*\b\d{1,2}:\d{2}\b/.test(context);
-  
-  const hasMiddleCase = /Adults/.test(context) && !hasTwoCases && !hasLeftTimeCase && !hasRightTimeCase;
-  
-  // Déterminer le type de nettoyage selon les règles
-  if (hasTwoCases) {
-    // Deux cases (arrivée/départ) = nettoyage à blanc
+  let cleaningType: 'full' | 'quick' | 'none' = 'none';
+
+  // RÈGLE 1: Si la colonne de gauche contient DIR → chambre à nettoyer à blanc
+  const hasDIR = /\bDIR\b/.test(context);
+  if (hasDIR) {
     cleaningType = 'full';
     status = 'needs-cleaning';
-  } else if (hasLeftTimeCase) {
-    // Une case à gauche avec date/heure = nettoyage à blanc
+    return { status, cleaningType };
+  }
+
+  // RÈGLE 2: Si la colonne de droite (plage) contient deux blocs ou une seule ligne avec heure → chambre à nettoyer à blanc
+  // Vérifier si deux dates sont mentionnées (arrivée/départ)
+  const hasTwoDates = /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
+  // Vérifier si une heure est mentionnée
+  const hasTimeFormat = /\b\d{1,2}:\d{2}\b/.test(context);
+  
+  if (hasTwoDates || hasTimeFormat) {
     cleaningType = 'full';
     status = 'needs-cleaning';
-  } else if (hasRightTimeCase) {
-    // Case à droite avec date/heure: vérifier statut
-    if (isDIR) {
-      cleaningType = 'full';
-      status = 'needs-cleaning';
-    } else {
-      // INS/CL = propre, rien à faire
-      cleaningType = 'none';
-      status = 'clean';
-    }
-  } else if (hasMiddleCase) {
-    // Une seule case au milieu = recouche
+    return { status, cleaningType };
+  }
+
+  // RÈGLE 3: Si la plage contient une date de départ > date du jour sélectionné → chambre recouche
+  // Vérifier si une date future est mentionnée (simplification: présence d'une date et du terme "séjour en cours")
+  const hasOngoingStay = context.includes('séjour en cours') || 
+                         context.includes('Adults') || 
+                         context.includes('Night');
+  if (hasOngoingStay) {
     cleaningType = 'quick';
     status = 'needs-cleaning';
-  } else {
-    // Plage vide: vérifier statut
-    if (isDIR) {
-      cleaningType = 'full';
-      status = 'needs-cleaning';
-    } else {
-      cleaningType = 'none';
-      status = 'clean';
-    }
+    return { status, cleaningType };
   }
-  
-  // Vérifier les statuts supplémentaires
-  if (context.includes('INS') || context.includes('CL')) {
-    // Si déjà marqué INS (inspected) ou CL (clean), la chambre est propre sauf si on a déterminé autrement
-    if (cleaningType === 'quick') {
-      status = 'needs-cleaning';
-    } else if (cleaningType === 'none') {
-      status = 'clean';
-    }
-  }
-  
-  if (context.includes('maintenance')) {
-    status = 'maintenance';
+
+  // RÈGLE 4: Si la plage est vide ou contient CL / INS / rien → chambre propre
+  const isCLorINS = /\bCL\b|\bINS\b/.test(context);
+  if (isCLorINS || !hasOngoingStay) {
     cleaningType = 'none';
+    status = 'clean';
+    return { status, cleaningType };
   }
-  
-  if (context.includes('occupied') || context.includes('occupé') || context.includes('séjour en cours')) {
-    status = 'occupied';
-    // Si occupé mais pas d'autres indications, c'est probablement une recouche
-    if (cleaningType === 'none') {
-      cleaningType = 'quick';
-      status = 'needs-cleaning';
-    }
-  }
-  
+
+  // Si aucune règle ne correspond explicitement
   return { status, cleaningType };
 }
 
