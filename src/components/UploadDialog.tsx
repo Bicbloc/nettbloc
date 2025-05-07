@@ -29,12 +29,12 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       if (file.type !== 'application/pdf') {
         toast({
           variant: "destructive",
-          title: "Invalid file type",
-          description: "Please upload a PDF file",
+          title: "Type de fichier invalide",
+          description: "Veuillez téléverser un fichier PDF",
         });
         return;
       }
-      console.log("File selected:", file.name);
+      console.log("Fichier sélectionné:", file.name);
       setSelectedFile(file);
     }
   };
@@ -46,12 +46,12 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       if (file.type !== 'application/pdf') {
         toast({
           variant: "destructive",
-          title: "Invalid file type",
-          description: "Please upload a PDF file",
+          title: "Type de fichier invalide",
+          description: "Veuillez téléverser un fichier PDF",
         });
         return;
       }
-      console.log("File dropped:", file.name);
+      console.log("Fichier déposé:", file.name);
       setSelectedFile(file);
     }
   };
@@ -64,29 +64,29 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     if (!selectedFile) {
       toast({
         variant: "destructive",
-        title: "No file selected",
-        description: "Please select a PDF file to upload",
+        title: "Aucun fichier sélectionné",
+        description: "Veuillez sélectionner un fichier PDF à téléverser",
       });
       return;
     }
 
     try {
       setIsUploading(true);
-      console.log("Processing file:", selectedFile.name);
+      console.log("Traitement du fichier:", selectedFile.name);
       const data = await processPdf(selectedFile);
-      console.log("Data processed:", data.length, "items");
+      console.log("Données traitées:", data.length, "chambres");
       onPdfProcessed(data);
       setOpen(false);
       toast({
-        title: "Upload successful",
-        description: `Processed ${data.length} rooms from ${selectedFile.name}`,
+        title: "Téléversement réussi",
+        description: `${data.length} chambres traitées depuis ${selectedFile.name}`,
       });
     } catch (error) {
-      console.error("Error processing PDF:", error);
+      console.error("Erreur lors du traitement du PDF:", error);
       toast({
         variant: "destructive",
-        title: "Processing failed",
-        description: "There was an error processing the PDF file.",
+        title: "Échec du traitement",
+        description: "Une erreur s'est produite lors du traitement du fichier PDF.",
       });
     } finally {
       setIsUploading(false);
@@ -98,14 +98,14 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       <DialogTrigger asChild>
         <Button>
           <FileUp className="mr-2 h-4 w-4" />
-          Upload Mews Report
+          Importer un Rapport
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Mews Report</DialogTitle>
+          <DialogTitle>Importer un Rapport Mews</DialogTitle>
           <DialogDescription>
-            Upload a PDF report exported from Mews to analyze room statuses.
+            Téléversez un rapport PDF exporté depuis Mews pour analyser les statuts des chambres.
           </DialogDescription>
         </DialogHeader>
         <div 
@@ -119,11 +119,11 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
             </div>
             <div>
               <p className="text-sm font-medium">
-                {selectedFile ? selectedFile.name : "Drag and drop your file here"}
+                {selectedFile ? selectedFile.name : "Glissez et déposez votre fichier ici"}
               </p>
               {!selectedFile && (
                 <p className="text-xs text-gray-500 mt-1">
-                  PDF files only, up to 10MB
+                  Fichiers PDF uniquement, jusqu'à 10MB
                 </p>
               )}
             </div>
@@ -140,7 +140,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
                   size="sm"
                   type="button"
                 >
-                  Select file
+                  Sélectionner un fichier
                 </Button>
               </label>
             </div>
@@ -153,14 +153,14 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
             onClick={() => setOpen(false)}
             disabled={isUploading}
           >
-            Cancel
+            Annuler
           </Button>
           <Button
             type="button"
             onClick={handleSubmit}
             disabled={!selectedFile || isUploading}
           >
-            {isUploading ? "Processing..." : "Upload"}
+            {isUploading ? "Traitement en cours..." : "Téléverser"}
           </Button>
         </DialogFooter>
       </DialogContent>
