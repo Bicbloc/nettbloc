@@ -34,6 +34,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         });
         return;
       }
+      console.log("File selected:", file.name);
       setSelectedFile(file);
     }
   };
@@ -50,6 +51,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         });
         return;
       }
+      console.log("File dropped:", file.name);
       setSelectedFile(file);
     }
   };
@@ -70,7 +72,9 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
 
     try {
       setIsUploading(true);
+      console.log("Processing file:", selectedFile.name);
       const data = await processPdf(selectedFile);
+      console.log("Data processed:", data.length, "items");
       onPdfProcessed(data);
       setOpen(false);
       toast({
@@ -105,7 +109,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div 
-          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center"
+          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >

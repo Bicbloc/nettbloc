@@ -3,6 +3,10 @@
 // This is a stub implementation that can be expanded later with real PDF parsing logic
 
 import { toast } from "@/components/ui/use-toast";
+import * as pdfjs from 'pdfjs-dist';
+
+// Initialiser le worker PDF.js
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 export interface Room {
   number: string;
@@ -12,22 +16,43 @@ export interface Room {
   assignedTo?: string;
 }
 
-// Mock function to simulate PDF processing
+// Process PDF file
 export async function processPdf(file: File): Promise<Room[]> {
   try {
-    // In a real implementation, this would use pdf.js or a similar library
-    // to extract text from the PDF and parse it
+    // Convertir le fichier en ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
     
-    // For now, let's simulate processing with a delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Charger le document PDF
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
-    // Return mock data
+    // Extraire le texte de toutes les pages
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + ' ';
+    }
+    
+    console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
+    
+    // Analyser le texte pour extraire les informations des chambres
+    const rooms = parseRoomsFromText(fullText);
+    
     toast({
       title: "PDF Processed",
       description: `Successfully processed ${file.name}`,
     });
     
-    return generateMockRoomData();
+    // Si aucune chambre n'a été trouvée, retourner des données de test
+    if (rooms.length === 0) {
+      console.log("Aucune chambre détectée, utilisation des données simulées");
+      return generateMockRoomData();
+    }
+    
+    return rooms;
   } catch (error) {
     console.error("Error processing PDF:", error);
     toast({
@@ -37,6 +62,66 @@ export async function processPdf(file: File): Promise<Room[]> {
     });
     throw error;
   }
+}
+
+// Analyse le texte pour extraire les informations des chambres
+function parseRoomsFromText(text: string): Room[] {
+  const rooms: Room[] = [];
+  
+  // Utiliser des expressions régulières pour détecter les numéros de chambre
+  // Cette expression régulière recherche des numéros comme 101, 102, etc.
+  const roomNumberPattern = /\b([1-9]\d{2})\b/g;
+  
+  // Trouver tous les numéros de chambre
+  let match;
+  const foundRooms = new Set();
+  
+  while ((match = roomNumberPattern.exec(text)) !== null) {
+    const roomNumber = match[1];
+    
+    // Éviter les doublons
+    if (foundRooms.has(roomNumber)) continue;
+    foundRooms.add(roomNumber);
+    
+    // Extraire le contexte autour du numéro de chambre
+    const start = Math.max(0, match.index - 100);
+    const end = Math.min(text.length, match.index + 100);
+    const context = text.substring(start, end);
+    
+    // Déterminer le statut en fonction du contexte
+    let status = 'needs-cleaning'; // Statut par défaut
+    if (context.includes('clean') || context.includes('propre')) {
+      status = 'clean';
+    } else if (context.includes('occupied') || context.includes('occupé')) {
+      status = 'occupied';
+    } else if (context.includes('maintenance')) {
+      status = 'maintenance';
+    }
+    
+    // Déterminer le type de nettoyage
+    let cleaningType: 'full' | 'quick' | 'none' = 'none';
+    
+    // Exemple de règles pour déterminer le type de nettoyage
+    if (context.includes('blanc') || context.includes('full')) {
+      cleaningType = 'full';
+    } else if (context.includes('recouche') || context.includes('quick')) {
+      cleaningType = 'quick';
+    }
+    
+    // Déterminer la priorité
+    const priority: 'high' | 'medium' | 'low' = 
+      context.includes('urgent') || context.includes('high') ? 'high' :
+      context.includes('medium') ? 'medium' : 'low';
+    
+    rooms.push({
+      number: roomNumber,
+      status,
+      cleaningType,
+      priority
+    });
+  }
+  
+  return rooms;
 }
 
 // Helper function to generate mock room data
