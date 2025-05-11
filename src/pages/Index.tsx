@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -341,12 +340,12 @@ const Index = () => {
                     <div className="space-y-2">
                       <div className="flex items-center">
                         <span className="text-sm font-medium flex-1">Chambres Propres</span>
-                        <span className="text-sm text-gray-500">{cleanedRooms}/{totalRooms}</span>
+                        <span className="text-sm text-gray-500">{cleanRooms}/{totalRooms}</span>
                       </div>
                       <div className="relative w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div 
                           className="absolute h-full bg-green-500" 
-                          style={{ width: totalRooms > 0 ? `${(cleanedRooms/totalRooms)*100}%` : '0%' }}
+                          style={{ width: totalRooms > 0 ? `${(cleanRooms/totalRooms)*100}%` : '0%' }}
                         ></div>
                       </div>
                     </div>
