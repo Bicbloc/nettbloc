@@ -7,6 +7,20 @@ export async function generateHousekeeperReport(
   rooms: Room[],
   config: CleaningConfig
 ): Promise<void> {
+  // Trier les chambres avant de générer le rapport
+  const sortedRooms = [...rooms].sort((a, b) => {
+    // D'abord par priorité (urgent en premier)
+    if (a.isUrgent && !b.isUrgent) return -1;
+    if (!a.isUrgent && b.isUrgent) return 1;
+    
+    // Ensuite par type de nettoyage (à blanc d'abord)
+    if (a.cleaningType === 'full' && b.cleaningType !== 'full') return -1;
+    if (a.cleaningType !== 'full' && b.cleaningType === 'full') return 1;
+    
+    // Puis par numéro de chambre (ordre naturel)
+    return a.number.localeCompare(b.number, undefined, {numeric: true});
+  });
+
   // Créer la structure HTML du rapport
   const reportHTML = `
     <div style="font-family: Arial, sans-serif; padding: 20px;">
@@ -17,11 +31,11 @@ export async function generateHousekeeperReport(
       </div>
       
       <div style="margin-bottom: 15px;">
-        <p><strong>Total des chambres:</strong> ${rooms.length}</p>
-        <p><strong>Chambres à blanc:</strong> ${rooms.filter(r => r.cleaningType === 'full').length}</p>
-        <p><strong>Recouches:</strong> ${rooms.filter(r => r.cleaningType === 'quick').length}</p>
+        <p><strong>Total des chambres:</strong> ${sortedRooms.length}</p>
+        <p><strong>Chambres à blanc:</strong> ${sortedRooms.filter(r => r.cleaningType === 'full').length}</p>
+        <p><strong>Recouches:</strong> ${sortedRooms.filter(r => r.cleaningType === 'quick').length}</p>
         <p><strong>Temps estimé:</strong> 
-          ${calculateEstimatedTime(rooms, config)} minutes
+          ${calculateEstimatedTime(sortedRooms, config)} minutes
         </p>
       </div>
       
@@ -35,7 +49,7 @@ export async function generateHousekeeperReport(
           </tr>
         </thead>
         <tbody>
-          ${rooms.map(room => `
+          ${sortedRooms.map(room => `
             <tr>
               <td style="padding: 10px; border-bottom: 1px solid #ddd; ${room.isUrgent ? 'color: red; font-weight: bold;' : ''}">${room.number}</td>
               <td style="padding: 10px; border-bottom: 1px solid #ddd;">
