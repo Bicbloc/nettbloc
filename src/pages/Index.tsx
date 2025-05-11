@@ -1,7 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Tag, Bed, Check } from "lucide-react";
+import { UserIcon, FileText, Calendar, Tag, Bed, Check, Layers } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
@@ -28,6 +29,21 @@ const Index = () => {
   const [housekeeperNames, setHousekeeperNames] = useState<string[]>([
     "Housekeeper 1", "Housekeeper 2", "Housekeeper 3", "Housekeeper 4"
   ]);
+  const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
+  const [availableFloors, setAvailableFloors] = useState<number[]>([]);
+
+  useEffect(() => {
+    // Initialiser les préférences d'étages pour chaque femme de chambre
+    const initialPreferences: Record<string, number[]> = {};
+    housekeeperNames.forEach((name, index) => {
+      // Répartir les étages de manière équilibrée au départ
+      const preferredFloors = availableFloors.filter((_, floorIndex) => 
+        floorIndex % housekeeperNames.length === index
+      );
+      initialPreferences[name] = preferredFloors;
+    });
+    setHousekeeperFloorPreferences(initialPreferences);
+  }, [housekeeperNames, availableFloors]);
   
   // Fonction pour mettre à jour une chambre
   const handleRoomUpdate = (updatedRoom: Room) => {
@@ -44,20 +60,44 @@ const Index = () => {
     delete updatedRoom.assignedTo;
     handleRoomUpdate(updatedRoom);
   };
+
+  // Mettre à jour les préférences d'étages d'une femme de chambre
+  const handleFloorPreferenceChange = (housekeeperName: string, floors: number[]) => {
+    setHousekeeperFloorPreferences(prev => ({
+      ...prev,
+      [housekeeperName]: floors
+    }));
+  };
   
   const handlePdfProcessed = (data: Room[]) => {
+    // Déterminer les étages disponibles
+    const floors = new Set<number>();
+    data.forEach(room => {
+      // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
+      const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
+      floors.add(floor);
+      // Mettre à jour la chambre avec son étage
+      room.floor = floor;
+    });
+    const floorArray = Array.from(floors).sort((a, b) => a - b);
+    setAvailableFloors(floorArray);
+    
     // Mettre à jour les chambres
     setRooms(data);
     
     // Auto-répartir les chambres entre les femmes de chambre
-    distributeRooms(data, housekeeperNames);
+    distributeRooms(data, housekeeperNames, housekeeperFloorPreferences);
     
     // Passer à l'onglet des chambres
     setActiveTab("rooms");
   };
   
   // Distribuer les chambres entre les femmes de chambre
-  const distributeRooms = (roomsList: Room[], housekeepers: string[]) => {
+  const distributeRooms = (
+    roomsList: Room[], 
+    housekeepers: string[], 
+    floorPreferences: Record<string, number[]> = {}
+  ) => {
     if (housekeepers.length === 0) return;
     
     // Trier les chambres par priorité
@@ -70,8 +110,13 @@ const Index = () => {
       if (a.cleaningType === 'full' && b.cleaningType !== 'full') return -1;
       if (b.cleaningType === 'full' && a.cleaningType !== 'full') return 1;
       
-      // Puis par numéro de chambre
-      return a.number.localeCompare(b.number);
+      // Puis par étage
+      const floorA = a.floor !== undefined ? a.floor : (a.number ? parseInt(a.number[0]) : 0);
+      const floorB = b.floor !== undefined ? b.floor : (b.number ? parseInt(b.number[0]) : 0);
+      if (floorA !== floorB) return floorA - floorB;
+      
+      // Enfin par numéro de chambre
+      return a.number.localeCompare(b.number, undefined, { numeric: true });
     });
     
     // Filtrer uniquement les chambres qui ont besoin de nettoyage
@@ -79,60 +124,75 @@ const Index = () => {
       room.cleaningType !== 'none' && room.status !== 'maintenance'
     );
     
-    // Calculer le temps total et la répartition idéale
-    const totalFullCleaning = roomsToClean.filter(r => r.cleaningType === 'full').length;
-    const totalQuickCleaning = roomsToClean.filter(r => r.cleaningType === 'quick').length;
-    
-    const totalTimeRequired = 
-      (totalFullCleaning * cleaningConfig.fullCleaningTime) + 
-      (totalQuickCleaning * cleaningConfig.quickCleaningTime);
-    
-    const timePerHousekeeper = totalTimeRequired / housekeepers.length;
-    
-    // Distribuer les chambres en essayant d'équilibrer le temps
-    const assignedRooms = new Set<string>();
-    const assignments: Record<string, Room[]> = {};
+    // Grouper les chambres par étage
+    const roomsByFloor: Record<number, Room[]> = {};
+    for (const room of roomsToClean) {
+      const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
+      if (!roomsByFloor[floor]) roomsByFloor[floor] = [];
+      roomsByFloor[floor].push(room);
+    }
     
     // Initialiser les listes d'assignation
+    const assignments: Record<string, Room[]> = {};
     housekeepers.forEach(name => {
       assignments[name] = [];
     });
     
-    // Première passe: assigner les chambres prioritaires
-    for (const room of roomsToClean.filter(r => r.priority === 'high')) {
-      let minLoadHousekeeper = housekeepers[0];
-      let minLoad = calculateHousekeeperLoad(assignments[minLoadHousekeeper], cleaningConfig);
+    // Fonction pour trouver la femme de chambre avec la charge de travail minimale
+    const findMinLoadHousekeeper = (preferredFloor?: number) => {
+      let candidates = housekeepers;
       
-      for (let i = 1; i < housekeepers.length; i++) {
-        const currentLoad = calculateHousekeeperLoad(assignments[housekeepers[i]], cleaningConfig);
-        if (currentLoad < minLoad) {
-          minLoad = currentLoad;
-          minLoadHousekeeper = housekeepers[i];
+      // Si un étage préféré est spécifié, filtrer les femmes de chambre qui préfèrent cet étage
+      if (preferredFloor !== undefined) {
+        const housekeepersForFloor = housekeepers.filter(name => 
+          floorPreferences[name]?.includes(preferredFloor)
+        );
+        // S'il y a des femmes de chambre qui préfèrent cet étage, les utiliser en priorité
+        if (housekeepersForFloor.length > 0) {
+          candidates = housekeepersForFloor;
         }
       }
       
-      assignments[minLoadHousekeeper].push({ ...room, assignedTo: minLoadHousekeeper });
+      let minLoadHousekeeper = candidates[0];
+      let minLoad = calculateHousekeeperLoad(assignments[minLoadHousekeeper], cleaningConfig);
+      
+      for (let i = 1; i < candidates.length; i++) {
+        const currentLoad = calculateHousekeeperLoad(assignments[candidates[i]], cleaningConfig);
+        if (currentLoad < minLoad) {
+          minLoad = currentLoad;
+          minLoadHousekeeper = candidates[i];
+        }
+      }
+      
+      return minLoadHousekeeper;
+    };
+    
+    // Assigner les chambres par étage, en optimisant l'affectation
+    const assignedRooms = new Set<string>();
+    
+    // Première passe pour les chambres prioritaires
+    for (const room of roomsToClean.filter(r => r.priority === 'high')) {
+      const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
+      const housekeeper = findMinLoadHousekeeper(floor);
+      
+      assignments[housekeeper].push({ ...room, assignedTo: housekeeper });
       assignedRooms.add(room.number);
     }
     
-    // Deuxième passe: assigner les chambres restantes
-    for (const room of roomsToClean) {
-      if (assignedRooms.has(room.number)) continue;
+    // Seconde passe pour les chambres restantes, en assignant par étage
+    // Itérer sur chaque étage pour optimiser les déplacements
+    Object.entries(roomsByFloor).forEach(([floor, floorRooms]) => {
+      const floorNum = parseInt(floor);
       
-      let minLoadHousekeeper = housekeepers[0];
-      let minLoad = calculateHousekeeperLoad(assignments[minLoadHousekeeper], cleaningConfig);
-      
-      for (let i = 1; i < housekeepers.length; i++) {
-        const currentLoad = calculateHousekeeperLoad(assignments[housekeepers[i]], cleaningConfig);
-        if (currentLoad < minLoad) {
-          minLoad = currentLoad;
-          minLoadHousekeeper = housekeepers[i];
-        }
+      // Distribuer les chambres de cet étage entre les femmes de chambre qui le préfèrent
+      for (const room of floorRooms) {
+        if (assignedRooms.has(room.number)) continue;
+        
+        const housekeeper = findMinLoadHousekeeper(floorNum);
+        assignments[housekeeper].push({ ...room, assignedTo: housekeeper });
+        assignedRooms.add(room.number);
       }
-      
-      assignments[minLoadHousekeeper].push({ ...room, assignedTo: minLoadHousekeeper });
-      assignedRooms.add(room.number);
-    }
+    });
     
     // Mettre à jour les chambres
     const updatedRooms = [...sortedRooms];
@@ -201,7 +261,7 @@ const Index = () => {
     
     // Réaffecter les chambres si les noms changent
     if (rooms.length > 0) {
-      distributeRooms(rooms, names);
+      distributeRooms(rooms, names, housekeeperFloorPreferences);
     }
   };
   
@@ -235,12 +295,20 @@ const Index = () => {
   
   // Fonction de redistribution des chambres
   const redistributeRooms = () => {
-    distributeRooms(rooms, housekeeperNames);
+    distributeRooms(rooms, housekeeperNames, housekeeperFloorPreferences);
     toast({
       title: "Chambres redistribuées",
       description: "Les chambres ont été réparties entre les femmes de chambre.",
     });
   };
+
+  // Grouper les chambres par étage pour l'affichage dans l'onglet des chambres
+  const roomsByFloor = rooms.reduce((acc, room) => {
+    const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
+    if (!acc[floor]) acc[floor] = [];
+    acc[floor].push(room);
+    return acc;
+  }, {} as Record<number, Room[]>);
   
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -302,12 +370,14 @@ const Index = () => {
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Chambres Twin</CardTitle>
-                  <Bed className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Étages</CardTitle>
+                  <Layers className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{twinRooms}</div>
-                  <p className="text-xs text-muted-foreground">Chambres avec lit jumeaux</p>
+                  <div className="text-2xl font-bold">{availableFloors.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {availableFloors.map(f => f === 0 ? 'RDC' : f).join(', ')}
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -402,6 +472,9 @@ const Index = () => {
                   onGenerateReport={handleGenerateReport}
                   cleaningConfig={cleaningConfig}
                   draggable={true}
+                  availableFloors={availableFloors}
+                  preferredFloors={housekeeperFloorPreferences[name] || []}
+                  onFloorPreferenceChange={handleFloorPreferenceChange}
                 />
               ))}
               
@@ -429,95 +502,100 @@ const Index = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Chambre</TableHead>
-                        <TableHead>Statut</TableHead>
-                        <TableHead>Type Nettoyage</TableHead>
-                        <TableHead>Twin</TableHead>
-                        <TableHead>Priorité</TableHead>
-                        <TableHead>Assignée À</TableHead>
-                        <TableHead>Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rooms.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="py-6 text-center text-gray-500">
-                            Aucune chambre disponible. Veuillez uploader un rapport Mews.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        rooms.map((room) => {
-                          return (
-                            <TableRow key={room.number} className="hover:bg-gray-50">
-                              <TableCell>{room.number}</TableCell>
-                              <TableCell>{getStatusBadge(room.status)}</TableCell>
-                              <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
-                              <TableCell>
-                                <Checkbox 
-                                  checked={room.isTwin || false}
-                                  onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex gap-2">
-                                  <Checkbox 
-                                    id={`urgent-table-${room.number}`}
-                                    checked={room.isUrgent || false}
-                                    onCheckedChange={(checked) => {
-                                      handleRoomUpdate({
-                                        ...room, 
-                                        isUrgent: !!checked,
-                                        notUrgent: false,
-                                        priority: !!checked ? 'high' : 'medium'
-                                      });
-                                    }}
-                                  />
-                                  <label htmlFor={`urgent-table-${room.number}`} className="text-xs text-red-500">
-                                    Urgent
-                                  </label>
-                                  
-                                  <Checkbox 
-                                    id={`noturgent-table-${room.number}`}
-                                    checked={room.notUrgent || false}
-                                    onCheckedChange={(checked) => {
-                                      handleRoomUpdate({
-                                        ...room, 
-                                        notUrgent: !!checked,
-                                        isUrgent: false,
-                                        priority: !!checked ? 'low' : 'medium'
-                                      });
-                                    }}
-                                  />
-                                  <label htmlFor={`noturgent-table-${room.number}`} className="text-xs text-green-500">
-                                    Pas urgent
-                                  </label>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {room.assignedTo || 'Non assignée'}
-                              </TableCell>
-                              <TableCell>
-                                <select 
-                                  className="border rounded px-2 py-1 text-sm"
-                                  value={room.assignedTo || ''}
-                                  onChange={(e) => handleRoomUpdate({...room, assignedTo: e.target.value || undefined})}
-                                >
-                                  <option value="">Non assignée</option>
-                                  {housekeeperNames.map(name => (
-                                    <option key={name} value={name}>{name}</option>
-                                  ))}
-                                </select>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-6">
+                  {Object.entries(roomsByFloor)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .map(([floor, floorRooms]) => (
+                      <div key={floor} className="space-y-2">
+                        <h3 className="font-semibold flex items-center gap-2">
+                          <Layers className="h-4 w-4" /> 
+                          Étage {floor === '0' ? 'RDC' : floor}
+                          <Badge variant="outline" className="bg-gray-100 ml-2">
+                            {floorRooms.length} chambres
+                          </Badge>
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Chambre</TableHead>
+                                <TableHead>Statut</TableHead>
+                                <TableHead>Type Nettoyage</TableHead>
+                                <TableHead>Twin</TableHead>
+                                <TableHead>Priorité</TableHead>
+                                <TableHead>Assignée À</TableHead>
+                                <TableHead>Action</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {floorRooms.map((room) => (
+                                <TableRow key={room.number} className="hover:bg-gray-50">
+                                  <TableCell>{room.number}</TableCell>
+                                  <TableCell>{getStatusBadge(room.status)}</TableCell>
+                                  <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
+                                  <TableCell>
+                                    <Checkbox 
+                                      checked={room.isTwin || false}
+                                      onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-2">
+                                      <Checkbox 
+                                        id={`urgent-table-${room.number}`}
+                                        checked={room.isUrgent || false}
+                                        onCheckedChange={(checked) => {
+                                          handleRoomUpdate({
+                                            ...room, 
+                                            isUrgent: !!checked,
+                                            notUrgent: false,
+                                            priority: !!checked ? 'high' : 'medium'
+                                          });
+                                        }}
+                                      />
+                                      <label htmlFor={`urgent-table-${room.number}`} className="text-xs text-red-500">
+                                        Urgent
+                                      </label>
+                                      
+                                      <Checkbox 
+                                        id={`noturgent-table-${room.number}`}
+                                        checked={room.notUrgent || false}
+                                        onCheckedChange={(checked) => {
+                                          handleRoomUpdate({
+                                            ...room, 
+                                            notUrgent: !!checked,
+                                            isUrgent: false,
+                                            priority: !!checked ? 'low' : 'medium'
+                                          });
+                                        }}
+                                      />
+                                      <label htmlFor={`noturgent-table-${room.number}`} className="text-xs text-green-500">
+                                        Pas urgent
+                                      </label>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {room.assignedTo || 'Non assignée'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <select 
+                                      className="border rounded px-2 py-1 text-sm"
+                                      value={room.assignedTo || ''}
+                                      onChange={(e) => handleRoomUpdate({...room, assignedTo: e.target.value || undefined})}
+                                    >
+                                      <option value="">Non assignée</option>
+                                      {housekeeperNames.map(name => (
+                                        <option key={name} value={name}>{name}</option>
+                                      ))}
+                                    </select>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </CardContent>
             </Card>
@@ -534,7 +612,6 @@ const Index = () => {
             </div>
           </TabsContent>
           
-          {/* New Tab for Clean Rooms */}
           <TabsContent value="clean-rooms" className="space-y-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -556,80 +633,100 @@ const Index = () => {
                     <p className="text-sm mt-1">Toutes les chambres sont à nettoyer ou en maintenance</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Chambre</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Twin</TableHead>
-                          <TableHead>Priorité</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {rooms.filter(room => room.status === 'clean').map((room) => (
-                          <TableRow key={room.number} className="hover:bg-gray-50">
-                            <TableCell className="font-medium">{room.number}</TableCell>
-                            <TableCell>{getStatusBadge(room.status)}</TableCell>
-                            <TableCell>
-                              <Checkbox 
-                                checked={room.isTwin || false}
-                                onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Checkbox 
-                                  id={`urgent-clean-${room.number}`}
-                                  checked={room.isUrgent || false}
-                                  onCheckedChange={(checked) => {
-                                    handleRoomUpdate({
-                                      ...room, 
-                                      isUrgent: !!checked,
-                                      notUrgent: false,
-                                      priority: !!checked ? 'high' : 'medium'
-                                    });
-                                  }}
-                                />
-                                <label htmlFor={`urgent-clean-${room.number}`} className="text-xs text-red-500">
-                                  Urgent
-                                </label>
-                                
-                                <Checkbox 
-                                  id={`noturgent-clean-${room.number}`}
-                                  checked={room.notUrgent || false}
-                                  onCheckedChange={(checked) => {
-                                    handleRoomUpdate({
-                                      ...room, 
-                                      notUrgent: !!checked,
-                                      isUrgent: false,
-                                      priority: !!checked ? 'low' : 'medium'
-                                    });
-                                  }}
-                                />
-                                <label htmlFor={`noturgent-clean-${room.number}`} className="text-xs text-green-500">
-                                  Pas urgent
-                                </label>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleRoomUpdate({
-                                  ...room,
-                                  status: 'needs-cleaning',
-                                  cleaningType: 'full'
-                                })}
-                              >
-                                Marquer à nettoyer
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="space-y-6">
+                    {Object.entries(roomsByFloor)
+                      .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                      .map(([floor, floorRooms]) => {
+                        const cleanFloorRooms = floorRooms.filter(room => room.status === 'clean');
+                        if (cleanFloorRooms.length === 0) return null;
+                        
+                        return (
+                          <div key={floor} className="space-y-2">
+                            <h3 className="font-semibold flex items-center gap-2">
+                              <Layers className="h-4 w-4" /> 
+                              Étage {floor === '0' ? 'RDC' : floor}
+                              <Badge variant="outline" className="bg-green-100 ml-2">
+                                {cleanFloorRooms.length} propres
+                              </Badge>
+                            </h3>
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Chambre</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Twin</TableHead>
+                                    <TableHead>Priorité</TableHead>
+                                    <TableHead>Action</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {cleanFloorRooms.map((room) => (
+                                    <TableRow key={room.number} className="hover:bg-gray-50">
+                                      <TableCell className="font-medium">{room.number}</TableCell>
+                                      <TableCell>{getStatusBadge(room.status)}</TableCell>
+                                      <TableCell>
+                                        <Checkbox 
+                                          checked={room.isTwin || false}
+                                          onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex gap-2">
+                                          <Checkbox 
+                                            id={`urgent-clean-${room.number}`}
+                                            checked={room.isUrgent || false}
+                                            onCheckedChange={(checked) => {
+                                              handleRoomUpdate({
+                                                ...room, 
+                                                isUrgent: !!checked,
+                                                notUrgent: false,
+                                                priority: !!checked ? 'high' : 'medium'
+                                              });
+                                            }}
+                                          />
+                                          <label htmlFor={`urgent-clean-${room.number}`} className="text-xs text-red-500">
+                                            Urgent
+                                          </label>
+                                          
+                                          <Checkbox 
+                                            id={`noturgent-clean-${room.number}`}
+                                            checked={room.notUrgent || false}
+                                            onCheckedChange={(checked) => {
+                                              handleRoomUpdate({
+                                                ...room, 
+                                                notUrgent: !!checked,
+                                                isUrgent: false,
+                                                priority: !!checked ? 'low' : 'medium'
+                                              });
+                                            }}
+                                          />
+                                          <label htmlFor={`noturgent-clean-${room.number}`} className="text-xs text-green-500">
+                                            Pas urgent
+                                          </label>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm" 
+                                          onClick={() => handleRoomUpdate({
+                                            ...room,
+                                            status: 'needs-cleaning',
+                                            cleaningType: 'full'
+                                          })}
+                                        >
+                                          Marquer à nettoyer
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </CardContent>

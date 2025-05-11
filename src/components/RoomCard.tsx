@@ -2,7 +2,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 interface RoomCardProps {
@@ -98,6 +98,10 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
     });
   };
 
+  // Détermine l'étage à partir du numéro de chambre
+  const floor = room.floor !== undefined ? room.floor : (room.number ? parseInt(room.number[0]) : 0);
+  const floorDisplay = floor === 0 ? "RDC" : `${floor}`;
+
   if (compact) {
     return (
       <div 
@@ -119,6 +123,7 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
           </span>
         )}
         {room.isTwin && <Bed className="h-3 w-3 text-gray-500" />}
+        <span className="text-xs text-gray-500 ml-auto">{floorDisplay}</span>
       </div>
     );
   }
@@ -137,7 +142,12 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
       onDragEnd={handleDragEnd}
     >
       <div className="flex justify-between items-start mb-2">
-        <h3 className="text-lg font-bold">{room.number}</h3>
+        <div className="flex gap-2 items-center">
+          <h3 className="text-lg font-bold">{room.number}</h3>
+          <Badge variant="outline" className="bg-gray-100 text-gray-700">
+            <Layers className="h-3 w-3 mr-1" /> {floorDisplay}
+          </Badge>
+        </div>
         <div className="flex gap-1">
           {getStatusBadge(room.status)}
           {getCleaningTypeBadge(room.cleaningType)}
