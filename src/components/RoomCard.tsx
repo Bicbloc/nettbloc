@@ -2,8 +2,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 interface RoomCardProps {
   room: Room;
@@ -116,6 +119,14 @@ export function RoomCard({
     }
   };
 
+  const setCleaningType = (type: 'full' | 'quick' | 'none') => {
+    onUpdate({
+      ...room,
+      cleaningType: type,
+      status: type === 'none' ? 'clean' : 'needs-cleaning'
+    });
+  };
+
   // Détermine l'étage à partir du numéro de chambre
   const floor = room.floor !== undefined ? room.floor : (room.number ? parseInt(room.number[0]) : 0);
   const floorDisplay = floor === 0 ? "RDC" : `${floor}`;
@@ -178,6 +189,44 @@ export function RoomCard({
           {getStatusBadge(room.status)}
           {getCleaningTypeBadge(room.cleaningType)}
         </div>
+      </div>
+      
+      {/* New Cleaning Type Selection */}
+      <div className="mb-3 mt-2 p-2 border border-gray-200 rounded-md bg-gray-50">
+        <p className="text-xs font-medium mb-2 text-gray-700">Type de nettoyage:</p>
+        <RadioGroup 
+          value={room.cleaningType} 
+          className="flex gap-2"
+          onValueChange={(value) => setCleaningType(value as 'full' | 'quick' | 'none')}
+        >
+          <div className="flex items-center space-x-1">
+            <RadioGroupItem value="full" id={`full-${room.number}`} />
+            <Label 
+              htmlFor={`full-${room.number}`}
+              className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
+            >
+              <Check className="h-3 w-3" /> À Blanc
+            </Label>
+          </div>
+          <div className="flex items-center space-x-1">
+            <RadioGroupItem value="quick" id={`quick-${room.number}`} />
+            <Label 
+              htmlFor={`quick-${room.number}`}
+              className="flex items-center text-xs gap-1 cursor-pointer text-blue-800"
+            >
+              <Bed className="h-3 w-3" /> Recouche
+            </Label>
+          </div>
+          <div className="flex items-center space-x-1">
+            <RadioGroupItem value="none" id={`none-${room.number}`} />
+            <Label 
+              htmlFor={`none-${room.number}`}
+              className="text-xs cursor-pointer text-gray-800"
+            >
+              Aucun
+            </Label>
+          </div>
+        </RadioGroup>
       </div>
       
       <div className="flex flex-col gap-2 mt-3">
