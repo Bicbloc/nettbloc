@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Tag, Bed, Check, Layers } from "lucide-react";
+import { UserIcon, FileText, Calendar, Tag, Bed, Check, Layers, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
@@ -12,6 +12,7 @@ import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { generateHousekeeperReport } from "@/services/reportService";
 import { toast } from "@/components/ui/use-toast";
+import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import {
   Table,
   TableBody,
@@ -31,19 +32,18 @@ const Index = () => {
   ]);
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
+  const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
+  const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
 
   useEffect(() => {
     // Initialiser les préférences d'étages pour chaque femme de chambre
     const initialPreferences: Record<string, number[]> = {};
-    housekeeperNames.forEach((name, index) => {
-      // Répartir les étages de manière équilibrée au départ
-      const preferredFloors = availableFloors.filter((_, floorIndex) => 
-        floorIndex % housekeeperNames.length === index
-      );
-      initialPreferences[name] = preferredFloors;
+    housekeeperNames.forEach((name) => {
+      // Préférences vides au départ pour permettre une sélection manuelle
+      initialPreferences[name] = [];
     });
     setHousekeeperFloorPreferences(initialPreferences);
-  }, [housekeeperNames, availableFloors]);
+  }, [housekeeperNames]);
   
   // Fonction pour mettre à jour une chambre
   const handleRoomUpdate = (updatedRoom: Room) => {
@@ -82,11 +82,13 @@ const Index = () => {
     const floorArray = Array.from(floors).sort((a, b) => a - b);
     setAvailableFloors(floorArray);
     
-    // Mettre à jour les chambres
-    setRooms(data);
+    // Trier les chambres par numéro
+    const sortedData = [...data].sort((a, b) => 
+      a.number.localeCompare(b.number, undefined, { numeric: true })
+    );
     
-    // Auto-répartir les chambres entre les femmes de chambre
-    distributeRooms(data, housekeeperNames, housekeeperFloorPreferences);
+    // Mettre à jour les chambres
+    setRooms(sortedData);
     
     // Passer à l'onglet des chambres
     setActiveTab("rooms");
@@ -259,10 +261,12 @@ const Index = () => {
   const handleHousekeeperNamesChange = (names: string[]) => {
     setHousekeeperNames(names);
     
-    // Réaffecter les chambres si les noms changent
-    if (rooms.length > 0) {
-      distributeRooms(rooms, names, housekeeperFloorPreferences);
-    }
+    // Mettre à jour les préférences d'étages
+    const updatedPreferences: Record<string, number[]> = {};
+    names.forEach(name => {
+      updatedPreferences[name] = housekeeperFloorPreferences[name] || [];
+    });
+    setHousekeeperFloorPreferences(updatedPreferences);
   };
   
   const getStatusBadge = (status: string) => {
@@ -301,14 +305,41 @@ const Index = () => {
       description: "Les chambres ont été réparties entre les femmes de chambre.",
     });
   };
-
-  // Grouper les chambres par étage pour l'affichage dans l'onglet des chambres
+  
+  // Ouvrir la fenêtre d'assignation manuelle pour une femme de chambre spécifique
+  const openManualAssignment = (housekeeperName?: string) => {
+    setSelectedHousekeeper(housekeeperName || "");
+    setIsManualAssignmentOpen(true);
+  };
+  
+  // Gérer l'assignation manuelle des chambres
+  const handleManualAssign = (housekeeperName: string, selectedRooms: Room[]) => {
+    const updatedRooms = [...rooms];
+    
+    for (const room of selectedRooms) {
+      const index = updatedRooms.findIndex(r => r.number === room.number);
+      if (index !== -1) {
+        updatedRooms[index] = { ...updatedRooms[index], assignedTo: housekeeperName };
+      }
+    }
+    
+    setRooms(updatedRooms);
+  };
+  
+  // Trier toutes les chambres par étage et numéro
   const roomsByFloor = rooms.reduce((acc, room) => {
     const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
     if (!acc[floor]) acc[floor] = [];
     acc[floor].push(room);
     return acc;
   }, {} as Record<number, Room[]>);
+  
+  // Trier les chambres à l'intérieur de chaque étage par numéro
+  Object.keys(roomsByFloor).forEach(floor => {
+    roomsByFloor[parseInt(floor)].sort((a, b) => 
+      a.number.localeCompare(b.number, undefined, { numeric: true })
+    );
+  });
   
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -440,13 +471,18 @@ const Index = () => {
                       </div>
                     </div>
                     
-                    {roomsToClean > 0 && housekeeperNames.length > 0 && (
-                      <div className="mt-6">
-                        <Button onClick={redistributeRooms} className="w-full">
-                          Redistribuer les Chambres
-                        </Button>
-                      </div>
-                    )}
+                    <div className="mt-6 space-y-2">
+                      <Button onClick={redistributeRooms} className="w-full">
+                        Distribuer les Chambres
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => openManualAssignment()} 
+                        className="w-full flex items-center justify-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" /> Assigner Manuellement
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -456,9 +492,21 @@ const Index = () => {
           <TabsContent value="housekeeping" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold">Attribution des Chambres</h2>
-              <Button onClick={redistributeRooms} className="bg-blue-600 hover:bg-blue-700">
-                Redistribuer les Chambres
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => openManualAssignment()}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="h-4 w-4" /> Assigner manuellement
+                </Button>
+                <Button 
+                  onClick={redistributeRooms} 
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Distribuer les Chambres
+                </Button>
+              </div>
             </div>
             
             <div className="grid gap-4 md:grid-cols-2">
@@ -475,6 +523,7 @@ const Index = () => {
                   availableFloors={availableFloors}
                   preferredFloors={housekeeperFloorPreferences[name] || []}
                   onFloorPreferenceChange={handleFloorPreferenceChange}
+                  onManualAssign={() => openManualAssignment(name)}
                 />
               ))}
               
@@ -495,11 +544,20 @@ const Index = () => {
           
           <TabsContent value="rooms" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Toutes les Chambres</CardTitle>
-                <CardDescription>
-                  Visualiser et gérer toutes les chambres de l'hôtel
-                </CardDescription>
+              <CardHeader className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Toutes les Chambres</CardTitle>
+                  <CardDescription>
+                    Visualiser et gérer toutes les chambres de l'hôtel
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => openManualAssignment()}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="h-4 w-4" /> Assigner chambres
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
@@ -661,66 +719,68 @@ const Index = () => {
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {cleanFloorRooms.map((room) => (
-                                    <TableRow key={room.number} className="hover:bg-gray-50">
-                                      <TableCell className="font-medium">{room.number}</TableCell>
-                                      <TableCell>{getStatusBadge(room.status)}</TableCell>
-                                      <TableCell>
-                                        <Checkbox 
-                                          checked={room.isTwin || false}
-                                          onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
-                                        />
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex gap-2">
+                                  {cleanFloorRooms
+                                    .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }))
+                                    .map((room) => (
+                                      <TableRow key={room.number} className="hover:bg-gray-50">
+                                        <TableCell className="font-medium">{room.number}</TableCell>
+                                        <TableCell>{getStatusBadge(room.status)}</TableCell>
+                                        <TableCell>
                                           <Checkbox 
-                                            id={`urgent-clean-${room.number}`}
-                                            checked={room.isUrgent || false}
-                                            onCheckedChange={(checked) => {
-                                              handleRoomUpdate({
-                                                ...room, 
-                                                isUrgent: !!checked,
-                                                notUrgent: false,
-                                                priority: !!checked ? 'high' : 'medium'
-                                              });
-                                            }}
+                                            checked={room.isTwin || false}
+                                            onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
                                           />
-                                          <label htmlFor={`urgent-clean-${room.number}`} className="text-xs text-red-500">
-                                            Urgent
-                                          </label>
-                                          
-                                          <Checkbox 
-                                            id={`noturgent-clean-${room.number}`}
-                                            checked={room.notUrgent || false}
-                                            onCheckedChange={(checked) => {
-                                              handleRoomUpdate({
-                                                ...room, 
-                                                notUrgent: !!checked,
-                                                isUrgent: false,
-                                                priority: !!checked ? 'low' : 'medium'
-                                              });
-                                            }}
-                                          />
-                                          <label htmlFor={`noturgent-clean-${room.number}`} className="text-xs text-green-500">
-                                            Pas urgent
-                                          </label>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm" 
-                                          onClick={() => handleRoomUpdate({
-                                            ...room,
-                                            status: 'needs-cleaning',
-                                            cleaningType: 'full'
-                                          })}
-                                        >
-                                          Marquer à nettoyer
-                                        </Button>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
+                                        </TableCell>
+                                        <TableCell>
+                                          <div className="flex gap-2">
+                                            <Checkbox 
+                                              id={`urgent-clean-${room.number}`}
+                                              checked={room.isUrgent || false}
+                                              onCheckedChange={(checked) => {
+                                                handleRoomUpdate({
+                                                  ...room, 
+                                                  isUrgent: !!checked,
+                                                  notUrgent: false,
+                                                  priority: !!checked ? 'high' : 'medium'
+                                                });
+                                              }}
+                                            />
+                                            <label htmlFor={`urgent-clean-${room.number}`} className="text-xs text-red-500">
+                                              Urgent
+                                            </label>
+                                            
+                                            <Checkbox 
+                                              id={`noturgent-clean-${room.number}`}
+                                              checked={room.notUrgent || false}
+                                              onCheckedChange={(checked) => {
+                                                handleRoomUpdate({
+                                                  ...room, 
+                                                  notUrgent: !!checked,
+                                                  isUrgent: false,
+                                                  priority: !!checked ? 'low' : 'medium'
+                                                });
+                                              }}
+                                            />
+                                            <label htmlFor={`noturgent-clean-${room.number}`} className="text-xs text-green-500">
+                                              Pas urgent
+                                            </label>
+                                          </div>
+                                        </TableCell>
+                                        <TableCell>
+                                          <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => handleRoomUpdate({
+                                              ...room,
+                                              status: 'needs-cleaning',
+                                              cleaningType: 'full'
+                                            })}
+                                          >
+                                            Marquer à nettoyer
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
                                 </TableBody>
                               </Table>
                             </div>
@@ -745,6 +805,15 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Dialogues */}
+      <ManualAssignmentDialog
+        isOpen={isManualAssignmentOpen}
+        onClose={() => setIsManualAssignmentOpen(false)}
+        rooms={rooms}
+        housekeeperNames={housekeeperNames}
+        onAssignRooms={handleManualAssign}
+      />
     </div>
   );
 };

@@ -11,9 +11,21 @@ interface RoomCardProps {
   onAssign?: (room: Room, housekeeperName: string) => void;
   draggable?: boolean;
   compact?: boolean;
+  selectable?: boolean;
+  isSelected?: boolean;
+  onSelect?: (room: Room) => void;
 }
 
-export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact = false }: RoomCardProps) {
+export function RoomCard({ 
+  room, 
+  onUpdate, 
+  onAssign, 
+  draggable = false, 
+  compact = false, 
+  selectable = false,
+  isSelected = false,
+  onSelect
+}: RoomCardProps) {
   const [dragging, setDragging] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +110,12 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
     });
   };
 
+  const handleClick = () => {
+    if (selectable && onSelect) {
+      onSelect(room);
+    }
+  };
+
   // Détermine l'étage à partir du numéro de chambre
   const floor = room.floor !== undefined ? room.floor : (room.number ? parseInt(room.number[0]) : 0);
   const floorDisplay = floor === 0 ? "RDC" : `${floor}`;
@@ -109,12 +127,16 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
         className={`px-2 py-1 text-xs border rounded flex items-center gap-1 transition-all duration-200 ${
           dragging ? 'opacity-50' : ''
         } ${
+          isSelected ? 'bg-blue-100 border-blue-500 border-2' :
           room.isUrgent ? 'border-red-500 border-2' : 
           room.notUrgent ? 'border-green-500' : 'border-gray-200'
+        } ${
+          selectable ? 'cursor-pointer' : ''
         }`}
         draggable={draggable}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onClick={handleClick}
       >
         <span className="font-medium">{room.number}</span>
         {room.cleaningType !== 'none' && (
@@ -134,12 +156,16 @@ export function RoomCard({ room, onUpdate, onAssign, draggable = false, compact 
       className={`p-4 border rounded-lg transition-all duration-200 ${
         dragging ? 'opacity-50' : ''
       } ${
+        isSelected ? 'bg-blue-100 border-blue-500 border-2' :
         room.isUrgent ? 'border-red-500 border-2 shadow-md' : 
         room.notUrgent ? 'border-green-500 border-2' : 'border-gray-200 shadow-sm'
+      } ${
+        selectable ? 'cursor-pointer' : ''
       }`}
       draggable={draggable}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onClick={handleClick}
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex gap-2 items-center">

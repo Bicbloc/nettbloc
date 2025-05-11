@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers } from "lucide-react";
+import { FileCog, Layers, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -21,6 +21,7 @@ interface HousekeeperCardProps {
   availableFloors: number[];
   onFloorPreferenceChange: (name: string, floors: number[]) => void;
   preferredFloors: number[];
+  onManualAssign?: () => void;
 }
 
 export function HousekeeperCard({ 
@@ -33,7 +34,8 @@ export function HousekeeperCard({
   draggable = false,
   availableFloors,
   onFloorPreferenceChange,
-  preferredFloors
+  preferredFloors,
+  onManualAssign
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -110,6 +112,14 @@ export function HousekeeperCard({
     setIsFloorSelectorOpen(!isFloorSelectorOpen);
   };
   
+  // Trier les chambres par étage et numéro
+  const sortedFloorRooms = Object.entries(roomsByFloor)
+    .sort(([a], [b]) => parseInt(a) - parseInt(b));
+  
+  const sortRoomsByNumber = (rooms: Room[]) => {
+    return [...rooms].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+  };
+  
   return (
     <Card 
       className={cn(
@@ -141,6 +151,17 @@ export function HousekeeperCard({
           >
             <FileCog className="h-4 w-4" /> Rapport
           </Button>
+          
+          {onManualAssign && (
+            <Button 
+              size="sm" 
+              variant="ghost"
+              onClick={onManualAssign}
+              className="flex items-center gap-1 text-sm"
+            >
+              <Plus className="h-4 w-4" /> Ajouter
+            </Button>
+          )}
         </div>
       </div>
       
@@ -205,38 +226,36 @@ export function HousekeeperCard({
       )}
       
       {/* Affichage par étage si au moins 2 étages différents */}
-      {Object.keys(roomsByFloor).length > 1 ? (
+      {sortedFloorRooms.length > 1 ? (
         <div className="space-y-4">
-          {Object.entries(roomsByFloor)
-            .sort(([a], [b]) => parseInt(a) - parseInt(b))
-            .map(([floor, floorRooms]) => (
-              <div key={floor} className="border-t pt-2">
-                <div className="text-xs font-semibold mb-1">
-                  Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {floorRooms.map(room => (
-                    <div 
-                      key={room.number} 
-                      className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                      onClick={() => onRoomUnassign(room)}
-                      title="Cliquer pour retirer l'assignation"
-                    >
-                      <RoomCard 
-                        room={room} 
-                        onUpdate={onRoomUpdate} 
-                        compact 
-                        draggable={draggable}
-                      />
-                    </div>
-                  ))}
-                </div>
+          {sortedFloorRooms.map(([floor, floorRooms]) => (
+            <div key={floor} className="border-t pt-2">
+              <div className="text-xs font-semibold mb-1">
+                Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
               </div>
-            ))}
+              <div className="grid grid-cols-3 gap-2">
+                {sortRoomsByNumber(floorRooms).map(room => (
+                  <div 
+                    key={room.number} 
+                    className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                    onClick={() => onRoomUnassign(room)}
+                    title="Cliquer pour retirer l'assignation"
+                  >
+                    <RoomCard 
+                      room={room} 
+                      onUpdate={onRoomUpdate} 
+                      compact 
+                      draggable={draggable}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-2 mt-2">
-          {rooms.map(room => (
+          {sortRoomsByNumber(rooms).map(room => (
             <div 
               key={room.number} 
               className="cursor-pointer hover:bg-gray-100 rounded p-1"
