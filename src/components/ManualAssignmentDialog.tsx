@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Room } from "@/services/pdfService";
@@ -9,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ManualAssignmentDialogProps {
   isOpen: boolean;
@@ -31,6 +31,14 @@ export function ManualAssignmentDialog({
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterFloor, setFilterFloor] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
+  
+  // Get available floors from rooms
+  const availableFloors = Array.from(
+    new Set(
+      rooms.map(room => room.floor !== undefined ? room.floor : parseInt(room.number[0]))
+    )
+  ).sort((a, b) => a - b);
   
   // Reset selections when dialog opens/closes
   useEffect(() => {
@@ -40,8 +48,22 @@ export function ManualAssignmentDialog({
       setSearchTerm("");
       setFilterFloor("all");
       setFilterStatus("all");
+      setSelectedFloors([...availableFloors]); // Select all floors by default
     }
-  }, [isOpen, housekeeperNames]);
+  }, [isOpen, housekeeperNames, availableFloors]);
+  
+  // Handle floor selection and filtering
+  const handleFloorToggle = (floor: number) => {
+    setSelectedFloors(prev => {
+      // If floor is already selected, remove it
+      if (prev.includes(floor)) {
+        return prev.filter(f => f !== floor);
+      } else {
+        // Otherwise, add it
+        return [...prev, floor].sort((a, b) => a - b);
+      }
+    });
+  };
   
   // Apply filters to rooms
   useEffect(() => {
@@ -54,7 +76,7 @@ export function ManualAssignmentDialog({
       );
     }
     
-    // Apply floor filter
+    // Apply floor filter (traditional dropdown filter)
     if (filterFloor !== "all") {
       const floorNum = parseInt(filterFloor);
       result = result.filter(room => {
@@ -68,11 +90,24 @@ export function ManualAssignmentDialog({
       result = result.filter(room => room.status === filterStatus);
     }
     
+    // Apply selected floors filter (new multi-select floors)
+    if (selectedFloors.length < availableFloors.length) {
+      result = result.filter(room => {
+        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+        return selectedFloors.includes(roomFloor);
+      });
+    }
+    
     // Sort by room number
     result.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
     
     setFilteredRooms(result);
-  }, [rooms, searchTerm, filterFloor, filterStatus]);
+    
+    // Removing rooms from selected if they're not in filtered results anymore
+    setSelectedRooms(prev => prev.filter(room => 
+      result.some(filteredRoom => filteredRoom.number === room.number)
+    ));
+  }, [rooms, searchTerm, filterFloor, filterStatus, selectedFloors, availableFloors]);
   
   const handleRoomSelect = (room: Room) => {
     setSelectedRooms(prev => {
@@ -113,19 +148,21 @@ export function ManualAssignmentDialog({
     onClose();
   };
   
-  // Get available floors from rooms
-  const availableFloors = Array.from(
-    new Set(
-      rooms.map(room => room.floor !== undefined ? room.floor : parseInt(room.number[0]))
-    )
-  ).sort((a, b) => a - b);
-  
   const selectAll = () => {
     setSelectedRooms(filteredRooms);
   };
   
   const clearSelection = () => {
     setSelectedRooms([]);
+  };
+  
+  // Toggle all floors
+  const selectAllFloors = () => {
+    setSelectedFloors([...availableFloors]);
+  };
+  
+  const clearAllFloors = () => {
+    setSelectedFloors([]);
   };
   
   return (
@@ -194,9 +231,44 @@ export function ManualAssignmentDialog({
             </div>
           </div>
           
+          {/* Floor Selection Checkboxes */}
+          <div className="col-span-12">
+            <div className="flex justify-between items-center mb-2">
+              <Label>Sélection des étages :</Label>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={selectAllFloors}>Tous</Button>
+                <Button variant="outline" size="sm" onClick={clearAllFloors}>Aucun</Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3 border rounded-md p-2">
+              {availableFloors.map(floor => (
+                <div key={floor} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`floor-${floor}`} 
+                    checked={selectedFloors.includes(floor)}
+                    onCheckedChange={() => handleFloorToggle(floor)}
+                  />
+                  <label 
+                    htmlFor={`floor-${floor}`}
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    {floor === 0 ? "RDC" : `Étage ${floor}`}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+          
           {/* Room Selection */}
           <div className="col-span-7">
-            <Label className="mb-2 block">Chambres disponibles ({filteredRooms.length})</Label>
+            <Label className="mb-2 block">
+              Chambres disponibles ({filteredRooms.length})
+              {selectedFloors.length < availableFloors.length && (
+                <span className="text-sm text-gray-500 ml-2">
+                  (Filtrées par étage: {selectedFloors.map(f => f === 0 ? "RDC" : f).join(', ')})
+                </span>
+              )}
+            </Label>
             <ScrollArea className="h-[400px] border rounded-md p-2">
               <div className="grid grid-cols-3 gap-2">
                 {filteredRooms.map(room => (

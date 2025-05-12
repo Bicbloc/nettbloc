@@ -191,7 +191,7 @@ export function RoomCard({
         </div>
       </div>
       
-      {/* New Cleaning Type Selection */}
+      {/* Cleaning Type Selection - Changed "Aucun" to "Propre" */}
       <div className="mb-3 mt-2 p-2 border border-gray-200 rounded-md bg-gray-50">
         <p className="text-xs font-medium mb-2 text-gray-700">Type de nettoyage:</p>
         <RadioGroup 
@@ -223,7 +223,7 @@ export function RoomCard({
               htmlFor={`none-${room.number}`}
               className="text-xs cursor-pointer text-gray-800"
             >
-              Aucun
+              Propre
             </Label>
           </div>
         </RadioGroup>
