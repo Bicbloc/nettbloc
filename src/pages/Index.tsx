@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -583,7 +582,7 @@ const Index = () => {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Warning className="h-5 w-5 text-red-500" />
+                      <AlertTriangle className="h-5 w-5 text-red-500" />
                       <CardTitle className="text-red-700">Chambres non assignées ({unassignedRooms.length})</CardTitle>
                     </div>
                     <Button 
