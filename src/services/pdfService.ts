@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -212,85 +213,94 @@ function parseRoomsFromText(text: string): Room[] {
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
 }
 
-// Implémentation de la nouvelle fonction d'analyse améliorée
+// Nouvelle fonction d'analyse selon les règles définies
 function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  let status: string = 'needs-cleaning';
+  // Valeurs par défaut
+  let status = 'needs-cleaning';
   let cleaningType: 'full' | 'quick' | 'none' = 'none';
 
-  const dateMatches = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-  const timeMatches = context.match(/\b\d{1,2}:\d{2}\b/g) || [];
-  const hasDIR = context.includes('DIR');
-  const hasINS = context.includes('INS');
-  const hasCL = context.includes('CL');
-  const hasClientBlock = context.includes('× Adultes');
-
-  // 🟩 Chambre propre
-  const noDates = dateMatches.length === 0;
-  if (
-    (noDates && (hasINS || hasCL)) || // vide avec statut CL/INS
-    (hasINS && hasClientBlock)        // client visible à droite mais chambre inspectée
-  ) {
-    return {
-      status: 'clean',
-      cleaningType: 'none',
-    };
+  // 🟦 Chambre à blanc - CAS 1: Un bloc de réservation apparaît dans la colonne de gauche du rapport
+  const leftColumnReservation = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
+                               !context.includes("Adults.*\d{2}\/\d{2}\/\d{4}");
+                               
+  if (leftColumnReservation) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
 
-  // 🔵 Recouche
-  // Bloc centré = 1 seul bloc client (date arrivée + nom + date départ)
-  // OU 2 blocs mais avec même nom (on simplifie ici par "× Adultes" deux fois)
-  const sameClientTwice = (context.match(/× Adultes/g) || []).length === 2;
-  const isCenteredSingleBlock = hasClientBlock && dateMatches.length === 2 && !hasDIR;
-
-  if (
-    isCenteredSingleBlock ||
-    sameClientTwice
-  ) {
-    return {
-      status: 'needs-cleaning',
-      cleaningType: 'quick',
-    };
+  // 🟦 Chambre à blanc - CAS 2: Un bloc de réservation en colonne droite ET statut DIR
+  const rightColumnWithDIR = /Adults.*\d{2}\/\d{2}\/\d{4}/.test(context) && 
+                             (context.includes('DIR') || context.toLowerCase().includes('dirty'));
+  
+  if (rightColumnWithDIR) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
 
-  // 🟥 À nettoyer à blanc
-  // Bloc à gauche, ou deux blocs différents (ex. deux dates + heure), ou statut DIR + date
-  const isLeftColumn = context.includes('Spaces') || context.includes('Espace');
-  const hasTwoClientBlocks = dateMatches.length >= 2 && timeMatches.length >= 1;
-  const oneBlockWithOnlyHour = dateMatches.length === 1 && timeMatches.length === 1;
-  const isRightWithDIR = hasDIR && hasClientBlock;
-
-  if (
-    isLeftColumn ||
-    hasTwoClientBlocks ||
-    oneBlockWithOnlyHour ||
-    isRightWithDIR
-  ) {
-    return {
-      status: 'needs-cleaning',
-      cleaningType: 'full',
-    };
+  // 🟦 Chambre à blanc - CAS 3: Deux blocs distincts visibles
+  const twoDistinctBlocks = context.match(/\d{2}\/\d{2}\/\d{4}/g)?.length >= 2;
+  
+  if (twoDistinctBlocks) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
 
-  // 🟠 Autres cas
-  if (context.toLowerCase().includes('maintenance') || context.toLowerCase().includes('hors service')) {
-    return {
-      status: 'maintenance',
-      cleaningType: 'none',
-    };
+  // 🔵 Chambre en recouche: Une seule ligne avec date d'arrivée et départ ultérieure
+  const hasOneReservationLine = /\d{2}\/\d{2}\/\d{4}.*Night/.test(context) || 
+                               /\d{2}\/\d{2}\/\d{4}.*séjour/.test(context) ||
+                               /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
+  
+  if (hasOneReservationLine && !leftColumnReservation && !rightColumnWithDIR && !twoDistinctBlocks) {
+    cleaningType = 'quick';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
 
-  if (context.toLowerCase().includes('occupied') || context.includes('OCC')) {
-    return {
-      status: 'occupied',
-      cleaningType: 'none',
-    };
+  // 🟩 Chambre propre - CAS 1: Case vide (aucun bloc client) ET statut CL ou INS
+  const emptyWithCleanStatus = (!context.match(/\d{2}\/\d{2}\/\d{4}/g) && 
+                              (context.includes('CL') || context.includes('INS') || 
+                               context.toLowerCase().includes('clean') || context.toLowerCase().includes('inspection')));
+  
+  // 🟩 Chambre propre - CAS 2: Chambre dans colonne de droite ET statut INS uniquement
+  const rightColumnINS = /Adults.*INS/.test(context) || 
+                         (context.includes('Adults') && context.toLowerCase().includes('inspection'));
+  
+  if (emptyWithCleanStatus || rightColumnINS) {
+    cleaningType = 'none';
+    status = 'clean';
+    return { status, cleaningType };
   }
 
-  // 🔁 Par défaut
-  return {
-    status: 'needs-cleaning',
-    cleaningType: 'full',
-  };
+  // Cas par défaut - si aucune règle ne correspond explicitement
+  // Vérifier s'il y a un statut DIR visible
+  if (context.includes('DIR') || context.toLowerCase().includes('dirty')) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
+  }
+  
+  // Si des mots-clés comme "maintenance" ou "out of order" sont présents
+  if (context.toLowerCase().includes('maintenance') || 
+      context.toLowerCase().includes('out of order') || 
+      context.toLowerCase().includes('hors service')) {
+    status = 'maintenance';
+    cleaningType = 'none';
+    return { status, cleaningType };
+  }
+  
+  // Si des mots-clés comme "occupé" ou "occupied" sont présents
+  if (context.toLowerCase().includes('occupied') || 
+      context.toLowerCase().includes('occupé') || 
+      context.includes('OCC')) {
+    status = 'occupied';
+    cleaningType = 'none';
+    return { status, cleaningType };
+  }
+
+  return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
 // Fonction historique laissée en place pour référence
@@ -326,23 +336,26 @@ function determinePriority(context: string): 'high' | 'medium' | 'low' {
 
 // Helper function to generate mock room data
 function generateMockRoomData(): Room[] {
-  // ... keep existing code (function to generate mock room data)
+  const statuses = ['needs-cleaning', 'clean', 'occupied', 'maintenance'];
+  const cleaningTypes = ['full', 'quick', 'none'] as const;
+  const priorities = ['high', 'medium', 'low'] as const;
+  
   return Array.from({ length: 50 }, (_, i) => {
     const floor = Math.floor(i / 20) + 1;
     const room = (i % 20) + 1;
     const roomNumber = `${floor}${room.toString().padStart(2, '0')}`;
     const isTwin = Math.random() > 0.7;
-    const priority = ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low';
+    const priority = priorities[Math.floor(Math.random() * priorities.length)];
     
     return {
       number: roomNumber,
-      status: ['needs-cleaning', 'clean', 'occupied', 'maintenance'][Math.floor(Math.random() * 4)],
-      cleaningType: ['full', 'quick', 'none'][Math.floor(Math.random() * 3)] as 'full' | 'quick' | 'none',
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      cleaningType: cleaningTypes[Math.floor(Math.random() * cleaningTypes.length)],
       priority,
       isTwin,
       isUrgent: priority === 'high',
       notUrgent: priority === 'low',
-      floor
+      floor // Ajout du numéro d'étage
     };
   });
 }
