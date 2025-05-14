@@ -12,7 +12,6 @@ interface EmailReportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (email: string, customFields?: ReportFields) => void;
-  email: string;
   isValid: boolean;
 }
 
@@ -20,18 +19,11 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  email,
   isValid
 }) => {
-  const [localEmail, setLocalEmail] = useState(email);
+  const [localEmail, setLocalEmail] = useState("");
   const [customFields, setCustomFields] = useState<ReportFields>({ toDoItems: [], toKnowItems: [] });
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (isOpen) {
-      setLocalEmail(email);
-    }
-  }, [isOpen, email]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
