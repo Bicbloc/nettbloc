@@ -7,7 +7,7 @@ export const BicblocLogo: React.FC = () => {
     <div className="flex flex-col items-center">
       <a href="https://www.bicbloc.eu" target="_blank" rel="noopener noreferrer" className="block max-w-[400px] mx-auto">
         <img 
-          src="https://id-preview--b36a7a8c-909b-4be7-a22c-f96dedec2bb4.lovable.app/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png"
+          src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png"
           alt="BicBloc Logo"
           className="object-contain h-full w-full"
         />
@@ -28,7 +28,7 @@ export const BicblocFooter: React.FC = () => {
         <div className="max-w-full w-full">
           <AspectRatio ratio={16/4} className="w-full">
             <img 
-              src="https://id-preview--b36a7a8c-909b-4be7-a22c-f96dedec2bb4.lovable.app/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png"
+              src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png"
               alt="BicBloc Banner"
               className="w-full h-full object-contain"
             />
