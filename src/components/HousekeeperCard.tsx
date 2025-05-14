@@ -3,7 +3,7 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings, FileText, Download } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -76,13 +76,8 @@ export function HousekeeperCard({
   
   const effectiveMaxRooms = maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper;
   
-  // Filter rooms based on selected floors
-  const visibleRooms = preferredFloors.length > 0 
-    ? rooms.filter(room => {
-        const roomFloor = parseInt(room.number[0]) || 0;
-        return preferredFloors.includes(roomFloor);
-      })
-    : rooms;
+  // Always show all rooms regardless of selected floors
+  const visibleRooms = rooms;
   
   // Group rooms by floor
   const roomsByFloor = visibleRooms.reduce((acc, room) => {
@@ -92,18 +87,18 @@ export function HousekeeperCard({
     return acc;
   }, {} as Record<number, Room[]>);
   
-  // Filtrer les chambres non assignées par étage si nécessaire
+  // Filter unassigned rooms by floor if necessary
   const filteredUnassignedRooms = unassignedRooms.filter(room => {
-    // Si des étages sont sélectionnés, filtre par ces étages
+    // If floors are selected, filter by those floors
     if (preferredFloors.length > 0) {
       const roomFloor = parseInt(room.number[0]) || 0;
       return preferredFloors.includes(roomFloor);
     }
-    // Sinon, montre toutes les chambres non assignées
+    // Otherwise, show all unassigned rooms
     return true;
   });
   
-  // Grouper les chambres non assignées par étage
+  // Group unassigned rooms by floor
   const unassignedRoomsByFloor = filteredUnassignedRooms.reduce((acc, room) => {
     const floor = parseInt(room.number[0]) || 0;
     if (!acc[floor]) acc[floor] = [];
@@ -112,7 +107,7 @@ export function HousekeeperCard({
   }, {} as Record<number, Room[]>);
   
   useEffect(() => {
-    // Calculer le temps estimé
+    // Calculate estimated time
     const time = rooms.reduce((total, room) => {
       if (room.cleaningType === 'full') {
         return total + cleaningConfig.fullCleaningTime;
@@ -124,22 +119,22 @@ export function HousekeeperCard({
     
     setEstimatedTime(time);
     
-    // Vérifier les contraintes min/max
+    // Check min/max constraints
     setIsOverloaded(rooms.length > effectiveMaxRooms);
     setIsUnderloaded(rooms.length < cleaningConfig.minRoomsPerHousekeeper);
     
-    // Calculer la charge de travail en pourcentage (basé sur un max idéal)
+    // Calculate workload percentage (based on ideal max)
     const idealMaxTime = effectiveMaxRooms * 
       ((cleaningConfig.fullCleaningTime + cleaningConfig.quickCleaningTime) / 2);
     
     setWorkload(Math.min(100, (time / idealMaxTime) * 100));
     
-    // Mettre à jour la valeur temporaire de maxRooms si le override change
+    // Update temp max rooms value if override changes
     if (maxRoomsOverride !== undefined && tempMaxRooms !== maxRoomsOverride) {
       setTempMaxRooms(maxRoomsOverride);
     }
     
-    // Update the edited name if the name prop changes
+    // Update edited name if name prop changes
     if (name !== editedName && !isEditing) {
       setEditedName(name);
     }
@@ -155,7 +150,7 @@ export function HousekeeperCard({
       const roomData = e.dataTransfer.getData('application/json');
       if (roomData) {
         const room = JSON.parse(roomData) as Room;
-        // Vérifier si la limite de chambres est atteinte
+        // Check if room limit is reached
         if (rooms.length >= effectiveMaxRooms) {
           toast({
             variant: "destructive",
@@ -165,7 +160,7 @@ export function HousekeeperCard({
           return;
         }
         
-        // La chambre est sur un étage autorisé, procéder à l'assignation
+        // The room is on an allowed floor, proceed with assignment
         const updatedRoom = { ...room, assignedTo: name };
         onRoomUpdate(updatedRoom);
       }
@@ -250,11 +245,11 @@ export function HousekeeperCard({
     setIsFloorSelectorOpen(!isFloorSelectorOpen);
   };
   
-  // Trier les chambres par étage et numéro
+  // Sort rooms by floor and number
   const sortedFloorRooms = Object.entries(roomsByFloor)
     .sort(([a], [b]) => parseInt(a) - parseInt(b));
   
-  // Trier les chambres non assignées par étage
+  // Sort unassigned rooms by floor
   const sortedUnassignedFloorRooms = Object.entries(unassignedRoomsByFloor)
     .sort(([a], [b]) => parseInt(a) - parseInt(b));
   
@@ -308,13 +303,8 @@ export function HousekeeperCard({
     }
   };
   
-  // Calculate hidden rooms (not shown due to floor filtering)
-  const hiddenRooms = preferredFloors.length > 0 
-    ? rooms.filter(room => {
-        const roomFloor = parseInt(room.number[0]) || 0;
-        return !preferredFloors.includes(roomFloor);
-      })
-    : [];
+  // This no longer filters out rooms because we're showing all rooms now
+  const hiddenRooms: Room[] = [];
   
   const toggleExpand = () => {
     setExpanded(!expanded);
@@ -367,8 +357,31 @@ export function HousekeeperCard({
           isOverloaded && "border-red-400",
           isUnderloaded && "border-amber-400"
         )}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          try {
+            const roomData = e.dataTransfer.getData('application/json');
+            if (roomData) {
+              const room = JSON.parse(roomData) as Room;
+              // Check if room limit is reached
+              if (rooms.length >= effectiveMaxRooms) {
+                toast({
+                  variant: "destructive",
+                  title: "Limite atteinte",
+                  description: `Impossible d'assigner plus de ${effectiveMaxRooms} chambres à ${name}. La limite est atteinte.`
+                });
+                return;
+              }
+              
+              // The room is on an allowed floor, proceed with assignment
+              const updatedRoom = { ...room, assignedTo: name };
+              onRoomUpdate(updatedRoom);
+            }
+          } catch (error) {
+            console.error("Erreur lors du drop:", error);
+          }
+        }}
       >
         <CardHeader className="p-4 pb-0">
           <div className="flex justify-between items-center">
@@ -469,7 +482,7 @@ export function HousekeeperCard({
                 onClick={() => onGenerateReport(name, rooms)}
                 className="flex items-center gap-1 text-sm"
               >
-                <FileCog className="h-4 w-4" /> Rapport
+                <FileText className="h-4 w-4" /> Rapport
               </Button>
               
               {onManualAssign && (
@@ -553,28 +566,7 @@ export function HousekeeperCard({
               </div>
             )}
             
-            {/* Afficher un message si des chambres sont masquées à cause des filtres d'étage */}
-            {hiddenRooms.length > 0 && (
-              <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center gap-2 text-red-700 text-sm">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>{hiddenRooms.length} chambres masquées</span>
-                </div>
-                <div className="text-xs text-red-600 mt-1">
-                  {hiddenRooms.length} chambres sont assignées mais ne sont pas affichées car elles sont sur des étages non sélectionnés.
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-xs mt-1 text-red-700 hover:text-red-800 hover:bg-red-100 px-2 py-1 h-auto" 
-                  onClick={() => onFloorPreferenceChange(name, availableFloors)}
-                >
-                  Afficher tous les étages
-                </Button>
-              </div>
-            )}
-            
-            {/* Affichage de la section des chambres non assignées si demandé */}
+            {/* Display unassigned column if showUnassignedColumn is true */}
             {showUnassignedColumn && (
               <div className="mb-6 pb-4 border-b-2 border-red-300">
                 <div className="text-red-600 font-bold mb-2 flex items-center gap-1">
@@ -623,7 +615,7 @@ export function HousekeeperCard({
               </div>
             )}
             
-            {/* Affichage des chambres assignées par étage si au moins 1 étage visible */}
+            {/* Display assigned rooms by floor */}
             <div className="mt-4">
               <h4 className="text-slate-600 font-bold mb-2">Chambres assignées</h4>
               {sortedFloorRooms.length > 0 ? (
@@ -654,10 +646,6 @@ export function HousekeeperCard({
                       </div>
                     </div>
                   ))}
-                </div>
-              ) : preferredFloors.length > 0 ? (
-                <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
-                  Aucune chambre sur les étages sélectionnés
                 </div>
               ) : (
                 <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">

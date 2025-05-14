@@ -10,14 +10,21 @@ interface UnassignedRoomsColumnProps {
   onRoomUpdate: (room: Room) => void;
   draggable?: boolean;
   allRooms?: Room[]; // Pour afficher toutes les chambres non assignées
+  forceHide?: boolean; // New prop to force hide the component
 }
 
 export function UnassignedRoomsColumn({ 
   rooms, 
   onRoomUpdate,
   draggable = true,
-  allRooms = [] // Par défaut, c'est un tableau vide
+  allRooms = [], // Par défaut, c'est un tableau vide
+  forceHide = false // Default is false, so the component will show
 }: UnassignedRoomsColumnProps) {
+  
+  // If forceHide is true, don't render the component
+  if (forceHide) {
+    return null;
+  }
   
   // Utiliser toutes les chambres si fournies, sinon utiliser les chambres passées
   const displayRooms = allRooms.length > 0 ? allRooms.filter(room => !room.assignedTo) : rooms;

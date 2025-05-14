@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,17 +13,26 @@ interface EmailReportDialogProps {
   onClose: () => void;
   onConfirm: (email: string, customFields?: ReportFields) => void;
   isValid: boolean;
+  initialEmail?: string;  // Add support for initial email
 }
 
 const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  isValid
+  isValid,
+  initialEmail = ""
 }) => {
-  const [localEmail, setLocalEmail] = useState("");
+  const [localEmail, setLocalEmail] = useState(initialEmail);
   const [customFields, setCustomFields] = useState<ReportFields>({ toDoItems: [], toKnowItems: [] });
   const { toast } = useToast();
+
+  // Update localEmail when initialEmail changes
+  useEffect(() => {
+    if (initialEmail) {
+      setLocalEmail(initialEmail);
+    }
+  }, [initialEmail]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
