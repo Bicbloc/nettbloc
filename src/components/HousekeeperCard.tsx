@@ -4,11 +4,12 @@ import { Card } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus } from "lucide-react";
+import { FileCog, Layers, Mail, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 import { toast } from "./ui/use-toast";
+import { Input } from "./ui/input";
 
 interface HousekeeperCardProps {
   name: string;
@@ -22,6 +23,8 @@ interface HousekeeperCardProps {
   onFloorPreferenceChange: (name: string, floors: number[]) => void;
   preferredFloors: number[];
   onManualAssign?: () => void;
+  email?: string; // Ajout de la propriété email
+  onEmailChange?: (email: string) => void; // Ajout de la fonction onEmailChange
 }
 
 export function HousekeeperCard({ 
@@ -35,13 +38,21 @@ export function HousekeeperCard({
   availableFloors,
   onFloorPreferenceChange,
   preferredFloors,
-  onManualAssign
+  onManualAssign,
+  email = '', // Valeur par défaut pour email
+  onEmailChange
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
   const [workload, setWorkload] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [isFloorSelectorOpen, setIsFloorSelectorOpen] = useState(false);
+  const [isEmailEditorOpen, setIsEmailEditorOpen] = useState(false);
+  const [emailValue, setEmailValue] = useState(email);
+  
+  useEffect(() => {
+    setEmailValue(email);
+  }, [email]);
   
   // Group rooms by floor
   const roomsByFloor = rooms.reduce((acc, room) => {
@@ -112,6 +123,18 @@ export function HousekeeperCard({
     setIsFloorSelectorOpen(!isFloorSelectorOpen);
   };
   
+  const toggleEmailEditor = () => {
+    setIsEmailEditorOpen(!isEmailEditorOpen);
+    
+    // Si on ferme l'éditeur et que l'email a changé, on appelle onEmailChange
+    if (isEmailEditorOpen && emailValue !== email && onEmailChange) {
+      onEmailChange(emailValue);
+      toast({
+        description: `Email professionnel mis à jour pour ${name}`
+      });
+    }
+  };
+  
   // Trier les chambres par étage et numéro
   const sortedFloorRooms = Object.entries(roomsByFloor)
     .sort(([a], [b]) => parseInt(a) - parseInt(b));
@@ -134,6 +157,16 @@ export function HousekeeperCard({
         <h3 className="font-bold text-lg">{name}</h3>
         
         <div className="flex gap-1">
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={toggleEmailEditor}
+            className="flex items-center gap-1 text-sm"
+            title="Configurer l'email pour l'envoi de rapport"
+          >
+            <Mail className="h-4 w-4" />
+          </Button>
+          
           <Button 
             size="sm" 
             variant="outline"
@@ -164,6 +197,27 @@ export function HousekeeperCard({
           )}
         </div>
       </div>
+      
+      {isEmailEditorOpen && (
+        <div className="mb-4 p-3 border rounded-md bg-slate-50">
+          <div className="text-sm font-medium mb-2">Email professionnel :</div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="email"
+              placeholder="email@example.com"
+              className="text-sm"
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
+            />
+            <Button 
+              size="sm"
+              onClick={toggleEmailEditor}
+            >
+              Enregistrer
+            </Button>
+          </div>
+        </div>
+      )}
       
       {isFloorSelectorOpen && (
         <div className="mb-4 p-3 border rounded-md bg-slate-50">
