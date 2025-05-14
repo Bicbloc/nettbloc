@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -14,7 +13,8 @@ export interface Room {
   isTwin?: boolean;
   isUrgent?: boolean;
   notUrgent?: boolean;
-  floor?: number; // Ajout du numéro d'étage
+  floor?: number;
+  notes?: string; // Added notes property
 }
 
 export interface CleaningConfig {
@@ -305,7 +305,18 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
 
 // Fonction historique laissée en place pour référence
 function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // ... keep existing code (obsolète mais conservé pour référence)
+  if (context.includes('CL') || context.includes('INS') || context.toLowerCase().includes('clean')) {
+    return { status: 'clean', cleaningType: 'none' };
+  }
+  
+  if (context.includes('OCC') || context.toLowerCase().includes('occupied')) {
+    return { status: 'occupied', cleaningType: 'none' };
+  }
+  
+  if (context.toLowerCase().includes('maintenance') || context.toLowerCase().includes('out of order')) {
+    return { status: 'maintenance', cleaningType: 'none' };
+  }
+
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
