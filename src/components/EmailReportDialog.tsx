@@ -87,7 +87,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-md overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {housekeeperName 
@@ -100,7 +100,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-          <ScrollArea className="flex-1 pr-4 mt-2" style={{ height: "60vh" }}>
+          <ScrollArea className="pr-4 mt-2" style={{ height: "400px" }}>
             <div className="space-y-4">
               <div className="grid gap-4 py-2">
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -163,7 +163,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
             </div>
           </ScrollArea>
           
-          <DialogFooter className="sticky bottom-0 pt-4 bg-background border-t mt-auto">
+          <DialogFooter className="sticky bottom-0 pt-4 bg-background border-t mt-4">
             <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? "Traitement en cours..." : "Télécharger le rapport"}
             </Button>

@@ -59,21 +59,25 @@ export async function generateHousekeeperReport(
 
     // Try sending email in background without blocking PDF download
     try {
-      const response = await fetch('/api/generate-pdf', {
+      const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          to: emailAddress,
+          from: EMAIL_CONFIG.senderEmail,
+          subject: `Rapport de nettoyage pour ${housekeeperName}`,
           html: htmlContent,
-          filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
-          email: emailAddress,
+          housekeeperName,
           adminEmail: ADMIN_EMAIL,
-          senderEmail: EMAIL_CONFIG.senderEmail,
-          senderPassword: EMAIL_CONFIG.senderPassword,
-          smtpServer: EMAIL_CONFIG.smtpServer,
-          smtpPort: EMAIL_CONFIG.smtpPort,
-          useTLS: EMAIL_CONFIG.useTLS,
+          emailConfig: {
+            senderEmail: EMAIL_CONFIG.senderEmail,
+            senderPassword: EMAIL_CONFIG.senderPassword,
+            smtpServer: EMAIL_CONFIG.smtpServer,
+            smtpPort: EMAIL_CONFIG.smtpPort,
+            useTLS: EMAIL_CONFIG.useTLS
+          },
           notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
           notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
         }),
@@ -219,7 +223,7 @@ function generateHousekeeperReportHTML(
     .map(item => `<li>${item}</li>`)
     .join('');
   
-  // Create the full HTML document
+  // Create the full HTML document with specific instructions for this housekeeper
   return `
     <!DOCTYPE html>
     <html>
@@ -309,7 +313,7 @@ function generateHousekeeperReportHTML(
         
         ${customFields?.instructions ? `
         <div class="instructions-section">
-          <h2>Instructions spéciales</h2>
+          <h2>Instructions spéciales pour ${housekeeperName}</h2>
           <p>${customFields.instructions}</p>
         </div>
         ` : ''}
