@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface ManualAssignmentDialogProps {
   isOpen: boolean;
@@ -32,8 +31,6 @@ export function ManualAssignmentDialog({
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterFloor, setFilterFloor] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [excludeTwinRooms, setExcludeTwinRooms] = useState<boolean>(true);
-  const [filterSelectedFloors, setFilterSelectedFloors] = useState<number[]>([]);
   
   // Reset selections when dialog opens/closes
   useEffect(() => {
@@ -43,8 +40,6 @@ export function ManualAssignmentDialog({
       setSearchTerm("");
       setFilterFloor("all");
       setFilterStatus("all");
-      setFilterSelectedFloors([]);
-      setExcludeTwinRooms(true);
     }
   }, [isOpen, housekeeperNames]);
   
@@ -68,29 +63,16 @@ export function ManualAssignmentDialog({
       });
     }
     
-    // Apply multi-floor filter
-    if (filterSelectedFloors.length > 0) {
-      result = result.filter(room => {
-        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
-        return filterSelectedFloors.includes(roomFloor);
-      });
-    }
-    
     // Apply status filter
     if (filterStatus !== "all") {
       result = result.filter(room => room.status === filterStatus);
-    }
-    
-    // Apply twin exclusion if enabled
-    if (excludeTwinRooms) {
-      result = result.filter(room => !room.isTwin);
     }
     
     // Sort by room number
     result.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
     
     setFilteredRooms(result);
-  }, [rooms, searchTerm, filterFloor, filterStatus, excludeTwinRooms, filterSelectedFloors]);
+  }, [rooms, searchTerm, filterFloor, filterStatus]);
   
   const handleRoomSelect = (room: Room) => {
     setSelectedRooms(prev => {
@@ -137,16 +119,6 @@ export function ManualAssignmentDialog({
       rooms.map(room => room.floor !== undefined ? room.floor : parseInt(room.number[0]))
     )
   ).sort((a, b) => a - b);
-  
-  const toggleFloorSelection = (floor: number) => {
-    setFilterSelectedFloors(prev => {
-      if (prev.includes(floor)) {
-        return prev.filter(f => f !== floor);
-      } else {
-        return [...prev, floor];
-      }
-    });
-  };
   
   const selectAll = () => {
     setSelectedRooms(filteredRooms);
@@ -219,60 +191,6 @@ export function ManualAssignmentDialog({
               <Button variant="outline" className="flex-1" onClick={clearSelection}>
                 Effacer
               </Button>
-            </div>
-          </div>
-          
-          {/* Multi-floor selection and Twin exclusion */}
-          <div className="col-span-12">
-            <div className="flex justify-between items-center mb-2">
-              <Label>Étages spécifiques</Label>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="exclude-twins" 
-                  checked={excludeTwinRooms} 
-                  onCheckedChange={(checked) => setExcludeTwinRooms(!!checked)} 
-                />
-                <Label htmlFor="exclude-twins" className="text-sm font-normal cursor-pointer">
-                  Exclure les chambres twin
-                </Label>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {availableFloors.map(floor => (
-                <label 
-                  key={floor} 
-                  className={`flex items-center space-x-2 border rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-50 ${
-                    filterSelectedFloors.includes(floor) ? 'bg-blue-50 border-blue-300' : ''
-                  }`}
-                  onClick={() => toggleFloorSelection(floor)}
-                >
-                  <Checkbox 
-                    checked={filterSelectedFloors.includes(floor)}
-                    className="h-4 w-4"
-                    onCheckedChange={() => {}}
-                  />
-                  <span className="text-sm">
-                    {floor === 0 ? 'RDC' : `Étage ${floor}`}
-                    <span className="ml-1 text-gray-500">
-                      ({rooms.filter(r => {
-                        const roomFloor = r.floor !== undefined ? r.floor : parseInt(r.number[0]);
-                        return roomFloor === floor;
-                      }).length})
-                    </span>
-                  </span>
-                </label>
-              ))}
-              
-              {filterSelectedFloors.length > 0 && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setFilterSelectedFloors([])}
-                  className="text-xs h-8"
-                >
-                  Effacer la sélection
-                </Button>
-              )}
             </div>
           </div>
           

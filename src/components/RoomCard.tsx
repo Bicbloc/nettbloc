@@ -12,26 +12,22 @@ interface RoomCardProps {
   room: Room;
   onUpdate: (room: Room) => void;
   onAssign?: (room: Room, housekeeperName: string) => void;
-  onUnassign?: (room: Room) => void;  // Add the missing onUnassign prop
   draggable?: boolean;
   compact?: boolean;
   selectable?: boolean;
   isSelected?: boolean;
   onSelect?: (room: Room) => void;
-  showActions?: boolean;
 }
 
 export function RoomCard({ 
   room, 
   onUpdate, 
   onAssign, 
-  onUnassign,  // Include the prop in the component parameters
   draggable = false, 
   compact = false, 
   selectable = false,
   isSelected = false,
-  onSelect,
-  showActions = true
+  onSelect
 }: RoomCardProps) {
   const [dragging, setDragging] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -279,4 +275,3 @@ export function RoomCard({
     </div>
   );
 }
-

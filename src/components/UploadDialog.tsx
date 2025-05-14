@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +22,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -59,13 +58,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-  };
-
-  const handleBrowseClick = () => {
-    // Déclencher le clic sur l'input file caché
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
   };
 
   const handleSubmit = async () => {
@@ -120,7 +112,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
-          onClick={handleBrowseClick}
         >
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -137,24 +128,21 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
               )}
             </div>
             <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation(); // Empêcher la propagation pour éviter le double clic
-                  handleBrowseClick();
-                }}
-              >
-                Sélectionner un fichier
-              </Button>
+              <label className="inline-block">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                >
+                  Sélectionner un fichier
+                </Button>
+              </label>
             </div>
           </div>
         </div>
