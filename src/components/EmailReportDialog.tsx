@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ReportFields } from "./ReportCustomFields";
-import ReportCustomFields from "./ReportCustomFields";
+import { ReportFields } from "@/components/ReportCustomFields";
+import ReportCustomFields from "@/components/ReportCustomFields";
 
 interface EmailReportDialogProps {
   isOpen: boolean;
@@ -61,7 +61,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
-                Email
+                Email <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="email"
@@ -72,9 +72,15 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                 className="col-span-3"
                 required
               />
+              <p className="text-xs text-muted-foreground col-span-4 text-center">
+                Un email valide est requis pour télécharger le rapport
+              </p>
             </div>
             
-            <ReportCustomFields onChange={setCustomFields} />
+            <div className="mt-4">
+              <Label className="font-medium mb-2 block">Instructions pour le rapport</Label>
+              <ReportCustomFields onChange={setCustomFields} />
+            </div>
           </div>
           <DialogFooter>
             <Button type="submit">Télécharger le rapport</Button>

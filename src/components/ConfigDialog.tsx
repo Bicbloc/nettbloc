@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +18,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Settings, MinusSquare, PlusSquare } from "lucide-react";
+import { Settings, MinusSquare, PlusSquare, Edit, Save, X } from "lucide-react";
 import { CleaningConfig, defaultCleaningConfig } from "@/services/pdfService";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
@@ -40,6 +39,8 @@ export function ConfigDialog({
   const [open, setOpen] = useState(false);
   const [names, setNames] = useState<string[]>(housekeeperNames);
   const [newName, setNewName] = useState("");
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
 
   useEffect(() => {
     // Update names when housekeeperNames prop changes
@@ -75,6 +76,24 @@ export function ConfigDialog({
     toast({
       description: "Femme de chambre supprimée"
     });
+  };
+
+  const startEditing = (index: number) => {
+    setEditIndex(index);
+    setEditName(names[index]);
+  };
+
+  const saveEdit = () => {
+    if (editIndex !== null && editName.trim()) {
+      const updatedNames = [...names];
+      updatedNames[editIndex] = editName.trim();
+      setNames(updatedNames);
+      setEditIndex(null);
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditIndex(null);
   };
 
   const incrementValue = (fieldName: keyof CleaningConfig) => {
@@ -280,15 +299,54 @@ export function ConfigDialog({
               <div className="space-y-1 max-h-40 overflow-y-auto">
                 {names.map((name, index) => (
                   <div key={index} className="flex items-center justify-between bg-muted px-3 py-2 rounded">
-                    <span>{name}</span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleRemoveName(index)}
-                      className="h-6 w-6 p-0 text-red-500"
-                    >
-                      &times;
-                    </Button>
+                    {editIndex === index ? (
+                      <div className="flex flex-1 items-center gap-2">
+                        <Input 
+                          value={editName} 
+                          onChange={(e) => setEditName(e.target.value)} 
+                          autoFocus 
+                          className="flex-1"
+                        />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={saveEdit}
+                          className="h-8 w-8 p-0 text-green-500"
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={cancelEdit}
+                          className="h-8 w-8 p-0 text-gray-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <span>{name}</span>
+                        <div className="flex items-center">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => startEditing(index)}
+                            className="h-6 w-6 p-0 text-blue-500 mr-1"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleRemoveName(index)}
+                            className="h-6 w-6 p-0 text-red-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
                 {names.length === 0 && (
