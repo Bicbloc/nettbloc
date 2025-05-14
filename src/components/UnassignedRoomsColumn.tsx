@@ -9,16 +9,21 @@ interface UnassignedRoomsColumnProps {
   rooms: Room[];
   onRoomUpdate: (room: Room) => void;
   draggable?: boolean;
+  allRooms?: Room[]; // Ajout pour afficher toutes les chambres non assignées
 }
 
 export function UnassignedRoomsColumn({ 
   rooms, 
   onRoomUpdate,
-  draggable = true
+  draggable = true,
+  allRooms = [] // Par défaut, c'est un tableau vide
 }: UnassignedRoomsColumnProps) {
   
+  // Utiliser toutes les chambres si fournies, sinon utiliser les chambres passées
+  const displayRooms = allRooms.length > 0 ? allRooms.filter(room => !room.assignedTo) : rooms;
+  
   // Grouper les chambres par étage
-  const roomsByFloor = rooms.reduce((acc, room) => {
+  const roomsByFloor = displayRooms.reduce((acc, room) => {
     const floor = parseInt(room.number[0]) || 0;
     if (!acc[floor]) acc[floor] = [];
     acc[floor].push(room);
@@ -42,12 +47,12 @@ export function UnassignedRoomsColumn({
             <h3 className="font-bold text-lg">Chambres non assignées</h3>
           </div>
           <Badge variant="outline" className="bg-red-50 text-red-700">
-            {rooms.length} chambres
+            {displayRooms.length} chambres
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="p-4">
-        {rooms.length > 0 ? (
+        {displayRooms.length > 0 ? (
           <div className="space-y-4">
             {sortedFloorRooms.map(([floor, floorRooms]) => (
               <div key={`unassigned-${floor}`} className="pt-1">

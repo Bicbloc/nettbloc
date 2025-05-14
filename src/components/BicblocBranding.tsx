@@ -4,13 +4,16 @@ import { AspectRatio } from "./ui/aspect-ratio";
 
 export const BicblocLogo: React.FC = () => {
   return (
-    <a href="https://www.bicbloc.eu" target="_blank" rel="noopener noreferrer" className="block max-w-[400px] mx-auto mb-4">
-      <img 
-        src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png"
-        alt="BicBloc Logo"
-        className="object-contain h-full w-full"
-      />
-    </a>
+    <div className="flex flex-col items-center">
+      <a href="https://www.bicbloc.eu" target="_blank" rel="noopener noreferrer" className="block max-w-[400px] mx-auto mb-2">
+        <img 
+          src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png"
+          alt="BicBloc Logo"
+          className="object-contain h-full w-full"
+        />
+      </a>
+      <h1 className="text-3xl font-bold mb-4 text-center">BicBloc</h1>
+    </div>
   );
 };
 
