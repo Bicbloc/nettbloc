@@ -1,3 +1,4 @@
+
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Room, CleaningConfig } from './pdfService';
 import { toast } from '@/hooks/use-toast';
@@ -21,35 +22,65 @@ export async function generateHousekeeperReport(
     // Generate HTML content
     const htmlContent = generateHousekeeperReportHTML(housekeeperName, rooms, config, customFields);
     
-    // Convert HTML to PDF using a server endpoint
-    const response = await fetch('/api/generate-pdf', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        html: htmlContent,
-        filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
-        email: emailAddress,
-        adminEmail: ADMIN_EMAIL, // Send a notification to the admin
-        notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
-        notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
-      }),
-    });
+    // Create a simple PDF as fallback in case the server endpoint fails
+    const pdfBytes = await createSimplePDF(housekeeperName, rooms, config);
     
-    if (!response.ok) {
-      throw new Error('Failed to generate PDF');
-    }
-    
-    const result = await response.json();
-    
-    if (result.success) {
+    try {
+      // Convert HTML to PDF using a server endpoint
+      const response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          html: htmlContent,
+          filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
+          email: emailAddress,
+          adminEmail: ADMIN_EMAIL, // Send a notification to the admin
+          notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
+          notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF via server');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "Rapport généré",
+          description: `Le rapport pour ${housekeeperName} a été envoyé à ${emailAddress}`,
+        });
+        return;
+      } else {
+        throw new Error(result.message || 'Unknown server error');
+      }
+    } catch (serverError) {
+      console.error('Server PDF generation failed, using fallback method:', serverError);
+      
+      // Use client-side fallback method
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+      
       toast({
         title: "Rapport généré",
-        description: `Le rapport pour ${housekeeperName} a été envoyé à ${emailAddress}`,
+        description: `Le rapport pour ${housekeeperName} a été téléchargé`,
       });
-    } else {
-      throw new Error(result.message || 'Unknown error');
     }
   } catch (error) {
     console.error('Error generating report:', error);
@@ -75,37 +106,52 @@ export async function generateAllHousekeeperReports(
       html: generateHousekeeperReportHTML(name, rooms, config, customFields)
     }));
     
-    // Convert HTML to PDF using a server endpoint
-    const response = await fetch('/api/generate-multiple-pdfs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        reports: htmlContents.map(item => ({
-          html: item.html,
-          filename: `${item.name.replace(/\s+/g, '_')}_rapport.pdf`,
-        })),
-        email: emailAddress,
-        adminEmail: ADMIN_EMAIL, // Send a notification to the admin
-        notificationSubject: `Rapports multiples téléchargés`,
-        notificationText: `${htmlContents.length} rapports ont été téléchargés et envoyés à ${emailAddress}`
-      }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to generate PDFs');
-    }
-    
-    const result = await response.json();
-    
-    if (result.success) {
+    try {
+      // Convert HTML to PDF using a server endpoint
+      const response = await fetch('/api/generate-multiple-pdfs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reports: htmlContents.map(item => ({
+            html: item.html,
+            filename: `${item.name.replace(/\s+/g, '_')}_rapport.pdf`,
+          })),
+          email: emailAddress,
+          adminEmail: ADMIN_EMAIL, // Send a notification to the admin
+          notificationSubject: `Rapports multiples téléchargés`,
+          notificationText: `${htmlContents.length} rapports ont été téléchargés et envoyés à ${emailAddress}`
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PDFs via server');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "Rapports générés",
+          description: `${htmlContents.length} rapports ont été envoyés à ${emailAddress}`,
+        });
+        return;
+      } else {
+        throw new Error(result.message || 'Unknown server error');
+      }
+    } catch (serverError) {
+      console.error('Server PDF generation failed, creating individual PDFs:', serverError);
+      
+      // Client-side fallback: generate each PDF individually 
+      for (const { name, rooms } of housekeepersWithRooms) {
+        await generateHousekeeperReport(name, rooms, config, emailAddress, customFields);
+      }
+      
       toast({
         title: "Rapports générés",
-        description: `${htmlContents.length} rapports ont été envoyés à ${emailAddress}`,
+        description: `${housekeepersWithRooms.length} rapports ont été téléchargés individuellement`,
       });
-    } else {
-      throw new Error(result.message || 'Unknown error');
     }
   } catch (error) {
     console.error('Error generating reports:', error);
