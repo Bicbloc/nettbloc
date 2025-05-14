@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 interface ManualAssignmentDialogProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export function ManualAssignmentDialog({
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [excludeTwin, setExcludeTwin] = useState<boolean>(true);
   const [useSmartAssignment, setUseSmartAssignment] = useState<boolean>(true);
+  const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
   
   // Reset selections when dialog opens/closes
   useEffect(() => {
@@ -47,6 +49,7 @@ export function ManualAssignmentDialog({
       setFilterStatus("all");
       setExcludeTwin(true);
       setUseSmartAssignment(true);
+      setSelectedFloors([]);
     }
   }, [isOpen, housekeeperNames]);
   
@@ -70,6 +73,14 @@ export function ManualAssignmentDialog({
       });
     }
     
+    // Apply selected floors filter for smart assignment
+    if (selectedFloors.length > 0) {
+      result = result.filter(room => {
+        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+        return selectedFloors.includes(roomFloor);
+      });
+    }
+    
     // Apply status filter
     if (filterStatus !== "all") {
       result = result.filter(room => room.status === filterStatus);
@@ -84,7 +95,7 @@ export function ManualAssignmentDialog({
     result.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
     
     setFilteredRooms(result);
-  }, [rooms, searchTerm, filterFloor, filterStatus, excludeTwin]);
+  }, [rooms, searchTerm, filterFloor, filterStatus, excludeTwin, selectedFloors]);
   
   const handleRoomSelect = (room: Room) => {
     setSelectedRooms(prev => {
@@ -94,6 +105,17 @@ export function ManualAssignmentDialog({
         return prev.filter(r => r.number !== room.number);
       } else {
         return [...prev, room];
+      }
+    });
+  };
+
+  // Gestion des étages sélectionnés
+  const toggleFloor = (floor: number) => {
+    setSelectedFloors(prev => {
+      if (prev.includes(floor)) {
+        return prev.filter(f => f !== floor);
+      } else {
+        return [...prev, floor];
       }
     });
   };
@@ -109,36 +131,45 @@ export function ManualAssignmentDialog({
       return;
     }
 
-    const preferredFloors = housekeeperPreferredFloors[selectedHousekeeper] || [];
+    let roomsToSelect: Room[] = [];
     
-    // Si aucun étage préféré, on prend toutes les chambres disponibles
-    if (preferredFloors.length === 0) {
-      toast({
-        title: "Aucun étage préféré défini",
-        description: "Veuillez définir des étages préférés pour l'assignation intelligente.",
-        variant: "destructive"
+    // Si des étages sont sélectionnés, utiliser ceux-ci en priorité
+    if (selectedFloors.length > 0) {
+      roomsToSelect = filteredRooms.filter(room => {
+        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+        return selectedFloors.includes(roomFloor);
       });
-      return;
+    } else {
+      // Sinon utiliser les étages préférés de la femme de chambre
+      const preferredFloors = housekeeperPreferredFloors[selectedHousekeeper] || [];
+      
+      if (preferredFloors.length === 0) {
+        toast({
+          title: "Aucun étage préféré défini",
+          description: "Veuillez sélectionner des étages ou définir des étages préférés pour l'assignation intelligente.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      roomsToSelect = filteredRooms.filter(room => {
+        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+        return preferredFloors.includes(roomFloor);
+      });
     }
 
-    // Filtrer les chambres selon les étages préférés de la femme de chambre
-    const roomsByPreferredFloors = filteredRooms.filter(room => {
-      const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
-      return preferredFloors.includes(roomFloor);
-    });
-
-    if (roomsByPreferredFloors.length === 0) {
+    if (roomsToSelect.length === 0) {
       toast({
         title: "Aucune chambre disponible",
-        description: "Aucune chambre disponible dans les étages préférés.",
+        description: "Aucune chambre disponible dans les étages sélectionnés.",
         variant: "destructive"
       });
       return;
     }
 
-    setSelectedRooms(roomsByPreferredFloors);
+    setSelectedRooms(roomsToSelect);
     toast({
-      description: `${roomsByPreferredFloors.length} chambres sélectionnées automatiquement dans les étages préférés.`
+      description: `${roomsToSelect.length} chambres sélectionnées automatiquement dans les étages choisis.`
     });
   };
   
@@ -251,44 +282,67 @@ export function ManualAssignmentDialog({
           </div>
           
           {/* Options additionnelles */}
-          <div className="col-span-12 flex items-center gap-8 mb-2">
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="exclude-twin" 
-                checked={excludeTwin}
-                onCheckedChange={(checked) => setExcludeTwin(!!checked)}
-              />
-              <Label 
-                htmlFor="exclude-twin"
-                className="text-sm cursor-pointer"
-              >
-                Exclure chambres twin
-              </Label>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="smart-assignment" 
-                checked={useSmartAssignment}
-                onCheckedChange={(checked) => setUseSmartAssignment(!!checked)}
-              />
-              <Label 
-                htmlFor="smart-assignment"
-                className="text-sm cursor-pointer"
-              >
-                Assignation intelligente par étage
-              </Label>
-            </div>
+          <div className="col-span-12 mb-2">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="exclude-twin" 
+                  checked={excludeTwin}
+                  onCheckedChange={(checked) => setExcludeTwin(!!checked)}
+                />
+                <Label 
+                  htmlFor="exclude-twin"
+                  className="text-sm cursor-pointer"
+                >
+                  Exclure chambres twin
+                </Label>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="smart-assignment" 
+                  checked={useSmartAssignment}
+                  onCheckedChange={(checked) => setUseSmartAssignment(!!checked)}
+                />
+                <Label 
+                  htmlFor="smart-assignment"
+                  className="text-sm cursor-pointer"
+                >
+                  Assignation intelligente par étage
+                </Label>
+              </div>
 
-            {useSmartAssignment && (
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={handleSmartAssign}
-              >
-                Sélection intelligente
-              </Button>
-            )}
+              {useSmartAssignment && (
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={handleSmartAssign}
+                >
+                  Sélection intelligente
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {/* Sélection des étages */}
+          <div className="col-span-12 mb-2">
+            <Label className="mb-2 block">Sélectionner des étages spécifiques</Label>
+            <div className="flex flex-wrap gap-2">
+              {availableFloors.map(floor => (
+                <Badge
+                  key={floor}
+                  className={`cursor-pointer ${selectedFloors.includes(floor) ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                  onClick={() => toggleFloor(floor)}
+                >
+                  {floor === 0 ? "RDC" : `Étage ${floor}`}
+                </Badge>
+              ))}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {selectedFloors.length > 0 ? 
+                `${selectedFloors.length} étage(s) sélectionné(s)` : 
+                "Aucun étage sélectionné - toutes les chambres seront affichées"}
+            </div>
           </div>
           
           {/* Room Selection */}
