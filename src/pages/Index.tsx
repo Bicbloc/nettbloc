@@ -491,16 +491,19 @@ const Index = () => {
         );
         
         toast({
-          title: "Rapport génér��",
+          title: "Rapport généré",
           description: `Le rapport pour ${reportHousekeeper} a été créé et envoyé à ${emailAddress}.`,
         });
       } else if (reportAction === "all") {
-        // Générer tous les rapports
-        const housekeepersWithRooms = housekeeperNames.map(name => ({
-          name,
-          rooms: getHousekeeperRooms(name)
-        }));
+        // Générer uniquement les rapports pour les femmes de chambre qui ont des chambres assignées
+        const housekeepersWithRooms = housekeeperNames
+          .filter(name => getHousekeeperRooms(name).length > 0)
+          .map(name => ({
+            name,
+            rooms: getHousekeeperRooms(name)
+          }));
         
+        // Ajouter les chambres non assignées si elles existent
         const unassignedRooms = rooms.filter(room => !room.assignedTo && room.cleaningType !== 'none');
         if (unassignedRooms.length > 0) {
           housekeepersWithRooms.push({
@@ -509,10 +512,19 @@ const Index = () => {
           });
         }
         
+        if (housekeepersWithRooms.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Aucun rapport à générer",
+            description: "Aucune femme de chambre n'a de chambres assignées.",
+          });
+          return;
+        }
+        
         await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, emailAddress, customFields);
         toast({
           title: "Rapports générés",
-          description: `Tous les rapports ont été créés et envoyés à ${emailAddress}.`,
+          description: `${housekeepersWithRooms.length} rapport(s) ont été créés et envoyés à ${emailAddress}.`,
         });
       }
     } catch (error) {
@@ -1113,6 +1125,8 @@ const Index = () => {
         onClose={() => setIsReportDialogOpen(false)}
         onConfirm={handleReportConfirm}
         initialEmail={email}
+        housekeeperName={reportAction === "single" ? reportHousekeeper : undefined}
+        allHousekeepers={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
       />
     </div>
   );

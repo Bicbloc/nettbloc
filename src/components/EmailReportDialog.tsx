@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +16,7 @@ interface EmailReportDialogProps {
   onConfirm: (email: string, customFields?: ReportFields) => void;
   initialEmail?: string;
   housekeeperName?: string;
+  allHousekeepers?: string[];
 }
 
 const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
@@ -24,7 +24,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   onClose,
   onConfirm,
   initialEmail = "",
-  housekeeperName = ""
+  housekeeperName = "",
+  allHousekeepers = []
 }) => {
   // Get saved email or use initialEmail
   const savedEmail = getReportEmail();
@@ -34,15 +35,65 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     toDoItems: [], 
     toKnowItems: [],
     instructions: '',
-    generalInstructions: ''
+    generalInstructions: '',
+    housekeeperInstructions: {}
   });
   const { toast } = useToast();
+  
+  // Initialize housekeeperInstructions object when housekeepers list changes
+  useEffect(() => {
+    if (!customFields.housekeeperInstructions) {
+      setCustomFields(prev => ({
+        ...prev,
+        housekeeperInstructions: {}
+      }));
+    }
+    
+    // Add any missing housekeepers
+    if (allHousekeepers && allHousekeepers.length > 0) {
+      const updatedInstructions = {...(customFields.housekeeperInstructions || {})};
+      
+      allHousekeepers.forEach(name => {
+        if (!updatedInstructions[name]) {
+          updatedInstructions[name] = '';
+        }
+      });
+      
+      setCustomFields(prev => ({
+        ...prev,
+        housekeeperInstructions: updatedInstructions
+      }));
+    }
+  }, [allHousekeepers, isOpen]);
 
-  // Update instructions field
+  // Update instructions field for single housekeeper view
   const handleInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (housekeeperName) {
+      // Single housekeeper mode - update specific instructions
+      const updatedInstructions = {...(customFields.housekeeperInstructions || {})};
+      updatedInstructions[housekeeperName] = e.target.value;
+      
+      setCustomFields(prev => ({
+        ...prev,
+        housekeeperInstructions: updatedInstructions
+      }));
+    } else {
+      // Legacy support for old format
+      setCustomFields(prev => ({
+        ...prev,
+        instructions: e.target.value
+      }));
+    }
+  };
+
+  // Update specific housekeeper instructions
+  const handleHousekeeperInstructionChange = (housekeeperName: string, value: string) => {
+    const updatedInstructions = {...(customFields.housekeeperInstructions || {})};
+    updatedInstructions[housekeeperName] = value;
+    
     setCustomFields(prev => ({
       ...prev,
-      instructions: e.target.value
+      housekeeperInstructions: updatedInstructions
     }));
   };
 
@@ -87,12 +138,12 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-md overflow-hidden flex flex-col max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>
             {housekeeperName 
               ? `Rapport de ${housekeeperName}`
-              : 'Téléchargement du rapport'}
+              : 'Téléchargement des rapports'}
           </DialogTitle>
           <DialogDescription>
             Saisissez votre email pour recevoir le rapport PDF
@@ -100,7 +151,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-          <ScrollArea className="pr-4 mt-2" style={{ height: "400px" }}>
+          <ScrollArea className="pr-4 mt-2" style={{ maxHeight: "400px", height: "auto" }}>
             <div className="space-y-4">
               <div className="grid gap-4 py-2">
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -143,22 +194,42 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                   }} />
                 </div>
                 
-                <div className="mt-2">
-                  <Label htmlFor="instructions" className="font-medium mb-2 block">
-                    {housekeeperName 
-                      ? `Instructions spécifiques pour ${housekeeperName}` 
-                      : 'Instructions spéciales par rapport'}
-                  </Label>
-                  <Textarea
-                    id="instructions"
-                    placeholder={housekeeperName 
-                      ? `Instructions spécifiques pour ${housekeeperName}...` 
-                      : 'Ajoutez des instructions spéciales pour ce rapport...'}
-                    value={customFields.instructions || ''}
-                    onChange={handleInstructionsChange}
-                    className="min-h-[80px]"
-                  />
-                </div>
+                {/* Single housekeeper mode */}
+                {housekeeperName && (
+                  <div className="mt-2">
+                    <Label htmlFor={`instructions-${housekeeperName}`} className="font-medium mb-2 block">
+                      Instructions spécifiques pour {housekeeperName}
+                    </Label>
+                    <Textarea
+                      id={`instructions-${housekeeperName}`}
+                      placeholder={`Instructions spécifiques pour ${housekeeperName}...`}
+                      value={(customFields.housekeeperInstructions && customFields.housekeeperInstructions[housekeeperName]) || ''}
+                      onChange={handleInstructionsChange}
+                      className="min-h-[80px]"
+                    />
+                  </div>
+                )}
+                
+                {/* Multiple housekeepers mode - show instructions fields for each housekeeper */}
+                {!housekeeperName && allHousekeepers && allHousekeepers.length > 0 && (
+                  <div className="mt-2">
+                    <Label className="font-medium mb-2 block">Instructions spécifiques par femme de chambre</Label>
+                    {allHousekeepers.map(name => (
+                      <div key={name} className="mb-3 border-b pb-3">
+                        <Label htmlFor={`instructions-${name}`} className="mb-1 block text-sm">
+                          {name}
+                        </Label>
+                        <Textarea
+                          id={`instructions-${name}`}
+                          placeholder={`Instructions spécifiques pour ${name}...`}
+                          value={(customFields.housekeeperInstructions && customFields.housekeeperInstructions[name]) || ''}
+                          onChange={(e) => handleHousekeeperInstructionChange(name, e.target.value)}
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </ScrollArea>
