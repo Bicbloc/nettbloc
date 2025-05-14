@@ -1,283 +1,278 @@
 
-import { Room, CleaningConfig } from "@/services/pdfService";
-import { Card } from "@/components/ui/card";
+import { useState } from "react";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { RoomCard } from "./RoomCard";
-import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus } from "lucide-react";
-import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
-import { Label } from "./ui/label";
-import { toast } from "./ui/use-toast";
+import { Room, CleaningConfig } from "@/services/pdfService";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/use-toast";
 
-interface HousekeeperCardProps {
+export interface HousekeeperCardProps {
   name: string;
   rooms: Room[];
   onRoomUpdate: (room: Room) => void;
   onRoomUnassign: (room: Room) => void;
-  onGenerateReport: (name: string, rooms: Room[]) => void;
+  onGenerateReport: (housekeeperName: string, rooms: Room[]) => Promise<void>;
   cleaningConfig: CleaningConfig;
   draggable?: boolean;
   availableFloors: number[];
-  onFloorPreferenceChange: (name: string, floors: number[]) => void;
   preferredFloors: number[];
-  onManualAssign?: () => void;
+  onFloorPreferenceChange: (housekeeperName: string, floors: number[]) => void;
+  onManualAssign: () => void;
+  email: string;
+  onEmailChange: (email: string) => void;
 }
 
-export function HousekeeperCard({ 
-  name, 
-  rooms, 
-  onRoomUpdate, 
+export function HousekeeperCard({
+  name,
+  rooms,
+  onRoomUpdate,
   onRoomUnassign,
   onGenerateReport,
   cleaningConfig,
   draggable = false,
   availableFloors,
-  onFloorPreferenceChange,
   preferredFloors,
-  onManualAssign
+  onFloorPreferenceChange,
+  onManualAssign,
+  email,
+  onEmailChange
 }: HousekeeperCardProps) {
-  const [isOverloaded, setIsOverloaded] = useState(false);
-  const [isUnderloaded, setIsUnderloaded] = useState(false);
-  const [workload, setWorkload] = useState(0);
-  const [estimatedTime, setEstimatedTime] = useState(0);
-  const [isFloorSelectorOpen, setIsFloorSelectorOpen] = useState(false);
+  const [isEmailEditing, setIsEmailEditing] = useState(false);
+  const [emailValue, setEmailValue] = useState(email);
   
-  // Group rooms by floor
-  const roomsByFloor = rooms.reduce((acc, room) => {
-    const floor = room.floor || 0;
-    if (!acc[floor]) acc[floor] = [];
-    acc[floor].push(room);
-    return acc;
-  }, {} as Record<number, Room[]>);
+  // Trier les chambres par numéro
+  const sortedRooms = [...rooms].sort((a, b) => 
+    a.number.localeCompare(b.number, undefined, { numeric: true })
+  );
   
-  useEffect(() => {
-    // Calculer le temps estimé
-    const time = rooms.reduce((total, room) => {
-      if (room.cleaningType === 'full') {
-        return total + cleaningConfig.fullCleaningTime;
-      } else if (room.cleaningType === 'quick') {
-        return total + cleaningConfig.quickCleaningTime;
-      }
-      return total;
-    }, 0);
-    
-    setEstimatedTime(time);
-    
-    // Vérifier les contraintes min/max
-    setIsOverloaded(rooms.length > cleaningConfig.maxRoomsPerHousekeeper);
-    setIsUnderloaded(rooms.length < cleaningConfig.minRoomsPerHousekeeper);
-    
-    // Calculer la charge de travail en pourcentage (basé sur un max idéal)
-    const idealMaxTime = cleaningConfig.maxRoomsPerHousekeeper * 
-      ((cleaningConfig.fullCleaningTime + cleaningConfig.quickCleaningTime) / 2);
-    
-    setWorkload(Math.min(100, (time / idealMaxTime) * 100));
-  }, [rooms, cleaningConfig]);
-  
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-  
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    try {
-      const roomData = e.dataTransfer.getData('application/json');
-      if (roomData) {
-        const room = JSON.parse(roomData) as Room;
-        // La chambre sera déjà assignée ailleurs, donc pas besoin de vérifier
-        const updatedRoom = { ...room, assignedTo: name };
-        onRoomUpdate(updatedRoom);
-      }
-    } catch (error) {
-      console.error("Erreur lors du drop:", error);
+  // Calculer la charge de travail
+  const workload = sortedRooms.reduce((total, room) => {
+    if (room.cleaningType === 'full') {
+      return total + cleaningConfig.fullCleaningTime;
+    } else if (room.cleaningType === 'quick') {
+      return total + cleaningConfig.quickCleaningTime;
     }
-  };
+    return total;
+  }, 0);
   
-  const handleFloorChange = (floor: number, isChecked: boolean) => {
-    const newPreferredFloors = isChecked
-      ? [...preferredFloors, floor]
-      : preferredFloors.filter(f => f !== floor);
+  // Calculer le nombre de chambres par type
+  const fullCleaningRooms = sortedRooms.filter(r => r.cleaningType === 'full').length;
+  const quickCleaningRooms = sortedRooms.filter(r => r.cleaningType === 'quick').length;
+  const totalRooms = sortedRooms.length;
+  
+  // Calculer le nombre de chambres par étage
+  const roomsByFloor = sortedRooms.reduce((acc: Record<number, number>, room) => {
+    const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
+    acc[floor] = (acc[floor] || 0) + 1;
+    return acc;
+  }, {});
+  
+  // Gérer la modification des préférences d'étage
+  const handleFloorToggle = (floor: number) => {
+    const newPreferredFloors = preferredFloors.includes(floor)
+      ? preferredFloors.filter(f => f !== floor)
+      : [...preferredFloors, floor];
     
     onFloorPreferenceChange(name, newPreferredFloors);
-    
-    if (isChecked) {
+  };
+  
+  // Gérer la sauvegarde de l'email
+  const handleSaveEmail = () => {
+    // Validation simple de format d'email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailValue && !emailRegex.test(emailValue)) {
       toast({
-        description: `Les chambres de l'étage ${floor === 0 ? 'RDC' : floor} seront prioritaires pour ${name}`
+        variant: "destructive",
+        title: "Format d'email invalide",
+        description: "Veuillez entrer une adresse email valide."
       });
+      return;
     }
-  };
-  
-  const toggleFloorSelector = () => {
-    setIsFloorSelectorOpen(!isFloorSelectorOpen);
-  };
-  
-  // Trier les chambres par étage et numéro
-  const sortedFloorRooms = Object.entries(roomsByFloor)
-    .sort(([a], [b]) => parseInt(a) - parseInt(b));
-  
-  const sortRoomsByNumber = (rooms: Room[]) => {
-    return [...rooms].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+    
+    onEmailChange(emailValue);
+    setIsEmailEditing(false);
+    
+    toast({
+      title: "Email enregistré",
+      description: `L'adresse email de ${name} a été mise à jour.`
+    });
   };
   
   return (
-    <Card 
-      className={cn(
-        "p-4 border rounded-lg",
-        isOverloaded && "border-red-400",
-        isUnderloaded && "border-amber-400"
-      )}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-lg">{name}</h3>
-        
-        <div className="flex gap-1">
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={toggleFloorSelector}
-            className="flex items-center gap-1 text-sm"
-          >
-            <Layers className="h-4 w-4" /> Étages
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={() => onGenerateReport(name, rooms)}
-            className="flex items-center gap-1 text-sm"
-          >
-            <FileCog className="h-4 w-4" /> Rapport
-          </Button>
-          
-          {onManualAssign && (
+    <Card className="overflow-hidden">
+      <CardHeader className="bg-blue-50">
+        <div className="flex justify-between items-start">
+          <CardTitle>{name}</CardTitle>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" onClick={onManualAssign}>
+              Assigner
+            </Button>
             <Button 
               size="sm" 
-              variant="ghost"
-              onClick={onManualAssign}
-              className="flex items-center gap-1 text-sm"
+              variant="outline"
+              onClick={() => onGenerateReport(name, sortedRooms)}
+              disabled={totalRooms === 0}
             >
-              <Plus className="h-4 w-4" /> Ajouter
+              Rapport
             </Button>
-          )}
-        </div>
-      </div>
-      
-      {isFloorSelectorOpen && (
-        <div className="mb-4 p-3 border rounded-md bg-slate-50">
-          <div className="text-sm font-medium mb-2">Étages préférés:</div>
-          <div className="grid grid-cols-5 gap-2">
-            {availableFloors.map((floor) => (
-              <div key={floor} className="flex items-center space-x-2">
-                <Checkbox 
-                  id={`floor-${name}-${floor}`} 
-                  checked={preferredFloors.includes(floor)}
-                  onCheckedChange={(checked) => handleFloorChange(floor, !!checked)}
-                />
-                <Label 
-                  htmlFor={`floor-${name}-${floor}`}
-                  className="text-sm cursor-pointer"
-                >
-                  {floor === 0 ? 'RDC' : `${floor}`}
-                </Label>
-              </div>
-            ))}
           </div>
         </div>
-      )}
-      
-      <div className="mb-4">
-        <div className="flex justify-between text-sm mb-1">
-          <span>Charge de travail</span>
-          <span>{estimatedTime} min</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            className={cn(
-              "h-2.5 rounded-full",
-              workload >= 90 ? "bg-red-500" :
-              workload >= 75 ? "bg-orange-500" :
-              workload <= 30 ? "bg-amber-500" :
-              "bg-green-500"
-            )} 
-            style={{ width: `${workload}%` }}
-          ></div>
+      </CardHeader>
+      <CardContent className="p-4 space-y-4">
+        <div className="flex justify-between mb-2">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Charge de travail</p>
+            <div className="flex space-x-2">
+              <Badge variant="outline" className="bg-blue-50">
+                {Math.floor(workload / 60)}h{workload % 60 > 0 ? ` ${workload % 60}min` : ''}
+              </Badge>
+              <Badge variant="outline" className="bg-purple-50">
+                {fullCleaningRooms} à blanc
+              </Badge>
+              <Badge variant="outline" className="bg-blue-50">
+                {quickCleaningRooms} recouche
+              </Badge>
+            </div>
+          </div>
+          <Badge variant="outline" className="flex items-center h-6">
+            {totalRooms} chambres
+          </Badge>
         </div>
         
-        <div className="flex justify-between text-xs mt-1 text-muted-foreground">
-          <span>Min: {cleaningConfig.minRoomsPerHousekeeper} chambres</span>
-          <span>{rooms.length} chambres</span>
-          <span>Max: {cleaningConfig.maxRoomsPerHousekeeper} chambres</span>
+        {/* Email professionnel */}
+        <div className="space-y-2">
+          <Label htmlFor={`email-${name}`} className="text-sm font-medium">
+            Email professionnel
+          </Label>
+          {isEmailEditing ? (
+            <div className="flex gap-2">
+              <Input
+                id={`email-${name}`}
+                value={emailValue}
+                onChange={(e) => setEmailValue(e.target.value)}
+                placeholder="email@exemple.com"
+                className="flex-1"
+              />
+              <Button onClick={handleSaveEmail} size="sm" variant="outline">
+                Enregistrer
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2 items-center">
+              <span className="text-sm flex-1 overflow-hidden text-ellipsis">
+                {email || "Aucun email configuré"}
+              </span>
+              <Button 
+                onClick={() => setIsEmailEditing(true)} 
+                size="sm" 
+                variant="ghost"
+                className="h-8 px-2"
+              >
+                Modifier
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
-      
-      {isOverloaded && (
-        <div className="text-red-500 text-xs mb-2">
-          ⚠️ Trop de chambres assignées
+        
+        {/* Préférences d'étage */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Préférences d'étages</Label>
+          <div className="flex flex-wrap gap-2">
+            {availableFloors.map(floor => (
+              <label 
+                key={floor} 
+                className="flex items-center space-x-2 border rounded-md px-2 py-1 cursor-pointer hover:bg-gray-50"
+              >
+                <Checkbox 
+                  checked={preferredFloors.includes(floor)} 
+                  onCheckedChange={() => handleFloorToggle(floor)}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm">
+                  {floor === 0 ? 'RDC' : `Étage ${floor}`}
+                  {roomsByFloor[floor] ? ` (${roomsByFloor[floor]})` : ''}
+                </span>
+              </label>
+            ))}
+            
+            {availableFloors.length === 0 && (
+              <span className="text-sm text-gray-500">Aucun étage disponible</span>
+            )}
+          </div>
         </div>
-      )}
-      
-      {isUnderloaded && rooms.length > 0 && (
-        <div className="text-amber-500 text-xs mb-2">
-          ⚠️ Pas assez de chambres assignées
-        </div>
-      )}
-      
-      {/* Affichage par étage si au moins 2 étages différents */}
-      {sortedFloorRooms.length > 1 ? (
-        <div className="space-y-4">
-          {sortedFloorRooms.map(([floor, floorRooms]) => (
-            <div key={floor} className="border-t pt-2">
-              <div className="text-xs font-semibold mb-1">
-                Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {sortRoomsByNumber(floorRooms).map(room => (
-                  <div 
-                    key={room.number} 
-                    className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                    onClick={() => onRoomUnassign(room)}
-                    title="Cliquer pour retirer l'assignation"
-                  >
-                    <RoomCard 
-                      room={room} 
-                      onUpdate={onRoomUpdate} 
-                      compact 
-                      draggable={draggable}
-                    />
-                  </div>
+        
+        {/* Liste des chambres assignées */}
+        {totalRooms > 0 ? (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Chambres assignées</Label>
+            <ScrollArea className="h-[200px]">
+              <div className="grid grid-cols-2 gap-2">
+                {sortedRooms.map((room) => (
+                  <RoomCard
+                    key={room.number}
+                    room={room}
+                    compact
+                    onUpdate={onRoomUpdate}
+                    onUnassign={() => onRoomUnassign(room)}
+                    showActions={false}
+                  />
                 ))}
               </div>
-            </div>
-          ))}
+            </ScrollArea>
+          </div>
+        ) : (
+          <div className="text-center py-4 text-gray-500">
+            <p>Aucune chambre assignée</p>
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="bg-gray-50 px-4 py-2 flex justify-between">
+        <div className="text-xs text-gray-500">
+          {Object.entries(roomsByFloor).length > 0 && (
+            <span>
+              Étages: {Object.entries(roomsByFloor)
+                .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                .map(([floor, count]) => `${floor}${count > 1 ? `(${count})` : ''}`)
+                .join(', ')}
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          {sortRoomsByNumber(rooms).map(room => (
-            <div 
-              key={room.number} 
-              className="cursor-pointer hover:bg-gray-100 rounded p-1"
-              onClick={() => onRoomUnassign(room)}
-              title="Cliquer pour retirer l'assignation"
+        <div className="flex space-x-2">
+          {totalRooms > 0 && (
+            <Select
+              onValueChange={(status) => {
+                const updatedRooms = sortedRooms.map(room => ({
+                  ...room,
+                  status: status as 'clean' | 'needs-cleaning' | 'occupied' | 'maintenance'
+                }));
+                
+                updatedRooms.forEach(room => onRoomUpdate(room));
+                
+                toast({
+                  title: "Statut mis à jour",
+                  description: `Toutes les chambres de ${name} ont été mises à jour.`
+                });
+              }}
             >
-              <RoomCard 
-                room={room} 
-                onUpdate={onRoomUpdate} 
-                compact 
-                draggable={draggable}
-              />
-            </div>
-          ))}
+              <SelectTrigger className="h-8 text-xs w-28">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="needs-cleaning">À nettoyer</SelectItem>
+                <SelectItem value="clean">Propre</SelectItem>
+                <SelectItem value="occupied">Occupée</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
-      )}
-      
-      {rooms.length === 0 && (
-        <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
-          Glissez des chambres ici
-        </div>
-      )}
+      </CardFooter>
     </Card>
   );
 }
