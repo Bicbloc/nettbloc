@@ -83,105 +83,125 @@ export async function processPdf(file: File): Promise<Room[]> {
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
   
-  // Pattern pour trouver les numéros de chambre (3 chiffres)
-  // Nous recherchons divers formats de numéros de chambre
-  const roomNumberPatterns = [
-    /\b(\d{3})\b/g,  // Format standard: 101, 102, etc.
-    /\bRoom\s+(\d{3})\b/gi,  // Format "Room 101"
-    /\bChambre\s+(\d{3})\b/gi,  // Format "Chambre 101"
-    /\b(\d{3})\s*-\s*[A-Z]/gi,  // Format "101-A"
-    /\b(No\.|N°)\s*(\d{3})\b/gi  // Format "No. 101" ou "N° 101"
+  // Patterns améliorés pour détecter les numéros de chambre dans différents formats
+  // Ajout de nouveaux patterns pour capturer plus de formats de numéros de chambre
+  const patterns = [
+    /\b(Spaces|Espace)\s+(\d{3})\b/gi,
+    /\b([1-9]\d{2})\s+(SGL|DBL|TWN|DIR|CL|INS|SP|DX|CB)\b/gi,
+    /\b([1-9]\d{2})\b(?=\s*[A-Z]{2,3})/g,
+    /\b(Room|Chambre)\s+(\d{3})\b/gi,
+    /\b([1-9]\d{2})\s*-\s*[A-Z]/gi, // Format 101-A
+    /\b(No\.|N°)\s*(\d{3})\b/gi,     // Format No. 101 ou N° 101
+    /\b(\d{3})\s*\(/gi,              // Format 101 (quelque chose)
+    /\b(\d{1,2})(\d{2})\b(?!\d)/g    // Capture numéro de chambre simple comme 101
   ];
   
-  // Ensemble pour suivre les chambres déjà trouvées
+  // Utiliser chaque pattern pour trouver les numéros de chambre
   const foundRooms = new Set();
   
-  // Utiliser chaque pattern pour rechercher des numéros de chambre
-  for (const pattern of roomNumberPatterns) {
+  for (const pattern of patterns) {
     let match;
+    pattern.lastIndex = 0; // Réinitialiser l'index pour chaque nouvelle recherche
+    
     while ((match = pattern.exec(text)) !== null) {
-      // Récupérer le numéro de chambre (dans le groupe 1 ou 2 selon le pattern)
+      // Récupérer le numéro de chambre correctement selon le pattern utilisé
       let roomNumber;
-      if (pattern.source.includes('No\\.|N°')) {
-        roomNumber = match[2];  // Pour les patterns avec "No." ou "N°"
+      
+      if (match[1] === 'Spaces' || match[1] === 'Espace' || match[1] === 'Room' || match[1] === 'Chambre' || match[1] === 'No.' || match[1] === 'N°') {
+        roomNumber = match[2];
+      } else if (pattern.source.includes('\\d{1,2})(\\d{2})')) {
+        // Pour le pattern qui capture le numéro de chambre directement
+        roomNumber = match[0];
       } else {
-        roomNumber = match[1];  // Pour les autres patterns
+        roomNumber = match[1];
       }
       
-      // Normaliser le format du numéro (assurer au moins 3 chiffres)
-      roomNumber = String(parseInt(roomNumber)).padStart(3, '0');
+      // Vérifier que le numéro de chambre est un nombre valide
+      if (!/^\d+$/.test(roomNumber)) continue;
+      
+      // Normaliser le format du numéro (éliminer les zéros au début mais assurer au moins 3 chiffres)
+      roomNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
       
       // Éviter les doublons
       if (foundRooms.has(roomNumber)) continue;
       foundRooms.add(roomNumber);
       
-      // Extraire les données pour cette chambre
-      const roomData = extractRoomData(text, roomNumber, match.index);
+      // Extraire le contexte autour du numéro de chambre (un plus grand contexte pour mieux analyser)
+      const start = Math.max(0, match.index - 200);
+      const end = Math.min(text.length, match.index + 200);
+      const context = text.substring(start, end);
       
-      // Déterminer l'étage à partir du premier chiffre du numéro de chambre
-      const floor = parseInt(roomNumber[0]);
+      // Analyser le statut et le type de nettoyage selon les règles définies
+      const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+      
+      // Déterminer si c'est une chambre twin
+      const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
+      
+      // Déterminer la priorité
+      const priority = determinePriority(context);
+      
+      // Déterminer l'étage
+      const floor = roomNumber.length > 0 ? parseInt(roomNumber[0]) : 0;
       
       rooms.push({
         number: roomNumber,
-        status: roomData.status,
-        cleaningType: roomData.cleaningType,
-        priority: roomData.priority,
-        isTwin: roomData.isTwin,
-        isUrgent: roomData.priority === 'high',
-        notUrgent: roomData.priority === 'low',
+        status,
+        cleaningType,
+        priority,
+        isTwin,
+        isUrgent: priority === 'high',
+        notUrgent: priority === 'low',
         floor
       });
     }
   }
   
-  // Deuxième passe avec un pattern plus générique pour détecter plus de chambres
-  // Ce pattern cherche des nombres de 3-4 chiffres qui pourraient être des numéros de chambre
-  const genericPattern = /\b(\d{3,4})\b/g;
+  // Deuxième passe pour essayer de trouver plus de numéros de chambres
+  // Cette fois avec un pattern très générique mais qui vérifie si le nombre pourrait être une chambre
+  const genericRoomPattern = /\b(\d{3})\b/g;
   let genericMatch;
   
-  while ((genericMatch = genericPattern.exec(text)) !== null) {
+  while ((genericMatch = genericRoomPattern.exec(text)) !== null) {
     const potentialRoomNumber = genericMatch[1];
     
-    // Vérifier si ce n'est pas un prix, une date, etc.
+    // Vérifier que ce n'est pas un nombre qui fait partie d'une date, heure, etc.
     const beforeText = text.substring(Math.max(0, genericMatch.index - 10), genericMatch.index);
-    const afterText = text.substring(genericMatch.index + potentialRoomNumber.length, 
-                                   Math.min(text.length, genericMatch.index + potentialRoomNumber.length + 10));
+    const afterText = text.substring(genericMatch.index + potentialRoomNumber.length, Math.min(text.length, genericMatch.index + potentialRoomNumber.length + 10));
     
-    if (beforeText.match(/\d[\/\-\.:]$/) || afterText.match(/^[\/\-\.:]/)  ) {
-      continue; // Ignorer si c'est probablement une date ou un prix
+    // Ignorer si ce semble être une date, heure, prix, etc.
+    if (beforeText.match(/\d[\/\-\.:]$/) || afterText.match(/^[\/\-\.:]/) || 
+        beforeText.match(/\$|€|£|\d+[.,]\d+$/) || afterText.match(/^[.,]\d+/)) {
+      continue;
     }
     
-    // Pour les numéros à 4 chiffres, vérifier s'ils commencent par un chiffre valide d'étage (0-9)
-    let roomNumber = potentialRoomNumber;
-    if (roomNumber.length === 4) {
-      const firstDigit = parseInt(roomNumber[0]);
-      if (firstDigit > 9) continue; // Ignorer si le premier chiffre n'est pas un étage valide
-      
-      // Pour les numéros à 4 chiffres, utiliser les 3 derniers chiffres comme numéro de chambre
-      roomNumber = roomNumber.substring(1);
-    }
-    
-    // Normaliser le format
-    roomNumber = String(parseInt(roomNumber)).padStart(3, '0');
-    
-    // Éviter les doublons
+    // Normaliser le format et vérifier qu'il n'est pas déjà trouvé
+    const roomNumber = String(parseInt(potentialRoomNumber, 10)).padStart(3, '0');
     if (foundRooms.has(roomNumber)) continue;
+    
+    // Inclure seulement si le premier chiffre est 0-9 (étage plausible)
+    const firstDigit = parseInt(roomNumber[0]);
+    if (firstDigit > 9) continue;
+    
     foundRooms.add(roomNumber);
     
-    // Extraire les données pour cette chambre
-    const roomData = extractRoomData(text, roomNumber, genericMatch.index);
+    // Extraire le contexte pour l'analyse
+    const start = Math.max(0, genericMatch.index - 200);
+    const end = Math.min(text.length, genericMatch.index + 200);
+    const context = text.substring(start, end);
     
-    // Déterminer l'étage
+    const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+    const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
+    const priority = determinePriority(context);
     const floor = parseInt(roomNumber[0]);
     
     rooms.push({
       number: roomNumber,
-      status: roomData.status,
-      cleaningType: roomData.cleaningType,
-      priority: roomData.priority,
-      isTwin: roomData.isTwin,
-      isUrgent: roomData.priority === 'high',
-      notUrgent: roomData.priority === 'low',
+      status,
+      cleaningType,
+      priority,
+      isTwin,
+      isUrgent: priority === 'high',
+      notUrgent: priority === 'low',
       floor
     });
   }
@@ -189,171 +209,93 @@ function parseRoomsFromText(text: string): Room[] {
   console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
   
   // Trier les chambres par numéro
-  return rooms.sort((a, b) => a.number.localeCompare(b.number));
+  return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
 }
 
-// Extraire les données d'une chambre à partir du contexte
-function extractRoomData(text: string, roomNumber: string, matchIndex: number) {
-  // Extraire le contexte autour du numéro de chambre
-  const contextStart = Math.max(0, matchIndex - 150);
-  const contextEnd = Math.min(text.length, matchIndex + 150);
-  const context = text.substring(contextStart, contextEnd);
-  
-  // Déterminer si c'est une chambre twin
-  const isTwin = context.includes('TWN') || 
-                 context.toLowerCase().includes('twin') ||
-                 context.toLowerCase().includes('deux lits');
-  
-  // Déterminer le statut et le type de nettoyage
-  const { status, cleaningType } = determineStatusAndCleaningType(context);
-  
-  // Déterminer la priorité
-  const priority = determinePriority(context);
-  
+// Implémentation de la nouvelle fonction d'analyse améliorée
+function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+  let status: string = 'needs-cleaning';
+  let cleaningType: 'full' | 'quick' | 'none' = 'none';
+
+  const dateMatches = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+  const timeMatches = context.match(/\b\d{1,2}:\d{2}\b/g) || [];
+  const hasDIR = context.includes('DIR');
+  const hasINS = context.includes('INS');
+  const hasCL = context.includes('CL');
+  const hasClientBlock = context.includes('× Adultes');
+
+  // 🟩 Chambre propre
+  const noDates = dateMatches.length === 0;
+  if (
+    (noDates && (hasINS || hasCL)) || // vide avec statut CL/INS
+    (hasINS && hasClientBlock)        // client visible à droite mais chambre inspectée
+  ) {
+    return {
+      status: 'clean',
+      cleaningType: 'none',
+    };
+  }
+
+  // 🔵 Recouche
+  // Bloc centré = 1 seul bloc client (date arrivée + nom + date départ)
+  // OU 2 blocs mais avec même nom (on simplifie ici par "× Adultes" deux fois)
+  const sameClientTwice = (context.match(/× Adultes/g) || []).length === 2;
+  const isCenteredSingleBlock = hasClientBlock && dateMatches.length === 2 && !hasDIR;
+
+  if (
+    isCenteredSingleBlock ||
+    sameClientTwice
+  ) {
+    return {
+      status: 'needs-cleaning',
+      cleaningType: 'quick',
+    };
+  }
+
+  // 🟥 À nettoyer à blanc
+  // Bloc à gauche, ou deux blocs différents (ex. deux dates + heure), ou statut DIR + date
+  const isLeftColumn = context.includes('Spaces') || context.includes('Espace');
+  const hasTwoClientBlocks = dateMatches.length >= 2 && timeMatches.length >= 1;
+  const oneBlockWithOnlyHour = dateMatches.length === 1 && timeMatches.length === 1;
+  const isRightWithDIR = hasDIR && hasClientBlock;
+
+  if (
+    isLeftColumn ||
+    hasTwoClientBlocks ||
+    oneBlockWithOnlyHour ||
+    isRightWithDIR
+  ) {
+    return {
+      status: 'needs-cleaning',
+      cleaningType: 'full',
+    };
+  }
+
+  // 🟠 Autres cas
+  if (context.toLowerCase().includes('maintenance') || context.toLowerCase().includes('hors service')) {
+    return {
+      status: 'maintenance',
+      cleaningType: 'none',
+    };
+  }
+
+  if (context.toLowerCase().includes('occupied') || context.includes('OCC')) {
+    return {
+      status: 'occupied',
+      cleaningType: 'none',
+    };
+  }
+
+  // 🔁 Par défaut
   return {
-    status,
-    cleaningType,
-    priority,
-    isTwin
+    status: 'needs-cleaning',
+    cleaningType: 'full',
   };
 }
 
-// Déterminer le statut et le type de nettoyage
+// Fonction historique laissée en place pour référence
 function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // Vérifier les indicateurs de statut
-  const isDirty = context.includes('DIR') || 
-                  context.toLowerCase().includes('dirty') ||
-                  context.toLowerCase().includes('sale');
-                  
-  const isClean = context.includes('CL') || 
-                  context.includes('INS') ||
-                  context.toLowerCase().includes('clean') ||
-                  context.toLowerCase().includes('propre') ||
-                  context.toLowerCase().includes('inspection');
-                  
-  const isMaintenance = context.toLowerCase().includes('maintenance') ||
-                       context.toLowerCase().includes('out of order') ||
-                       context.toLowerCase().includes('hors service');
-                       
-  const isOccupied = context.includes('OCC') ||
-                     context.toLowerCase().includes('occupied') ||
-                     context.toLowerCase().includes('occupé');
-  
-  // Vérifier les indicateurs de type de séjour
-  const hasCheckout = context.toLowerCase().includes('checkout') ||
-                      context.toLowerCase().includes('départ');
-                      
-  const hasStayover = context.toLowerCase().includes('stayover') ||
-                     context.toLowerCase().includes('séjour');
-                     
-  // Règles de décision
-  if (isMaintenance) {
-    return { status: 'maintenance', cleaningType: 'none' };
-  }
-  
-  if (isClean && !isDirty) {
-    return { status: 'clean', cleaningType: 'none' };
-  }
-  
-  if (isOccupied && !isDirty && !hasCheckout) {
-    return { status: 'occupied', cleaningType: 'none' };
-  }
-  
-  if (hasStayover && !hasCheckout) {
-    return { status: 'needs-cleaning', cleaningType: 'quick' };
-  }
-  
-  // Par défaut, si aucune règle spécifique ne s'applique
-  return { status: 'needs-cleaning', cleaningType: 'full' };
-}
-
-// Autre méthode pour déterminer statut et nettoyage (laissée pour référence)
-function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // Valeurs par défaut
-  let status = 'needs-cleaning';
-  let cleaningType: 'full' | 'quick' | 'none' = 'none';
-
-  // 🟦 Chambre à blanc - CAS 1: Un bloc de réservation apparaît dans la colonne de gauche du rapport
-  const leftColumnReservation = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
-                               !context.includes("Adults.*\d{2}\/\d{2}\/\d{4}");
-                               
-  if (leftColumnReservation) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟦 Chambre à blanc - CAS 2: Un bloc de réservation en colonne droite ET statut DIR
-  const rightColumnWithDIR = /Adults.*\d{2}\/\d{2}\/\d{4}/.test(context) && 
-                             (context.includes('DIR') || context.toLowerCase().includes('dirty'));
-  
-  if (rightColumnWithDIR) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟦 Chambre à blanc - CAS 3: Deux blocs distincts visibles
-  const twoDistinctBlocks = context.match(/\d{2}\/\d{2}\/\d{4}/g)?.length >= 2;
-  
-  if (twoDistinctBlocks) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🔵 Chambre en recouche: Une seule ligne avec date d'arrivée et départ ultérieure
-  const hasOneReservationLine = /\d{2}\/\d{2}\/\d{4}.*Night/.test(context) || 
-                               /\d{2}\/\d{2}\/\d{4}.*séjour/.test(context) ||
-                               /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
-  
-  if (hasOneReservationLine && !leftColumnReservation && !rightColumnWithDIR && !twoDistinctBlocks) {
-    cleaningType = 'quick';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟩 Chambre propre - CAS 1: Case vide (aucun bloc client) ET statut CL ou INS
-  const emptyWithCleanStatus = (!context.match(/\d{2}\/\d{2}\/\d{4}/g) && 
-                              (context.includes('CL') || context.includes('INS') || 
-                               context.toLowerCase().includes('clean') || context.toLowerCase().includes('inspection')));
-  
-  // 🟩 Chambre propre - CAS 2: Chambre dans colonne de droite ET statut INS uniquement
-  const rightColumnINS = /Adults.*INS/.test(context) || 
-                         (context.includes('Adults') && context.toLowerCase().includes('inspection'));
-  
-  if (emptyWithCleanStatus || rightColumnINS) {
-    cleaningType = 'none';
-    status = 'clean';
-    return { status, cleaningType };
-  }
-
-  // Cas par défaut - si aucune règle ne correspond explicitement
-  // Vérifier s'il y a un statut DIR visible
-  if (context.includes('DIR') || context.toLowerCase().includes('dirty')) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-  
-  // Si des mots-clés comme "maintenance" ou "out of order" sont présents
-  if (context.toLowerCase().includes('maintenance') || 
-      context.toLowerCase().includes('out of order') || 
-      context.toLowerCase().includes('hors service')) {
-    status = 'maintenance';
-    cleaningType = 'none';
-    return { status, cleaningType };
-  }
-  
-  // Si des mots-clés comme "occupé" ou "occupied" sont présents
-  if (context.toLowerCase().includes('occupied') || 
-      context.toLowerCase().includes('occupé') || 
-      context.includes('OCC')) {
-    status = 'occupied';
-    cleaningType = 'none';
-    return { status, cleaningType };
-  }
-
+  // ... keep existing code (obsolète mais conservé pour référence)
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
@@ -384,21 +326,18 @@ function determinePriority(context: string): 'high' | 'medium' | 'low' {
 
 // Helper function to generate mock room data
 function generateMockRoomData(): Room[] {
-  const statuses = ['needs-cleaning', 'clean', 'occupied', 'maintenance'];
-  const cleaningTypes = ['full', 'quick', 'none'] as const;
-  const priorities = ['high', 'medium', 'low'] as const;
-  
+  // ... keep existing code (function to generate mock room data)
   return Array.from({ length: 50 }, (_, i) => {
     const floor = Math.floor(i / 20) + 1;
     const room = (i % 20) + 1;
     const roomNumber = `${floor}${room.toString().padStart(2, '0')}`;
     const isTwin = Math.random() > 0.7;
-    const priority = priorities[Math.floor(Math.random() * priorities.length)];
+    const priority = ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low';
     
     return {
       number: roomNumber,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      cleaningType: cleaningTypes[Math.floor(Math.random() * cleaningTypes.length)],
+      status: ['needs-cleaning', 'clean', 'occupied', 'maintenance'][Math.floor(Math.random() * 4)],
+      cleaningType: ['full', 'quick', 'none'][Math.floor(Math.random() * 3)] as 'full' | 'quick' | 'none',
       priority,
       isTwin,
       isUrgent: priority === 'high',

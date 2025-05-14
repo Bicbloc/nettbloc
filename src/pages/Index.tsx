@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,7 +34,6 @@ const Index = () => {
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
-  const [housekeeperEmails, setHousekeeperEmails] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Initialiser les préférences d'étages pour chaque femme de chambre
@@ -61,14 +61,6 @@ const Index = () => {
     handleRoomUpdate(updatedRoom);
   };
 
-  // Mettre à jour l'email d'une femme de chambre
-  const handleHousekeeperEmailChange = (housekeeperName: string, email: string) => {
-    setHousekeeperEmails(prev => ({
-      ...prev,
-      [housekeeperName]: email
-    }));
-  };
-  
   // Mettre à jour les préférences d'étages d'une femme de chambre
   const handleFloorPreferenceChange = (housekeeperName: string, floors: number[]) => {
     setHousekeeperFloorPreferences(prev => ({
@@ -102,7 +94,7 @@ const Index = () => {
     setActiveTab("rooms");
   };
   
-  // Distribuer les chambres entre les femmes de chambre de façon intelligente
+  // Distribuer les chambres entre les femmes de chambre
   const distributeRooms = (
     roomsList: Room[], 
     housekeepers: string[], 
@@ -142,86 +134,67 @@ const Index = () => {
       roomsByFloor[floor].push(room);
     }
     
-    // Initialiser les listes d'assignation et les étages déjà assignés
+    // Initialiser les listes d'assignation
     const assignments: Record<string, Room[]> = {};
-    const assignedFloors: Record<string, Set<number>> = {};
     housekeepers.forEach(name => {
       assignments[name] = [];
-      assignedFloors[name] = new Set();
     });
     
-    // Fonction pour trouver la femme de chambre la plus appropriée pour une chambre
-    const findBestHousekeeper = (room: Room) => {
-      const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
+    // Fonction pour trouver la femme de chambre avec la charge de travail minimale
+    const findMinLoadHousekeeper = (preferredFloor?: number) => {
+      let candidates = housekeepers;
       
-      // 1. Vérifier les préférences d'étage explicites
-      const preferredHousekeepers = housekeepers.filter(name => 
-        floorPreferences[name]?.includes(roomFloor)
-      );
-      
-      if (preferredHousekeepers.length > 0) {
-        // Parmi ceux qui préfèrent cet étage, choisir celui avec la charge minimale
-        return preferredHousekeepers.reduce((best, current) => {
-          const bestLoad = calculateHousekeeperLoad(assignments[best], cleaningConfig);
-          const currentLoad = calculateHousekeeperLoad(assignments[current], cleaningConfig);
-          return currentLoad < bestLoad ? current : best;
-        }, preferredHousekeepers[0]);
-      }
-      
-      // 2. Vérifier si quelqu'un travaille déjà sur cet étage
-      const housekeepersOnThisFloor = housekeepers.filter(name => 
-        assignedFloors[name].has(roomFloor)
-      );
-      
-      if (housekeepersOnThisFloor.length > 0) {
-        // Parmi ceux qui travaillent déjà sur cet étage, choisir celui avec la charge minimale
-        return housekeepersOnThisFloor.reduce((best, current) => {
-          const bestLoad = calculateHousekeeperLoad(assignments[best], cleaningConfig);
-          const currentLoad = calculateHousekeeperLoad(assignments[current], cleaningConfig);
-          return currentLoad < bestLoad ? current : best;
-        }, housekeepersOnThisFloor[0]);
-      }
-      
-      // 3. Vérifier les étages adjacents pour la continuité
-      for (const name of housekeepers) {
-        for (const assignedFloor of Array.from(assignedFloors[name])) {
-          if (Math.abs(assignedFloor - roomFloor) === 1) {
-            // Cette femme de chambre travaille sur un étage adjacent
-            return name;
-          }
+      // Si un étage préféré est spécifié, filtrer les femmes de chambre qui préfèrent cet étage
+      if (preferredFloor !== undefined) {
+        const housekeepersForFloor = housekeepers.filter(name => 
+          floorPreferences[name]?.includes(preferredFloor)
+        );
+        // S'il y a des femmes de chambre qui préfèrent cet étage, les utiliser en priorité
+        if (housekeepersForFloor.length > 0) {
+          candidates = housekeepersForFloor;
         }
       }
       
-      // 4. Fallback: choisir la femme de chambre avec la charge minimale
-      return housekeepers.reduce((best, current) => {
-        const bestLoad = calculateHousekeeperLoad(assignments[best], cleaningConfig);
-        const currentLoad = calculateHousekeeperLoad(assignments[current], cleaningConfig);
-        return currentLoad < bestLoad ? current : best;
-      }, housekeepers[0]);
+      let minLoadHousekeeper = candidates[0];
+      let minLoad = calculateHousekeeperLoad(assignments[minLoadHousekeeper], cleaningConfig);
+      
+      for (let i = 1; i < candidates.length; i++) {
+        const currentLoad = calculateHousekeeperLoad(assignments[candidates[i]], cleaningConfig);
+        if (currentLoad < minLoad) {
+          minLoad = currentLoad;
+          minLoadHousekeeper = candidates[i];
+        }
+      }
+      
+      return minLoadHousekeeper;
     };
     
-    // Assigner les chambres en privilégiant d'abord les priorités élevées
-    const highPriorityRooms = roomsToClean.filter(room => room.priority === 'high');
-    for (const room of highPriorityRooms) {
-      const housekeeper = findBestHousekeeper(room);
-      const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
+    // Assigner les chambres par étage, en optimisant l'affectation
+    const assignedRooms = new Set<string>();
+    
+    // Première passe pour les chambres prioritaires
+    for (const room of roomsToClean.filter(r => r.priority === 'high')) {
+      const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
+      const housekeeper = findMinLoadHousekeeper(floor);
       
       assignments[housekeeper].push({ ...room, assignedTo: housekeeper });
-      assignedFloors[housekeeper].add(roomFloor);
+      assignedRooms.add(room.number);
     }
     
-    // Ensuite, assigner le reste des chambres
-    const normalRooms = roomsToClean.filter(room => room.priority !== 'high');
-    for (const room of normalRooms) {
-      // Vérifier si la chambre est déjà assignée (était prioritaire)
-      if (highPriorityRooms.some(r => r.number === room.number)) continue;
+    // Seconde passe pour les chambres restantes, en assignant par étage
+    // Itérer sur chaque étage pour optimiser les déplacements
+    Object.entries(roomsByFloor).forEach(([floor, floorRooms]) => {
+      const floorNum = parseInt(floor);
       
-      const housekeeper = findBestHousekeeper(room);
-      const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
-      
-      assignments[housekeeper].push({ ...room, assignedTo: housekeeper });
-      assignedFloors[housekeeper].add(roomFloor);
-    }
+      // Distribuer les chambres de cet étage entre les femmes de chambre qui le préfèrent
+      for (const room of floorRooms) {
+        if (assignedRooms.has(room.number)) continue;
+        
+        const housekeeper = findMinLoadHousekeeper(floorNum);
+        assignments[housekeeper].push({ ...room, assignedTo: housekeeper });
+        assignedRooms.add(room.number);
+      }
+    });
     
     // Mettre à jour les chambres
     const updatedRooms = [...sortedRooms];
@@ -252,8 +225,7 @@ const Index = () => {
   // Générer un rapport pour une femme de chambre
   const handleGenerateReport = async (housekeeperName: string, housekeeperRooms: Room[]) => {
     try {
-      const email = housekeeperEmails[housekeeperName] || '';
-      await generateHousekeeperReport(housekeeperName, housekeeperRooms, cleaningConfig, email);
+      await generateHousekeeperReport(housekeeperName, housekeeperRooms, cleaningConfig);
       toast({
         title: "Rapport généré",
         description: `Le rapport pour ${housekeeperName} a été créé avec succès.`,
@@ -295,13 +267,6 @@ const Index = () => {
       updatedPreferences[name] = housekeeperFloorPreferences[name] || [];
     });
     setHousekeeperFloorPreferences(updatedPreferences);
-    
-    // Mettre à jour les emails
-    const updatedEmails: Record<string, string> = {};
-    names.forEach(name => {
-      updatedEmails[name] = housekeeperEmails[name] || '';
-    });
-    setHousekeeperEmails(updatedEmails);
   };
   
   const getStatusBadge = (status: string) => {
@@ -348,16 +313,8 @@ const Index = () => {
   };
   
   // Gérer l'assignation manuelle des chambres
-  const handleManualAssign = (housekeeperName: string, selectedRooms: Room[], email?: string) => {
+  const handleManualAssign = (housekeeperName: string, selectedRooms: Room[]) => {
     const updatedRooms = [...rooms];
-    
-    // Mettre à jour l'email si fourni
-    if (email) {
-      setHousekeeperEmails(prev => ({
-        ...prev,
-        [housekeeperName]: email
-      }));
-    }
     
     for (const room of selectedRooms) {
       const index = updatedRooms.findIndex(r => r.number === room.number);
@@ -367,17 +324,6 @@ const Index = () => {
     }
     
     setRooms(updatedRooms);
-  };
-  
-  // Changer rapidement le statut d'une chambre
-  const handleQuickStatusChange = (room: Room, newStatus: string) => {
-    const updatedRoom = { ...room, status: newStatus };
-    if (newStatus === 'needs-cleaning' && room.cleaningType === 'none') {
-      updatedRoom.cleaningType = 'full';
-    } else if (newStatus === 'clean') {
-      updatedRoom.cleaningType = 'none';
-    }
-    handleRoomUpdate(updatedRoom);
   };
   
   // Trier toutes les chambres par étage et numéro
@@ -578,8 +524,6 @@ const Index = () => {
                   preferredFloors={housekeeperFloorPreferences[name] || []}
                   onFloorPreferenceChange={handleFloorPreferenceChange}
                   onManualAssign={() => openManualAssignment(name)}
-                  email={housekeeperEmails[name] || ''}
-                  onEmailChange={(email) => handleHousekeeperEmailChange(name, email)}
                 />
               ))}
               
@@ -638,7 +582,7 @@ const Index = () => {
                                 <TableHead>Twin</TableHead>
                                 <TableHead>Priorité</TableHead>
                                 <TableHead>Assignée À</TableHead>
-                                <TableHead>Actions</TableHead>
+                                <TableHead>Action</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -692,36 +636,16 @@ const Index = () => {
                                     {room.assignedTo || 'Non assignée'}
                                   </TableCell>
                                   <TableCell>
-                                    <div className="flex gap-2">
-                                      <select 
-                                        className="border rounded px-2 py-1 text-sm"
-                                        value={room.assignedTo || ''}
-                                        onChange={(e) => handleRoomUpdate({...room, assignedTo: e.target.value || undefined})}
-                                      >
-                                        <option value="">Non assignée</option>
-                                        {housekeeperNames.map(name => (
-                                          <option key={name} value={name}>{name}</option>
-                                        ))}
-                                      </select>
-                                      <div className="flex gap-1">
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm"
-                                          onClick={() => handleQuickStatusChange(room, 'clean')}
-                                          className="bg-green-100 hover:bg-green-200 border-green-200 px-2"
-                                        >
-                                          Propre
-                                        </Button>
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm"
-                                          onClick={() => handleQuickStatusChange(room, 'needs-cleaning')}
-                                          className="bg-yellow-100 hover:bg-yellow-200 border-yellow-200 px-2"
-                                        >
-                                          À nettoyer
-                                        </Button>
-                                      </div>
-                                    </div>
+                                    <select 
+                                      className="border rounded px-2 py-1 text-sm"
+                                      value={room.assignedTo || ''}
+                                      onChange={(e) => handleRoomUpdate({...room, assignedTo: e.target.value || undefined})}
+                                    >
+                                      <option value="">Non assignée</option>
+                                      {housekeeperNames.map(name => (
+                                        <option key={name} value={name}>{name}</option>
+                                      ))}
+                                    </select>
                                   </TableCell>
                                 </TableRow>
                               ))}

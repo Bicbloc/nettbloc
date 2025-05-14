@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Room } from "@/services/pdfService";
@@ -30,21 +29,9 @@ export function ManualAssignmentDialog({
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
+  const [filterFloor, setFilterFloor] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [housekeeperEmail, setHousekeeperEmail] = useState<string>("");
-  
-  // Reset selections when dialog opens/closes
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedRooms([]);
-      setSelectedHousekeeper(housekeeperNames.length > 0 ? housekeeperNames[0] : "");
-      setSearchTerm("");
-      setSelectedFloors([]);
-      setFilterStatus("all");
-      setHousekeeperEmail("");
-    }
-  }, [isOpen, housekeeperNames]);
+  const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
   
   // Get available floors from rooms
   const availableFloors = Array.from(
@@ -52,6 +39,31 @@ export function ManualAssignmentDialog({
       rooms.map(room => room.floor !== undefined ? room.floor : parseInt(room.number[0]))
     )
   ).sort((a, b) => a - b);
+  
+  // Reset selections when dialog opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedRooms([]);
+      setSelectedHousekeeper(housekeeperNames.length > 0 ? housekeeperNames[0] : "");
+      setSearchTerm("");
+      setFilterFloor("all");
+      setFilterStatus("all");
+      setSelectedFloors([...availableFloors]); // Select all floors by default
+    }
+  }, [isOpen, housekeeperNames, availableFloors]);
+  
+  // Handle floor selection and filtering
+  const handleFloorToggle = (floor: number) => {
+    setSelectedFloors(prev => {
+      // If floor is already selected, remove it
+      if (prev.includes(floor)) {
+        return prev.filter(f => f !== floor);
+      } else {
+        // Otherwise, add it
+        return [...prev, floor].sort((a, b) => a - b);
+      }
+    });
+  };
   
   // Apply filters to rooms
   useEffect(() => {
@@ -64,11 +76,12 @@ export function ManualAssignmentDialog({
       );
     }
     
-    // Apply floor filter - only show rooms from selected floors
-    if (selectedFloors.length > 0) {
+    // Apply floor filter (traditional dropdown filter)
+    if (filterFloor !== "all") {
+      const floorNum = parseInt(filterFloor);
       result = result.filter(room => {
         const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
-        return selectedFloors.includes(roomFloor);
+        return roomFloor === floorNum;
       });
     }
     
@@ -77,11 +90,24 @@ export function ManualAssignmentDialog({
       result = result.filter(room => room.status === filterStatus);
     }
     
+    // Apply selected floors filter (new multi-select floors)
+    if (selectedFloors.length < availableFloors.length) {
+      result = result.filter(room => {
+        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+        return selectedFloors.includes(roomFloor);
+      });
+    }
+    
     // Sort by room number
     result.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
     
     setFilteredRooms(result);
-  }, [rooms, searchTerm, selectedFloors, filterStatus]);
+    
+    // Removing rooms from selected if they're not in filtered results anymore
+    setSelectedRooms(prev => prev.filter(room => 
+      result.some(filteredRoom => filteredRoom.number === room.number)
+    ));
+  }, [rooms, searchTerm, filterFloor, filterStatus, selectedFloors, availableFloors]);
   
   const handleRoomSelect = (room: Room) => {
     setSelectedRooms(prev => {
@@ -91,28 +117,6 @@ export function ManualAssignmentDialog({
         return prev.filter(r => r.number !== room.number);
       } else {
         return [...prev, room];
-      }
-    });
-  };
-  
-  const handleFloorToggle = (floor: number) => {
-    setSelectedFloors(prev => {
-      if (prev.includes(floor)) {
-        // Remove floor
-        const newFloors = prev.filter(f => f !== floor);
-        
-        // Also remove rooms from that floor from selection
-        setSelectedRooms(currentRooms => 
-          currentRooms.filter(room => {
-            const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
-            return newFloors.includes(roomFloor);
-          })
-        );
-        
-        return newFloors;
-      } else {
-        // Add floor
-        return [...prev, floor];
       }
     });
   };
@@ -152,6 +156,15 @@ export function ManualAssignmentDialog({
     setSelectedRooms([]);
   };
   
+  // Toggle all floors
+  const selectAllFloors = () => {
+    setSelectedFloors([...availableFloors]);
+  };
+  
+  const clearAllFloors = () => {
+    setSelectedFloors([]);
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-3xl">
@@ -164,67 +177,98 @@ export function ManualAssignmentDialog({
         
         <div className="grid grid-cols-12 gap-4">
           {/* Filters */}
-          <div className="col-span-12 grid grid-cols-1 gap-4">
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <Label htmlFor="search">Recherche</Label>
-                <Input
-                  id="search"
-                  placeholder="Numéro de chambre..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="status-filter">Statut</Label>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger id="status-filter">
-                    <SelectValue placeholder="Tous les statuts" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les statuts</SelectItem>
-                    <SelectItem value="needs-cleaning">À nettoyer</SelectItem>
-                    <SelectItem value="clean">Propre</SelectItem>
-                    <SelectItem value="occupied">Occupé</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="flex gap-2 items-end">
-                <Button variant="outline" className="flex-1" onClick={selectAll}>
-                  Tout sélectionner
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={clearSelection}>
-                  Effacer
-                </Button>
-              </div>
+          <div className="col-span-12 grid grid-cols-4 gap-2">
+            <div>
+              <Label htmlFor="search">Recherche</Label>
+              <Input
+                id="search"
+                placeholder="Numéro de chambre..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
             
-            {/* Floors checkboxes */}
             <div>
-              <Label className="mb-2 block">Étages</Label>
-              <div className="flex flex-wrap gap-2">
-                {availableFloors.map(floor => (
-                  <div key={floor} className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`floor-${floor}`} 
-                      checked={selectedFloors.includes(floor)}
-                      onCheckedChange={() => handleFloorToggle(floor)}
-                    />
-                    <Label htmlFor={`floor-${floor}`}>
+              <Label htmlFor="floor-filter">Étage</Label>
+              <Select value={filterFloor} onValueChange={setFilterFloor}>
+                <SelectTrigger id="floor-filter">
+                  <SelectValue placeholder="Tous les étages" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les étages</SelectItem>
+                  {availableFloors.map(floor => (
+                    <SelectItem key={floor} value={floor.toString()}>
                       {floor === 0 ? "RDC" : `Étage ${floor}`}
-                    </Label>
-                  </div>
-                ))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="status-filter">Statut</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger id="status-filter">
+                  <SelectValue placeholder="Tous les statuts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="needs-cleaning">À nettoyer</SelectItem>
+                  <SelectItem value="clean">Propre</SelectItem>
+                  <SelectItem value="occupied">Occupé</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex gap-2 items-end">
+              <Button variant="outline" className="flex-1" onClick={selectAll}>
+                Tout sélectionner
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={clearSelection}>
+                Effacer
+              </Button>
+            </div>
+          </div>
+          
+          {/* Floor Selection Checkboxes */}
+          <div className="col-span-12">
+            <div className="flex justify-between items-center mb-2">
+              <Label>Sélection des étages :</Label>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={selectAllFloors}>Tous</Button>
+                <Button variant="outline" size="sm" onClick={clearAllFloors}>Aucun</Button>
               </div>
+            </div>
+            <div className="flex flex-wrap gap-3 border rounded-md p-2">
+              {availableFloors.map(floor => (
+                <div key={floor} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`floor-${floor}`} 
+                    checked={selectedFloors.includes(floor)}
+                    onCheckedChange={() => handleFloorToggle(floor)}
+                  />
+                  <label 
+                    htmlFor={`floor-${floor}`}
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    {floor === 0 ? "RDC" : `Étage ${floor}`}
+                  </label>
+                </div>
+              ))}
             </div>
           </div>
           
           {/* Room Selection */}
           <div className="col-span-7">
-            <Label className="mb-2 block">Chambres disponibles ({filteredRooms.length})</Label>
+            <Label className="mb-2 block">
+              Chambres disponibles ({filteredRooms.length})
+              {selectedFloors.length < availableFloors.length && (
+                <span className="text-sm text-gray-500 ml-2">
+                  (Filtrées par étage: {selectedFloors.map(f => f === 0 ? "RDC" : f).join(', ')})
+                </span>
+              )}
+            </Label>
             <ScrollArea className="h-[400px] border rounded-md p-2">
               <div className="grid grid-cols-3 gap-2">
                 {filteredRooms.map(room => (
@@ -264,19 +308,6 @@ export function ManualAssignmentDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            
-            <div className="mb-4">
-              <Label htmlFor="housekeeper-email" className="mb-2 block">
-                Email professionnel
-              </Label>
-              <Input
-                id="housekeeper-email"
-                type="email"
-                placeholder="email@hotel.com"
-                value={housekeeperEmail}
-                onChange={(e) => setHousekeeperEmail(e.target.value)}
-              />
             </div>
             
             <Label className="mb-2 block">Chambres sélectionnées ({selectedRooms.length})</Label>
