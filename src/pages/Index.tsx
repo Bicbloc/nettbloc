@@ -457,6 +457,54 @@ const Index = () => {
 
   const unassignedRooms = getUnassignedRooms();
   
+  const handleEmailConfirm = async (emailAddress: string) => {
+    try {
+      // Fermer la boîte de dialogue
+      setIsEmailDialogOpen(false);
+      
+      if (reportAction === "single" && reportHousekeeper) {
+        // Générer le rapport pour une seule femme de chambre
+        await generateHousekeeperReport(
+          reportHousekeeper, 
+          getHousekeeperRooms(reportHousekeeper), 
+          cleaningConfig, 
+          emailAddress
+        );
+        
+        toast({
+          title: "Rapport généré",
+          description: `Le rapport pour ${reportHousekeeper} a été créé et envoyé à ${emailAddress}.`,
+        });
+      } else if (reportAction === "all") {
+        // Générer tous les rapports
+        const housekeepersWithRooms = housekeeperNames.map(name => ({
+          name,
+          rooms: getHousekeeperRooms(name)
+        }));
+        
+        const unassignedRooms = rooms.filter(room => !room.assignedTo && room.cleaningType !== 'none');
+        if (unassignedRooms.length > 0) {
+          housekeepersWithRooms.push({
+            name: "Chambres non assignées",
+            rooms: unassignedRooms
+          });
+        }
+        
+        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, emailAddress);
+        toast({
+          title: "Rapports générés",
+          description: `Tous les rapports ont été créés et envoyés à ${emailAddress}.`,
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de générer le(s) rapport(s). Veuillez réessayer.",
+      });
+    }
+  };
+  
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container mx-auto py-6">
