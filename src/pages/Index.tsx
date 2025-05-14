@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Tag, Bed, Check, Layers, Plus, Download, Warning, FileDown } from "lucide-react";
+import { UserIcon, FileText, Calendar, Tag, Bed, Check, Layers, Plus, Download, AlertTriangle, FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
