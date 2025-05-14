@@ -491,7 +491,7 @@ const Index = () => {
         );
         
         toast({
-          title: "Rapport généré",
+          title: "Rapport génér��",
           description: `Le rapport pour ${reportHousekeeper} a été créé et envoyé à ${emailAddress}.`,
         });
       } else if (reportAction === "all") {
@@ -1112,7 +1112,7 @@ const Index = () => {
         isOpen={isReportDialogOpen}
         onClose={() => setIsReportDialogOpen(false)}
         onConfirm={handleReportConfirm}
-        isValid={isValid}
+        initialEmail={email}
       />
     </div>
   );
