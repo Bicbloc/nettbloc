@@ -9,7 +9,7 @@ interface UnassignedRoomsColumnProps {
   rooms: Room[];
   onRoomUpdate: (room: Room) => void;
   draggable?: boolean;
-  allRooms?: Room[]; // Ajout pour afficher toutes les chambres non assignées
+  allRooms?: Room[]; // Pour afficher toutes les chambres non assignées
 }
 
 export function UnassignedRoomsColumn({ 

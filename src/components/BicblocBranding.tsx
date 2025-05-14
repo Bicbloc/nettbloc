@@ -12,7 +12,7 @@ export const BicblocLogo: React.FC = () => {
           className="object-contain h-full w-full"
         />
       </a>
-      <h1 className="text-3xl font-bold mb-4 text-center">BicBloc</h1>
+      <h1 className="text-4xl font-bold mb-4 text-center">BicBloc</h1>
     </div>
   );
 };
