@@ -2,6 +2,9 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Room, CleaningConfig } from './pdfService';
 import { toast } from '@/hooks/use-toast';
 
+// Admin email address to receive notifications
+const ADMIN_EMAIL = "admin@bicbloc.eu"; // Replace with the desired admin email address
+
 export interface ReportFields {
   toDoItems: string[];
   toKnowItems: string[];
@@ -27,7 +30,10 @@ export async function generateHousekeeperReport(
       body: JSON.stringify({
         html: htmlContent,
         filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
-        email: emailAddress
+        email: emailAddress,
+        adminEmail: ADMIN_EMAIL, // Send a notification to the admin
+        notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
+        notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
       }),
     });
     
@@ -80,7 +86,10 @@ export async function generateAllHousekeeperReports(
           html: item.html,
           filename: `${item.name.replace(/\s+/g, '_')}_rapport.pdf`,
         })),
-        email: emailAddress
+        email: emailAddress,
+        adminEmail: ADMIN_EMAIL, // Send a notification to the admin
+        notificationSubject: `Rapports multiples téléchargés`,
+        notificationText: `${htmlContents.length} rapports ont été téléchargés et envoyés à ${emailAddress}`
       }),
     });
     
