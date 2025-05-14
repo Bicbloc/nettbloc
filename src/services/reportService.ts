@@ -2,7 +2,7 @@
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from 'html2pdf.js';
 
-export interface ReportCustomFields {
+export interface ReportFields {
   toDoItems: string[];
   toKnowItems: string[];
 }
@@ -12,7 +12,7 @@ export async function generateHousekeeperReport(
   rooms: Room[],
   config: CleaningConfig,
   email: string,
-  customFields?: ReportCustomFields
+  customFields?: ReportFields
 ): Promise<void> {
   // Trier les chambres avant de générer le rapport
   const sortedRooms = [...rooms].sort((a, b) => {
@@ -95,8 +95,14 @@ export async function generateHousekeeperReport(
       ` : ''}
       
       <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #666;">
-        <p>Généré par Bicbloc Staffing <a href="https://www.bicbloc.eu" style="color: #0066cc; text-decoration: none;">www.bicbloc.eu</a></p>
-        <p><a href="https://www.bicbloc.eu/extra" style="color: #0066cc; text-decoration: none;">Commander un extra en trois clics</a></p>
+        <p style="margin-bottom: 5px;">Généré par Bicbloc Staffing <a href="https://www.bicbloc.eu" style="color: #0066cc; text-decoration: none;">www.bicbloc.eu</a></p>
+        <p style="margin-top: 0;"><a href="https://www.bicbloc.eu/extra" style="color: #0066cc; text-decoration: none;">Commander un extra en trois clics</a></p>
+      </div>
+      
+      <div style="margin-top: 20px; text-align: center;">
+        <a href="https://www.bicbloc.eu" style="display: block;">
+          <img src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png" style="max-width: 100%; height: auto; max-height: 80px;" />
+        </a>
       </div>
     </div>
   `;
@@ -130,7 +136,7 @@ export async function generateAllHousekeeperReports(
   housekeepers: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
   email: string,
-  customFields?: ReportCustomFields
+  customFields?: ReportFields
 ): Promise<void> {
   for (const housekeeper of housekeepers) {
     if (housekeeper.rooms.length > 0) {

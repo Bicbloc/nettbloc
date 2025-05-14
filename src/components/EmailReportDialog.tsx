@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ReportFields } from "@/components/ReportCustomFields";
+import { ReportFields } from "@/services/reportService";
 import ReportCustomFields from "@/components/ReportCustomFields";
 
 interface EmailReportDialogProps {

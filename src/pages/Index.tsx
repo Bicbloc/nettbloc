@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
-import { generateHousekeeperReport, generateAllHousekeeperReports } from "@/services/reportService";
+import { generateHousekeeperReport, generateAllHousekeeperReports, ReportFields } from "@/services/reportService";
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { EmailDialog } from "@/components/EmailDialog";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { EmailReportDialog } from "@/components/EmailReportDialog";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -40,16 +41,12 @@ const Index = () => {
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportAction, setReportAction] = useState<"single" | "all">("single");
   const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
   const { email, setEmail, isValid } = useReportEmail();
   const [recommendedHousekeepers, setRecommendedHousekeepers] = useState<number>(0);
-  const defaultEmail = "operations@bicbloc.eu";
-
-  useEffect(() => {
-    // Set the default email
-    setEmail(defaultEmail);
-  }, [setEmail]);
+  const [reportCustomFields, setReportCustomFields] = useState<ReportFields>({ toDoItems: [], toKnowItems: [] });
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -112,6 +109,54 @@ const Index = () => {
       const updated = { ...prev };
       delete updated[housekeeperName];
       return updated;
+    });
+  };
+  
+  // Handle changing housekeeper name directly in the assignment section
+  const handleRenameHousekeeper = (oldName: string, newName: string) => {
+    // Don't rename if the new name is empty or already exists
+    if (!newName.trim() || (oldName !== newName && housekeeperNames.includes(newName))) {
+      toast({
+        variant: "destructive",
+        title: "Nom invalide",
+        description: "Le nom ne peut pas être vide ou déjà existant."
+      });
+      return;
+    }
+    
+    // Update housekeeperNames array
+    setHousekeeperNames(prev => prev.map(name => name === oldName ? newName : name));
+    
+    // Update floor preferences
+    setHousekeeperFloorPreferences(prev => {
+      const updated = { ...prev };
+      if (updated[oldName]) {
+        updated[newName] = updated[oldName];
+        delete updated[oldName];
+      }
+      return updated;
+    });
+    
+    // Update max rooms overrides
+    setHousekeeperMaxRoomsOverrides(prev => {
+      const updated = { ...prev };
+      if (updated[oldName]) {
+        updated[newName] = updated[oldName];
+        delete updated[oldName];
+      }
+      return updated;
+    });
+    
+    // Update room assignments
+    setRooms(prevRooms => 
+      prevRooms.map(room => 
+        room.assignedTo === oldName ? { ...room, assignedTo: newName } : room
+      )
+    );
+    
+    toast({
+      title: "Nom modifié",
+      description: `"${oldName}" a été renommé en "${newName}".`
     });
   };
   
@@ -295,20 +340,8 @@ const Index = () => {
     setReportAction("single");
     
     if (email && isValid) {
-      // Si l'email est déjà valide, générer le rapport directement
-      try {
-        await generateHousekeeperReport(housekeeperName, housekeeperRooms, cleaningConfig, email);
-        toast({
-          title: "Rapport généré",
-          description: `Le rapport pour ${housekeeperName} a été créé et envoyé à ${email}.`,
-        });
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de générer le rapport. Veuillez réessayer.",
-        });
-      }
+      // Si l'email est déjà valide, ouvrir le dialog pour les champs personnalisés
+      setIsReportDialogOpen(true);
     } else {
       // Sinon, ouvrir la boîte de dialogue pour entrer l'email
       setIsEmailDialogOpen(true);
@@ -319,33 +352,8 @@ const Index = () => {
     setReportAction("all");
     
     if (email && isValid) {
-      // Si l'email est déjà valide, générer les rapports directement
-      try {
-        const housekeepersWithRooms = housekeeperNames.map(name => ({
-          name,
-          rooms: getHousekeeperRooms(name)
-        }));
-        
-        const unassignedRooms = rooms.filter(room => !room.assignedTo && room.cleaningType !== 'none');
-        if (unassignedRooms.length > 0) {
-          housekeepersWithRooms.push({
-            name: "Chambres non assignées",
-            rooms: unassignedRooms
-          });
-        }
-        
-        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, email);
-        toast({
-          title: "Rapports générés",
-          description: `Tous les rapports ont été créés et envoyés à ${email}.`,
-        });
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de générer les rapports. Veuillez réessayer.",
-        });
-      }
+      // Si l'email est déjà valide, ouvrir le dialog pour les champs personnalisés
+      setIsReportDialogOpen(true);
     } else {
       // Sinon, ouvrir la boîte de dialogue pour entrer l'email
       setIsEmailDialogOpen(true);
@@ -465,17 +473,21 @@ const Index = () => {
   const unassignedRooms = getUnassignedRooms();
   
   const handleEmailConfirm = async (emailAddress: string) => {
+    // After email is confirmed, open the report dialog for custom fields
+    setIsEmailDialogOpen(false);
+    setIsReportDialogOpen(true);
+  };
+  
+  const handleReportConfirm = async (emailAddress: string, customFields?: ReportFields) => {
     try {
-      // Fermer la boîte de dialogue
-      setIsEmailDialogOpen(false);
-      
       if (reportAction === "single" && reportHousekeeper) {
         // Générer le rapport pour une seule femme de chambre
         await generateHousekeeperReport(
           reportHousekeeper, 
           getHousekeeperRooms(reportHousekeeper), 
           cleaningConfig, 
-          emailAddress
+          emailAddress,
+          customFields
         );
         
         toast({
@@ -497,7 +509,7 @@ const Index = () => {
           });
         }
         
-        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, emailAddress);
+        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, emailAddress, customFields);
         toast({
           title: "Rapports générés",
           description: `Tous les rapports ont été créés et envoyés à ${emailAddress}.`,
@@ -763,6 +775,7 @@ const Index = () => {
                   <HousekeeperCard 
                     key={name}
                     name={name}
+                    onRename={(newName) => handleRenameHousekeeper(name, newName)}
                     rooms={getHousekeeperRooms(name)}
                     onRoomUpdate={handleRoomUpdate}
                     onRoomUnassign={handleRoomUnassign}
@@ -1093,6 +1106,14 @@ const Index = () => {
         isOpen={isEmailDialogOpen}
         onClose={() => setIsEmailDialogOpen(false)}
         onConfirm={handleEmailConfirm}
+      />
+      
+      <EmailReportDialog
+        isOpen={isReportDialogOpen}
+        onClose={() => setIsReportDialogOpen(false)}
+        onConfirm={handleReportConfirm}
+        email={email}
+        isValid={isValid}
       />
     </div>
   );
