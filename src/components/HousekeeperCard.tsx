@@ -87,16 +87,8 @@ export function HousekeeperCard({
     return acc;
   }, {} as Record<number, Room[]>);
   
-  // Filter unassigned rooms by floor if necessary
-  const filteredUnassignedRooms = unassignedRooms.filter(room => {
-    // If floors are selected, filter by those floors
-    if (preferredFloors.length > 0) {
-      const roomFloor = parseInt(room.number[0]) || 0;
-      return preferredFloors.includes(roomFloor);
-    }
-    // Otherwise, show all unassigned rooms
-    return true;
-  });
+  // Show ALL unassigned rooms, not just those from selected floors
+  const filteredUnassignedRooms = unassignedRooms.filter(room => !room.assignedTo);
   
   // Group unassigned rooms by floor
   const unassignedRoomsByFloor = filteredUnassignedRooms.reduce((acc, room) => {
@@ -357,31 +349,8 @@ export function HousekeeperCard({
           isOverloaded && "border-red-400",
           isUnderloaded && "border-amber-400"
         )}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          try {
-            const roomData = e.dataTransfer.getData('application/json');
-            if (roomData) {
-              const room = JSON.parse(roomData) as Room;
-              // Check if room limit is reached
-              if (rooms.length >= effectiveMaxRooms) {
-                toast({
-                  variant: "destructive",
-                  title: "Limite atteinte",
-                  description: `Impossible d'assigner plus de ${effectiveMaxRooms} chambres à ${name}. La limite est atteinte.`
-                });
-                return;
-              }
-              
-              // The room is on an allowed floor, proceed with assignment
-              const updatedRoom = { ...room, assignedTo: name };
-              onRoomUpdate(updatedRoom);
-            }
-          } catch (error) {
-            console.error("Erreur lors du drop:", error);
-          }
-        }}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
         <CardHeader className="p-4 pb-0">
           <div className="flex justify-between items-center">
