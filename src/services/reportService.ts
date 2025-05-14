@@ -99,9 +99,9 @@ export async function generateHousekeeperReport(
         <p style="margin-top: 0;"><a href="https://www.bicbloc.eu/extra" style="color: #0066cc; text-decoration: none;">Commander un extra en trois clics</a></p>
       </div>
       
-      <div style="margin-top: 20px; text-align: center;">
-        <a href="https://www.bicbloc.eu" style="display: block;">
-          <img src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png" style="max-width: 100%; height: auto; max-height: 80px;" />
+      <div style="margin-top: 20px; width: 100%; text-align: center;">
+        <a href="https://www.bicbloc.eu" style="display: block; text-decoration: none;">
+          <img src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png" style="max-width: 100%; width: 100%; height: auto; max-height: 140px;" />
         </a>
       </div>
     </div>

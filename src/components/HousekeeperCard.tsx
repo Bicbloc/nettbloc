@@ -155,18 +155,6 @@ export function HousekeeperCard({
       const roomData = e.dataTransfer.getData('application/json');
       if (roomData) {
         const room = JSON.parse(roomData) as Room;
-        // Vérifier si la chambre est sur un étage autorisé pour cette femme de chambre
-        const roomFloor = parseInt(room.number[0]) || 0;
-        
-        if (preferredFloors.length > 0 && !preferredFloors.includes(roomFloor)) {
-          toast({
-            variant: "destructive",
-            title: "Assignation impossible",
-            description: `${name} ne peut pas être assignée à des chambres de l'étage ${roomFloor} car cet étage n'est pas sélectionné.`
-          });
-          return;
-        }
-        
         // Vérifier si la limite de chambres est atteinte
         if (rooms.length >= effectiveMaxRooms) {
           toast({
@@ -289,18 +277,7 @@ export function HousekeeperCard({
       return;
     }
     
-    // Vérifier si la chambre est sur un étage autorisé
-    const roomFloor = parseInt(room.number[0]) || 0;
-    
-    if (preferredFloors.length > 0 && !preferredFloors.includes(roomFloor)) {
-      toast({
-        variant: "destructive",
-        title: "Assignation impossible",
-        description: `${name} ne peut pas être assignée à des chambres de l'étage ${roomFloor} car cet étage n'est pas sélectionné.`
-      });
-      return;
-    }
-    
+    // Plus de vérification d'étage - on peut maintenant assigner n'importe quelle chambre
     if (onAssignRoom) {
       onAssignRoom(room);
     }
