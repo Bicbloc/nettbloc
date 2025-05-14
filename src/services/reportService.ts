@@ -23,7 +23,7 @@ export async function generateHousekeeperReport(
     const htmlContent = generateHousekeeperReportHTML(housekeeperName, rooms, config, customFields);
     
     // Create a simple PDF as fallback in case the server endpoint fails
-    const pdfBytes = await createSimplePDF(housekeeperName, rooms, config);
+    const pdfBytes = await createSimplePDF(housekeeperName, rooms, config, customFields);
     
     try {
       // Convert HTML to PDF using a server endpoint
@@ -319,7 +319,12 @@ function generateHousekeeperReportHTML(
 }
 
 // Function to create a simple PDF (fallback if HTML conversion fails)
-async function createSimplePDF(housekeeperName: string, rooms: Room[], config: CleaningConfig): Promise<Uint8Array> {
+async function createSimplePDF(
+  housekeeperName: string, 
+  rooms: Room[], 
+  config: CleaningConfig,
+  customFields?: ReportFields
+): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage();
   const { width, height } = page.getSize();
@@ -367,19 +372,90 @@ async function createSimplePDF(housekeeperName: string, rooms: Room[], config: C
     font,
   });
   
+  // Add custom fields if present
+  let yPosition = height - 200;
+  
+  // Add to-do items if present
+  if (customFields?.toDoItems && customFields.toDoItems.length > 0) {
+    page.drawText('À faire:', {
+      x: 50,
+      y: yPosition,
+      size: 14,
+      font: boldFont,
+    });
+    yPosition -= 20;
+    
+    for (const item of customFields.toDoItems.filter(item => item.trim() !== '')) {
+      page.drawText(`• ${item}`, {
+        x: 60,
+        y: yPosition,
+        size: 10,
+        font,
+      });
+      yPosition -= 15;
+      
+      // Add a new page if we're running out of space
+      if (yPosition < 100) {
+        const newPage = pdfDoc.addPage();
+        yPosition = height - 50;
+      }
+    }
+    
+    yPosition -= 10;
+  }
+  
+  // Add to-know items if present
+  if (customFields?.toKnowItems && customFields.toKnowItems.length > 0) {
+    page.drawText('À savoir:', {
+      x: 50,
+      y: yPosition,
+      size: 14,
+      font: boldFont,
+    });
+    yPosition -= 20;
+    
+    for (const item of customFields.toKnowItems.filter(item => item.trim() !== '')) {
+      page.drawText(`• ${item}`, {
+        x: 60,
+        y: yPosition,
+        size: 10,
+        font,
+      });
+      yPosition -= 15;
+      
+      // Add a new page if we're running out of space
+      if (yPosition < 100) {
+        const newPage = pdfDoc.addPage();
+        yPosition = height - 50;
+      }
+    }
+    
+    yPosition -= 10;
+  }
+  
   // Add room list title
   page.drawText('Liste des Chambres:', {
     x: 50,
-    y: height - 200,
+    y: yPosition,
     size: 14,
     font: boldFont,
   });
+  yPosition -= 20;
   
   // Add room list
-  let yPosition = height - 230;
   for (const room of rooms) {
     const cleaningType = room.cleaningType === 'full' ? 'À Blanc' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
-    page.drawText(`${room.number} - ${cleaningType}${room.priority === 'high' ? ' (Prioritaire)' : ''}`, {
+    const status = room.status === 'needs-cleaning' ? 'À Nettoyer' : 
+                  room.status === 'clean' ? 'Propre' : 
+                  room.status === 'occupied' ? 'Occupé' : 
+                  room.status === 'maintenance' ? 'Maintenance' : room.status;
+    
+    let roomText = `${room.number} - ${status} - ${cleaningType}`;
+    if (room.isTwin) roomText += ' - Twin';
+    if (room.priority === 'high') roomText += ' (Prioritaire)';
+    if (room.notes) roomText += ` - ${room.notes}`;
+    
+    page.drawText(roomText, {
       x: 50,
       y: yPosition,
       size: 10,
@@ -394,6 +470,7 @@ async function createSimplePDF(housekeeperName: string, rooms: Room[], config: C
     }
   }
   
+  // Add footer
   page.drawText('Généré par BicBloc.eu Staffing Agency - Commander un extra en trois clics', {
     x: 50,
     y: 20,
