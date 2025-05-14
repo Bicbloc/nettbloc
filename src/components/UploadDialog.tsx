@@ -22,6 +22,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
+  const fileInputRef = useState<HTMLInputElement | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -93,6 +94,12 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     }
   };
 
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -110,6 +117,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         </DialogHeader>
         <div 
           className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
+          onClick={triggerFileInput}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
@@ -128,21 +136,21 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
               )}
             </div>
             <div>
-              <label className="inline-block">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                >
-                  Sélectionner un fichier
-                </Button>
-              </label>
+              <input
+                ref={(el) => fileInputRef.current = el}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={triggerFileInput}
+              >
+                Sélectionner un fichier
+              </Button>
             </div>
           </div>
         </div>

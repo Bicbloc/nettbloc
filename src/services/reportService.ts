@@ -5,7 +5,8 @@ import html2pdf from 'html2pdf.js';
 export async function generateHousekeeperReport(
   housekeeperName: string,
   rooms: Room[],
-  config: CleaningConfig
+  config: CleaningConfig,
+  email: string = ""
 ): Promise<void> {
   // Trier les chambres avant de générer le rapport
   const sortedRooms = [...rooms].sort((a, b) => {
@@ -28,6 +29,7 @@ export async function generateHousekeeperReport(
         <h1 style="margin: 0; color: #333;">Rapport de Nettoyage</h1>
         <h2 style="margin: 5px 0; color: #666;">${housekeeperName}</h2>
         <p style="margin: 5px 0; color: #888;">${new Date().toLocaleDateString()}</p>
+        ${email ? `<p style="margin: 5px 0; color: #888;">Email: ${email}</p>` : ''}
       </div>
       
       <div style="margin-bottom: 15px;">
@@ -54,7 +56,7 @@ export async function generateHousekeeperReport(
               <td style="padding: 10px; border-bottom: 1px solid #ddd; ${room.isUrgent ? 'color: red; font-weight: bold;' : ''}">${room.number}</td>
               <td style="padding: 10px; border-bottom: 1px solid #ddd;">
                 ${room.cleaningType === 'full' ? 'À BLANC' : 
-                 room.cleaningType === 'quick' ? 'RECOUCHE' : 'N/A'}
+                 room.cleaningType === 'quick' ? 'RECOUCHE' : 'PROPRE'}
                 ${room.isTwin ? ' (Twin)' : ''}
               </td>
               <td style="padding: 10px; border-bottom: 1px solid #ddd;">
@@ -88,6 +90,12 @@ export async function generateHousekeeperReport(
   try {
     await html2pdf().from(element).set(options).save();
     console.log(`Rapport généré pour ${housekeeperName}`);
+    
+    // Si l'email est fourni, nous pourrions envoyer le rapport par email ici
+    // Cette fonctionnalité nécessiterait un backend pour l'envoi d'emails
+    if (email) {
+      console.log(`Email would be sent to: ${email}`);
+    }
   } catch (error) {
     console.error("Erreur lors de la génération du rapport:", error);
   } finally {

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ManualAssignmentDialogProps {
   isOpen: boolean;
@@ -29,8 +30,9 @@ export function ManualAssignmentDialog({
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filterFloor, setFilterFloor] = useState<string>("all");
+  const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [housekeeperEmail, setHousekeeperEmail] = useState<string>("");
   
   // Reset selections when dialog opens/closes
   useEffect(() => {
@@ -38,10 +40,18 @@ export function ManualAssignmentDialog({
       setSelectedRooms([]);
       setSelectedHousekeeper(housekeeperNames.length > 0 ? housekeeperNames[0] : "");
       setSearchTerm("");
-      setFilterFloor("all");
+      setSelectedFloors([]);
       setFilterStatus("all");
+      setHousekeeperEmail("");
     }
   }, [isOpen, housekeeperNames]);
+  
+  // Get available floors from rooms
+  const availableFloors = Array.from(
+    new Set(
+      rooms.map(room => room.floor !== undefined ? room.floor : parseInt(room.number[0]))
+    )
+  ).sort((a, b) => a - b);
   
   // Apply filters to rooms
   useEffect(() => {
@@ -54,12 +64,11 @@ export function ManualAssignmentDialog({
       );
     }
     
-    // Apply floor filter
-    if (filterFloor !== "all") {
-      const floorNum = parseInt(filterFloor);
+    // Apply floor filter - only show rooms from selected floors
+    if (selectedFloors.length > 0) {
       result = result.filter(room => {
         const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
-        return roomFloor === floorNum;
+        return selectedFloors.includes(roomFloor);
       });
     }
     
@@ -72,7 +81,7 @@ export function ManualAssignmentDialog({
     result.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
     
     setFilteredRooms(result);
-  }, [rooms, searchTerm, filterFloor, filterStatus]);
+  }, [rooms, searchTerm, selectedFloors, filterStatus]);
   
   const handleRoomSelect = (room: Room) => {
     setSelectedRooms(prev => {
@@ -82,6 +91,28 @@ export function ManualAssignmentDialog({
         return prev.filter(r => r.number !== room.number);
       } else {
         return [...prev, room];
+      }
+    });
+  };
+  
+  const handleFloorToggle = (floor: number) => {
+    setSelectedFloors(prev => {
+      if (prev.includes(floor)) {
+        // Remove floor
+        const newFloors = prev.filter(f => f !== floor);
+        
+        // Also remove rooms from that floor from selection
+        setSelectedRooms(currentRooms => 
+          currentRooms.filter(room => {
+            const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+            return newFloors.includes(roomFloor);
+          })
+        );
+        
+        return newFloors;
+      } else {
+        // Add floor
+        return [...prev, floor];
       }
     });
   };
@@ -113,13 +144,6 @@ export function ManualAssignmentDialog({
     onClose();
   };
   
-  // Get available floors from rooms
-  const availableFloors = Array.from(
-    new Set(
-      rooms.map(room => room.floor !== undefined ? room.floor : parseInt(room.number[0]))
-    )
-  ).sort((a, b) => a - b);
-  
   const selectAll = () => {
     setSelectedRooms(filteredRooms);
   };
@@ -140,57 +164,61 @@ export function ManualAssignmentDialog({
         
         <div className="grid grid-cols-12 gap-4">
           {/* Filters */}
-          <div className="col-span-12 grid grid-cols-4 gap-2">
-            <div>
-              <Label htmlFor="search">Recherche</Label>
-              <Input
-                id="search"
-                placeholder="Numéro de chambre..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+          <div className="col-span-12 grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label htmlFor="search">Recherche</Label>
+                <Input
+                  id="search"
+                  placeholder="Numéro de chambre..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="status-filter">Statut</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger id="status-filter">
+                    <SelectValue placeholder="Tous les statuts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les statuts</SelectItem>
+                    <SelectItem value="needs-cleaning">À nettoyer</SelectItem>
+                    <SelectItem value="clean">Propre</SelectItem>
+                    <SelectItem value="occupied">Occupé</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex gap-2 items-end">
+                <Button variant="outline" className="flex-1" onClick={selectAll}>
+                  Tout sélectionner
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={clearSelection}>
+                  Effacer
+                </Button>
+              </div>
             </div>
             
+            {/* Floors checkboxes */}
             <div>
-              <Label htmlFor="floor-filter">Étage</Label>
-              <Select value={filterFloor} onValueChange={setFilterFloor}>
-                <SelectTrigger id="floor-filter">
-                  <SelectValue placeholder="Tous les étages" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les étages</SelectItem>
-                  {availableFloors.map(floor => (
-                    <SelectItem key={floor} value={floor.toString()}>
+              <Label className="mb-2 block">Étages</Label>
+              <div className="flex flex-wrap gap-2">
+                {availableFloors.map(floor => (
+                  <div key={floor} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`floor-${floor}`} 
+                      checked={selectedFloors.includes(floor)}
+                      onCheckedChange={() => handleFloorToggle(floor)}
+                    />
+                    <Label htmlFor={`floor-${floor}`}>
                       {floor === 0 ? "RDC" : `Étage ${floor}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="status-filter">Statut</Label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger id="status-filter">
-                  <SelectValue placeholder="Tous les statuts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="needs-cleaning">À nettoyer</SelectItem>
-                  <SelectItem value="clean">Propre</SelectItem>
-                  <SelectItem value="occupied">Occupé</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex gap-2 items-end">
-              <Button variant="outline" className="flex-1" onClick={selectAll}>
-                Tout sélectionner
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={clearSelection}>
-                Effacer
-              </Button>
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           
@@ -236,6 +264,19 @@ export function ManualAssignmentDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            
+            <div className="mb-4">
+              <Label htmlFor="housekeeper-email" className="mb-2 block">
+                Email professionnel
+              </Label>
+              <Input
+                id="housekeeper-email"
+                type="email"
+                placeholder="email@hotel.com"
+                value={housekeeperEmail}
+                onChange={(e) => setHousekeeperEmail(e.target.value)}
+              />
             </div>
             
             <Label className="mb-2 block">Chambres sélectionnées ({selectedRooms.length})</Label>
