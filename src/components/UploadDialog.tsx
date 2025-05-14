@@ -147,7 +147,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
                 variant="outline"
                 size="sm"
                 type="button"
-                onClick={triggerFileInput}
               >
                 Sélectionner un fichier
               </Button>

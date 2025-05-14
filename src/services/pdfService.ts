@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -148,7 +147,7 @@ function parseRoomsFromText(text: string): Room[] {
     const afterText = text.substring(genericMatch.index + potentialRoomNumber.length, 
                                    Math.min(text.length, genericMatch.index + potentialRoomNumber.length + 10));
     
-    if (beforeText.match(/\d[\/\-\.:]$/) || afterText.match(/^[\/\-\.:]/)) {
+    if (beforeText.match(/\d[\/\-\.:]$/) || afterText.match(/^[\/\-\.:]/)  ) {
       continue; // Ignorer si c'est probablement une date ou un prix
     }
     
@@ -355,12 +354,6 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
     return { status, cleaningType };
   }
 
-  return { status: 'needs-cleaning', cleaningType: 'full' };
-}
-
-// Fonction historique laissée en place pour référence
-function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // ... keep existing code (obsolète mais conservé pour référence)
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
