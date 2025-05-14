@@ -206,10 +206,10 @@ function generateHousekeeperReportHTML(
     return `
       <tr class="${priorityClass}">
         <td>${room.number}</td>
-        <td>${cleaningType}</td>
         <td>${status}</td>
         <td>${room.isTwin ? 'Oui' : 'Non'}</td>
-        <td>${room.priority === 'high' ? 'Haute' : room.priority === 'low' ? 'Basse' : 'Normale'}</td>
+        <td>${cleaningType}</td>
+        <td>${room.notes || ''}</td>
       </tr>
     `;
   }).join('');
@@ -291,10 +291,10 @@ function generateHousekeeperReportHTML(
           <thead>
             <tr>
               <th>Chambre</th>
-              <th>Type Nettoyage</th>
               <th>Statut</th>
               <th>Twin</th>
-              <th>Priorité</th>
+              <th>Type Nettoyage</th>
+              <th>Remarque</th>
             </tr>
           </thead>
           <tbody>
@@ -303,7 +303,7 @@ function generateHousekeeperReportHTML(
         </table>
         
         <div class="footer">
-          <p>Généré par <a href="https://www.bicbloc.eu" class="footer-link" target="_blank">BicBloc</a></p>
+          <p>Généré par <a href="https://www.bicbloc.eu" class="footer-link" target="_blank">BicBloc.eu Staffing Agency</a></p>
           <p style="margin-top: 0;"><a href="https://www.bicbloc.eu/extra" class="footer-link" target="_blank">Commander un extra en trois clics</a></p>
         </div>
         
@@ -393,6 +393,13 @@ async function createSimplePDF(housekeeperName: string, rooms: Room[], config: C
       yPosition = height - 50;
     }
   }
+  
+  page.drawText('Généré par BicBloc.eu Staffing Agency - Commander un extra en trois clics', {
+    x: 50,
+    y: 20,
+    size: 8,
+    font: font,
+  });
   
   return pdfDoc.save();
 }
