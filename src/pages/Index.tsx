@@ -1112,7 +1112,6 @@ const Index = () => {
         isOpen={isReportDialogOpen}
         onClose={() => setIsReportDialogOpen(false)}
         onConfirm={handleReportConfirm}
-        email={email}
         isValid={isValid}
       />
     </div>
