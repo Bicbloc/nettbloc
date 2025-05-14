@@ -28,8 +28,15 @@ export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
   useEffect(() => {
     if (isOpen) {
       setLocalEmail(email);
+      
+      // Si l'email est déjà valide et enregistré, fermer la boîte de dialogue
+      // et confirmer directement avec l'email stocké
+      if (email && isValid) {
+        onConfirm(email);
+        onClose();
+      }
     }
-  }, [isOpen, email]);
+  }, [isOpen, email, isValid]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +60,11 @@ export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
       });
     }
   };
+
+  // Si l'email est déjà valide et enregistré, nous ne montrons pas le dialogue
+  if (email && isValid && isOpen) {
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

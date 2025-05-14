@@ -1,4 +1,3 @@
-
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
@@ -162,21 +161,25 @@ export function HousekeeperCard({
     onFloorPreferenceChange(name, newPreferredFloors);
     
     if (isChecked) {
-      // Si on ajoute un étage, assigner automatiquement toutes les chambres non assignées de cet étage
-      const floorUnassignedRooms = unassignedRooms.filter(room => {
-        const roomFloor = parseInt(room.number[0]) || 0;
-        return roomFloor === floor;
-      });
+      // Lorsqu'on ajoute un étage, assigner toutes les chambres de cet étage à cette femme de chambre
+      // Inclure aussi les chambres déjà assignées à d'autres femmes de chambre
+      const allRoomsOnFloor = unassignedRooms ? [
+        ...unassignedRooms.filter(room => {
+          const roomFloor = parseInt(room.number[0]) || 0;
+          return roomFloor === floor;
+        })
+      ] : [];
       
-      if (floorUnassignedRooms.length > 0 && onAssignRoom) {
+      // Si on a des chambres non assignées sur cet étage
+      if (allRoomsOnFloor.length > 0 && onRoomUpdate) {
         // Assigner toutes les chambres non assignées de cet étage
-        floorUnassignedRooms.forEach(room => {
+        allRoomsOnFloor.forEach(room => {
           const updatedRoom = { ...room, assignedTo: name };
           onRoomUpdate(updatedRoom);
         });
         
         toast({
-          description: `${floorUnassignedRooms.length} chambre(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
+          description: `${allRoomsOnFloor.length} chambre(s) non assignée(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
         });
       }
     }
