@@ -9,19 +9,22 @@ import { useToast } from "@/hooks/use-toast";
 import { ReportFields } from "@/services/reportService";
 import ReportCustomFields from "@/components/ReportCustomFields";
 import { getReportEmail, saveReportEmail } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface EmailReportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (email: string, customFields?: ReportFields) => void;
   initialEmail?: string;
+  housekeeperName?: string; // New prop for housekeeper name
 }
 
 const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  initialEmail = ""
+  initialEmail = "",
+  housekeeperName = "" // Default to empty string if not provided
 }) => {
   // Get saved email or use initialEmail
   const savedEmail = getReportEmail();
@@ -31,7 +34,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     toDoItems: [], 
     toKnowItems: [],
     instructions: '',
-    generalInstructions: '' // New field for general instructions
+    generalInstructions: ''
   });
   const { toast } = useToast();
 
@@ -84,74 +87,82 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Téléchargement du rapport</DialogTitle>
-            <DialogDescription>
-              Saisissez votre email pour recevoir le rapport PDF
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                Email <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="votre@email.com"
-                value={localEmail}
-                onChange={(e) => setLocalEmail(e.target.value)}
-                className="col-span-3"
-                required
-              />
-              <p className="text-xs text-muted-foreground col-span-4 text-center">
-                Un email valide est requis pour télécharger le rapport
-              </p>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>
+            {housekeeperName 
+              ? `Téléchargement du rapport - ${housekeeperName}`
+              : 'Téléchargement du rapport'}
+          </DialogTitle>
+          <DialogDescription>
+            Saisissez votre email pour recevoir le rapport PDF
+          </DialogDescription>
+        </DialogHeader>
+        
+        <ScrollArea className="flex-grow pr-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                  Email <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="votre@email.com"
+                  value={localEmail}
+                  onChange={(e) => setLocalEmail(e.target.value)}
+                  className="col-span-3"
+                  required
+                />
+                <p className="text-xs text-muted-foreground col-span-4 text-center">
+                  Un email valide est requis pour télécharger le rapport
+                </p>
+              </div>
+              
+              <div className="mt-4">
+                <Label className="font-medium mb-2 block">Instructions générales (pour tous les rapports)</Label>
+                <Textarea
+                  id="generalInstructions"
+                  placeholder="Instructions générales qui s'appliqueront à tous les rapports..."
+                  value={customFields.generalInstructions || ''}
+                  onChange={handleGeneralInstructionsChange}
+                  className="min-h-[100px]"
+                />
+              </div>
+              
+              <div className="mt-4">
+                <Label className="font-medium mb-2 block">À faire et à savoir (par rapport)</Label>
+                <ReportCustomFields onChange={(fields) => {
+                  setCustomFields(prev => ({
+                    ...prev,
+                    toDoItems: fields.toDoItems,
+                    toKnowItems: fields.toKnowItems
+                  }));
+                }} />
+              </div>
+              
+              <div className="mt-4">
+                <Label htmlFor="instructions" className="font-medium mb-2 block">
+                  Instructions spéciales {housekeeperName ? `(pour ${housekeeperName})` : '(par rapport)'}
+                </Label>
+                <Textarea
+                  id="instructions"
+                  placeholder={`Ajoutez des instructions spéciales pour ce rapport${housekeeperName ? ` de ${housekeeperName}` : ''}...`}
+                  value={customFields.instructions || ''}
+                  onChange={handleInstructionsChange}
+                  className="min-h-[100px]"
+                />
+              </div>
             </div>
             
-            <div className="mt-4">
-              <Label className="font-medium mb-2 block">Instructions générales (pour tous les rapports)</Label>
-              <Textarea
-                id="generalInstructions"
-                placeholder="Instructions générales qui s'appliqueront à tous les rapports..."
-                value={customFields.generalInstructions || ''}
-                onChange={handleGeneralInstructionsChange}
-                className="min-h-[100px]"
-              />
-            </div>
-            
-            <div className="mt-4">
-              <Label className="font-medium mb-2 block">À faire et à savoir (par rapport)</Label>
-              <ReportCustomFields onChange={(fields) => {
-                setCustomFields(prev => ({
-                  ...prev,
-                  toDoItems: fields.toDoItems,
-                  toKnowItems: fields.toKnowItems
-                }));
-              }} />
-            </div>
-            
-            <div className="mt-4">
-              <Label htmlFor="instructions" className="font-medium mb-2 block">
-                Instructions spéciales (par rapport)
-              </Label>
-              <Textarea
-                id="instructions"
-                placeholder="Ajoutez des instructions spéciales pour ce rapport..."
-                value={customFields.instructions || ''}
-                onChange={handleInstructionsChange}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Traitement en cours..." : "Télécharger le rapport"}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter className="mt-6 pt-4 border-t">
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Traitement en cours..." : "Télécharger le rapport"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
