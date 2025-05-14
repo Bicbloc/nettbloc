@@ -1,4 +1,3 @@
-
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
@@ -40,6 +39,7 @@ interface HousekeeperCardProps {
   onDelete?: (name: string) => void;
   maxRoomsOverride?: number;
   onMaxRoomsOverrideChange?: (name: string, maxRooms: number) => void;
+  onRename?: (newName: string) => void;
 }
 
 export function HousekeeperCard({ 
@@ -59,7 +59,8 @@ export function HousekeeperCard({
   onAssignRoom,
   onDelete,
   maxRoomsOverride,
-  onMaxRoomsOverrideChange
+  onMaxRoomsOverrideChange,
+  onRename
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -70,6 +71,8 @@ export function HousekeeperCard({
   const [expanded, setExpanded] = useState(true);
   const [tempMaxRooms, setTempMaxRooms] = useState(maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper);
   const [showMaxRoomsSettings, setShowMaxRoomsSettings] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState(name);
   
   const effectiveMaxRooms = maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper;
   
@@ -135,7 +138,12 @@ export function HousekeeperCard({
     if (maxRoomsOverride !== undefined && tempMaxRooms !== maxRoomsOverride) {
       setTempMaxRooms(maxRoomsOverride);
     }
-  }, [rooms, cleaningConfig, effectiveMaxRooms, maxRoomsOverride]);
+    
+    // Update the edited name if the name prop changes
+    if (name !== editedName && !isEditing) {
+      setEditedName(name);
+    }
+  }, [rooms, cleaningConfig, effectiveMaxRooms, maxRoomsOverride, name, isEditing, editedName]);
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -352,6 +360,28 @@ export function HousekeeperCard({
     setShowMaxRoomsSettings(false);
   };
   
+  const handleNameEdit = () => {
+    setIsEditing(true);
+  };
+  
+  const handleNameSave = () => {
+    if (editedName.trim() && onRename) {
+      onRename(editedName.trim());
+    } else {
+      setEditedName(name);
+    }
+    setIsEditing(false);
+  };
+  
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameSave();
+    } else if (e.key === 'Escape') {
+      setEditedName(name);
+      setIsEditing(false);
+    }
+  };
+  
   return (
     <>
       <Card 
@@ -366,7 +396,33 @@ export function HousekeeperCard({
         <CardHeader className="p-4 pb-0">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-lg">{name}</h3>
+              {isEditing ? (
+                <div className="flex gap-1">
+                  <Input
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    onKeyDown={handleNameKeyDown}
+                    className="h-8 text-lg font-bold py-1 px-2"
+                    autoFocus
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleNameSave}
+                    className="h-8"
+                  >
+                    OK
+                  </Button>
+                </div>
+              ) : (
+                <h3 
+                  className="font-bold text-lg cursor-pointer hover:underline"
+                  onClick={handleNameEdit}
+                  title="Cliquer pour modifier le nom"
+                >
+                  {name}
+                </h3>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

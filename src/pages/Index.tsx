@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { EmailReportDialog } from "@/components/EmailReportDialog";
+import EmailReportDialog from "@/components/EmailReportDialog";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
