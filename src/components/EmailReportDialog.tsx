@@ -16,7 +16,7 @@ interface EmailReportDialogProps {
   onClose: () => void;
   onConfirm: (email: string, customFields?: ReportFields) => void;
   initialEmail?: string;
-  housekeeperName?: string; // New prop for housekeeper name
+  housekeeperName?: string;
 }
 
 const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
@@ -24,7 +24,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   onClose,
   onConfirm,
   initialEmail = "",
-  housekeeperName = "" // Default to empty string if not provided
+  housekeeperName = ""
 }) => {
   // Get saved email or use initialEmail
   const savedEmail = getReportEmail();
@@ -99,7 +99,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-grow pr-4">
+        <ScrollArea className="flex-grow pr-4" style={{ maxHeight: "calc(80vh - 120px)" }}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
@@ -157,7 +157,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
             </div>
             
             <DialogFooter className="mt-6 pt-4 border-t">
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting ? "Traitement en cours..." : "Télécharger le rapport"}
               </Button>
             </DialogFooter>

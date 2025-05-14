@@ -1,9 +1,19 @@
+
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Room, CleaningConfig } from './pdfService';
 import { toast } from '@/hooks/use-toast';
 
+// Email configuration
+const EMAIL_CONFIG = {
+  senderEmail: "support@bicbloc.eu",
+  senderPassword: "Staffing2023*",
+  smtpServer: "smtp.ionos.fr",
+  smtpPort: 465,
+  useTLS: true
+};
+
 // Admin email address to receive notifications
-const ADMIN_EMAIL = "admin@bicbloc.eu"; // Replace with the desired admin email address
+const ADMIN_EMAIL = "admin@bicbloc.eu";
 
 export interface ReportFields {
   toDoItems: string[];
@@ -60,6 +70,11 @@ export async function generateHousekeeperReport(
           filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
           email: emailAddress,
           adminEmail: ADMIN_EMAIL,
+          senderEmail: EMAIL_CONFIG.senderEmail,
+          senderPassword: EMAIL_CONFIG.senderPassword,
+          smtpServer: EMAIL_CONFIG.smtpServer,
+          smtpPort: EMAIL_CONFIG.smtpPort,
+          useTLS: EMAIL_CONFIG.useTLS,
           notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
           notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
         }),
