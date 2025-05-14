@@ -1,4 +1,3 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/hooks/use-toast";
 
 interface RoomCardProps {
   room: Room;
@@ -129,6 +129,10 @@ export function RoomCard({
       cleaningType: type,
       status: type === 'none' ? 'clean' : 'needs-cleaning'
     });
+    
+    toast({
+      description: `Chambre ${room.number} : nettoyage ${type === 'full' ? 'à blanc' : type === 'quick' ? 'recouche' : 'aucun'}`
+    });
   };
 
   // Détermine l'étage à partir du numéro de chambre
@@ -162,21 +166,39 @@ export function RoomCard({
         {room.isTwin && <Bed className="h-3 w-3 text-gray-500" />}
         <span className="text-xs text-gray-500 ml-auto">{floorDisplay}</span>
         
-        {/* Ajout des boutons de changement rapide de statut */}
+        {/* Boutons de changement rapide */}
         {showActions && (
-          <div className="ml-2 flex gap-1">
-            <Button
-              variant="ghost" 
-              size="icon" 
-              className="h-4 w-4 p-0 text-gray-500 hover:text-green-500"
+          <div className="ml-1 flex items-center gap-1">
+            <button 
+              className="h-4 w-4 flex items-center justify-center rounded hover:bg-purple-100 text-purple-700"
               onClick={(e) => {
                 e.stopPropagation();
-                onUpdate({...room, status: 'clean', cleaningType: 'none'});
+                setCleaningType('full');
+              }}
+              title="À Blanc"
+            >
+              B
+            </button>
+            <button 
+              className="h-4 w-4 flex items-center justify-center rounded hover:bg-blue-100 text-blue-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCleaningType('quick');
+              }}
+              title="Recouche"
+            >
+              R
+            </button>
+            <button
+              className="h-4 w-4 flex items-center justify-center rounded hover:bg-green-100 text-green-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCleaningType('none');
               }}
               title="Marquer comme propre"
             >
               <Check className="h-3 w-3" />
-            </Button>
+            </button>
           </div>
         )}
       </div>

@@ -22,6 +22,9 @@ interface HousekeeperCardProps {
   onFloorPreferenceChange: (name: string, floors: number[]) => void;
   preferredFloors: number[];
   onManualAssign?: () => void;
+  unassignedRooms?: Room[];
+  showUnassignedColumn?: boolean;
+  onAssignRoom?: (room: Room) => void;
 }
 
 export function HousekeeperCard({ 
@@ -35,7 +38,10 @@ export function HousekeeperCard({
   availableFloors,
   onFloorPreferenceChange,
   preferredFloors,
-  onManualAssign
+  onManualAssign,
+  unassignedRooms = [],
+  showUnassignedColumn = false,
+  onAssignRoom
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -53,6 +59,22 @@ export function HousekeeperCard({
   
   // Group rooms by floor
   const roomsByFloor = visibleRooms.reduce((acc, room) => {
+    const floor = parseInt(room.number[0]) || 0;
+    if (!acc[floor]) acc[floor] = [];
+    acc[floor].push(room);
+    return acc;
+  }, {} as Record<number, Room[]>);
+  
+  // Filtrer les chambres non assignées par étage si nécessaire
+  const filteredUnassignedRooms = preferredFloors.length > 0 
+    ? unassignedRooms.filter(room => {
+        const roomFloor = parseInt(room.number[0]) || 0;
+        return preferredFloors.includes(roomFloor);
+      })
+    : unassignedRooms;
+  
+  // Grouper les chambres non assignées par étage
+  const unassignedRoomsByFloor = filteredUnassignedRooms.reduce((acc, room) => {
     const floor = parseInt(room.number[0]) || 0;
     if (!acc[floor]) acc[floor] = [];
     acc[floor].push(room);
@@ -128,12 +150,22 @@ export function HousekeeperCard({
   const sortedFloorRooms = Object.entries(roomsByFloor)
     .sort(([a], [b]) => parseInt(a) - parseInt(b));
   
+  // Trier les chambres non assignées par étage
+  const sortedUnassignedFloorRooms = Object.entries(unassignedRoomsByFloor)
+    .sort(([a], [b]) => parseInt(a) - parseInt(b));
+  
   const sortRoomsByNumber = (rooms: Room[]) => {
     return [...rooms].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
   };
 
   const handleUnassignRoom = (room: Room) => {
     onRoomUnassign(room);
+  };
+  
+  const handleAssignRoom = (room: Room) => {
+    if (onAssignRoom) {
+      onAssignRoom(room);
+    }
   };
   
   // Calculate hidden rooms (not shown due to floor filtering)
@@ -270,45 +302,97 @@ export function HousekeeperCard({
         </div>
       )}
       
-      {/* Affichage par étage si au moins 1 étage visible */}
-      {sortedFloorRooms.length > 0 ? (
-        <div className="space-y-4">
-          {sortedFloorRooms.map(([floor, floorRooms]) => (
-            <div key={floor} className="border-t pt-2">
-              <div className="text-xs font-semibold mb-1">
-                Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {sortRoomsByNumber(floorRooms).map(room => (
-                  <div 
-                    key={room.number} 
-                    className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                    onClick={() => handleUnassignRoom(room)}
-                    title="Cliquer pour retirer l'assignation"
-                  >
-                    <RoomCard 
-                      room={room} 
-                      onUpdate={onRoomUpdate} 
-                      compact 
-                      draggable={draggable}
-                      onUnassign={() => handleUnassignRoom(room)}
-                      showActions={true}
-                    />
+      {/* Affichage de la section des chambres non assignées si demandé */}
+      {showUnassignedColumn && (
+        <div className="mb-6 pb-4 border-b-2 border-red-300">
+          <div className="text-red-600 font-bold mb-2 flex items-center gap-1">
+            <AlertTriangle className="h-4 w-4" />
+            <span>Chambres non assignées</span>
+          </div>
+          {filteredUnassignedRooms.length > 0 ? (
+            sortedUnassignedFloorRooms.length > 0 ? (
+              <div className="space-y-2">
+                {sortedUnassignedFloorRooms.map(([floor, floorRooms]) => (
+                  <div key={`unassigned-${floor}`} className="pt-1">
+                    <div className="text-xs font-semibold mb-1">
+                      Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {sortRoomsByNumber(floorRooms).map(room => (
+                        <div 
+                          key={`unassigned-${room.number}`} 
+                          className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                          onClick={() => handleAssignRoom(room)}
+                          title="Cliquer pour assigner à cette personne"
+                        >
+                          <RoomCard 
+                            room={room} 
+                            onUpdate={onRoomUpdate}
+                            compact 
+                            draggable={draggable}
+                            showActions={true}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                ))
               </div>
+            ) : (
+              <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
+                Aucune chambre non assignée sur les étages sélectionnés
+              </div>
+            )
+          ) : (
+            <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
+              Toutes les chambres sont assignées
             </div>
-          ))}
-        </div>
-      ) : preferredFloors.length > 0 ? (
-        <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
-          Aucune chambre sur les étages sélectionnés
-        </div>
-      ) : (
-        <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
-          Glissez des chambres ici
+          )}
         </div>
       )}
+      
+      {/* Affichage des chambres assignées par étage si au moins 1 étage visible */}
+      <div className="mt-4">
+        <h4 className="text-slate-600 font-bold mb-2">Chambres assignées</h4>
+        {sortedFloorRooms.length > 0 ? (
+          <div className="space-y-4">
+            {sortedFloorRooms.map(([floor, floorRooms]) => (
+              <div key={floor} className="border-t pt-2">
+                <div className="text-xs font-semibold mb-1">
+                  Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {sortRoomsByNumber(floorRooms).map(room => (
+                    <div 
+                      key={room.number} 
+                      className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                      onClick={() => handleUnassignRoom(room)}
+                      title="Cliquer pour retirer l'assignation"
+                    >
+                      <RoomCard 
+                        room={room} 
+                        onUpdate={onRoomUpdate} 
+                        compact 
+                        draggable={draggable}
+                        onUnassign={() => handleUnassignRoom(room)}
+                        showActions={true}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : preferredFloors.length > 0 ? (
+          <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
+            Aucune chambre sur les étages sélectionnés
+          </div>
+        ) : (
+          <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
+            Glissez des chambres ici
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
