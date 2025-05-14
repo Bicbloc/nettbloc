@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +22,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -92,9 +93,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       setIsUploading(false);
     }
   };
-
-  // Référence à l'input file pour le déclencher manuellement
-  const fileInputRef = React.createRef<HTMLInputElement>();
 
   const triggerFileInput = () => {
     // Déclencher le clic sur l'input file
