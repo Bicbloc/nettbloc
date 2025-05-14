@@ -9,8 +9,9 @@ import { Room, CleaningConfig, defaultCleaningConfig } from "@/services/pdfServi
 import { Badge } from "@/components/ui/badge";
 import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
+import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
 import { generateHousekeeperReport, generateAllHousekeeperReports } from "@/services/reportService";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { EmailDialog } from "@/components/EmailDialog";
 import { useReportEmail } from "@/hooks/use-report-email";
@@ -23,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -32,6 +34,7 @@ const Index = () => {
     "Housekeeper 1", "Housekeeper 2", "Housekeeper 3", "Housekeeper 4"
   ]);
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
+  const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
@@ -39,6 +42,7 @@ const Index = () => {
   const [reportAction, setReportAction] = useState<"single" | "all">("single");
   const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
   const { email, isValid } = useReportEmail();
+  const [recommendedHousekeepers, setRecommendedHousekeepers] = useState<number>(0);
 
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -47,6 +51,31 @@ const Index = () => {
     });
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
+  
+  // Calculer le nombre recommandé de femmes de chambre
+  useEffect(() => {
+    if (rooms.length === 0) return;
+    
+    const roomsToClean = rooms.filter(room => room.cleaningType !== 'none' && room.status !== 'maintenance');
+    
+    // Calculer le temps total estimé
+    const totalTime = roomsToClean.reduce((total, room) => {
+      if (room.cleaningType === 'full') {
+        return total + cleaningConfig.fullCleaningTime;
+      } else if (room.cleaningType === 'quick') {
+        return total + cleaningConfig.quickCleaningTime;
+      }
+      return total;
+    }, 0);
+    
+    // Calculer le temps moyen par femme de chambre (en minutes)
+    const averageTimePerHousekeeper = 360; // 6 heures = 360 minutes
+    
+    // Calculer le nombre recommandé de femmes de chambre
+    const recommended = Math.ceil(totalTime / averageTimePerHousekeeper);
+    setRecommendedHousekeepers(recommended);
+    
+  }, [rooms, cleaningConfig]);
   
   const handleRoomUpdate = (updatedRoom: Room) => {
     setRooms(prevRooms => 
@@ -65,8 +94,14 @@ const Index = () => {
   const handleDeleteHousekeeper = (housekeeperName: string) => {
     setHousekeeperNames(prev => prev.filter(name => name !== housekeeperName));
     
-    // Also remove from floor preferences
+    // Also remove from floor preferences and max rooms overrides
     setHousekeeperFloorPreferences(prev => {
+      const updated = { ...prev };
+      delete updated[housekeeperName];
+      return updated;
+    });
+    
+    setHousekeeperMaxRoomsOverrides(prev => {
       const updated = { ...prev };
       delete updated[housekeeperName];
       return updated;
@@ -77,6 +112,13 @@ const Index = () => {
     setHousekeeperFloorPreferences(prev => ({
       ...prev,
       [housekeeperName]: floors
+    }));
+  };
+  
+  const handleMaxRoomsOverrideChange = (housekeeperName: string, maxRooms: number) => {
+    setHousekeeperMaxRoomsOverrides(prev => ({
+      ...prev,
+      [housekeeperName]: maxRooms
     }));
   };
   
@@ -102,7 +144,8 @@ const Index = () => {
   const distributeRooms = (
     roomsList: Room[], 
     housekeepers: string[], 
-    floorPreferences: Record<string, number[]> = {}
+    floorPreferences: Record<string, number[]> = {},
+    maxRoomsOverrides: Record<string, number> = {}
   ) => {
     if (housekeepers.length === 0) return;
     
@@ -147,14 +190,23 @@ const Index = () => {
         }
       }
       
-      let minLoadHousekeeper = candidates[0];
+      // Filter candidates that haven't reached their max rooms limit
+      const availableCandidates = candidates.filter(name => {
+        const maxRooms = maxRoomsOverrides[name] || cleaningConfig.maxRoomsPerHousekeeper;
+        return assignments[name].length < maxRooms;
+      });
+      
+      // If all candidates have reached their max, return null
+      if (availableCandidates.length === 0) return null;
+      
+      let minLoadHousekeeper = availableCandidates[0];
       let minLoad = calculateHousekeeperLoad(assignments[minLoadHousekeeper], cleaningConfig);
       
-      for (let i = 1; i < candidates.length; i++) {
-        const currentLoad = calculateHousekeeperLoad(assignments[candidates[i]], cleaningConfig);
+      for (let i = 1; i < availableCandidates.length; i++) {
+        const currentLoad = calculateHousekeeperLoad(assignments[availableCandidates[i]], cleaningConfig);
         if (currentLoad < minLoad) {
           minLoad = currentLoad;
-          minLoadHousekeeper = candidates[i];
+          minLoadHousekeeper = availableCandidates[i];
         }
       }
       
@@ -167,6 +219,8 @@ const Index = () => {
     for (const room of roomsToClean.filter(r => r.priority === 'high')) {
       const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
       const housekeeper = findMinLoadHousekeeper(floor);
+      
+      if (!housekeeper) continue; // Skip if all housekeepers are at max capacity
       
       // Only assign if the housekeeper accepts this floor or has no preferences
       const preferences = floorPreferences[housekeeper] || [];
@@ -183,6 +237,7 @@ const Index = () => {
         if (assignedRooms.has(room.number)) continue;
         
         const housekeeper = findMinLoadHousekeeper(floorNum);
+        if (!housekeeper) continue; // Skip if all housekeepers are at max capacity
         
         // Only assign if the housekeeper accepts this floor or has no preferences
         const preferences = floorPreferences[housekeeper] || [];
@@ -211,7 +266,7 @@ const Index = () => {
     if (unassignedRooms.length > 0) {
       toast({
         title: "Distribution terminée",
-        description: `${unassignedRooms.length} chambres n'ont pas pu être assignées en raison des préférences d'étage.`,
+        description: `${unassignedRooms.length} chambres n'ont pas pu être assignées en raison des préférences d'étage ou des limites de chambres.`,
         variant: "default",
       });
     }
@@ -231,26 +286,34 @@ const Index = () => {
   const handleGenerateReport = async (housekeeperName: string, housekeeperRooms: Room[]) => {
     setReportHousekeeper(housekeeperName);
     setReportAction("single");
-    setIsEmailDialogOpen(true);
+    
+    if (email && isValid) {
+      // Si l'email est déjà valide, générer le rapport directement
+      try {
+        await generateHousekeeperReport(housekeeperName, housekeeperRooms, cleaningConfig, email);
+        toast({
+          title: "Rapport généré",
+          description: `Le rapport pour ${housekeeperName} a été créé et envoyé à ${email}.`,
+        });
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de générer le rapport. Veuillez réessayer.",
+        });
+      }
+    } else {
+      // Sinon, ouvrir la boîte de dialogue pour entrer l'email
+      setIsEmailDialogOpen(true);
+    }
   };
   
   const handleGenerateAllReports = async () => {
     setReportAction("all");
-    setIsEmailDialogOpen(true);
-  };
-  
-  const handleEmailConfirm = async (confirmedEmail: string) => {
-    setIsEmailDialogOpen(false);
     
-    try {
-      if (reportAction === "single") {
-        const housekeeperRooms = getHousekeeperRooms(reportHousekeeper);
-        await generateHousekeeperReport(reportHousekeeper, housekeeperRooms, cleaningConfig, confirmedEmail);
-        toast({
-          title: "Rapport généré",
-          description: `Le rapport pour ${reportHousekeeper} a été créé avec succès.`,
-        });
-      } else {
+    if (email && isValid) {
+      // Si l'email est déjà valide, générer les rapports directement
+      try {
         const housekeepersWithRooms = housekeeperNames.map(name => ({
           name,
           rooms: getHousekeeperRooms(name)
@@ -264,19 +327,21 @@ const Index = () => {
           });
         }
         
-        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, confirmedEmail);
+        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, email);
         toast({
           title: "Rapports générés",
-          description: `Tous les rapports ont été créés avec succès.`,
+          description: `Tous les rapports ont été créés et envoyés à ${email}.`,
+        });
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de générer les rapports. Veuillez réessayer.",
         });
       }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de générer le(s) rapport(s). Veuillez réessayer.",
-      });
-      console.error("Erreur lors de la génération du/des rapport(s):", error);
+    } else {
+      // Sinon, ouvrir la boîte de dialogue pour entrer l'email
+      setIsEmailDialogOpen(true);
     }
   };
   
@@ -312,6 +377,15 @@ const Index = () => {
       updatedPreferences[name] = housekeeperFloorPreferences[name] || [];
     });
     setHousekeeperFloorPreferences(updatedPreferences);
+    
+    // Mettre à jour les overrides
+    const updatedOverrides: Record<string, number> = {};
+    names.forEach(name => {
+      if (housekeeperMaxRoomsOverrides[name]) {
+        updatedOverrides[name] = housekeeperMaxRoomsOverrides[name];
+      }
+    });
+    setHousekeeperMaxRoomsOverrides(updatedOverrides);
   };
   
   const getStatusBadge = (status: string) => {
@@ -343,7 +417,7 @@ const Index = () => {
   };
   
   const redistributeRooms = () => {
-    distributeRooms(rooms, housekeeperNames, housekeeperFloorPreferences);
+    distributeRooms(rooms, housekeeperNames, housekeeperFloorPreferences, housekeeperMaxRoomsOverrides);
     toast({
       title: "Chambres redistribuées",
       description: "Les chambres ont été réparties entre les femmes de chambre.",
@@ -513,6 +587,22 @@ const Index = () => {
                       </div>
                     </div>
                     
+                    {recommendedHousekeepers > 0 && roomsToClean > 0 && (
+                      <Alert className="mt-4 bg-indigo-50">
+                        <AlertTriangle className="h-5 w-5 text-indigo-600" />
+                        <AlertTitle className="text-indigo-700">Recommandation</AlertTitle>
+                        <AlertDescription className="text-indigo-600">
+                          Pour {roomsToClean} chambres à nettoyer, nous recommandons {recommendedHousekeepers} femmes de chambre.
+                          {housekeeperNames.length < recommendedHousekeepers && (
+                            <div className="mt-1 text-xs">
+                              ⚠️ Vous avez actuellement {housekeeperNames.length} femmes de chambre configurées, 
+                              ce qui est insuffisant pour nettoyer toutes les chambres dans un temps raisonnable.
+                            </div>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
                     <div className="mt-6 space-y-2">
                       <Button onClick={redistributeRooms} className="w-full">
                         Distribuer les Chambres
@@ -559,6 +649,34 @@ const Index = () => {
               </div>
             </div>
             
+            {/* Recommandation pour le nombre de femmes de chambre */}
+            {recommendedHousekeepers > 0 && roomsToClean > 0 && (
+              <Alert className="bg-indigo-50 mb-4">
+                <AlertTriangle className="h-5 w-5 text-indigo-600" />
+                <AlertTitle className="text-indigo-700">Recommandation de personnel</AlertTitle>
+                <AlertDescription className="text-indigo-600">
+                  Pour nettoyer {roomsToClean} chambres ({fullCleaningRooms} à blanc, {quickCleaningRooms} recouches), 
+                  nous recommandons {recommendedHousekeepers} femmes de chambre.
+                  {housekeeperNames.length < recommendedHousekeepers && (
+                    <div className="mt-1 font-medium">
+                      ⚠️ Vous avez actuellement {housekeeperNames.length} femmes de chambre configurées, 
+                      ce qui est insuffisant pour la charge de travail actuelle.
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {unassignedRooms.length > 0 && (
+              <div className="mb-6">
+                <UnassignedRoomsColumn
+                  rooms={unassignedRooms}
+                  onRoomUpdate={handleRoomUpdate}
+                  draggable={true}
+                />
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className={`grid gap-4 md:col-span-4 grid-cols-1 md:grid-cols-2`}>
                 {housekeeperNames.map((name) => (
@@ -576,9 +694,11 @@ const Index = () => {
                     onFloorPreferenceChange={handleFloorPreferenceChange}
                     onManualAssign={() => openManualAssignment(name)}
                     unassignedRooms={rooms.filter(room => room.cleaningType !== 'none')} // Passer toutes les chambres, pas seulement les non-assignées
-                    showUnassignedColumn={true}
+                    showUnassignedColumn={false} // On n'affiche plus les chambres non assignées dans la carte
                     onAssignRoom={(room) => handleRoomUpdate({...room, assignedTo: name})}
                     onDelete={handleDeleteHousekeeper}
+                    maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
+                    onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
                   />
                 ))}
                 
@@ -695,7 +815,25 @@ const Index = () => {
                                     <select 
                                       className="border rounded px-2 py-1 text-sm"
                                       value={room.assignedTo || ''}
-                                      onChange={(e) => handleRoomUpdate({...room, assignedTo: e.target.value || undefined})}
+                                      onChange={(e) => {
+                                        const newAssignee = e.target.value;
+                                        if (newAssignee) {
+                                          // Vérifier si l'housekeeper a atteint sa limite de chambres
+                                          const currentRoomsCount = getHousekeeperRooms(newAssignee).length;
+                                          const maxRooms = housekeeperMaxRoomsOverrides[newAssignee] || cleaningConfig.maxRoomsPerHousekeeper;
+                                          
+                                          if (currentRoomsCount >= maxRooms) {
+                                            toast({
+                                              variant: "destructive",
+                                              title: "Limite atteinte",
+                                              description: `${newAssignee} a déjà ${currentRoomsCount} chambres assignées (limite: ${maxRooms}).`,
+                                            });
+                                            return;
+                                          }
+                                        }
+                                        
+                                        handleRoomUpdate({...room, assignedTo: e.target.value || undefined})
+                                      }}
                                     >
                                       <option value="">Non assignée</option>
                                       {housekeeperNames.map(name => (

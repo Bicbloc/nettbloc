@@ -1,13 +1,15 @@
+
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 import { toast } from "@/hooks/use-toast";
+import { Input } from "./ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +38,8 @@ interface HousekeeperCardProps {
   showUnassignedColumn?: boolean;
   onAssignRoom?: (room: Room) => void;
   onDelete?: (name: string) => void;
+  maxRoomsOverride?: number;
+  onMaxRoomsOverrideChange?: (name: string, maxRooms: number) => void;
 }
 
 export function HousekeeperCard({ 
@@ -53,7 +57,9 @@ export function HousekeeperCard({
   unassignedRooms = [],
   showUnassignedColumn = false,
   onAssignRoom,
-  onDelete
+  onDelete,
+  maxRoomsOverride,
+  onMaxRoomsOverrideChange
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -62,6 +68,10 @@ export function HousekeeperCard({
   const [isFloorSelectorOpen, setIsFloorSelectorOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [expanded, setExpanded] = useState(true);
+  const [tempMaxRooms, setTempMaxRooms] = useState(maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper);
+  const [showMaxRoomsSettings, setShowMaxRoomsSettings] = useState(false);
+  
+  const effectiveMaxRooms = maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper;
   
   // Filter rooms based on selected floors
   const visibleRooms = preferredFloors.length > 0 
@@ -112,15 +122,20 @@ export function HousekeeperCard({
     setEstimatedTime(time);
     
     // Vérifier les contraintes min/max
-    setIsOverloaded(rooms.length > cleaningConfig.maxRoomsPerHousekeeper);
+    setIsOverloaded(rooms.length > effectiveMaxRooms);
     setIsUnderloaded(rooms.length < cleaningConfig.minRoomsPerHousekeeper);
     
     // Calculer la charge de travail en pourcentage (basé sur un max idéal)
-    const idealMaxTime = cleaningConfig.maxRoomsPerHousekeeper * 
+    const idealMaxTime = effectiveMaxRooms * 
       ((cleaningConfig.fullCleaningTime + cleaningConfig.quickCleaningTime) / 2);
     
     setWorkload(Math.min(100, (time / idealMaxTime) * 100));
-  }, [rooms, cleaningConfig]);
+    
+    // Mettre à jour la valeur temporaire de maxRooms si le override change
+    if (maxRoomsOverride !== undefined && tempMaxRooms !== maxRoomsOverride) {
+      setTempMaxRooms(maxRoomsOverride);
+    }
+  }, [rooms, cleaningConfig, effectiveMaxRooms, maxRoomsOverride]);
   
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -140,6 +155,16 @@ export function HousekeeperCard({
             variant: "destructive",
             title: "Assignation impossible",
             description: `${name} ne peut pas être assignée à des chambres de l'étage ${roomFloor} car cet étage n'est pas sélectionné.`
+          });
+          return;
+        }
+        
+        // Vérifier si la limite de chambres est atteinte
+        if (rooms.length >= effectiveMaxRooms) {
+          toast({
+            variant: "destructive",
+            title: "Limite atteinte",
+            description: `Impossible d'assigner plus de ${effectiveMaxRooms} chambres à ${name}. La limite est atteinte.`
           });
           return;
         }
@@ -173,6 +198,42 @@ export function HousekeeperCard({
           return roomFloor === floor && room.assignedTo !== name;
         })
       ] : [];
+      
+      // Vérifier si l'ajout dépasserait la limite de chambres
+      if (rooms.length + allRoomsOnFloor.length > effectiveMaxRooms) {
+        toast({
+          variant: "destructive",
+          title: "Limite dépassée",
+          description: `L'ajout de ${allRoomsOnFloor.length} chambres dépasserait la limite de ${effectiveMaxRooms} chambres pour ${name}. Seulement ${effectiveMaxRooms - rooms.length} chambres peuvent être ajoutées.`
+        });
+        
+        // Ne pas ajouter toutes les chambres, mais uniquement jusqu'à la limite
+        const availableSlots = effectiveMaxRooms - rooms.length;
+        if (availableSlots <= 0) return;
+        
+        // Prioriser les chambres non assignées et les chambres prioritaires
+        const prioritizedRooms = [...allRoomsOnFloor]
+          .sort((a, b) => {
+            // D'abord les chambres non assignées
+            if (!a.assignedTo && b.assignedTo) return -1;
+            if (a.assignedTo && !b.assignedTo) return 1;
+            // Ensuite par priorité
+            if (a.priority === 'high' && b.priority !== 'high') return -1;
+            if (b.priority === 'high' && a.priority !== 'high') return 1;
+            return 0;
+          })
+          .slice(0, availableSlots);
+        
+        prioritizedRooms.forEach(room => {
+          const updatedRoom = { ...room, assignedTo: name };
+          onRoomUpdate(updatedRoom);
+        });
+        
+        toast({
+          description: `${prioritizedRooms.length} chambres de l'étage ${floor === 0 ? 'RDC' : floor} assignées à ${name} (limite atteinte)`
+        });
+        return;
+      }
       
       // Si on a des chambres sur cet étage
       if (allRoomsOnFloor.length > 0 && onRoomUpdate) {
@@ -210,6 +271,16 @@ export function HousekeeperCard({
   };
   
   const handleAssignRoom = (room: Room) => {
+    // Vérifier si la limite de chambres est atteinte
+    if (rooms.length >= effectiveMaxRooms) {
+      toast({
+        variant: "destructive",
+        title: "Limite atteinte",
+        description: `Impossible d'assigner plus de ${effectiveMaxRooms} chambres à ${name}. La limite est atteinte.`
+      });
+      return;
+    }
+    
     // Vérifier si la chambre est sur un étage autorisé
     const roomFloor = parseInt(room.number[0]) || 0;
     
@@ -264,6 +335,23 @@ export function HousekeeperCard({
     setExpanded(!expanded);
   };
   
+  const handleMaxRoomsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value);
+    if (!isNaN(value) && value > 0) {
+      setTempMaxRooms(value);
+    }
+  };
+  
+  const saveMaxRooms = () => {
+    if (onMaxRoomsOverrideChange) {
+      onMaxRoomsOverrideChange(name, tempMaxRooms);
+      toast({
+        description: `Limite de chambres pour ${name} modifiée à ${tempMaxRooms}`
+      });
+    }
+    setShowMaxRoomsSettings(false);
+  };
+  
   return (
     <>
       <Card 
@@ -291,6 +379,36 @@ export function HousekeeperCard({
             </div>
             
             <div className="flex gap-1">
+              <Popover open={showMaxRoomsSettings} onOpenChange={setShowMaxRoomsSettings}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    title="Configurer la limite de chambres"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-3">
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm">Limite de chambres</h4>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={tempMaxRooms}
+                        onChange={handleMaxRoomsChange}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-muted-foreground">chambres</span>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button size="sm" onClick={saveMaxRooms}>Appliquer</Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
               {onDelete && (
                 <Button 
                   size="sm" 
@@ -356,7 +474,7 @@ export function HousekeeperCard({
               <div className="flex justify-between text-xs mt-1 text-muted-foreground">
                 <span>Min: {cleaningConfig.minRoomsPerHousekeeper} chambres</span>
                 <span>{rooms.length} chambres</span>
-                <span>Max: {cleaningConfig.maxRoomsPerHousekeeper} chambres</span>
+                <span>Max: {effectiveMaxRooms} chambres</span>
               </div>
             </div>
           )}
@@ -385,20 +503,20 @@ export function HousekeeperCard({
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Lorsqu'un étage est sélectionné, toutes les chambres non assignées de cet étage sont automatiquement assignées.
+                  Lorsqu'un étage est sélectionné, toutes les chambres de cet étage sont automatiquement assignées.
                 </p>
               </div>
             )}
             
             {isOverloaded && (
               <div className="text-red-500 text-xs mb-2">
-                ⚠️ Trop de chambres assignées
+                ⚠️ Trop de chambres assignées (limite: {effectiveMaxRooms})
               </div>
             )}
             
             {isUnderloaded && rooms.length > 0 && (
               <div className="text-amber-500 text-xs mb-2">
-                ⚠️ Pas assez de chambres assignées
+                ⚠️ Pas assez de chambres assignées (min: {cleaningConfig.minRoomsPerHousekeeper})
               </div>
             )}
             
