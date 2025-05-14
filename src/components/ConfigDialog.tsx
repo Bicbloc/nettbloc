@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Settings } from "lucide-react";
 import { CleaningConfig, defaultCleaningConfig } from "@/services/pdfService";
 import { useForm } from "react-hook-form";
+import { toast } from "@/components/ui/use-toast";
 
 interface ConfigDialogProps {
   config: CleaningConfig;
@@ -65,6 +67,10 @@ export function ConfigDialog({
     const updatedNames = [...names];
     updatedNames.splice(index, 1);
     setNames(updatedNames);
+    // Ne pas fermer la fenêtre après suppression
+    toast({
+      description: "Femme de chambre supprimée"
+    });
   };
 
   return (
