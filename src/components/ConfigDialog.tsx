@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -339,7 +340,10 @@ export function ConfigDialog({
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            onClick={() => handleRemoveName(index)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Important: prevent event bubbling up to Dialog
+                              handleRemoveName(index);
+                            }}
                             className="h-6 w-6 p-0 text-red-500"
                           >
                             <X className="h-4 w-4" />

@@ -4,13 +4,13 @@ import { AspectRatio } from "./ui/aspect-ratio";
 
 export const BicblocLogo: React.FC = () => {
   return (
-    <div className="max-w-[200px] mx-auto mb-6">
+    <a href="https://bicbloc.eu" target="_blank" rel="noopener noreferrer" className="block max-w-[200px] mx-auto mb-6">
       <AspectRatio ratio={3/1}>
         <div className="flex items-center justify-center h-full w-full bg-blue-600 rounded-md text-white font-bold text-xl">
-          BicBloc Staffing
+          NettoBloc
         </div>
       </AspectRatio>
-    </div>
+    </a>
   );
 };
 
