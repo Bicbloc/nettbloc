@@ -69,11 +69,15 @@ export function ConfigDialog({
     }
   };
 
-  const handleRemoveName = (index: number) => {
+  const handleRemoveName = (index: number, e: React.MouseEvent) => {
+    // Prevent event bubbling
+    e.stopPropagation();
+    
     const updatedNames = [...names];
     updatedNames.splice(index, 1);
     setNames(updatedNames);
-    // Ne pas fermer la fenêtre après suppression
+    
+    // Show notification but don't close dialog
     toast({
       description: "Femme de chambre supprimée"
     });
@@ -340,10 +344,7 @@ export function ConfigDialog({
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            onClick={(e) => {
-                              e.stopPropagation(); // Important: prevent event bubbling up to Dialog
-                              handleRemoveName(index);
-                            }}
+                            onClick={(e) => handleRemoveName(index, e)}
                             className="h-6 w-6 p-0 text-red-500"
                           >
                             <X className="h-4 w-4" />

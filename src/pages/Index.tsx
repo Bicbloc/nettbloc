@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { EmailDialog } from "@/components/EmailDialog";
 import { useReportEmail } from "@/hooks/use-report-email";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -41,9 +42,15 @@ const Index = () => {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [reportAction, setReportAction] = useState<"single" | "all">("single");
   const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
-  const { email, isValid } = useReportEmail();
+  const { email, setEmail, isValid } = useReportEmail();
   const [recommendedHousekeepers, setRecommendedHousekeepers] = useState<number>(0);
+  const defaultEmail = "operations@bicbloc.eu";
 
+  useEffect(() => {
+    // Set the default email
+    setEmail(defaultEmail);
+  }, [setEmail]);
+  
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
     housekeeperNames.forEach((name) => {
@@ -508,16 +515,41 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">Gestion des Chambres</h1>
-          <div className="flex gap-2">
-            <ConfigDialog 
-              config={cleaningConfig} 
-              onConfigChange={handleConfigChange}
-              housekeeperNames={housekeeperNames}
-              onHousekeeperNamesChange={handleHousekeeperNamesChange}
-            />
-            <UploadDialog onPdfProcessed={handlePdfProcessed} />
+        <div className="flex flex-col items-center mb-6">
+          <h1 className="text-3xl font-bold tracking-tight text-center mb-4">NettoBloc</h1>
+          
+          <div className="w-full max-w-md mb-4">
+            <div className="flex items-center space-x-2">
+              <Input 
+                type="email" 
+                placeholder="Email pour les rapports" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)}
+                className="flex-1"
+              />
+              {isValid ? (
+                <Badge variant="outline" className="bg-green-100 text-green-800">
+                  Valide
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-red-100 text-red-800">
+                  Invalide
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center w-full">
+            <div />
+            <div className="flex gap-2">
+              <ConfigDialog 
+                config={cleaningConfig} 
+                onConfigChange={handleConfigChange}
+                housekeeperNames={housekeeperNames}
+                onHousekeeperNamesChange={handleHousekeeperNamesChange}
+              />
+              <UploadDialog onPdfProcessed={handlePdfProcessed} />
+            </div>
           </div>
         </div>
         
