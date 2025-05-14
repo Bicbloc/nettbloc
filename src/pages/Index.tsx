@@ -575,7 +575,7 @@ const Index = () => {
                     preferredFloors={housekeeperFloorPreferences[name] || []}
                     onFloorPreferenceChange={handleFloorPreferenceChange}
                     onManualAssign={() => openManualAssignment(name)}
-                    unassignedRooms={getUnassignedRooms()}
+                    unassignedRooms={rooms.filter(room => room.cleaningType !== 'none')} // Passer toutes les chambres, pas seulement les non-assignées
                     showUnassignedColumn={true}
                     onAssignRoom={(room) => handleRoomUpdate({...room, assignedTo: name})}
                     onDelete={handleDeleteHousekeeper}
