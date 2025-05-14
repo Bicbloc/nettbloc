@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -43,9 +43,17 @@ export function HousekeeperCard({
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [isFloorSelectorOpen, setIsFloorSelectorOpen] = useState(false);
   
+  // Filter rooms based on selected floors
+  const visibleRooms = preferredFloors.length > 0 
+    ? rooms.filter(room => {
+        const roomFloor = parseInt(room.number[0]) || 0;
+        return preferredFloors.includes(roomFloor);
+      })
+    : rooms;
+  
   // Group rooms by floor
-  const roomsByFloor = rooms.reduce((acc, room) => {
-    const floor = room.floor || 0;
+  const roomsByFloor = visibleRooms.reduce((acc, room) => {
+    const floor = parseInt(room.number[0]) || 0;
     if (!acc[floor]) acc[floor] = [];
     acc[floor].push(room);
     return acc;
@@ -103,7 +111,11 @@ export function HousekeeperCard({
     
     if (isChecked) {
       toast({
-        description: `Les chambres de l'étage ${floor === 0 ? 'RDC' : floor} seront prioritaires pour ${name}`
+        description: `Les chambres de l'étage ${floor === 0 ? 'RDC' : floor} seront affichées pour ${name}`
+      });
+    } else if (preferredFloors.includes(floor)) {
+      toast({
+        description: `Les chambres de l'étage ${floor === 0 ? 'RDC' : floor} ne seront plus affichées pour ${name}`
       });
     }
   };
@@ -123,6 +135,14 @@ export function HousekeeperCard({
   const handleUnassignRoom = (room: Room) => {
     onRoomUnassign(room);
   };
+  
+  // Calculate hidden rooms (not shown due to floor filtering)
+  const hiddenRooms = preferredFloors.length > 0 
+    ? rooms.filter(room => {
+        const roomFloor = parseInt(room.number[0]) || 0;
+        return !preferredFloors.includes(roomFloor);
+      })
+    : [];
   
   return (
     <Card 
@@ -171,7 +191,7 @@ export function HousekeeperCard({
       
       {isFloorSelectorOpen && (
         <div className="mb-4 p-3 border rounded-md bg-slate-50">
-          <div className="text-sm font-medium mb-2">Étages préférés:</div>
+          <div className="text-sm font-medium mb-2">Étages à afficher:</div>
           <div className="grid grid-cols-5 gap-2">
             {availableFloors.map((floor) => (
               <div key={floor} className="flex items-center space-x-2">
@@ -229,8 +249,29 @@ export function HousekeeperCard({
         </div>
       )}
       
-      {/* Affichage par étage si au moins 2 étages différents */}
-      {sortedFloorRooms.length > 1 ? (
+      {/* Afficher un message si des chambres sont masquées à cause des filtres d'étage */}
+      {hiddenRooms.length > 0 && (
+        <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex items-center gap-2 text-red-700 text-sm">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{hiddenRooms.length} chambres masquées</span>
+          </div>
+          <div className="text-xs text-red-600 mt-1">
+            {hiddenRooms.length} chambres sont assignées mais ne sont pas affichées car elles sont sur des étages non sélectionnés.
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs mt-1 text-red-700 hover:text-red-800 hover:bg-red-100 px-2 py-1 h-auto" 
+            onClick={() => onFloorPreferenceChange(name, availableFloors)}
+          >
+            Afficher tous les étages
+          </Button>
+        </div>
+      )}
+      
+      {/* Affichage par étage si au moins 1 étage visible */}
+      {sortedFloorRooms.length > 0 ? (
         <div className="space-y-4">
           {sortedFloorRooms.map(([floor, floorRooms]) => (
             <div key={floor} className="border-t pt-2">
@@ -259,29 +300,11 @@ export function HousekeeperCard({
             </div>
           ))}
         </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          {sortRoomsByNumber(rooms).map(room => (
-            <div 
-              key={room.number} 
-              className="cursor-pointer hover:bg-gray-100 rounded p-1"
-              onClick={() => handleUnassignRoom(room)}
-              title="Cliquer pour retirer l'assignation"
-            >
-              <RoomCard 
-                room={room} 
-                onUpdate={onRoomUpdate} 
-                compact 
-                draggable={draggable}
-                onUnassign={() => handleUnassignRoom(room)}
-                showActions={true}
-              />
-            </div>
-          ))}
+      ) : preferredFloors.length > 0 ? (
+        <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
+          Aucune chambre sur les étages sélectionnés
         </div>
-      )}
-      
-      {rooms.length === 0 && (
+      ) : (
         <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
           Glissez des chambres ici
         </div>
