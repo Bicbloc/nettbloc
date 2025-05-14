@@ -6,9 +6,11 @@ export const BicblocLogo: React.FC = () => {
   return (
     <a href="https://bicbloc.eu" target="_blank" rel="noopener noreferrer" className="block max-w-[200px] mx-auto mb-6">
       <AspectRatio ratio={3/1}>
-        <div className="flex items-center justify-center h-full w-full bg-blue-600 rounded-md text-white font-bold text-xl">
-          NettoBloc
-        </div>
+        <img 
+          src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png"
+          alt="BicBloc Logo"
+          className="object-contain h-full w-full"
+        />
       </AspectRatio>
     </a>
   );
@@ -21,9 +23,13 @@ export const BicblocFooter: React.FC = () => {
         href="https://bicbloc.eu" 
         target="_blank" 
         rel="noopener noreferrer"
-        className="block text-center py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+        className="block text-center"
       >
-        BicBloc.eu - Optimisation de personnel hôtelier
+        <img 
+          src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png"
+          alt="BicBloc Banner"
+          className="max-h-24 w-auto mx-auto"
+        />
       </a>
     </footer>
   );
