@@ -1,6 +1,5 @@
-
 import { Room, CleaningConfig } from "@/services/pdfService";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -336,7 +335,7 @@ export function HousekeeperCard({
                       ))}
                     </div>
                   </div>
-                ))
+                ))}
               </div>
             ) : (
               <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
