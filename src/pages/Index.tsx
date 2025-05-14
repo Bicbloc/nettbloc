@@ -578,7 +578,7 @@ const Index = () => {
                     unassignedRooms={getUnassignedRooms()}
                     showUnassignedColumn={true}
                     onAssignRoom={(room) => handleRoomUpdate({...room, assignedTo: name})}
-                    onDeleteHousekeeper={handleDeleteHousekeeper}
+                    onDelete={handleDeleteHousekeeper}
                   />
                 ))}
                 
