@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,7 +69,8 @@ export function ConfigDialog({
   };
 
   const handleRemoveName = (index: number, e: React.MouseEvent) => {
-    // Prevent event bubbling
+    // Prevent event bubbling and default behavior
+    e.preventDefault();
     e.stopPropagation();
     
     const updatedNames = [...names];
@@ -346,6 +346,7 @@ export function ConfigDialog({
                             size="sm" 
                             onClick={(e) => handleRemoveName(index, e)}
                             className="h-6 w-6 p-0 text-red-500"
+                            type="button"
                           >
                             <X className="h-4 w-4" />
                           </Button>

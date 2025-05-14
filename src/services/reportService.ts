@@ -1,6 +1,6 @@
-
-import { Room, CleaningConfig } from "./pdfService";
-import html2pdf from 'html2pdf.js';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { Room, CleaningConfig } from './pdfService';
+import { toast } from '@/hooks/use-toast';
 
 export interface ReportFields {
   toDoItems: string[];
@@ -11,148 +11,126 @@ export async function generateHousekeeperReport(
   housekeeperName: string,
   rooms: Room[],
   config: CleaningConfig,
-  email: string,
+  emailAddress: string,
   customFields?: ReportFields
 ): Promise<void> {
-  // Trier les chambres avant de générer le rapport
-  const sortedRooms = [...rooms].sort((a, b) => {
-    // D'abord par priorité (urgent en premier)
-    if (a.isUrgent && !b.isUrgent) return -1;
-    if (!a.isUrgent && b.isUrgent) return 1;
-    
-    // Ensuite par type de nettoyage (à blanc d'abord)
-    if (a.cleaningType === 'full' && b.cleaningType !== 'full') return -1;
-    if (a.cleaningType !== 'full' && b.cleaningType === 'full') return 1;
-    
-    // Puis par numéro de chambre (ordre naturel)
-    return a.number.localeCompare(b.number, undefined, {numeric: true});
-  });
-
-  // Créer la structure HTML du rapport
-  const reportHTML = `
-    <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="margin: 0; color: #333;">Rapport de Nettoyage</h1>
-        <h2 style="margin: 5px 0; color: #666;">${housekeeperName}</h2>
-        <p style="margin: 5px 0; color: #888;">${new Date().toLocaleDateString()}</p>
-        <p style="margin: 5px 0; color: #888;">Contact: ${email}</p>
-      </div>
-      
-      <div style="margin-bottom: 15px;">
-        <p><strong>Total des chambres:</strong> ${sortedRooms.length}</p>
-        <p><strong>Chambres à blanc:</strong> ${sortedRooms.filter(r => r.cleaningType === 'full').length}</p>
-        <p><strong>Recouches:</strong> ${sortedRooms.filter(r => r.cleaningType === 'quick').length}</p>
-        <p><strong>Temps estimé:</strong> 
-          ${calculateEstimatedTime(sortedRooms, config)} minutes
-        </p>
-      </div>
-      
-      <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-          <tr style="background-color: #f3f4f6;">
-            <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Chambre</th>
-            <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Type</th>
-            <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Statut</th>
-            <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sortedRooms.map(room => `
-            <tr>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd; ${room.isUrgent ? 'color: red; font-weight: bold;' : ''}">${room.number}</td>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd;">
-                ${room.cleaningType === 'full' ? 'À BLANC' : 
-                 room.cleaningType === 'quick' ? 'RECOUCHE' : 'N/A'}
-                ${room.isTwin ? ' (Twin)' : ''}
-              </td>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd;">
-                ${getStatusText(room.status)}
-              </td>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd;">
-                ${room.isUrgent ? '⚠️ PRIORITAIRE' : ''}
-                ${room.notUrgent ? '🕒 Pas urgent' : ''}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-
-      ${customFields ? `
-      <div style="margin-top: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
-        <div style="margin-bottom: 15px;">
-          <h3 style="margin: 0 0 10px 0; color: #333;">Choses à faire</h3>
-          <ul style="margin: 0; padding-left: 20px;">
-            ${customFields.toDoItems.map(item => item ? `<li style="margin-bottom: 5px;">${item}</li>` : '').join('')}
-          </ul>
-        </div>
-        <div>
-          <h3 style="margin: 0 0 10px 0; color: #333;">Choses à savoir</h3>
-          <ul style="margin: 0; padding-left: 20px;">
-            ${customFields.toKnowItems.map(item => item ? `<li style="margin-bottom: 5px;">${item}</li>` : '').join('')}
-          </ul>
-        </div>
-      </div>
-      ` : ''}
-      
-      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #666;">
-        <p style="margin-bottom: 5px;">Généré par Bicbloc Staffing <a href="https://www.bicbloc.eu" style="color: #0066cc; text-decoration: none;">www.bicbloc.eu</a></p>
-        <p style="margin-top: 0;"><a href="https://www.bicbloc.eu/extra" style="color: #0066cc; text-decoration: none;">Commander un extra en trois clics</a></p>
-      </div>
-      
-      <div style="margin-top: 20px; width: 100%; text-align: center;">
-        <a href="https://www.bicbloc.eu" style="display: block; text-decoration: none;">
-          <img src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png" style="max-width: 100%; width: 100%; height: auto; max-height: 140px;" />
-        </a>
-      </div>
-    </div>
-  `;
-  
-  // Configuration des options pour html2pdf
-  const options = {
-    margin: 10,
-    filename: `rapport_${housekeeperName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-  
-  // Création du PDF
-  const element = document.createElement('div');
-  element.innerHTML = reportHTML;
-  document.body.appendChild(element);
-  
   try {
-    await html2pdf().from(element).set(options).save();
-    console.log(`Rapport généré pour ${housekeeperName}`);
+    // Generate HTML content
+    const htmlContent = generateHousekeeperReportHTML(housekeeperName, rooms, config, customFields);
+    
+    // Convert HTML to PDF using a server endpoint
+    const response = await fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        html: htmlContent,
+        filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
+        email: emailAddress
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF');
+    }
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      toast({
+        title: "Rapport généré",
+        description: `Le rapport pour ${housekeeperName} a été envoyé à ${emailAddress}`,
+      });
+    } else {
+      throw new Error(result.message || 'Unknown error');
+    }
   } catch (error) {
-    console.error("Erreur lors de la génération du rapport:", error);
+    console.error('Error generating report:', error);
+    toast({
+      variant: "destructive",
+      title: "Erreur",
+      description: "Impossible de générer le rapport PDF",
+    });
     throw error;
-  } finally {
-    document.body.removeChild(element);
   }
 }
 
 export async function generateAllHousekeeperReports(
-  housekeepers: { name: string; rooms: Room[] }[],
+  housekeepersWithRooms: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
-  email: string,
+  emailAddress: string,
   customFields?: ReportFields
 ): Promise<void> {
-  for (const housekeeper of housekeepers) {
-    if (housekeeper.rooms.length > 0) {
-      try {
-        await generateHousekeeperReport(housekeeper.name, housekeeper.rooms, config, email, customFields);
-        // Ajouter un petit délai entre chaque génération pour éviter les problèmes de performance
-        await new Promise(resolve => setTimeout(resolve, 800));
-      } catch (error) {
-        console.error(`Erreur lors de la génération du rapport pour ${housekeeper.name}:`, error);
-      }
+  try {
+    // Generate HTML content for each housekeeper
+    const htmlContents = housekeepersWithRooms.map(({ name, rooms }) => ({
+      name,
+      html: generateHousekeeperReportHTML(name, rooms, config, customFields)
+    }));
+    
+    // Convert HTML to PDF using a server endpoint
+    const response = await fetch('/api/generate-multiple-pdfs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reports: htmlContents.map(item => ({
+          html: item.html,
+          filename: `${item.name.replace(/\s+/g, '_')}_rapport.pdf`,
+        })),
+        email: emailAddress
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to generate PDFs');
     }
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      toast({
+        title: "Rapports générés",
+        description: `${htmlContents.length} rapports ont été envoyés à ${emailAddress}`,
+      });
+    } else {
+      throw new Error(result.message || 'Unknown error');
+    }
+  } catch (error) {
+    console.error('Error generating reports:', error);
+    toast({
+      variant: "destructive",
+      title: "Erreur",
+      description: "Impossible de générer les rapports PDF",
+    });
+    throw error;
   }
 }
 
-function calculateEstimatedTime(rooms: Room[], config: CleaningConfig): number {
-  return rooms.reduce((total, room) => {
+// This function is used to generate the HTML content for a housekeeper's report
+function generateHousekeeperReportHTML(
+  housekeeperName: string,
+  rooms: Room[],
+  config: CleaningConfig,
+  customFields?: ReportFields
+): string {
+  // Sort rooms by priority and then by number
+  const sortedRooms = [...rooms].sort((a, b) => {
+    if (a.priority === 'high' && b.priority !== 'high') return -1;
+    if (b.priority === 'high' && a.priority !== 'high') return 1;
+    return a.number.localeCompare(b.number, undefined, { numeric: true });
+  });
+  
+  // Count different types of rooms
+  const fullCleaningCount = rooms.filter(room => room.cleaningType === 'full').length;
+  const quickCleaningCount = rooms.filter(room => room.cleaningType === 'quick').length;
+  const highPriorityCount = rooms.filter(room => room.priority === 'high').length;
+  const twinCount = rooms.filter(room => room.isTwin).length;
+  
+  // Calculate estimated time
+  const estimatedTimeInMinutes = rooms.reduce((total, room) => {
     if (room.cleaningType === 'full') {
       return total + config.fullCleaningTime;
     } else if (room.cleaningType === 'quick') {
@@ -160,14 +138,206 @@ function calculateEstimatedTime(rooms: Room[], config: CleaningConfig): number {
     }
     return total;
   }, 0);
+  
+  // Build HTML table rows
+  const roomRows = sortedRooms.map(room => {
+    const priorityClass = room.priority === 'high' ? 'priority-high' : '';
+    const cleaningType = room.cleaningType === 'full' ? 'À Blanc' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
+    const status = room.status === 'needs-cleaning' ? 'À Nettoyer' : 
+                  room.status === 'clean' ? 'Propre' : 
+                  room.status === 'occupied' ? 'Occupé' : 
+                  room.status === 'maintenance' ? 'Maintenance' : room.status;
+    
+    return `
+      <tr class="${priorityClass}">
+        <td>${room.number}</td>
+        <td>${cleaningType}</td>
+        <td>${status}</td>
+        <td>${room.isTwin ? 'Oui' : 'Non'}</td>
+        <td>${room.priority === 'high' ? 'Haute' : room.priority === 'low' ? 'Basse' : 'Normale'}</td>
+      </tr>
+    `;
+  }).join('');
+  
+  // Generate to-do and to-know lists
+  const todoItems = (customFields?.toDoItems || [])
+    .filter(item => item.trim() !== '')
+    .map(item => `<li>${item}</li>`)
+    .join('');
+    
+  const toKnowItems = (customFields?.toKnowItems || [])
+    .filter(item => item.trim() !== '')
+    .map(item => `<li>${item}</li>`)
+    .join('');
+  
+  // Create the full HTML document
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Rapport de Nettoyage - ${housekeeperName}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 100%; margin: 0 auto; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .header { margin-bottom: 20px; }
+        .summary { margin-bottom: 15px; }
+        .footer { margin-top: 30px; font-size: 0.9em; color: #666; text-align: center; }
+        .priority-high { background-color: #ffebee; }
+        h1 { margin-top: 0; color: #333; }
+        h2 { color: #555; }
+        .banner { width: 100%; text-align: center; margin-top: 30px; }
+        .banner img { width: 100%; height: auto; max-height: 200px; object-fit: contain; }
+        .todo-section { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+        .footer-link { color: #0066cc; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rapport de Nettoyage</h1>
+          <p><strong>Nom:</strong> ${housekeeperName}</p>
+          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <div class="summary">
+          <h2>Résumé</h2>
+          <p><strong>Total des chambres:</strong> ${rooms.length}</p>
+          <p><strong>Nettoyages à blanc:</strong> ${fullCleaningCount}</p>
+          <p><strong>Recouches:</strong> ${quickCleaningCount}</p>
+          <p><strong>Chambres prioritaires:</strong> ${highPriorityCount}</p>
+          <p><strong>Chambres twin:</strong> ${twinCount}</p>
+          <p><strong>Temps estimé:</strong> ${estimatedTimeInMinutes} minutes (${Math.floor(estimatedTimeInMinutes/60)}h${estimatedTimeInMinutes%60})</p>
+        </div>
+        
+        ${todoItems ? `
+        <div class="todo-section">
+          <h2>À faire</h2>
+          <ul>
+            ${todoItems}
+          </ul>
+        </div>
+        ` : ''}
+        
+        ${toKnowItems ? `
+        <div class="todo-section">
+          <h2>À savoir</h2>
+          <ul>
+            ${toKnowItems}
+          </ul>
+        </div>
+        ` : ''}
+        
+        <h2>Liste des Chambres</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Chambre</th>
+              <th>Type Nettoyage</th>
+              <th>Statut</th>
+              <th>Twin</th>
+              <th>Priorité</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${roomRows}
+          </tbody>
+        </table>
+        
+        <div class="footer">
+          <p>Généré par <a href="https://www.bicbloc.eu" class="footer-link" target="_blank">BicBloc</a></p>
+          <p style="margin-top: 0;"><a href="https://www.bicbloc.eu/extra" class="footer-link" target="_blank">Commander un extra en trois clics</a></p>
+        </div>
+        
+        <div class="banner">
+          <a href="https://www.bicbloc.eu" target="_blank" style="display: block;">
+            <img src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png" alt="BicBloc Banner" style="width: 100%; height: auto;" />
+          </a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }
 
-function getStatusText(status: string): string {
-  switch (status) {
-    case 'needs-cleaning': return 'À nettoyer';
-    case 'clean': return 'Propre';
-    case 'occupied': return 'Occupé';
-    case 'maintenance': return 'Maintenance';
-    default: return status;
+// Function to create a simple PDF (fallback if HTML conversion fails)
+async function createSimplePDF(housekeeperName: string, rooms: Room[], config: CleaningConfig): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage();
+  const { width, height } = page.getSize();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  
+  // Add title
+  page.drawText(`Rapport de Nettoyage - ${housekeeperName}`, {
+    x: 50,
+    y: height - 50,
+    size: 16,
+    font: boldFont,
+  });
+  
+  // Add date
+  page.drawText(`Date: ${new Date().toLocaleDateString()}`, {
+    x: 50,
+    y: height - 80,
+    size: 12,
+    font,
+  });
+  
+  // Add summary
+  const fullCleaningCount = rooms.filter(room => room.cleaningType === 'full').length;
+  const quickCleaningCount = rooms.filter(room => room.cleaningType === 'quick').length;
+  
+  page.drawText(`Total des chambres: ${rooms.length}`, {
+    x: 50,
+    y: height - 120,
+    size: 12,
+    font,
+  });
+  
+  page.drawText(`Nettoyages à blanc: ${fullCleaningCount}`, {
+    x: 50,
+    y: height - 140,
+    size: 12,
+    font,
+  });
+  
+  page.drawText(`Recouches: ${quickCleaningCount}`, {
+    x: 50,
+    y: height - 160,
+    size: 12,
+    font,
+  });
+  
+  // Add room list title
+  page.drawText('Liste des Chambres:', {
+    x: 50,
+    y: height - 200,
+    size: 14,
+    font: boldFont,
+  });
+  
+  // Add room list
+  let yPosition = height - 230;
+  for (const room of rooms) {
+    const cleaningType = room.cleaningType === 'full' ? 'À Blanc' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
+    page.drawText(`${room.number} - ${cleaningType}${room.priority === 'high' ? ' (Prioritaire)' : ''}`, {
+      x: 50,
+      y: yPosition,
+      size: 10,
+      font,
+    });
+    yPosition -= 20;
+    
+    // Add a new page if we're running out of space
+    if (yPosition < 50) {
+      const newPage = pdfDoc.addPage();
+      yPosition = height - 50;
+    }
   }
+  
+  return pdfDoc.save();
 }
