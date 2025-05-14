@@ -93,6 +93,16 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     }
   };
 
+  // Référence à l'input file pour le déclencher manuellement
+  const fileInputRef = React.createRef<HTMLInputElement>();
+
+  const triggerFileInput = () => {
+    // Déclencher le clic sur l'input file
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -112,6 +122,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
+          onClick={triggerFileInput}
         >
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -128,21 +139,24 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
               )}
             </div>
             <div>
-              <label className="inline-block">
-                <input
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                >
-                  Sélectionner un fichier
-                </Button>
-              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerFileInput();
+                }}
+              >
+                Sélectionner un fichier
+              </Button>
             </div>
           </div>
         </div>

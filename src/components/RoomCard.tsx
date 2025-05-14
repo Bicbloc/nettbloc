@@ -12,22 +12,26 @@ interface RoomCardProps {
   room: Room;
   onUpdate: (room: Room) => void;
   onAssign?: (room: Room, housekeeperName: string) => void;
+  onUnassign?: (room: Room) => void;
   draggable?: boolean;
   compact?: boolean;
   selectable?: boolean;
   isSelected?: boolean;
   onSelect?: (room: Room) => void;
+  showActions?: boolean;
 }
 
 export function RoomCard({ 
   room, 
   onUpdate, 
   onAssign, 
+  onUnassign,
   draggable = false, 
   compact = false, 
   selectable = false,
   isSelected = false,
-  onSelect
+  onSelect,
+  showActions = false
 }: RoomCardProps) {
   const [dragging, setDragging] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -157,6 +161,24 @@ export function RoomCard({
         )}
         {room.isTwin && <Bed className="h-3 w-3 text-gray-500" />}
         <span className="text-xs text-gray-500 ml-auto">{floorDisplay}</span>
+        
+        {/* Ajout des boutons de changement rapide de statut */}
+        {showActions && (
+          <div className="ml-2 flex gap-1">
+            <Button
+              variant="ghost" 
+              size="icon" 
+              className="h-4 w-4 p-0 text-gray-500 hover:text-green-500"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate({...room, status: 'clean', cleaningType: 'none'});
+              }}
+              title="Marquer comme propre"
+            >
+              <Check className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

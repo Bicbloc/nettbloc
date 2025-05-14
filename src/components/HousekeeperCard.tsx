@@ -119,6 +119,10 @@ export function HousekeeperCard({
   const sortRoomsByNumber = (rooms: Room[]) => {
     return [...rooms].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
   };
+
+  const handleUnassignRoom = (room: Room) => {
+    onRoomUnassign(room);
+  };
   
   return (
     <Card 
@@ -238,7 +242,7 @@ export function HousekeeperCard({
                   <div 
                     key={room.number} 
                     className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                    onClick={() => onRoomUnassign(room)}
+                    onClick={() => handleUnassignRoom(room)}
                     title="Cliquer pour retirer l'assignation"
                   >
                     <RoomCard 
@@ -246,6 +250,8 @@ export function HousekeeperCard({
                       onUpdate={onRoomUpdate} 
                       compact 
                       draggable={draggable}
+                      onUnassign={() => handleUnassignRoom(room)}
+                      showActions={true}
                     />
                   </div>
                 ))}
@@ -259,7 +265,7 @@ export function HousekeeperCard({
             <div 
               key={room.number} 
               className="cursor-pointer hover:bg-gray-100 rounded p-1"
-              onClick={() => onRoomUnassign(room)}
+              onClick={() => handleUnassignRoom(room)}
               title="Cliquer pour retirer l'assignation"
             >
               <RoomCard 
@@ -267,6 +273,8 @@ export function HousekeeperCard({
                 onUpdate={onRoomUpdate} 
                 compact 
                 draggable={draggable}
+                onUnassign={() => handleUnassignRoom(room)}
+                showActions={true}
               />
             </div>
           ))}

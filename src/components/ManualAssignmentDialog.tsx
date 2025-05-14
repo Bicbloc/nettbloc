@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ManualAssignmentDialogProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ManualAssignmentDialogProps {
   rooms: Room[];
   housekeeperNames: string[];
   onAssignRooms: (housekeeperName: string, rooms: Room[]) => void;
+  housekeeperPreferredFloors: Record<string, number[]>;
 }
 
 export function ManualAssignmentDialog({
@@ -24,6 +26,7 @@ export function ManualAssignmentDialog({
   rooms,
   housekeeperNames,
   onAssignRooms,
+  housekeeperPreferredFloors,
 }: ManualAssignmentDialogProps) {
   const [selectedRooms, setSelectedRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
@@ -31,6 +34,8 @@ export function ManualAssignmentDialog({
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterFloor, setFilterFloor] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [excludeTwin, setExcludeTwin] = useState<boolean>(true);
+  const [useSmartAssignment, setUseSmartAssignment] = useState<boolean>(true);
   
   // Reset selections when dialog opens/closes
   useEffect(() => {
@@ -40,6 +45,8 @@ export function ManualAssignmentDialog({
       setSearchTerm("");
       setFilterFloor("all");
       setFilterStatus("all");
+      setExcludeTwin(true);
+      setUseSmartAssignment(true);
     }
   }, [isOpen, housekeeperNames]);
   
@@ -68,11 +75,16 @@ export function ManualAssignmentDialog({
       result = result.filter(room => room.status === filterStatus);
     }
     
+    // Exclude twin rooms if option is selected
+    if (excludeTwin) {
+      result = result.filter(room => !room.isTwin);
+    }
+    
     // Sort by room number
     result.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
     
     setFilteredRooms(result);
-  }, [rooms, searchTerm, filterFloor, filterStatus]);
+  }, [rooms, searchTerm, filterFloor, filterStatus, excludeTwin]);
   
   const handleRoomSelect = (room: Room) => {
     setSelectedRooms(prev => {
@@ -83,6 +95,50 @@ export function ManualAssignmentDialog({
       } else {
         return [...prev, room];
       }
+    });
+  };
+
+  // Implémentation de l'assignation intelligente
+  const handleSmartAssign = () => {
+    if (!selectedHousekeeper) {
+      toast({
+        title: "Aucune femme de chambre sélectionnée",
+        description: "Veuillez sélectionner une femme de chambre.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const preferredFloors = housekeeperPreferredFloors[selectedHousekeeper] || [];
+    
+    // Si aucun étage préféré, on prend toutes les chambres disponibles
+    if (preferredFloors.length === 0) {
+      toast({
+        title: "Aucun étage préféré défini",
+        description: "Veuillez définir des étages préférés pour l'assignation intelligente.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Filtrer les chambres selon les étages préférés de la femme de chambre
+    const roomsByPreferredFloors = filteredRooms.filter(room => {
+      const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+      return preferredFloors.includes(roomFloor);
+    });
+
+    if (roomsByPreferredFloors.length === 0) {
+      toast({
+        title: "Aucune chambre disponible",
+        description: "Aucune chambre disponible dans les étages préférés.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedRooms(roomsByPreferredFloors);
+    toast({
+      description: `${roomsByPreferredFloors.length} chambres sélectionnées automatiquement dans les étages préférés.`
     });
   };
   
@@ -140,7 +196,7 @@ export function ManualAssignmentDialog({
         
         <div className="grid grid-cols-12 gap-4">
           {/* Filters */}
-          <div className="col-span-12 grid grid-cols-4 gap-2">
+          <div className="col-span-12 grid grid-cols-4 gap-2 mb-2">
             <div>
               <Label htmlFor="search">Recherche</Label>
               <Input
@@ -192,6 +248,47 @@ export function ManualAssignmentDialog({
                 Effacer
               </Button>
             </div>
+          </div>
+          
+          {/* Options additionnelles */}
+          <div className="col-span-12 flex items-center gap-8 mb-2">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="exclude-twin" 
+                checked={excludeTwin}
+                onCheckedChange={(checked) => setExcludeTwin(!!checked)}
+              />
+              <Label 
+                htmlFor="exclude-twin"
+                className="text-sm cursor-pointer"
+              >
+                Exclure chambres twin
+              </Label>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="smart-assignment" 
+                checked={useSmartAssignment}
+                onCheckedChange={(checked) => setUseSmartAssignment(!!checked)}
+              />
+              <Label 
+                htmlFor="smart-assignment"
+                className="text-sm cursor-pointer"
+              >
+                Assignation intelligente par étage
+              </Label>
+            </div>
+
+            {useSmartAssignment && (
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={handleSmartAssign}
+              >
+                Sélection intelligente
+              </Button>
+            )}
           </div>
           
           {/* Room Selection */}
