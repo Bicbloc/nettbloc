@@ -19,10 +19,10 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Settings } from "lucide-react";
+import { Settings, MinusSquare, PlusSquare } from "lucide-react";
 import { CleaningConfig, defaultCleaningConfig } from "@/services/pdfService";
 import { useForm } from "react-hook-form";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 interface ConfigDialogProps {
   config: CleaningConfig;
@@ -54,6 +54,10 @@ export function ConfigDialog({
     onConfigChange(data);
     onHousekeeperNamesChange(names);
     setOpen(false);
+    
+    toast({
+      description: "Configuration sauvegardée"
+    });
   };
 
   const handleAddName = () => {
@@ -71,6 +75,18 @@ export function ConfigDialog({
     toast({
       description: "Femme de chambre supprimée"
     });
+  };
+
+  const incrementValue = (fieldName: keyof CleaningConfig) => {
+    const currentValue = form.getValues(fieldName) as number;
+    form.setValue(fieldName, currentValue + 1);
+  };
+
+  const decrementValue = (fieldName: keyof CleaningConfig) => {
+    const currentValue = form.getValues(fieldName) as number;
+    if (currentValue > 1) { // Prevent going below 1
+      form.setValue(fieldName, currentValue - 1);
+    }
   };
 
   return (
@@ -98,7 +114,32 @@ export function ConfigDialog({
                 <FormItem>
                   <FormLabel>Temps de nettoyage à blanc (minutes)</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                    <div className="flex items-center">
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-r-none"
+                        onClick={() => decrementValue("fullCleaningTime")}
+                      >
+                        <MinusSquare className="h-4 w-4" />
+                      </Button>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        onChange={e => field.onChange(parseInt(e.target.value))} 
+                        className="rounded-none text-center" 
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-l-none"
+                        onClick={() => incrementValue("fullCleaningTime")}
+                      >
+                        <PlusSquare className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </FormControl>
                   <FormDescription>
                     Temps nécessaire pour un nettoyage complet
@@ -114,7 +155,32 @@ export function ConfigDialog({
                 <FormItem>
                   <FormLabel>Temps de recouche (minutes)</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                    <div className="flex items-center">
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-r-none"
+                        onClick={() => decrementValue("quickCleaningTime")}
+                      >
+                        <MinusSquare className="h-4 w-4" />
+                      </Button>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        onChange={e => field.onChange(parseInt(e.target.value))} 
+                        className="rounded-none text-center" 
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-l-none"
+                        onClick={() => incrementValue("quickCleaningTime")}
+                      >
+                        <PlusSquare className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </FormControl>
                   <FormDescription>
                     Temps nécessaire pour un nettoyage rapide
@@ -130,7 +196,32 @@ export function ConfigDialog({
                 <FormItem>
                   <FormLabel>Minimum de chambres par femme de chambre</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                    <div className="flex items-center">
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-r-none"
+                        onClick={() => decrementValue("minRoomsPerHousekeeper")}
+                      >
+                        <MinusSquare className="h-4 w-4" />
+                      </Button>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        onChange={e => field.onChange(parseInt(e.target.value))} 
+                        className="rounded-none text-center" 
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-l-none"
+                        onClick={() => incrementValue("minRoomsPerHousekeeper")}
+                      >
+                        <PlusSquare className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </FormControl>
                 </FormItem>
               )}
@@ -143,7 +234,32 @@ export function ConfigDialog({
                 <FormItem>
                   <FormLabel>Maximum de chambres par femme de chambre</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                    <div className="flex items-center">
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-r-none"
+                        onClick={() => decrementValue("maxRoomsPerHousekeeper")}
+                      >
+                        <MinusSquare className="h-4 w-4" />
+                      </Button>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        onChange={e => field.onChange(parseInt(e.target.value))} 
+                        className="rounded-none text-center" 
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-l-none"
+                        onClick={() => incrementValue("maxRoomsPerHousekeeper")}
+                      >
+                        <PlusSquare className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </FormControl>
                 </FormItem>
               )}

@@ -1,13 +1,25 @@
+
 import { Room, CleaningConfig } from "@/services/pdfService";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus, AlertTriangle, UserMinus } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
-import { toast } from "./ui/use-toast";
+import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface HousekeeperCardProps {
   name: string;
@@ -24,7 +36,7 @@ interface HousekeeperCardProps {
   unassignedRooms?: Room[];
   showUnassignedColumn?: boolean;
   onAssignRoom?: (room: Room) => void;
-  onDeleteHousekeeper?: (name: string) => void;
+  onDelete?: (name: string) => void;
 }
 
 export function HousekeeperCard({ 
@@ -42,13 +54,15 @@ export function HousekeeperCard({
   unassignedRooms = [],
   showUnassignedColumn = false,
   onAssignRoom,
-  onDeleteHousekeeper
+  onDelete
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
   const [workload, setWorkload] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [isFloorSelectorOpen, setIsFloorSelectorOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   
   // Filter rooms based on selected floors
   const visibleRooms = preferredFloors.length > 0 
@@ -67,12 +81,15 @@ export function HousekeeperCard({
   }, {} as Record<number, Room[]>);
   
   // Filtrer les chambres non assignées par étage si nécessaire
-  const filteredUnassignedRooms = preferredFloors.length > 0 
-    ? unassignedRooms.filter(room => {
-        const roomFloor = parseInt(room.number[0]) || 0;
-        return preferredFloors.includes(roomFloor);
-      })
-    : unassignedRooms;
+  const filteredUnassignedRooms = unassignedRooms.filter(room => {
+    // Si des étages sont sélectionnés, filtre par ces étages
+    if (preferredFloors.length > 0) {
+      const roomFloor = parseInt(room.number[0]) || 0;
+      return preferredFloors.includes(roomFloor);
+    }
+    // Sinon, montre toutes les chambres non assignées
+    return true;
+  });
   
   // Grouper les chambres non assignées par étage
   const unassignedRoomsByFloor = filteredUnassignedRooms.reduce((acc, room) => {
@@ -116,20 +133,21 @@ export function HousekeeperCard({
       const roomData = e.dataTransfer.getData('application/json');
       if (roomData) {
         const room = JSON.parse(roomData) as Room;
-        // Check if the room's floor is in preferred floors
+        // Vérifier si la chambre est sur un étage autorisé pour cette femme de chambre
         const roomFloor = parseInt(room.number[0]) || 0;
         
-        if (preferredFloors.length === 0 || preferredFloors.includes(roomFloor)) {
-          const updatedRoom = { ...room, assignedTo: name };
-          onRoomUpdate(updatedRoom);
-        } else {
-          // Show toast message if floor is not allowed
+        if (preferredFloors.length > 0 && !preferredFloors.includes(roomFloor)) {
           toast({
             variant: "destructive",
-            title: "Action impossible",
-            description: `La chambre ${room.number} est sur un étage non sélectionné pour ${name}`,
+            title: "Assignation impossible",
+            description: `${name} ne peut pas être assignée à des chambres de l'étage ${roomFloor} car cet étage n'est pas sélectionné.`
           });
+          return;
         }
+        
+        // La chambre est sur un étage autorisé, procéder à l'assignation
+        const updatedRoom = { ...room, assignedTo: name };
+        onRoomUpdate(updatedRoom);
       }
     } catch (error) {
       console.error("Erreur lors du drop:", error);
@@ -144,13 +162,23 @@ export function HousekeeperCard({
     onFloorPreferenceChange(name, newPreferredFloors);
     
     if (isChecked) {
-      toast({
-        description: `Les chambres de l'étage ${floor === 0 ? 'RDC' : floor} seront affichées pour ${name}`
+      // Si on ajoute un étage, assigner automatiquement toutes les chambres non assignées de cet étage
+      const floorUnassignedRooms = unassignedRooms.filter(room => {
+        const roomFloor = parseInt(room.number[0]) || 0;
+        return roomFloor === floor;
       });
-    } else if (preferredFloors.includes(floor)) {
-      toast({
-        description: `Les chambres de l'étage ${floor === 0 ? 'RDC' : floor} ne seront plus affichées pour ${name}`
-      });
+      
+      if (floorUnassignedRooms.length > 0 && onAssignRoom) {
+        // Assigner toutes les chambres non assignées de cet étage
+        floorUnassignedRooms.forEach(room => {
+          const updatedRoom = { ...room, assignedTo: name };
+          onRoomUpdate(updatedRoom);
+        });
+        
+        toast({
+          description: `${floorUnassignedRooms.length} chambre(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
+        });
+      }
     }
   };
   
@@ -175,8 +203,45 @@ export function HousekeeperCard({
   };
   
   const handleAssignRoom = (room: Room) => {
+    // Vérifier si la chambre est sur un étage autorisé
+    const roomFloor = parseInt(room.number[0]) || 0;
+    
+    if (preferredFloors.length > 0 && !preferredFloors.includes(roomFloor)) {
+      toast({
+        variant: "destructive",
+        title: "Assignation impossible",
+        description: `${name} ne peut pas être assignée à des chambres de l'étage ${roomFloor} car cet étage n'est pas sélectionné.`
+      });
+      return;
+    }
+    
     if (onAssignRoom) {
       onAssignRoom(room);
+    }
+  };
+  
+  const handleDeleteHousekeeper = () => {
+    if (onDelete) {
+      if (rooms.length > 0) {
+        // Confirmation avant suppression si des chambres sont assignées
+        setShowDeleteConfirm(true);
+      } else {
+        // Suppression directe si aucune chambre assignée
+        onDelete(name);
+        toast({
+          description: `${name} a été supprimé(e)`
+        });
+      }
+    }
+  };
+  
+  const confirmDelete = () => {
+    if (onDelete) {
+      onDelete(name);
+      setShowDeleteConfirm(false);
+      toast({
+        description: `${name} a été supprimé(e). ${rooms.length} chambre(s) ont été désassignées.`
+      });
     }
   };
   
@@ -188,256 +253,291 @@ export function HousekeeperCard({
       })
     : [];
   
-  const handleDeleteHousekeeper = () => {
-    if (onDeleteHousekeeper) {
-      if (rooms.length > 0) {
-        // Show confirmation if housekeeper has assigned rooms
-        if (confirm(`Êtes-vous sûr de vouloir supprimer ${name}? Toutes les chambres assignées (${rooms.length}) seront désassignées.`)) {
-          // Unassign all rooms first
-          rooms.forEach(room => {
-            onRoomUnassign(room);
-          });
-          onDeleteHousekeeper(name);
-          toast({
-            description: `${name} a été supprimé(e) et toutes les chambres ont été désassignées.`
-          });
-        }
-      } else {
-        // Directly delete if no rooms are assigned
-        onDeleteHousekeeper(name);
-        toast({
-          description: `${name} a été supprimé(e).`
-        });
-      }
-    }
+  const toggleExpand = () => {
+    setExpanded(!expanded);
   };
   
   return (
-    <Card 
-      className={cn(
-        "p-4 border rounded-lg",
-        isOverloaded && "border-red-400",
-        isUnderloaded && "border-amber-400"
-      )}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-lg">{name}</h3>
-        
-        <div className="flex gap-1">
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={toggleFloorSelector}
-            className="flex items-center gap-1 text-sm"
-          >
-            <Layers className="h-4 w-4" /> Étages
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={() => onGenerateReport(name, rooms)}
-            className="flex items-center gap-1 text-sm"
-          >
-            <FileCog className="h-4 w-4" /> Rapport
-          </Button>
-          
-          {onManualAssign && (
-            <Button 
-              size="sm" 
-              variant="ghost"
-              onClick={onManualAssign}
-              className="flex items-center gap-1 text-sm"
-            >
-              <Plus className="h-4 w-4" /> Ajouter
-            </Button>
-          )}
-          
-          {onDeleteHousekeeper && (
-            <Button 
-              size="sm" 
-              variant="ghost"
-              onClick={handleDeleteHousekeeper}
-              className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              <UserMinus className="h-4 w-4" /> Supprimer
-            </Button>
-          )}
-        </div>
-      </div>
-      
-      {isFloorSelectorOpen && (
-        <div className="mb-4 p-3 border rounded-md bg-slate-50">
-          <div className="text-sm font-medium mb-2">Étages à afficher:</div>
-          <div className="grid grid-cols-5 gap-2">
-            {availableFloors.map((floor) => (
-              <div key={floor} className="flex items-center space-x-2">
-                <Checkbox 
-                  id={`floor-${name}-${floor}`} 
-                  checked={preferredFloors.includes(floor)}
-                  onCheckedChange={(checked) => handleFloorChange(floor, !!checked)}
-                />
-                <Label 
-                  htmlFor={`floor-${name}-${floor}`}
-                  className="text-sm cursor-pointer"
-                >
-                  {floor === 0 ? 'RDC' : `${floor}`}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      <div className="mb-4">
-        <div className="flex justify-between text-sm mb-1">
-          <span>Charge de travail</span>
-          <span>{estimatedTime} min</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            className={cn(
-              "h-2.5 rounded-full",
-              workload >= 90 ? "bg-red-500" :
-              workload >= 75 ? "bg-orange-500" :
-              workload <= 30 ? "bg-amber-500" :
-              "bg-green-500"
-            )} 
-            style={{ width: `${workload}%` }}
-          ></div>
-        </div>
-        
-        <div className="flex justify-between text-xs mt-1 text-muted-foreground">
-          <span>Min: {cleaningConfig.minRoomsPerHousekeeper} chambres</span>
-          <span>{rooms.length} chambres</span>
-          <span>Max: {cleaningConfig.maxRoomsPerHousekeeper} chambres</span>
-        </div>
-      </div>
-      
-      {isOverloaded && (
-        <div className="text-red-500 text-xs mb-2">
-          ⚠️ Trop de chambres assignées
-        </div>
-      )}
-      
-      {isUnderloaded && rooms.length > 0 && (
-        <div className="text-amber-500 text-xs mb-2">
-          ⚠️ Pas assez de chambres assignées
-        </div>
-      )}
-      
-      {/* Afficher un message si des chambres sont masquées à cause des filtres d'étage */}
-      {hiddenRooms.length > 0 && (
-        <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-md">
-          <div className="flex items-center gap-2 text-red-700 text-sm">
-            <AlertTriangle className="h-4 w-4" />
-            <span>{hiddenRooms.length} chambres masquées</span>
-          </div>
-          <div className="text-xs text-red-600 mt-1">
-            {hiddenRooms.length} chambres sont assignées mais ne sont pas affichées car elles sont sur des étages non sélectionnés.
-          </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-xs mt-1 text-red-700 hover:text-red-800 hover:bg-red-100 px-2 py-1 h-auto" 
-            onClick={() => onFloorPreferenceChange(name, availableFloors)}
-          >
-            Afficher tous les étages
-          </Button>
-        </div>
-      )}
-      
-      {/* Affichage de la section des chambres non assignées sera toujours visible */}
-      <div className="mb-6 pb-4 border-b-2 border-red-300">
-        <div className="text-red-600 font-bold mb-2 flex items-center gap-1">
-          <AlertTriangle className="h-4 w-4" />
-          <span>Chambres non assignées</span>
-        </div>
-        {filteredUnassignedRooms.length > 0 ? (
-          sortedUnassignedFloorRooms.length > 0 ? (
-            <div className="space-y-2">
-              {sortedUnassignedFloorRooms.map(([floor, floorRooms]) => (
-                <div key={`unassigned-${floor}`} className="pt-1">
-                  <div className="text-xs font-semibold mb-1">
-                    Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {sortRoomsByNumber(floorRooms).map(room => (
-                      <div 
-                        key={`unassigned-${room.number}`} 
-                        className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                        onClick={() => handleAssignRoom(room)}
-                        title="Cliquer pour assigner à cette personne"
-                      >
-                        <RoomCard 
-                          room={room} 
-                          onUpdate={onRoomUpdate}
-                          compact 
-                          draggable={draggable}
-                          showActions={true}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
-              Aucune chambre non assignée sur les étages sélectionnés
-            </div>
-          )
-        ) : (
-          <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
-            Toutes les chambres sont assignées
-          </div>
+    <>
+      <Card 
+        className={cn(
+          "border rounded-lg",
+          isOverloaded && "border-red-400",
+          isUnderloaded && "border-amber-400"
         )}
-      </div>
-      
-      {/* Affichage des chambres assignées par étage si au moins 1 étage visible */}
-      <div className="mt-4">
-        <h4 className="text-slate-600 font-bold mb-2">Chambres assignées</h4>
-        {sortedFloorRooms.length > 0 ? (
-          <div className="space-y-4">
-            {sortedFloorRooms.map(([floor, floorRooms]) => (
-              <div key={floor} className="border-t pt-2">
-                <div className="text-xs font-semibold mb-1">
-                  Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {sortRoomsByNumber(floorRooms).map(room => (
-                    <div 
-                      key={room.number} 
-                      className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                      onClick={() => handleUnassignRoom(room)}
-                      title="Cliquer pour retirer l'assignation"
-                    >
-                      <RoomCard 
-                        room={room} 
-                        onUpdate={onRoomUpdate} 
-                        compact 
-                        draggable={draggable}
-                        onUnassign={() => handleUnassignRoom(room)}
-                        showActions={true}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        <CardHeader className="p-4 pb-0">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-lg">{name}</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleExpand}
+                className="h-6 w-6 p-0"
+                title={expanded ? "Minimiser" : "Maximiser"}
+              >
+                {expanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </Button>
+            </div>
+            
+            <div className="flex gap-1">
+              {onDelete && (
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  onClick={handleDeleteHousekeeper}
+                  title="Supprimer cette femme de chambre"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={toggleFloorSelector}
+                className="flex items-center gap-1 text-sm"
+              >
+                <Layers className="h-4 w-4" /> Étages
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="ghost"
+                onClick={() => onGenerateReport(name, rooms)}
+                className="flex items-center gap-1 text-sm"
+              >
+                <FileCog className="h-4 w-4" /> Rapport
+              </Button>
+              
+              {onManualAssign && (
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  onClick={onManualAssign}
+                  className="flex items-center gap-1 text-sm"
+                >
+                  <Plus className="h-4 w-4" /> Ajouter
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {expanded && (
+            <div className="mb-4 mt-3">
+              <div className="flex justify-between text-sm mb-1">
+                <span>Charge de travail</span>
+                <span>{estimatedTime} min</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className={cn(
+                    "h-2.5 rounded-full",
+                    workload >= 90 ? "bg-red-500" :
+                    workload >= 75 ? "bg-orange-500" :
+                    workload <= 30 ? "bg-amber-500" :
+                    "bg-green-500"
+                  )} 
+                  style={{ width: `${workload}%` }}
+                ></div>
+              </div>
+              
+              <div className="flex justify-between text-xs mt-1 text-muted-foreground">
+                <span>Min: {cleaningConfig.minRoomsPerHousekeeper} chambres</span>
+                <span>{rooms.length} chambres</span>
+                <span>Max: {cleaningConfig.maxRoomsPerHousekeeper} chambres</span>
+              </div>
+            </div>
+          )}
+        </CardHeader>
+          
+        {expanded && (
+          <CardContent className="p-4 pt-2">
+            {isFloorSelectorOpen && (
+              <div className="mb-4 p-3 border rounded-md bg-slate-50">
+                <div className="text-sm font-medium mb-2">Étages à afficher:</div>
+                <div className="grid grid-cols-5 gap-2">
+                  {availableFloors.map((floor) => (
+                    <div key={floor} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`floor-${name}-${floor}`} 
+                        checked={preferredFloors.includes(floor)}
+                        onCheckedChange={(checked) => handleFloorChange(floor, !!checked)}
                       />
+                      <Label 
+                        htmlFor={`floor-${name}-${floor}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {floor === 0 ? 'RDC' : `${floor}`}
+                      </Label>
                     </div>
                   ))}
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Lorsqu'un étage est sélectionné, toutes les chambres non assignées de cet étage sont automatiquement assignées.
+                </p>
               </div>
-            ))}
-          </div>
-        ) : preferredFloors.length > 0 ? (
-          <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
-            Aucune chambre sur les étages sélectionnés
-          </div>
-        ) : (
-          <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
-            Glissez des chambres ici
-          </div>
+            )}
+            
+            {isOverloaded && (
+              <div className="text-red-500 text-xs mb-2">
+                ⚠️ Trop de chambres assignées
+              </div>
+            )}
+            
+            {isUnderloaded && rooms.length > 0 && (
+              <div className="text-amber-500 text-xs mb-2">
+                ⚠️ Pas assez de chambres assignées
+              </div>
+            )}
+            
+            {/* Afficher un message si des chambres sont masquées à cause des filtres d'étage */}
+            {hiddenRooms.length > 0 && (
+              <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-center gap-2 text-red-700 text-sm">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>{hiddenRooms.length} chambres masquées</span>
+                </div>
+                <div className="text-xs text-red-600 mt-1">
+                  {hiddenRooms.length} chambres sont assignées mais ne sont pas affichées car elles sont sur des étages non sélectionnés.
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs mt-1 text-red-700 hover:text-red-800 hover:bg-red-100 px-2 py-1 h-auto" 
+                  onClick={() => onFloorPreferenceChange(name, availableFloors)}
+                >
+                  Afficher tous les étages
+                </Button>
+              </div>
+            )}
+            
+            {/* Affichage de la section des chambres non assignées si demandé */}
+            {showUnassignedColumn && (
+              <div className="mb-6 pb-4 border-b-2 border-red-300">
+                <div className="text-red-600 font-bold mb-2 flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>Chambres non assignées</span>
+                </div>
+                {filteredUnassignedRooms.length > 0 ? (
+                  sortedUnassignedFloorRooms.length > 0 ? (
+                    <div className="space-y-2">
+                      {sortedUnassignedFloorRooms.map(([floor, floorRooms]) => (
+                        <div key={`unassigned-${floor}`} className="pt-1">
+                          <div className="text-xs font-semibold mb-1">
+                            Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {sortRoomsByNumber(floorRooms).map(room => (
+                              <div 
+                                key={`unassigned-${room.number}`} 
+                                className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                                onClick={() => handleAssignRoom(room)}
+                                title="Cliquer pour assigner à cette personne"
+                              >
+                                <RoomCard 
+                                  room={room} 
+                                  onUpdate={onRoomUpdate}
+                                  compact 
+                                  draggable={draggable}
+                                  showActions={true}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
+                      Aucune chambre non assignée sur les étages sélectionnés
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
+                    Toutes les chambres sont assignées
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Affichage des chambres assignées par étage si au moins 1 étage visible */}
+            <div className="mt-4">
+              <h4 className="text-slate-600 font-bold mb-2">Chambres assignées</h4>
+              {sortedFloorRooms.length > 0 ? (
+                <div className="space-y-4">
+                  {sortedFloorRooms.map(([floor, floorRooms]) => (
+                    <div key={floor} className="border-t pt-2">
+                      <div className="text-xs font-semibold mb-1">
+                        Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {sortRoomsByNumber(floorRooms).map(room => (
+                          <div 
+                            key={room.number} 
+                            className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                            onClick={() => handleUnassignRoom(room)}
+                            title="Cliquer pour retirer l'assignation"
+                          >
+                            <RoomCard 
+                              room={room} 
+                              onUpdate={onRoomUpdate} 
+                              compact 
+                              draggable={draggable}
+                              onUnassign={() => handleUnassignRoom(room)}
+                              showActions={true}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : preferredFloors.length > 0 ? (
+                <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
+                  Aucune chambre sur les étages sélectionnés
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-400 border border-dashed rounded-lg">
+                  Glissez des chambres ici
+                </div>
+              )}
+            </div>
+          </CardContent>
         )}
-      </div>
-    </Card>
+        
+        {!expanded && (
+          <CardContent className="p-4 pt-0">
+            <div className="flex justify-between text-sm">
+              <span>{rooms.length} chambres</span>
+              <span>{estimatedTime} min</span>
+              {isOverloaded && <span className="text-red-500">Surcharge</span>}
+              {isUnderloaded && rooms.length > 0 && <span className="text-amber-500">Sous-charge</span>}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+      
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer {name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action va supprimer la femme de chambre "{name}" et désassigner ses {rooms.length} chambres. Cette action ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

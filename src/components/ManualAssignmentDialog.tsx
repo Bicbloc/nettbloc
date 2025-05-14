@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Room } from "@/services/pdfService";
@@ -111,14 +110,42 @@ export function ManualAssignmentDialog({
     });
   };
 
-  // Gestion des étages sélectionnés
+  // Function to handle floor selection that assigns all rooms of that floor
   const toggleFloor = (floor: number) => {
     setSelectedFloors(prev => {
-      if (prev.includes(floor)) {
-        return prev.filter(f => f !== floor);
+      const isAlreadySelected = prev.includes(floor);
+      let newFloors: number[];
+      
+      if (isAlreadySelected) {
+        // Removing floor from selection
+        newFloors = prev.filter(f => f !== floor);
       } else {
-        return [...prev, floor];
+        // Adding floor - this should also auto-select all rooms from that floor
+        newFloors = [...prev, floor];
+        
+        // Get all rooms from this floor
+        const floorRooms = rooms.filter(room => {
+          const roomFloor = parseInt(room.number[0]) || 0;
+          return roomFloor === floor;
+        });
+        
+        // Add these rooms to selection if not already there
+        setSelectedRooms(prev => {
+          // Create a map of existing selected rooms for quick lookup
+          const existingMap = new Map(prev.map(room => [room.number, room]));
+          
+          // Add all floor rooms that aren't already selected
+          floorRooms.forEach(room => {
+            if (!existingMap.has(room.number)) {
+              existingMap.set(room.number, room);
+            }
+          });
+          
+          return Array.from(existingMap.values());
+        });
       }
+      
+      return newFloors;
     });
   };
 
@@ -339,7 +366,7 @@ export function ManualAssignmentDialog({
           
           {/* Sélection des étages */}
           <div className="col-span-12 mb-2">
-            <Label className="mb-2 block">Sélectionner des étages spécifiques</Label>
+            <Label className="mb-2 block">Sélectionner des étages spécifiques (sélectionne automatiquement toutes les chambres de l'étage)</Label>
             <div className="flex flex-wrap gap-2">
               {availableFloors.map(floor => (
                 <Badge
