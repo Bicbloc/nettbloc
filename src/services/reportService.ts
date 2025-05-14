@@ -1,9 +1,8 @@
-
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Room, CleaningConfig } from './pdfService';
-import { toast } from '@/hooks/use-toast';
+import { useToast, toast } from '@/hooks/use-toast';
 
-// Email configuration
+// Email configuration - SMTP settings for ionos.fr
 const EMAIL_CONFIG = {
   senderEmail: "support@bicbloc.eu",
   senderPassword: "Staffing2023*",
@@ -60,7 +59,7 @@ export async function generateHousekeeperReport(
 
     // Try sending email in background without blocking PDF download
     try {
-      fetch('/api/generate-pdf', {
+      const response = await fetch('/api/generate-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,24 +77,30 @@ export async function generateHousekeeperReport(
           notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
           notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
         }),
-      }).then(response => {
-        if (response.ok) {
-          console.log("Email sent successfully");
-          toast({
-            title: "Email envoyé",
-            description: `Un email avec le rapport a été envoyé à ${emailAddress}`,
-          });
-        }
-      }).catch(err => {
-        console.log("Email sending failed, but PDF was downloaded", err);
+      });
+      
+      if (response.ok) {
+        console.log("Email sent successfully");
+        toast({
+          title: "Email envoyé",
+          description: `Un email avec le rapport a été envoyé à ${emailAddress}`,
+        });
+      } else {
+        const errorData = await response.json();
+        console.error("Email sending failed:", errorData);
         toast({
           variant: "destructive",
           title: "Erreur d'envoi d'email",
           description: "L'email n'a pas pu être envoyé, mais le PDF a été téléchargé",
         });
-      });
+      }
     } catch (emailError) {
-      console.log("Email sending failed, but PDF was downloaded", emailError);
+      console.error("Email sending error:", emailError);
+      toast({
+        variant: "destructive",
+        title: "Erreur d'envoi d'email",
+        description: "L'email n'a pas pu être envoyé, mais le PDF a été téléchargé",
+      });
     }
   } catch (error) {
     console.error('Error generating report:', error);

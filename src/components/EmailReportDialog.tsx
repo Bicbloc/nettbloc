@@ -87,11 +87,11 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {housekeeperName 
-              ? `Téléchargement du rapport - ${housekeeperName}`
+              ? `Rapport de ${housekeeperName}`
               : 'Téléchargement du rapport'}
           </DialogTitle>
           <DialogDescription>
@@ -99,9 +99,9 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-grow pr-4" style={{ maxHeight: "calc(80vh - 120px)" }}>
+        <ScrollArea className="flex-grow pr-4" style={{ maxHeight: "60vh" }}>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-2">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email" className="text-right">
                   Email <span className="text-red-500">*</span>
@@ -120,18 +120,18 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                 </p>
               </div>
               
-              <div className="mt-4">
+              <div className="mt-2">
                 <Label className="font-medium mb-2 block">Instructions générales (pour tous les rapports)</Label>
                 <Textarea
                   id="generalInstructions"
                   placeholder="Instructions générales qui s'appliqueront à tous les rapports..."
                   value={customFields.generalInstructions || ''}
                   onChange={handleGeneralInstructionsChange}
-                  className="min-h-[100px]"
+                  className="min-h-[80px]"
                 />
               </div>
               
-              <div className="mt-4">
+              <div className="mt-2">
                 <Label className="font-medium mb-2 block">À faire et à savoir (par rapport)</Label>
                 <ReportCustomFields onChange={(fields) => {
                   setCustomFields(prev => ({
@@ -142,21 +142,25 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                 }} />
               </div>
               
-              <div className="mt-4">
+              <div className="mt-2">
                 <Label htmlFor="instructions" className="font-medium mb-2 block">
-                  Instructions spéciales {housekeeperName ? `(pour ${housekeeperName})` : '(par rapport)'}
+                  {housekeeperName 
+                    ? `Instructions pour ${housekeeperName}` 
+                    : 'Instructions spéciales par rapport'}
                 </Label>
                 <Textarea
                   id="instructions"
-                  placeholder={`Ajoutez des instructions spéciales pour ce rapport${housekeeperName ? ` de ${housekeeperName}` : ''}...`}
+                  placeholder={housekeeperName 
+                    ? `Instructions spécifiques pour ${housekeeperName}...` 
+                    : 'Ajoutez des instructions spéciales pour ce rapport...'}
                   value={customFields.instructions || ''}
                   onChange={handleInstructionsChange}
-                  className="min-h-[100px]"
+                  className="min-h-[80px]"
                 />
               </div>
             </div>
             
-            <DialogFooter className="mt-6 pt-4 border-t">
+            <DialogFooter className="sticky bottom-0 pt-4 bg-background border-t mt-4">
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting ? "Traitement en cours..." : "Télécharger le rapport"}
               </Button>
