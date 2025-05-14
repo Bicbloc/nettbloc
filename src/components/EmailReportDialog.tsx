@@ -7,32 +7,35 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ReportFields } from "@/services/reportService";
 import ReportCustomFields from "@/components/ReportCustomFields";
+import { getReportEmail, saveReportEmail } from "@/lib/utils";
 
 interface EmailReportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (email: string, customFields?: ReportFields) => void;
-  isValid: boolean;
-  initialEmail?: string;  // Add support for initial email
+  isValid?: boolean; // Make optional since we validate internally now
+  initialEmail?: string;
 }
 
 const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  isValid,
   initialEmail = ""
 }) => {
-  const [localEmail, setLocalEmail] = useState(initialEmail);
+  // Get saved email or use initialEmail
+  const savedEmail = getReportEmail();
+  const [localEmail, setLocalEmail] = useState(savedEmail || initialEmail);
   const [customFields, setCustomFields] = useState<ReportFields>({ toDoItems: [], toKnowItems: [] });
   const { toast } = useToast();
 
-  // Update localEmail when initialEmail changes
+  // Auto-confirm if we already have email and dialog is opened
   useEffect(() => {
-    if (initialEmail) {
-      setLocalEmail(initialEmail);
+    if (isOpen && savedEmail) {
+      onConfirm(savedEmail, customFields);
+      onClose();
     }
-  }, [initialEmail]);
+  }, [isOpen, savedEmail]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +44,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     const isValidEmail = emailRegex.test(localEmail);
     
     if (isValidEmail) {
+      saveReportEmail(localEmail); // Save for future use
       onConfirm(localEmail, customFields);
       onClose();
     } else {

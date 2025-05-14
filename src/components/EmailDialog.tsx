@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useReportEmail } from "@/hooks/use-report-email";
 import { Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getReportEmail } from "@/lib/utils";
 
 interface EmailDialogProps {
   isOpen: boolean;
@@ -24,6 +25,16 @@ interface EmailDialogProps {
 export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
   const { email, setEmail, isValid } = useReportEmail();
   const [localEmail, setLocalEmail] = useState(email);
+
+  // Check if we already have a stored email
+  useEffect(() => {
+    const savedEmail = getReportEmail();
+    // If we have a saved valid email and the dialog is open, auto-confirm
+    if (savedEmail && isOpen) {
+      onConfirm(savedEmail);
+      onClose();
+    }
+  }, [isOpen, onConfirm, onClose]);
 
   useEffect(() => {
     if (isOpen) {

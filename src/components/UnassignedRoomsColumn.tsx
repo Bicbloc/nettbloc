@@ -26,7 +26,7 @@ export function UnassignedRoomsColumn({
     return null;
   }
   
-  // Utiliser toutes les chambres si fournies, sinon utiliser les chambres passées
+  // Always use all unassigned rooms regardless of floor selection
   const displayRooms = allRooms.length > 0 ? allRooms.filter(room => !room.assignedTo) : rooms;
   
   // Grouper les chambres par étage
