@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ interface EmailReportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (email: string, customFields?: ReportFields) => void;
-  isValid?: boolean; // Make optional since we validate internally now
   initialEmail?: string;
 }
 
@@ -42,14 +41,6 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     }));
   };
 
-  // Auto-confirm if we already have email and dialog is opened
-  useEffect(() => {
-    if (isOpen && savedEmail) {
-      onConfirm(savedEmail, customFields);
-      onClose();
-    }
-  }, [isOpen, savedEmail]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -70,7 +61,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
