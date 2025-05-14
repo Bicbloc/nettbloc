@@ -68,15 +68,17 @@ export function ManualAssignmentDialog({
     if (filterFloor !== "all") {
       const floorNum = parseInt(filterFloor);
       result = result.filter(room => {
-        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
+        const roomFloor = parseInt(room.number[0]);
         return roomFloor === floorNum;
       });
     }
     
-    // Apply selected floors filter for smart assignment
+    // Apply selected floors filter
     if (selectedFloors.length > 0) {
       result = result.filter(room => {
-        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
+        const roomFloor = parseInt(room.number[0]);
         return selectedFloors.includes(roomFloor);
       });
     }
@@ -135,8 +137,9 @@ export function ManualAssignmentDialog({
     
     // Si des étages sont sélectionnés, utiliser ceux-ci en priorité
     if (selectedFloors.length > 0) {
-      roomsToSelect = filteredRooms.filter(room => {
-        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+      roomsToSelect = rooms.filter(room => {
+        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
+        const roomFloor = parseInt(room.number[0]);
         return selectedFloors.includes(roomFloor);
       });
     } else {
@@ -152,10 +155,20 @@ export function ManualAssignmentDialog({
         return;
       }
 
-      roomsToSelect = filteredRooms.filter(room => {
-        const roomFloor = room.floor !== undefined ? room.floor : parseInt(room.number[0]);
+      roomsToSelect = rooms.filter(room => {
+        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
+        const roomFloor = parseInt(room.number[0]);
         return preferredFloors.includes(roomFloor);
       });
+    }
+
+    // Appliquer les autres filtres
+    if (excludeTwin) {
+      roomsToSelect = roomsToSelect.filter(room => !room.isTwin);
+    }
+    
+    if (filterStatus !== "all") {
+      roomsToSelect = roomsToSelect.filter(room => room.status === filterStatus);
     }
 
     if (roomsToSelect.length === 0) {
@@ -203,7 +216,7 @@ export function ManualAssignmentDialog({
   // Get available floors from rooms
   const availableFloors = Array.from(
     new Set(
-      rooms.map(room => room.floor !== undefined ? room.floor : parseInt(room.number[0]))
+      rooms.map(room => parseInt(room.number[0]))
     )
   ).sort((a, b) => a - b);
   
