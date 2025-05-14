@@ -1,4 +1,3 @@
-
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Room, CleaningConfig } from './pdfService';
 import { toast } from '@/hooks/use-toast';
@@ -442,32 +441,128 @@ async function createSimplePDF(
   });
   yPosition -= 20;
   
-  // Add room list
+  // Draw table header
+  const tableTop = yPosition;
+  const colWidth = 100;
+  const rowHeight = 20;
+  const columns = ['Chambre', 'Statut', 'Twin', 'Type', 'Remarque'];
+  const columnWidths = [80, 90, 50, 90, 150]; // Width for each column
+  
+  // Draw table headers
+  let xPosition = 50;
+  for (let i = 0; i < columns.length; i++) {
+    // Draw header background
+    page.drawRectangle({
+      x: xPosition,
+      y: tableTop - rowHeight,
+      width: columnWidths[i],
+      height: rowHeight,
+      color: rgb(0.9, 0.9, 0.9),
+      borderColor: rgb(0.5, 0.5, 0.5),
+      borderWidth: 1,
+    });
+    
+    // Draw header text
+    page.drawText(columns[i], {
+      x: xPosition + 5,
+      y: tableTop - 15,
+      size: 10,
+      font: boldFont,
+    });
+    
+    xPosition += columnWidths[i];
+  }
+  
+  // Draw table rows
+  yPosition = tableTop - rowHeight;
   for (const room of rooms) {
     const cleaningType = room.cleaningType === 'full' ? 'À Blanc' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
     const status = room.status === 'needs-cleaning' ? 'À Nettoyer' : 
                   room.status === 'clean' ? 'Propre' : 
                   room.status === 'occupied' ? 'Occupé' : 
                   room.status === 'maintenance' ? 'Maintenance' : room.status;
-    
-    let roomText = `${room.number} - ${status} - ${cleaningType}`;
-    if (room.isTwin) roomText += ' - Twin';
-    if (room.priority === 'high') roomText += ' (Prioritaire)';
-    if (room.notes) roomText += ` - ${room.notes}`;
-    
-    page.drawText(roomText, {
-      x: 50,
-      y: yPosition,
-      size: 10,
-      font,
-    });
-    yPosition -= 20;
+    const isTwin = room.isTwin ? 'Oui' : 'Non';
+    const notes = room.notes || '';
     
     // Add a new page if we're running out of space
     if (yPosition < 50) {
       const newPage = pdfDoc.addPage();
       yPosition = height - 50;
+      
+      // Redraw table header on new page
+      xPosition = 50;
+      for (let i = 0; i < columns.length; i++) {
+        page.drawRectangle({
+          x: xPosition,
+          y: yPosition - rowHeight,
+          width: columnWidths[i],
+          height: rowHeight,
+          color: rgb(0.9, 0.9, 0.9),
+          borderColor: rgb(0.5, 0.5, 0.5),
+          borderWidth: 1,
+        });
+        
+        page.drawText(columns[i], {
+          x: xPosition + 5,
+          y: yPosition - 15,
+          size: 10,
+          font: boldFont,
+        });
+        
+        xPosition += columnWidths[i];
+      }
+      yPosition -= rowHeight;
     }
+    
+    // Draw cell backgrounds for priority rooms
+    if (room.priority === 'high') {
+      xPosition = 50;
+      for (let i = 0; i < columns.length; i++) {
+        page.drawRectangle({
+          x: xPosition,
+          y: yPosition - rowHeight,
+          width: columnWidths[i],
+          height: rowHeight,
+          color: rgb(1.0, 0.9, 0.9),
+          borderColor: rgb(0.5, 0.5, 0.5),
+          borderWidth: 1,
+        });
+        xPosition += columnWidths[i];
+      }
+    } else {
+      // Draw regular cell backgrounds
+      xPosition = 50;
+      for (let i = 0; i < columns.length; i++) {
+        page.drawRectangle({
+          x: xPosition,
+          y: yPosition - rowHeight,
+          width: columnWidths[i],
+          height: rowHeight,
+          borderColor: rgb(0.5, 0.5, 0.5),
+          borderWidth: 1,
+        });
+        xPosition += columnWidths[i];
+      }
+    }
+    
+    // Write cell contents
+    const rowData = [room.number, status, isTwin, cleaningType, notes];
+    xPosition = 50;
+    for (let i = 0; i < rowData.length; i++) {
+      const cellText = rowData[i];
+      const maxLength = Math.floor(columnWidths[i] / 6) - 2; // Approximate characters that fit
+      const truncatedText = cellText.length > maxLength ? cellText.substring(0, maxLength) + '...' : cellText;
+      
+      page.drawText(truncatedText, {
+        x: xPosition + 5,
+        y: yPosition - 15,
+        size: 9,
+        font,
+      });
+      xPosition += columnWidths[i];
+    }
+    
+    yPosition -= rowHeight;
   }
   
   // Add footer
