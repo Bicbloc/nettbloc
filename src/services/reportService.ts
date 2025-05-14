@@ -19,6 +19,7 @@ export interface ReportFields {
   toKnowItems: string[];
   instructions?: string; // Instructions spécifiques à un rapport
   generalInstructions?: string; // Instructions générales pour tous les rapports
+  housekeeperInstructions?: { [housekeeperName: string]: string }; // Instructions spécifiques par femme de chambre
 }
 
 export async function generateHousekeeperReport(
@@ -189,6 +190,9 @@ function generateHousekeeperReportHTML(
     return total;
   }, 0);
   
+  // Get specific instructions for this housekeeper
+  const housekeeperSpecificInstructions = customFields?.housekeeperInstructions?.[housekeeperName] || customFields?.instructions || '';
+  
   // Build HTML table rows
   const roomRows = sortedRooms.map(room => {
     const priorityClass = room.priority === 'high' ? 'priority-high' : '';
@@ -249,6 +253,7 @@ function generateHousekeeperReportHTML(
         .general-instructions-section { margin: 20px 0; padding: 15px; background-color: #e6f7ff; border-radius: 5px; border-left: 4px solid #0099cc; }
         .footer-link { color: #0066cc; text-decoration: none; }
         tr:nth-child(even) { background-color: #f9f9f9; }
+        .container { max-width: 100%; margin: 0 auto; padding: 20px; }
       </style>
     </head>
     <body>
@@ -311,10 +316,10 @@ function generateHousekeeperReportHTML(
           </tbody>
         </table>
         
-        ${customFields?.instructions ? `
+        ${housekeeperSpecificInstructions ? `
         <div class="instructions-section">
           <h2>Instructions spéciales pour ${housekeeperName}</h2>
-          <p>${customFields.instructions}</p>
+          <p>${housekeeperSpecificInstructions}</p>
         </div>
         ` : ''}
         
@@ -480,6 +485,9 @@ async function createSimplePDF(
     yPosition -= 10;
   }
   
+  // Get specific instructions for this housekeeper
+  const housekeeperSpecificInstructions = customFields?.housekeeperInstructions?.[housekeeperName] || customFields?.instructions || '';
+  
   // Add room list title
   page.drawText('Liste des Chambres:', {
     x: 50,
@@ -620,7 +628,7 @@ async function createSimplePDF(
   }
   
   // Add instructions if present
-  if (customFields?.instructions) {
+  if (housekeeperSpecificInstructions) {
     // Start a new page for instructions if we're running out of space
     if (yPosition < 100) {
       const newPage = pdfDoc.addPage();
@@ -638,7 +646,7 @@ async function createSimplePDF(
     yPosition -= 20;
     
     // Split instructions into multiple lines if needed
-    const instructionLines = splitTextIntoLines(customFields.instructions, 80);
+    const instructionLines = splitTextIntoLines(housekeeperSpecificInstructions, 80);
     for (const line of instructionLines) {
       page.drawText(line, {
         x: 50,
