@@ -198,7 +198,8 @@ function generateHousekeeperReportHTML(
   const roomRows = sortedRooms.map(room => {
     const priorityClass = room.priority === 'high' ? 'priority-high' : '';
     const priorityText = room.priority === 'high' ? 'Oui' : 'Non';
-    const cleaningType = room.cleaningType === 'full' ? 'À Blanc' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
+    const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 
+                           room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
     const status = room.status === 'needs-cleaning' ? 'À Nettoyer' : 
                   room.status === 'clean' ? 'Propre' : 
                   room.status === 'occupied' ? 'Occupé' : 
@@ -208,6 +209,7 @@ function generateHousekeeperReportHTML(
       <tr class="${priorityClass}">
         <td>${room.number}</td>
         <td>${status}</td>
+        <td>${cleaningTypeText}</td>
         <td>${room.isTwin ? 'Oui' : 'Non'}</td>
         <td>${priorityText}</td>
         <td>${room.notes || ''}</td>
@@ -250,6 +252,7 @@ function generateHousekeeperReportHTML(
         .todo-section { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
         .instructions-section { margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #0066cc; }
         .footer-link { color: #0066cc; text-decoration: none; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
       </style>
     </head>
     <body>
@@ -294,6 +297,7 @@ function generateHousekeeperReportHTML(
             <tr>
               <th>Chambre</th>
               <th>Statut</th>
+              <th>Type Nettoyage</th>
               <th>Twin</th>
               <th>Prioritaire</th>
               <th>Remarque</th>
@@ -455,8 +459,8 @@ async function createSimplePDF(
   const tableTop = yPosition;
   const colWidth = 100;
   const rowHeight = 20;
-  const columns = ['Chambre', 'Statut', 'Twin', 'Prioritaire', 'Remarque'];
-  const columnWidths = [80, 90, 50, 70, 150]; // Width for each column
+  const columns = ['Chambre', 'Statut', 'Type', 'Twin', 'Prioritaire', 'Remarque'];
+  const columnWidths = [70, 80, 70, 50, 70, 150]; // Width for each column
   
   // Draw table headers
   let xPosition = 50;
@@ -525,6 +529,10 @@ async function createSimplePDF(
       yPosition -= rowHeight;
     }
     
+    // Draw cell backgrounds (alternating for readability)
+    const rowIndex = rooms.indexOf(room);
+    const isEvenRow = rowIndex % 2 === 0;
+    
     // Draw cell backgrounds for priority rooms
     if (room.priority === 'high') {
       xPosition = 50;
@@ -549,6 +557,7 @@ async function createSimplePDF(
           y: yPosition - rowHeight,
           width: columnWidths[i],
           height: rowHeight,
+          color: isEvenRow ? rgb(1, 1, 1) : rgb(0.97, 0.97, 0.97),
           borderColor: rgb(0.5, 0.5, 0.5),
           borderWidth: 1,
         });
@@ -557,7 +566,7 @@ async function createSimplePDF(
     }
     
     // Write cell contents
-    const rowData = [room.number, status, isTwin, isPriority, notes];
+    const rowData = [room.number, status, cleaningType, isTwin, isPriority, notes];
     xPosition = 50;
     for (let i = 0; i < rowData.length; i++) {
       const cellText = rowData[i];
