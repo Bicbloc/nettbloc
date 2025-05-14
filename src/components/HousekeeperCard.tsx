@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus, AlertTriangle } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle, UserMinus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -24,6 +24,7 @@ interface HousekeeperCardProps {
   unassignedRooms?: Room[];
   showUnassignedColumn?: boolean;
   onAssignRoom?: (room: Room) => void;
+  onDeleteHousekeeper?: (name: string) => void;
 }
 
 export function HousekeeperCard({ 
@@ -40,7 +41,8 @@ export function HousekeeperCard({
   onManualAssign,
   unassignedRooms = [],
   showUnassignedColumn = false,
-  onAssignRoom
+  onAssignRoom,
+  onDeleteHousekeeper
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -114,9 +116,20 @@ export function HousekeeperCard({
       const roomData = e.dataTransfer.getData('application/json');
       if (roomData) {
         const room = JSON.parse(roomData) as Room;
-        // La chambre sera déjà assignée ailleurs, donc pas besoin de vérifier
-        const updatedRoom = { ...room, assignedTo: name };
-        onRoomUpdate(updatedRoom);
+        // Check if the room's floor is in preferred floors
+        const roomFloor = parseInt(room.number[0]) || 0;
+        
+        if (preferredFloors.length === 0 || preferredFloors.includes(roomFloor)) {
+          const updatedRoom = { ...room, assignedTo: name };
+          onRoomUpdate(updatedRoom);
+        } else {
+          // Show toast message if floor is not allowed
+          toast({
+            variant: "destructive",
+            title: "Action impossible",
+            description: `La chambre ${room.number} est sur un étage non sélectionné pour ${name}`,
+          });
+        }
       }
     } catch (error) {
       console.error("Erreur lors du drop:", error);
@@ -175,6 +188,30 @@ export function HousekeeperCard({
       })
     : [];
   
+  const handleDeleteHousekeeper = () => {
+    if (onDeleteHousekeeper) {
+      if (rooms.length > 0) {
+        // Show confirmation if housekeeper has assigned rooms
+        if (confirm(`Êtes-vous sûr de vouloir supprimer ${name}? Toutes les chambres assignées (${rooms.length}) seront désassignées.`)) {
+          // Unassign all rooms first
+          rooms.forEach(room => {
+            onRoomUnassign(room);
+          });
+          onDeleteHousekeeper(name);
+          toast({
+            description: `${name} a été supprimé(e) et toutes les chambres ont été désassignées.`
+          });
+        }
+      } else {
+        // Directly delete if no rooms are assigned
+        onDeleteHousekeeper(name);
+        toast({
+          description: `${name} a été supprimé(e).`
+        });
+      }
+    }
+  };
+  
   return (
     <Card 
       className={cn(
@@ -215,6 +252,17 @@ export function HousekeeperCard({
               className="flex items-center gap-1 text-sm"
             >
               <Plus className="h-4 w-4" /> Ajouter
+            </Button>
+          )}
+          
+          {onDeleteHousekeeper && (
+            <Button 
+              size="sm" 
+              variant="ghost"
+              onClick={handleDeleteHousekeeper}
+              className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <UserMinus className="h-4 w-4" /> Supprimer
             </Button>
           )}
         </div>
@@ -301,54 +349,52 @@ export function HousekeeperCard({
         </div>
       )}
       
-      {/* Affichage de la section des chambres non assignées si demandé */}
-      {showUnassignedColumn && (
-        <div className="mb-6 pb-4 border-b-2 border-red-300">
-          <div className="text-red-600 font-bold mb-2 flex items-center gap-1">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Chambres non assignées</span>
-          </div>
-          {filteredUnassignedRooms.length > 0 ? (
-            sortedUnassignedFloorRooms.length > 0 ? (
-              <div className="space-y-2">
-                {sortedUnassignedFloorRooms.map(([floor, floorRooms]) => (
-                  <div key={`unassigned-${floor}`} className="pt-1">
-                    <div className="text-xs font-semibold mb-1">
-                      Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {sortRoomsByNumber(floorRooms).map(room => (
-                        <div 
-                          key={`unassigned-${room.number}`} 
-                          className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                          onClick={() => handleAssignRoom(room)}
-                          title="Cliquer pour assigner à cette personne"
-                        >
-                          <RoomCard 
-                            room={room} 
-                            onUpdate={onRoomUpdate}
-                            compact 
-                            draggable={draggable}
-                            showActions={true}
-                          />
-                        </div>
-                      ))}
-                    </div>
+      {/* Affichage de la section des chambres non assignées sera toujours visible */}
+      <div className="mb-6 pb-4 border-b-2 border-red-300">
+        <div className="text-red-600 font-bold mb-2 flex items-center gap-1">
+          <AlertTriangle className="h-4 w-4" />
+          <span>Chambres non assignées</span>
+        </div>
+        {filteredUnassignedRooms.length > 0 ? (
+          sortedUnassignedFloorRooms.length > 0 ? (
+            <div className="space-y-2">
+              {sortedUnassignedFloorRooms.map(([floor, floorRooms]) => (
+                <div key={`unassigned-${floor}`} className="pt-1">
+                  <div className="text-xs font-semibold mb-1">
+                    Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
-                Aucune chambre non assignée sur les étages sélectionnés
-              </div>
-            )
+                  <div className="grid grid-cols-3 gap-2">
+                    {sortRoomsByNumber(floorRooms).map(room => (
+                      <div 
+                        key={`unassigned-${room.number}`} 
+                        className="cursor-pointer hover:bg-gray-100 rounded p-1"
+                        onClick={() => handleAssignRoom(room)}
+                        title="Cliquer pour assigner à cette personne"
+                      >
+                        <RoomCard 
+                          room={room} 
+                          onUpdate={onRoomUpdate}
+                          compact 
+                          draggable={draggable}
+                          showActions={true}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
-              Toutes les chambres sont assignées
+              Aucune chambre non assignée sur les étages sélectionnés
             </div>
-          )}
-        </div>
-      )}
+          )
+        ) : (
+          <div className="text-center py-3 text-gray-500 border border-dashed rounded-lg">
+            Toutes les chambres sont assignées
+          </div>
+        )}
+      </div>
       
       {/* Affichage des chambres assignées par étage si au moins 1 étage visible */}
       <div className="mt-4">
