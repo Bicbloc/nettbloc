@@ -2,11 +2,17 @@
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from 'html2pdf.js';
 
+export interface ReportCustomFields {
+  toDoItems: string[];
+  toKnowItems: string[];
+}
+
 export async function generateHousekeeperReport(
   housekeeperName: string,
   rooms: Room[],
   config: CleaningConfig,
-  email: string
+  email: string,
+  customFields?: ReportCustomFields
 ): Promise<void> {
   // Trier les chambres avant de générer le rapport
   const sortedRooms = [...rooms].sort((a, b) => {
@@ -70,6 +76,28 @@ export async function generateHousekeeperReport(
           `).join('')}
         </tbody>
       </table>
+
+      ${customFields ? `
+      <div style="margin-top: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 10px 0; color: #333;">Choses à faire</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${customFields.toDoItems.map(item => item ? `<li style="margin-bottom: 5px;">${item}</li>` : '').join('')}
+          </ul>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 10px 0; color: #333;">Choses à savoir</h3>
+          <ul style="margin: 0; padding-left: 20px;">
+            ${customFields.toKnowItems.map(item => item ? `<li style="margin-bottom: 5px;">${item}</li>` : '').join('')}
+          </ul>
+        </div>
+      </div>
+      ` : ''}
+      
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #666;">
+        <p>Généré par Bicbloc Staffing <a href="https://www.bicbloc.eu" style="color: #0066cc; text-decoration: none;">www.bicbloc.eu</a></p>
+        <p><a href="https://www.bicbloc.eu/extra" style="color: #0066cc; text-decoration: none;">Commander un extra en trois clics</a></p>
+      </div>
     </div>
   `;
   
@@ -101,12 +129,13 @@ export async function generateHousekeeperReport(
 export async function generateAllHousekeeperReports(
   housekeepers: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
-  email: string
+  email: string,
+  customFields?: ReportCustomFields
 ): Promise<void> {
   for (const housekeeper of housekeepers) {
     if (housekeeper.rooms.length > 0) {
       try {
-        await generateHousekeeperReport(housekeeper.name, housekeeper.rooms, config, email);
+        await generateHousekeeperReport(housekeeper.name, housekeeper.rooms, config, email, customFields);
         // Ajouter un petit délai entre chaque génération pour éviter les problèmes de performance
         await new Promise(resolve => setTimeout(resolve, 800));
       } catch (error) {

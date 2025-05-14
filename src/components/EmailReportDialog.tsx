@@ -1,0 +1,88 @@
+
+import React, { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { ReportFields } from "./ReportCustomFields";
+import ReportCustomFields from "./ReportCustomFields";
+
+interface EmailReportDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (email: string, customFields?: ReportFields) => void;
+  email: string;
+  isValid: boolean;
+}
+
+const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  email,
+  isValid
+}) => {
+  const [localEmail, setLocalEmail] = useState(email);
+  const [customFields, setCustomFields] = useState<ReportFields>({ toDoItems: [], toKnowItems: [] });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocalEmail(email);
+    }
+  }, [isOpen, email]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isValidEmail = emailRegex.test(localEmail);
+    
+    if (isValidEmail) {
+      onConfirm(localEmail, customFields);
+      onClose();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Email invalide",
+        description: "Veuillez saisir une adresse email valide."
+      });
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Téléchargement du rapport</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email" className="text-right">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="votre@email.com"
+                value={localEmail}
+                onChange={(e) => setLocalEmail(e.target.value)}
+                className="col-span-3"
+                required
+              />
+            </div>
+            
+            <ReportCustomFields onChange={setCustomFields} />
+          </div>
+          <DialogFooter>
+            <Button type="submit">Télécharger le rapport</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default EmailReportDialog;
