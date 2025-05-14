@@ -5,7 +5,8 @@ import html2pdf from 'html2pdf.js';
 export async function generateHousekeeperReport(
   housekeeperName: string,
   rooms: Room[],
-  config: CleaningConfig
+  config: CleaningConfig,
+  email: string
 ): Promise<void> {
   // Trier les chambres avant de générer le rapport
   const sortedRooms = [...rooms].sort((a, b) => {
@@ -28,6 +29,7 @@ export async function generateHousekeeperReport(
         <h1 style="margin: 0; color: #333;">Rapport de Nettoyage</h1>
         <h2 style="margin: 5px 0; color: #666;">${housekeeperName}</h2>
         <p style="margin: 5px 0; color: #888;">${new Date().toLocaleDateString()}</p>
+        <p style="margin: 5px 0; color: #888;">Contact: ${email}</p>
       </div>
       
       <div style="margin-bottom: 15px;">
@@ -90,8 +92,27 @@ export async function generateHousekeeperReport(
     console.log(`Rapport généré pour ${housekeeperName}`);
   } catch (error) {
     console.error("Erreur lors de la génération du rapport:", error);
+    throw error;
   } finally {
     document.body.removeChild(element);
+  }
+}
+
+export async function generateAllHousekeeperReports(
+  housekeepers: { name: string; rooms: Room[] }[],
+  config: CleaningConfig,
+  email: string
+): Promise<void> {
+  for (const housekeeper of housekeepers) {
+    if (housekeeper.rooms.length > 0) {
+      try {
+        await generateHousekeeperReport(housekeeper.name, housekeeper.rooms, config, email);
+        // Ajouter un petit délai entre chaque génération pour éviter les problèmes de performance
+        await new Promise(resolve => setTimeout(resolve, 800));
+      } catch (error) {
+        console.error(`Erreur lors de la génération du rapport pour ${housekeeper.name}:`, error);
+      }
+    }
   }
 }
 

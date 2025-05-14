@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,6 +38,11 @@ export function ConfigDialog({
   const [open, setOpen] = useState(false);
   const [names, setNames] = useState<string[]>(housekeeperNames);
   const [newName, setNewName] = useState("");
+
+  useEffect(() => {
+    // Update names when housekeeperNames prop changes
+    setNames(housekeeperNames);
+  }, [housekeeperNames]);
 
   const form = useForm<CleaningConfig>({
     defaultValues: config

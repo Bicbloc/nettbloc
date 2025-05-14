@@ -1,7 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Tag, Bed, Check, Layers, Plus } from "lucide-react";
+import { UserIcon, FileText, Calendar, Tag, Bed, Check, Layers, Plus, Download, Warning, FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
@@ -9,9 +10,11 @@ import { Room, CleaningConfig, defaultCleaningConfig } from "@/services/pdfServi
 import { Badge } from "@/components/ui/badge";
 import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
-import { generateHousekeeperReport } from "@/services/reportService";
+import { generateHousekeeperReport, generateAllHousekeeperReports } from "@/services/reportService";
 import { toast } from "@/components/ui/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
+import { EmailDialog } from "@/components/EmailDialog";
+import { useReportEmail } from "@/hooks/use-report-email";
 import {
   Table,
   TableBody,
@@ -33,6 +36,10 @@ const Index = () => {
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [reportAction, setReportAction] = useState<"single" | "all">("single");
+  const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
+  const { email, isValid } = useReportEmail();
 
   useEffect(() => {
     // Initialiser les préférences d'étages pour chaque femme de chambre
@@ -77,6 +84,10 @@ const Index = () => {
       floors.add(floor);
       // Mettre à jour la chambre avec son étage
       room.floor = floor;
+      // S'assurer que les chambres ont isTwin défini à false par défaut
+      if (room.isTwin === undefined) {
+        room.isTwin = false;
+      }
     });
     const floorArray = Array.from(floors).sort((a, b) => a - b);
     setAvailableFloors(floorArray);
@@ -223,19 +234,57 @@ const Index = () => {
   
   // Générer un rapport pour une femme de chambre
   const handleGenerateReport = async (housekeeperName: string, housekeeperRooms: Room[]) => {
+    setReportHousekeeper(housekeeperName);
+    setReportAction("single");
+    setIsEmailDialogOpen(true);
+  };
+  
+  // Générer tous les rapports
+  const handleGenerateAllReports = async () => {
+    setReportAction("all");
+    setIsEmailDialogOpen(true);
+  };
+  
+  // Gérer la confirmation de l'email
+  const handleEmailConfirm = async (confirmedEmail: string) => {
+    setIsEmailDialogOpen(false);
+    
     try {
-      await generateHousekeeperReport(housekeeperName, housekeeperRooms, cleaningConfig);
-      toast({
-        title: "Rapport généré",
-        description: `Le rapport pour ${housekeeperName} a été créé avec succès.`,
-      });
+      if (reportAction === "single") {
+        const housekeeperRooms = getHousekeeperRooms(reportHousekeeper);
+        await generateHousekeeperReport(reportHousekeeper, housekeeperRooms, cleaningConfig, confirmedEmail);
+        toast({
+          title: "Rapport généré",
+          description: `Le rapport pour ${reportHousekeeper} a été créé avec succès.`,
+        });
+      } else {
+        const housekeepersWithRooms = housekeeperNames.map(name => ({
+          name,
+          rooms: getHousekeeperRooms(name)
+        }));
+        
+        // Ajouter une section pour les chambres non assignées
+        const unassignedRooms = rooms.filter(room => !room.assignedTo && room.cleaningType !== 'none');
+        if (unassignedRooms.length > 0) {
+          housekeepersWithRooms.push({
+            name: "Chambres non assignées",
+            rooms: unassignedRooms
+          });
+        }
+        
+        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, confirmedEmail);
+        toast({
+          title: "Rapports générés",
+          description: `Tous les rapports ont été créés avec succès.`,
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de générer le rapport. Veuillez réessayer.",
+        description: "Impossible de générer le(s) rapport(s). Veuillez réessayer.",
       });
-      console.error("Erreur lors de la génération du rapport:", error);
+      console.error("Erreur lors de la génération du/des rapport(s):", error);
     }
   };
   
@@ -251,6 +300,15 @@ const Index = () => {
   // Obtenir les chambres assignées à chaque femme de chambre
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
+  };
+  
+  // Obtenir les chambres non assignées qui ont besoin de nettoyage
+  const getUnassignedRooms = () => {
+    return rooms.filter(room => 
+      !room.assignedTo && 
+      room.cleaningType !== 'none' && 
+      room.status !== 'maintenance'
+    );
   };
   
   const handleConfigChange = (newConfig: CleaningConfig) => {
@@ -339,6 +397,9 @@ const Index = () => {
       a.number.localeCompare(b.number, undefined, { numeric: true })
     );
   });
+
+  // Obtenir les chambres non assignées
+  const unassignedRooms = getUnassignedRooms();
   
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -499,6 +560,14 @@ const Index = () => {
                 >
                   <Plus className="h-4 w-4" /> Assigner manuellement
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleGenerateAllReports}
+                  className="flex items-center gap-1"
+                  disabled={!isValid && rooms.length === 0}
+                >
+                  <FileDown className="h-4 w-4" /> Télécharger tous les rapports
+                </Button>
                 <Button 
                   onClick={redistributeRooms} 
                   className="bg-blue-600 hover:bg-blue-700"
@@ -507,6 +576,57 @@ const Index = () => {
                 </Button>
               </div>
             </div>
+            
+            {/* Section pour les chambres non assignées */}
+            {unassignedRooms.length > 0 && (
+              <Card className="border-red-300 bg-red-50">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Warning className="h-5 w-5 text-red-500" />
+                      <CardTitle className="text-red-700">Chambres non assignées ({unassignedRooms.length})</CardTitle>
+                    </div>
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openManualAssignment()}
+                      className="bg-white border-red-300 text-red-700 hover:bg-red-100"
+                    >
+                      Assigner ces chambres
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                    {unassignedRooms.map(room => (
+                      <div key={room.number} className="border border-red-200 rounded p-2 bg-white flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{room.number} {room.isTwin && "(Twin)"}</p>
+                          <div className="flex gap-1 mt-1">
+                            {getCleaningTypeBadge(room.cleaningType)}
+                            {room.isUrgent && <Badge variant="outline" className="bg-red-100 text-red-800">Urgent</Badge>}
+                          </div>
+                        </div>
+                        <select 
+                          className="border rounded px-2 py-1 text-sm bg-white"
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleRoomUpdate({...room, assignedTo: e.target.value});
+                            }
+                          }}
+                          defaultValue=""
+                        >
+                          <option value="">Assigner à</option>
+                          {housekeeperNames.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             
             <div className="grid gap-4 md:grid-cols-2">
               {housekeeperNames.map((name) => (
@@ -813,6 +933,13 @@ const Index = () => {
         housekeeperNames={housekeeperNames}
         onAssignRooms={handleManualAssign}
         housekeeperPreferredFloors={housekeeperFloorPreferences}
+      />
+      
+      {/* Email Dialog */}
+      <EmailDialog
+        isOpen={isEmailDialogOpen}
+        onClose={() => setIsEmailDialogOpen(false)}
+        onConfirm={handleEmailConfirm}
       />
     </div>
   );
