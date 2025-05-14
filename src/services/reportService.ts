@@ -8,6 +8,7 @@ const ADMIN_EMAIL = "admin@bicbloc.eu"; // Replace with the desired admin email 
 export interface ReportFields {
   toDoItems: string[];
   toKnowItems: string[];
+  instructions?: string; // Added instructions field
 }
 
 export async function generateHousekeeperReport(
@@ -196,6 +197,7 @@ function generateHousekeeperReportHTML(
   // Build HTML table rows
   const roomRows = sortedRooms.map(room => {
     const priorityClass = room.priority === 'high' ? 'priority-high' : '';
+    const priorityText = room.priority === 'high' ? 'Oui' : 'Non';
     const cleaningType = room.cleaningType === 'full' ? 'À Blanc' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
     const status = room.status === 'needs-cleaning' ? 'À Nettoyer' : 
                   room.status === 'clean' ? 'Propre' : 
@@ -207,7 +209,7 @@ function generateHousekeeperReportHTML(
         <td>${room.number}</td>
         <td>${status}</td>
         <td>${room.isTwin ? 'Oui' : 'Non'}</td>
-        <td>${cleaningType}</td>
+        <td>${priorityText}</td>
         <td>${room.notes || ''}</td>
       </tr>
     `;
@@ -246,6 +248,7 @@ function generateHousekeeperReportHTML(
         .banner { width: 100%; text-align: center; margin-top: 30px; }
         .banner img { width: 100%; height: auto; max-height: 200px; object-fit: contain; }
         .todo-section { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+        .instructions-section { margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #0066cc; }
         .footer-link { color: #0066cc; text-decoration: none; }
       </style>
     </head>
@@ -292,7 +295,7 @@ function generateHousekeeperReportHTML(
               <th>Chambre</th>
               <th>Statut</th>
               <th>Twin</th>
-              <th>Type Nettoyage</th>
+              <th>Prioritaire</th>
               <th>Remarque</th>
             </tr>
           </thead>
@@ -300,6 +303,13 @@ function generateHousekeeperReportHTML(
             ${roomRows}
           </tbody>
         </table>
+        
+        ${customFields?.instructions ? `
+        <div class="instructions-section">
+          <h2>Instructions</h2>
+          <p>${customFields.instructions}</p>
+        </div>
+        ` : ''}
         
         <div class="footer">
           <p>Généré par <a href="https://www.bicbloc.eu" class="footer-link" target="_blank">BicBloc.eu Staffing Agency</a></p>
@@ -445,8 +455,8 @@ async function createSimplePDF(
   const tableTop = yPosition;
   const colWidth = 100;
   const rowHeight = 20;
-  const columns = ['Chambre', 'Statut', 'Twin', 'Type', 'Remarque'];
-  const columnWidths = [80, 90, 50, 90, 150]; // Width for each column
+  const columns = ['Chambre', 'Statut', 'Twin', 'Prioritaire', 'Remarque'];
+  const columnWidths = [80, 90, 50, 70, 150]; // Width for each column
   
   // Draw table headers
   let xPosition = 50;
@@ -482,6 +492,7 @@ async function createSimplePDF(
                   room.status === 'occupied' ? 'Occupé' : 
                   room.status === 'maintenance' ? 'Maintenance' : room.status;
     const isTwin = room.isTwin ? 'Oui' : 'Non';
+    const isPriority = room.priority === 'high' ? 'Oui' : 'Non';
     const notes = room.notes || '';
     
     // Add a new page if we're running out of space
@@ -546,7 +557,7 @@ async function createSimplePDF(
     }
     
     // Write cell contents
-    const rowData = [room.number, status, isTwin, cleaningType, notes];
+    const rowData = [room.number, status, isTwin, isPriority, notes];
     xPosition = 50;
     for (let i = 0; i < rowData.length; i++) {
       const cellText = rowData[i];
@@ -565,6 +576,43 @@ async function createSimplePDF(
     yPosition -= rowHeight;
   }
   
+  // Add instructions if present
+  if (customFields?.instructions) {
+    // Start a new page for instructions if we're running out of space
+    if (yPosition < 100) {
+      const newPage = pdfDoc.addPage();
+      yPosition = height - 50;
+    } else {
+      yPosition -= 30;
+    }
+    
+    page.drawText('Instructions:', {
+      x: 50,
+      y: yPosition,
+      size: 14,
+      font: boldFont,
+    });
+    yPosition -= 20;
+    
+    // Split instructions into multiple lines if needed
+    const instructionLines = splitTextIntoLines(customFields.instructions, 80);
+    for (const line of instructionLines) {
+      page.drawText(line, {
+        x: 50,
+        y: yPosition,
+        size: 10,
+        font,
+      });
+      yPosition -= 15;
+      
+      // Add a new page if we're running out of space
+      if (yPosition < 50) {
+        const newPage = pdfDoc.addPage();
+        yPosition = height - 50;
+      }
+    }
+  }
+  
   // Add footer
   page.drawText('Généré par BicBloc.eu Staffing Agency - Commander un extra en trois clics', {
     x: 50,
@@ -574,4 +622,26 @@ async function createSimplePDF(
   });
   
   return pdfDoc.save();
+}
+
+// Helper function to split text into lines with max character count
+function splitTextIntoLines(text: string, maxCharPerLine: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  for (const word of words) {
+    if ((currentLine + word).length <= maxCharPerLine) {
+      currentLine += (currentLine ? ' ' : '') + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
 }

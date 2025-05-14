@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ReportFields } from "@/services/reportService";
 import ReportCustomFields from "@/components/ReportCustomFields";
@@ -26,8 +27,20 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   // Get saved email or use initialEmail
   const savedEmail = getReportEmail();
   const [localEmail, setLocalEmail] = useState(savedEmail || initialEmail);
-  const [customFields, setCustomFields] = useState<ReportFields>({ toDoItems: [], toKnowItems: [] });
+  const [customFields, setCustomFields] = useState<ReportFields>({ 
+    toDoItems: [], 
+    toKnowItems: [],
+    instructions: '' 
+  });
   const { toast } = useToast();
+
+  // Update instructions field
+  const handleInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCustomFields(prev => ({
+      ...prev,
+      instructions: e.target.value
+    }));
+  };
 
   // Auto-confirm if we already have email and dialog is opened
   useEffect(() => {
@@ -83,8 +96,27 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
             </div>
             
             <div className="mt-4">
-              <Label className="font-medium mb-2 block">Instructions pour le rapport</Label>
-              <ReportCustomFields onChange={setCustomFields} />
+              <Label className="font-medium mb-2 block">À faire et à savoir</Label>
+              <ReportCustomFields onChange={(fields) => {
+                setCustomFields(prev => ({
+                  ...prev,
+                  toDoItems: fields.toDoItems,
+                  toKnowItems: fields.toKnowItems
+                }));
+              }} />
+            </div>
+            
+            <div className="mt-4">
+              <Label htmlFor="instructions" className="font-medium mb-2 block">
+                Instructions spéciales
+              </Label>
+              <Textarea
+                id="instructions"
+                placeholder="Ajoutez des instructions spéciales ici..."
+                value={customFields.instructions || ''}
+                onChange={handleInstructionsChange}
+                className="min-h-[100px]"
+              />
             </div>
           </div>
           <DialogFooter>
