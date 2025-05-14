@@ -22,12 +22,34 @@ export async function generateHousekeeperReport(
     // Generate HTML content
     const htmlContent = generateHousekeeperReportHTML(housekeeperName, rooms, config, customFields);
     
-    // Create a simple PDF as fallback in case the server endpoint fails
+    // Create a PDF using client-side method
     const pdfBytes = await createSimplePDF(housekeeperName, rooms, config, customFields);
     
+    // Use client-side method directly without server call
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+    toast({
+      title: "Rapport généré",
+      description: `Le rapport pour ${housekeeperName} a été téléchargé`,
+    });
+
+    // Try sending email in background without blocking PDF download
     try {
-      // Convert HTML to PDF using a server endpoint
-      const response = await fetch('/api/generate-pdf', {
+      fetch('/api/generate-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,51 +58,19 @@ export async function generateHousekeeperReport(
           html: htmlContent,
           filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
           email: emailAddress,
-          adminEmail: ADMIN_EMAIL, // Send a notification to the admin
+          adminEmail: ADMIN_EMAIL,
           notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
           notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
         }),
+      }).then(response => {
+        if (response.ok) {
+          console.log("Email sent successfully");
+        }
+      }).catch(err => {
+        console.log("Email sending failed, but PDF was downloaded", err);
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF via server');
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        toast({
-          title: "Rapport généré",
-          description: `Le rapport pour ${housekeeperName} a été envoyé à ${emailAddress}`,
-        });
-        return;
-      } else {
-        throw new Error(result.message || 'Unknown server error');
-      }
-    } catch (serverError) {
-      console.error('Server PDF generation failed, using fallback method:', serverError);
-      
-      // Use client-side fallback method
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      
-      // Create download link
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 100);
-      
-      toast({
-        title: "Rapport généré",
-        description: `Le rapport pour ${housekeeperName} a été téléchargé`,
-      });
+    } catch (emailError) {
+      console.log("Email sending failed, but PDF was downloaded", emailError);
     }
   } catch (error) {
     console.error('Error generating report:', error);
@@ -100,57 +90,28 @@ export async function generateAllHousekeeperReports(
   customFields?: ReportFields
 ): Promise<void> {
   try {
-    // Generate HTML content for each housekeeper
-    const htmlContents = housekeepersWithRooms.map(({ name, rooms }) => ({
-      name,
-      html: generateHousekeeperReportHTML(name, rooms, config, customFields)
-    }));
+    // For multiple reports, generate each PDF individually
+    let successCount = 0;
     
-    try {
-      // Convert HTML to PDF using a server endpoint
-      const response = await fetch('/api/generate-multiple-pdfs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reports: htmlContents.map(item => ({
-            html: item.html,
-            filename: `${item.name.replace(/\s+/g, '_')}_rapport.pdf`,
-          })),
-          email: emailAddress,
-          adminEmail: ADMIN_EMAIL, // Send a notification to the admin
-          notificationSubject: `Rapports multiples téléchargés`,
-          notificationText: `${htmlContents.length} rapports ont été téléchargés et envoyés à ${emailAddress}`
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate PDFs via server');
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        toast({
-          title: "Rapports générés",
-          description: `${htmlContents.length} rapports ont été envoyés à ${emailAddress}`,
-        });
-        return;
-      } else {
-        throw new Error(result.message || 'Unknown server error');
-      }
-    } catch (serverError) {
-      console.error('Server PDF generation failed, creating individual PDFs:', serverError);
-      
-      // Client-side fallback: generate each PDF individually 
-      for (const { name, rooms } of housekeepersWithRooms) {
+    for (const { name, rooms } of housekeepersWithRooms) {
+      try {
         await generateHousekeeperReport(name, rooms, config, emailAddress, customFields);
+        successCount++;
+      } catch (err) {
+        console.error(`Error generating report for ${name}:`, err);
       }
-      
+    }
+    
+    if (successCount > 0) {
       toast({
         title: "Rapports générés",
-        description: `${housekeepersWithRooms.length} rapports ont été téléchargés individuellement`,
+        description: `${successCount} rapport(s) sur ${housekeepersWithRooms.length} ont été téléchargés`,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Aucun rapport n'a pu être généré",
       });
     }
   } catch (error) {

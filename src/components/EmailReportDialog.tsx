@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   // Get saved email or use initialEmail
   const savedEmail = getReportEmail();
   const [localEmail, setLocalEmail] = useState(savedEmail || initialEmail);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [customFields, setCustomFields] = useState<ReportFields>({ 
     toDoItems: [], 
     toKnowItems: [],
@@ -41,16 +42,28 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const isValidEmail = emailRegex.test(localEmail);
     
     if (isValidEmail) {
-      saveReportEmail(localEmail); // Save for future use
-      onConfirm(localEmail, customFields);
-      onClose();
+      setIsSubmitting(true);
+      try {
+        saveReportEmail(localEmail); // Save for future use
+        await onConfirm(localEmail, customFields);
+        onClose();
+      } catch (error) {
+        console.error("Erreur lors de la génération du rapport:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur de téléchargement",
+          description: "Une erreur est survenue lors de la génération du PDF. Veuillez réessayer."
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
       toast({
         variant: "destructive",
@@ -66,6 +79,9 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Téléchargement du rapport</DialogTitle>
+            <DialogDescription>
+              Saisissez votre email pour recevoir le rapport PDF
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
@@ -111,7 +127,9 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Télécharger le rapport</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Traitement en cours..." : "Télécharger le rapport"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
