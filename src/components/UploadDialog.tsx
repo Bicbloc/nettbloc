@@ -120,6 +120,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
+          onClick={handleBrowseClick}
         >
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -147,7 +148,10 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
                 variant="outline"
                 size="sm"
                 type="button"
-                onClick={handleBrowseClick}
+                onClick={(e) => {
+                  e.stopPropagation(); // Empêcher la propagation pour éviter le double clic
+                  handleBrowseClick();
+                }}
               >
                 Sélectionner un fichier
               </Button>

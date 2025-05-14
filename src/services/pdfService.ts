@@ -303,12 +303,6 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
-// Fonction historique laissée en place pour référence
-function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // ... keep existing code (obsolète mais conservé pour référence)
-  return { status: 'needs-cleaning', cleaningType: 'full' };
-}
-
 // Déterminer la priorité
 function determinePriority(context: string): 'high' | 'medium' | 'low' {
   if (context.includes('VIP') || 
