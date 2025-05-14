@@ -30,7 +30,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   const [customFields, setCustomFields] = useState<ReportFields>({ 
     toDoItems: [], 
     toKnowItems: [],
-    instructions: '' 
+    instructions: '',
+    generalInstructions: '' // New field for general instructions
   });
   const { toast } = useToast();
 
@@ -39,6 +40,14 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     setCustomFields(prev => ({
       ...prev,
       instructions: e.target.value
+    }));
+  };
+
+  // Update general instructions field
+  const handleGeneralInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCustomFields(prev => ({
+      ...prev,
+      generalInstructions: e.target.value
     }));
   };
 
@@ -103,7 +112,18 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
             </div>
             
             <div className="mt-4">
-              <Label className="font-medium mb-2 block">À faire et à savoir</Label>
+              <Label className="font-medium mb-2 block">Instructions générales (pour tous les rapports)</Label>
+              <Textarea
+                id="generalInstructions"
+                placeholder="Instructions générales qui s'appliqueront à tous les rapports..."
+                value={customFields.generalInstructions || ''}
+                onChange={handleGeneralInstructionsChange}
+                className="min-h-[100px]"
+              />
+            </div>
+            
+            <div className="mt-4">
+              <Label className="font-medium mb-2 block">À faire et à savoir (par rapport)</Label>
               <ReportCustomFields onChange={(fields) => {
                 setCustomFields(prev => ({
                   ...prev,
@@ -115,11 +135,11 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
             
             <div className="mt-4">
               <Label htmlFor="instructions" className="font-medium mb-2 block">
-                Instructions spéciales
+                Instructions spéciales (par rapport)
               </Label>
               <Textarea
                 id="instructions"
-                placeholder="Ajoutez des instructions spéciales ici..."
+                placeholder="Ajoutez des instructions spéciales pour ce rapport..."
                 value={customFields.instructions || ''}
                 onChange={handleInstructionsChange}
                 className="min-h-[100px]"

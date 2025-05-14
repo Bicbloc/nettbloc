@@ -8,7 +8,8 @@ const ADMIN_EMAIL = "admin@bicbloc.eu"; // Replace with the desired admin email 
 export interface ReportFields {
   toDoItems: string[];
   toKnowItems: string[];
-  instructions?: string; // Added instructions field
+  instructions?: string; // Instructions spécifiques à un rapport
+  generalInstructions?: string; // Instructions générales pour tous les rapports
 }
 
 export async function generateHousekeeperReport(
@@ -65,9 +66,18 @@ export async function generateHousekeeperReport(
       }).then(response => {
         if (response.ok) {
           console.log("Email sent successfully");
+          toast({
+            title: "Email envoyé",
+            description: `Un email avec le rapport a été envoyé à ${emailAddress}`,
+          });
         }
       }).catch(err => {
         console.log("Email sending failed, but PDF was downloaded", err);
+        toast({
+          variant: "destructive",
+          title: "Erreur d'envoi d'email",
+          description: "L'email n'a pas pu être envoyé, mais le PDF a été téléchargé",
+        });
       });
     } catch (emailError) {
       console.log("Email sending failed, but PDF was downloaded", emailError);
@@ -212,6 +222,7 @@ function generateHousekeeperReportHTML(
         .banner img { width: 100%; height: auto; max-height: 200px; object-fit: contain; }
         .todo-section { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
         .instructions-section { margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #0066cc; }
+        .general-instructions-section { margin: 20px 0; padding: 15px; background-color: #e6f7ff; border-radius: 5px; border-left: 4px solid #0099cc; }
         .footer-link { color: #0066cc; text-decoration: none; }
         tr:nth-child(even) { background-color: #f9f9f9; }
       </style>
@@ -233,6 +244,13 @@ function generateHousekeeperReportHTML(
           <p><strong>Chambres twin:</strong> ${twinCount}</p>
           <p><strong>Temps estimé:</strong> ${estimatedTimeInMinutes} minutes (${Math.floor(estimatedTimeInMinutes/60)}h${estimatedTimeInMinutes%60})</p>
         </div>
+        
+        ${customFields?.generalInstructions ? `
+        <div class="general-instructions-section">
+          <h2>Instructions générales</h2>
+          <p>${customFields.generalInstructions}</p>
+        </div>
+        ` : ''}
         
         ${todoItems ? `
         <div class="todo-section">
@@ -271,7 +289,7 @@ function generateHousekeeperReportHTML(
         
         ${customFields?.instructions ? `
         <div class="instructions-section">
-          <h2>Instructions</h2>
+          <h2>Instructions spéciales</h2>
           <p>${customFields.instructions}</p>
         </div>
         ` : ''}
@@ -348,6 +366,37 @@ async function createSimplePDF(
   
   // Add custom fields if present
   let yPosition = height - 200;
+  
+  // Add general instructions if present
+  if (customFields?.generalInstructions) {
+    page.drawText('Instructions générales:', {
+      x: 50,
+      y: yPosition,
+      size: 14,
+      font: boldFont,
+    });
+    yPosition -= 20;
+    
+    // Split instructions into multiple lines if needed
+    const generalInstructionLines = splitTextIntoLines(customFields.generalInstructions, 80);
+    for (const line of generalInstructionLines) {
+      page.drawText(line, {
+        x: 60,
+        y: yPosition,
+        size: 10,
+        font,
+      });
+      yPosition -= 15;
+      
+      // Add a new page if we're running out of space
+      if (yPosition < 100) {
+        const newPage = pdfDoc.addPage();
+        yPosition = height - 50;
+      }
+    }
+    
+    yPosition -= 10;
+  }
   
   // Add to-do items if present
   if (customFields?.toDoItems && customFields.toDoItems.length > 0) {
@@ -556,7 +605,7 @@ async function createSimplePDF(
       yPosition -= 30;
     }
     
-    page.drawText('Instructions:', {
+    page.drawText('Instructions spéciales:', {
       x: 50,
       y: yPosition,
       size: 14,
