@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +20,7 @@ interface UploadDialogProps {
   onPdfProcessed: (data: any) => void;
 }
 
-// Clé d'API (simplifiée car l'API ne fonctionne pas réellement dans ce projet)
+// API key (simplified as API doesn't actually work in this project)
 const DEEPSEEK_API_KEY = "sk-internal-deepseek-key";
 
 export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
@@ -39,12 +38,12 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       if (file.type !== 'application/pdf') {
         toast({
           variant: "destructive",
-          title: "Type de fichier invalide",
-          description: "Veuillez téléverser un fichier PDF",
+          title: "Invalid file type",
+          description: "Please upload a PDF file",
         });
         return;
       }
-      console.log("Fichier sélectionné:", file.name);
+      console.log("File selected:", file.name);
       setSelectedFile(file);
     }
   };
@@ -56,12 +55,12 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       if (file.type !== 'application/pdf') {
         toast({
           variant: "destructive",
-          title: "Type de fichier invalide",
-          description: "Veuillez téléverser un fichier PDF",
+          title: "Invalid file type",
+          description: "Please upload a PDF file",
         });
         return;
       }
-      console.log("Fichier déposé:", file.name);
+      console.log("File dropped:", file.name);
       setSelectedFile(file);
     }
   };
@@ -74,8 +73,8 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     if (!selectedFile) {
       toast({
         variant: "destructive",
-        title: "Aucun fichier sélectionné",
-        description: "Veuillez sélectionner un fichier PDF à téléverser",
+        title: "No file selected",
+        description: "Please select a PDF file to upload",
       });
       return;
     }
@@ -83,13 +82,13 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     try {
       setIsUploading(true);
       setAnalysisProgress(0);
-      console.log("Traitement du fichier:", selectedFile.name);
-      console.log("Utilisation de l'analyse avancée:", useAdvancedAnalysis);
+      console.log("Processing file:", selectedFile.name);
+      console.log("Using advanced analysis:", useAdvancedAnalysis);
       
       let data;
       
       if (useAdvancedAnalysis) {
-        // Étapes d'analyse avancée avec progression
+        // Advanced analysis steps with progress
         setAnalysisStep("preparation");
         setAnalysisProgress(10);
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -98,26 +97,26 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         setAnalysisProgress(30);
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        setAnalysisStep("analyse");
+        setAnalysisStep("analysis");
         setAnalysisProgress(70);
         
         data = await processWithDeepSeek(selectedFile, DEEPSEEK_API_KEY);
         setAnalysisProgress(100);
       } else {
-        // Analyse standard
+        // Standard analysis
         setAnalysisStep("standard");
         setAnalysisProgress(50);
         data = await processPdf(selectedFile);
         setAnalysisProgress(100);
       }
       
-      // Statistiques des types de nettoyage
+      // Statistics of cleaning types
       const fullCleanings = data.filter((r: any) => r.cleaningType === 'full').length;
       const quickCleanings = data.filter((r: any) => r.cleaningType === 'quick').length;
       const noCleanings = data.filter((r: any) => r.cleaningType === 'none').length;
       
-      console.log(`🎉 Analyse terminée: ${data.length} chambres détectées`);
-      console.log("Types de nettoyage détectés:", {
+      console.log(`🎉 Analysis complete: ${data.length} rooms detected`);
+      console.log("Detected cleaning types:", {
         "à blanc": fullCleanings,
         recouche: quickCleanings,
         propre: noCleanings
@@ -126,15 +125,15 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       onPdfProcessed(data);
       setOpen(false);
       toast({
-        title: "Téléversement réussi",
-        description: `${data.length} chambres analysées: ${fullCleanings} à blanc, ${quickCleanings} recouches, ${noCleanings} propres`,
+        title: "Upload successful",
+        description: `${data.length} rooms analyzed: ${fullCleanings} à blanc, ${quickCleanings} recouches, ${noCleanings} propres`,
       });
     } catch (error) {
-      console.error("Erreur lors du traitement du PDF:", error);
+      console.error("Error processing PDF:", error);
       toast({
         variant: "destructive",
-        title: "Échec du traitement",
-        description: "Une erreur s'est produite lors du traitement du fichier PDF.",
+        title: "Processing failed",
+        description: "An error occurred while processing the PDF file.",
       });
     } finally {
       setIsUploading(false);
@@ -149,19 +148,19 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     }
   };
 
-  // Afficher différents messages selon l'étape de traitement
+  // Display different messages based on processing stage
   const getLoadingMessage = () => {
     switch (analysisStep) {
       case "preparation":
-        return "Préparation du document...";
+        return "Preparing document...";
       case "extraction":
-        return "Extraction du texte...";
-      case "analyse":
-        return "Analyse des chambres et règles...";
+        return "Extracting text...";
+      case "analysis":
+        return "Analyzing rooms and rules...";
       case "standard":
-        return "Traitement standard en cours...";
+        return "Standard processing in progress...";
       default:
-        return "Préparation...";
+        return "Preparing...";
     }
   };
 
