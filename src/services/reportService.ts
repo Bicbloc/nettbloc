@@ -1,4 +1,3 @@
-
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
@@ -301,7 +300,7 @@ function generateReportHTML(data: ReportData): string {
           font-weight: bold;
         }
         .date {
-          margin-bottom: 35px; /* Increased space between date and table */
+          margin-bottom: 50px; /* Increased space between date and table to 50px */
           font-style: italic;
           margin-top: 15px; /* Space between date and housekeeper name */
         }
