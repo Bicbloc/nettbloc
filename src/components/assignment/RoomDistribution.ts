@@ -77,12 +77,14 @@ export function smartAssignRooms(
 
 /**
  * Distributes rooms to housekeepers by first digit of room number
- * Each housekeeper gets all rooms starting with specific digits
+ * Each housekeeper gets consecutive pairs of digits (1&2, 3&4, etc.)
  * 
  * Assignment Logic:
- * - First housekeeper gets all rooms starting with digit 1, second gets all rooms with digit 2, etc.
- * - If there are more digits than housekeepers, the assignment wraps around
- *   (e.g., with 4 housekeepers, rooms with first digit 5 go to housekeeper 1 again)
+ * - First housekeeper gets rooms with first digits 1,2
+ * - Second housekeeper gets rooms with first digits 3,4
+ * - Third housekeeper gets rooms with first digits 5,6
+ * - Fourth housekeeper gets rooms with first digits 7,8 etc.
+ * - If there are more digits than housekeepers*2, distribution cycles
  */
 export function distributeRoomsByFloor(
   rooms: Room[],
@@ -99,36 +101,44 @@ export function distributeRoomsByFloor(
     return null;
   }
 
-  // Get only the rooms that are not assigned and not in maintenance
-  let availableRooms = rooms.filter(room => 
-    !room.assignedTo && 
-    room.cleaningType !== 'none' && 
-    room.status !== 'maintenance'
-  );
+  // Filter rooms based on selected floors if any are selected
+  let availableRooms: Room[];
+  
+  if (selectedFloors.length > 0) {
+    // If specific floors are selected, get all rooms from those floors
+    // even if they are already assigned
+    availableRooms = rooms.filter(room => {
+      const roomFloor = getRoomFloor(room.number);
+      return selectedFloors.includes(roomFloor) &&
+             room.cleaningType !== 'none' && 
+             room.status !== 'maintenance';
+    });
+  } else {
+    // Otherwise, only get unassigned rooms
+    availableRooms = rooms.filter(room => 
+      !room.assignedTo && 
+      room.cleaningType !== 'none' && 
+      room.status !== 'maintenance'
+    );
+  }
   
   // Apply exclusion filters
   if (excludeTwin) {
     availableRooms = availableRooms.filter(room => !room.isTwin);
   }
   
-  // Only use selected floors if any are selected
-  if (selectedFloors.length > 0) {
-    availableRooms = availableRooms.filter(room => {
-      const roomFloor = getRoomFloor(room.number);
-      return selectedFloors.includes(roomFloor);
-    });
-  }
-  
   if (availableRooms.length === 0) {
     toast({
       title: "Aucune chambre à distribuer",
-      description: "Il n'y a pas de chambres non assignées à distribuer.",
+      description: selectedFloors.length > 0 
+        ? "Il n'y a pas de chambres dans les étages sélectionnés."
+        : "Il n'y a pas de chambres non assignées à distribuer.",
       variant: "destructive"
     });
     return null;
   }
 
-  console.log(`Distributing ${availableRooms.length} unassigned rooms`);
+  console.log(`Distributing ${availableRooms.length} rooms`);
   
   // Prepare assignments map
   const assignments: Record<string, Room[]> = {};
@@ -156,10 +166,12 @@ export function distributeRoomsByFloor(
   if (availableFirstDigits.length > 0 && housekeeperNames.length > 0) {
     const numHousekeepers = housekeeperNames.length;
     
-    // Distribute rooms by first digit with wrap-around logic
+    // Distribute rooms by pairs of digits to each housekeeper (1&2 to first, 3&4 to second, etc.)
+    // with wrap-around logic if needed
     for (let digitIndex = 0; digitIndex < availableFirstDigits.length; digitIndex++) {
-      // Calculate which housekeeper gets this digit (with wrap-around)
-      const housekeeperIndex = digitIndex % numHousekeepers;
+      // Calculate which housekeeper gets this digit (with pair wrap-around)
+      // Integer division by 2 to get pairs of digits
+      const housekeeperIndex = Math.floor(digitIndex / 2) % numHousekeepers;
       const housekeeper = housekeeperNames[housekeeperIndex];
       const firstDigit = availableFirstDigits[digitIndex];
       

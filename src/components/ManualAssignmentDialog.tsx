@@ -73,7 +73,8 @@ export function ManualAssignmentDialog({
       if (isSelected) {
         return prev.filter(r => r.number !== room.number);
       } else {
-        // Check if room is already assigned to a housekeeper
+        // Check if room is already assigned to a different housekeeper
+        // Allow selecting if it's assigned to the current housekeeper or not assigned
         if (room.assignedTo && selectedHousekeeper !== room.assignedTo) {
           toast({
             title: "Chambre déjà assignée",
@@ -87,7 +88,7 @@ export function ManualAssignmentDialog({
     });
   };
 
-  // Floor selection implementation - modified to respect existing assignments
+  // Floor selection implementation - now allows reassigning rooms from other housekeepers
   const toggleFloor = (floor: number) => {
     // Check if floor is already selected
     if (selectedFloors.includes(floor)) {
@@ -106,20 +107,18 @@ export function ManualAssignmentDialog({
       setSelectedFloors(prev => [...prev, floor]);
       
       // Find all rooms from this floor that match current filters
+      // Now includes rooms assigned to other housekeepers
       const roomsOnFloor = rooms.filter(room => {
         // Room must be from the selected floor
         const roomFloor = parseInt(room.number.charAt(0));
         if (roomFloor !== floor) return false;
-        
-        // Only include rooms that are either unassigned or already assigned to the current housekeeper
-        if (room.assignedTo && room.assignedTo !== selectedHousekeeper) return false;
         
         // Apply other active filters
         if (filterStatus !== "all" && room.status !== filterStatus) return false;
         if (excludeTwin && room.isTwin) return false;
         if (searchTerm && !room.number.toLowerCase().includes(searchTerm.toLowerCase())) return false;
         
-        // The room passes all filters
+        // The room passes all filters - include even if assigned to other housekeepers
         return true;
       });
       
@@ -160,12 +159,13 @@ export function ManualAssignmentDialog({
     }
   };
   
-  // Room distribution implementation - now uses our improved wraparound distribution logic
+  // Room distribution implementation - now uses our paired digit distribution logic
   const handleDistributeRooms = () => {
-    // Use our autoDistributeRooms function that uses the first digit logic with wraparound
-    const assignments = autoDistributeRooms(
+    // Use the distributeRoomsByFloor function with selected floors
+    const assignments = distributeRoomsByFloor(
       rooms,
       housekeeperNames,
+      selectedFloors,
       excludeTwin
     );
     
@@ -184,7 +184,7 @@ export function ManualAssignmentDialog({
     // Success message
     toast({
       title: "Distribution réussie",
-      description: `${totalAssigned} chambres ont été distribuées en fonction du premier chiffre du numéro avec distribution cyclique.`,
+      description: `${totalAssigned} chambres ont été distribuées en paires de chiffres (1-2, 3-4, etc.) en respectant l'ordre des étages.`,
     });
     
     onClose();

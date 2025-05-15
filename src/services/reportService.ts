@@ -3,6 +3,18 @@ import html2pdf from 'html2pdf.js';
 import { toast } from "@/hooks/use-toast";
 import { ReportFields } from "@/components/ReportCustomFields"; // Import from ReportCustomFields
 
+export interface ReportFields {
+  hotelName: string;
+  hotelAddress: string;
+  currentDate: string;
+  logoUrl: string;
+  showRoomStatus: boolean;
+  includeMaintenance: boolean;
+  showTwinRooms: boolean;
+  generalInstructions: string;
+  housekeeperInstructions: Record<string, string>;
+}
+
 export async function generateHousekeeperReport(
   housekeeperName: string, 
   rooms: Room[],
