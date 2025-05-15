@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Room } from "@/services/pdfService";
@@ -119,23 +120,40 @@ export function ManualAssignmentDialog({
       if (isAlreadySelected) {
         // Removing floor from selection
         newFloors = prev.filter(f => f !== floor);
+        
+        // Also remove rooms from this floor from selection
+        setSelectedRooms(prev => 
+          prev.filter(room => {
+            const roomFloor = parseInt(room.number[0]) || 0;
+            return roomFloor !== floor;
+          })
+        );
       } else {
-        // Adding floor - this should also auto-select all rooms from that floor
+        // Adding floor to selection
         newFloors = [...prev, floor];
         
-        // Get all rooms from this floor
-        const floorRooms = rooms.filter(room => {
+        // Get ALL rooms from this floor, regardless of current filter settings
+        const allFloorRooms = rooms.filter(room => {
           const roomFloor = parseInt(room.number[0]) || 0;
           return roomFloor === floor;
         });
         
-        // Add these rooms to selection if not already there
+        // Check if adding these rooms would exceed any limits
+        // This is a simplified check for the UI display only
+        if (selectedRooms.length + allFloorRooms.length > 50) { // Using 50 as a UI safety limit
+          toast({
+            description: `L'ajout de l'étage ${floor} ajouterait ${allFloorRooms.length} chambres supplémentaires à votre sélection.`,
+            variant: "default"
+          });
+        }
+        
+        // Add these rooms to selection (automatically filtered by next render)
         setSelectedRooms(prev => {
           // Create a map of existing selected rooms for quick lookup
           const existingMap = new Map(prev.map(room => [room.number, room]));
           
           // Add all floor rooms that aren't already selected
-          floorRooms.forEach(room => {
+          allFloorRooms.forEach(room => {
             if (!existingMap.has(room.number)) {
               existingMap.set(room.number, room);
             }
@@ -149,7 +167,7 @@ export function ManualAssignmentDialog({
     });
   };
 
-  // Implémentation de l'assignation intelligente
+  // Implémentation améliorée de l'assignation intelligente
   const handleSmartAssign = () => {
     if (!selectedHousekeeper) {
       toast({
@@ -164,14 +182,17 @@ export function ManualAssignmentDialog({
     
     // Si des étages sont sélectionnés, utiliser ceux-ci en priorité
     if (selectedFloors.length > 0) {
+      console.log("Assignation intelligente basée sur les étages sélectionnés:", selectedFloors);
+      // Récupérer TOUTES les chambres des étages sélectionnés
       roomsToSelect = rooms.filter(room => {
         // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
-        const roomFloor = parseInt(room.number[0]);
+        const roomFloor = parseInt(room.number[0]) || 0;
         return selectedFloors.includes(roomFloor);
       });
     } else {
       // Sinon utiliser les étages préférés de la femme de chambre
       const preferredFloors = housekeeperPreferredFloors[selectedHousekeeper] || [];
+      console.log("Assignation intelligente basée sur les étages préférés:", preferredFloors);
       
       if (preferredFloors.length === 0) {
         toast({
@@ -182,9 +203,10 @@ export function ManualAssignmentDialog({
         return;
       }
 
+      // Récupérer TOUTES les chambres des étages préférés
       roomsToSelect = rooms.filter(room => {
         // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
-        const roomFloor = parseInt(room.number[0]);
+        const roomFloor = parseInt(room.number[0]) || 0;
         return preferredFloors.includes(roomFloor);
       });
     }
@@ -253,6 +275,7 @@ export function ManualAssignmentDialog({
   
   const clearSelection = () => {
     setSelectedRooms([]);
+    setSelectedFloors([]);
   };
   
   return (
