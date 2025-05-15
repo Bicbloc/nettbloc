@@ -2,7 +2,7 @@ import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
-import { toast } from "@/hooks/use-toast"; // Import correct
+import { toast } from "@/hooks/use-toast"; // Adding the import for toast
 
 // Renamed to avoid conflict
 export interface ReportData extends CustomReportFields {
@@ -222,11 +222,11 @@ function generateRoomSummary(data: ReportData): string {
         <th>Nombre de chambres</th>
       </tr>
       <tr>
-        <td>À Blanc</td>
+        <td>Nettoyage complet</td>
         <td>${fullCleanCount}</td>
       </tr>
       <tr>
-        <td>Recouche</td>
+        <td>Nettoyage rapide</td>
         <td>${quickCleanCount}</td>
       </tr>
       <tr>
@@ -274,7 +274,7 @@ function generateRoomsTable(data: ReportData): string {
     
     // Create rows for each room
     const rowsHtml = roomsOnFloor.map(room => {
-      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
+      const cleaningTypeText = room.cleaningType === 'full' ? 'Complet' : 'Rapide';
       const priorityText = room.priority === 'high' ? '⚠️ Haute' : 'Normale';
       
       return `
@@ -308,7 +308,7 @@ function generateRoomsTable(data: ReportData): string {
   return tablesHtml;
 }
 
-// Generate combined report for all housekeepers - modified to create one single PDF
+// Generate combined report for all housekeepers
 export async function generateCombinedReport(
   housekeeperRooms: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
@@ -316,175 +316,18 @@ export async function generateCombinedReport(
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
-    // Create one big HTML document containing all reports
-    const today = new Date();
-    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const currentDate = today.toLocaleDateString('fr-FR', dateOptions as any);
-    
-    // Prepare the HTML for all reports
-    let allReportsHtml = `
-      <!DOCTYPE html>
-      <html lang="fr">
-      <head>
-        <meta charset="UTF-8">
-        <title>Rapports de Nettoyage</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-          h1 { font-size: 18px; margin-bottom: 5px; }
-          h2 { font-size: 16px; margin-top: 10px; margin-bottom: 5px; }
-          h3 { font-size: 14px; margin-top: 15px; margin-bottom: 5px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; page-break-inside: auto; }
-          table, th, td { border: 1px solid #000; }
-          th, td { padding: 5px; text-align: left; font-size: 11px; }
-          th { background-color: #f0f0f0; }
-          .info { margin-bottom: 15px; }
-          .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-          .footer { margin-top: 20px; text-align: center; font-size: 10px; }
-          .todo-section, .toknow-section, .instructions-section { margin-top: 15px; }
-          ul { margin-top: 5px; padding-left: 20px; }
-          .room-type { font-weight: bold; }
-          .page-break { page-break-after: always; }
-          .signature { margin-top: 30px; border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
-        </style>
-      </head>
-      <body>
-    `;
-    
-    // Process each housekeeper's report
-    for (let i = 0; i < housekeeperRooms.length; i++) {
-      const { name, rooms } = housekeeperRooms[i];
-      
+    // Generate report for each housekeeper
+    for (const { name, rooms } of housekeeperRooms) {
       if (rooms.length > 0) {
-        // Sort rooms by floor and then room number
-        const sortedRooms = [...rooms].sort((a, b) => {
-          const floorA = parseInt(a.number.charAt(0));
-          const floorB = parseInt(b.number.charAt(0));
-          if (floorA !== floorB) return floorA - floorB;
-          return a.number.localeCompare(b.number, undefined, { numeric: true });
-        });
-        
-        // Prepare the report data
-        const reportData: ReportData = {
-          roomCount: sortedRooms.length,
-          housekeeperName: name,
-          rooms: sortedRooms,
-          currentDate: currentDate,
-          config: config,
-          // Include custom fields if provided
-          toDoItems: customFields?.toDoItems || [],
-          toKnowItems: customFields?.toKnowItems || [],
-          instructions: customFields?.instructions || '',
-          generalInstructions: customFields?.generalInstructions || '',
-          housekeeperInstructions: customFields?.housekeeperInstructions || {}
-        };
-        
-        // Generate HTML for report content (without the HTML/HEAD/BODY tags)
-        let reportHtml = '';
-        
-        // Instructions section - use specific housekeeper instructions if available
-        const housekeeperInstructions = reportData.housekeeperInstructions?.[name] || reportData.instructions || '';
-        const generalInstructions = reportData.generalInstructions || '';
-        
-        // Combined instructions
-        const combinedInstructions = [generalInstructions, housekeeperInstructions].filter(Boolean).join('<br><br>');
-        
-        if (combinedInstructions) {
-          reportHtml += `
-            <div class="instructions-section">
-              <h3>Instructions</h3>
-              <div>${combinedInstructions}</div>
-            </div>
-          `;
-        }
-        
-        // Process to-do list if present
-        if (reportData.toDoItems && reportData.toDoItems.some(item => item.trim())) {
-          const todoItems = reportData.toDoItems
-            .filter(item => item.trim())
-            .map(item => `<li>${item}</li>`)
-            .join('');
-            
-          reportHtml += `
-            <div class="todo-section">
-              <h3>À faire</h3>
-              <ul>${todoItems}</ul>
-            </div>
-          `;
-        }
-        
-        // Process to-know list if present
-        if (reportData.toKnowItems && reportData.toKnowItems.some(item => item.trim())) {
-          const toknowItems = reportData.toKnowItems
-            .filter(item => item.trim())
-            .map(item => `<li>${item}</li>`)
-            .join('');
-            
-          reportHtml += `
-            <div class="toknow-section">
-              <h3>À savoir</h3>
-              <ul>${toknowItems}</ul>
-            </div>
-          `;
-        }
-        
-        // Get room summary and rooms table HTML
-        const summaryHtml = generateRoomSummary(reportData);
-        const roomsTableHtml = generateRoomsTable(reportData);
-        
-        // Add report header and content to the all reports HTML
-        allReportsHtml += `
-          <div class="header">
-            <div>
-              <h1>Rapport de Nettoyage - ${reportData.housekeeperName}</h1>
-              <div class="info">Date: ${reportData.currentDate}</div>
-            </div>
-          </div>
-          
-          ${reportHtml}
-          
-          <h2>Résumé des chambres</h2>
-          ${summaryHtml}
-          
-          <h2>Liste des chambres à nettoyer</h2>
-          ${roomsTableHtml}
-          
-          <div class="signature">
-            Signature
-          </div>
-          
-          <div class="footer">
-            Bicbloc Report - Généré le ${reportData.currentDate}
-          </div>
-        `;
-        
-        // Add page break after each report except the last one
-        if (i < housekeeperRooms.length - 1) {
-          allReportsHtml += '<div class="page-break"></div>';
-        }
+        // Process one by one with a small delay to avoid browser issues
+        await generateReport(name, rooms, config, emailAddress, customFields);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
-    // Close the HTML document
-    allReportsHtml += `
-        </body>
-      </html>
-    `;
-    
-    // Generate PDF from the combined HTML
-    const pdfOptions = {
-      margin: [10, 10, 10, 10],
-      filename: `rapports-combinés.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    
-    // Convert HTML to PDF and download
-    await html2pdf().from(allReportsHtml).set(pdfOptions).save();
-    
     toast({
       title: "Rapports générés",
-      description: `Les rapports pour ${housekeeperRooms.length} femmes de chambre ont été combinés en un seul fichier PDF.`
+      description: `${housekeeperRooms.length} rapports ont été générés et téléchargés.`
     });
     
     return true;

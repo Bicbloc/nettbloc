@@ -79,24 +79,14 @@ export function ManualAssignmentDialog({
     });
   };
 
-  // Fonction modifiée pour réassigner les chambres lors de la sélection d'un étage
+  // Floor selection implementation - allow reassigning rooms from other housekeepers
   const toggleFloor = (floor: number) => {
-    // Vérifier d'abord si l'on a sélectionné une femme de chambre
-    if (!selectedHousekeeper) {
-      toast({
-        title: "Aucune femme de chambre sélectionnée",
-        description: "Veuillez d'abord sélectionner une femme de chambre.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Vérifier si l'étage est déjà sélectionné
+    // Check if floor is already selected
     if (selectedFloors.includes(floor)) {
-      // Désélectionner l'étage
+      // Remove floor from selected floors
       setSelectedFloors(prev => prev.filter(f => f !== floor));
       
-      // Retirer toutes les chambres de cet étage de la sélection
+      // Remove all rooms from this floor from selection
       setSelectedRooms(prev => 
         prev.filter(room => {
           const roomFloor = parseInt(room.number.charAt(0));
@@ -104,37 +94,29 @@ export function ManualAssignmentDialog({
         })
       );
     } else {
-      // Ajouter l'étage aux étages sélectionnés
+      // Add floor to selected floors
       setSelectedFloors(prev => [...prev, floor]);
       
-      // Trouver toutes les chambres de cet étage, MÊME SI DÉJÀ ASSIGNÉES
+      // Find all rooms from this floor that match current filters
+      // Includes rooms assigned to other housekeepers
       const roomsOnFloor = rooms.filter(room => {
-        // La chambre doit être de l'étage sélectionné
+        // Room must be from the selected floor
         const roomFloor = parseInt(room.number.charAt(0));
         if (roomFloor !== floor) return false;
         
-        // Appliquer les autres filtres actifs
+        // Apply other active filters
         if (filterStatus !== "all" && room.status !== filterStatus) return false;
         if (excludeTwin && room.isTwin) return false;
         if (searchTerm && !room.number.toLowerCase().includes(searchTerm.toLowerCase())) return false;
         
-        // Inclure toutes les chambres, indépendamment de leur assignation actuelle
+        // Include all rooms regardless of assignment status
         return true;
       });
       
-      // Trier les chambres par numéro avant de les ajouter
+      // Sort rooms by number before adding
       roomsOnFloor.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
       
-      // Message pour informer l'utilisateur du transfert des chambres
-      const reassignedRooms = roomsOnFloor.filter(room => room.assignedTo && room.assignedTo !== selectedHousekeeper);
-      if (reassignedRooms.length > 0) {
-        toast({
-          title: "Transfert de chambres",
-          description: `${reassignedRooms.length} chambre(s) déjà assignée(s) à d'autres femmes de chambre vont être réassignées à ${selectedHousekeeper}.`,
-        });
-      }
-      
-      // Ajouter les chambres à la sélection (sans doublons)
+      // Add rooms to selection (without duplicates)
       setSelectedRooms(prev => {
         const existingRoomNumbers = new Set(prev.map(r => r.number));
         const uniqueNewRooms = roomsOnFloor.filter(room => !existingRoomNumbers.has(room.number));
