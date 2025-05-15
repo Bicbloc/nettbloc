@@ -1,4 +1,3 @@
-
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
@@ -161,11 +160,109 @@ function generateReportHTML(data: ReportData): string {
   // Format current date in a readable format (e.g., "jeudi 15 mai 2025")
   const formattedDate = data.currentDate.split(' ').slice(0, 3).join(' ');
   
-  // Get room summary and rooms table HTML
-  const summaryTableHtml = generateRoomSummaryTable(data);
-  const roomsTablesByFloor = generateRoomsTablesByFloor(data);
+  // Calculate room counts and estimated time
+  const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full').length;
+  const quickCleanCount = data.rooms.filter(room => room.cleaningType === 'quick').length;
   
-  // Complete HTML with enhanced table styling
+  // Calculate estimated time
+  const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
+                       quickCleanCount * data.config.quickCleaningTime;
+  
+  // Summary table with improved styling
+  const summaryTableHtml = `
+    <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:20px; border:1px solid #000;">
+      <tr>
+        <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Type de nettoyage</th>
+        <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Nombre de chambres</th>
+      </tr>
+      <tr style="background-color:#FEC6A1;">
+        <td style="border:1px solid #000;">À Blanc</td>
+        <td style="border:1px solid #000;">${fullCleanCount}</td>
+      </tr>
+      <tr style="background-color:#F2FCE2;">
+        <td style="border:1px solid #000;">Recouche</td>
+        <td style="border:1px solid #000;">${quickCleanCount}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #000; font-weight:bold;">Total</td>
+        <td style="border:1px solid #000; font-weight:bold;">${data.rooms.length}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #000;">Temps estimé</td>
+        <td style="border:1px solid #000;">${estimatedTime} minutes</td>
+      </tr>
+    </table>
+  `;
+  
+  // Group rooms by floor for better organization
+  const roomsByFloor: Record<number, Room[]> = {};
+  
+  data.rooms.forEach(room => {
+    const floor = getFirstDigitFromRoomNumber(room.number);
+    if (!roomsByFloor[floor]) {
+      roomsByFloor[floor] = [];
+    }
+    roomsByFloor[floor].push(room);
+  });
+  
+  // Sort floors
+  const sortedFloors = Object.keys(roomsByFloor)
+    .map(Number)
+    .sort((a, b) => a - b);
+  
+  // Build table for each floor
+  let roomsTablesByFloor = '';
+  
+  sortedFloors.forEach(floor => {
+    const roomsOnFloor = roomsByFloor[floor];
+    
+    // Sort rooms on this floor by number
+    roomsOnFloor.sort((a, b) => 
+      a.number.localeCompare(b.number, undefined, { numeric: true })
+    );
+    
+    // Create rows for each room with appropriate styling
+    let rowsHtml = '';
+    roomsOnFloor.forEach(room => {
+      // Determine background color based on cleaning type
+      const bgColor = room.cleaningType === 'full' ? '#FEC6A1' : '#F2FCE2'; // Orange for full, Green for quick
+      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
+      const priorityText = room.priority === 'high' ? 'Haute' : 'Normale';
+      
+      rowsHtml += `
+        <tr style="background-color:${bgColor};">
+          <td style="border:1px solid #000;">${room.number}</td>
+          <td style="border:1px solid #000;">${cleaningTypeText}</td>
+          <td style="border:1px solid #000;">${room.isTwin ? 'Oui' : 'Non'}</td>
+          <td style="border:1px solid #000;">${priorityText}</td>
+          <td style="border:1px solid #000;">${room.notes || '-'}</td>
+          <td style="border:1px solid #000;"></td>
+        </tr>
+      `;
+    });
+    
+    // Complete floor section with table
+    roomsTablesByFloor += `
+      <div class="floor-section" style="margin-top:20px;">
+        <div class="floor-heading" style="font-weight:bold; background-color:#eee; padding:5px; margin-bottom:5px;">
+          Étage ${floor === 0 ? 'RDC' : floor}
+        </div>
+        <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:20px; border:1px solid #000;">
+          <tr>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Chambre</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Type</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Twin</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Priorité</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Notes</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Remarques</th>
+          </tr>
+          ${rowsHtml}
+        </table>
+      </div>
+    `;
+  });
+  
+  // Complete HTML with improved styling and encadré for housekeeper name
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -206,12 +303,11 @@ function generateReportHTML(data: ReportData): string {
           margin-bottom: 20px;
           font-style: italic;
         }
-        /* Enhanced table styling */
         table { 
           width: 100%; 
           border-collapse: collapse; 
           margin-bottom: 20px;
-          border: 1px solid #000;
+          page-break-inside: avoid;
         }
         th, td { 
           border: 1px solid #000;
@@ -221,22 +317,6 @@ function generateReportHTML(data: ReportData): string {
         th { 
           background-color: #f2f2f2; 
           font-weight: bold;
-        }
-        /* Color coding for room types */
-        .a-blanc { 
-          background-color: #FEC6A1 !important; 
-        }
-        .recouche { 
-          background-color: #F2FCE2 !important; 
-        }
-        .floor-heading {
-          margin-top: 20px;
-          margin-bottom: 5px;
-          font-weight: bold;
-          font-size: 14px;
-          background-color: #eee;
-          padding: 5px;
-          border-radius: 4px;
         }
         .signature { 
           margin-top: 30px; 
@@ -268,10 +348,18 @@ function generateReportHTML(data: ReportData): string {
           background-color: #f9f9f9;
           border-radius: 4px;
         }
+        .housekeeperName {
+          border: 2px solid #000;
+          padding: 8px;
+          font-weight: bold;
+          display: inline-block;
+          margin-bottom: 15px;
+        }
       </style>
     </head>
     <body>
-      <h1>Rapport de Nettoyage - ${data.housekeeperName}</h1>
+      <h1>Rapport de Nettoyage</h1>
+      <div class="housekeeperName">${data.housekeeperName}</div>
       <div class="date">Date: ${formattedDate}</div>
       
       ${instructionsHtml}
