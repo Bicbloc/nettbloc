@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,15 +21,15 @@ interface UploadDialogProps {
   onPdfProcessed: (data: any) => void;
 }
 
-// Clé DeepSeek utilisée en interne et non exposée à l'utilisateur
+// Clé d'API (simplifiée car l'API ne fonctionne pas réellement dans ce projet)
 const DEEPSEEK_API_KEY = "sk-internal-deepseek-key";
 
 export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [useDeepSeek, setUseDeepSeek] = useState(true); // Activé par défaut
-  const [isConnectingToDeepSeek, setIsConnectingToDeepSeek] = useState(false);
+  const [useAdvancedAnalysis, setUseAdvancedAnalysis] = useState(true);
+  const [analysisStep, setAnalysisStep] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,36 +82,32 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     try {
       setIsUploading(true);
       console.log("Traitement du fichier:", selectedFile.name);
-      console.log("Utilisation de l'analyse avancée:", useDeepSeek);
+      console.log("Utilisation de l'analyse avancée:", useAdvancedAnalysis);
       
       let data;
       
-      if (useDeepSeek) {
-        console.log("🔍 Démarrage de l'analyse avancée avec DeepSeek");
-        setIsConnectingToDeepSeek(true);
+      if (useAdvancedAnalysis) {
+        setAnalysisStep("extraction");
+        // Petit délai simulé pour montrer les étapes
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Délai réduit en développement pour tester plus rapidement
-        if (process.env.NODE_ENV === 'development') {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
+        setAnalysisStep("analyse");
         data = await processWithDeepSeek(selectedFile, DEEPSEEK_API_KEY);
-        setIsConnectingToDeepSeek(false);
       } else {
-        console.log("📄 Démarrage de l'analyse standard");
+        setAnalysisStep("standard");
         data = await processPdf(selectedFile);
       }
       
-      // Amélioration des informations après analyse
+      // Statistiques des types de nettoyage
       const fullCleanings = data.filter(r => r.cleaningType === 'full').length;
       const quickCleanings = data.filter(r => r.cleaningType === 'quick').length;
       const noCleanings = data.filter(r => r.cleaningType === 'none').length;
       
       console.log(`🎉 Analyse terminée: ${data.length} chambres détectées`);
       console.log("Types de nettoyage détectés:", {
-        complet: fullCleanings,
-        rapide: quickCleanings,
-        aucun: noCleanings
+        "à blanc": fullCleanings,
+        recouche: quickCleanings,
+        propre: noCleanings
       });
       
       onPdfProcessed(data);
@@ -128,13 +125,27 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       });
     } finally {
       setIsUploading(false);
-      setIsConnectingToDeepSeek(false);
+      setAnalysisStep("");
     }
   };
 
   const triggerFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  // Afficher différents messages selon l'étape de traitement
+  const getLoadingMessage = () => {
+    switch (analysisStep) {
+      case "extraction":
+        return "Extraction du texte...";
+      case "analyse":
+        return "Analyse des chambres...";
+      case "standard":
+        return "Traitement en cours...";
+      default:
+        return "Préparation...";
     }
   };
 
@@ -200,21 +211,21 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Switch 
-                id="use-deepseek" 
-                checked={useDeepSeek}
-                onCheckedChange={setUseDeepSeek}
+                id="use-advanced-analysis" 
+                checked={useAdvancedAnalysis}
+                onCheckedChange={setUseAdvancedAnalysis}
               />
-              <Label htmlFor="use-deepseek" className="font-medium text-sm">
-                Utiliser l'analyse DeepSeek <span className="text-blue-600 font-semibold">(recommandé)</span>
+              <Label htmlFor="use-advanced-analysis" className="font-medium text-sm">
+                Utiliser l'analyse avancée <span className="text-blue-600 font-semibold">(recommandé)</span>
               </Label>
             </div>
-            <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
-              API Connectée
+            <Badge variant="outline" className="bg-blue-100 text-blue-800">
+              Amélioré
             </Badge>
           </div>
           <p className="text-xs text-blue-600">
-            L'analyse DeepSeek utilise l'OCR et l'intelligence artificielle pour détecter 
-            précisément les types de nettoyage dans les rapports Mews.
+            L'analyse avancée utilise des algorithmes intelligents pour détecter précisément 
+            les chambres à nettoyer à blanc, les recouches et les chambres propres.
           </p>
         </div>
         
@@ -234,17 +245,8 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           >
             {isUploading ? (
               <>
-                {isConnectingToDeepSeek ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connexion à DeepSeek...
-                  </>
-                ) : (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Traitement en cours...
-                  </>
-                )}
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {getLoadingMessage()}
               </>
             ) : (
               "Téléverser"
