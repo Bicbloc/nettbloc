@@ -1,4 +1,3 @@
-
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
@@ -107,23 +106,19 @@ export async function generateReport(
   }
 }
 
-// Generate HTML for report
+// Generate HTML for report - Simplified to match the provided template
 function generateReportHTML(data: ReportData): string {
-  // Prepare to-do and to-know sections if they exist
-  let todoHtml = '';
-  let toknowHtml = '';
-  let instructionsHtml = '';
-  
   // Instructions section - use specific housekeeper instructions if available
   const housekeeperInstructions = data.housekeeperInstructions?.[data.housekeeperName] || data.instructions || '';
   const generalInstructions = data.generalInstructions || '';
   
   // Combined instructions
   const combinedInstructions = [generalInstructions, housekeeperInstructions].filter(Boolean).join('<br><br>');
+  let instructionsHtml = '';
   
   if (combinedInstructions) {
     instructionsHtml = `
-      <div class="instructions-section avoid-break">
+      <div class="instructions-section">
         <h3>Instructions</h3>
         <div>${combinedInstructions}</div>
       </div>
@@ -131,6 +126,7 @@ function generateReportHTML(data: ReportData): string {
   }
   
   // Process to-do list if present
+  let todoHtml = '';
   if (data.toDoItems && data.toDoItems.some(item => item.trim())) {
     const todoItems = data.toDoItems
       .filter(item => item.trim())
@@ -138,7 +134,7 @@ function generateReportHTML(data: ReportData): string {
       .join('');
       
     todoHtml = `
-      <div class="todo-section avoid-break">
+      <div class="todo-section">
         <h3>À faire</h3>
         <ul>${todoItems}</ul>
       </div>
@@ -146,6 +142,7 @@ function generateReportHTML(data: ReportData): string {
   }
   
   // Process to-know list if present
+  let toknowHtml = '';
   if (data.toKnowItems && data.toKnowItems.some(item => item.trim())) {
     const toknowItems = data.toKnowItems
       .filter(item => item.trim())
@@ -153,18 +150,21 @@ function generateReportHTML(data: ReportData): string {
       .join('');
       
     toknowHtml = `
-      <div class="toknow-section avoid-break">
+      <div class="toknow-section">
         <h3>À savoir</h3>
         <ul>${toknowItems}</ul>
       </div>
     `;
   }
   
-  // Get room summary and rooms table HTML
-  const summaryHtml = generateRoomSummary(data);
-  const roomsTableHtml = generateRoomsTable(data);
+  // Format current date in a readable format (e.g., "jeudi 15 mai 2025")
+  const formattedDate = data.currentDate.split(' ').slice(0, 3).join(' ');
   
-  // Complete HTML with improved page break controls and design
+  // Get room summary and rooms table HTML
+  const summaryTableHtml = generateRoomSummaryTable(data);
+  const roomsTablesByFloor = generateRoomsTablesByFloor(data);
+  
+  // Complete HTML that matches the provided template
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -173,270 +173,137 @@ function generateReportHTML(data: ReportData): string {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Rapport - ${data.housekeeperName}</title>
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
         body { 
-          font-family: 'Montserrat', Arial, sans-serif; 
-          margin: 20px; 
+          font-family: Arial, sans-serif; 
+          margin: 20px;
           font-size: 12px;
           line-height: 1.5;
-          color: #333;
-          background-color: #fff; 
         }
         h1 { 
-          font-size: 22px; 
-          margin-bottom: 10px; 
-          color: #1A1F2C;
-          font-weight: 700;
-          border-bottom: 2px solid #9b87f5;
-          padding-bottom: 8px;
+          font-size: 18px; 
+          margin-bottom: 5px;
         }
         h2 { 
-          font-size: 18px; 
-          margin-top: 15px; 
-          margin-bottom: 10px;
-          color: #7E69AB;
-          font-weight: 600;
-        }
-        h3 { 
           font-size: 16px; 
-          margin-top: 15px; 
-          margin-bottom: 8px;
-          color: #6E59A5;
-          font-weight: 500;
+          margin-top: 20px; 
+          margin-bottom: 10px;
         }
-        .table-container { 
-          page-break-inside: avoid !important; 
+        .date {
           margin-bottom: 20px;
-          box-shadow: 0 3px 8px rgba(0,0,0,0.1);
-          border-radius: 6px;
-          overflow: hidden;
         }
         table { 
           width: 100%; 
           border-collapse: collapse; 
-          margin-bottom: 0; 
-          table-layout: fixed; 
-          background: #fff;
+          margin-bottom: 15px;
         }
         table, th, td { 
-          border: 1px solid #ddd; 
+          border: 1px solid #000; 
         }
         th { 
-          background-color: #9b87f5; 
-          color: white; 
-          padding: 8px; 
+          background-color: #f2f2f2; 
+          font-weight: normal;
+          padding: 5px; 
           text-align: left; 
-          font-size: 11px;
-          font-weight: 600;
         }
         td { 
-          padding: 8px; 
+          padding: 5px; 
           text-align: left; 
-          font-size: 11px;
-          border-bottom: 1px solid #eee;
-        }
-        tr:hover {
-          background-color: #f9f8ff;
-        }
-        .info { 
-          margin-bottom: 15px; 
-          color: #555;
-          font-style: italic;
-        }
-        .header { 
-          display: flex; 
-          justify-content: space-between; 
-          align-items: center; 
-          margin-bottom: 25px;
-          padding: 15px;
-          background: linear-gradient(to right, #f8f7ff, #fff);
-          border-radius: 8px;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        .footer { 
-          margin-top: 30px; 
-          text-align: center; 
-          font-size: 11px;
-          padding: 15px;
-          border-top: 1px solid #eee;
-          color: #666;
-          background-color: #f9f9f9;
-          border-radius: 0 0 8px 8px;
-        }
-        .footer-brand {
-          font-weight: 600;
-          color: #7E69AB;
-        }
-        .todo-section, .toknow-section, .instructions-section { 
-          margin-top: 20px;
-          background-color: #f9f8ff;
-          padding: 15px;
-          border-radius: 8px;
-          border-left: 4px solid #9b87f5;
-        }
-        ul { 
-          margin-top: 8px; 
-          padding-left: 20px; 
-        }
-        li {
-          margin-bottom: 5px;
-        }
-        .room-type { 
-          font-weight: 600; 
         }
         .a-blanc { 
-          background-color: #FEC6A1 !important; 
+          background-color: #FEC6A1; 
         }
         .recouche { 
-          background-color: #F2FCE2 !important; 
-        }
-        .floor-section { 
-          page-break-inside: avoid !important; 
-          margin-bottom: 30px; 
+          background-color: #F2FCE2; 
         }
         .floor-heading {
-          background-color: #e5deff;
-          padding: 10px;
-          border-radius: 5px;
-          margin-bottom: 10px;
-          font-weight: 600;
-          color: #6E59A5;
-        }
-        .page-break { 
-          page-break-after: always !important; 
-          break-after: page !important; 
-        }
-        .page-break-before { 
-          page-break-before: always !important; 
-          break-before: page !important; 
-        }
-        .page-break-after { 
-          page-break-after: always !important; 
-          break-after: page !important; 
-        }
-        .avoid-break { 
-          page-break-inside: avoid !important; 
+          margin-top: 20px;
+          margin-bottom: 5px;
+          font-weight: bold;
         }
         .signature { 
-          margin-top: 40px; 
-          border-top: 1px solid #ddd; 
+          margin-top: 30px; 
+          border-top: 1px solid #000; 
           width: 200px; 
           text-align: center; 
           padding-top: 10px; 
         }
-        .housekeeping-icon { 
-          font-size: 24px; 
-          margin-right: 10px; 
-          vertical-align: middle;
-        }
-        .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 15px;
-          margin-bottom: 20px;
-        }
-        .summary-card {
-          background: #fff;
-          border-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-          padding: 15px;
+        .footer { 
           text-align: center;
+          margin-top: 30px;
+          font-size: 10px;
         }
-        .summary-title {
-          font-size: 14px;
-          color: #7E69AB;
-          margin-bottom: 5px;
-        }
-        .summary-value {
-          font-size: 22px;
-          font-weight: 700;
-          color: #1A1F2C;
-        }
-        .summary-card.a-blanc {
-          border-left: 4px solid #FEC6A1;
-        }
-        .summary-card.recouche {
-          border-left: 4px solid #F2FCE2;
-        }
-        .summary-card.total {
-          border-left: 4px solid #9b87f5;
-        }
-        .summary-card.time {
-          border-left: 4px solid #D3E4FD;
+        .instructions-section,
+        .todo-section,
+        .toknow-section { 
+          margin-top: 15px;
+          margin-bottom: 15px;
         }
       </style>
     </head>
     <body>
-      <div class="header avoid-break">
-        <div>
-          <h1><span class="housekeeping-icon">🧹</span>Rapport de Nettoyage - ${data.housekeeperName}</h1>
-          <div class="info">Date: ${data.currentDate}</div>
-        </div>
-      </div>
+      <h1>Rapport de Nettoyage - ${data.housekeeperName}</h1>
+      <div class="date">Date: ${formattedDate}</div>
       
       ${instructionsHtml}
       ${todoHtml}
       ${toknowHtml}
       
-      <div class="avoid-break">
-        <h2>Résumé des chambres</h2>
-        ${summaryHtml}
-      </div>
+      <h2>Résumé des chambres</h2>
+      ${summaryTableHtml}
       
-      <div class="avoid-break page-break-before">
-        <h2>Liste des chambres à nettoyer</h2>
-        <div class="rooms-section">
-          ${roomsTableHtml}
-        </div>
-      </div>
+      <h2>Liste des chambres à nettoyer</h2>
+      ${roomsTablesByFloor}
       
-      <div class="signature avoid-break">
+      <div class="signature">
         Signature
       </div>
       
       <div class="footer">
-        <p>Généré le ${data.currentDate}</p>
-        <p class="footer-brand">Généré par bicbloc.eu Staffing - Commander un extra en trois 3 clics</p>
+        Bicbloc Report - Généré le ${formattedDate}
       </div>
     </body>
     </html>
   `;
 }
 
-// Generate room summary HTML with enhanced design
-function generateRoomSummary(data: ReportData): string {
+// Generate room summary table that matches the template
+function generateRoomSummaryTable(data: ReportData): string {
   // Count different room types
   const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full').length;
   const quickCleanCount = data.rooms.filter(room => room.cleaningType === 'quick').length;
   
   // Calculate estimated time
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
-                        quickCleanCount * data.config.quickCleaningTime;
+                       quickCleanCount * data.config.quickCleaningTime;
   
   return `
-    <div class="summary-grid">
-      <div class="summary-card a-blanc">
-        <div class="summary-title">À Blanc</div>
-        <div class="summary-value">${fullCleanCount}</div>
-      </div>
-      <div class="summary-card recouche">
-        <div class="summary-title">Recouche</div>
-        <div class="summary-value">${quickCleanCount}</div>
-      </div>
-      <div class="summary-card total">
-        <div class="summary-title">Total</div>
-        <div class="summary-value">${data.rooms.length}</div>
-      </div>
-      <div class="summary-card time">
-        <div class="summary-title">Temps estimé</div>
-        <div class="summary-value">${estimatedTime} min</div>
-      </div>
-    </div>
+    <table>
+      <tr>
+        <th>Type de nettoyage</th>
+        <th>Nombre de chambres</th>
+      </tr>
+      <tr>
+        <td>À Blanc</td>
+        <td>${fullCleanCount}</td>
+      </tr>
+      <tr>
+        <td>Recouche</td>
+        <td>${quickCleanCount}</td>
+      </tr>
+      <tr>
+        <td>Total</td>
+        <td>${data.rooms.length}</td>
+      </tr>
+      <tr>
+        <td>Temps estimé</td>
+        <td>${estimatedTime} minutes</td>
+      </tr>
+    </table>
   `;
 }
 
-// Generate rooms table HTML with enhanced design
-function generateRoomsTable(data: ReportData): string {
+// Generate rooms tables grouped by floor
+function generateRoomsTablesByFloor(data: ReportData): string {
   if (data.rooms.length === 0) {
     return '<p>Aucune chambre assignée.</p>';
   }
@@ -445,7 +312,7 @@ function generateRoomsTable(data: ReportData): string {
   const roomsByFloor: Record<number, Room[]> = {};
   
   data.rooms.forEach(room => {
-    const floor = parseInt(room.number.charAt(0));
+    const floor = getFirstDigitFromRoomNumber(room.number);
     if (!roomsByFloor[floor]) {
       roomsByFloor[floor] = [];
     }
@@ -458,7 +325,7 @@ function generateRoomsTable(data: ReportData): string {
     .sort((a, b) => a - b);
   
   // Build table for each floor
-  const tablesHtml = sortedFloors.map((floor, index) => {
+  const tablesHtml = sortedFloors.map(floor => {
     const roomsOnFloor = roomsByFloor[floor];
     
     // Sort rooms on this floor by number
@@ -471,39 +338,34 @@ function generateRoomsTable(data: ReportData): string {
       // Apply highlighting classes based on cleaning type
       const cleaningTypeClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
       const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
-      const priorityText = room.priority === 'high' ? '⚠️ Haute' : 'Normale';
       
       return `
         <tr class="${cleaningTypeClass}">
           <td>${room.number}</td>
           <td class="room-type">${cleaningTypeText}</td>
           <td>${room.isTwin ? 'Oui' : 'Non'}</td>
-          <td>${priorityText}</td>
+          <td>${room.priority === 'high' ? 'Haute' : 'Normale'}</td>
           <td>${room.notes || '-'}</td>
           <td></td>
         </tr>
       `;
     }).join('');
     
-    // Add page break before new floor section if not the first floor
-    const pageBreakClass = index > 0 && index % 2 === 0 ? 'page-break-before' : '';
-    
+    // Display floor header and table
     return `
-      <div class="floor-section avoid-break ${pageBreakClass}">
+      <div class="floor-section">
         <div class="floor-heading">Étage ${floor === 0 ? 'RDC' : floor}</div>
-        <div class="table-container">
-          <table>
-            <tr>
-              <th>Chambre</th>
-              <th>Type</th>
-              <th>Twin</th>
-              <th>Priorité</th>
-              <th>Notes</th>
-              <th>Remarques</th>
-            </tr>
-            ${rowsHtml}
-          </table>
-        </div>
+        <table>
+          <tr>
+            <th>Chambre</th>
+            <th>Type</th>
+            <th>Twin</th>
+            <th>Priorité</th>
+            <th>Notes</th>
+            <th>Remarques</th>
+          </tr>
+          ${rowsHtml}
+        </table>
       </div>
     `;
   }).join('');
