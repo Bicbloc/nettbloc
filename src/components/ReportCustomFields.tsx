@@ -7,6 +7,9 @@ import { Label } from "./ui/label";
 export interface ReportFields {
   toDoItems: string[];
   toKnowItems: string[];
+  instructions?: string;
+  generalInstructions?: string;
+  housekeeperInstructions?: Record<string, string>;
 }
 
 interface ReportCustomFieldsProps {
