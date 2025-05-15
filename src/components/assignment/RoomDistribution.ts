@@ -3,6 +3,7 @@ import { Room } from "@/services/pdfService";
 import { toast } from "@/components/ui/use-toast";
 import { getRoomFloor, groupRoomsByFloor } from "@/utils/roomUtils";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
+import { generateCombinedReport as generateCombinedReportService } from "@/services/reportService";
 
 /**
  * Smart assignment function to select rooms based on floors
@@ -228,6 +229,6 @@ export function generateCombinedReport(
   emailAddress: string,
   customFields?: any
 ): Promise<boolean> {
-  // This function is implemented in reportService.ts
-  return Promise.resolve(true);
+  // Call the implementation in reportService.ts
+  return generateCombinedReportService(housekeeperRooms, config, emailAddress, customFields);
 }

@@ -168,7 +168,7 @@ function generateReportHTML(data: ReportData): string {
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
                        quickCleanCount * data.config.quickCleaningTime;
   
-  // Summary table with improved styling
+  // Summary table with improved styling - removed title "Résumé des chambres"
   const summaryTableHtml = `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:20px; border:1px solid #000;">
       <tr>
@@ -262,7 +262,7 @@ function generateReportHTML(data: ReportData): string {
     `;
   });
   
-  // Complete HTML with improved styling and encadré for housekeeper name
+  // Complete HTML with improved styling and encadré for housekeeper name with bold text
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -366,7 +366,6 @@ function generateReportHTML(data: ReportData): string {
       ${todoHtml}
       ${toknowHtml}
       
-      <h2>Résumé des chambres</h2>
       ${summaryTableHtml}
       
       <h2>Liste des chambres à nettoyer</h2>
