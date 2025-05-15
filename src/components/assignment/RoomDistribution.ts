@@ -2,6 +2,7 @@
 import { Room } from "@/services/pdfService";
 import { toast } from "@/components/ui/use-toast";
 import { getRoomFloor, groupRoomsByFloor } from "@/utils/roomUtils";
+import { getFirstDigitFromRoomNumber } from "@/lib/utils";
 
 /**
  * Smart assignment function to select rooms based on floors

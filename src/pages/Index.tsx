@@ -27,6 +27,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailReportDialog from "@/components/EmailReportDialog";
+import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -432,11 +433,29 @@ const Index = () => {
   };
   
   const redistributeRooms = () => {
-    distributeRooms(rooms, housekeeperNames, housekeeperFloorPreferences, housekeeperMaxRoomsOverrides);
-    toast({
-      title: "Chambres redistribuées",
-      description: "Les chambres ont été réparties entre les femmes de chambre.",
-    });
+    // Utiliser autoDistributeRooms au lieu de distributeRooms pour la distribution par premier chiffre
+    const assignments = autoDistributeRooms(rooms, housekeeperNames, false);
+    
+    if (assignments) {
+      // Mettre à jour toutes les chambres avec leurs nouvelles assignations
+      const updatedRooms = [...rooms];
+      
+      for (const housekeeper of housekeeperNames) {
+        for (const room of assignments[housekeeper]) {
+          const index = updatedRooms.findIndex(r => r.number === room.number);
+          if (index !== -1) {
+            updatedRooms[index] = { ...updatedRooms[index], assignedTo: housekeeper };
+          }
+        }
+      }
+      
+      setRooms(updatedRooms);
+      
+      toast({
+        title: "Chambres redistribuées",
+        description: "Les chambres ont été réparties entre les femmes de chambre par premier chiffre du numéro.",
+      });
+    }
   };
   
   const openManualAssignment = (housekeeperName?: string) => {
