@@ -52,20 +52,21 @@ export function ManualAssignmentDialog({
     }
   }, [isOpen, housekeeperNames]);
   
-  // Function to determine room floor from room number
+  // Function to determine room floor from room number - updated for more accurate detection
   const getRoomFloor = (roomNumber: string): number => {
     // Ignore years like 2025, 2026, 2027, 2028
     if (/^20(2[5-8])$/.test(roomNumber)) {
       return 0; // Considérer comme RDC
     }
     
-    // Si le numéro a deux chiffres ou moins, c'est au RDC
-    if (roomNumber.length <= 2) {
+    // Si c'est juste un chiffre (comme 1, 2, 3) ou deux chiffres (comme 12, 24), c'est RDC
+    if (/^\d{1,2}$/.test(roomNumber)) {
       return 0;
     }
     
-    // Sinon, le premier chiffre indique l'étage
-    return parseInt(roomNumber[0]) || 0;
+    // Pour les numéros plus longs, le premier chiffre indique généralement l'étage
+    const firstDigit = parseInt(roomNumber.charAt(0));
+    return isNaN(firstDigit) ? 0 : firstDigit;
   };
   
   // Apply filters to rooms
@@ -145,9 +146,8 @@ export function ManualAssignmentDialog({
         // Adding floor to selection
         newFloors = [...prev, floor];
         
-        // Get ALL rooms from this floor, regardless of current filter settings
+        // IMPORTANT: Get ALL rooms from this floor, including from all available rooms
         const floorRooms = rooms.filter(room => {
-          // Use the fixed getRoomFloor function
           const roomFloor = getRoomFloor(room.number);
           return roomFloor === floor;
         });
@@ -213,7 +213,7 @@ export function ManualAssignmentDialog({
         return;
       }
 
-      // Récupérer TOUTES les chambres des étages préférés
+      // R��cupérer TOUTES les chambres des étages préférés
       roomsToSelect = rooms.filter(room => {
         // Utiliser la fonction getRoomFloor pour identifier l'étage
         const roomFloor = getRoomFloor(room.number);
@@ -243,6 +243,131 @@ export function ManualAssignmentDialog({
     toast({
       description: `${roomsToSelect.length} chambres sélectionnées automatiquement dans les étages choisis.`
     });
+  };
+  
+  // Nouvelle méthode pour distribuer équitablement les chambres aux femmes de chambre
+  const handleDistributeRooms = () => {
+    if (housekeeperNames.length === 0) {
+      toast({
+        title: "Aucune femme de chambre disponible",
+        description: "Veuillez ajouter au moins une femme de chambre avant de distribuer les chambres.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Regrouper toutes les chambres non assignées par étage
+    const allRooms = [...rooms].filter(room => !room.assignedTo);
+    
+    // Si pas de chambres à distribuer
+    if (allRooms.length === 0) {
+      toast({
+        title: "Aucune chambre à distribuer",
+        description: "Il n'y a pas de chambres non assignées à distribuer.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Trier les chambres d'abord par étage puis par numéro de chambre
+    allRooms.sort((a, b) => {
+      const floorA = getRoomFloor(a.number);
+      const floorB = getRoomFloor(b.number);
+      
+      // D'abord comparer les étages
+      if (floorA !== floorB) return floorA - floorB;
+      
+      // Ensuite comparer les numéros de chambre
+      return a.number.localeCompare(b.number, undefined, { numeric: true });
+    });
+    
+    // Regrouper les chambres par étage pour un accès plus facile
+    const roomsByFloor = allRooms.reduce((acc, room) => {
+      const floor = getRoomFloor(room.number);
+      if (!acc[floor]) acc[floor] = [];
+      acc[floor].push(room);
+      return acc;
+    }, {} as Record<number, Room[]>);
+
+    // Tri des étages par ordre croissant
+    const sortedFloors = Object.keys(roomsByFloor).map(Number).sort((a, b) => a - b);
+    
+    // Préparation des assignations
+    const assignments: Record<string, Room[]> = {};
+    housekeeperNames.forEach(name => {
+      assignments[name] = [];
+    });
+
+    // Distribution des étages complets aux femmes de chambre de manière équitable
+    let currentHousekeeperIndex = 0;
+    
+    // D'abord, essayer de distribuer des étages entiers quand c'est possible
+    for (const floor of sortedFloors) {
+      const floorRooms = roomsByFloor[floor];
+      
+      // Si cet étage a trop de chambres, on le divisera plus tard
+      if (floorRooms.length > Math.ceil(allRooms.length / housekeeperNames.length)) {
+        continue;
+      }
+      
+      // Assigner tout l'étage à une femme de chambre
+      const housekeeper = housekeeperNames[currentHousekeeperIndex];
+      assignments[housekeeper].push(...floorRooms);
+      
+      // Supprimer ces chambres du pool à distribuer
+      delete roomsByFloor[floor];
+      
+      // Passer à la femme de chambre suivante
+      currentHousekeeperIndex = (currentHousekeeperIndex + 1) % housekeeperNames.length;
+    }
+
+    // Distribuer les chambres restantes de manière équitable
+    const remainingRooms: Room[] = [];
+    Object.values(roomsByFloor).forEach(floorRooms => {
+      remainingRooms.push(...floorRooms);
+    });
+    
+    // Tri des chambres restantes par étage et numéro
+    remainingRooms.sort((a, b) => {
+      const floorA = getRoomFloor(a.number);
+      const floorB = getRoomFloor(b.number);
+      if (floorA !== floorB) return floorA - floorB;
+      return a.number.localeCompare(b.number, undefined, { numeric: true });
+    });
+
+    // Distribuer les chambres restantes une par une
+    for (const room of remainingRooms) {
+      // Trouver la femme de chambre avec le moins de chambres
+      let minHousekeeper = housekeeperNames[0];
+      let minRooms = assignments[minHousekeeper].length;
+      
+      for (const name of housekeeperNames) {
+        if (assignments[name].length < minRooms) {
+          minHousekeeper = name;
+          minRooms = assignments[name].length;
+        }
+      }
+      
+      // Assigner la chambre
+      assignments[minHousekeeper].push(room);
+    }
+
+    // Effectuer les assignations
+    let totalAssigned = 0;
+    for (const housekeeper of housekeeperNames) {
+      if (assignments[housekeeper].length > 0) {
+        onAssignRooms(housekeeper, assignments[housekeeper]);
+        totalAssigned += assignments[housekeeper].length;
+      }
+    }
+
+    // Notification de succès
+    toast({
+      title: "Distribution réussie",
+      description: `${totalAssigned} chambres ont été distribuées équitablement entre ${housekeeperNames.length} femmes de chambre.`
+    });
+    
+    onClose();
   };
   
   const handleAssign = () => {
@@ -394,6 +519,15 @@ export function ManualAssignmentDialog({
                   Sélection intelligente
                 </Button>
               )}
+              
+              {/* Bouton de distribution équitable */}
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={handleDistributeRooms}
+              >
+                Distribuer équitablement
+              </Button>
             </div>
           </div>
           
