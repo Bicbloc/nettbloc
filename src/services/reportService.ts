@@ -1,26 +1,26 @@
-import { CleaningConfig, Room } from "@/services/pdfService";
-import html2pdf from 'html2pdf.js';
-import { toast } from "@/hooks/use-toast";
-import { ReportFields } from "@/components/ReportCustomFields"; // Import from ReportCustomFields
+import { Room, CleaningConfig } from "./pdfService";
+import html2pdf from "html2pdf.js";
+import { getFirstDigitFromRoomNumber } from "@/lib/utils";
+import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 
-export interface ReportFields {
+// Renamed to avoid conflict
+export interface ReportData extends CustomReportFields {
   hotelName: string;
   hotelAddress: string;
   currentDate: string;
   logoUrl: string;
-  showRoomStatus: boolean;
-  includeMaintenance: boolean;
-  showTwinRooms: boolean;
-  generalInstructions: string;
-  housekeeperInstructions: Record<string, string>;
+  roomCount: number;
+  fullCleaningCount: number;
+  quickCleaningCount: number;
 }
 
+// Use the updated interface name
 export async function generateHousekeeperReport(
-  housekeeperName: string, 
+  housekeeperName: string,
   rooms: Room[],
   config: CleaningConfig,
   emailAddress: string,
-  customFields?: ReportFields
+  customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
     // Generate individual report HTML
@@ -47,15 +47,16 @@ export async function generateHousekeeperReport(
   }
 }
 
+// Update other function signatures to use the new interface
 export async function generateAllHousekeeperReports(
-  housekeepersWithRooms: { name: string, rooms: Room[] }[],
+  housekeepers: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
   emailAddress: string,
-  customFields?: ReportFields
+  customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
     // For multiple reports, we'll generate them one by one
-    for (const { name, rooms } of housekeepersWithRooms) {
+    for (const { name, rooms } of housekeepers) {
       await generateHousekeeperReport(name, rooms, config, emailAddress, customFields);
     }
     return true;
@@ -72,25 +73,25 @@ export async function generateAllHousekeeperReports(
 
 // New function to generate a combined PDF report for all housekeepers
 export async function generateCombinedHousekeeperReport(
-  housekeepersWithRooms: { name: string, rooms: Room[] }[],
+  housekeepers: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
   emailAddress: string,
-  customFields?: ReportFields
+  customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
     // Create a container for all reports
     const combinedHtml = document.createElement('div');
     
     // Add each housekeeper's report to the container
-    for (let i = 0; i < housekeepersWithRooms.length; i++) {
-      const { name, rooms } = housekeepersWithRooms[i];
+    for (let i = 0; i < housekeepers.length; i++) {
+      const { name, rooms } = housekeepers[i];
       
       // Generate the HTML for this housekeeper
       const reportHtml = generateHousekeeperReportHtml(name, rooms, config, customFields);
       combinedHtml.innerHTML += reportHtml;
       
       // Add page break between reports (except for the last one)
-      if (i < housekeepersWithRooms.length - 1) {
+      if (i < housekeepers.length - 1) {
         const pageBreak = document.createElement('div');
         pageBreak.style.pageBreakAfter = 'always';
         pageBreak.innerHTML = '<hr style="border: none; margin: 0; padding: 0;">';
@@ -125,7 +126,7 @@ function generateHousekeeperReportHtml(
   housekeeperName: string, 
   rooms: Room[], 
   config: CleaningConfig,
-  customFields?: ReportFields
+  customFields?: CustomReportFields
 ): string {
   // Sort rooms by floor and then by room number
   const sortedRooms = [...rooms].sort((a, b) => {

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
-import { generateHousekeeperReport, generateAllHousekeeperReports, generateCombinedHousekeeperReport, ReportFields } from "@/services/reportService";
+import { generateHousekeeperReport, generateAllHousekeeperReports, generateCombinedHousekeeperReport } from "@/services/reportService";
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { EmailDialog } from "@/components/EmailDialog";
@@ -29,6 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailReportDialog from "@/components/EmailReportDialog";
 import { autoDistributeRooms, generateCombinedReport } from "@/components/assignment/RoomDistribution";
+import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -48,7 +48,10 @@ const Index = () => {
   const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
   const { email, setEmail, isValid } = useReportEmail();
   const [recommendedHousekeepers, setRecommendedHousekeepers] = useState<number>(0);
-  const [reportCustomFields, setReportCustomFields] = useState<ReportFields>({ toDoItems: [], toKnowItems: [] });
+  const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ 
+    toDoItems: [], 
+    toKnowItems: [] 
+  });
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -498,7 +501,7 @@ const Index = () => {
     setIsReportDialogOpen(true);
   };
   
-  const handleReportConfirm = async (emailAddress: string, customFields?: ReportFields) => {
+  const handleReportConfirm = async (emailAddress: string, customFields?: CustomReportFields) => {
     try {
       if (reportAction === "single" && reportHousekeeper) {
         // Générer le rapport pour une seule femme de chambre
@@ -542,7 +545,13 @@ const Index = () => {
         }
         
         // Utiliser la nouvelle fonction pour générer un PDF combiné
-        await generateCombinedHousekeeperReport(housekeepersWithRooms, cleaningConfig, emailAddress, customFields);
+        await generateCombinedHousekeeperReport(
+          housekeepersWithRooms, 
+          cleaningConfig, 
+          emailAddress, 
+          customFields
+        );
+        
         toast({
           title: "Rapport combiné généré",
           description: `Un rapport combiné pour ${housekeepersWithRooms.length} femme(s) de chambre a été créé.`,

@@ -18,12 +18,11 @@ export function smartAssignRooms(
   
   // If floors are selected, prioritize them
   if (selectedFloors.length > 0) {
-    // Get all rooms from selected floors THAT ARE NOT ASSIGNED to other housekeepers
+    // Get all rooms from selected floors EVEN IF ASSIGNED to other housekeepers
     roomsToSelect = rooms.filter(room => {
       const roomFloor = getRoomFloor(room.number);
-      // Only include rooms that are either unassigned or already assigned to the current housekeeper
-      return selectedFloors.includes(roomFloor) && 
-             (!room.assignedTo || room.assignedTo === selectedHousekeeper);
+      // Include all rooms from selected floors regardless of assignment
+      return selectedFloors.includes(roomFloor);
     });
   } else {
     // Otherwise use housekeeper's preferred floors
@@ -38,12 +37,10 @@ export function smartAssignRooms(
       return [];
     }
 
-    // Get all rooms from preferred floors THAT ARE NOT ASSIGNED to other housekeepers
+    // Get rooms from preferred floors, including those assigned to others
     roomsToSelect = rooms.filter(room => {
       const roomFloor = getRoomFloor(room.number);
-      // Only include rooms that are either unassigned or already assigned to the current housekeeper
-      return preferredFloors.includes(roomFloor) && 
-             (!room.assignedTo || room.assignedTo === selectedHousekeeper);
+      return preferredFloors.includes(roomFloor);
     });
   }
 
@@ -105,8 +102,7 @@ export function distributeRoomsByFloor(
   let availableRooms: Room[];
   
   if (selectedFloors.length > 0) {
-    // If specific floors are selected, get all rooms from those floors
-    // even if they are already assigned
+    // Get ALL rooms from selected floors, even if already assigned
     availableRooms = rooms.filter(room => {
       const roomFloor = getRoomFloor(room.number);
       return selectedFloors.includes(roomFloor) &&
@@ -114,9 +110,8 @@ export function distributeRoomsByFloor(
              room.status !== 'maintenance';
     });
   } else {
-    // Otherwise, only get unassigned rooms
+    // Otherwise, get all rooms with cleaningType not 'none' and not in maintenance
     availableRooms = rooms.filter(room => 
-      !room.assignedTo && 
       room.cleaningType !== 'none' && 
       room.status !== 'maintenance'
     );
@@ -132,7 +127,7 @@ export function distributeRoomsByFloor(
       title: "Aucune chambre à distribuer",
       description: selectedFloors.length > 0 
         ? "Il n'y a pas de chambres dans les étages sélectionnés."
-        : "Il n'y a pas de chambres non assignées à distribuer.",
+        : "Il n'y a pas de chambres à distribuer.",
       variant: "destructive"
     });
     return null;
@@ -151,7 +146,7 @@ export function distributeRoomsByFloor(
   
   availableRooms.forEach(room => {
     // Get first digit of room number
-    const firstDigit = room.number.replace(/^\D+/, '').charAt(0);
+    const firstDigit = getFirstDigitFromRoomNumber(room.number);
     if (!roomsByFirstDigit[firstDigit]) {
       roomsByFirstDigit[firstDigit] = [];
     }
@@ -161,13 +156,12 @@ export function distributeRoomsByFloor(
   console.log("Rooms grouped by first digit:", Object.keys(roomsByFirstDigit));
   
   // Get all available first digits and sort them
-  const availableFirstDigits = Object.keys(roomsByFirstDigit).sort();
+  const availableFirstDigits = Object.keys(roomsByFirstDigit).sort((a, b) => parseInt(a) - parseInt(b));
   
   if (availableFirstDigits.length > 0 && housekeeperNames.length > 0) {
     const numHousekeepers = housekeeperNames.length;
     
     // Distribute rooms by pairs of digits to each housekeeper (1&2 to first, 3&4 to second, etc.)
-    // with wrap-around logic if needed
     for (let digitIndex = 0; digitIndex < availableFirstDigits.length; digitIndex++) {
       // Calculate which housekeeper gets this digit (with pair wrap-around)
       // Integer division by 2 to get pairs of digits
@@ -179,6 +173,7 @@ export function distributeRoomsByFloor(
       
       if (roomsByFirstDigit[firstDigit] && roomsByFirstDigit[firstDigit].length > 0) {
         const roomsWithDigit = roomsByFirstDigit[firstDigit];
+        
         // Sort rooms by floor and then by number before adding
         roomsWithDigit.sort((a, b) => {
           const floorA = getRoomFloor(a.number);
@@ -186,6 +181,7 @@ export function distributeRoomsByFloor(
           if (floorA !== floorB) return floorA - floorB;
           return a.number.localeCompare(b.number, undefined, { numeric: true });
         });
+        
         assignments[housekeeper].push(...roomsWithDigit);
         
         console.log(`Added ${roomsWithDigit.length} rooms starting with ${firstDigit} to ${housekeeper}`);
@@ -203,18 +199,14 @@ export function distributeRoomsByFloor(
   
   toast({
     title: "Pas de chambres disponibles",
-    description: "Aucune chambre non assignée avec des numéros valides n'a été trouvée.",
+    description: "Aucune chambre avec des numéros valides n'a été trouvée.",
     variant: "destructive"
   });
   
   return null;
 }
 
-// Add a new function that will be used for the automatic assignment button
-/**
- * Automatically distribute rooms to housekeepers using the same logic as distributeRoomsByFloor
- * This function is used by the automatic assignment button
- */
+// Add a function for automatic distribution
 export function autoDistributeRooms(
   rooms: Room[],
   housekeeperNames: string[],
@@ -223,18 +215,13 @@ export function autoDistributeRooms(
   return distributeRoomsByFloor(rooms, housekeeperNames, [], excludeTwin);
 }
 
-// Add a new function to generate a combined PDF report for all housekeepers
-/**
- * Generates a single PDF containing reports for all housekeepers
- * This allows downloading one file instead of multiple files
- */
+// Function for generating combined PDF report
 export function generateCombinedReport(
   housekeeperRooms: { name: string; rooms: Room[] }[],
   config: any,
   emailAddress: string,
   customFields?: any
 ): Promise<boolean> {
-  // This function is just a placeholder - the actual implementation
-  // will be added to reportService.ts
+  // This function is a placeholder - implementation in reportService.ts
   return Promise.resolve(true);
 }

@@ -73,22 +73,13 @@ export function ManualAssignmentDialog({
       if (isSelected) {
         return prev.filter(r => r.number !== room.number);
       } else {
-        // Check if room is already assigned to a different housekeeper
-        // Allow selecting if it's assigned to the current housekeeper or not assigned
-        if (room.assignedTo && selectedHousekeeper !== room.assignedTo) {
-          toast({
-            title: "Chambre déjà assignée",
-            description: `La chambre ${room.number} est déjà assignée à ${room.assignedTo}`,
-            variant: "destructive"
-          });
-          return prev;
-        }
+        // Allow selecting even if room is assigned to other housekeepers
         return [...prev, room];
       }
     });
   };
 
-  // Floor selection implementation - now allows reassigning rooms from other housekeepers
+  // Floor selection implementation - allow reassigning rooms from other housekeepers
   const toggleFloor = (floor: number) => {
     // Check if floor is already selected
     if (selectedFloors.includes(floor)) {
@@ -107,7 +98,7 @@ export function ManualAssignmentDialog({
       setSelectedFloors(prev => [...prev, floor]);
       
       // Find all rooms from this floor that match current filters
-      // Now includes rooms assigned to other housekeepers
+      // Includes rooms assigned to other housekeepers
       const roomsOnFloor = rooms.filter(room => {
         // Room must be from the selected floor
         const roomFloor = parseInt(room.number.charAt(0));
@@ -118,7 +109,7 @@ export function ManualAssignmentDialog({
         if (excludeTwin && room.isTwin) return false;
         if (searchTerm && !room.number.toLowerCase().includes(searchTerm.toLowerCase())) return false;
         
-        // The room passes all filters - include even if assigned to other housekeepers
+        // Include all rooms regardless of assignment status
         return true;
       });
       
