@@ -1,3 +1,4 @@
+
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
@@ -332,6 +333,10 @@ function generateReportHTML(data: ReportData): string {
           font-size: 11px;
           padding-top: 10px;
           border-top: 1px solid #ddd;
+          position: fixed;
+          bottom: 10px;
+          left: 0;
+          right: 0;
         }
         .footer .phone {
           font-weight: bold;
@@ -361,6 +366,23 @@ function generateReportHTML(data: ReportData): string {
           margin-top: 15px;
           font-size: 14px;
         }
+        .content-section {
+          margin-bottom: 50px; /* Add space before the summary table */
+        }
+        .summary-table {
+          margin-top: 50px; /* Additional space between the content and the summary table */
+        }
+        @media print {
+          .footer {
+            position: fixed;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+          }
+          .content {
+            margin-bottom: 50px;
+          }
+        }
       </style>
     </head>
     <body>
@@ -372,11 +394,15 @@ function generateReportHTML(data: ReportData): string {
       
       <div class="date">Date: ${formattedDate}</div>
       
-      ${instructionsHtml}
-      ${todoHtml}
-      ${toknowHtml}
+      <div class="content-section">
+        ${instructionsHtml}
+        ${todoHtml}
+        ${toknowHtml}
+      </div>
       
-      ${summaryTableHtml}
+      <div class="summary-table">
+        ${summaryTableHtml}
+      </div>
       
       <h2>Liste des chambres à nettoyer</h2>
       ${roomsTablesByFloor}
