@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -120,6 +121,9 @@ function parseRoomsFromText(text: string): Room[] {
       // Vérifier que le numéro de chambre est un nombre valide
       if (!/^\d+$/.test(roomNumber)) continue;
       
+      // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
+      if (/^20(2[5-8])$/.test(roomNumber)) continue;
+      
       // Normaliser le format du numéro (éliminer les zéros au début mais assurer au moins 3 chiffres)
       roomNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
       
@@ -142,7 +146,7 @@ function parseRoomsFromText(text: string): Room[] {
       const priority = determinePriority(context);
       
       // Déterminer l'étage
-      const floor = roomNumber.length > 0 ? parseInt(roomNumber[0]) : 0;
+      const floor = getRoomFloor(roomNumber);
       
       rooms.push({
         number: roomNumber,
@@ -175,6 +179,9 @@ function parseRoomsFromText(text: string): Room[] {
       continue;
     }
     
+    // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
+    if (/^20(2[5-8])$/.test(potentialRoomNumber)) continue;
+    
     // Normaliser le format et vérifier qu'il n'est pas déjà trouvé
     const roomNumber = String(parseInt(potentialRoomNumber, 10)).padStart(3, '0');
     if (foundRooms.has(roomNumber)) continue;
@@ -193,7 +200,7 @@ function parseRoomsFromText(text: string): Room[] {
     const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
     const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
     const priority = determinePriority(context);
-    const floor = parseInt(roomNumber[0]);
+    const floor = getRoomFloor(roomNumber);
     
     rooms.push({
       number: roomNumber,
@@ -211,6 +218,22 @@ function parseRoomsFromText(text: string): Room[] {
   
   // Trier les chambres par numéro
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+}
+
+// Function to determine room floor from room number - shared with ManualAssignmentDialog
+function getRoomFloor(roomNumber: string): number {
+  // Ignore years like 2025, 2026, 2027, 2028
+  if (/^20(2[5-8])$/.test(roomNumber)) {
+    return 0; // Considérer comme RDC
+  }
+  
+  // Si le numéro a deux chiffres ou moins, c'est au RDC
+  if (roomNumber.length <= 2) {
+    return 0;
+  }
+  
+  // Sinon, le premier chiffre indique l'étage
+  return parseInt(roomNumber[0]) || 0;
 }
 
 // Nouvelle fonction d'analyse selon les règles définies
