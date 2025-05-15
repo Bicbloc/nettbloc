@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
-import { generateHousekeeperReport, generateAllHousekeeperReports, generateCombinedHousekeeperReport } from "@/services/reportService";
+import { generateReport, generateCombinedReport } from "@/services/reportService";
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { EmailDialog } from "@/components/EmailDialog";
@@ -27,7 +27,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailReportDialog from "@/components/EmailReportDialog";
-import { autoDistributeRooms, generateCombinedReport } from "@/components/assignment/RoomDistribution";
+import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 
 const Index = () => {
@@ -505,7 +505,7 @@ const Index = () => {
     try {
       if (reportAction === "single" && reportHousekeeper) {
         // Générer le rapport pour une seule femme de chambre
-        await generateHousekeeperReport(
+        await generateReport(
           reportHousekeeper, 
           getHousekeeperRooms(reportHousekeeper), 
           cleaningConfig, 
@@ -544,8 +544,8 @@ const Index = () => {
           return;
         }
         
-        // Utiliser la nouvelle fonction pour générer un PDF combiné
-        await generateCombinedHousekeeperReport(
+        // Utiliser la fonction pour générer un PDF combiné
+        await generateCombinedReport(
           housekeepersWithRooms, 
           cleaningConfig, 
           emailAddress, 
