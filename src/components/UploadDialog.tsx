@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,9 +89,9 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         console.log("🔍 Démarrage de l'analyse avancée avec DeepSeek");
         setIsConnectingToDeepSeek(true);
         
-        // Délai pour simuler la connexion à DeepSeek si en développement
+        // Délai réduit en développement pour tester plus rapidement
         if (process.env.NODE_ENV === 'development') {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
         
         data = await processWithDeepSeek(selectedFile, DEEPSEEK_API_KEY);
@@ -102,18 +101,23 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         data = await processPdf(selectedFile);
       }
       
+      // Amélioration des informations après analyse
+      const fullCleanings = data.filter(r => r.cleaningType === 'full').length;
+      const quickCleanings = data.filter(r => r.cleaningType === 'quick').length;
+      const noCleanings = data.filter(r => r.cleaningType === 'none').length;
+      
       console.log(`🎉 Analyse terminée: ${data.length} chambres détectées`);
       console.log("Types de nettoyage détectés:", {
-        complet: data.filter(r => r.cleaningType === 'full').length,
-        rapide: data.filter(r => r.cleaningType === 'quick').length,
-        aucun: data.filter(r => r.cleaningType === 'none').length
+        complet: fullCleanings,
+        rapide: quickCleanings,
+        aucun: noCleanings
       });
       
       onPdfProcessed(data);
       setOpen(false);
       toast({
         title: "Téléversement réussi",
-        description: `${data.length} chambres traitées depuis ${selectedFile.name}`,
+        description: `${data.length} chambres analysées: ${fullCleanings} à blanc, ${quickCleanings} recouches, ${noCleanings} propres`,
       });
     } catch (error) {
       console.error("Erreur lors du traitement du PDF:", error);

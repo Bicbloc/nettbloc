@@ -238,60 +238,83 @@ function extractRoomContexts(fullText: string): { roomNumber: string, context: s
   });
 }
 
-// Implémentation améliorée de la fonction d'analyse selon les règles fournies
+// Implémentation améliorée et corrigée pour la détection des types de nettoyage
 function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // Extraction des informations clés du contexte
-  const dateMatches = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+  // Convertir le contexte en minuscules pour faciliter la détection
+  const lowerContext = context.toLowerCase();
+  
+  // Extractions des éléments clés avec des regex plus précises
+  const dateMatches = context.match(/\d{1,2}\/\d{1,2}\/\d{4}/g) || [];
   const timeMatches = context.match(/\b\d{1,2}:\d{2}\b/g) || [];
-  const adultBlocks = context.match(/× Adultes.*?(?=\d{2}\/\d{2}\/\d{4}|$)/g) || [];
-  const hasDIR = context.includes('DIR');
-  const hasINS = context.includes('INS');
-  const hasCL = context.includes('CL');
-  const hasSAL = context.includes('SAL');
-  const hasNight = context.includes('Nuit');
   
-  // Position du texte (gauche vs centre/droite) - estimation basée sur le contexte
-  const isLeftColumn = context.includes('Spaces') || context.includes('Espace') || 
-                      context.match(/^\s*\d{3}\s+[A-Z]{2,3}\s+/);
+  // Détecter les blocs clients (adultes + nom)
+  const clientBlocks = (context.match(/× adultes.*?(?=\d{1,2}\/\d{1,2}\/\d{4}|$)/gi) || [])
+    .map(block => block.trim())
+    .filter(block => block.length > 0);
+
+  // Détecter les indicateurs de statut
+  const hasDIR = /\bdir\b/i.test(context);
+  const hasINS = /\bins\b/i.test(context);
+  const hasCL = /\bcl\b/i.test(context) || /\bclean\b/i.test(context);
+  const hasSAL = /\bsal\b/i.test(context) || /\bsale\b/i.test(context);
   
-  // Vérifier si deux blocs clients ont le même nom (prolongation)
+  // Détecter les séjours (Nuit X/Y)
+  const hasNightStay = /nuit \d+\/\d+/i.test(context);
+  
+  // Détecter si la position du bloc est à gauche ou à droite/centre
+  // Une estimation basée sur les patterns typiques des rapports Mews
+  const leftSideIndicators = [
+    /^\s*\d{3}\s+[a-z]{2,3}/i,
+    /département/i,
+    /sortant/i,
+    /départ/i
+  ];
+  const isLeftColumn = leftSideIndicators.some(pattern => pattern.test(context.substring(0, 50)));
+
+  // Vérifier si deux blocs clients ont le même nom (prolongation de séjour)
   let sameClientTwice = false;
-  if (adultBlocks.length >= 2) {
-    const clientNames = adultBlocks.map(block => {
-      const nameMatch = block.match(/× Adultes\s+(.*?)(?=,|$)/);
+  if (clientBlocks.length >= 2) {
+    // Extraire les noms des clients de chaque bloc
+    const clientNames = clientBlocks.map(block => {
+      const nameMatch = block.match(/× adultes\s+(.*?)(?=,|\s*$)/i);
       return nameMatch ? nameMatch[1].trim() : '';
     }).filter(name => name);
     
+    // Comparer les noms pour voir s'ils sont identiques
     if (clientNames.length >= 2) {
-      sameClientTwice = clientNames[0] === clientNames[1];
+      sameClientTwice = clientNames[0].toLowerCase() === clientNames[1].toLowerCase();
     }
   }
   
-  console.log("🔍 Analyse détaillée: dates=" + dateMatches.length + 
-              ", heures=" + timeMatches.length + 
-              ", blocs client=" + adultBlocks.length +
-              ", DIR=" + hasDIR + 
-              ", INS=" + hasINS + 
-              ", CL=" + hasCL +
-              ", SAL=" + hasSAL +
-              ", Nuit=" + hasNight +
-              ", isLeftColumn=" + isLeftColumn +
-              ", sameClientTwice=" + sameClientTwice);
-  
-  // 🟥 NETTOYAGE À BLANC (FULL)
+  console.log("🔍 Analyse détaillée:", { 
+    dates: dateMatches, 
+    heures: timeMatches, 
+    blocsClient: clientBlocks.length,
+    DIR: hasDIR, 
+    INS: hasINS, 
+    CL: hasCL,
+    SAL: hasSAL,
+    Nuit: hasNightStay,
+    isLeftColumn,
+    sameClientTwice
+  });
+
+  // 🟥 NETTOYAGE À BLANC (FULL) - DÉPART
   if (
     // Deux blocs clients différents (départ + arrivée)
-    (adultBlocks.length >= 2 && !sameClientTwice) ||
+    (clientBlocks.length >= 2 && !sameClientTwice) ||
     // Une date et une heure (chambre prévue en départ)
-    (dateMatches.length === 1 && timeMatches.length >= 1) ||
+    (dateMatches.length >= 1 && timeMatches.length >= 1) ||
     // Positionnement à gauche (colonne de départ)
     isLeftColumn ||
     // Statut DIR
     hasDIR ||
     // Deux dates sans mention "Nuit" (check-out + check-in)
-    (dateMatches.length >= 2 && !hasNight)
+    (dateMatches.length >= 2 && !hasNightStay) ||
+    // Statut explicitement SAL (sale)
+    hasSAL
   ) {
-    console.log("✅ Détecté: À BLANC (nettoyage complet)");
+    console.log("✅ Détecté: À BLANC (départ/nettoyage complet)");
     return {
       status: 'a_blanc',
       cleaningType: 'full',
@@ -300,10 +323,12 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
   
   // 🔵 RECOUCHE (QUICK)
   if (
-    // Un seul bloc client avec info séjour
-    (adultBlocks.length === 1 && hasNight && dateMatches.length >= 1 && !isLeftColumn) ||
+    // Un seul bloc client avec info séjour (Nuit X/Y)
+    (clientBlocks.length === 1 && hasNightStay && dateMatches.length >= 1 && !isLeftColumn) ||
     // Deux blocs client avec le même nom (prolongation)
-    sameClientTwice
+    sameClientTwice ||
+    // Présence explicite d'une indication de séjour en cours
+    (context.match(/en séjour|séjourne|occupé/i) && !hasSAL && !isLeftColumn)
   ) {
     console.log("✅ Détecté: RECOUCHE (nettoyage rapide)");
     return {
@@ -315,9 +340,9 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
   // 🟩 PROPRE (NONE)
   if (
     // Aucun bloc client et statut CL ou INS
-    ((adultBlocks.length === 0 || !context.includes('× Adultes')) && (hasCL || hasINS)) ||
+    ((clientBlocks.length === 0 || !context.includes('× Adultes')) && (hasCL || hasINS)) ||
     // Un bloc client à droite uniquement et statut INS
-    (adultBlocks.length === 1 && hasINS && !isLeftColumn)
+    (clientBlocks.length === 1 && hasINS && !isLeftColumn)
   ) {
     console.log("✅ Détecté: PROPRE (pas de nettoyage)");
     return {
@@ -328,11 +353,11 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
   
   // 🔧 MAINTENANCE (NONE)
   if (
-    context.toLowerCase().includes('maintenance') ||
-    context.toLowerCase().includes('hors service') ||
-    context.toLowerCase().includes('hors d\'usage') ||
-    context.toLowerCase().includes('punaises de lit') ||
-    context.toLowerCase().includes('inutilisable')
+    lowerContext.includes('maintenance') ||
+    lowerContext.includes('hors service') ||
+    lowerContext.includes('hors d\'usage') ||
+    lowerContext.includes('punaises de lit') ||
+    lowerContext.includes('inutilisable')
   ) {
     console.log("✅ Détecté: MAINTENANCE");
     return {
@@ -341,18 +366,24 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
     };
   }
   
-  // 🟠 Par défaut : À BLANC si SAL, sinon PROPRE
-  if (hasSAL) {
-    console.log("⚠️ Règle par défaut: SAL => À BLANC (nettoyage complet)");
+  // 🟠 Par défaut : À BLANC si SAL ou inconnu, PROPRE si explicitement CL/INS
+  if (hasSAL || clientBlocks.length >= 1) {
+    console.log("⚠️ Règle par défaut: SAL/Client => À BLANC (nettoyage complet)");
     return {
       status: 'a_blanc',
       cleaningType: 'full',
     };
-  } else {
-    console.log("⚠️ Règle par défaut: PROPRE (pas de nettoyage)");
+  } else if (hasCL || hasINS) {
+    console.log("⚠️ Règle par défaut: CL/INS => PROPRE (pas de nettoyage)");
     return {
       status: 'propre',
       cleaningType: 'none',
+    };
+  } else {
+    console.log("⚠️ Statut indéterminé => À BLANC par défaut (nettoyage complet)");
+    return {
+      status: 'a_blanc',
+      cleaningType: 'full',
     };
   }
 }
