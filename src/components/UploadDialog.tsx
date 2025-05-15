@@ -24,7 +24,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [useDeepSeek, setUseDeepSeek] = useState(false);
+  const [useDeepSeek, setUseDeepSeek] = useState(true); // Activé par défaut maintenant
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,14 +77,16 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     try {
       setIsUploading(true);
       console.log("Traitement du fichier:", selectedFile.name);
+      console.log("Utilisation de DeepSeek:", useDeepSeek);
       
       let data;
       if (useDeepSeek) {
-        console.log("Utilisation de DeepSeek AI pour l'analyse");
+        console.log("Utilisation de l'analyse avancée");
         // Using internal API key, no need to ask for it
         const internalApiKey = "sk-INTERNAL-KEY"; // This will be replaced on the backend
         data = await processWithDeepSeek(selectedFile, internalApiKey);
       } else {
+        console.log("Utilisation de l'analyse standard");
         data = await processPdf(selectedFile);
       }
       
@@ -171,13 +173,15 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           </div>
         </div>
         
-        <div className="flex items-center space-x-2 mt-4">
+        <div className="flex items-center space-x-2 mt-4 p-2 bg-blue-50 rounded-md border border-blue-200">
           <Switch 
             id="use-deepseek" 
             checked={useDeepSeek}
             onCheckedChange={setUseDeepSeek}
           />
-          <Label htmlFor="use-deepseek" className="font-medium text-sm">Utiliser l'analyse avancée (DeepSeek AI)</Label>
+          <Label htmlFor="use-deepseek" className="font-medium text-sm">
+            Utiliser l'analyse avancée <span className="text-blue-600 font-semibold">(recommandé)</span>
+          </Label>
         </div>
         
         <DialogFooter className="sm:justify-end">

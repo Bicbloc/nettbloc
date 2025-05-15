@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -103,8 +102,10 @@ export async function processWithDeepSeek(file: File, apiKey: string): Promise<R
     
     console.log("PDF texte extrait pour DeepSeek:", fullText.substring(0, 500) + "...");
     
-    // Utiliser directement l'analyse du texte avec le nouvel algorithme amélioré
+    // Utiliser l'analyse du texte avec la fonction améliorée
     const rooms = parseRoomsFromText(fullText, true);
+    
+    console.log("Chambres détectées avec DeepSeek:", rooms);
     
     if (rooms.length === 0) {
       console.log("Aucune chambre détectée avec l'analyse avancée, utilisation des données simulées");
@@ -162,7 +163,7 @@ function extractRoomContexts(fullText: string): { roomNumber: string, context: s
   });
 }
 
-// Implémentation de la nouvelle fonction d'analyse fournie par l'utilisateur
+// Implémentation de la fonction d'analyse fournie par l'utilisateur
 function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
   let status: string = 'needs-cleaning';
   let cleaningType: 'full' | 'quick' | 'none' = 'none';
@@ -304,10 +305,12 @@ function parseRoomsFromText(text: string, useAdvancedAnalysis: boolean = false):
       let status, cleaningType;
       
       if (useAdvancedAnalysis) {
-        // Utiliser la nouvelle fonction d'analyse améliorée
+        // Utiliser la fonction d'analyse améliorée
+        console.log(`Analyse avancée pour chambre ${roomNumber}`);
         const result = determineStatusAndCleaningTypeNewRules(context);
         status = result.status;
         cleaningType = result.cleaningType;
+        console.log(`Résultat pour chambre ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
       } else {
         // Utiliser l'ancienne fonction d'analyse
         const result = determineStatusAndCleaningType(context);
@@ -338,7 +341,6 @@ function parseRoomsFromText(text: string, useAdvancedAnalysis: boolean = false):
   }
   
   // Deuxième passe pour essayer de trouver plus de numéros de chambres
-  // Cette fois avec un pattern très générique mais qui vérifie si le nombre pourrait être une chambre
   const genericRoomPattern = /\b(\d{3})\b/g;
   let genericMatch;
   
@@ -376,10 +378,12 @@ function parseRoomsFromText(text: string, useAdvancedAnalysis: boolean = false):
     let status, cleaningType;
     
     if (useAdvancedAnalysis) {
-      // Utiliser la nouvelle fonction d'analyse améliorée
+      // Utiliser la fonction d'analyse améliorée
+      console.log(`Analyse avancée pour chambre générique ${roomNumber}`);
       const result = determineStatusAndCleaningTypeNewRules(context);
       status = result.status;
       cleaningType = result.cleaningType;
+      console.log(`Résultat pour chambre générique ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
     } else {
       // Utiliser l'ancienne fonction d'analyse
       const result = determineStatusAndCleaningType(context);
