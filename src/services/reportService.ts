@@ -309,13 +309,14 @@ function generateReportHTML(data: ReportData): string {
           right: 20px;
         }
         .housekeeperName {
-          border: 2px solid #000;
-          padding: 10px;
+          border: 3px solid #000; /* Thicker border */
+          padding: 12px;  /* More padding */
           font-weight: bold;
           display: inline-block;
-          margin-bottom: 40px; /* Increased space after housekeeper name */
+          margin-bottom: 60px; /* Increased space after housekeeper name and before tables */
           margin-top: 25px; /* Increased space between title and housekeeper name */
-          font-size: 14px;
+          font-size: 18px; /* Larger font size */
+          text-transform: uppercase; /* Make it uppercase for emphasis */
         }
         table { 
           width: 100%; 
