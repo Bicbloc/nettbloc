@@ -161,6 +161,24 @@ export function HousekeeperCard({
     }
   };
   
+  // Function to determine room floor from room number
+  const getRoomFloor = (roomNumber: string): number => {
+    // Ignore years like 2025, 2026, 2027, 2028
+    if (/^20(2[5-8])$/.test(roomNumber)) {
+      return 0;
+    }
+    
+    // Si c'est juste un chiffre (comme 1, 2, 3) ou deux chiffres (comme 12, 24), c'est RDC
+    if (/^\d{1,2}$/.test(roomNumber)) {
+      return 0;
+    }
+    
+    // Pour les numéros plus longs, le premier chiffre indique généralement l'étage
+    const firstDigit = parseInt(roomNumber.charAt(0));
+    return isNaN(firstDigit) ? 0 : firstDigit;
+  };
+  
+  // Revised floor change handler - also gets rooms from other housekeepers
   const handleFloorChange = (floor: number, isChecked: boolean) => {
     const newPreferredFloors = isChecked
       ? [...preferredFloors, floor]
@@ -169,18 +187,25 @@ export function HousekeeperCard({
     onFloorPreferenceChange(name, newPreferredFloors);
     
     if (isChecked) {
-      // Récupérer TOUTES les chambres de cet étage, y compris celles déjà assignées à d'autres femmes de chambre
-      const allRoomsOnFloor = unassignedRooms ? [
-        ...unassignedRooms.filter(room => {
-          const roomFloor = parseInt(room.number[0]) || 0;
-          return roomFloor === floor;
-        }),
-        // Ajouter les chambres déjà assignées à d'autres personnes sur cet étage
-        ...rooms.filter(room => {
-          const roomFloor = parseInt(room.number[0]) || 0;
-          return roomFloor === floor && room.assignedTo !== name;
-        })
-      ] : [];
+      // Récupérer TOUTES les chambres de cet étage, incluant celles assignées à d'autres
+      const allRoomsOnFloor = rooms.filter(room => {
+        const roomFloor = getRoomFloor(room.number);
+        return roomFloor === floor && room.assignedTo !== name;
+      });
+      
+      // Ajouter les chambres non assignées sur cet étage
+      if (unassignedRooms) {
+        const unassignedFloorRooms = unassignedRooms.filter(room => {
+          const roomFloor = getRoomFloor(room.number);
+          return roomFloor === floor && !room.assignedTo;
+        });
+        
+        allRoomsOnFloor.push(...unassignedFloorRooms);
+      }
+      
+      // Log pour debugging
+      console.log(`Étage ${floor} - Chambres trouvées:`, allRoomsOnFloor.length);
+      console.log("Numéros:", allRoomsOnFloor.map(r => r.number).join(', '));
       
       // Vérifier si l'ajout dépasserait la limite de chambres
       if (rooms.length + allRoomsOnFloor.length > effectiveMaxRooms) {
@@ -228,6 +253,22 @@ export function HousekeeperCard({
         
         toast({
           description: `${allRoomsOnFloor.length} chambre(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
+        });
+      }
+    } else {
+      // Si on désélectionne un étage, désassigner toutes les chambres de cet étage
+      const roomsToUnassign = rooms.filter(room => {
+        const roomFloor = getRoomFloor(room.number);
+        return roomFloor === floor;
+      });
+      
+      if (roomsToUnassign.length > 0) {
+        roomsToUnassign.forEach(room => {
+          onRoomUnassign(room);
+        });
+        
+        toast({
+          description: `${roomsToUnassign.length} chambre(s) de l'étage ${floor === 0 ? 'RDC' : floor} retirée(s) de ${name}`
         });
       }
     }

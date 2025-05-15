@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -220,7 +219,7 @@ function parseRoomsFromText(text: string): Room[] {
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
 }
 
-// Function to determine room floor from room number - shared with ManualAssignmentDialog
+// Updated consistent floor detection function that matches the one in other files
 function getRoomFloor(roomNumber: string): number {
   // Ignore years like 2025, 2026, 2027, 2028
   if (/^20(2[5-8])$/.test(roomNumber)) {
@@ -233,7 +232,8 @@ function getRoomFloor(roomNumber: string): number {
   }
   
   // Sinon, le premier chiffre indique l'étage
-  return parseInt(roomNumber[0]) || 0;
+  const firstDigit = parseInt(roomNumber[0]);
+  return isNaN(firstDigit) ? 0 : firstDigit;
 }
 
 // Nouvelle fonction d'analyse selon les règles définies

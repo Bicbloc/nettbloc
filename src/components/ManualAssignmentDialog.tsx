@@ -143,26 +143,22 @@ export function ManualAssignmentDialog({
           })
         );
       } else {
-        // Adding floor to selection
+        // Adding floor to selection - add all rooms from this floor
         newFloors = [...prev, floor];
         
-        // IMPORTANT: Get ALL rooms from this floor, including from all available rooms
+        // Récupérer TOUTES les chambres de cet étage depuis TOUTES les chambres disponibles
         const floorRooms = rooms.filter(room => {
           const roomFloor = getRoomFloor(room.number);
           return roomFloor === floor;
         });
         
         console.log(`Étage ${floor} sélectionné: ${floorRooms.length} chambres trouvées`);
-        console.log("Numéros de chambre:", floorRooms.map(r => r.number).join(", "));
         
-        // Add these rooms to selection
+        // Add these rooms to selection (without duplicates)
         setSelectedRooms(prev => {
-          // Create a set of existing room numbers for quick lookup
           const existingRoomNumbers = new Set(prev.map(r => r.number));
           
-          // Add all floor rooms that aren't already selected
           const newRooms = [...prev];
-          
           floorRooms.forEach(room => {
             if (!existingRoomNumbers.has(room.number)) {
               newRooms.push(room);
@@ -245,7 +241,7 @@ export function ManualAssignmentDialog({
     });
   };
   
-  // Nouvelle méthode pour distribuer équitablement les chambres aux femmes de chambre
+  // Nouvelle méthode complètement réécrite pour distribuer équitablement les chambres
   const handleDistributeRooms = () => {
     if (housekeeperNames.length === 0) {
       toast({
@@ -256,11 +252,11 @@ export function ManualAssignmentDialog({
       return;
     }
 
-    // Regrouper toutes les chambres non assignées par étage
-    const allRooms = [...rooms].filter(room => !room.assignedTo);
+    // Récupérer toutes les chambres non assignées
+    const unassignedRooms = [...rooms].filter(room => !room.assignedTo);
     
     // Si pas de chambres à distribuer
-    if (allRooms.length === 0) {
+    if (unassignedRooms.length === 0) {
       toast({
         title: "Aucune chambre à distribuer",
         description: "Il n'y a pas de chambres non assignées à distribuer.",
@@ -269,89 +265,47 @@ export function ManualAssignmentDialog({
       return;
     }
 
-    // Trier les chambres d'abord par étage puis par numéro de chambre
-    allRooms.sort((a, b) => {
-      const floorA = getRoomFloor(a.number);
-      const floorB = getRoomFloor(b.number);
-      
-      // D'abord comparer les étages
-      if (floorA !== floorB) return floorA - floorB;
-      
-      // Ensuite comparer les numéros de chambre
-      return a.number.localeCompare(b.number, undefined, { numeric: true });
+    // Grouper les chambres par étage
+    const roomsByFloor: Record<number, Room[]> = {};
+    
+    // Trier d'abord les chambres par numéro (pour l'ordre au sein de chaque étage)
+    unassignedRooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+    
+    // Ensuite regrouper par étage
+    unassignedRooms.forEach(room => {
+      const floor = getRoomFloor(room.number);
+      if (!roomsByFloor[floor]) roomsByFloor[floor] = [];
+      roomsByFloor[floor].push(room);
     });
     
-    // Regrouper les chambres par étage pour un accès plus facile
-    const roomsByFloor = allRooms.reduce((acc, room) => {
-      const floor = getRoomFloor(room.number);
-      if (!acc[floor]) acc[floor] = [];
-      acc[floor].push(room);
-      return acc;
-    }, {} as Record<number, Room[]>);
-
-    // Tri des étages par ordre croissant
-    const sortedFloors = Object.keys(roomsByFloor).map(Number).sort((a, b) => a - b);
+    // Récupérer les étages disponibles et les trier en ordre ascendant
+    const availableFloors = Object.keys(roomsByFloor).map(Number).sort((a, b) => a - b);
+    console.log("Distribution - Étages disponibles:", availableFloors);
     
-    // Préparation des assignations
+    // Préparer les assignations pour chaque femme de chambre
     const assignments: Record<string, Room[]> = {};
     housekeeperNames.forEach(name => {
       assignments[name] = [];
     });
 
-    // Distribution des étages complets aux femmes de chambre de manière équitable
+    // Distribuer les chambres en alternant entre les femmes de chambre, par étage
     let currentHousekeeperIndex = 0;
     
-    // D'abord, essayer de distribuer des étages entiers quand c'est possible
-    for (const floor of sortedFloors) {
+    // Parcourir les étages dans l'ordre ascendant
+    for (const floor of availableFloors) {
       const floorRooms = roomsByFloor[floor];
+      console.log(`Distribution - Étage ${floor}: ${floorRooms.length} chambres`);
       
-      // Si cet étage a trop de chambres, on le divisera plus tard
-      if (floorRooms.length > Math.ceil(allRooms.length / housekeeperNames.length)) {
-        continue;
+      // Distribuer les chambres de cet étage aux femmes de chambre de manière équitable
+      for (const room of floorRooms) {
+        const housekeeper = housekeeperNames[currentHousekeeperIndex];
+        assignments[housekeeper].push(room);
+        
+        // Passer à la femme de chambre suivante
+        currentHousekeeperIndex = (currentHousekeeperIndex + 1) % housekeeperNames.length;
       }
-      
-      // Assigner tout l'étage à une femme de chambre
-      const housekeeper = housekeeperNames[currentHousekeeperIndex];
-      assignments[housekeeper].push(...floorRooms);
-      
-      // Supprimer ces chambres du pool à distribuer
-      delete roomsByFloor[floor];
-      
-      // Passer à la femme de chambre suivante
-      currentHousekeeperIndex = (currentHousekeeperIndex + 1) % housekeeperNames.length;
     }
-
-    // Distribuer les chambres restantes de manière équitable
-    const remainingRooms: Room[] = [];
-    Object.values(roomsByFloor).forEach(floorRooms => {
-      remainingRooms.push(...floorRooms);
-    });
     
-    // Tri des chambres restantes par étage et numéro
-    remainingRooms.sort((a, b) => {
-      const floorA = getRoomFloor(a.number);
-      const floorB = getRoomFloor(b.number);
-      if (floorA !== floorB) return floorA - floorB;
-      return a.number.localeCompare(b.number, undefined, { numeric: true });
-    });
-
-    // Distribuer les chambres restantes une par une
-    for (const room of remainingRooms) {
-      // Trouver la femme de chambre avec le moins de chambres
-      let minHousekeeper = housekeeperNames[0];
-      let minRooms = assignments[minHousekeeper].length;
-      
-      for (const name of housekeeperNames) {
-        if (assignments[name].length < minRooms) {
-          minHousekeeper = name;
-          minRooms = assignments[name].length;
-        }
-      }
-      
-      // Assigner la chambre
-      assignments[minHousekeeper].push(room);
-    }
-
     // Effectuer les assignations
     let totalAssigned = 0;
     for (const housekeeper of housekeeperNames) {
@@ -361,11 +315,28 @@ export function ManualAssignmentDialog({
       }
     }
 
+    // Calculer les nombres de chambres par étage et par femme de chambre pour affichage
+    const summary = housekeeperNames.map(name => {
+      const roomsByFloor: Record<number, number> = {};
+      assignments[name].forEach(room => {
+        const floor = getRoomFloor(room.number);
+        roomsByFloor[floor] = (roomsByFloor[floor] || 0) + 1;
+      });
+      
+      const floorSummary = Object.entries(roomsByFloor)
+        .map(([floor, count]) => `${floor === '0' ? 'RDC' : `Étage ${floor}`}: ${count}`)
+        .join(', ');
+        
+      return `${name}: ${assignments[name].length} chambres (${floorSummary})`;
+    }).join('\n');
+
     // Notification de succès
     toast({
       title: "Distribution réussie",
-      description: `${totalAssigned} chambres ont été distribuées équitablement entre ${housekeeperNames.length} femmes de chambre.`
+      description: `${totalAssigned} chambres ont été distribuées de manière équitable entre les étages et les femmes de chambre.`
     });
+    
+    console.log("Résumé de distribution:\n" + summary);
     
     onClose();
   };
