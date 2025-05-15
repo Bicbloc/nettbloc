@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -125,7 +124,6 @@ export async function processWithDeepSeek(file: File, apiKey: string): Promise<R
       description: `Successfully analyzed ${rooms.length} rooms with DeepSeek AI`,
     });
     
-    console.log("Chambres analysées:", rooms);
     return rooms;
   } catch (error) {
     console.error("Error processing PDF with DeepSeek:", error);
@@ -225,8 +223,6 @@ N'inclus AUCUN texte d'explication, seulement le JSON.`;
 ${roomContext.context}
 \`\`\``;
 
-          console.log(`Envoi requête pour chambre ${roomContext.roomNumber} à DeepSeek avec clé API: ${apiKey.substring(0, 5)}...`);
-          
           const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -251,14 +247,10 @@ ${roomContext.context}
           });
           
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`DeepSeek API error (${response.status}):`, errorText);
-            throw new Error(`DeepSeek API responded with status: ${response.status}, message: ${errorText}`);
+            throw new Error(`DeepSeek API responded with status: ${response.status}`);
           }
           
           const data = await response.json();
-          console.log(`Réponse DeepSeek pour chambre ${roomContext.roomNumber}:`, data);
-          
           const content = data.choices[0]?.message?.content;
           
           if (content) {
@@ -268,8 +260,6 @@ ${roomContext.context}
                               content.match(/```\s*([\s\S]*?)\s*```/) || 
                               [null, content];
               const jsonStr = jsonMatch[1] || content;
-              
-              console.log(`JSON extrait pour chambre ${roomContext.roomNumber}:`, jsonStr);
               
               const roomData = JSON.parse(jsonStr);
               
@@ -296,14 +286,12 @@ ${roomContext.context}
                 floor
               });
               
-              console.log(`DeepSeek a analysé la chambre ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
+              console.log(`DeepSeek a analysé la chambre ${roomNumber}: ${status}, ${cleaningType}`);
               
             } catch (error) {
               console.error(`Erreur lors du traitement JSON pour la chambre ${roomContext.roomNumber}:`, error);
               console.log("Contenu de la réponse:", content);
             }
-          } else {
-            console.error(`Pas de contenu dans la réponse pour la chambre ${roomContext.roomNumber}`);
           }
         } catch (error) {
           console.error(`Erreur lors de l'analyse de la chambre ${roomContext.roomNumber}:`, error);
@@ -369,21 +357,6 @@ function normalizeCleaningType(cleaningType: string): 'full' | 'quick' | 'none' 
   }
   
   if (typeLower.includes('none')) {
-    return 'none';
-  }
-  
-  // Map statuses to cleaning types
-  if (typeLower.includes('à_blanc') || typeLower.includes('a_blanc') || 
-      typeLower.includes('blanc') || typeLower.includes('depart')) {
-    return 'full';
-  }
-  
-  if (typeLower.includes('recouche')) {
-    return 'quick';
-  }
-  
-  if (typeLower.includes('propre') || typeLower.includes('clean') || 
-      typeLower.includes('maintenance') || typeLower.includes('hors')) {
     return 'none';
   }
   
