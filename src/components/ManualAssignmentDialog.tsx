@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Room } from "@/services/pdfService";
@@ -147,35 +146,30 @@ export function ManualAssignmentDialog({
         newFloors = [...prev, floor];
         
         // Get ALL rooms from this floor, regardless of current filter settings
-        const allFloorRooms = rooms.filter(room => {
+        const floorRooms = rooms.filter(room => {
+          // Use the fixed getRoomFloor function
           const roomFloor = getRoomFloor(room.number);
           return roomFloor === floor;
         });
         
-        console.log(`Chambres trouvées à l'étage ${floor}:`, allFloorRooms.length);
+        console.log(`Étage ${floor} sélectionné: ${floorRooms.length} chambres trouvées`);
+        console.log("Numéros de chambre:", floorRooms.map(r => r.number).join(", "));
         
-        // Check if adding these rooms would exceed any limits
-        // This is a simplified check for the UI display only
-        if (selectedRooms.length + allFloorRooms.length > 50) { // Using 50 as a UI safety limit
-          toast({
-            description: `L'ajout de l'étage ${floor} ajouterait ${allFloorRooms.length} chambres supplémentaires à votre sélection.`,
-            variant: "default"
-          });
-        }
-        
-        // Add these rooms to selection (automatically filtered by next render)
+        // Add these rooms to selection
         setSelectedRooms(prev => {
-          // Create a map of existing selected rooms for quick lookup
-          const existingMap = new Map(prev.map(room => [room.number, room]));
+          // Create a set of existing room numbers for quick lookup
+          const existingRoomNumbers = new Set(prev.map(r => r.number));
           
           // Add all floor rooms that aren't already selected
-          allFloorRooms.forEach(room => {
-            if (!existingMap.has(room.number)) {
-              existingMap.set(room.number, room);
+          const newRooms = [...prev];
+          
+          floorRooms.forEach(room => {
+            if (!existingRoomNumbers.has(room.number)) {
+              newRooms.push(room);
             }
           });
           
-          return Array.from(existingMap.values());
+          return newRooms;
         });
       }
       
