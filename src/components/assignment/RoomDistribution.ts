@@ -1,3 +1,4 @@
+
 import { Room } from "@/services/pdfService";
 import { toast } from "@/components/ui/use-toast";
 import { getRoomFloor, groupRoomsByFloor } from "@/utils/roomUtils";
@@ -78,9 +79,8 @@ export function smartAssignRooms(
  * Each housekeeper gets complete floors assigned to them
  * 
  * Assignment Logic:
- * - Housekeeper 1 gets floors 0, numHousekeepers, 2*numHousekeepers...
- * - Housekeeper 2 gets floors 1, numHousekeepers+1, 2*numHousekeepers+1...
- * - And so on
+ * - First housekeeper gets first floor, second gets second floor, etc.
+ * - If there are more floors than housekeepers, the assignment wraps around
  */
 export function distributeRoomsByFloor(
   rooms: Room[],
@@ -128,43 +128,48 @@ export function distributeRoomsByFloor(
 
   console.log(`Distributing ${availableRooms.length} unassigned rooms`);
   
-  // Group rooms by floor
-  const roomsByFloor = groupRoomsByFloor(availableRooms);
-  
-  // Get available floors and sort them
-  const availableFloors = Object.keys(roomsByFloor)
-    .map(Number)
-    .sort((a, b) => a - b);
-  
-  console.log("Available floors for distribution:", availableFloors);
-  
   // Prepare assignments map
   const assignments: Record<string, Room[]> = {};
   housekeeperNames.forEach(name => {
     assignments[name] = [];
   });
+
+  // Nouvelle logique: organiser les chambres par premier chiffre du numéro de chambre
+  const roomsByFirstDigit: Record<string, Room[]> = {};
   
-  // Completely reworked distribution logic
-  if (availableFloors.length > 0 && housekeeperNames.length > 0) {
+  availableRooms.forEach(room => {
+    // Obtenir le premier chiffre du numéro de chambre
+    const firstDigit = room.number.replace(/^\D+/, '').charAt(0);
+    if (!roomsByFirstDigit[firstDigit]) {
+      roomsByFirstDigit[firstDigit] = [];
+    }
+    roomsByFirstDigit[firstDigit].push(room);
+  });
+  
+  console.log("Rooms grouped by first digit:", Object.keys(roomsByFirstDigit));
+  
+  // Obtenir tous les premiers chiffres disponibles et les trier
+  const availableFirstDigits = Object.keys(roomsByFirstDigit).sort();
+  
+  if (availableFirstDigits.length > 0 && housekeeperNames.length > 0) {
     const numHousekeepers = housekeeperNames.length;
     
-    // Assign each floor to just one housekeeper
-    // First housekeeper gets floors 0, numHousekeepers, 2*numHousekeepers...
-    // Second housekeeper gets floors 1, numHousekeepers+1, 2*numHousekeepers+1...
-    // And so on
-    for (let floorIndex = 0; floorIndex < availableFloors.length; floorIndex++) {
-      const housekeeperIndex = floorIndex % numHousekeepers;
+    // Distribuer les chambres par premier chiffre
+    for (let digitIndex = 0; digitIndex < availableFirstDigits.length; digitIndex++) {
+      const housekeeperIndex = digitIndex % numHousekeepers;
       const housekeeper = housekeeperNames[housekeeperIndex];
-      const floor = availableFloors[floorIndex];
+      const firstDigit = availableFirstDigits[digitIndex];
       
-      console.log(`Assigning all rooms on floor ${floor} (index ${floorIndex}) to ${housekeeper} (index ${housekeeperIndex})`);
+      console.log(`Assigning all rooms starting with digit ${firstDigit} to ${housekeeper} (index ${housekeeperIndex})`);
       
-      if (roomsByFloor[floor] && roomsByFloor[floor].length > 0) {
-        const roomsOnFloor = roomsByFloor[floor];
-        assignments[housekeeper].push(...roomsOnFloor);
+      if (roomsByFirstDigit[firstDigit] && roomsByFirstDigit[firstDigit].length > 0) {
+        const roomsWithDigit = roomsByFirstDigit[firstDigit];
+        // Trier les chambres par numéro avant de les ajouter
+        roomsWithDigit.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+        assignments[housekeeper].push(...roomsWithDigit);
         
-        console.log(`Added ${roomsOnFloor.length} rooms from floor ${floor} to ${housekeeper}`);
-        console.log(`Room numbers: ${roomsOnFloor.map(r => r.number).join(', ')}`);
+        console.log(`Added ${roomsWithDigit.length} rooms starting with ${firstDigit} to ${housekeeper}`);
+        console.log(`Room numbers: ${roomsWithDigit.map(r => r.number).join(', ')}`);
       }
     }
     
@@ -177,8 +182,8 @@ export function distributeRoomsByFloor(
   }
   
   toast({
-    title: "Pas d'étages disponibles",
-    description: "Aucun étage avec des chambres non assignées n'a été trouvé.",
+    title: "Pas de chambres disponibles",
+    description: "Aucune chambre non assignée avec des numéros valides n'a été trouvée.",
     variant: "destructive"
   });
   
