@@ -158,14 +158,12 @@ export function HousekeeperCard({
           return;
         }
         
-        // Modification: Check if room is already assigned to another housekeeper
+        // MODIFIED: We no longer block room assignment if already assigned to another housekeeper
+        // Just show a notification but allow the force reassignment
         if (room.assignedTo && room.assignedTo !== name) {
           toast({
-            variant: "destructive",
-            title: "Chambre déjà assignée",
-            description: `La chambre ${room.number} est déjà assignée à ${room.assignedTo}.`
+            description: `La chambre ${room.number} a été réassignée de ${room.assignedTo} à ${name}.`
           });
-          return;
         }
         
         // The room is allowed to be assigned, proceed with assignment
@@ -291,14 +289,12 @@ export function HousekeeperCard({
       return;
     }
     
-    // Modification: Check if room is already assigned to another housekeeper
+    // MODIFIED: We no longer block room assignment if already assigned to another housekeeper
+    // Just show a notification but allow the force reassignment
     if (room.assignedTo && room.assignedTo !== name) {
       toast({
-        variant: "destructive",
-        title: "Chambre déjà assignée",
-        description: `La chambre ${room.number} est déjà assignée à ${room.assignedTo}.`
+        description: `La chambre ${room.number} a été réassignée de ${room.assignedTo} à ${name}.`
       });
-      return;
     }
     
     if (onAssignRoom) {

@@ -82,7 +82,7 @@ export function ManualAssignmentDialog({
     });
   };
 
-  // Floor selection implementation - allow reassigning rooms from other housekeepers
+  // Floor selection implementation - MODIFIED to force reassign rooms from other housekeepers
   const toggleFloor = (floor: number) => {
     // Check if floor is already selected
     if (selectedFloors.includes(floor)) {
@@ -153,7 +153,7 @@ export function ManualAssignmentDialog({
     }
   };
   
-  // Room distribution implementation - now uses our paired digit distribution logic
+  // Room distribution implementation - MODIFIED to properly handle remaining unassigned rooms
   const handleDistributeRooms = () => {
     // Use the distributeRoomsByFloor function with selected floors
     const assignments = distributeRoomsByFloor(

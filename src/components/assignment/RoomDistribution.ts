@@ -177,7 +177,18 @@ export function distributeRoomsByFloor(
           a.number.localeCompare(b.number, undefined, { numeric: true })
         );
         
-        assignments[housekeeper].push(...roomsOnFloor);
+        // Check if adding these rooms would exceed the limit
+        // If so, only add what can fit - remaining will be unassigned
+        // IMPORTANT: We still loop through all rooms so we can mark them as handled
+        roomsOnFloor.forEach(room => {
+          if (assignments[housekeeper].length < numHousekeepers * 15) { // Assuming average 15 rooms per housekeeper
+            assignments[housekeeper].push(room);
+          } else {
+            // Rooms that can't fit with current housekeeper will remain unassigned
+            // and show up in the unassigned section
+            console.log(`Room ${room.number} exceeds capacity for ${housekeeper}, leaving unassigned`);
+          }
+        });
         
         console.log(`Added ${roomsOnFloor.length} rooms from floor ${floor} to ${housekeeper}`);
         console.log(`Room numbers: ${roomsOnFloor.map(r => r.number).join(', ')}`);

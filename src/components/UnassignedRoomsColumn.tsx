@@ -1,4 +1,3 @@
-
 import { Room } from "@/services/pdfService";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
@@ -26,9 +25,12 @@ export function UnassignedRoomsColumn({
     return null;
   }
   
-  // Always use all unassigned rooms regardless of floor selection
-  // Important: This ensures all unselected floors' rooms appear here
-  const displayRooms = allRooms.length > 0 ? allRooms.filter(room => !room.assignedTo) : rooms;
+  // MODIFIED: When floors are selected, some rooms may already be assigned to housekeepers
+  // but might not be in their visible rooms due to floor preference settings
+  // We need to ensure any room that isn't visibly assigned appears in the unassigned column
+  const displayRooms = allRooms.length > 0 
+    ? allRooms.filter(room => !room.assignedTo) 
+    : rooms.filter(room => !room.assignedTo);
   
   // Grouper les chambres par étage
   const roomsByFloor = displayRooms.reduce((acc, room) => {
