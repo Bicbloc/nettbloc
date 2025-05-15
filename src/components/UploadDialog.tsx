@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf, processWithDeepSeek } from "@/services/pdfService";
-import { FileUp } from "lucide-react";
+import { FileUp, Star } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useApiKey } from "@/hooks/use-api-key";
 
 interface UploadDialogProps {
   onPdfProcessed: (data: any) => void;
@@ -25,7 +27,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
   const [useDeepSeek, setUseDeepSeek] = useState(false);
-  const [apiKey, setApiKey] = useState<string>("");
+  const [apiKey, setApiKey] = useApiKey("deepseek-api-key", "");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,13 +92,15 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       
       let data;
       if (useDeepSeek) {
-        console.log("Utilisation de DeepSeek API pour le traitement");
+        console.log("Utilisation de DeepSeek API pour le traitement avec clé:", apiKey.substring(0, 5) + "...");
         data = await processWithDeepSeek(selectedFile, apiKey);
       } else {
         data = await processPdf(selectedFile);
       }
       
       console.log("Données traitées:", data.length, "chambres");
+      console.log("Exemples de données:", data.slice(0, 3));
+      
       onPdfProcessed(data);
       setOpen(false);
       toast({
@@ -116,7 +120,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   };
 
   const triggerFileInput = () => {
-    // Déclencher le clic sur l'input file
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -125,7 +128,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="relative">
           <FileUp className="mr-2 h-4 w-4" />
           Importer un Rapport
         </Button>
@@ -180,28 +183,36 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           </div>
         </div>
         
-        <div className="flex items-center space-x-2 mt-4">
-          <Switch 
-            id="use-deepseek" 
-            checked={useDeepSeek}
-            onCheckedChange={setUseDeepSeek}
-          />
-          <Label htmlFor="use-deepseek">Utiliser DeepSeek AI pour l'analyse</Label>
-        </div>
-        
-        {useDeepSeek && (
-          <div className="mt-3">
-            <Label htmlFor="api-key">Clé API DeepSeek</Label>
-            <input
-              id="api-key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxx"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        <div className="mt-6 p-4 border rounded-lg bg-muted/30">
+          <div className="flex items-center space-x-2 mb-3">
+            <Switch 
+              id="use-deepseek" 
+              checked={useDeepSeek}
+              onCheckedChange={setUseDeepSeek}
             />
+            <Label htmlFor="use-deepseek" className="flex items-center gap-2 font-medium">
+              <Star className="h-4 w-4" />
+              Utiliser DeepSeek AI pour l'analyse avancée
+            </Label>
           </div>
-        )}
+          
+          {useDeepSeek && (
+            <div className="mt-3 space-y-2">
+              <Label htmlFor="api-key">Clé API DeepSeek</Label>
+              <Input
+                id="api-key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+                className="flex h-10 w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Nécessaire pour l'analyse avancée des chambres et la détection précise du type de nettoyage
+              </p>
+            </div>
+          )}
+        </div>
         
         <DialogFooter className="sm:justify-end">
           <Button
