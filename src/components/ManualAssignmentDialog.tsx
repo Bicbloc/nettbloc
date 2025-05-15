@@ -160,9 +160,9 @@ export function ManualAssignmentDialog({
     }
   };
   
-  // Room distribution implementation
+  // Room distribution implementation - now uses our improved wraparound distribution logic
   const handleDistributeRooms = () => {
-    // Use our new autoDistributeRooms function that uses the first digit logic
+    // Use our autoDistributeRooms function that uses the first digit logic with wraparound
     const assignments = autoDistributeRooms(
       rooms,
       housekeeperNames,
@@ -184,7 +184,7 @@ export function ManualAssignmentDialog({
     // Success message
     toast({
       title: "Distribution réussie",
-      description: `${totalAssigned} chambres ont été distribuées en fonction du premier chiffre du numéro.`,
+      description: `${totalAssigned} chambres ont été distribuées en fonction du premier chiffre du numéro avec distribution cyclique.`,
     });
     
     onClose();

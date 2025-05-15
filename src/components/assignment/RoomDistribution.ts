@@ -82,6 +82,7 @@ export function smartAssignRooms(
  * Assignment Logic:
  * - First housekeeper gets all rooms starting with digit 1, second gets all rooms with digit 2, etc.
  * - If there are more digits than housekeepers, the assignment wraps around
+ *   (e.g., with 4 housekeepers, rooms with first digit 5 go to housekeeper 1 again)
  */
 export function distributeRoomsByFloor(
   rooms: Room[],
@@ -155,8 +156,9 @@ export function distributeRoomsByFloor(
   if (availableFirstDigits.length > 0 && housekeeperNames.length > 0) {
     const numHousekeepers = housekeeperNames.length;
     
-    // Distribute rooms by first digit
+    // Distribute rooms by first digit with wrap-around logic
     for (let digitIndex = 0; digitIndex < availableFirstDigits.length; digitIndex++) {
+      // Calculate which housekeeper gets this digit (with wrap-around)
       const housekeeperIndex = digitIndex % numHousekeepers;
       const housekeeper = housekeeperNames[housekeeperIndex];
       const firstDigit = availableFirstDigits[digitIndex];
@@ -165,8 +167,13 @@ export function distributeRoomsByFloor(
       
       if (roomsByFirstDigit[firstDigit] && roomsByFirstDigit[firstDigit].length > 0) {
         const roomsWithDigit = roomsByFirstDigit[firstDigit];
-        // Sort rooms by number before adding
-        roomsWithDigit.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+        // Sort rooms by floor and then by number before adding
+        roomsWithDigit.sort((a, b) => {
+          const floorA = getRoomFloor(a.number);
+          const floorB = getRoomFloor(b.number);
+          if (floorA !== floorB) return floorA - floorB;
+          return a.number.localeCompare(b.number, undefined, { numeric: true });
+        });
         assignments[housekeeper].push(...roomsWithDigit);
         
         console.log(`Added ${roomsWithDigit.length} rooms starting with ${firstDigit} to ${housekeeper}`);
