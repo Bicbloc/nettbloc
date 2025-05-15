@@ -241,7 +241,7 @@ export function ManualAssignmentDialog({
     });
   };
   
-  // Nouvelle méthode complètement réécrite pour distribuer équitablement les chambres
+  // Completely rewritten distribution method to assign by whole floors
   const handleDistributeRooms = () => {
     if (housekeeperNames.length === 0) {
       toast({
@@ -281,28 +281,60 @@ export function ManualAssignmentDialog({
     // Récupérer les étages disponibles et les trier en ordre ascendant
     const availableFloors = Object.keys(roomsByFloor).map(Number).sort((a, b) => a - b);
     console.log("Distribution - Étages disponibles:", availableFloors);
+
+    // Calculer le nombre total d'étages et les attribuer équitablement aux femmes de chambre
+    const numHousekeepers = housekeeperNames.length;
     
     // Préparer les assignations pour chaque femme de chambre
     const assignments: Record<string, Room[]> = {};
     housekeeperNames.forEach(name => {
       assignments[name] = [];
     });
-
-    // Distribuer les chambres en alternant entre les femmes de chambre, par étage
-    let currentHousekeeperIndex = 0;
     
-    // Parcourir les étages dans l'ordre ascendant
-    for (const floor of availableFloors) {
-      const floorRooms = roomsByFloor[floor];
-      console.log(`Distribution - Étage ${floor}: ${floorRooms.length} chambres`);
+    // Nouvelle logique de distribution: attribuer des étages complets à chaque femme de chambre
+    // en respectant l'ordre des étages
+    
+    // Déterminer combien d'étages complets chaque femme de chambre devrait recevoir
+    const floorsPerHousekeeper = Math.ceil(availableFloors.length / numHousekeepers);
+    
+    // Distribuer les étages entiers aux femmes de chambre
+    let currentFloorIndex = 0;
+    
+    for (let i = 0; i < numHousekeepers && currentFloorIndex < availableFloors.length; i++) {
+      const housekeeper = housekeeperNames[i];
       
-      // Distribuer les chambres de cet étage aux femmes de chambre de manière équitable
-      for (const room of floorRooms) {
-        const housekeeper = housekeeperNames[currentHousekeeperIndex];
-        assignments[housekeeper].push(room);
+      // Calculer combien d'étages cette femme de chambre recevra
+      const floorsForThisHousekeeper = Math.min(
+        floorsPerHousekeeper, 
+        availableFloors.length - currentFloorIndex
+      );
+      
+      // Assigner les étages à cette femme de chambre
+      for (let j = 0; j < floorsForThisHousekeeper; j++) {
+        const floor = availableFloors[currentFloorIndex];
+        const floorRooms = roomsByFloor[floor];
         
-        // Passer à la femme de chambre suivante
-        currentHousekeeperIndex = (currentHousekeeperIndex + 1) % housekeeperNames.length;
+        // Ajouter toutes les chambres de cet étage à cette femme de chambre
+        assignments[housekeeper].push(...floorRooms);
+        
+        console.log(`Assignation: Femme de chambre "${housekeeper}" reçoit l'étage ${floor} avec ${floorRooms.length} chambres`);
+        
+        currentFloorIndex++;
+      }
+    }
+    
+    // Si il reste des étages non assignés (cas où il y a plus d'étages que de femmes de chambre)
+    // On continue la distribution circulaire
+    while (currentFloorIndex < availableFloors.length) {
+      for (let i = 0; i < numHousekeepers && currentFloorIndex < availableFloors.length; i++) {
+        const housekeeper = housekeeperNames[i];
+        const floor = availableFloors[currentFloorIndex];
+        const floorRooms = roomsByFloor[floor];
+        
+        assignments[housekeeper].push(...floorRooms);
+        console.log(`Assignation supplémentaire: Femme de chambre "${housekeeper}" reçoit aussi l'étage ${floor} avec ${floorRooms.length} chambres`);
+        
+        currentFloorIndex++;
       }
     }
     
@@ -333,10 +365,10 @@ export function ManualAssignmentDialog({
     // Notification de succès
     toast({
       title: "Distribution réussie",
-      description: `${totalAssigned} chambres ont été distribuées de manière équitable entre les étages et les femmes de chambre.`
+      description: `${totalAssigned} chambres ont été distribuées par étages complets à chaque femme de chambre.`
     });
     
-    console.log("Résumé de distribution:\n" + summary);
+    console.log("Résumé de distribution par étages:\n" + summary);
     
     onClose();
   };
