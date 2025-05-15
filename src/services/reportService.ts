@@ -2,6 +2,7 @@ import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
+import { toast } from "@/hooks/use-toast"; // Adding the import for toast
 
 // Renamed to avoid conflict
 export interface ReportData extends CustomReportFields {
