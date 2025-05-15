@@ -1,3 +1,4 @@
+
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
@@ -183,6 +184,9 @@ function generateReportHTML(data: ReportData): string {
           font-size: 18px; 
           margin-bottom: 5px;
           font-weight: bold;
+          border: 2px solid #000;
+          padding: 8px;
+          display: inline-block;
         }
         h2 { 
           font-size: 16px; 
@@ -208,14 +212,11 @@ function generateReportHTML(data: ReportData): string {
           border-collapse: collapse; 
           margin-bottom: 20px;
           border: 1px solid #000;
-          table-layout: fixed;
         }
         th, td { 
           border: 1px solid #000;
           padding: 6px; 
           text-align: left;
-          vertical-align: middle;
-          word-wrap: break-word;
         }
         th { 
           background-color: #f2f2f2; 
@@ -305,34 +306,33 @@ function generateRoomSummaryTable(data: ReportData): string {
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
                        quickCleanCount * data.config.quickCleaningTime;
   
-  // Return HTML table with explicit width and border attributes
   return `
-    <table style="width:100%; border:1px solid black; border-collapse:collapse;">
+    <table>
       <tr>
-        <th style="border:1px solid black; padding:6px; background-color:#f2f2f2; width:50%;">Type de nettoyage</th>
-        <th style="border:1px solid black; padding:6px; background-color:#f2f2f2; width:50%;">Nombre de chambres</th>
+        <th>Type de nettoyage</th>
+        <th>Nombre de chambres</th>
+      </tr>
+      <tr class="a-blanc">
+        <td>À Blanc</td>
+        <td>${fullCleanCount}</td>
+      </tr>
+      <tr class="recouche">
+        <td>Recouche</td>
+        <td>${quickCleanCount}</td>
       </tr>
       <tr>
-        <td style="border:1px solid black; padding:6px; background-color:#FEC6A1;">À Blanc</td>
-        <td style="border:1px solid black; padding:6px;">${fullCleanCount}</td>
+        <td style="font-weight:bold;">Total</td>
+        <td style="font-weight:bold;">${data.rooms.length}</td>
       </tr>
       <tr>
-        <td style="border:1px solid black; padding:6px; background-color:#F2FCE2;">Recouche</td>
-        <td style="border:1px solid black; padding:6px;">${quickCleanCount}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid black; padding:6px; font-weight:bold;">Total</td>
-        <td style="border:1px solid black; padding:6px; font-weight:bold;">${data.rooms.length}</td>
-      </tr>
-      <tr>
-        <td style="border:1px solid black; padding:6px;">Temps estimé</td>
-        <td style="border:1px solid black; padding:6px;">${estimatedTime} minutes</td>
+        <td>Temps estimé</td>
+        <td>${estimatedTime} minutes</td>
       </tr>
     </table>
   `;
 }
 
-// Generate rooms tables grouped by floor with inline styles for tables
+// Generate rooms tables grouped by floor
 function generateRoomsTablesByFloor(data: ReportData): string {
   if (data.rooms.length === 0) {
     return '<p>Aucune chambre assignée.</p>';
@@ -354,7 +354,7 @@ function generateRoomsTablesByFloor(data: ReportData): string {
     .map(Number)
     .sort((a, b) => a - b);
   
-  // Build table for each floor with inline styles
+  // Build table for each floor
   const tablesHtml = sortedFloors.map(floor => {
     const roomsOnFloor = roomsByFloor[floor];
     
@@ -363,36 +363,36 @@ function generateRoomsTablesByFloor(data: ReportData): string {
       a.number.localeCompare(b.number, undefined, { numeric: true })
     );
     
-    // Create rows for each room with inline styles
+    // Create rows for each room
     const rowsHtml = roomsOnFloor.map(room => {
-      // Apply highlighting styles based on cleaning type
-      const bgColor = room.cleaningType === 'full' ? '#FEC6A1' : '#F2FCE2';
+      // Apply highlighting based on cleaning type
+      const rowClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
       const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
       
       return `
-        <tr>
-          <td style="border:1px solid black; padding:6px;">${room.number}</td>
-          <td style="border:1px solid black; padding:6px; background-color:${bgColor};">${cleaningTypeText}</td>
-          <td style="border:1px solid black; padding:6px;">${room.isTwin ? 'Oui' : 'Non'}</td>
-          <td style="border:1px solid black; padding:6px;">${room.priority === 'high' ? 'Haute' : 'Normale'}</td>
-          <td style="border:1px solid black; padding:6px;">${room.notes || '-'}</td>
-          <td style="border:1px solid black; padding:6px;"></td>
+        <tr class="${rowClass}">
+          <td>${room.number}</td>
+          <td>${cleaningTypeText}</td>
+          <td>${room.isTwin ? 'Oui' : 'Non'}</td>
+          <td>${room.priority === 'high' ? 'Haute' : 'Normale'}</td>
+          <td>${room.notes || '-'}</td>
+          <td></td>
         </tr>
       `;
     }).join('');
     
-    // Display floor header and table with inline styles
+    // Display floor header and table
     return `
       <div class="floor-section">
         <div class="floor-heading">Étage ${floor === 0 ? 'RDC' : floor}</div>
-        <table style="width:100%; border:1px solid black; border-collapse:collapse;">
+        <table>
           <tr>
-            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Chambre</th>
-            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Type</th>
-            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Twin</th>
-            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Priorité</th>
-            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Notes</th>
-            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Remarques</th>
+            <th>Chambre</th>
+            <th>Type</th>
+            <th>Twin</th>
+            <th>Priorité</th>
+            <th>Notes</th>
+            <th>Remarques</th>
           </tr>
           ${rowsHtml}
         </table>
