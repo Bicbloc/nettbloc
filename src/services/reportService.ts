@@ -62,9 +62,9 @@ export async function generateReport(
     
     // Generate PDF using html2pdf library with improved table handling
     const pdfOptions = {
-      margin: [15, 15, 15, 15],
+      margin: [10, 10, 10, 10],
       filename: `rapport-${housekeeper.replace(/\s+/g, '-')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg', quality: 1 },
       html2canvas: { 
         scale: 2, 
         logging: true, 
@@ -106,7 +106,7 @@ export async function generateReport(
   }
 }
 
-// Generate HTML for report - Simplified to match the provided template
+// Generate HTML for report - Enhanced to match the provided template with improved tables
 function generateReportHTML(data: ReportData): string {
   // Instructions section - use specific housekeeper instructions if available
   const housekeeperInstructions = data.housekeeperInstructions?.[data.housekeeperName] || data.instructions || '';
@@ -164,7 +164,7 @@ function generateReportHTML(data: ReportData): string {
   const summaryTableHtml = generateRoomSummaryTable(data);
   const roomsTablesByFloor = generateRoomsTablesByFloor(data);
   
-  // Complete HTML that matches the provided template
+  // Complete HTML with enhanced table styling
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -182,43 +182,60 @@ function generateReportHTML(data: ReportData): string {
         h1 { 
           font-size: 18px; 
           margin-bottom: 5px;
+          font-weight: bold;
         }
         h2 { 
           font-size: 16px; 
           margin-top: 20px; 
           margin-bottom: 10px;
+          font-weight: bold;
+          border-bottom: 1px solid #ddd;
+          padding-bottom: 5px;
+        }
+        h3 {
+          font-size: 14px;
+          margin-top: 15px;
+          margin-bottom: 5px;
+          font-weight: bold;
         }
         .date {
           margin-bottom: 20px;
+          font-style: italic;
         }
+        /* Enhanced table styling */
         table { 
           width: 100%; 
           border-collapse: collapse; 
-          margin-bottom: 15px;
+          margin-bottom: 20px;
+          border: 1px solid #000;
+          table-layout: fixed;
         }
-        table, th, td { 
-          border: 1px solid #000; 
+        th, td { 
+          border: 1px solid #000;
+          padding: 6px; 
+          text-align: left;
+          vertical-align: middle;
+          word-wrap: break-word;
         }
         th { 
           background-color: #f2f2f2; 
-          font-weight: normal;
-          padding: 5px; 
-          text-align: left; 
+          font-weight: bold;
         }
-        td { 
-          padding: 5px; 
-          text-align: left; 
-        }
+        /* Color coding for room types */
         .a-blanc { 
-          background-color: #FEC6A1; 
+          background-color: #FEC6A1 !important; 
         }
         .recouche { 
-          background-color: #F2FCE2; 
+          background-color: #F2FCE2 !important; 
         }
         .floor-heading {
           margin-top: 20px;
           margin-bottom: 5px;
           font-weight: bold;
+          font-size: 14px;
+          background-color: #eee;
+          padding: 5px;
+          border-radius: 4px;
         }
         .signature { 
           margin-top: 30px; 
@@ -229,14 +246,26 @@ function generateReportHTML(data: ReportData): string {
         }
         .footer { 
           text-align: center;
-          margin-top: 30px;
-          font-size: 10px;
+          margin-top: 40px;
+          font-size: 11px;
+          padding-top: 10px;
+          border-top: 1px solid #ddd;
+        }
+        ul {
+          margin: 5px 0 10px 20px;
+          padding-left: 0;
+        }
+        li {
+          margin-bottom: 3px;
         }
         .instructions-section,
         .todo-section,
         .toknow-section { 
           margin-top: 15px;
           margin-bottom: 15px;
+          padding: 10px;
+          background-color: #f9f9f9;
+          border-radius: 4px;
         }
       </style>
     </head>
@@ -259,14 +288,14 @@ function generateReportHTML(data: ReportData): string {
       </div>
       
       <div class="footer">
-        Bicbloc Report - Généré le ${formattedDate}
+        Généré par bicbloc.eu Staffing - Commander un extra en trois 3 clics
       </div>
     </body>
     </html>
   `;
 }
 
-// Generate room summary table that matches the template
+// Generate room summary table with improved styling
 function generateRoomSummaryTable(data: ReportData): string {
   // Count different room types
   const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full').length;
@@ -276,33 +305,34 @@ function generateRoomSummaryTable(data: ReportData): string {
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
                        quickCleanCount * data.config.quickCleaningTime;
   
+  // Return HTML table with explicit width and border attributes
   return `
-    <table>
+    <table style="width:100%; border:1px solid black; border-collapse:collapse;">
       <tr>
-        <th>Type de nettoyage</th>
-        <th>Nombre de chambres</th>
+        <th style="border:1px solid black; padding:6px; background-color:#f2f2f2; width:50%;">Type de nettoyage</th>
+        <th style="border:1px solid black; padding:6px; background-color:#f2f2f2; width:50%;">Nombre de chambres</th>
       </tr>
       <tr>
-        <td>À Blanc</td>
-        <td>${fullCleanCount}</td>
+        <td style="border:1px solid black; padding:6px; background-color:#FEC6A1;">À Blanc</td>
+        <td style="border:1px solid black; padding:6px;">${fullCleanCount}</td>
       </tr>
       <tr>
-        <td>Recouche</td>
-        <td>${quickCleanCount}</td>
+        <td style="border:1px solid black; padding:6px; background-color:#F2FCE2;">Recouche</td>
+        <td style="border:1px solid black; padding:6px;">${quickCleanCount}</td>
       </tr>
       <tr>
-        <td>Total</td>
-        <td>${data.rooms.length}</td>
+        <td style="border:1px solid black; padding:6px; font-weight:bold;">Total</td>
+        <td style="border:1px solid black; padding:6px; font-weight:bold;">${data.rooms.length}</td>
       </tr>
       <tr>
-        <td>Temps estimé</td>
-        <td>${estimatedTime} minutes</td>
+        <td style="border:1px solid black; padding:6px;">Temps estimé</td>
+        <td style="border:1px solid black; padding:6px;">${estimatedTime} minutes</td>
       </tr>
     </table>
   `;
 }
 
-// Generate rooms tables grouped by floor
+// Generate rooms tables grouped by floor with inline styles for tables
 function generateRoomsTablesByFloor(data: ReportData): string {
   if (data.rooms.length === 0) {
     return '<p>Aucune chambre assignée.</p>';
@@ -324,7 +354,7 @@ function generateRoomsTablesByFloor(data: ReportData): string {
     .map(Number)
     .sort((a, b) => a - b);
   
-  // Build table for each floor
+  // Build table for each floor with inline styles
   const tablesHtml = sortedFloors.map(floor => {
     const roomsOnFloor = roomsByFloor[floor];
     
@@ -333,36 +363,36 @@ function generateRoomsTablesByFloor(data: ReportData): string {
       a.number.localeCompare(b.number, undefined, { numeric: true })
     );
     
-    // Create rows for each room
+    // Create rows for each room with inline styles
     const rowsHtml = roomsOnFloor.map(room => {
-      // Apply highlighting classes based on cleaning type
-      const cleaningTypeClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
+      // Apply highlighting styles based on cleaning type
+      const bgColor = room.cleaningType === 'full' ? '#FEC6A1' : '#F2FCE2';
       const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
       
       return `
-        <tr class="${cleaningTypeClass}">
-          <td>${room.number}</td>
-          <td class="room-type">${cleaningTypeText}</td>
-          <td>${room.isTwin ? 'Oui' : 'Non'}</td>
-          <td>${room.priority === 'high' ? 'Haute' : 'Normale'}</td>
-          <td>${room.notes || '-'}</td>
-          <td></td>
+        <tr>
+          <td style="border:1px solid black; padding:6px;">${room.number}</td>
+          <td style="border:1px solid black; padding:6px; background-color:${bgColor};">${cleaningTypeText}</td>
+          <td style="border:1px solid black; padding:6px;">${room.isTwin ? 'Oui' : 'Non'}</td>
+          <td style="border:1px solid black; padding:6px;">${room.priority === 'high' ? 'Haute' : 'Normale'}</td>
+          <td style="border:1px solid black; padding:6px;">${room.notes || '-'}</td>
+          <td style="border:1px solid black; padding:6px;"></td>
         </tr>
       `;
     }).join('');
     
-    // Display floor header and table
+    // Display floor header and table with inline styles
     return `
       <div class="floor-section">
         <div class="floor-heading">Étage ${floor === 0 ? 'RDC' : floor}</div>
-        <table>
+        <table style="width:100%; border:1px solid black; border-collapse:collapse;">
           <tr>
-            <th>Chambre</th>
-            <th>Type</th>
-            <th>Twin</th>
-            <th>Priorité</th>
-            <th>Notes</th>
-            <th>Remarques</th>
+            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Chambre</th>
+            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Type</th>
+            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Twin</th>
+            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Priorité</th>
+            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Notes</th>
+            <th style="border:1px solid black; padding:6px; background-color:#f2f2f2;">Remarques</th>
           </tr>
           ${rowsHtml}
         </table>
@@ -466,7 +496,7 @@ export async function generateCombinedReport(
     
     // Generate PDF using html2pdf library with improved table handling
     const pdfOptions = {
-      margin: [15, 15, 15, 15],
+      margin: [10, 10, 10, 10],
       filename: `rapports-complet-${new Date().toISOString().slice(0,10)}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
