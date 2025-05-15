@@ -8,10 +8,10 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { BicblocFooter } from "./components/BicblocBranding";
 
-// Create a simple blank container for the top of the page
+// Minimal header space with no title
 const HeaderSpace = () => (
-  <div className="container mx-auto py-4">
-    {/* Titre supprimé - espace réservé uniquement */}
+  <div className="container mx-auto py-2">
+    {/* Empty space - no title */}
   </div>
 );
 
@@ -24,6 +24,10 @@ const App = () => (
       <Sonner />
       <div className="flex flex-col min-h-screen">
         <HeaderSpace />
+        {/* Footer positioned at the top, before the main content */}
+        <div className="container mx-auto mb-4">
+          <BicblocFooter />
+        </div>
         <div className="flex-grow">
           <BrowserRouter>
             <Routes>
@@ -32,9 +36,6 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-        </div>
-        <div className="container mx-auto">
-          <BicblocFooter />
         </div>
       </div>
     </TooltipProvider>
