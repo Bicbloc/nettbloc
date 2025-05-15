@@ -68,9 +68,10 @@ export async function generateReport(
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
         scale: 2, 
-        logging: false, 
-        dpi: 192, 
-        letterRendering: true 
+        logging: true, 
+        dpi: 300, 
+        letterRendering: true,
+        useCORS: true
       },
       jsPDF: { 
         unit: 'mm', 
@@ -169,6 +170,7 @@ function generateReportHTML(data: ReportData): string {
     <html lang="fr">
     <head>
       <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Rapport - ${data.housekeeperName}</title>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
@@ -203,7 +205,7 @@ function generateReportHTML(data: ReportData): string {
           font-weight: 500;
         }
         .table-container { 
-          page-break-inside: avoid; 
+          page-break-inside: avoid !important; 
           margin-bottom: 20px;
           box-shadow: 0 3px 8px rgba(0,0,0,0.1);
           border-radius: 6px;
@@ -283,13 +285,13 @@ function generateReportHTML(data: ReportData): string {
           font-weight: 600; 
         }
         .a-blanc { 
-          background-color: #FEC6A1; 
+          background-color: #FEC6A1 !important; 
         }
         .recouche { 
-          background-color: #F2FCE2; 
+          background-color: #F2FCE2 !important; 
         }
         .floor-section { 
-          page-break-inside: avoid; 
+          page-break-inside: avoid !important; 
           margin-bottom: 30px; 
         }
         .floor-heading {
@@ -301,19 +303,19 @@ function generateReportHTML(data: ReportData): string {
           color: #6E59A5;
         }
         .page-break { 
-          page-break-after: always; 
-          break-after: page; 
+          page-break-after: always !important; 
+          break-after: page !important; 
         }
         .page-break-before { 
-          page-break-before: always; 
-          break-before: page; 
+          page-break-before: always !important; 
+          break-before: page !important; 
         }
         .page-break-after { 
-          page-break-after: always; 
-          break-after: page; 
+          page-break-after: always !important; 
+          break-after: page !important; 
         }
         .avoid-break { 
-          page-break-inside: avoid; 
+          page-break-inside: avoid !important; 
         }
         .signature { 
           margin-top: 40px; 
@@ -574,18 +576,20 @@ export async function generateCombinedReport(
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Rapports de Nettoyage</title>
         <style>
           .report-container {
-            page-break-after: always;
-            break-after: page;
+            page-break-after: always !important;
+            break-after: page !important;
           }
           .report-container:last-child {
-            page-break-after: avoid;
-            break-after: avoid;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
           }
           /* Prevent table breaking */
-          table { page-break-inside: avoid; }
+          table { page-break-inside: avoid !important; }
         </style>
       </head>
       <body>
@@ -605,9 +609,10 @@ export async function generateCombinedReport(
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
         scale: 2, 
-        logging: false, 
-        dpi: 192, 
-        letterRendering: true 
+        logging: true, 
+        dpi: 300, 
+        letterRendering: true,
+        useCORS: true
       },
       jsPDF: { 
         unit: 'mm', 
