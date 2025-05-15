@@ -50,6 +50,9 @@ export function smartAssignRooms(
   if (filterStatus !== "all") {
     roomsToSelect = roomsToSelect.filter(room => room.status === filterStatus);
   }
+  
+  // Add check to not include already assigned rooms
+  roomsToSelect = roomsToSelect.filter(room => !room.assignedTo);
 
   if (roomsToSelect.length === 0) {
     toast({
@@ -73,6 +76,11 @@ export function smartAssignRooms(
 /**
  * Distributes rooms to housekeepers by floor
  * Each housekeeper gets complete floors assigned to them
+ * 
+ * Assignment Logic:
+ * - Housekeeper 1 gets floors 0, numHousekeepers, 2*numHousekeepers...
+ * - Housekeeper 2 gets floors 1, numHousekeepers+1, 2*numHousekeepers+1...
+ * - And so on
  */
 export function distributeRoomsByFloor(
   rooms: Room[],

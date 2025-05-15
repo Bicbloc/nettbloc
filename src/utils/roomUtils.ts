@@ -3,20 +3,24 @@ import { Room } from "@/services/pdfService";
 
 /**
  * Determines the floor of a room based on its number
+ * Enhanced to handle different room number formats
  */
 export const getRoomFloor = (roomNumber: string): number => {
+  // Remove any non-numeric prefix if it exists
+  const numericPart = roomNumber.replace(/^[^\d]+/, '');
+  
   // Ignore years like 2025, 2026, 2027, 2028
-  if (/^20(2[5-8])$/.test(roomNumber)) {
+  if (/^20(2[5-8])$/.test(numericPart)) {
     return 0; // Consider as ground floor
   }
   
   // If it's just a digit (like 1, 2, 3) or two digits (like 12, 24), it's ground floor
-  if (/^\d{1,2}$/.test(roomNumber)) {
+  if (/^\d{1,2}$/.test(numericPart)) {
     return 0;
   }
   
   // For longer numbers, the first digit typically indicates the floor
-  const firstDigit = parseInt(roomNumber.charAt(0));
+  const firstDigit = parseInt(numericPart.charAt(0));
   return isNaN(firstDigit) ? 0 : firstDigit;
 };
 

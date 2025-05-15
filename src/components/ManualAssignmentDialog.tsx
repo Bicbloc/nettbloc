@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Room } from "@/services/pdfService";
@@ -70,6 +69,15 @@ export function ManualAssignmentDialog({
       if (isSelected) {
         return prev.filter(r => r.number !== room.number);
       } else {
+        // Check if room is already assigned to a housekeeper
+        if (room.assignedTo && selectedHousekeeper !== room.assignedTo) {
+          toast({
+            title: "Chambre déjà assignée",
+            description: `La chambre ${room.number} est déjà assignée à ${room.assignedTo}`,
+            variant: "destructive"
+          });
+          return prev;
+        }
         return [...prev, room];
       }
     });

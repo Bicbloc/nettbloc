@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getRoomFloor } from "@/utils/roomUtils";
 
 interface HousekeeperCardProps {
   name: string;
@@ -76,23 +77,28 @@ export function HousekeeperCard({
   
   const effectiveMaxRooms = maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper;
   
-  // Always show all rooms regardless of selected floors
-  const visibleRooms = rooms;
+  // Modification: Filter rooms to show only those from preferred floors when preferredFloors is not empty
+  const visibleRooms = preferredFloors.length > 0
+    ? rooms.filter(room => preferredFloors.includes(getRoomFloor(room.number)))
+    : rooms;
   
   // Group rooms by floor
   const roomsByFloor = visibleRooms.reduce((acc, room) => {
-    const floor = parseInt(room.number[0]) || 0;
+    const floor = getRoomFloor(room.number);
     if (!acc[floor]) acc[floor] = [];
     acc[floor].push(room);
     return acc;
   }, {} as Record<number, Room[]>);
   
-  // Show ALL unassigned rooms, not just those from selected floors
-  const filteredUnassignedRooms = unassignedRooms.filter(room => !room.assignedTo);
+  // Modification: Show both unassigned rooms AND rooms assigned to this housekeeper that are on floors not in preferredFloors
+  const filteredUnassignedRooms = [
+    ...unassignedRooms.filter(room => !room.assignedTo),
+    ...rooms.filter(room => !preferredFloors.includes(getRoomFloor(room.number)))
+  ];
   
   // Group unassigned rooms by floor
   const unassignedRoomsByFloor = filteredUnassignedRooms.reduce((acc, room) => {
-    const floor = parseInt(room.number[0]) || 0;
+    const floor = getRoomFloor(room.number);
     if (!acc[floor]) acc[floor] = [];
     acc[floor].push(room);
     return acc;
@@ -152,7 +158,17 @@ export function HousekeeperCard({
           return;
         }
         
-        // The room is on an allowed floor, proceed with assignment
+        // Modification: Check if room is already assigned to another housekeeper
+        if (room.assignedTo && room.assignedTo !== name) {
+          toast({
+            variant: "destructive",
+            title: "Chambre déjà assignée",
+            description: `La chambre ${room.number} est déjà assignée à ${room.assignedTo}.`
+          });
+          return;
+        }
+        
+        // The room is allowed to be assigned, proceed with assignment
         const updatedRoom = { ...room, assignedTo: name };
         onRoomUpdate(updatedRoom);
       }
@@ -161,24 +177,7 @@ export function HousekeeperCard({
     }
   };
   
-  // Function to determine room floor from room number
-  const getRoomFloor = (roomNumber: string): number => {
-    // Ignore years like 2025, 2026, 2027, 2028
-    if (/^20(2[5-8])$/.test(roomNumber)) {
-      return 0;
-    }
-    
-    // Si c'est juste un chiffre (comme 1, 2, 3) ou deux chiffres (comme 12, 24), c'est RDC
-    if (/^\d{1,2}$/.test(roomNumber)) {
-      return 0;
-    }
-    
-    // Pour les numéros plus longs, le premier chiffre indique généralement l'étage
-    const firstDigit = parseInt(roomNumber.charAt(0));
-    return isNaN(firstDigit) ? 0 : firstDigit;
-  };
-  
-  // Revised floor change handler - also gets rooms from other housekeepers
+  // Revised floor change handler - modified to handle re-assignments correctly
   const handleFloorChange = (floor: number, isChecked: boolean) => {
     const newPreferredFloors = isChecked
       ? [...preferredFloors, floor]
@@ -187,45 +186,32 @@ export function HousekeeperCard({
     onFloorPreferenceChange(name, newPreferredFloors);
     
     if (isChecked) {
-      // Récupérer TOUTES les chambres de cet étage, incluant celles assignées à d'autres
-      const allRoomsOnFloor = rooms.filter(room => {
+      // Get only unassigned rooms from this floor
+      const unassignedFloorRooms = unassignedRooms.filter(room => {
         const roomFloor = getRoomFloor(room.number);
-        return roomFloor === floor && room.assignedTo !== name;
+        return roomFloor === floor && !room.assignedTo;
       });
       
-      // Ajouter les chambres non assignées sur cet étage
-      if (unassignedRooms) {
-        const unassignedFloorRooms = unassignedRooms.filter(room => {
-          const roomFloor = getRoomFloor(room.number);
-          return roomFloor === floor && !room.assignedTo;
-        });
-        
-        allRoomsOnFloor.push(...unassignedFloorRooms);
-      }
-      
       // Log pour debugging
-      console.log(`Étage ${floor} - Chambres trouvées:`, allRoomsOnFloor.length);
-      console.log("Numéros:", allRoomsOnFloor.map(r => r.number).join(', '));
+      console.log(`Étage ${floor} - Chambres non assignées trouvées:`, unassignedFloorRooms.length);
+      console.log("Numéros:", unassignedFloorRooms.map(r => r.number).join(', '));
       
-      // Vérifier si l'ajout dépasserait la limite de chambres
-      if (rooms.length + allRoomsOnFloor.length > effectiveMaxRooms) {
+      // Check if adding all rooms would exceed the limit
+      if (rooms.length + unassignedFloorRooms.length > effectiveMaxRooms) {
         toast({
           variant: "destructive",
           title: "Limite dépassée",
-          description: `L'ajout de ${allRoomsOnFloor.length} chambres dépasserait la limite de ${effectiveMaxRooms} chambres pour ${name}. Seulement ${effectiveMaxRooms - rooms.length} chambres peuvent être ajoutées.`
+          description: `L'ajout de ${unassignedFloorRooms.length} chambres dépasserait la limite de ${effectiveMaxRooms} chambres pour ${name}. Seulement ${effectiveMaxRooms - rooms.length} chambres peuvent être ajoutées.`
         });
         
-        // Ne pas ajouter toutes les chambres, mais uniquement jusqu'à la limite
+        // Don't add all rooms, only up to the limit
         const availableSlots = effectiveMaxRooms - rooms.length;
         if (availableSlots <= 0) return;
         
-        // Prioriser les chambres non assignées et les chambres prioritaires
-        const prioritizedRooms = [...allRoomsOnFloor]
+        // Prioritize unassigned rooms and high priority rooms
+        const prioritizedRooms = [...unassignedFloorRooms]
           .sort((a, b) => {
-            // D'abord les chambres non assignées
-            if (!a.assignedTo && b.assignedTo) return -1;
-            if (a.assignedTo && !b.assignedTo) return 1;
-            // Ensuite par priorité
+            // First by priority
             if (a.priority === 'high' && b.priority !== 'high') return -1;
             if (b.priority === 'high' && a.priority !== 'high') return 1;
             return 0;
@@ -243,20 +229,20 @@ export function HousekeeperCard({
         return;
       }
       
-      // Si on a des chambres sur cet étage
-      if (allRoomsOnFloor.length > 0 && onRoomUpdate) {
-        // Assigner toutes les chambres de cet étage à cette femme de chambre
-        allRoomsOnFloor.forEach(room => {
+      // If we have unassigned rooms on this floor
+      if (unassignedFloorRooms.length > 0 && onRoomUpdate) {
+        // Assign all unassigned rooms on this floor to this housekeeper
+        unassignedFloorRooms.forEach(room => {
           const updatedRoom = { ...room, assignedTo: name };
           onRoomUpdate(updatedRoom);
         });
         
         toast({
-          description: `${allRoomsOnFloor.length} chambre(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
+          description: `${unassignedFloorRooms.length} chambre(s) non assignée(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
         });
       }
     } else {
-      // Si on désélectionne un étage, désassigner toutes les chambres de cet étage
+      // When deselecting a floor, unassign all rooms from this floor
       const roomsToUnassign = rooms.filter(room => {
         const roomFloor = getRoomFloor(room.number);
         return roomFloor === floor;
@@ -295,7 +281,7 @@ export function HousekeeperCard({
   };
   
   const handleAssignRoom = (room: Room) => {
-    // Vérifier si la limite de chambres est atteinte
+    // Check if room limit is reached
     if (rooms.length >= effectiveMaxRooms) {
       toast({
         variant: "destructive",
@@ -305,7 +291,16 @@ export function HousekeeperCard({
       return;
     }
     
-    // Plus de vérification d'étage - on peut maintenant assigner n'importe quelle chambre
+    // Modification: Check if room is already assigned to another housekeeper
+    if (room.assignedTo && room.assignedTo !== name) {
+      toast({
+        variant: "destructive",
+        title: "Chambre déjà assignée",
+        description: `La chambre ${room.number} est déjà assignée à ${room.assignedTo}.`
+      });
+      return;
+    }
+    
     if (onAssignRoom) {
       onAssignRoom(room);
     }
