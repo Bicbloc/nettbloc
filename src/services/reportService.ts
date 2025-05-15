@@ -186,8 +186,8 @@ function generateReportHTML(data: ReportData): string {
         .todo-section, .toknow-section, .instructions-section { margin-top: 15px; }
         ul { margin-top: 5px; padding-left: 20px; }
         .room-type { font-weight: bold; }
-        .a-blanc { background-color: #FFD580; }
-        .recouche { background-color: #90EE90; }
+        .a-blanc { background-color: #FEC6A1; }
+        .recouche { background-color: #F2FCE2; }
         .floor-section { page-break-inside: avoid; margin-bottom: 30px; }
         .page-break { page-break-after: always; break-after: page; }
         .page-break-before { page-break-before: always; break-before: page; }
@@ -304,15 +304,15 @@ function generateRoomsTable(data: ReportData): string {
     
     // Create rows for each room
     const rowsHtml = roomsOnFloor.map(room => {
-      // Apply highlighting classes
+      // Apply highlighting classes based on cleaning type
       const cleaningTypeClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
       const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
       const priorityText = room.priority === 'high' ? '⚠️ Haute' : 'Normale';
       
       return `
-        <tr>
+        <tr class="${cleaningTypeClass}">
           <td>${room.number}</td>
-          <td class="room-type ${cleaningTypeClass}">${cleaningTypeText}</td>
+          <td class="room-type">${cleaningTypeText}</td>
           <td>${room.isTwin ? 'Oui' : 'Non'}</td>
           <td>${priorityText}</td>
           <td>${room.notes || '-'}</td>
