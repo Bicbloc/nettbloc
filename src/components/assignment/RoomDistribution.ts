@@ -1,3 +1,4 @@
+
 import { Room } from "@/services/pdfService";
 import { toast } from "@/components/ui/use-toast";
 import { getRoomFloor, groupRoomsByFloor } from "@/utils/roomUtils";
@@ -179,9 +180,8 @@ export function distributeRoomsByFloor(
         
         // Check if adding these rooms would exceed the limit
         // If so, only add what can fit - remaining will be unassigned
-        // IMPORTANT: We still loop through all rooms so we can mark them as handled
         roomsOnFloor.forEach(room => {
-          if (assignments[housekeeper].length < numHousekeepers * 15) { // Assuming average 15 rooms per housekeeper
+          if (assignments[housekeeper].length < Math.ceil(availableRooms.length / numHousekeepers) + 5) { // Allow some flexibility
             assignments[housekeeper].push(room);
           } else {
             // Rooms that can't fit with current housekeeper will remain unassigned
@@ -228,6 +228,6 @@ export function generateCombinedReport(
   emailAddress: string,
   customFields?: any
 ): Promise<boolean> {
-  // This function is a placeholder - implementation in reportService.ts
+  // This function is implemented in reportService.ts
   return Promise.resolve(true);
 }

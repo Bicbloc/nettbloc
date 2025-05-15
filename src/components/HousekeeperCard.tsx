@@ -175,7 +175,7 @@ export function HousekeeperCard({
     }
   };
   
-  // Revised floor change handler - modified to handle re-assignments correctly
+  // Revised floor change handler - modified to ensure ALL rooms on a floor are assigned
   const handleFloorChange = (floor: number, isChecked: boolean) => {
     const newPreferredFloors = isChecked
       ? [...preferredFloors, floor]
@@ -184,30 +184,30 @@ export function HousekeeperCard({
     onFloorPreferenceChange(name, newPreferredFloors);
     
     if (isChecked) {
-      // Get only unassigned rooms from this floor
-      const unassignedFloorRooms = unassignedRooms.filter(room => {
+      // Get ALL rooms from this floor, even if already assigned to other housekeepers
+      const floorRooms = unassignedRooms.filter(room => {
         const roomFloor = getRoomFloor(room.number);
-        return roomFloor === floor && !room.assignedTo;
+        return roomFloor === floor;
       });
       
-      // Log pour debugging
-      console.log(`Étage ${floor} - Chambres non assignées trouvées:`, unassignedFloorRooms.length);
-      console.log("Numéros:", unassignedFloorRooms.map(r => r.number).join(', '));
+      // Log for debugging
+      console.log(`Étage ${floor} - Chambres trouvées:`, floorRooms.length);
+      console.log("Numéros:", floorRooms.map(r => r.number).join(', '));
       
       // Check if adding all rooms would exceed the limit
-      if (rooms.length + unassignedFloorRooms.length > effectiveMaxRooms) {
+      if (rooms.length + floorRooms.length > effectiveMaxRooms) {
         toast({
           variant: "destructive",
           title: "Limite dépassée",
-          description: `L'ajout de ${unassignedFloorRooms.length} chambres dépasserait la limite de ${effectiveMaxRooms} chambres pour ${name}. Seulement ${effectiveMaxRooms - rooms.length} chambres peuvent être ajoutées.`
+          description: `L'ajout de ${floorRooms.length} chambres dépasserait la limite de ${effectiveMaxRooms} chambres pour ${name}. Seulement ${effectiveMaxRooms - rooms.length} chambres peuvent être ajoutées.`
         });
         
         // Don't add all rooms, only up to the limit
         const availableSlots = effectiveMaxRooms - rooms.length;
         if (availableSlots <= 0) return;
         
-        // Prioritize unassigned rooms and high priority rooms
-        const prioritizedRooms = [...unassignedFloorRooms]
+        // Prioritize high priority rooms
+        const prioritizedRooms = [...floorRooms]
           .sort((a, b) => {
             // First by priority
             if (a.priority === 'high' && b.priority !== 'high') return -1;
@@ -227,16 +227,21 @@ export function HousekeeperCard({
         return;
       }
       
-      // If we have unassigned rooms on this floor
-      if (unassignedFloorRooms.length > 0 && onRoomUpdate) {
-        // Assign all unassigned rooms on this floor to this housekeeper
-        unassignedFloorRooms.forEach(room => {
+      // If we have rooms on this floor, assign ALL of them to this housekeeper
+      if (floorRooms.length > 0 && onRoomUpdate) {
+        // Force assign all rooms on this floor to this housekeeper
+        floorRooms.forEach(room => {
+          // If room is already assigned to someone else, we need to force reassign
+          if (room.assignedTo && room.assignedTo !== name) {
+            console.log(`Réassignation de chambre ${room.number} de ${room.assignedTo} à ${name}`);
+          }
+          
           const updatedRoom = { ...room, assignedTo: name };
           onRoomUpdate(updatedRoom);
         });
         
         toast({
-          description: `${unassignedFloorRooms.length} chambre(s) non assignée(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
+          description: `${floorRooms.length} chambre(s) de l'étage ${floor === 0 ? 'RDC' : floor} assignée(s) à ${name}`
         });
       }
     } else {

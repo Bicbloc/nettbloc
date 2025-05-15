@@ -1,3 +1,4 @@
+
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
@@ -172,7 +173,7 @@ function generateReportHTML(data: ReportData): string {
         .recouche { background-color: #90EE90; }
         @media print {
           body { margin: 0; }
-          .page-break { page-break-after: always; }
+          .page-break { page-break-after: always; break-after: page; }
         }
         .signature { margin-top: 30px; border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
       </style>
@@ -276,7 +277,7 @@ function generateRoomsTable(data: ReportData): string {
     
     // Create rows for each room
     const rowsHtml = roomsOnFloor.map(room => {
-      // Change the display text and add highlighting classes
+      // Apply highlighting classes
       const cleaningTypeClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
       const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
       const priorityText = room.priority === 'high' ? '⚠️ Haute' : 'Normale';
@@ -373,7 +374,7 @@ export async function generateCombinedReport(
       return generateReportHTML(reportData);
     }));
 
-    // Combine all HTML into a single document with page breaks
+    // Combine all HTML into a single document with explicit page breaks
     const combinedHTML = allHousekeepersHTML.join('<div class="page-break"></div>');
     
     // Generate PDF using html2pdf library
