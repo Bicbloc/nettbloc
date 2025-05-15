@@ -284,8 +284,7 @@ function generateReportHTML(data: ReportData): string {
   });
   
   // Complete HTML with improved styling and encadré for housekeeper name with bold text
-  // Added more padding for housekeeper name (padding: 40px 0 -> padding: 60px 0)
-  // Also increased margin (margin: 30px 0 -> margin: 50px 0)
+  // Added more padding for housekeeper name and increased space between it and tables
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -342,16 +341,16 @@ function generateReportHTML(data: ReportData): string {
         }
         .housekeeper-column {
           width: 100%;
-          padding: 60px 0;  /* Increased padding */
+          padding: 80px 0;  /* Further increased padding */
           text-align: center;
-          margin: 50px 0;  /* Increased margin */
+          margin: 70px 0;  /* Further increased margin */
         }
         .housekeeperName {
           border: 3px solid #000;
-          padding: 20px;
+          padding: 25px 30px;  /* Increased padding inside box */
           font-weight: bold;
           display: inline-block;
-          font-size: 20px;
+          font-size: 22px;  /* Increased font size */
           text-transform: uppercase;
           background-color: #f9f9f9;
           letter-spacing: 1px;
@@ -417,11 +416,11 @@ function generateReportHTML(data: ReportData): string {
           text-align: left;
         }
         .content-section {
-          margin-bottom: 50px;
+          margin-bottom: 70px;  /* Increased space */
           text-align: left;
         }
         .summary-table {
-          margin-top: 50px;
+          margin-top: 80px;  /* Increased space */
         }
         @media print {
           .footer {
@@ -431,7 +430,7 @@ function generateReportHTML(data: ReportData): string {
             right: 0;
           }
           .content {
-            margin-bottom: 50px;
+            margin-bottom: 70px;  /* Increased space */
           }
         }
       </style>
