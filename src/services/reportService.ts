@@ -157,18 +157,6 @@ function generateReportHTML(data: ReportData): string {
   const summaryHtml = generateRoomSummary(data);
   const roomsTableHtml = generateRoomsTable(data);
   
-  // Add housekeeping icon
-  const housekeepingIcon = `
-    <div class="housekeeping-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4"/>
-        <path d="M12 3v16"/>
-        <path d="m9 7 3-3 3 3"/>
-        <path d="M4 15h16"/>
-      </svg>
-    </div>
-  `;
-  
   // Complete HTML with improved page break controls
   return `
     <!DOCTYPE html>
@@ -199,7 +187,6 @@ function generateReportHTML(data: ReportData): string {
         .recouche { background-color: #90EE90; }
         .floor-section { page-break-inside: avoid !important; }
         .signature { margin-top: 30px; border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
-        .housekeeping-icon { text-align: right; }
       </style>
     </head>
     <body>
@@ -209,7 +196,6 @@ function generateReportHTML(data: ReportData): string {
             <h1>Rapport de Nettoyage - ${data.housekeeperName}</h1>
             <div class="info">Date: ${data.currentDate}</div>
           </div>
-          ${housekeepingIcon}
         </div>
         
         ${instructionsHtml}
@@ -421,8 +407,7 @@ export async function generateCombinedReport(
       <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
         /* Ensuring each housekeeper report starts on a new page */
-        .housekeeper-report { page-break-before: always; page-break-after: always; }
-        .housekeeper-report:first-child { page-break-before: auto; }
+        .housekeeper-report { page-break-after: always; }
       </style>
     </head>
     <body>
