@@ -53,6 +53,22 @@ export function ManualAssignmentDialog({
     }
   }, [isOpen, housekeeperNames]);
   
+  // Function to determine room floor from room number
+  const getRoomFloor = (roomNumber: string): number => {
+    // Ignore years like 2025, 2026, 2027, 2028
+    if (/^20(2[5-8])$/.test(roomNumber)) {
+      return 0; // Considérer comme RDC
+    }
+    
+    // Si le numéro a deux chiffres ou moins, c'est au RDC
+    if (roomNumber.length <= 2) {
+      return 0;
+    }
+    
+    // Sinon, le premier chiffre indique l'étage
+    return parseInt(roomNumber[0]) || 0;
+  };
+  
   // Apply filters to rooms
   useEffect(() => {
     let result = [...rooms];
@@ -68,8 +84,7 @@ export function ManualAssignmentDialog({
     if (filterFloor !== "all") {
       const floorNum = parseInt(filterFloor);
       result = result.filter(room => {
-        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
-        const roomFloor = parseInt(room.number[0]);
+        const roomFloor = getRoomFloor(room.number);
         return roomFloor === floorNum;
       });
     }
@@ -77,8 +92,7 @@ export function ManualAssignmentDialog({
     // Apply selected floors filter
     if (selectedFloors.length > 0) {
       result = result.filter(room => {
-        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
-        const roomFloor = parseInt(room.number[0]);
+        const roomFloor = getRoomFloor(room.number);
         return selectedFloors.includes(roomFloor);
       });
     }
@@ -124,7 +138,7 @@ export function ManualAssignmentDialog({
         // Also remove rooms from this floor from selection
         setSelectedRooms(prev => 
           prev.filter(room => {
-            const roomFloor = parseInt(room.number[0]) || 0;
+            const roomFloor = getRoomFloor(room.number);
             return roomFloor !== floor;
           })
         );
@@ -134,9 +148,11 @@ export function ManualAssignmentDialog({
         
         // Get ALL rooms from this floor, regardless of current filter settings
         const allFloorRooms = rooms.filter(room => {
-          const roomFloor = parseInt(room.number[0]) || 0;
+          const roomFloor = getRoomFloor(room.number);
           return roomFloor === floor;
         });
+        
+        console.log(`Chambres trouvées à l'étage ${floor}:`, allFloorRooms.length);
         
         // Check if adding these rooms would exceed any limits
         // This is a simplified check for the UI display only
@@ -185,8 +201,8 @@ export function ManualAssignmentDialog({
       console.log("Assignation intelligente basée sur les étages sélectionnés:", selectedFloors);
       // Récupérer TOUTES les chambres des étages sélectionnés
       roomsToSelect = rooms.filter(room => {
-        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
-        const roomFloor = parseInt(room.number[0]) || 0;
+        // Utiliser la fonction getRoomFloor pour identifier l'étage
+        const roomFloor = getRoomFloor(room.number);
         return selectedFloors.includes(roomFloor);
       });
     } else {
@@ -205,8 +221,8 @@ export function ManualAssignmentDialog({
 
       // Récupérer TOUTES les chambres des étages préférés
       roomsToSelect = rooms.filter(room => {
-        // Utiliser le premier chiffre du numéro de chambre comme indicateur d'étage
-        const roomFloor = parseInt(room.number[0]) || 0;
+        // Utiliser la fonction getRoomFloor pour identifier l'étage
+        const roomFloor = getRoomFloor(room.number);
         return preferredFloors.includes(roomFloor);
       });
     }
@@ -265,7 +281,7 @@ export function ManualAssignmentDialog({
   // Get available floors from rooms
   const availableFloors = Array.from(
     new Set(
-      rooms.map(room => parseInt(room.number[0]))
+      rooms.map(room => getRoomFloor(room.number))
     )
   ).sort((a, b) => a - b);
   
