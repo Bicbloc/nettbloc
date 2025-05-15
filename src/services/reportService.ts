@@ -77,12 +77,7 @@ export async function generateReport(
         orientation: 'portrait',
         compress: true
       },
-      pagebreak: { 
-        mode: ['avoid-all', 'css', 'legacy'],
-        before: '.page-break-before',
-        after: '.page-break-after',
-        avoid: '.avoid-break'
-      }
+      pagebreak: { mode: 'avoid-all' } // Stronger page break control
     };
     
     // Convert HTML to PDF and download
@@ -121,7 +116,7 @@ function generateReportHTML(data: ReportData): string {
   
   if (combinedInstructions) {
     instructionsHtml = `
-      <div class="instructions-section avoid-break">
+      <div class="instructions-section">
         <h3>Instructions</h3>
         <div>${combinedInstructions}</div>
       </div>
@@ -136,7 +131,7 @@ function generateReportHTML(data: ReportData): string {
       .join('');
       
     todoHtml = `
-      <div class="todo-section avoid-break">
+      <div class="todo-section">
         <h3>À faire</h3>
         <ul>${todoItems}</ul>
       </div>
@@ -151,7 +146,7 @@ function generateReportHTML(data: ReportData): string {
       .join('');
       
     toknowHtml = `
-      <div class="toknow-section avoid-break">
+      <div class="toknow-section">
         <h3>À savoir</h3>
         <ul>${toknowItems}</ul>
       </div>
@@ -174,57 +169,56 @@ function generateReportHTML(data: ReportData): string {
         h1 { font-size: 18px; margin-bottom: 5px; }
         h2 { font-size: 16px; margin-top: 10px; margin-bottom: 5px; }
         h3 { font-size: 14px; margin-top: 15px; margin-bottom: 5px; }
-        .table-container { page-break-inside: avoid; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
+        
+        /* Enhanced page break controls */
+        .page-container { page-break-after: always; }
+        .no-break { page-break-inside: avoid !important; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; page-break-inside: avoid !important; }
         table, th, td { border: 1px solid #000; }
         th, td { padding: 5px; text-align: left; font-size: 11px; }
         th { background-color: #f0f0f0; }
         .info { margin-bottom: 15px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .footer { margin-top: 20px; text-align: center; font-size: 10px; }
-        .todo-section, .toknow-section, .instructions-section { margin-top: 15px; }
+        .todo-section, .toknow-section, .instructions-section { margin-top: 15px; page-break-inside: avoid; }
         ul { margin-top: 5px; padding-left: 20px; }
         .room-type { font-weight: bold; }
         .a-blanc { background-color: #FFD580; }
         .recouche { background-color: #90EE90; }
-        .floor-section { page-break-inside: avoid; margin-bottom: 30px; }
-        .page-break { page-break-after: always; break-after: page; }
-        .page-break-before { page-break-before: always; break-before: page; }
-        .page-break-after { page-break-after: always; break-after: page; }
-        .avoid-break { page-break-inside: avoid; }
+        .floor-section { page-break-inside: avoid !important; }
         .signature { margin-top: 30px; border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
       </style>
     </head>
     <body>
-      <div class="header avoid-break">
-        <div>
-          <h1>Rapport de Nettoyage - ${data.housekeeperName}</h1>
-          <div class="info">Date: ${data.currentDate}</div>
+      <div class="page-container no-break">
+        <div class="header no-break">
+          <div>
+            <h1>Rapport de Nettoyage - ${data.housekeeperName}</h1>
+            <div class="info">Date: ${data.currentDate}</div>
+          </div>
         </div>
-      </div>
-      
-      ${instructionsHtml}
-      ${todoHtml}
-      ${toknowHtml}
-      
-      <div class="avoid-break">
+        
+        ${instructionsHtml}
+        ${todoHtml}
+        ${toknowHtml}
+        
         <h2>Résumé des chambres</h2>
-        ${summaryHtml}
-      </div>
-      
-      <div class="avoid-break page-break-before">
+        <div class="no-break">
+          ${summaryHtml}
+        </div>
+        
         <h2>Liste des chambres à nettoyer</h2>
-        <div class="rooms-section">
+        <div class="no-break">
           ${roomsTableHtml}
         </div>
-      </div>
-      
-      <div class="signature avoid-break">
-        Signature
-      </div>
-      
-      <div class="footer">
-        Bicbloc Report - Généré le ${data.currentDate}
+        
+        <div class="signature no-break">
+          Signature
+        </div>
+        
+        <div class="footer">
+          Bicbloc Report - Généré le ${data.currentDate}
+        </div>
       </div>
     </body>
     </html>
@@ -242,7 +236,7 @@ function generateRoomSummary(data: ReportData): string {
                         quickCleanCount * data.config.quickCleaningTime;
   
   return `
-    <div class="table-container">
+    <div class="table-container no-break">
       <table>
         <tr>
           <th>Type de nettoyage</th>
@@ -292,7 +286,7 @@ function generateRoomsTable(data: ReportData): string {
     .sort((a, b) => a - b);
   
   // Build table for each floor
-  const tablesHtml = sortedFloors.map((floor, index) => {
+  const tablesHtml = sortedFloors.map(floor => {
     const roomsOnFloor = roomsByFloor[floor];
     
     // Sort rooms on this floor by number
@@ -319,18 +313,15 @@ function generateRoomsTable(data: ReportData): string {
       `;
     }).join('');
     
-    // Add page break before new floor section if not the first floor
-    const pageBreakClass = index > 0 && index % 2 === 0 ? 'page-break-before' : '';
-    
     return `
-      <div class="floor-section avoid-break ${pageBreakClass}">
+      <div class="floor-section no-break">
         <h3>Étage ${floor === 0 ? 'RDC' : floor}</h3>
-        <div class="table-container">
+        <div class="table-container no-break">
           <table>
             <tr>
               <th>Chambre</th>
               <th>Type</th>
-              <th>Double</th>
+              <th>Twin</th>
               <th>Priorité</th>
               <th>Notes</th>
               <th>Remarques</th>
@@ -365,10 +356,8 @@ export async function generateCombinedReport(
       return false;
     }
 
-    // Create HTML sections for each housekeeper - one per page
-    const housekeeperHTMLs: string[] = [];
-
-    for (const { name, rooms } of validHousekeepers) {
+    // Create separate HTML pages for each housekeeper
+    const allHousekeepersHTML = validHousekeepers.map(({ name, rooms }) => {
       // Get today's date in French locale
       const today = new Date();
       const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -376,13 +365,16 @@ export async function generateCombinedReport(
       
       // Sort rooms by floor and then room number
       const sortedRooms = [...rooms].sort((a, b) => {
+        // Extract floor and room numbers
         const floorA = parseInt(a.number.charAt(0));
         const floorB = parseInt(b.number.charAt(0));
         
+        // Compare floors first
         if (floorA !== floorB) {
           return floorA - floorB;
         }
         
+        // If on same floor, compare room numbers
         return a.number.localeCompare(b.number, undefined, { numeric: true });
       });
       
@@ -393,6 +385,7 @@ export async function generateCombinedReport(
         rooms: sortedRooms,
         currentDate: currentDate,
         config: config,
+        // Include custom fields if provided
         toDoItems: customFields?.toDoItems || [],
         toKnowItems: customFields?.toKnowItems || [],
         instructions: customFields?.instructions || '',
@@ -400,41 +393,34 @@ export async function generateCombinedReport(
         housekeeperInstructions: customFields?.housekeeperInstructions || {}
       };
       
-      // Generate complete HTML for this housekeeper
-      const housekeeperHTML = generateReportHTML(reportData);
-      housekeeperHTMLs.push(housekeeperHTML);
-    }
+      // Generate HTML for this housekeeper
+      return generateReportHTML(reportData);
+    });
     
-    // Combine all HTML sections with forced page breaks between them
+    // Combine all HTML pages
     const combinedHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Rapports de Nettoyage</title>
-        <style>
-          .report-container {
-            page-break-after: always;
-            break-after: page;
-          }
-          .report-container:last-child {
-            page-break-after: avoid;
-            break-after: avoid;
-          }
-          /* Prevent table breaking */
-          table { page-break-inside: avoid; }
-        </style>
-      </head>
-      <body>
-        ${housekeeperHTMLs.map(html => `
-          <div class="report-container">
-            ${html.replace(/<!DOCTYPE[^>]*>|<html[^>]*>|<\/html>|<head>.*?<\/head>|<body>|<\/body>/gs, '')}
-          </div>
-        `).join('')}
-      </body>
-      </html>
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <title>Rapports Combinés</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        /* Ensuring each housekeeper report starts on a new page */
+        .housekeeper-report { page-break-after: always; }
+      </style>
+    </head>
+    <body>
+      ${allHousekeepersHTML.map((html, index) => {
+        // We need to extract just the body content from each HTML
+        const bodyContent = html.match(/<body>([\s\S]*?)<\/body>/i)?.[1] || html;
+        return `<div class="housekeeper-report">${bodyContent}</div>`;
+      }).join('')}
+    </body>
+    </html>
     `;
     
-    // Generate PDF using html2pdf library with improved table handling
+    // Generate PDF using html2pdf library with improved page break handling
     const pdfOptions = {
       margin: [15, 15, 15, 15],
       filename: `rapports-complet-${new Date().toISOString().slice(0,10)}.pdf`,
@@ -451,15 +437,10 @@ export async function generateCombinedReport(
         orientation: 'portrait',
         compress: true
       },
-      pagebreak: { 
-        mode: ['avoid-all', 'css', 'legacy'],
-        before: '.page-break-before',
-        after: '.page-break-after',
-        avoid: '.avoid-break'
-      }
+      pagebreak: { mode: 'avoid-all' } // Stronger page break control
     };
     
-    // Convert HTML to PDF and download as a single file
+    // Convert HTML to PDF and download
     await html2pdf().from(combinedHTML).set(pdfOptions).save();
     
     toast({
