@@ -238,104 +238,123 @@ function extractRoomContexts(fullText: string): { roomNumber: string, context: s
   });
 }
 
-// Implémentation de la fonction d'analyse fournie par l'utilisateur
+// Implémentation améliorée de la fonction d'analyse selon les règles fournies
 function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  let status: string = 'needs-cleaning';
-  let cleaningType: 'full' | 'quick' | 'none' = 'none';
-
+  // Extraction des informations clés du contexte
   const dateMatches = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
   const timeMatches = context.match(/\b\d{1,2}:\d{2}\b/g) || [];
+  const adultBlocks = context.match(/× Adultes.*?(?=\d{2}\/\d{2}\/\d{4}|$)/g) || [];
   const hasDIR = context.includes('DIR');
   const hasINS = context.includes('INS');
   const hasCL = context.includes('CL');
-
-  // 🟦 Analyse du contexte
-  const isLeftColumn = context.includes('Spaces') || context.includes('Espace'); // indicateur gauche
-  const hasTwoClientBlocks = dateMatches.length >= 2 && timeMatches.length >= 1;
-  const sameClientTwice = (context.match(/× Adultes.*\d{2}\/\d{2}\/\d{4}/g) || []).length >= 2;
-  const oneBlockWithOnlyHour = dateMatches.length === 1 && timeMatches.length === 1;
-
-  console.log("🔍 Analyse contexte: dates=" + dateMatches.length + 
+  const hasSAL = context.includes('SAL');
+  const hasNight = context.includes('Nuit');
+  
+  // Position du texte (gauche vs centre/droite) - estimation basée sur le contexte
+  const isLeftColumn = context.includes('Spaces') || context.includes('Espace') || 
+                      context.match(/^\s*\d{3}\s+[A-Z]{2,3}\s+/);
+  
+  // Vérifier si deux blocs clients ont le même nom (prolongation)
+  let sameClientTwice = false;
+  if (adultBlocks.length >= 2) {
+    const clientNames = adultBlocks.map(block => {
+      const nameMatch = block.match(/× Adultes\s+(.*?)(?=,|$)/);
+      return nameMatch ? nameMatch[1].trim() : '';
+    }).filter(name => name);
+    
+    if (clientNames.length >= 2) {
+      sameClientTwice = clientNames[0] === clientNames[1];
+    }
+  }
+  
+  console.log("🔍 Analyse détaillée: dates=" + dateMatches.length + 
               ", heures=" + timeMatches.length + 
+              ", blocs client=" + adultBlocks.length +
               ", DIR=" + hasDIR + 
               ", INS=" + hasINS + 
-              ", CL=" + hasCL + 
-              ", isLeftColumn=" + isLeftColumn + 
-              ", hasTwoClientBlocks=" + hasTwoClientBlocks + 
+              ", CL=" + hasCL +
+              ", SAL=" + hasSAL +
+              ", Nuit=" + hasNight +
+              ", isLeftColumn=" + isLeftColumn +
               ", sameClientTwice=" + sameClientTwice);
-
-  // 🟥 Nettoyage à blanc : uniquement si ce n'est PAS le même client deux fois
+  
+  // 🟥 NETTOYAGE À BLANC (FULL)
   if (
-    !sameClientTwice && (
-      isLeftColumn ||
-      hasTwoClientBlocks ||
-      oneBlockWithOnlyHour ||
-      (hasDIR && dateMatches.length >= 1)
-    )
+    // Deux blocs clients différents (départ + arrivée)
+    (adultBlocks.length >= 2 && !sameClientTwice) ||
+    // Une date et une heure (chambre prévue en départ)
+    (dateMatches.length === 1 && timeMatches.length >= 1) ||
+    // Positionnement à gauche (colonne de départ)
+    isLeftColumn ||
+    // Statut DIR
+    hasDIR ||
+    // Deux dates sans mention "Nuit" (check-out + check-in)
+    (dateMatches.length >= 2 && !hasNight)
   ) {
-    console.log("✅ Détecté: nettoyage COMPLET (à blanc)");
+    console.log("✅ Détecté: À BLANC (nettoyage complet)");
     return {
-      status: 'needs-cleaning',
+      status: 'a_blanc',
       cleaningType: 'full',
     };
   }
-
-  // 🔵 Recouche : un seul bloc ou deux blocs du même client
-  const hasSingleClient = dateMatches.length === 2 && context.includes('× Adultes');
+  
+  // 🔵 RECOUCHE (QUICK)
   if (
-    sameClientTwice ||
-    (hasSingleClient && !hasTwoClientBlocks && !isLeftColumn && !oneBlockWithOnlyHour)
+    // Un seul bloc client avec info séjour
+    (adultBlocks.length === 1 && hasNight && dateMatches.length >= 1 && !isLeftColumn) ||
+    // Deux blocs client avec le même nom (prolongation)
+    sameClientTwice
   ) {
-    console.log("✅ Détecté: nettoyage RAPIDE (recouche)");
+    console.log("✅ Détecté: RECOUCHE (nettoyage rapide)");
     return {
-      status: 'needs-cleaning',
+      status: 'recouche',
       cleaningType: 'quick',
     };
   }
-
-  // 🟩 Propre
-  const noDates = dateMatches.length === 0;
+  
+  // 🟩 PROPRE (NONE)
   if (
-    (noDates && (hasINS || hasCL)) ||
-    (hasINS && context.includes('× Adultes'))
+    // Aucun bloc client et statut CL ou INS
+    ((adultBlocks.length === 0 || !context.includes('× Adultes')) && (hasCL || hasINS)) ||
+    // Un bloc client à droite uniquement et statut INS
+    (adultBlocks.length === 1 && hasINS && !isLeftColumn)
   ) {
-    console.log("✅ Détecté: chambre PROPRE");
+    console.log("✅ Détecté: PROPRE (pas de nettoyage)");
     return {
-      status: 'clean',
+      status: 'propre',
       cleaningType: 'none',
     };
   }
-
-  // 🔧 Maintenance
+  
+  // 🔧 MAINTENANCE (NONE)
   if (
     context.toLowerCase().includes('maintenance') ||
-    context.toLowerCase().includes('hors service')
+    context.toLowerCase().includes('hors service') ||
+    context.toLowerCase().includes('hors d\'usage') ||
+    context.toLowerCase().includes('punaises de lit') ||
+    context.toLowerCase().includes('inutilisable')
   ) {
-    console.log("✅ Détecté: chambre en MAINTENANCE");
+    console.log("✅ Détecté: MAINTENANCE");
     return {
       status: 'maintenance',
       cleaningType: 'none',
     };
   }
-
-  // 🟠 Occupée
-  if (
-    context.toLowerCase().includes('occupied') ||
-    context.includes('OCC')
-  ) {
-    console.log("✅ Détecté: chambre OCCUPÉE");
+  
+  // 🟠 Par défaut : À BLANC si SAL, sinon PROPRE
+  if (hasSAL) {
+    console.log("⚠️ Règle par défaut: SAL => À BLANC (nettoyage complet)");
     return {
-      status: 'occupied',
+      status: 'a_blanc',
+      cleaningType: 'full',
+    };
+  } else {
+    console.log("⚠️ Règle par défaut: PROPRE (pas de nettoyage)");
+    return {
+      status: 'propre',
       cleaningType: 'none',
     };
   }
-
-  // 🔁 Par défaut
-  console.log("⚠️ Aucun motif reconnu, par défaut: nettoyage COMPLET");
-  return {
-    status: 'needs-cleaning',
-    cleaningType: 'full',
-  };
 }
 
 // Analyse le texte pour extraire les informations des chambres
