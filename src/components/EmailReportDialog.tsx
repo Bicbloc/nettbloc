@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ReportFields } from "@/services/reportService";
+import { ReportFields } from "@/components/ReportCustomFields"; // Updated import path
 import ReportCustomFields from "@/components/ReportCustomFields";
 import { getReportEmail, saveReportEmail } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";

@@ -1,11 +1,7 @@
 import { CleaningConfig, Room } from "@/services/pdfService";
 import html2pdf from 'html2pdf.js';
 import { toast } from "@/hooks/use-toast";
-
-export interface ReportFields {
-  toDoItems: string[];
-  toKnowItems: string[];
-}
+import { ReportFields } from "@/components/ReportCustomFields"; // Import from ReportCustomFields
 
 export async function generateHousekeeperReport(
   housekeeperName: string, 
@@ -176,26 +172,54 @@ function generateHousekeeperReportHtml(
   
   // Add custom fields if provided
   if (customFields) {
-    if (customFields.toDoItems && customFields.toDoItems.length > 0) {
+    // Add general instructions if provided
+    if (customFields.generalInstructions) {
       html += `
-        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff8dc;">
-          <h3 style="margin-top: 0;">À Faire</h3>
-          <ul>
-            ${customFields.toDoItems.map(item => `<li>${item}</li>`).join('')}
-          </ul>
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f5f5f5;">
+          <h3 style="margin-top: 0;">Instructions Générales</h3>
+          <p>${customFields.generalInstructions}</p>
         </div>
       `;
     }
     
-    if (customFields.toKnowItems && customFields.toKnowItems.length > 0) {
+    // Add specific instructions for this housekeeper if provided
+    if (customFields.housekeeperInstructions && customFields.housekeeperInstructions[housekeeperName]) {
       html += `
-        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #e6f7ff;">
-          <h3 style="margin-top: 0;">À Savoir</h3>
-          <ul>
-            ${customFields.toKnowItems.map(item => `<li>${item}</li>`).join('')}
-          </ul>
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff0db;">
+          <h3 style="margin-top: 0;">Instructions pour ${housekeeperName}</h3>
+          <p>${customFields.housekeeperInstructions[housekeeperName]}</p>
         </div>
       `;
+    }
+    
+    // Add to-do items if provided
+    if (customFields.toDoItems && customFields.toDoItems.length > 0) {
+      const filteredItems = customFields.toDoItems.filter(item => item.trim().length > 0);
+      if (filteredItems.length > 0) {
+        html += `
+          <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff8dc;">
+            <h3 style="margin-top: 0;">À Faire</h3>
+            <ul>
+              ${filteredItems.map(item => `<li>${item}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      }
+    }
+    
+    // Add to-know items if provided
+    if (customFields.toKnowItems && customFields.toKnowItems.length > 0) {
+      const filteredItems = customFields.toKnowItems.filter(item => item.trim().length > 0);
+      if (filteredItems.length > 0) {
+        html += `
+          <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #e6f7ff;">
+            <h3 style="margin-top: 0;">À Savoir</h3>
+            <ul>
+              ${filteredItems.map(item => `<li>${item}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      }
     }
   }
   
