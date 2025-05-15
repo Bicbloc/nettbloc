@@ -188,8 +188,8 @@ export async function processWithDeepSeek(file: File, apiKey: string): Promise<R
     try {
       const standardRooms = await processPdf(file);
       toast({
-        variant: "warning",
-        title: "Analyse DeepSeek échouée",
+        variant: "default", 
+        title: "⚠️ Analyse DeepSeek échouée",
         description: "Analyse standard utilisée en secours",
       });
       return standardRooms;
