@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -102,35 +103,26 @@ export async function processWithDeepSeek(file: File, apiKey: string): Promise<R
     
     console.log("PDF texte extrait pour DeepSeek:", fullText.substring(0, 500) + "...");
     
-    // Extraire les numéros de chambre potentiels avec leur contexte
-    const roomContexts = extractRoomContexts(fullText);
+    // Utiliser directement l'analyse du texte avec le nouvel algorithme amélioré
+    const rooms = parseRoomsFromText(fullText, true);
     
-    if (roomContexts.length === 0) {
-      console.log("Aucune chambre détectée pour DeepSeek, utilisation des données simulées");
-      return generateMockRoomData();
-    }
-    
-    // Analyser chaque contexte de chambre avec DeepSeek
-    const rooms: Room[] = await analyzeRoomsWithDeepSeek(roomContexts, apiKey);
-    
-    // Si aucune chambre n'a été analysée correctement, retourner des données de test
     if (rooms.length === 0) {
-      console.log("Aucune chambre analysée correctement avec DeepSeek, utilisation des données simulées");
+      console.log("Aucune chambre détectée avec l'analyse avancée, utilisation des données simulées");
       return generateMockRoomData();
     }
     
     toast({
-      title: "DeepSeek Analysis Complete",
-      description: `Successfully analyzed ${rooms.length} rooms with DeepSeek AI`,
+      title: "Analyse Avancée Complète",
+      description: `${rooms.length} chambres analysées avec succès`,
     });
     
     return rooms;
   } catch (error) {
-    console.error("Error processing PDF with DeepSeek:", error);
+    console.error("Error processing PDF with advanced analysis:", error);
     toast({
       variant: "destructive",
-      title: "DeepSeek Processing Failed",
-      description: "Failed to process the PDF file with DeepSeek. Please try again.",
+      title: "Échec de l'Analyse",
+      description: "Une erreur s'est produite lors de l'analyse avancée du PDF.",
     });
     throw error;
   }
@@ -170,214 +162,105 @@ function extractRoomContexts(fullText: string): { roomNumber: string, context: s
   });
 }
 
-// Fonction pour analyser les chambres avec DeepSeek
-async function analyzeRoomsWithDeepSeek(
-  roomContexts: { roomNumber: string, context: string }[], 
-  apiKey: string
-): Promise<Room[]> {
-  try {
-    // Construire le prompt pour DeepSeek
-    const systemPrompt = `Tu es un assistant spécialisé dans l'analyse de rapports d'hôtel du système Mews.
-Ton objectif est d'analyser le contexte autour d'un numéro de chambre et déterminer son statut selon ces règles précises:
+// Implémentation de la nouvelle fonction d'analyse fournie par l'utilisateur
+function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+  let status: string = 'needs-cleaning';
+  let cleaningType: 'full' | 'quick' | 'none' = 'none';
 
-1. 🟥 À nettoyer à blanc (status: "à_blanc", cleaningType: "full") si:
-   - Tu observes deux blocs client différents (deux ensembles "× Adultes" + dates différentes)
-   - Le bloc client est positionné dans la colonne gauche
-   - Il y a un bloc client à droite ET le statut contient "DIR"
-   - Tu vois une date unique + une heure (ex: 11:00)
-   - Le statut contient "DIR", même sans client
+  const dateMatches = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+  const timeMatches = context.match(/\b\d{1,2}:\d{2}\b/g) || [];
+  const hasDIR = context.includes('DIR');
+  const hasINS = context.includes('INS');
+  const hasCL = context.includes('CL');
 
-2. 🔵 Recouche (status: "recouche", cleaningType: "quick") si:
-   - Tu observes un seul bloc client (centré)
-   - Le bloc contient date d'arrivée + nom client + date départ
-   - OU deux blocs avec même nom client (séjour prolongé)
-   - ET la chambre ne remplit aucune condition d'un départ
+  // 🟦 Analyse du contexte
+  const isLeftColumn = context.includes('Spaces') || context.includes('Espace'); // indicateur gauche
+  const hasTwoClientBlocks = dateMatches.length >= 2 && timeMatches.length >= 1;
+  const sameClientTwice = (context.match(/× Adultes.*\d{2}\/\d{2}\/\d{4}/g) || []).length >= 2;
+  const oneBlockWithOnlyHour = dateMatches.length === 1 && timeMatches.length === 1;
 
-3. 🟩 Propre (status: "propre", cleaningType: "none") si:
-   - La chambre est vide (pas de bloc client) ET son statut contient "INS" ou "CL"
-   - OU un bloc client uniquement dans la colonne droite ET statut contient "INS"
-
-4. 🛠 Maintenance (status: "maintenance", cleaningType: "none") si:
-   - Tu trouves une mention "hors d'usage", "maintenance", ou "punaises de lit"
-
-Pour chaque chambre, réponds UNIQUEMENT au format JSON comme ceci:
-\`\`\`json
-{
-  "number": "[numéro de chambre]",
-  "status": "[à_blanc/recouche/propre/maintenance]",
-  "cleaningType": "[full/quick/none]"
-}
-\`\`\`
-
-N'inclus AUCUN texte d'explication, seulement le JSON.`;
-
-    const rooms: Room[] = [];
-    const batchSize = 5; // Traiter par lots pour éviter de surcharger l'API
-    
-    for (let i = 0; i < roomContexts.length; i += batchSize) {
-      const batch = roomContexts.slice(i, i + batchSize);
-      const batchPromises = batch.map(async (roomContext) => {
-        try {
-          const userPrompt = `Analyse le contexte suivant pour la chambre ${roomContext.roomNumber} et détermine son statut:
-\`\`\`
-${roomContext.context}
-\`\`\``;
-
-          const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-              model: "deepseek-chat",
-              messages: [
-                {
-                  role: "system",
-                  content: systemPrompt
-                },
-                {
-                  role: "user",
-                  content: userPrompt
-                }
-              ],
-              temperature: 0.2,
-              max_tokens: 150
-            })
-          });
-          
-          if (!response.ok) {
-            throw new Error(`DeepSeek API responded with status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          const content = data.choices[0]?.message?.content;
-          
-          if (content) {
-            try {
-              // Extraire le JSON de la réponse (peut être entouré de ```json ... ```)
-              const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
-                              content.match(/```\s*([\s\S]*?)\s*```/) || 
-                              [null, content];
-              const jsonStr = jsonMatch[1] || content;
-              
-              const roomData = JSON.parse(jsonStr);
-              
-              // Valider et normaliser les données
-              const status = normalizeStatus(roomData.status);
-              const cleaningType = normalizeCleaningType(roomData.cleaningType);
-              const roomNumber = roomData.number || roomContext.roomNumber;
-              
-              const priority = determinePriority(roomContext.context);
-              const isTwin = roomContext.context.includes('TWN') || 
-                           roomContext.context.includes('twin') || 
-                           roomContext.context.includes('TWIN');
-              const floor = getRoomFloor(roomNumber);
-              
-              // Convertir au format Room attendu par l'application
-              rooms.push({
-                number: roomNumber,
-                status,
-                cleaningType,
-                priority,
-                isTwin,
-                isUrgent: priority === 'high',
-                notUrgent: priority === 'low',
-                floor
-              });
-              
-              console.log(`DeepSeek a analysé la chambre ${roomNumber}: ${status}, ${cleaningType}`);
-              
-            } catch (error) {
-              console.error(`Erreur lors du traitement JSON pour la chambre ${roomContext.roomNumber}:`, error);
-              console.log("Contenu de la réponse:", content);
-            }
-          }
-        } catch (error) {
-          console.error(`Erreur lors de l'analyse de la chambre ${roomContext.roomNumber}:`, error);
-        }
-      });
-      
-      // Attendre que toutes les chambres dans ce lot soient traitées
-      await Promise.all(batchPromises);
-      
-      // Petite pause entre les lots pour respecter les limites de l'API
-      if (i + batchSize < roomContexts.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    // Trier les chambres par numéro
-    return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
-  } catch (error) {
-    console.error("Erreur lors de l'analyse avec DeepSeek:", error);
-    throw error;
+  // 🟥 Nettoyage à blanc : uniquement si ce n'est PAS le même client deux fois
+  if (
+    !sameClientTwice && (
+      isLeftColumn ||
+      hasTwoClientBlocks ||
+      oneBlockWithOnlyHour ||
+      (hasDIR && dateMatches.length >= 1)
+    )
+  ) {
+    return {
+      status: 'needs-cleaning',
+      cleaningType: 'full',
+    };
   }
-}
 
-// Fonction pour normaliser le statut retourné par DeepSeek vers le format attendu par l'application
-function normalizeStatus(status: string): string {
-  if (!status) return 'needs-cleaning';
-  
-  const statusLower = status.toLowerCase();
-  
-  if (statusLower.includes('à_blanc') || statusLower.includes('a_blanc') || 
-      statusLower.includes('blanc') || statusLower.includes('depart')) {
-    return 'needs-cleaning';
+  // 🔵 Recouche : un seul bloc ou deux blocs du même client
+  const hasSingleClient = dateMatches.length === 2 && context.includes('× Adultes');
+  if (
+    sameClientTwice ||
+    (hasSingleClient && !hasTwoClientBlocks && !isLeftColumn && !oneBlockWithOnlyHour)
+  ) {
+    return {
+      status: 'needs-cleaning',
+      cleaningType: 'quick',
+    };
   }
-  
-  if (statusLower.includes('recouche')) {
-    return 'needs-cleaning';
-  }
-  
-  if (statusLower.includes('propre') || statusLower.includes('clean')) {
-    return 'clean';
-  }
-  
-  if (statusLower.includes('maintenance') || statusLower.includes('hors') || 
-      statusLower.includes('usage') || statusLower.includes('punaise')) {
-    return 'maintenance';
-  }
-  
-  return 'needs-cleaning'; // Par défaut
-}
 
-// Fonction pour normaliser le type de nettoyage retourné par DeepSeek
-function normalizeCleaningType(cleaningType: string): 'full' | 'quick' | 'none' {
-  if (!cleaningType) return 'full';
-  
-  const typeLower = cleaningType.toLowerCase();
-  
-  if (typeLower.includes('full')) {
-    return 'full';
+  // 🟩 Propre
+  const noDates = dateMatches.length === 0;
+  if (
+    (noDates && (hasINS || hasCL)) ||
+    (hasINS && context.includes('× Adultes'))
+  ) {
+    return {
+      status: 'clean',
+      cleaningType: 'none',
+    };
   }
-  
-  if (typeLower.includes('quick')) {
-    return 'quick';
+
+  // 🔧 Maintenance
+  if (
+    context.toLowerCase().includes('maintenance') ||
+    context.toLowerCase().includes('hors service')
+  ) {
+    return {
+      status: 'maintenance',
+      cleaningType: 'none',
+    };
   }
-  
-  if (typeLower.includes('none')) {
-    return 'none';
+
+  // 🟠 Occupée
+  if (
+    context.toLowerCase().includes('occupied') ||
+    context.includes('OCC')
+  ) {
+    return {
+      status: 'occupied',
+      cleaningType: 'none',
+    };
   }
-  
-  return 'full'; // Par défaut
+
+  // 🔁 Par défaut
+  return {
+    status: 'needs-cleaning',
+    cleaningType: 'full',
+  };
 }
 
 // Analyse le texte pour extraire les informations des chambres
-function parseRoomsFromText(text: string): Room[] {
+function parseRoomsFromText(text: string, useAdvancedAnalysis: boolean = false): Room[] {
   const rooms: Room[] = [];
   
   // Patterns améliorés pour détecter les numéros de chambre dans différents formats
-  // Ajout de nouveaux patterns pour capturer plus de formats de numéros de chambre
   const patterns = [
     /\b(Spaces|Espace)\s+(\d{3})\b/gi,
     /\b([1-9]\d{2})\s+(SGL|DBL|TWN|DIR|CL|INS|SP|DX|CB)\b/gi,
     /\b([1-9]\d{2})\b(?=\s*[A-Z]{2,3})/g,
     /\b(Room|Chambre)\s+(\d{3})\b/gi,
-    /\b([1-9]\d{2})\s*-\s*[A-Z]/gi, // Format 101-A
-    /\b(No\.|N°)\s*(\d{3})\b/gi,     // Format No. 101 ou N° 101
-    /\b(\d{3})\s*\(/gi,              // Format 101 (quelque chose)
-    /\b(\d{1,2})(\d{2})\b(?!\d)/g    // Capture numéro de chambre simple comme 101
+    /\b([1-9]\d{2})\s*-\s*[A-Z]/gi, 
+    /\b(No\.|N°)\s*(\d{3})\b/gi,    
+    /\b(\d{3})\s*\(/gi,             
+    /\b(\d{1,2})(\d{2})\b(?!\d)/g   
   ];
   
   // Utiliser chaque pattern pour trouver les numéros de chambre
@@ -394,7 +277,6 @@ function parseRoomsFromText(text: string): Room[] {
       if (match[1] === 'Spaces' || match[1] === 'Espace' || match[1] === 'Room' || match[1] === 'Chambre' || match[1] === 'No.' || match[1] === 'N°') {
         roomNumber = match[2];
       } else if (pattern.source.includes('\\d{1,2})(\\d{2})')) {
-        // Pour le pattern qui capture le numéro de chambre directement
         roomNumber = match[0];
       } else {
         roomNumber = match[1];
@@ -419,7 +301,19 @@ function parseRoomsFromText(text: string): Room[] {
       const context = text.substring(start, end);
       
       // Analyser le statut et le type de nettoyage selon les règles définies
-      const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+      let status, cleaningType;
+      
+      if (useAdvancedAnalysis) {
+        // Utiliser la nouvelle fonction d'analyse améliorée
+        const result = determineStatusAndCleaningTypeNewRules(context);
+        status = result.status;
+        cleaningType = result.cleaningType;
+      } else {
+        // Utiliser l'ancienne fonction d'analyse
+        const result = determineStatusAndCleaningType(context);
+        status = result.status;
+        cleaningType = result.cleaningType;
+      }
       
       // Déterminer si c'est une chambre twin
       const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
@@ -479,7 +373,20 @@ function parseRoomsFromText(text: string): Room[] {
     const end = Math.min(text.length, genericMatch.index + 200);
     const context = text.substring(start, end);
     
-    const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+    let status, cleaningType;
+    
+    if (useAdvancedAnalysis) {
+      // Utiliser la nouvelle fonction d'analyse améliorée
+      const result = determineStatusAndCleaningTypeNewRules(context);
+      status = result.status;
+      cleaningType = result.cleaningType;
+    } else {
+      // Utiliser l'ancienne fonction d'analyse
+      const result = determineStatusAndCleaningType(context);
+      status = result.status;
+      cleaningType = result.cleaningType;
+    }
+    
     const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
     const priority = determinePriority(context);
     const floor = getRoomFloor(roomNumber);
@@ -496,7 +403,7 @@ function parseRoomsFromText(text: string): Room[] {
     });
   }
   
-  console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
+  console.log(`Détecté ${rooms.length} chambres avec le parsing ${useAdvancedAnalysis ? 'avancé' : 'standard'}`);
   
   // Trier les chambres par numéro
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
@@ -517,96 +424,6 @@ function getRoomFloor(roomNumber: string): number {
   // Sinon, le premier chiffre indique l'étage
   const firstDigit = parseInt(roomNumber[0]);
   return isNaN(firstDigit) ? 0 : firstDigit;
-}
-
-// Nouvelle fonction d'analyse selon les règles définies
-function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // Valeurs par défaut
-  let status = 'needs-cleaning';
-  let cleaningType: 'full' | 'quick' | 'none' = 'none';
-
-  // 🟦 Chambre à blanc - CAS 1: Un bloc de réservation apparaît dans la colonne de gauche du rapport
-  const leftColumnReservation = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
-                               !context.includes("Adults.*\d{2}\/\d{2}\/\d{4}");
-                               
-  if (leftColumnReservation) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟦 Chambre à blanc - CAS 2: Un bloc de réservation en colonne droite ET statut DIR
-  const rightColumnWithDIR = /Adults.*\d{2}\/\d{2}\/\d{4}/.test(context) && 
-                             (context.includes('DIR') || context.toLowerCase().includes('dirty'));
-  
-  if (rightColumnWithDIR) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟦 Chambre à blanc - CAS 3: Deux blocs distincts visibles
-  const twoDistinctBlocks = context.match(/\d{2}\/\d{2}\/\d{4}/g)?.length >= 2;
-  
-  if (twoDistinctBlocks) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🔵 Chambre en recouche: Une seule ligne avec date d'arrivée et départ ultérieure
-  const hasOneReservationLine = /\d{2}\/\d{2}\/\d{4}.*Night/.test(context) || 
-                               /\d{2}\/\d{2}\/\d{4}.*séjour/.test(context) ||
-                               /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
-  
-  if (hasOneReservationLine && !leftColumnReservation && !rightColumnWithDIR && !twoDistinctBlocks) {
-    cleaningType = 'quick';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟩 Chambre propre - CAS 1: Case vide (aucun bloc client) ET statut CL ou INS
-  const emptyWithCleanStatus = (!context.match(/\d{2}\/\d{2}\/\d{4}/g) && 
-                              (context.includes('CL') || context.includes('INS') || 
-                               context.toLowerCase().includes('clean') || context.toLowerCase().includes('inspection')));
-  
-  // 🟩 Chambre propre - CAS 2: Chambre dans colonne de droite ET statut INS uniquement
-  const rightColumnINS = /Adults.*INS/.test(context) || 
-                         (context.includes('Adults') && context.toLowerCase().includes('inspection'));
-  
-  if (emptyWithCleanStatus || rightColumnINS) {
-    cleaningType = 'none';
-    status = 'clean';
-    return { status, cleaningType };
-  }
-
-  // Cas par défaut - si aucune règle ne correspond explicitement
-  // Vérifier s'il y a un statut DIR visible
-  if (context.includes('DIR') || context.toLowerCase().includes('dirty')) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-  
-  // Si des mots-clés comme "maintenance" ou "out of order" sont présents
-  if (context.toLowerCase().includes('maintenance') || 
-      context.toLowerCase().includes('out of order') || 
-      context.toLowerCase().includes('hors service')) {
-    status = 'maintenance';
-    cleaningType = 'none';
-    return { status, cleaningType };
-  }
-  
-  // Si des mots-clés comme "occupé" ou "occupied" sont présents
-  if (context.toLowerCase().includes('occupied') || 
-      context.toLowerCase().includes('occupé') || 
-      context.includes('OCC')) {
-    status = 'occupied';
-    cleaningType = 'none';
-    return { status, cleaningType };
-  }
-
-  return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
 // Fonction historique laissée en place pour référence

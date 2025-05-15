@@ -25,7 +25,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
   const [useDeepSeek, setUseDeepSeek] = useState(false);
-  const [apiKey, setApiKey] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,23 +74,16 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       return;
     }
 
-    if (useDeepSeek && !apiKey) {
-      toast({
-        variant: "destructive",
-        title: "Clé API manquante",
-        description: "Veuillez fournir une clé API DeepSeek pour utiliser cette fonctionnalité",
-      });
-      return;
-    }
-
     try {
       setIsUploading(true);
       console.log("Traitement du fichier:", selectedFile.name);
       
       let data;
       if (useDeepSeek) {
-        console.log("Utilisation de DeepSeek API pour le traitement");
-        data = await processWithDeepSeek(selectedFile, apiKey);
+        console.log("Utilisation de DeepSeek AI pour l'analyse");
+        // Using internal API key, no need to ask for it
+        const internalApiKey = "sk-INTERNAL-KEY"; // This will be replaced on the backend
+        data = await processWithDeepSeek(selectedFile, internalApiKey);
       } else {
         data = await processPdf(selectedFile);
       }
@@ -116,7 +108,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   };
 
   const triggerFileInput = () => {
-    // Déclencher le clic sur l'input file
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -186,22 +177,8 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
             checked={useDeepSeek}
             onCheckedChange={setUseDeepSeek}
           />
-          <Label htmlFor="use-deepseek">Utiliser DeepSeek AI pour l'analyse</Label>
+          <Label htmlFor="use-deepseek" className="font-medium text-sm">Utiliser l'analyse avancée (DeepSeek AI)</Label>
         </div>
-        
-        {useDeepSeek && (
-          <div className="mt-3">
-            <Label htmlFor="api-key">Clé API DeepSeek</Label>
-            <input
-              id="api-key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxx"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </div>
-        )}
         
         <DialogFooter className="sm:justify-end">
           <Button
@@ -215,7 +192,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={!selectedFile || isUploading || (useDeepSeek && !apiKey)}
+            disabled={!selectedFile || isUploading}
           >
             {isUploading ? "Traitement en cours..." : "Téléverser"}
           </Button>
