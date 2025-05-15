@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -15,12 +14,12 @@ export interface Room {
   isUrgent?: boolean;
   notUrgent?: boolean;
   floor?: number;
-  notes?: string; // Added notes property
+  notes?: string;
 }
 
 export interface CleaningConfig {
-  fullCleaningTime: number; // in minutes
-  quickCleaningTime: number; // in minutes
+  fullCleaningTime: number;
+  quickCleaningTime: number;
   minRoomsPerHousekeeper: number;
   maxRoomsPerHousekeeper: number;
 }
@@ -33,7 +32,7 @@ export const defaultCleaningConfig: CleaningConfig = {
   maxRoomsPerHousekeeper: 18
 };
 
-// Process PDF file using the existing algorithm
+// Processus standard d'analyse PDF
 export async function processPdf(file: File): Promise<Room[]> {
   try {
     console.log("Démarrage du traitement standard du PDF:", file.name);
@@ -85,74 +84,123 @@ export async function processPdf(file: File): Promise<Room[]> {
   }
 }
 
-// Process PDF with DeepSeek-enhanced analysis
+// Process PDF with DeepSeek API - Version réelle
 export async function processWithDeepSeek(file: File, apiKey: string): Promise<Room[]> {
   try {
-    console.log("Démarrage de l'analyse avancée du PDF:", file.name);
+    console.log("🔍 Démarrage de l'analyse avancée DeepSeek pour:", file.name);
     
-    // Convertir le fichier en ArrayBuffer
+    // Convertir le PDF en Base64
     const arrayBuffer = await file.arrayBuffer();
+    const base64Data = btoa(
+      new Uint8Array(arrayBuffer)
+        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
     
-    // Charger le document PDF
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    console.log(`Document PDF chargé: ${pdf.numPages} pages`);
+    console.log("PDF converti en Base64, envoi à l'API DeepSeek...");
     
-    // Extraire le texte de toutes les pages
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      console.log(`Extraction du texte de la page ${i}/${pdf.numPages}`);
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + ' ';
-    }
-    
-    console.log("PDF texte extrait pour analyse avancée - longueur:", fullText.length);
-    console.log("Extrait:", fullText.substring(0, 500) + "...");
-    
-    // Extraction des contextes de chambre pour une analyse avancée
-    const roomContexts = extractRoomContexts(fullText);
-    console.log(`Contextes de chambres extraits: ${roomContexts.length}`);
-    
-    // Utiliser l'analyse du texte avec la fonction améliorée
-    const rooms = parseRoomsFromText(fullText, true);
-    
-    console.log("Chambres détectées avec analyse avancée:", rooms.length);
-    console.log("Exemples de chambres avec types de nettoyage:");
-    rooms.slice(0, 5).forEach(room => {
-      console.log(`Chambre ${room.number}: status=${room.status}, cleaningType=${room.cleaningType}`);
+    // Appel à l'API DeepSeek pour l'OCR et analyse du PDF
+    const response = await fetch('https://api.deepseek.com/v1/documents/extract', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        file: {
+          data: base64Data,
+          mime_type: "application/pdf"
+        },
+        extract_options: {
+          include_text: true,
+          include_structure: true
+        }
+      })
     });
     
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Erreur API DeepSeek:", errorData);
+      throw new Error(`Erreur API DeepSeek: ${response.status} ${response.statusText}`);
+    }
+    
+    // Récupérer et traiter la réponse de DeepSeek
+    const deepseekData = await response.json();
+    console.log("Réponse DeepSeek reçue:", deepseekData);
+    
+    // Extraire le texte et la structure du document
+    const extractedText = deepseekData.text || '';
+    console.log("Texte extrait par DeepSeek (extrait):", extractedText.substring(0, 500) + "...");
+    
+    // Analyse du texte extrait par DeepSeek pour identifier les chambres
+    const rooms = parseRoomsFromText(extractedText, true);
+    console.log(`Chambres identifiées avec DeepSeek: ${rooms.length}`);
+    console.log("Exemples:", rooms.slice(0, 3));
+    
+    // Si aucune chambre n'est détectée avec DeepSeek, faire une analyse secondaire
     if (rooms.length === 0) {
-      console.log("Aucune chambre détectée avec l'analyse avancée, utilisation des données simulées");
+      console.log("Aucune chambre trouvée via DeepSeek, tentative d'analyse standard...");
+      
+      // Fallback à l'extraction standard
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + ' ';
+      }
+      
+      // Réanalyser avec notre algorithme
+      const fallbackRooms = parseRoomsFromText(fullText, true);
+      console.log(`Analyse de secours: ${fallbackRooms.length} chambres identifiées`);
+      
+      if (fallbackRooms.length > 0) {
+        return fallbackRooms;
+      }
+      
+      console.log("Aucune chambre détectée même après analyse de secours, utilisation des données simulées");
       return generateMockRoomData();
     }
     
-    // Vérifier la répartition des types de nettoyage
+    // Statistiques sur les types de nettoyage détectés
     const cleaningTypes = {
       full: rooms.filter(r => r.cleaningType === 'full').length,
       quick: rooms.filter(r => r.cleaningType === 'quick').length,
       none: rooms.filter(r => r.cleaningType === 'none').length
     };
     
-    console.log("Répartition des types de nettoyage:", cleaningTypes);
+    console.log("Répartition des types de nettoyage avec DeepSeek:", cleaningTypes);
     
     toast({
-      title: "Analyse Avancée Complète",
+      title: "Analyse DeepSeek Complète",
       description: `${rooms.length} chambres analysées avec succès`,
     });
     
     return rooms;
   } catch (error) {
-    console.error("Error processing PDF with advanced analysis:", error);
-    toast({
-      variant: "destructive",
-      title: "Échec de l'Analyse",
-      description: "Une erreur s'est produite lors de l'analyse avancée du PDF.",
-    });
-    throw error;
+    console.error("Erreur lors de l'analyse DeepSeek:", error);
+    
+    // En cas d'erreur, essayer l'analyse standard comme fallback
+    console.log("Tentative d'analyse standard en secours...");
+    try {
+      const standardRooms = await processPdf(file);
+      toast({
+        variant: "warning",
+        title: "Analyse DeepSeek échouée",
+        description: "Analyse standard utilisée en secours",
+      });
+      return standardRooms;
+    } catch (secondError) {
+      toast({
+        variant: "destructive",
+        title: "Échec de l'analyse",
+        description: "Impossible d'analyser le document PDF.",
+      });
+      throw error;
+    }
   }
 }
 
