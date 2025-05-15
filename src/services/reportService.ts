@@ -125,11 +125,30 @@ export async function generateAllHousekeeperReports(
   customFields?: ReportFields
 ): Promise<void> {
   try {
-    // For multiple reports, generate each PDF individually
+    // Filter housekeepers with assigned rooms
+    const housekeepersWithAssignedRooms = housekeepersWithRooms.filter(
+      housekeeper => housekeeper.rooms && housekeeper.rooms.length > 0
+    );
+    
+    if (housekeepersWithAssignedRooms.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Attention",
+        description: "Aucune femme de chambre n'a de chambres assignées.",
+      });
+      return;
+    }
+    
     let successCount = 0;
     
-    for (const { name, rooms } of housekeepersWithRooms) {
+    // Generate reports for each housekeeper with assigned rooms
+    for (const { name, rooms } of housekeepersWithAssignedRooms) {
       try {
+        // Small delay between downloads to prevent browser issues
+        if (successCount > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
         await generateHousekeeperReport(name, rooms, config, emailAddress, customFields);
         successCount++;
       } catch (err) {
@@ -140,7 +159,7 @@ export async function generateAllHousekeeperReports(
     if (successCount > 0) {
       toast({
         title: "Rapports générés",
-        description: `${successCount} rapport(s) sur ${housekeepersWithRooms.length} ont été téléchargés`,
+        description: `${successCount} rapport(s) sur ${housekeepersWithAssignedRooms.length} ont été téléchargés`,
       });
     } else {
       toast({

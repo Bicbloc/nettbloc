@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -236,7 +237,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           
           <DialogFooter className="sticky bottom-0 pt-4 bg-background border-t mt-4">
             <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Traitement en cours..." : "Télécharger le rapport"}
+              {isSubmitting ? "Traitement en cours..." : housekeeperName ? `Télécharger le rapport de ${housekeeperName}` : "Télécharger tous les rapports"}
             </Button>
           </DialogFooter>
         </form>
