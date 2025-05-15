@@ -27,7 +27,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailReportDialog from "@/components/EmailReportDialog";
-import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
+import { autoDistributeRooms, generateCombinedReport } from "@/components/assignment/RoomDistribution";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -540,10 +540,11 @@ const Index = () => {
           return;
         }
         
-        await generateAllHousekeeperReports(housekeepersWithRooms, cleaningConfig, emailAddress, customFields);
+        // Utiliser la nouvelle fonction pour générer un PDF combiné
+        await generateCombinedHousekeeperReport(housekeepersWithRooms, cleaningConfig, emailAddress, customFields);
         toast({
-          title: "Rapports générés",
-          description: `${housekeepersWithRooms.length} rapport(s) ont été créés et envoyés à ${emailAddress}.`,
+          title: "Rapport combiné généré",
+          description: `Un rapport combiné pour ${housekeepersWithRooms.length} femme(s) de chambre a été créé.`,
         });
       }
     } catch (error) {

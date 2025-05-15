@@ -1,4 +1,3 @@
-
 import { Room } from "@/services/pdfService";
 import { toast } from "@/components/ui/use-toast";
 import { getRoomFloor, groupRoomsByFloor } from "@/utils/roomUtils";
@@ -19,10 +18,12 @@ export function smartAssignRooms(
   
   // If floors are selected, prioritize them
   if (selectedFloors.length > 0) {
-    // Get all rooms from selected floors
+    // Get all rooms from selected floors THAT ARE NOT ASSIGNED to other housekeepers
     roomsToSelect = rooms.filter(room => {
       const roomFloor = getRoomFloor(room.number);
-      return selectedFloors.includes(roomFloor);
+      // Only include rooms that are either unassigned or already assigned to the current housekeeper
+      return selectedFloors.includes(roomFloor) && 
+             (!room.assignedTo || room.assignedTo === selectedHousekeeper);
     });
   } else {
     // Otherwise use housekeeper's preferred floors
@@ -37,10 +38,12 @@ export function smartAssignRooms(
       return [];
     }
 
-    // Get all rooms from preferred floors
+    // Get all rooms from preferred floors THAT ARE NOT ASSIGNED to other housekeepers
     roomsToSelect = rooms.filter(room => {
       const roomFloor = getRoomFloor(room.number);
-      return preferredFloors.includes(roomFloor);
+      // Only include rooms that are either unassigned or already assigned to the current housekeeper
+      return preferredFloors.includes(roomFloor) && 
+             (!room.assignedTo || room.assignedTo === selectedHousekeeper);
     });
   }
 
@@ -52,9 +55,6 @@ export function smartAssignRooms(
   if (filterStatus !== "all") {
     roomsToSelect = roomsToSelect.filter(room => room.status === filterStatus);
   }
-  
-  // Add check to not include already assigned rooms
-  roomsToSelect = roomsToSelect.filter(room => !room.assignedTo);
 
   if (roomsToSelect.length === 0) {
     toast({
@@ -202,4 +202,20 @@ export function autoDistributeRooms(
   excludeTwin: boolean = false
 ): Record<string, Room[]> | null {
   return distributeRoomsByFloor(rooms, housekeeperNames, [], excludeTwin);
+}
+
+// Add a new function to generate a combined PDF report for all housekeepers
+/**
+ * Generates a single PDF containing reports for all housekeepers
+ * This allows downloading one file instead of multiple files
+ */
+export function generateCombinedReport(
+  housekeeperRooms: { name: string; rooms: Room[] }[],
+  config: any,
+  emailAddress: string,
+  customFields?: any
+): Promise<boolean> {
+  // This function is just a placeholder - the actual implementation
+  // will be added to reportService.ts
+  return Promise.resolve(true);
 }

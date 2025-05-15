@@ -1,231 +1,149 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { Room, CleaningConfig } from './pdfService';
-import { toast } from '@/hooks/use-toast';
-
-// Email configuration - SMTP settings for ionos.fr
-const EMAIL_CONFIG = {
-  senderEmail: "support@bicbloc.eu",
-  senderPassword: "Staffing2023*",
-  smtpServer: "smtp.ionos.fr",
-  smtpPort: 465,
-  useTLS: true
-};
-
-// Admin email address to receive notifications
-const ADMIN_EMAIL = "admin@bicbloc.eu";
+import { CleaningConfig, Room } from "@/services/pdfService";
+import html2pdf from 'html2pdf.js';
+import { toast } from "@/hooks/use-toast";
 
 export interface ReportFields {
   toDoItems: string[];
   toKnowItems: string[];
-  instructions?: string; // Instructions spécifiques à un rapport
-  generalInstructions?: string; // Instructions générales pour tous les rapports
-  housekeeperInstructions?: { [housekeeperName: string]: string }; // Instructions spécifiques par femme de chambre
 }
 
 export async function generateHousekeeperReport(
-  housekeeperName: string,
+  housekeeperName: string, 
   rooms: Room[],
   config: CleaningConfig,
   emailAddress: string,
   customFields?: ReportFields
-): Promise<void> {
+): Promise<boolean> {
   try {
-    console.log(`Generating report for ${housekeeperName} with ${rooms.length} rooms`);
+    // Generate individual report HTML
+    const reportHtml = generateHousekeeperReportHtml(housekeeperName, rooms, config, customFields);
     
-    // Generate HTML content
-    const htmlContent = generateHousekeeperReportHTML(housekeeperName, rooms, config, customFields);
+    const opt = {
+      margin: 10,
+      filename: `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
     
-    // Create a PDF using client-side method
-    const pdfBytes = await createSimplePDF(housekeeperName, rooms, config, customFields);
-    
-    // Use client-side method directly without server call
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    
-    // Create download link
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${housekeeperName.replace(/\s+/g, '_')}_rapport.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    
-    // Clean up
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 100);
-    
-    toast({
-      title: "Rapport généré",
-      description: `Le rapport pour ${housekeeperName} a été téléchargé`,
-    });
-
-    // Try sending email in background without blocking PDF download
-    try {
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: emailAddress,
-          from: EMAIL_CONFIG.senderEmail,
-          subject: `Rapport de nettoyage pour ${housekeeperName}`,
-          html: htmlContent,
-          housekeeperName,
-          adminEmail: ADMIN_EMAIL,
-          emailConfig: {
-            senderEmail: EMAIL_CONFIG.senderEmail,
-            senderPassword: EMAIL_CONFIG.senderPassword,
-            smtpServer: EMAIL_CONFIG.smtpServer,
-            smtpPort: EMAIL_CONFIG.smtpPort,
-            useTLS: EMAIL_CONFIG.useTLS
-          },
-          notificationSubject: `Rapport téléchargé: ${housekeeperName}`,
-          notificationText: `Un rapport pour ${housekeeperName} a été téléchargé et envoyé à ${emailAddress}`
-        }),
-      });
-      
-      if (response.ok) {
-        console.log("Email sent successfully");
-        toast({
-          title: "Email envoyé",
-          description: `Un email avec le rapport a été envoyé à ${emailAddress}`,
-        });
-      } else {
-        const errorData = await response.json();
-        console.error("Email sending failed:", errorData);
-        toast({
-          variant: "destructive",
-          title: "Erreur d'envoi d'email",
-          description: "L'email n'a pas pu être envoyé, mais le PDF a été téléchargé",
-        });
-      }
-    } catch (emailError) {
-      console.error("Email sending error:", emailError);
-      toast({
-        variant: "destructive",
-        title: "Erreur d'envoi d'email",
-        description: "L'email n'a pas pu être envoyé, mais le PDF a été téléchargé",
-      });
-    }
+    const pdf = await html2pdf().set(opt).from(reportHtml).save();
+    return true;
   } catch (error) {
-    console.error('Error generating report:', error);
+    console.error("Error generating PDF:", error);
     toast({
       variant: "destructive",
       title: "Erreur",
-      description: "Impossible de générer le rapport PDF",
+      description: "Impossible de générer le PDF."
     });
-    throw error;
+    return false;
   }
 }
 
 export async function generateAllHousekeeperReports(
-  housekeepersWithRooms: { name: string; rooms: Room[] }[],
+  housekeepersWithRooms: { name: string, rooms: Room[] }[],
   config: CleaningConfig,
   emailAddress: string,
   customFields?: ReportFields
-): Promise<void> {
+): Promise<boolean> {
   try {
-    console.log(`Generating all reports for ${housekeepersWithRooms.length} housekeepers`);
-    
-    // Filter housekeepers with assigned rooms
-    const housekeepersWithAssignedRooms = housekeepersWithRooms.filter(
-      housekeeper => housekeeper.rooms && housekeeper.rooms.length > 0
-    );
-    
-    console.log(`Found ${housekeepersWithAssignedRooms.length} housekeepers with assigned rooms`);
-    
-    if (housekeepersWithAssignedRooms.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Attention",
-        description: "Aucune femme de chambre n'a de chambres assignées.",
-      });
-      return;
+    // For multiple reports, we'll generate them one by one
+    for (const { name, rooms } of housekeepersWithRooms) {
+      await generateHousekeeperReport(name, rooms, config, emailAddress, customFields);
     }
-
-    // Show initial toast for better user experience
-    toast({
-      title: "Préparation des rapports",
-      description: `Génération de ${housekeepersWithAssignedRooms.length} rapports en cours...`,
-    });
-    
-    let successCount = 0;
-    let failureCount = 0;
-    
-    // Process each housekeeper individually with a delay between each
-    for (let i = 0; i < housekeepersWithAssignedRooms.length; i++) {
-      const { name, rooms } = housekeepersWithAssignedRooms[i];
-      
-      try {
-        console.log(`Processing report ${i+1}/${housekeepersWithAssignedRooms.length} for ${name} with ${rooms.length} rooms`);
-        
-        // Add delay between downloads to prevent browser issues
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-        // Generate the report for this specific housekeeper
-        await generateHousekeeperReport(name, rooms, config, emailAddress, {
-          ...customFields,
-          // Ensure we're passing the right instructions for this housekeeper
-          instructions: customFields?.housekeeperInstructions?.[name] || customFields?.instructions || ''
-        });
-        
-        successCount++;
-      } catch (err) {
-        console.error(`Error generating report for ${name}:`, err);
-        failureCount++;
-      }
-    }
-    
-    // Final notification
-    if (successCount > 0) {
-      toast({
-        title: "Rapports générés",
-        description: `${successCount} rapport(s) sur ${housekeepersWithAssignedRooms.length} ont été téléchargés${failureCount > 0 ? ` (${failureCount} échoué(s))` : ''}`,
-      });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Aucun rapport n'a pu être généré",
-      });
-    }
+    return true;
   } catch (error) {
-    console.error('Error generating all reports:', error);
+    console.error("Error generating PDFs:", error);
     toast({
       variant: "destructive",
       title: "Erreur",
-      description: "Impossible de générer les rapports PDF",
+      description: "Impossible de générer les PDFs."
     });
-    throw error;
+    return false;
   }
 }
 
-// This function is used to generate the HTML content for a housekeeper's report
-function generateHousekeeperReportHTML(
-  housekeeperName: string,
-  rooms: Room[],
+// New function to generate a combined PDF report for all housekeepers
+export async function generateCombinedHousekeeperReport(
+  housekeepersWithRooms: { name: string, rooms: Room[] }[],
+  config: CleaningConfig,
+  emailAddress: string,
+  customFields?: ReportFields
+): Promise<boolean> {
+  try {
+    // Create a container for all reports
+    const combinedHtml = document.createElement('div');
+    
+    // Add each housekeeper's report to the container
+    for (let i = 0; i < housekeepersWithRooms.length; i++) {
+      const { name, rooms } = housekeepersWithRooms[i];
+      
+      // Generate the HTML for this housekeeper
+      const reportHtml = generateHousekeeperReportHtml(name, rooms, config, customFields);
+      combinedHtml.innerHTML += reportHtml;
+      
+      // Add page break between reports (except for the last one)
+      if (i < housekeepersWithRooms.length - 1) {
+        const pageBreak = document.createElement('div');
+        pageBreak.style.pageBreakAfter = 'always';
+        pageBreak.innerHTML = '<hr style="border: none; margin: 0; padding: 0;">';
+        combinedHtml.appendChild(pageBreak);
+      }
+    }
+    
+    // Generate the PDF with all reports
+    const opt = {
+      margin: 10,
+      filename: `rapport_complet_${new Date().toISOString().slice(0, 10)}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    await html2pdf().set(opt).from(combinedHtml).save();
+    return true;
+  } catch (error) {
+    console.error("Error generating combined PDF:", error);
+    toast({
+      variant: "destructive",
+      title: "Erreur",
+      description: "Impossible de générer le PDF combiné."
+    });
+    return false;
+  }
+}
+
+// Helper function to generate the HTML for a housekeeper report
+function generateHousekeeperReportHtml(
+  housekeeperName: string, 
+  rooms: Room[], 
   config: CleaningConfig,
   customFields?: ReportFields
 ): string {
-  // Sort rooms by priority and then by number
+  // Sort rooms by floor and then by room number
   const sortedRooms = [...rooms].sort((a, b) => {
-    if (a.priority === 'high' && b.priority !== 'high') return -1;
-    if (b.priority === 'high' && a.priority !== 'high') return 1;
+    const floorA = parseInt(a.number.charAt(0));
+    const floorB = parseInt(b.number.charAt(0));
+    if (floorA !== floorB) return floorA - floorB;
     return a.number.localeCompare(b.number, undefined, { numeric: true });
   });
   
-  // Count different types of rooms
-  const fullCleaningCount = rooms.filter(room => room.cleaningType === 'full').length;
-  const quickCleaningCount = rooms.filter(room => room.cleaningType === 'quick').length;
-  const highPriorityCount = rooms.filter(room => room.priority === 'high').length;
-  const twinCount = rooms.filter(room => room.isTwin).length;
+  // Group rooms by floor
+  const roomsByFloor: Record<number, Room[]> = {};
+  sortedRooms.forEach(room => {
+    const floor = parseInt(room.number.charAt(0));
+    if (!roomsByFloor[floor]) roomsByFloor[floor] = [];
+    roomsByFloor[floor].push(room);
+  });
+  
+  // Calculate counts
+  const totalRooms = rooms.length;
+  const fullCleaningRooms = rooms.filter(r => r.cleaningType === 'full').length;
+  const quickCleaningRooms = rooms.filter(r => r.cleaningType === 'quick').length;
+  const priorityRooms = rooms.filter(r => r.priority === 'high').length;
+  const twinRooms = rooms.filter(r => r.isTwin).length;
   
   // Calculate estimated time
-  const estimatedTimeInMinutes = rooms.reduce((total, room) => {
+  const estimatedTime = rooms.reduce((total, room) => {
     if (room.cleaningType === 'full') {
       return total + config.fullCleaningTime;
     } else if (room.cleaningType === 'quick') {
@@ -234,509 +152,138 @@ function generateHousekeeperReportHTML(
     return total;
   }, 0);
   
-  // Get specific instructions for this housekeeper
-  const housekeeperSpecificInstructions = customFields?.housekeeperInstructions?.[housekeeperName] || customFields?.instructions || '';
+  const hours = Math.floor(estimatedTime / 60);
+  const minutes = estimatedTime % 60;
   
-  // Build HTML table rows
-  const roomRows = sortedRooms.map(room => {
-    const priorityClass = room.priority === 'high' ? 'priority-high' : '';
-    const priorityText = room.priority === 'high' ? 'Oui' : 'Non';
-    const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 
-                           room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
-    const status = room.status === 'needs-cleaning' ? 'À Nettoyer' : 
-                  room.status === 'clean' ? 'Propre' : 
-                  room.status === 'occupied' ? 'Occupé' : 
-                  room.status === 'maintenance' ? 'Maintenance' : room.status;
-    
-    return `
-      <tr class="${priorityClass}">
-        <td>${room.number}</td>
-        <td>${status}</td>
-        <td>${cleaningTypeText}</td>
-        <td>${room.isTwin ? 'Oui' : 'Non'}</td>
-        <td>${priorityText}</td>
-        <td>${room.notes || ''}</td>
-      </tr>
-    `;
-  }).join('');
-  
-  // Generate to-do and to-know lists
-  const todoItems = (customFields?.toDoItems || [])
-    .filter(item => item.trim() !== '')
-    .map(item => `<li>${item}</li>`)
-    .join('');
-    
-  const toKnowItems = (customFields?.toKnowItems || [])
-    .filter(item => item.trim() !== '')
-    .map(item => `<li>${item}</li>`)
-    .join('');
-  
-  // Create the full HTML document with specific instructions for this housekeeper
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Rapport de Nettoyage - ${housekeeperName}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-        .container { max-width: 100%; margin: 0 auto; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .header { margin-bottom: 20px; }
-        .summary { margin-bottom: 15px; }
-        .footer { margin-top: 30px; font-size: 0.9em; color: #666; text-align: center; }
-        .priority-high { background-color: #ffebee; }
-        h1 { margin-top: 0; color: #333; }
-        h2 { color: #555; }
-        .banner { width: 100%; text-align: center; margin-top: 30px; }
-        .banner img { width: 100%; height: auto; max-height: 200px; object-fit: contain; }
-        .todo-section { margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
-        .instructions-section { margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #0066cc; }
-        .general-instructions-section { margin: 20px 0; padding: 15px; background-color: #e6f7ff; border-radius: 5px; border-left: 4px solid #0099cc; }
-        .footer-link { color: #0066cc; text-decoration: none; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .container { max-width: 100%; margin: 0 auto; padding: 20px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Rapport de Nettoyage</h1>
-          <p><strong>Nom:</strong> ${housekeeperName}</p>
-          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-        </div>
-        
-        <div class="summary">
-          <h2>Résumé</h2>
-          <p><strong>Total des chambres:</strong> ${rooms.length}</p>
-          <p><strong>Nettoyages à blanc:</strong> ${fullCleaningCount}</p>
-          <p><strong>Recouches:</strong> ${quickCleaningCount}</p>
-          <p><strong>Chambres prioritaires:</strong> ${highPriorityCount}</p>
-          <p><strong>Chambres twin:</strong> ${twinCount}</p>
-          <p><strong>Temps estimé:</strong> ${estimatedTimeInMinutes} minutes (${Math.floor(estimatedTimeInMinutes/60)}h${estimatedTimeInMinutes%60})</p>
-        </div>
-        
-        ${customFields?.generalInstructions ? `
-        <div class="general-instructions-section">
-          <h2>Instructions générales</h2>
-          <p>${customFields.generalInstructions}</p>
-        </div>
-        ` : ''}
-        
-        ${todoItems ? `
-        <div class="todo-section">
-          <h2>À faire</h2>
-          <ul>
-            ${todoItems}
-          </ul>
-        </div>
-        ` : ''}
-        
-        ${toKnowItems ? `
-        <div class="todo-section">
-          <h2>À savoir</h2>
-          <ul>
-            ${toKnowItems}
-          </ul>
-        </div>
-        ` : ''}
-        
-        <h2>Liste des Chambres</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Chambre</th>
-              <th>Statut</th>
-              <th>Type Nettoyage</th>
-              <th>Twin</th>
-              <th>Prioritaire</th>
-              <th>Remarque</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${roomRows}
-          </tbody>
-        </table>
-        
-        ${housekeeperSpecificInstructions ? `
-        <div class="instructions-section">
-          <h2>Instructions spéciales pour ${housekeeperName}</h2>
-          <p>${housekeeperSpecificInstructions}</p>
-        </div>
-        ` : ''}
-        
-        <div class="footer">
-          <p>Généré par <a href="https://www.bicbloc.eu" class="footer-link" target="_blank">BicBloc.eu Staffing Agency</a></p>
-          <p style="margin-top: 0;"><a href="https://www.bicbloc.eu/extra" class="footer-link" target="_blank">Commander un extra en trois clics</a></p>
-        </div>
-        
-        <div class="banner">
-          <a href="https://www.bicbloc.eu" target="_blank" style="display: block;">
-            <img src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png" alt="BicBloc Banner" style="width: 100%; height: auto;" />
-          </a>
-        </div>
+  // Generate HTML for the report
+  let html = `
+    <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+      <h1 style="text-align: center; color: #333;">Rapport de Nettoyage</h1>
+      <h2 style="text-align: center; margin-bottom: 20px;">${housekeeperName}</h2>
+      
+      <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;">
+        <h3 style="margin-top: 0;">Résumé</h3>
+        <ul style="list-style-type: none; padding-left: 0;">
+          <li><strong>Total des chambres:</strong> ${totalRooms}</li>
+          <li><strong>Chambres à blanc:</strong> ${fullCleaningRooms}</li>
+          <li><strong>Recouches:</strong> ${quickCleaningRooms}</li>
+          <li><strong>Chambres prioritaires:</strong> ${priorityRooms}</li>
+          <li><strong>Chambres twin:</strong> ${twinRooms}</li>
+          <li><strong>Temps estimé:</strong> ${hours}h${minutes ? ` ${minutes}min` : ''}</li>
+        </ul>
       </div>
-    </body>
-    </html>
   `;
-}
-
-// Function to create a simple PDF (fallback if HTML conversion fails)
-async function createSimplePDF(
-  housekeeperName: string, 
-  rooms: Room[], 
-  config: CleaningConfig,
-  customFields?: ReportFields
-): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage();
-  const { width, height } = page.getSize();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   
-  // Add title
-  page.drawText(`Rapport de Nettoyage - ${housekeeperName}`, {
-    x: 50,
-    y: height - 50,
-    size: 16,
-    font: boldFont,
-  });
-  
-  // Add date
-  page.drawText(`Date: ${new Date().toLocaleDateString()}`, {
-    x: 50,
-    y: height - 80,
-    size: 12,
-    font,
-  });
-  
-  // Add summary
-  const fullCleaningCount = rooms.filter(room => room.cleaningType === 'full').length;
-  const quickCleaningCount = rooms.filter(room => room.cleaningType === 'quick').length;
-  
-  page.drawText(`Total des chambres: ${rooms.length}`, {
-    x: 50,
-    y: height - 120,
-    size: 12,
-    font,
-  });
-  
-  page.drawText(`Nettoyages à blanc: ${fullCleaningCount}`, {
-    x: 50,
-    y: height - 140,
-    size: 12,
-    font,
-  });
-  
-  page.drawText(`Recouches: ${quickCleaningCount}`, {
-    x: 50,
-    y: height - 160,
-    size: 12,
-    font,
-  });
-  
-  // Add custom fields if present
-  let yPosition = height - 200;
-  
-  // Add general instructions if present
-  if (customFields?.generalInstructions) {
-    page.drawText('Instructions générales:', {
-      x: 50,
-      y: yPosition,
-      size: 14,
-      font: boldFont,
-    });
-    yPosition -= 20;
-    
-    // Split instructions into multiple lines if needed
-    const generalInstructionLines = splitTextIntoLines(customFields.generalInstructions, 80);
-    for (const line of generalInstructionLines) {
-      page.drawText(line, {
-        x: 60,
-        y: yPosition,
-        size: 10,
-        font,
-      });
-      yPosition -= 15;
-      
-      // Add a new page if we're running out of space
-      if (yPosition < 100) {
-        const newPage = pdfDoc.addPage();
-        yPosition = height - 50;
-      }
+  // Add custom fields if provided
+  if (customFields) {
+    if (customFields.toDoItems && customFields.toDoItems.length > 0) {
+      html += `
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff8dc;">
+          <h3 style="margin-top: 0;">À Faire</h3>
+          <ul>
+            ${customFields.toDoItems.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+      `;
     }
     
-    yPosition -= 10;
-  }
-  
-  // Add to-do items if present
-  if (customFields?.toDoItems && customFields.toDoItems.length > 0) {
-    page.drawText('À faire:', {
-      x: 50,
-      y: yPosition,
-      size: 14,
-      font: boldFont,
-    });
-    yPosition -= 20;
-    
-    for (const item of customFields.toDoItems.filter(item => item.trim() !== '')) {
-      page.drawText(`• ${item}`, {
-        x: 60,
-        y: yPosition,
-        size: 10,
-        font,
-      });
-      yPosition -= 15;
-      
-      // Add a new page if we're running out of space
-      if (yPosition < 100) {
-        const newPage = pdfDoc.addPage();
-        yPosition = height - 50;
-      }
+    if (customFields.toKnowItems && customFields.toKnowItems.length > 0) {
+      html += `
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #e6f7ff;">
+          <h3 style="margin-top: 0;">À Savoir</h3>
+          <ul>
+            ${customFields.toKnowItems.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+      `;
     }
-    
-    yPosition -= 10;
   }
   
-  // Add to-know items if present
-  if (customFields?.toKnowItems && customFields.toKnowItems.length > 0) {
-    page.drawText('À savoir:', {
-      x: 50,
-      y: yPosition,
-      size: 14,
-      font: boldFont,
-    });
-    yPosition -= 20;
-    
-    for (const item of customFields.toKnowItems.filter(item => item.trim() !== '')) {
-      page.drawText(`• ${item}`, {
-        x: 60,
-        y: yPosition,
-        size: 10,
-        font,
-      });
-      yPosition -= 15;
+  // Add rooms by floor
+  html += `<h3>Chambres par Étage</h3>`;
+  
+  Object.keys(roomsByFloor)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .forEach(floor => {
+      html += `
+        <div style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 10px;">Étage ${floor === 0 ? 'RDC' : floor}</h4>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #f2f2f2;">
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Chambre</th>
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Type</th>
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Statut</th>
+                <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Twin</th>
+                <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Priorité</th>
+                <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Temps (min)</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
       
-      // Add a new page if we're running out of space
-      if (yPosition < 100) {
-        const newPage = pdfDoc.addPage();
-        yPosition = height - 50;
-      }
-    }
-    
-    yPosition -= 10;
-  }
-  
-  // Get specific instructions for this housekeeper
-  const housekeeperSpecificInstructions = customFields?.housekeeperInstructions?.[housekeeperName] || customFields?.instructions || '';
-  
-  // Add room list title
-  page.drawText('Liste des Chambres:', {
-    x: 50,
-    y: yPosition,
-    size: 14,
-    font: boldFont,
-  });
-  yPosition -= 20;
-  
-  // Draw table header
-  const tableTop = yPosition;
-  const colWidth = 100;
-  const rowHeight = 20;
-  const columns = ['Chambre', 'Statut', 'Type', 'Twin', 'Prioritaire', 'Remarque'];
-  const columnWidths = [70, 80, 70, 50, 70, 150]; // Width for each column
-  
-  // Draw table headers
-  let xPosition = 50;
-  for (let i = 0; i < columns.length; i++) {
-    // Draw header background
-    page.drawRectangle({
-      x: xPosition,
-      y: tableTop - rowHeight,
-      width: columnWidths[i],
-      height: rowHeight,
-      color: rgb(0.9, 0.9, 0.9),
-      borderColor: rgb(0.5, 0.5, 0.5),
-      borderWidth: 1,
-    });
-    
-    // Draw header text
-    page.drawText(columns[i], {
-      x: xPosition + 5,
-      y: tableTop - 15,
-      size: 10,
-      font: boldFont,
-    });
-    
-    xPosition += columnWidths[i];
-  }
-  
-  // Draw table rows
-  yPosition = tableTop - rowHeight;
-  for (const room of rooms) {
-    const cleaningType = room.cleaningType === 'full' ? 'À Blanc' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun';
-    const status = room.status === 'needs-cleaning' ? 'À Nettoyer' : 
-                  room.status === 'clean' ? 'Propre' : 
-                  room.status === 'occupied' ? 'Occupé' : 
-                  room.status === 'maintenance' ? 'Maintenance' : room.status;
-    const isTwin = room.isTwin ? 'Oui' : 'Non';
-    const isPriority = room.priority === 'high' ? 'Oui' : 'Non';
-    const notes = room.notes || '';
-    
-    // Add a new page if we're running out of space
-    if (yPosition < 50) {
-      const newPage = pdfDoc.addPage();
-      yPosition = height - 50;
-      
-      // Redraw table header on new page
-      xPosition = 50;
-      for (let i = 0; i < columns.length; i++) {
-        page.drawRectangle({
-          x: xPosition,
-          y: yPosition - rowHeight,
-          width: columnWidths[i],
-          height: rowHeight,
-          color: rgb(0.9, 0.9, 0.9),
-          borderColor: rgb(0.5, 0.5, 0.5),
-          borderWidth: 1,
+      roomsByFloor[floor]
+        .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }))
+        .forEach(room => {
+          const cleaningTime = room.cleaningType === 'full' 
+            ? config.fullCleaningTime 
+            : room.cleaningType === 'quick' 
+              ? config.quickCleaningTime 
+              : 0;
+          
+          const cleaningTypeText = room.cleaningType === 'full' 
+            ? 'À Blanc' 
+            : room.cleaningType === 'quick' 
+              ? 'Recouche' 
+              : 'Aucun';
+          
+          const statusText = room.status === 'needs-cleaning' 
+            ? 'À Nettoyer' 
+            : room.status === 'clean' 
+              ? 'Propre' 
+              : room.status === 'occupied' 
+                ? 'Occupé' 
+                : room.status === 'maintenance' 
+                  ? 'Maintenance' 
+                  : 'Inconnu';
+          
+          html += `
+            <tr>
+              <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${room.number}</td>
+              <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">
+                <span style="display: inline-block; padding: 3px 8px; border-radius: 3px; background-color: ${room.cleaningType === 'full' ? '#e0b0ff' : room.cleaningType === 'quick' ? '#b0e0ff' : '#e0e0e0'};">
+                  ${cleaningTypeText}
+                </span>
+              </td>
+              <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">
+                <span style="display: inline-block; padding: 3px 8px; border-radius: 3px; background-color: ${room.status === 'needs-cleaning' ? '#fff2b0' : room.status === 'clean' ? '#b0ffc0' : room.status === 'occupied' ? '#b0c0ff' : '#ffb0b0'};">
+                  ${statusText}
+                </span>
+              </td>
+              <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${room.isTwin ? '✓' : '-'}</td>
+              <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">
+                ${room.priority === 'high' ? '⚠️ Haute' : room.priority === 'low' ? '⏳ Basse' : '-'}
+              </td>
+              <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${cleaningTime}</td>
+            </tr>
+          `;
         });
-        
-        page.drawText(columns[i], {
-          x: xPosition + 5,
-          y: yPosition - 15,
-          size: 10,
-          font: boldFont,
-        });
-        
-        xPosition += columnWidths[i];
-      }
-      yPosition -= rowHeight;
-    }
-    
-    // Draw cell backgrounds (alternating for readability)
-    const rowIndex = rooms.indexOf(room);
-    const isEvenRow = rowIndex % 2 === 0;
-    
-    // Draw cell backgrounds for priority rooms
-    if (room.priority === 'high') {
-      xPosition = 50;
-      for (let i = 0; i < columns.length; i++) {
-        page.drawRectangle({
-          x: xPosition,
-          y: yPosition - rowHeight,
-          width: columnWidths[i],
-          height: rowHeight,
-          color: rgb(1.0, 0.9, 0.9),
-          borderColor: rgb(0.5, 0.5, 0.5),
-          borderWidth: 1,
-        });
-        xPosition += columnWidths[i];
-      }
-    } else {
-      // Draw regular cell backgrounds
-      xPosition = 50;
-      for (let i = 0; i < columns.length; i++) {
-        page.drawRectangle({
-          x: xPosition,
-          y: yPosition - rowHeight,
-          width: columnWidths[i],
-          height: rowHeight,
-          color: isEvenRow ? rgb(1, 1, 1) : rgb(0.97, 0.97, 0.97),
-          borderColor: rgb(0.5, 0.5, 0.5),
-          borderWidth: 1,
-        });
-        xPosition += columnWidths[i];
-      }
-    }
-    
-    // Write cell contents
-    const rowData = [room.number, status, cleaningType, isTwin, isPriority, notes];
-    xPosition = 50;
-    for (let i = 0; i < rowData.length; i++) {
-      const cellText = rowData[i];
-      const maxLength = Math.floor(columnWidths[i] / 6) - 2; // Approximate characters that fit
-      const truncatedText = cellText.length > maxLength ? cellText.substring(0, maxLength) + '...' : cellText;
       
-      page.drawText(truncatedText, {
-        x: xPosition + 5,
-        y: yPosition - 15,
-        size: 9,
-        font,
-      });
-      xPosition += columnWidths[i];
-    }
-    
-    yPosition -= rowHeight;
-  }
-  
-  // Add instructions if present
-  if (housekeeperSpecificInstructions) {
-    // Start a new page for instructions if we're running out of space
-    if (yPosition < 100) {
-      const newPage = pdfDoc.addPage();
-      yPosition = height - 50;
-    } else {
-      yPosition -= 30;
-    }
-    
-    page.drawText('Instructions spéciales:', {
-      x: 50,
-      y: yPosition,
-      size: 14,
-      font: boldFont,
+      html += `
+            </tbody>
+          </table>
+        </div>
+      `;
     });
-    yPosition -= 20;
-    
-    // Split instructions into multiple lines if needed
-    const instructionLines = splitTextIntoLines(housekeeperSpecificInstructions, 80);
-    for (const line of instructionLines) {
-      page.drawText(line, {
-        x: 50,
-        y: yPosition,
-        size: 10,
-        font,
-      });
-      yPosition -= 15;
-      
-      // Add a new page if we're running out of space
-      if (yPosition < 50) {
-        const newPage = pdfDoc.addPage();
-        yPosition = height - 50;
-      }
-    }
-  }
   
-  // Add footer
-  page.drawText('Généré par BicBloc.eu Staffing Agency - Commander un extra en trois clics', {
-    x: 50,
-    y: 20,
-    size: 8,
-    font: font,
-  });
+  // Close the container
+  html += `
+      <div style="margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px;">
+        <p style="color: #666; font-size: 12px; text-align: center;">Généré le ${new Date().toLocaleDateString()} à ${new Date().toLocaleTimeString()}</p>
+      </div>
+    </div>
+  `;
   
-  return pdfDoc.save();
-}
-
-// Helper function to split text into lines with max character count
-function splitTextIntoLines(text: string, maxCharPerLine: number): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
-  
-  for (const word of words) {
-    if ((currentLine + word).length <= maxCharPerLine) {
-      currentLine += (currentLine ? ' ' : '') + word;
-    } else {
-      lines.push(currentLine);
-      currentLine = word;
-    }
-  }
-  
-  if (currentLine) {
-    lines.push(currentLine);
-  }
-  
-  return lines;
+  return html;
 }

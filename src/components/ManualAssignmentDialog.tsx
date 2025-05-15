@@ -87,7 +87,7 @@ export function ManualAssignmentDialog({
     });
   };
 
-  // Floor selection implementation
+  // Floor selection implementation - modified to respect existing assignments
   const toggleFloor = (floor: number) => {
     // Check if floor is already selected
     if (selectedFloors.includes(floor)) {
@@ -110,6 +110,9 @@ export function ManualAssignmentDialog({
         // Room must be from the selected floor
         const roomFloor = parseInt(room.number.charAt(0));
         if (roomFloor !== floor) return false;
+        
+        // Only include rooms that are either unassigned or already assigned to the current housekeeper
+        if (room.assignedTo && room.assignedTo !== selectedHousekeeper) return false;
         
         // Apply other active filters
         if (filterStatus !== "all" && room.status !== filterStatus) return false;
