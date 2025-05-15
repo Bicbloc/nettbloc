@@ -116,6 +116,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
       setIsSubmitting(true);
       try {
         saveReportEmail(localEmail); // Save for future use
+        console.log("Submitting with custom fields:", customFields);
+        console.log("Current housekeeper name:", housekeeperName);
         await onConfirm(localEmail, customFields);
         onClose();
       } catch (error) {

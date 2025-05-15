@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Room, CleaningConfig } from './pdfService';
-import { useToast, toast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 // Email configuration - SMTP settings for ionos.fr
 const EMAIL_CONFIG = {
@@ -30,6 +30,8 @@ export async function generateHousekeeperReport(
   customFields?: ReportFields
 ): Promise<void> {
   try {
+    console.log(`Generating report for ${housekeeperName} with ${rooms.length} rooms`);
+    
     // Generate HTML content
     const htmlContent = generateHousekeeperReportHTML(housekeeperName, rooms, config, customFields);
     
@@ -125,10 +127,14 @@ export async function generateAllHousekeeperReports(
   customFields?: ReportFields
 ): Promise<void> {
   try {
+    console.log(`Generating all reports for ${housekeepersWithRooms.length} housekeepers`);
+    
     // Filter housekeepers with assigned rooms
     const housekeepersWithAssignedRooms = housekeepersWithRooms.filter(
       housekeeper => housekeeper.rooms && housekeeper.rooms.length > 0
     );
+    
+    console.log(`Found ${housekeepersWithAssignedRooms.length} housekeepers with assigned rooms`);
     
     if (housekeepersWithAssignedRooms.length === 0) {
       toast({
