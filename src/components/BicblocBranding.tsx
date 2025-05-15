@@ -18,21 +18,19 @@ export const BicblocLogo: React.FC = () => {
 
 export const BicblocFooter: React.FC = () => {
   return (
-    <footer className="mt-4 py-6 border-t">
+    <footer className="py-8 w-full">
       <a 
         href="https://www.bicbloc.eu" 
         target="_blank" 
         rel="noopener noreferrer"
-        className="block text-center"
+        className="block"
       >
-        <div className="max-w-full w-full">
-          <AspectRatio ratio={16/4} className="w-full">
-            <img 
-              src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png"
-              alt="BicBloc Banner"
-              className="w-full h-full object-contain"
-            />
-          </AspectRatio>
+        <div className="w-full">
+          <img 
+            src="/lovable-uploads/d6290f4a-190e-4ad8-99a9-51307a4cbcc8.png"
+            alt="BicBloc Banner"
+            className="w-full object-contain max-h-[180px]"
+          />
         </div>
       </a>
     </footer>

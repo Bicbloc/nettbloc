@@ -6,24 +6,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { BicblocFooter } from "./components/BicblocBranding";
 
-// Create the NettoBloc branding components
-const NettoBlockLogo = () => (
-  <div className="flex items-center">
-    <h1 className="text-2xl font-bold font-poppins tracking-wider">NettoBloc</h1>
-  </div>
-);
-
-const NettoBlockFooter = () => (
-  <div className="text-center text-gray-600 text-sm">
-    <a 
-      href="https://bicbloc.eu" 
-      target="_blank" 
-      rel="noopener noreferrer"
-      className="hover:text-gray-800 transition-colors"
-    >
-      <span className="font-poppins font-semibold">NettoBloc</span> - Commander un extra en trois clics
-    </a>
+// Create a simple blank container for the top of the page
+const HeaderSpace = () => (
+  <div className="container mx-auto py-4">
+    {/* Titre supprimé - espace réservé uniquement */}
   </div>
 );
 
@@ -35,9 +23,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <div className="flex flex-col min-h-screen">
-        <div className="container mx-auto py-4">
-          <NettoBlockLogo />
-        </div>
+        <HeaderSpace />
         <div className="flex-grow">
           <BrowserRouter>
             <Routes>
@@ -47,8 +33,8 @@ const App = () => (
             </Routes>
           </BrowserRouter>
         </div>
-        <div className="container mx-auto py-4">
-          <NettoBlockFooter />
+        <div className="container mx-auto">
+          <BicblocFooter />
         </div>
       </div>
     </TooltipProvider>

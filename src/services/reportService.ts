@@ -284,6 +284,8 @@ function generateReportHTML(data: ReportData): string {
   });
   
   // Complete HTML with improved styling and encadré for housekeeper name with bold text
+  // Added more padding for housekeeper name (padding: 40px 0 -> padding: 60px 0)
+  // Also increased margin (margin: 30px 0 -> margin: 50px 0)
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -340,9 +342,9 @@ function generateReportHTML(data: ReportData): string {
         }
         .housekeeper-column {
           width: 100%;
-          padding: 40px 0;
+          padding: 60px 0;  /* Increased padding */
           text-align: center;
-          margin: 30px 0;
+          margin: 50px 0;  /* Increased margin */
         }
         .housekeeperName {
           border: 3px solid #000;
@@ -467,7 +469,7 @@ function generateReportHTML(data: ReportData): string {
       
       <div class="footer">
         <a href="https://bicbloc.eu" style="text-decoration: none; color: inherit;">
-          <span class="company">NettoBloc</span> - Commander un extra en trois clics<br>
+          <span class="company">bicbloc.eu</span> - Commander un extra en trois clics<br>
           <span class="phone">+33 (0)1 89 70 69 50</span>
         </a>
       </div>
