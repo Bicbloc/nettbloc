@@ -61,13 +61,24 @@ export async function generateReport(
     // Generate the HTML for the report
     const html = generateReportHTML(reportData);
     
-    // Generate PDF using html2pdf library
+    // Generate PDF using html2pdf library with improved table handling
     const pdfOptions = {
-      margin: [10, 10, 10, 10],
+      margin: [15, 15, 15, 15],
       filename: `rapport-${housekeeper.replace(/\s+/g, '-')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas: { 
+        scale: 2, 
+        logging: false, 
+        dpi: 192, 
+        letterRendering: true 
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait',
+        compress: true
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } // Improved page break handling
     };
     
     // Convert HTML to PDF and download
@@ -147,7 +158,7 @@ function generateReportHTML(data: ReportData): string {
   const summaryHtml = generateRoomSummary(data);
   const roomsTableHtml = generateRoomsTable(data);
   
-  // Complete HTML
+  // Complete HTML with improved page break controls
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -159,7 +170,8 @@ function generateReportHTML(data: ReportData): string {
         h1 { font-size: 18px; margin-bottom: 5px; }
         h2 { font-size: 16px; margin-top: 10px; margin-bottom: 5px; }
         h3 { font-size: 14px; margin-top: 15px; margin-bottom: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; page-break-inside: auto; }
+        .table-container { page-break-inside: avoid; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
         table, th, td { border: 1px solid #000; }
         th, td { padding: 5px; text-align: left; font-size: 11px; }
         th { background-color: #f0f0f0; }
@@ -171,15 +183,14 @@ function generateReportHTML(data: ReportData): string {
         .room-type { font-weight: bold; }
         .a-blanc { background-color: #FFD580; }
         .recouche { background-color: #90EE90; }
-        @media print {
-          body { margin: 0; }
-          .page-break { page-break-after: always; break-after: page; }
-        }
+        .floor-section { page-break-inside: avoid; }
+        .page-break { page-break-after: always; break-after: page; }
+        .avoid-break { page-break-inside: avoid; }
         .signature { margin-top: 30px; border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
       </style>
     </head>
     <body>
-      <div class="header">
+      <div class="header avoid-break">
         <div>
           <h1>Rapport de Nettoyage - ${data.housekeeperName}</h1>
           <div class="info">Date: ${data.currentDate}</div>
@@ -191,12 +202,16 @@ function generateReportHTML(data: ReportData): string {
       ${toknowHtml}
       
       <h2>Résumé des chambres</h2>
-      ${summaryHtml}
+      <div class="avoid-break">
+        ${summaryHtml}
+      </div>
       
       <h2>Liste des chambres à nettoyer</h2>
-      ${roomsTableHtml}
+      <div class="table-section">
+        ${roomsTableHtml}
+      </div>
       
-      <div class="signature">
+      <div class="signature avoid-break">
         Signature
       </div>
       
@@ -219,28 +234,30 @@ function generateRoomSummary(data: ReportData): string {
                         quickCleanCount * data.config.quickCleaningTime;
   
   return `
-    <table>
-      <tr>
-        <th>Type de nettoyage</th>
-        <th>Nombre de chambres</th>
-      </tr>
-      <tr>
-        <td>À Blanc</td>
-        <td>${fullCleanCount}</td>
-      </tr>
-      <tr>
-        <td>Recouche</td>
-        <td>${quickCleanCount}</td>
-      </tr>
-      <tr>
-        <th>Total</th>
-        <th>${data.rooms.length}</th>
-      </tr>
-      <tr>
-        <td>Temps estimé</td>
-        <td>${estimatedTime} minutes</td>
-      </tr>
-    </table>
+    <div class="table-container">
+      <table>
+        <tr>
+          <th>Type de nettoyage</th>
+          <th>Nombre de chambres</th>
+        </tr>
+        <tr>
+          <td>À Blanc</td>
+          <td>${fullCleanCount}</td>
+        </tr>
+        <tr>
+          <td>Recouche</td>
+          <td>${quickCleanCount}</td>
+        </tr>
+        <tr>
+          <th>Total</th>
+          <th>${data.rooms.length}</th>
+        </tr>
+        <tr>
+          <td>Temps estimé</td>
+          <td>${estimatedTime} minutes</td>
+        </tr>
+      </table>
+    </div>
   `;
 }
 
@@ -295,18 +312,22 @@ function generateRoomsTable(data: ReportData): string {
     }).join('');
     
     return `
-      <h3>Étage ${floor === 0 ? 'RDC' : floor}</h3>
-      <table>
-        <tr>
-          <th>Chambre</th>
-          <th>Type</th>
-          <th>Double</th>
-          <th>Priorité</th>
-          <th>Notes</th>
-          <th>Remarques</th>
-        </tr>
-        ${rowsHtml}
-      </table>
+      <div class="floor-section">
+        <h3>Étage ${floor === 0 ? 'RDC' : floor}</h3>
+        <div class="table-container">
+          <table>
+            <tr>
+              <th>Chambre</th>
+              <th>Type</th>
+              <th>Double</th>
+              <th>Priorité</th>
+              <th>Notes</th>
+              <th>Remarques</th>
+            </tr>
+            ${rowsHtml}
+          </table>
+        </div>
+      </div>
     `;
   }).join('');
   
@@ -377,13 +398,24 @@ export async function generateCombinedReport(
     // Combine all HTML into a single document with explicit page breaks
     const combinedHTML = allHousekeepersHTML.join('<div class="page-break"></div>');
     
-    // Generate PDF using html2pdf library
+    // Generate PDF using html2pdf library with improved table handling
     const pdfOptions = {
-      margin: [10, 10, 10, 10],
+      margin: [15, 15, 15, 15],
       filename: `rapports-complet-${new Date().toISOString().slice(0,10)}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas: { 
+        scale: 2, 
+        logging: false, 
+        dpi: 192, 
+        letterRendering: true 
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait',
+        compress: true
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } // Improved page break handling
     };
     
     // Convert HTML to PDF and download as a single file
