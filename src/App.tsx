@@ -17,7 +17,6 @@ const App = () => (
       <Sonner />
       <div className="flex flex-col min-h-screen">
         <div className="container mx-auto py-4">
-          <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" />
           <BicblocLogo />
         </div>
         <div className="flex-grow">

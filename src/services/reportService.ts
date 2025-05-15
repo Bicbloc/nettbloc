@@ -270,7 +270,6 @@ function generateReportHTML(data: ReportData): string {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Rapport - ${data.housekeeperName}</title>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap">
       <style>
         body { 
           font-family: Arial, sans-serif; 
@@ -314,7 +313,7 @@ function generateReportHTML(data: ReportData): string {
           padding: 12px;  /* More padding */
           font-weight: bold;
           display: inline-block;
-          margin-bottom: 80px; /* Increased space after housekeeper name and before tables */
+          margin-bottom: 60px; /* Increased space after housekeeper name and before tables */
           margin-top: 25px; /* Increased space between title and housekeeper name */
           font-size: 18px; /* Larger font size */
           text-transform: uppercase; /* Make it uppercase for emphasis */
@@ -354,13 +353,6 @@ function generateReportHTML(data: ReportData): string {
         }
         .footer .phone {
           font-weight: bold;
-        }
-        .brand {
-          font-family: 'Poppins', sans-serif;
-          font-size: 22px;
-          font-weight: bold;
-          color: #000;
-          text-decoration: none;
         }
         ul {
           margin: 5px 0 10px 20px;
@@ -424,7 +416,7 @@ function generateReportHTML(data: ReportData): string {
       </div>
       
       <div class="footer">
-        Généré par <a href="https://bicbloc.eu" target="_blank" class="brand">NettoBloc</a> Staffing - Commander un extra en trois 3 clics<br>
+        Généré par bicbloc.eu Staffing - Commander un extra en trois 3 clics<br>
         <span class="phone">+33 (0)1 89 70 69 50</span>
       </div>
     </body>
