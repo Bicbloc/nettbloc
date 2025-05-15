@@ -6,7 +6,11 @@ import { filterRooms } from "@/utils/roomUtils";
 import { FilterControls } from "@/components/assignment/FilterControls";
 import { RoomSelection } from "@/components/assignment/RoomSelection";
 import { AssignmentSection } from "@/components/assignment/AssignmentSection";
-import { smartAssignRooms, distributeRoomsByFloor } from "@/components/assignment/RoomDistribution";
+import { 
+  smartAssignRooms, 
+  distributeRoomsByFloor,
+  autoDistributeRooms 
+} from "@/components/assignment/RoomDistribution";
 
 interface ManualAssignmentDialogProps {
   isOpen: boolean;
@@ -155,10 +159,10 @@ export function ManualAssignmentDialog({
   
   // Room distribution implementation
   const handleDistributeRooms = () => {
-    const assignments = distributeRoomsByFloor(
+    // Use our new autoDistributeRooms function that uses the first digit logic
+    const assignments = autoDistributeRooms(
       rooms,
       housekeeperNames,
-      selectedFloors,
       excludeTwin
     );
     
@@ -177,7 +181,7 @@ export function ManualAssignmentDialog({
     // Success message
     toast({
       title: "Distribution réussie",
-      description: `${totalAssigned} chambres ont été distribuées par étages complets.`,
+      description: `${totalAssigned} chambres ont été distribuées en fonction du premier chiffre du numéro.`,
     });
     
     onClose();

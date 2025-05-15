@@ -75,12 +75,12 @@ export function smartAssignRooms(
 }
 
 /**
- * Distributes rooms to housekeepers by floor
- * Each housekeeper gets complete floors assigned to them
+ * Distributes rooms to housekeepers by first digit of room number
+ * Each housekeeper gets all rooms starting with specific digits
  * 
  * Assignment Logic:
- * - First housekeeper gets first floor, second gets second floor, etc.
- * - If there are more floors than housekeepers, the assignment wraps around
+ * - First housekeeper gets all rooms starting with digit 1, second gets all rooms with digit 2, etc.
+ * - If there are more digits than housekeepers, the assignment wraps around
  */
 export function distributeRoomsByFloor(
   rooms: Room[],
@@ -134,11 +134,11 @@ export function distributeRoomsByFloor(
     assignments[name] = [];
   });
 
-  // Nouvelle logique: organiser les chambres par premier chiffre du numéro de chambre
+  // Group rooms by first digit of room number
   const roomsByFirstDigit: Record<string, Room[]> = {};
   
   availableRooms.forEach(room => {
-    // Obtenir le premier chiffre du numéro de chambre
+    // Get first digit of room number
     const firstDigit = room.number.replace(/^\D+/, '').charAt(0);
     if (!roomsByFirstDigit[firstDigit]) {
       roomsByFirstDigit[firstDigit] = [];
@@ -148,13 +148,13 @@ export function distributeRoomsByFloor(
   
   console.log("Rooms grouped by first digit:", Object.keys(roomsByFirstDigit));
   
-  // Obtenir tous les premiers chiffres disponibles et les trier
+  // Get all available first digits and sort them
   const availableFirstDigits = Object.keys(roomsByFirstDigit).sort();
   
   if (availableFirstDigits.length > 0 && housekeeperNames.length > 0) {
     const numHousekeepers = housekeeperNames.length;
     
-    // Distribuer les chambres par premier chiffre
+    // Distribute rooms by first digit
     for (let digitIndex = 0; digitIndex < availableFirstDigits.length; digitIndex++) {
       const housekeeperIndex = digitIndex % numHousekeepers;
       const housekeeper = housekeeperNames[housekeeperIndex];
@@ -164,7 +164,7 @@ export function distributeRoomsByFloor(
       
       if (roomsByFirstDigit[firstDigit] && roomsByFirstDigit[firstDigit].length > 0) {
         const roomsWithDigit = roomsByFirstDigit[firstDigit];
-        // Trier les chambres par numéro avant de les ajouter
+        // Sort rooms by number before adding
         roomsWithDigit.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
         assignments[housekeeper].push(...roomsWithDigit);
         
@@ -188,4 +188,17 @@ export function distributeRoomsByFloor(
   });
   
   return null;
+}
+
+// Add a new function that will be used for the automatic assignment button
+/**
+ * Automatically distribute rooms to housekeepers using the same logic as distributeRoomsByFloor
+ * This function is used by the automatic assignment button
+ */
+export function autoDistributeRooms(
+  rooms: Room[],
+  housekeeperNames: string[],
+  excludeTwin: boolean = false
+): Record<string, Room[]> | null {
+  return distributeRoomsByFloor(rooms, housekeeperNames, [], excludeTwin);
 }

@@ -21,3 +21,13 @@ export function getReportEmail(): string {
   }
   return "";
 }
+
+/**
+ * Gets the first digit from a room number
+ * @param roomNumber The room number (e.g., "101", "R102", etc.)
+ * @returns The first digit as a number
+ */
+export function getFirstDigitFromRoomNumber(roomNumber: string): number {
+  const digit = roomNumber.replace(/^\D+/, '').charAt(0);
+  return parseInt(digit, 10) || 0;
+}
