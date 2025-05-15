@@ -1,3 +1,4 @@
+
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
@@ -193,12 +194,13 @@ function generateReportHTML(data: ReportData): string {
         .page-break-after { page-break-after: always; break-after: page; }
         .avoid-break { page-break-inside: avoid; }
         .signature { margin-top: 30px; border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
+        .housekeeping-icon { font-size: 24px; margin-right: 10px; }
       </style>
     </head>
     <body>
       <div class="header avoid-break">
         <div>
-          <h1>Rapport de Nettoyage - ${data.housekeeperName}</h1>
+          <h1><span class="housekeeping-icon">🧹</span>Rapport de Nettoyage - ${data.housekeeperName}</h1>
           <div class="info">Date: ${data.currentDate}</div>
         </div>
       </div>
@@ -224,7 +226,7 @@ function generateReportHTML(data: ReportData): string {
       </div>
       
       <div class="footer">
-        Bicbloc Report - Généré le ${data.currentDate}
+        Généré le ${data.currentDate}
       </div>
     </body>
     </html>
@@ -330,7 +332,7 @@ function generateRoomsTable(data: ReportData): string {
             <tr>
               <th>Chambre</th>
               <th>Type</th>
-              <th>Double</th>
+              <th>Twin</th>
               <th>Priorité</th>
               <th>Notes</th>
               <th>Remarques</th>
