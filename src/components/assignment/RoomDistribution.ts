@@ -135,32 +135,28 @@ export function distributeRoomsByFloor(
     assignments[name] = [];
   });
   
-  // Assign floors sequentially to housekeepers
+  // CORRECTED DISTRIBUTION LOGIC: Assign whole floors sequentially to housekeepers
   if (availableFloors.length > 0) {
-    // Calculate how many floors each housekeeper should get
     const numHousekeepers = housekeeperNames.length;
-    const floorsPerHousekeeper = Math.max(1, Math.ceil(availableFloors.length / numHousekeepers));
-    console.log(`Each housekeeper gets ${floorsPerHousekeeper} floors`);
     
-    // Distribute floors to housekeepers
-    for (let i = 0; i < numHousekeepers && i * floorsPerHousekeeper < availableFloors.length; i++) {
-      const housekeeper = housekeeperNames[i];
+    // Assign floors one by one to housekeepers in round-robin fashion
+    for (let i = 0; i < availableFloors.length; i++) {
+      // Determine which housekeeper gets this floor (round-robin)
+      const housekeeperIndex = i % numHousekeepers;
+      const housekeeper = housekeeperNames[housekeeperIndex];
+      const floor = availableFloors[i];
       
-      // Calculate which floors this housekeeper gets
-      const startIndex = i * floorsPerHousekeeper;
-      const endIndex = Math.min((i + 1) * floorsPerHousekeeper, availableFloors.length);
-      const assignedFloors = availableFloors.slice(startIndex, endIndex);
-      
-      console.log(`${housekeeper} gets floors:`, assignedFloors);
-      
-      // Assign all rooms from these floors
-      assignedFloors.forEach(floor => {
-        if (roomsByFloor[floor]) {
-          assignments[housekeeper].push(...roomsByFloor[floor]);
-          console.log(`${housekeeper} gets ${roomsByFloor[floor].length} rooms from floor ${floor}`);
-        }
-      });
+      // Add all rooms from this floor to this housekeeper
+      if (roomsByFloor[floor]) {
+        console.log(`Assigning all rooms on floor ${floor} to ${housekeeper}`);
+        assignments[housekeeper].push(...roomsByFloor[floor]);
+      }
     }
+    
+    // Log assignments for debugging
+    housekeeperNames.forEach(name => {
+      console.log(`${name} is assigned ${assignments[name].length} rooms: ${assignments[name].map(r => r.number).join(', ')}`);
+    });
     
     return assignments;
   }
