@@ -24,7 +24,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [useDeepSeek, setUseDeepSeek] = useState(true); // Activé par défaut maintenant
+  const [useDeepSeek, setUseDeepSeek] = useState(true); // Activé par défaut
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,20 +77,26 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     try {
       setIsUploading(true);
       console.log("Traitement du fichier:", selectedFile.name);
-      console.log("Utilisation de DeepSeek:", useDeepSeek);
+      console.log("Utilisation de l'analyse avancée:", useDeepSeek);
       
       let data;
       if (useDeepSeek) {
-        console.log("Utilisation de l'analyse avancée");
+        console.log("🔍 Démarrage de l'analyse avancée");
         // Using internal API key, no need to ask for it
         const internalApiKey = "sk-INTERNAL-KEY"; // This will be replaced on the backend
         data = await processWithDeepSeek(selectedFile, internalApiKey);
       } else {
-        console.log("Utilisation de l'analyse standard");
+        console.log("📄 Démarrage de l'analyse standard");
         data = await processPdf(selectedFile);
       }
       
-      console.log("Données traitées:", data.length, "chambres");
+      console.log(`🎉 Analyse terminée: ${data.length} chambres détectées`);
+      console.log("Types de nettoyage détectés:", {
+        complet: data.filter(r => r.cleaningType === 'full').length,
+        rapide: data.filter(r => r.cleaningType === 'quick').length,
+        aucun: data.filter(r => r.cleaningType === 'none').length
+      });
+      
       onPdfProcessed(data);
       setOpen(false);
       toast({
@@ -173,15 +179,21 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
           </div>
         </div>
         
-        <div className="flex items-center space-x-2 mt-4 p-2 bg-blue-50 rounded-md border border-blue-200">
-          <Switch 
-            id="use-deepseek" 
-            checked={useDeepSeek}
-            onCheckedChange={setUseDeepSeek}
-          />
-          <Label htmlFor="use-deepseek" className="font-medium text-sm">
-            Utiliser l'analyse avancée <span className="text-blue-600 font-semibold">(recommandé)</span>
-          </Label>
+        <div className="flex flex-col space-y-3 mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+          <div className="flex items-center space-x-2">
+            <Switch 
+              id="use-deepseek" 
+              checked={useDeepSeek}
+              onCheckedChange={setUseDeepSeek}
+            />
+            <Label htmlFor="use-deepseek" className="font-medium text-sm">
+              Utiliser l'analyse avancée <span className="text-blue-600 font-semibold">(recommandé)</span>
+            </Label>
+          </div>
+          <p className="text-xs text-blue-600">
+            L'analyse avancée détecte plus précisément les types de nettoyage (complet/rapide) 
+            à l'aide d'algorithmes optimisés pour les rapports Mews.
+          </p>
         </div>
         
         <DialogFooter className="sm:justify-end">

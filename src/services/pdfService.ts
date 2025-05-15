@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -35,6 +36,8 @@ export const defaultCleaningConfig: CleaningConfig = {
 // Process PDF file using the existing algorithm
 export async function processPdf(file: File): Promise<Room[]> {
   try {
+    console.log("Démarrage du traitement standard du PDF:", file.name);
+    
     // Convertir le fichier en ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     
@@ -52,14 +55,16 @@ export async function processPdf(file: File): Promise<Room[]> {
       fullText += pageText + ' ';
     }
     
-    console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
+    console.log("PDF texte extrait (standard):", fullText.substring(0, 500) + "...");
     
     // Analyser le texte pour extraire les informations des chambres
-    const rooms = parseRoomsFromText(fullText);
+    const rooms = parseRoomsFromText(fullText, false);
+    console.log("Analyse standard, chambres détectées:", rooms.length);
+    console.log("Exemple de chambres:", rooms.slice(0, 3));
     
     toast({
-      title: "PDF Processed",
-      description: `Successfully processed ${file.name}`,
+      title: "PDF Traité",
+      description: `${file.name} analysé avec succès`,
     });
     
     // Si aucune chambre n'a été trouvée, retourner des données de test
@@ -73,25 +78,29 @@ export async function processPdf(file: File): Promise<Room[]> {
     console.error("Error processing PDF:", error);
     toast({
       variant: "destructive",
-      title: "Processing Failed",
-      description: "Failed to process the PDF file. Please try again.",
+      title: "Échec du traitement",
+      description: "Une erreur s'est produite lors du traitement du fichier PDF.",
     });
     throw error;
   }
 }
 
-// Process PDF with DeepSeek API
+// Process PDF with DeepSeek-enhanced analysis
 export async function processWithDeepSeek(file: File, apiKey: string): Promise<Room[]> {
   try {
+    console.log("Démarrage de l'analyse avancée du PDF:", file.name);
+    
     // Convertir le fichier en ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     
     // Charger le document PDF
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    console.log(`Document PDF chargé: ${pdf.numPages} pages`);
     
     // Extraire le texte de toutes les pages
     let fullText = '';
     for (let i = 1; i <= pdf.numPages; i++) {
+      console.log(`Extraction du texte de la page ${i}/${pdf.numPages}`);
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items
@@ -100,17 +109,35 @@ export async function processWithDeepSeek(file: File, apiKey: string): Promise<R
       fullText += pageText + ' ';
     }
     
-    console.log("PDF texte extrait pour DeepSeek:", fullText.substring(0, 500) + "...");
+    console.log("PDF texte extrait pour analyse avancée - longueur:", fullText.length);
+    console.log("Extrait:", fullText.substring(0, 500) + "...");
+    
+    // Extraction des contextes de chambre pour une analyse avancée
+    const roomContexts = extractRoomContexts(fullText);
+    console.log(`Contextes de chambres extraits: ${roomContexts.length}`);
     
     // Utiliser l'analyse du texte avec la fonction améliorée
     const rooms = parseRoomsFromText(fullText, true);
     
-    console.log("Chambres détectées avec DeepSeek:", rooms);
+    console.log("Chambres détectées avec analyse avancée:", rooms.length);
+    console.log("Exemples de chambres avec types de nettoyage:");
+    rooms.slice(0, 5).forEach(room => {
+      console.log(`Chambre ${room.number}: status=${room.status}, cleaningType=${room.cleaningType}`);
+    });
     
     if (rooms.length === 0) {
       console.log("Aucune chambre détectée avec l'analyse avancée, utilisation des données simulées");
       return generateMockRoomData();
     }
+    
+    // Vérifier la répartition des types de nettoyage
+    const cleaningTypes = {
+      full: rooms.filter(r => r.cleaningType === 'full').length,
+      quick: rooms.filter(r => r.cleaningType === 'quick').length,
+      none: rooms.filter(r => r.cleaningType === 'none').length
+    };
+    
+    console.log("Répartition des types de nettoyage:", cleaningTypes);
     
     toast({
       title: "Analyse Avancée Complète",
@@ -180,6 +207,15 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
   const sameClientTwice = (context.match(/× Adultes.*\d{2}\/\d{2}\/\d{4}/g) || []).length >= 2;
   const oneBlockWithOnlyHour = dateMatches.length === 1 && timeMatches.length === 1;
 
+  console.log("🔍 Analyse contexte: dates=" + dateMatches.length + 
+              ", heures=" + timeMatches.length + 
+              ", DIR=" + hasDIR + 
+              ", INS=" + hasINS + 
+              ", CL=" + hasCL + 
+              ", isLeftColumn=" + isLeftColumn + 
+              ", hasTwoClientBlocks=" + hasTwoClientBlocks + 
+              ", sameClientTwice=" + sameClientTwice);
+
   // 🟥 Nettoyage à blanc : uniquement si ce n'est PAS le même client deux fois
   if (
     !sameClientTwice && (
@@ -189,6 +225,7 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
       (hasDIR && dateMatches.length >= 1)
     )
   ) {
+    console.log("✅ Détecté: nettoyage COMPLET (à blanc)");
     return {
       status: 'needs-cleaning',
       cleaningType: 'full',
@@ -201,6 +238,7 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
     sameClientTwice ||
     (hasSingleClient && !hasTwoClientBlocks && !isLeftColumn && !oneBlockWithOnlyHour)
   ) {
+    console.log("✅ Détecté: nettoyage RAPIDE (recouche)");
     return {
       status: 'needs-cleaning',
       cleaningType: 'quick',
@@ -213,6 +251,7 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
     (noDates && (hasINS || hasCL)) ||
     (hasINS && context.includes('× Adultes'))
   ) {
+    console.log("✅ Détecté: chambre PROPRE");
     return {
       status: 'clean',
       cleaningType: 'none',
@@ -224,6 +263,7 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
     context.toLowerCase().includes('maintenance') ||
     context.toLowerCase().includes('hors service')
   ) {
+    console.log("✅ Détecté: chambre en MAINTENANCE");
     return {
       status: 'maintenance',
       cleaningType: 'none',
@@ -235,6 +275,7 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
     context.toLowerCase().includes('occupied') ||
     context.includes('OCC')
   ) {
+    console.log("✅ Détecté: chambre OCCUPÉE");
     return {
       status: 'occupied',
       cleaningType: 'none',
@@ -242,6 +283,7 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
   }
 
   // 🔁 Par défaut
+  console.log("⚠️ Aucun motif reconnu, par défaut: nettoyage COMPLET");
   return {
     status: 'needs-cleaning',
     cleaningType: 'full',
@@ -306,11 +348,12 @@ function parseRoomsFromText(text: string, useAdvancedAnalysis: boolean = false):
       
       if (useAdvancedAnalysis) {
         // Utiliser la fonction d'analyse améliorée
-        console.log(`Analyse avancée pour chambre ${roomNumber}`);
+        console.log(`\n🔍 Analyse avancée pour chambre ${roomNumber}`);
+        console.log(`Contexte (extrait): "${context.substring(0, 50)}..."`);
         const result = determineStatusAndCleaningTypeNewRules(context);
         status = result.status;
         cleaningType = result.cleaningType;
-        console.log(`Résultat pour chambre ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
+        console.log(`📊 Résultat pour chambre ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
       } else {
         // Utiliser l'ancienne fonction d'analyse
         const result = determineStatusAndCleaningType(context);
@@ -379,11 +422,12 @@ function parseRoomsFromText(text: string, useAdvancedAnalysis: boolean = false):
     
     if (useAdvancedAnalysis) {
       // Utiliser la fonction d'analyse améliorée
-      console.log(`Analyse avancée pour chambre générique ${roomNumber}`);
+      console.log(`\n🔍 Analyse avancée pour chambre générique ${roomNumber}`);
+      console.log(`Contexte (extrait): "${context.substring(0, 50)}..."`);
       const result = determineStatusAndCleaningTypeNewRules(context);
       status = result.status;
       cleaningType = result.cleaningType;
-      console.log(`Résultat pour chambre générique ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
+      console.log(`📊 Résultat pour chambre générique ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
     } else {
       // Utiliser l'ancienne fonction d'analyse
       const result = determineStatusAndCleaningType(context);
@@ -407,7 +451,7 @@ function parseRoomsFromText(text: string, useAdvancedAnalysis: boolean = false):
     });
   }
   
-  console.log(`Détecté ${rooms.length} chambres avec le parsing ${useAdvancedAnalysis ? 'avancé' : 'standard'}`);
+  console.log(`\n📋 Détecté ${rooms.length} chambres avec le parsing ${useAdvancedAnalysis ? 'avancé' : 'standard'}`);
   
   // Trier les chambres par numéro
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
