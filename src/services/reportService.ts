@@ -279,7 +279,7 @@ function generateReportHTML(data: ReportData): string {
         }
         h1 { 
           font-size: 18px; 
-          margin-bottom: 5px;
+          margin-bottom: 25px; /* Increased space after the title */
           font-weight: bold;
           border: 2px solid #000;
           padding: 8px;
@@ -303,6 +303,19 @@ function generateReportHTML(data: ReportData): string {
           margin-bottom: 50px; /* Increased space between date and table to 50px */
           font-style: italic;
           margin-top: 15px; /* Space between date and housekeeper name */
+          text-align: right; /* Align date to the right */
+          position: absolute;
+          top: 20px;
+          right: 20px;
+        }
+        .housekeeperName {
+          border: 2px solid #000;
+          padding: 10px;
+          font-weight: bold;
+          display: inline-block;
+          margin-bottom: 40px; /* Increased space after housekeeper name */
+          margin-top: 25px; /* Increased space between title and housekeeper name */
+          font-size: 14px;
         }
         table { 
           width: 100%; 
@@ -356,15 +369,6 @@ function generateReportHTML(data: ReportData): string {
           background-color: #f9f9f9;
           border-radius: 4px;
         }
-        .housekeeperName {
-          border: 2px solid #000;
-          padding: 10px;
-          font-weight: bold;
-          display: inline-block;
-          margin-bottom: 20px;
-          margin-top: 15px;
-          font-size: 14px;
-        }
         .content-section {
           margin-bottom: 50px; /* Add space before the summary table */
         }
@@ -387,11 +391,11 @@ function generateReportHTML(data: ReportData): string {
     <body>
       <h1>Rapport de Nettoyage</h1>
       
+      <div class="date">Date: ${formattedDate}</div>
+      
       <div style="margin-top: 25px;">
         <div class="housekeeperName">${data.housekeeperName}</div>
       </div>
-      
-      <div class="date">Date: ${formattedDate}</div>
       
       <div class="content-section">
         ${instructionsHtml}
