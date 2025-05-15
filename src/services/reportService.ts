@@ -144,28 +144,47 @@ export async function generateAllHousekeeperReports(
       });
       return;
     }
+
+    // Show initial toast for better user experience
+    toast({
+      title: "Préparation des rapports",
+      description: `Génération de ${housekeepersWithAssignedRooms.length} rapports en cours...`,
+    });
     
     let successCount = 0;
+    let failureCount = 0;
     
-    // Generate reports for each housekeeper with assigned rooms
-    for (const { name, rooms } of housekeepersWithAssignedRooms) {
+    // Process each housekeeper individually with a delay between each
+    for (let i = 0; i < housekeepersWithAssignedRooms.length; i++) {
+      const { name, rooms } = housekeepersWithAssignedRooms[i];
+      
       try {
-        // Small delay between downloads to prevent browser issues
-        if (successCount > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        console.log(`Processing report ${i+1}/${housekeepersWithAssignedRooms.length} for ${name} with ${rooms.length} rooms`);
+        
+        // Add delay between downloads to prevent browser issues
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
-        await generateHousekeeperReport(name, rooms, config, emailAddress, customFields);
+        // Generate the report for this specific housekeeper
+        await generateHousekeeperReport(name, rooms, config, emailAddress, {
+          ...customFields,
+          // Ensure we're passing the right instructions for this housekeeper
+          instructions: customFields?.housekeeperInstructions?.[name] || customFields?.instructions || ''
+        });
+        
         successCount++;
       } catch (err) {
         console.error(`Error generating report for ${name}:`, err);
+        failureCount++;
       }
     }
     
+    // Final notification
     if (successCount > 0) {
       toast({
         title: "Rapports générés",
-        description: `${successCount} rapport(s) sur ${housekeepersWithAssignedRooms.length} ont été téléchargés`,
+        description: `${successCount} rapport(s) sur ${housekeepersWithAssignedRooms.length} ont été téléchargés${failureCount > 0 ? ` (${failureCount} échoué(s))` : ''}`,
       });
     } else {
       toast({
@@ -175,7 +194,7 @@ export async function generateAllHousekeeperReports(
       });
     }
   } catch (error) {
-    console.error('Error generating reports:', error);
+    console.error('Error generating all reports:', error);
     toast({
       variant: "destructive",
       title: "Erreur",

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -118,6 +117,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
         saveReportEmail(localEmail); // Save for future use
         console.log("Submitting with custom fields:", customFields);
         console.log("Current housekeeper name:", housekeeperName);
+        
+        // Pass the complete customFields object to onConfirm
         await onConfirm(localEmail, customFields);
         onClose();
       } catch (error) {
