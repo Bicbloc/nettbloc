@@ -302,6 +302,7 @@ function generateReportHTML(data: ReportData): string {
         .date {
           margin-bottom: 20px;
           font-style: italic;
+          margin-top: 15px; /* Add more space between date and housekeeper name */
         }
         table { 
           width: 100%; 
@@ -350,16 +351,22 @@ function generateReportHTML(data: ReportData): string {
         }
         .housekeeperName {
           border: 2px solid #000;
-          padding: 8px;
+          padding: 10px;
           font-weight: bold;
           display: inline-block;
-          margin-bottom: 15px;
+          margin-bottom: 20px;
+          margin-top: 15px;
+          font-size: 14px;
         }
       </style>
     </head>
     <body>
       <h1>Rapport de Nettoyage</h1>
-      <div class="housekeeperName">${data.housekeeperName}</div>
+      
+      <div style="margin-top: 25px;">
+        <div class="housekeeperName">${data.housekeeperName}</div>
+      </div>
+      
       <div class="date">Date: ${formattedDate}</div>
       
       ${instructionsHtml}
