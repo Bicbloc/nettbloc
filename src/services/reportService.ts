@@ -341,9 +341,9 @@ function generateReportHTML(data: ReportData): string {
         }
         .housekeeper-column {
           width: 100%;
-          padding: 80px 0;  /* Further increased padding */
+          padding: 90px 0;  /* Further increased padding */
           text-align: center;
-          margin: 70px 0;  /* Further increased margin */
+          margin: 90px 0;  /* Further increased margin */
         }
         .housekeeperName {
           border: 3px solid #000;
@@ -416,11 +416,11 @@ function generateReportHTML(data: ReportData): string {
           text-align: left;
         }
         .content-section {
-          margin-bottom: 70px;  /* Increased space */
+          margin-bottom: 100px;  /* Further increased space */
           text-align: left;
         }
         .summary-table {
-          margin-top: 80px;  /* Increased space */
+          margin-top: 100px;  /* Further increased space */
         }
         @media print {
           .footer {
@@ -430,7 +430,7 @@ function generateReportHTML(data: ReportData): string {
             right: 0;
           }
           .content {
-            margin-bottom: 70px;  /* Increased space */
+            margin-bottom: 100px;  /* Further increased space */
           }
         }
       </style>

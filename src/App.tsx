@@ -10,7 +10,7 @@ import { BicblocFooter } from "./components/BicblocBranding";
 
 // Minimal header space with no title
 const HeaderSpace = () => (
-  <div className="container mx-auto py-2">
+  <div className="container mx-auto pt-1">
     {/* Empty space - no title */}
   </div>
 );
@@ -24,8 +24,8 @@ const App = () => (
       <Sonner />
       <div className="flex flex-col min-h-screen">
         <HeaderSpace />
-        {/* Footer positioned at the top, before the main content */}
-        <div className="container mx-auto mb-4">
+        {/* Footer positioned at the top, before the main content, with increased width and less padding */}
+        <div className="container mx-auto mb-2 px-0">
           <BicblocFooter />
         </div>
         <div className="flex-grow">

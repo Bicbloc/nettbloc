@@ -18,7 +18,7 @@ export const BicblocLogo: React.FC = () => {
 
 export const BicblocFooter: React.FC = () => {
   return (
-    <footer className="py-12 w-full">
+    <footer className="w-full py-6">
       <a 
         href="https://www.bicbloc.eu" 
         target="_blank" 
@@ -29,7 +29,7 @@ export const BicblocFooter: React.FC = () => {
           <img 
             src="/lovable-uploads/d6290f4a-190e-4ad8-99a9-51307a4cbcc8.png"
             alt="BicBloc Banner"
-            className="w-full object-contain max-h-[220px]"
+            className="w-full object-contain max-h-[300px]" /* Increased height from 220px to 300px */
           />
         </div>
       </a>
