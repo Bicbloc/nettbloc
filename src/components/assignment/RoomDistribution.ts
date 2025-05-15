@@ -62,8 +62,13 @@ export function smartAssignRooms(
     return [];
   }
 
-  // Sort rooms by number for better organization
-  roomsToSelect.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+  // Sort rooms by floor and then by room number for better floor-based organization
+  roomsToSelect.sort((a, b) => {
+    const floorA = getRoomFloor(a.number);
+    const floorB = getRoomFloor(b.number);
+    if (floorA !== floorB) return floorA - floorB;
+    return a.number.localeCompare(b.number, undefined, { numeric: true });
+  });
   
   toast({
     description: `${roomsToSelect.length} chambres sélectionnées automatiquement dans les étages choisis.`
@@ -73,15 +78,8 @@ export function smartAssignRooms(
 }
 
 /**
- * Distributes rooms to housekeepers by first digit of room number
- * Each housekeeper gets consecutive pairs of digits (1&2, 3&4, etc.)
- * 
- * Assignment Logic:
- * - First housekeeper gets rooms with first digits 1,2
- * - Second housekeeper gets rooms with first digits 3,4
- * - Third housekeeper gets rooms with first digits 5,6
- * - Fourth housekeeper gets rooms with first digits 7,8 etc.
- * - If there are more digits than housekeepers*2, distribution cycles
+ * Distributes rooms to housekeepers by floors in sequential order
+ * Each housekeeper gets consecutive floors to maintain continuity
  */
 export function distributeRoomsByFloor(
   rooms: Room[],
