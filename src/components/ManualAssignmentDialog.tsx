@@ -52,7 +52,7 @@ export function ManualAssignmentDialog({
     }
   }, [isOpen, housekeeperNames]);
   
-  // Function to determine room floor from room number - updated for more accurate detection
+  // Function to determine room floor from room number
   const getRoomFloor = (roomNumber: string): number => {
     // Ignore years like 2025, 2026, 2027, 2028
     if (/^20(2[5-8])$/.test(roomNumber)) {
@@ -125,34 +125,26 @@ export function ManualAssignmentDialog({
     });
   };
 
-  // Completely rewritten toggle floor implementation
+  // Improved toggle floor implementation
   const toggleFloor = (floor: number) => {
-    console.log(`Toggling floor ${floor}`);
-    
-    // Check if floor is already selected
-    const isFloorSelected = selectedFloors.includes(floor);
-    
-    if (isFloorSelected) {
-      // Remove floor from selection
+    if (selectedFloors.includes(floor)) {
+      // Remove floor from selected floors
       setSelectedFloors(prev => prev.filter(f => f !== floor));
       
-      // Also remove all rooms of this floor from selection
+      // Remove rooms from this floor from selection
       setSelectedRooms(prev => 
         prev.filter(room => getRoomFloor(room.number) !== floor)
       );
-      
-      console.log(`Floor ${floor} deselected: all rooms from this floor have been removed`);
     } else {
-      // Add floor to selection
+      // Add floor to selected floors
       setSelectedFloors(prev => [...prev, floor]);
       
-      // Find all rooms on this floor that match current filters
-      const floorRoomsToSelect = rooms.filter(room => {
-        // Check floor
-        const roomFloor = getRoomFloor(room.number);
-        if (roomFloor !== floor) return false;
+      // Add all rooms from this floor to selection (that match current filters)
+      const roomsToAdd = rooms.filter(room => {
+        // Room must be from the selected floor
+        if (getRoomFloor(room.number) !== floor) return false;
         
-        // Apply current filters
+        // Apply other filters
         if (filterStatus !== "all" && room.status !== filterStatus) return false;
         if (excludeTwin && room.isTwin) return false;
         if (searchTerm && !room.number.toLowerCase().includes(searchTerm.toLowerCase())) return false;
@@ -160,28 +152,23 @@ export function ManualAssignmentDialog({
         return true;
       });
       
-      console.log(`Floor ${floor} selected: ${floorRoomsToSelect.length} rooms found`);
-      
-      // Add these rooms to selection (without duplicates)
-      if (floorRoomsToSelect.length > 0) {
-        setSelectedRooms(prev => {
-          const existingRoomNumbers = new Set(prev.map(r => r.number));
-          const newRooms = [...prev];
-          
-          floorRoomsToSelect.forEach(room => {
-            if (!existingRoomNumbers.has(room.number)) {
-              newRooms.push(room);
-            }
-          });
-          
-          console.log(`${newRooms.length - prev.length} new rooms added to selection`);
-          return newRooms;
+      // Add rooms (avoiding duplicates)
+      setSelectedRooms(prev => {
+        const existingRoomNumbers = new Set(prev.map(r => r.number));
+        const newRooms = [...prev];
+        
+        roomsToAdd.forEach(room => {
+          if (!existingRoomNumbers.has(room.number)) {
+            newRooms.push(room);
+          }
         });
-      }
+        
+        return newRooms;
+      });
     }
   };
 
-  // Improved smart assignment implementation
+  // Smart assignment implementation
   const handleSmartAssign = () => {
     if (!selectedHousekeeper) {
       toast({
@@ -196,8 +183,6 @@ export function ManualAssignmentDialog({
     
     // If floors are selected, prioritize them
     if (selectedFloors.length > 0) {
-      console.log("Smart assignment based on selected floors:", selectedFloors);
-      
       // Get all rooms from selected floors
       roomsToSelect = rooms.filter(room => {
         const roomFloor = getRoomFloor(room.number);
@@ -206,7 +191,6 @@ export function ManualAssignmentDialog({
     } else {
       // Otherwise use housekeeper's preferred floors
       const preferredFloors = housekeeperPreferredFloors[selectedHousekeeper] || [];
-      console.log("Smart assignment based on preferred floors:", preferredFloors);
       
       if (preferredFloors.length === 0) {
         toast({
@@ -251,7 +235,7 @@ export function ManualAssignmentDialog({
     });
   };
   
-  // COMPLETELY REWRITTEN room distribution algorithm
+  // Completely rewritten room distribution algorithm
   const handleDistributeRooms = () => {
     if (housekeeperNames.length === 0) {
       toast({
@@ -262,14 +246,25 @@ export function ManualAssignmentDialog({
       return;
     }
 
-    console.log("Starting room distribution process");
-    
-    // Get all rooms that need to be cleaned (not in maintenance and not already assigned)
-    const unassignedRooms = [...rooms].filter(room => 
+    // Filtre initial: ne prendre que les chambres non assignées et non en maintenance
+    let unassignedRooms = rooms.filter(room => 
       !room.assignedTo && 
       room.cleaningType !== 'none' && 
       room.status !== 'maintenance'
     );
+    
+    // Si on veut exclure les chambres twin
+    if (excludeTwin) {
+      unassignedRooms = unassignedRooms.filter(room => !room.isTwin);
+    }
+    
+    // Si on a sélectionné des étages spécifiques, ne prendre que ces étages
+    if (selectedFloors.length > 0) {
+      unassignedRooms = unassignedRooms.filter(room => {
+        const roomFloor = getRoomFloor(room.number);
+        return selectedFloors.includes(roomFloor);
+      });
+    }
     
     if (unassignedRooms.length === 0) {
       toast({
@@ -280,9 +275,9 @@ export function ManualAssignmentDialog({
       return;
     }
 
-    console.log(`Found ${unassignedRooms.length} unassigned rooms to distribute`);
+    console.log(`Distributing ${unassignedRooms.length} unassigned rooms`);
     
-    // Group rooms by floor
+    // Organiser par étage
     const roomsByFloor: Record<number, Room[]> = {};
     
     unassignedRooms.forEach(room => {
@@ -291,48 +286,47 @@ export function ManualAssignmentDialog({
       roomsByFloor[floor].push(room);
     });
     
-    // Sort rooms by number within each floor
+    // Trier les chambres par numéro dans chaque étage
     Object.keys(roomsByFloor).forEach(floorStr => {
       const floor = parseInt(floorStr);
       roomsByFloor[floor].sort((a, b) => 
         a.number.localeCompare(b.number, undefined, { numeric: true })
       );
-      console.log(`Floor ${floor}: ${roomsByFloor[floor].length} rooms`);
     });
     
-    // Get available floors and sort them
+    // Obtenir les étages disponibles et les trier
     const availableFloors = Object.keys(roomsByFloor)
       .map(Number)
       .sort((a, b) => a - b);
     
-    console.log("Distribution - Available floors:", availableFloors);
+    console.log("Available floors for distribution:", availableFloors);
     
-    // Number of housekeepers
+    // Nombre de femmes de chambre
     const numHousekeepers = housekeeperNames.length;
     
-    // Prepare assignments
+    // Préparer les assignations
     const assignments: Record<string, Room[]> = {};
     housekeeperNames.forEach(name => {
       assignments[name] = [];
     });
     
-    // Distribute floors sequentially to housekeepers
+    // Distribuer les étages séquentiellement aux femmes de chambre
     if (availableFloors.length > 0) {
-      // Calculate how many floors each housekeeper should get
+      // Calculer combien d'étages chaque femme de chambre doit recevoir
       const floorsPerHousekeeper = Math.max(1, Math.ceil(availableFloors.length / numHousekeepers));
-      console.log(`Floors per housekeeper: ${floorsPerHousekeeper}`);
+      console.log(`Each housekeeper gets ${floorsPerHousekeeper} floors`);
       
-      // Assign entire floors to housekeepers sequentially
+      // Assigner des étages entiers aux femmes de chambre séquentiellement
       housekeeperNames.forEach((housekeeper, index) => {
-        // Calculate which floors this housekeeper gets
+        // Calculer quels étages cette femme de chambre reçoit
         const startFloorIndex = index * floorsPerHousekeeper;
         const endFloorIndex = Math.min((index + 1) * floorsPerHousekeeper, availableFloors.length);
         
-        // Get floors for this housekeeper
+        // Obtenir les étages pour cette femme de chambre
         const assignedFloors = availableFloors.slice(startFloorIndex, endFloorIndex);
         console.log(`${housekeeper} gets floors:`, assignedFloors);
         
-        // Assign all rooms from these floors
+        // Assigner toutes les chambres de ces étages
         assignedFloors.forEach(floor => {
           if (roomsByFloor[floor] && roomsByFloor[floor].length > 0) {
             assignments[housekeeper].push(...roomsByFloor[floor]);
@@ -341,7 +335,7 @@ export function ManualAssignmentDialog({
         });
       });
       
-      // Make the assignments
+      // Faire les assignations
       for (const housekeeper of housekeeperNames) {
         if (assignments[housekeeper] && assignments[housekeeper].length > 0) {
           console.log(`Assigning ${assignments[housekeeper].length} rooms to ${housekeeper}`);
@@ -349,7 +343,7 @@ export function ManualAssignmentDialog({
         }
       }
       
-      // Display success message
+      // Afficher un message de succès
       const totalAssigned = Object.values(assignments).reduce((sum, rooms) => sum + rooms.length, 0);
       toast({
         title: "Distribution réussie",
