@@ -127,50 +127,42 @@ export function ManualAssignmentDialog({
 
   // Function to handle floor selection that assigns all rooms of that floor
   const toggleFloor = (floor: number) => {
-    setSelectedFloors(prev => {
-      const isAlreadySelected = prev.includes(floor);
-      let newFloors: number[];
+    // Vérifier si l'étage est déjà sélectionné
+    const isAlreadySelected = selectedFloors.includes(floor);
+    
+    // Mettre à jour l'état des étages sélectionnés
+    if (isAlreadySelected) {
+      // Retirer l'étage des sélectionnés
+      setSelectedFloors(prev => prev.filter(f => f !== floor));
       
-      if (isAlreadySelected) {
-        // Removing floor from selection
-        newFloors = prev.filter(f => f !== floor);
+      // Aussi retirer toutes les chambres de cet étage de la sélection
+      setSelectedRooms(prev => 
+        prev.filter(room => getRoomFloor(room.number) !== floor)
+      );
+      console.log(`Étage ${floor} désélectionné: toutes les chambres de cet étage ont été retirées`);
+    } else {
+      // Ajouter l'étage aux sélectionnés
+      setSelectedFloors(prev => [...prev, floor]);
+      
+      // Trouver toutes les chambres de cet étage
+      const floorRooms = rooms.filter(room => getRoomFloor(room.number) === floor);
+      console.log(`Étage ${floor} sélectionné: ${floorRooms.length} chambres trouvées`);
+      
+      // Ajouter ces chambres à la sélection (sans doublons)
+      setSelectedRooms(prev => {
+        const existingRoomNumbers = new Set(prev.map(r => r.number));
+        const newRooms = [...prev];
         
-        // Also remove rooms from this floor from selection
-        setSelectedRooms(prev => 
-          prev.filter(room => {
-            const roomFloor = getRoomFloor(room.number);
-            return roomFloor !== floor;
-          })
-        );
-      } else {
-        // Adding floor to selection - add all rooms from this floor
-        newFloors = [...prev, floor];
-        
-        // Récupérer TOUTES les chambres de cet étage depuis TOUTES les chambres disponibles
-        const floorRooms = rooms.filter(room => {
-          const roomFloor = getRoomFloor(room.number);
-          return roomFloor === floor;
+        floorRooms.forEach(room => {
+          if (!existingRoomNumbers.has(room.number)) {
+            newRooms.push(room);
+          }
         });
         
-        console.log(`Étage ${floor} sélectionné: ${floorRooms.length} chambres trouvées`);
-        
-        // Add these rooms to selection (without duplicates)
-        setSelectedRooms(prev => {
-          const existingRoomNumbers = new Set(prev.map(r => r.number));
-          
-          const newRooms = [...prev];
-          floorRooms.forEach(room => {
-            if (!existingRoomNumbers.has(room.number)) {
-              newRooms.push(room);
-            }
-          });
-          
-          return newRooms;
-        });
-      }
-      
-      return newFloors;
-    });
+        console.log(`${newRooms.length - prev.length} nouvelles chambres ajoutées à la sélection`);
+        return newRooms;
+      });
+    }
   };
 
   // Implémentation améliorée de l'assignation intelligente
@@ -253,7 +245,7 @@ export function ManualAssignmentDialog({
     }
 
     // Récupérer toutes les chambres non assignées
-    const unassignedRooms = [...rooms].filter(room => !room.assignedTo);
+    const unassignedRooms = [...rooms].filter(room => !room.assignedTo && room.cleaningType !== 'none' && room.status !== 'maintenance');
     
     // Si pas de chambres à distribuer
     if (unassignedRooms.length === 0) {
@@ -265,78 +257,68 @@ export function ManualAssignmentDialog({
       return;
     }
 
+    // *** NOUVELLE LOGIQUE DE DISTRIBUTION PAR ÉTAGES ENTIERS ***
+    
     // Grouper les chambres par étage
     const roomsByFloor: Record<number, Room[]> = {};
     
-    // Trier d'abord les chambres par numéro (pour l'ordre au sein de chaque étage)
-    unassignedRooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
-    
-    // Ensuite regrouper par étage
     unassignedRooms.forEach(room => {
       const floor = getRoomFloor(room.number);
       if (!roomsByFloor[floor]) roomsByFloor[floor] = [];
       roomsByFloor[floor].push(room);
     });
     
-    // Récupérer les étages disponibles et les trier en ordre ascendant
+    // Trier les chambres par numéro dans chaque étage
+    Object.keys(roomsByFloor).forEach(floor => {
+      roomsByFloor[parseInt(floor)].sort((a, b) => 
+        a.number.localeCompare(b.number, undefined, { numeric: true })
+      );
+    });
+    
+    // Récupérer les étages disponibles et les trier par ordre croissant
     const availableFloors = Object.keys(roomsByFloor).map(Number).sort((a, b) => a - b);
     console.log("Distribution - Étages disponibles:", availableFloors);
 
-    // Calculer le nombre total d'étages et les attribuer équitablement aux femmes de chambre
+    // Nombre de femmes de chambre 
     const numHousekeepers = housekeeperNames.length;
     
-    // Préparer les assignations pour chaque femme de chambre
+    // Préparation des assignations
     const assignments: Record<string, Room[]> = {};
     housekeeperNames.forEach(name => {
       assignments[name] = [];
     });
     
-    // Nouvelle logique de distribution: attribuer des étages complets à chaque femme de chambre
-    // en respectant l'ordre des étages
+    // Assigner des étages COMPLETS séquentiellement aux femmes de chambre
+    // Par exemple: 1er et 2ème étages à la première femme de chambre, 3ème et 4ème à la deuxième, etc.
     
-    // Déterminer combien d'étages complets chaque femme de chambre devrait recevoir
-    const floorsPerHousekeeper = Math.ceil(availableFloors.length / numHousekeepers);
+    let currentHousekeeperIndex = 0;
+    let currentFloorGroup: number[] = [];
+    let currentHousekeeper = housekeeperNames[0];
     
-    // Distribuer les étages entiers aux femmes de chambre
-    let currentFloorIndex = 0;
-    
-    for (let i = 0; i < numHousekeepers && currentFloorIndex < availableFloors.length; i++) {
-      const housekeeper = housekeeperNames[i];
+    // Distribuer les étages de façon égale entre les femmes de chambre
+    availableFloors.forEach((floor, index) => {
+      // Ajouter cet étage au groupe courant
+      currentFloorGroup.push(floor);
       
-      // Calculer combien d'étages cette femme de chambre recevra
-      const floorsForThisHousekeeper = Math.min(
-        floorsPerHousekeeper, 
-        availableFloors.length - currentFloorIndex
-      );
+      // Si on atteint le nombre d'étages par femme de chambre OU c'est le dernier étage
+      const isLastFloor = index === availableFloors.length - 1;
+      const floorGroupSize = Math.ceil(availableFloors.length / numHousekeepers);
+      const groupIsFull = currentFloorGroup.length >= floorGroupSize;
       
-      // Assigner les étages à cette femme de chambre
-      for (let j = 0; j < floorsForThisHousekeeper; j++) {
-        const floor = availableFloors[currentFloorIndex];
-        const floorRooms = roomsByFloor[floor];
+      if (groupIsFull || isLastFloor) {
+        // Assigner tous les étages du groupe à la femme de chambre courante
+        currentFloorGroup.forEach(groupFloor => {
+          const floorRooms = roomsByFloor[groupFloor];
+          assignments[currentHousekeeper].push(...floorRooms);
+          console.log(`Assignation: "${currentHousekeeper}" reçoit l'étage ${groupFloor} avec ${floorRooms.length} chambres`);
+        });
         
-        // Ajouter toutes les chambres de cet étage à cette femme de chambre
-        assignments[housekeeper].push(...floorRooms);
-        
-        console.log(`Assignation: Femme de chambre "${housekeeper}" reçoit l'étage ${floor} avec ${floorRooms.length} chambres`);
-        
-        currentFloorIndex++;
+        // Passer à la femme de chambre suivante
+        currentHousekeeperIndex = (currentHousekeeperIndex + 1) % numHousekeepers;
+        currentHousekeeper = housekeeperNames[currentHousekeeperIndex];
+        currentFloorGroup = []; // Réinitialiser le groupe d'étages
       }
-    }
-    
-    // Si il reste des étages non assignés (cas où il y a plus d'étages que de femmes de chambre)
-    // On continue la distribution circulaire
-    while (currentFloorIndex < availableFloors.length) {
-      for (let i = 0; i < numHousekeepers && currentFloorIndex < availableFloors.length; i++) {
-        const housekeeper = housekeeperNames[i];
-        const floor = availableFloors[currentFloorIndex];
-        const floorRooms = roomsByFloor[floor];
-        
-        assignments[housekeeper].push(...floorRooms);
-        console.log(`Assignation supplémentaire: Femme de chambre "${housekeeper}" reçoit aussi l'étage ${floor} avec ${floorRooms.length} chambres`);
-        
-        currentFloorIndex++;
-      }
-    }
+    });
     
     // Effectuer les assignations
     let totalAssigned = 0;
@@ -365,7 +347,7 @@ export function ManualAssignmentDialog({
     // Notification de succès
     toast({
       title: "Distribution réussie",
-      description: `${totalAssigned} chambres ont été distribuées par étages complets à chaque femme de chambre.`
+      description: `${totalAssigned} chambres ont été distribuées par étages complets. Chaque femme de chambre a reçu des étages entiers.`
     });
     
     console.log("Résumé de distribution par étages:\n" + summary);
