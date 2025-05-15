@@ -55,6 +55,8 @@ export function ManualAssignmentDialog({
   
   // Apply filters to rooms
   useEffect(() => {
+    // When filtering, we want to show all rooms, even if they're already assigned
+    // This allows users to select rooms from any housekeeper
     const filtered = filterRooms(
       rooms, 
       searchTerm, 
@@ -71,9 +73,10 @@ export function ManualAssignmentDialog({
       const isSelected = prev.some(r => r.number === room.number);
       
       if (isSelected) {
+        // Remove from selection
         return prev.filter(r => r.number !== room.number);
       } else {
-        // Allow selecting even if room is assigned to other housekeepers
+        // Add to selection - always allow, regardless of current assignment
         return [...prev, room];
       }
     });
@@ -98,7 +101,7 @@ export function ManualAssignmentDialog({
       setSelectedFloors(prev => [...prev, floor]);
       
       // Find all rooms from this floor that match current filters
-      // Includes rooms assigned to other housekeepers
+      // Always include rooms assigned to other housekeepers
       const roomsOnFloor = rooms.filter(room => {
         // Room must be from the selected floor
         const roomFloor = parseInt(room.number.charAt(0));
@@ -175,7 +178,7 @@ export function ManualAssignmentDialog({
     // Success message
     toast({
       title: "Distribution réussie",
-      description: `${totalAssigned} chambres ont été distribuées en paires de chiffres (1-2, 3-4, etc.) en respectant l'ordre des étages.`,
+      description: `${totalAssigned} chambres ont été distribuées en respectant l'ordre des étages.`,
     });
     
     onClose();
@@ -200,7 +203,10 @@ export function ManualAssignmentDialog({
       return;
     }
     
+    // Assign all selected rooms to the housekeeper, even if they're currently
+    // assigned to someone else or on a floor not checked for this housekeeper
     onAssignRooms(selectedHousekeeper, selectedRooms);
+    
     toast({
       title: "Chambres assignées",
       description: `${selectedRooms.length} chambre(s) assignée(s) à ${selectedHousekeeper}`,

@@ -78,8 +78,8 @@ export function smartAssignRooms(
 }
 
 /**
- * Distributes rooms to housekeepers by floors in sequential order
- * Each housekeeper gets consecutive floors to maintain continuity
+ * Distributes rooms to housekeepers by continuous floors to maintain continuity
+ * Each housekeeper gets consecutive floors to maintain flow
  */
 export function distributeRoomsByFloor(
   rooms: Room[],
@@ -139,51 +139,48 @@ export function distributeRoomsByFloor(
     assignments[name] = [];
   });
 
-  // Group rooms by first digit of room number
-  const roomsByFirstDigit: Record<string, Room[]> = {};
-  
+  // Group rooms by floor
+  const roomsByFloor: Record<number, Room[]> = {};
   availableRooms.forEach(room => {
-    // Get first digit of room number
-    const firstDigit = getFirstDigitFromRoomNumber(room.number);
-    if (!roomsByFirstDigit[firstDigit]) {
-      roomsByFirstDigit[firstDigit] = [];
+    const floor = getRoomFloor(room.number);
+    if (!roomsByFloor[floor]) {
+      roomsByFloor[floor] = [];
     }
-    roomsByFirstDigit[firstDigit].push(room);
+    roomsByFloor[floor].push(room);
   });
   
-  console.log("Rooms grouped by first digit:", Object.keys(roomsByFirstDigit));
+  // Get all available floors and sort them
+  const availableFloors = Object.keys(roomsByFloor)
+    .map(Number)
+    .sort((a, b) => a - b);
   
-  // Get all available first digits and sort them
-  const availableFirstDigits = Object.keys(roomsByFirstDigit).sort((a, b) => parseInt(a) - parseInt(b));
+  console.log("Available floors:", availableFloors);
   
-  if (availableFirstDigits.length > 0 && housekeeperNames.length > 0) {
+  if (availableFloors.length > 0 && housekeeperNames.length > 0) {
     const numHousekeepers = housekeeperNames.length;
     
-    // Distribute rooms by pairs of digits to each housekeeper (1&2 to first, 3&4 to second, etc.)
-    for (let digitIndex = 0; digitIndex < availableFirstDigits.length; digitIndex++) {
-      // Calculate which housekeeper gets this digit (with pair wrap-around)
-      // Integer division by 2 to get pairs of digits
-      const housekeeperIndex = Math.floor(digitIndex / 2) % numHousekeepers;
+    // Distribute rooms by consecutive floors to ensure each housekeeper gets adjacent floors
+    // This helps maintain continuity in their work
+    for (let floorIndex = 0; floorIndex < availableFloors.length; floorIndex++) {
+      // Calculate which housekeeper gets this floor by dividing floors evenly
+      const housekeeperIndex = Math.floor(floorIndex / Math.ceil(availableFloors.length / numHousekeepers)) % numHousekeepers;
       const housekeeper = housekeeperNames[housekeeperIndex];
-      const firstDigit = availableFirstDigits[digitIndex];
+      const floor = availableFloors[floorIndex];
       
-      console.log(`Assigning all rooms starting with digit ${firstDigit} to ${housekeeper} (index ${housekeeperIndex})`);
+      console.log(`Assigning floor ${floor} to ${housekeeper} (index ${housekeeperIndex})`);
       
-      if (roomsByFirstDigit[firstDigit] && roomsByFirstDigit[firstDigit].length > 0) {
-        const roomsWithDigit = roomsByFirstDigit[firstDigit];
+      if (roomsByFloor[floor] && roomsByFloor[floor].length > 0) {
+        const roomsOnFloor = roomsByFloor[floor];
         
-        // Sort rooms by floor and then by number before adding
-        roomsWithDigit.sort((a, b) => {
-          const floorA = getRoomFloor(a.number);
-          const floorB = getRoomFloor(b.number);
-          if (floorA !== floorB) return floorA - floorB;
-          return a.number.localeCompare(b.number, undefined, { numeric: true });
-        });
+        // Sort rooms by number before adding
+        roomsOnFloor.sort((a, b) => 
+          a.number.localeCompare(b.number, undefined, { numeric: true })
+        );
         
-        assignments[housekeeper].push(...roomsWithDigit);
+        assignments[housekeeper].push(...roomsOnFloor);
         
-        console.log(`Added ${roomsWithDigit.length} rooms starting with ${firstDigit} to ${housekeeper}`);
-        console.log(`Room numbers: ${roomsWithDigit.map(r => r.number).join(', ')}`);
+        console.log(`Added ${roomsOnFloor.length} rooms from floor ${floor} to ${housekeeper}`);
+        console.log(`Room numbers: ${roomsOnFloor.map(r => r.number).join(', ')}`);
       }
     }
     

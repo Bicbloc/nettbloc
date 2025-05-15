@@ -168,6 +168,8 @@ function generateReportHTML(data: ReportData): string {
         .todo-section, .toknow-section, .instructions-section { margin-top: 15px; }
         ul { margin-top: 5px; padding-left: 20px; }
         .room-type { font-weight: bold; }
+        .a-blanc { background-color: #FFD580; }
+        .recouche { background-color: #90EE90; }
         @media print {
           body { margin: 0; }
           .page-break { page-break-after: always; }
@@ -222,11 +224,11 @@ function generateRoomSummary(data: ReportData): string {
         <th>Nombre de chambres</th>
       </tr>
       <tr>
-        <td>Nettoyage complet</td>
+        <td>À Blanc</td>
         <td>${fullCleanCount}</td>
       </tr>
       <tr>
-        <td>Nettoyage rapide</td>
+        <td>Recouche</td>
         <td>${quickCleanCount}</td>
       </tr>
       <tr>
@@ -274,13 +276,15 @@ function generateRoomsTable(data: ReportData): string {
     
     // Create rows for each room
     const rowsHtml = roomsOnFloor.map(room => {
-      const cleaningTypeText = room.cleaningType === 'full' ? 'Complet' : 'Rapide';
+      // Change the display text and add highlighting classes
+      const cleaningTypeClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
+      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
       const priorityText = room.priority === 'high' ? '⚠️ Haute' : 'Normale';
       
       return `
         <tr>
           <td>${room.number}</td>
-          <td class="room-type">${cleaningTypeText}</td>
+          <td class="room-type ${cleaningTypeClass}">${cleaningTypeText}</td>
           <td>${room.isTwin ? 'Oui' : 'Non'}</td>
           <td>${priorityText}</td>
           <td>${room.notes || '-'}</td>
@@ -308,7 +312,7 @@ function generateRoomsTable(data: ReportData): string {
   return tablesHtml;
 }
 
-// Generate combined report for all housekeepers
+// Generate combined report for all housekeepers into a single file
 export async function generateCombinedReport(
   housekeeperRooms: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
@@ -316,18 +320,77 @@ export async function generateCombinedReport(
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
-    // Generate report for each housekeeper
-    for (const { name, rooms } of housekeeperRooms) {
-      if (rooms.length > 0) {
-        // Process one by one with a small delay to avoid browser issues
-        await generateReport(name, rooms, config, emailAddress, customFields);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+    // Filter out housekeepers with no rooms
+    const validHousekeepers = housekeeperRooms.filter(item => item.rooms.length > 0);
+    
+    if (validHousekeepers.length === 0) {
+      toast({
+        title: "Aucune chambre assignée",
+        description: "Il n'y a pas de chambres assignées aux femmes de chambre.",
+        variant: "destructive"
+      });
+      return false;
     }
+
+    // Create HTML for each housekeeper
+    const allHousekeepersHTML = await Promise.all(validHousekeepers.map(async ({ name, rooms }) => {
+      // Get today's date in French locale
+      const today = new Date();
+      const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const currentDate = today.toLocaleDateString('fr-FR', dateOptions as any);
+      
+      // Sort rooms by floor and then room number
+      const sortedRooms = [...rooms].sort((a, b) => {
+        // Extract floor and room numbers
+        const floorA = parseInt(a.number.charAt(0));
+        const floorB = parseInt(b.number.charAt(0));
+        
+        // Compare floors first
+        if (floorA !== floorB) {
+          return floorA - floorB;
+        }
+        
+        // If on same floor, compare room numbers
+        return a.number.localeCompare(b.number, undefined, { numeric: true });
+      });
+      
+      // Prepare the report data
+      const reportData: ReportData = {
+        roomCount: sortedRooms.length,
+        housekeeperName: name,
+        rooms: sortedRooms,
+        currentDate: currentDate,
+        config: config,
+        // Include custom fields if provided
+        toDoItems: customFields?.toDoItems || [],
+        toKnowItems: customFields?.toKnowItems || [],
+        instructions: customFields?.instructions || '',
+        generalInstructions: customFields?.generalInstructions || '',
+        housekeeperInstructions: customFields?.housekeeperInstructions || {}
+      };
+      
+      // Generate section for this housekeeper
+      return generateReportHTML(reportData);
+    }));
+
+    // Combine all HTML into a single document with page breaks
+    const combinedHTML = allHousekeepersHTML.join('<div class="page-break"></div>');
+    
+    // Generate PDF using html2pdf library
+    const pdfOptions = {
+      margin: [10, 10, 10, 10],
+      filename: `rapports-complet-${new Date().toISOString().slice(0,10)}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, logging: false, dpi: 192, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    // Convert HTML to PDF and download as a single file
+    await html2pdf().from(combinedHTML).set(pdfOptions).save();
     
     toast({
       title: "Rapports générés",
-      description: `${housekeeperRooms.length} rapports ont été générés et téléchargés.`
+      description: `Un fichier PDF combinant les rapports de ${validHousekeepers.length} femmes de chambre a été téléchargé.`
     });
     
     return true;
