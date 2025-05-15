@@ -300,9 +300,9 @@ function generateReportHTML(data: ReportData): string {
           font-weight: bold;
         }
         .date {
-          margin-bottom: 20px;
+          margin-bottom: 35px; /* Increased space between date and table */
           font-style: italic;
-          margin-top: 15px; /* Add more space between date and housekeeper name */
+          margin-top: 15px; /* Space between date and housekeeper name */
         }
         table { 
           width: 100%; 
@@ -332,6 +332,9 @@ function generateReportHTML(data: ReportData): string {
           font-size: 11px;
           padding-top: 10px;
           border-top: 1px solid #ddd;
+        }
+        .footer .phone {
+          font-weight: bold;
         }
         ul {
           margin: 5px 0 10px 20px;
@@ -383,7 +386,8 @@ function generateReportHTML(data: ReportData): string {
       </div>
       
       <div class="footer">
-        Généré par bicbloc.eu Staffing - Commander un extra en trois 3 clics
+        Généré par bicbloc.eu Staffing - Commander un extra en trois 3 clics<br>
+        <span class="phone">+33 (0)1 89 70 69 50</span>
       </div>
     </body>
     </html>
