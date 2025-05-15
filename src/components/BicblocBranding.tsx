@@ -5,13 +5,24 @@ import { AspectRatio } from "./ui/aspect-ratio";
 export const BicblocLogo: React.FC = () => {
   return (
     <div className="flex flex-col items-center">
-      <a href="https://www.bicbloc.eu" target="_blank" rel="noopener noreferrer" className="block max-w-[400px] mx-auto">
-        <img 
-          src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png"
-          alt="BicBloc Logo"
-          className="object-contain h-full w-full"
-        />
-      </a>
+      <div className="block max-w-[400px] mx-auto">
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="100" 
+          height="100" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+        >
+          <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4"/>
+          <path d="M12 3v16"/>
+          <path d="m9 7 3-3 3 3"/>
+          <path d="M4 15h16"/>
+        </svg>
+      </div>
     </div>
   );
 };
@@ -19,22 +30,9 @@ export const BicblocLogo: React.FC = () => {
 export const BicblocFooter: React.FC = () => {
   return (
     <footer className="mt-4 py-6 border-t">
-      <a 
-        href="https://www.bicbloc.eu" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="block text-center"
-      >
-        <div className="max-w-full w-full">
-          <AspectRatio ratio={16/4} className="w-full">
-            <img 
-              src="/lovable-uploads/c8c4ab5d-01f9-48ea-970c-2ba1488f614d.png"
-              alt="BicBloc Banner"
-              className="w-full h-full object-contain"
-            />
-          </AspectRatio>
-        </div>
-      </a>
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground">BicBloc Housekeeping Report</p>
+      </div>
     </footer>
   );
 };
