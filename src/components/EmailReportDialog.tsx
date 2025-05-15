@@ -10,6 +10,7 @@ import { ReportFields } from "@/components/ReportCustomFields"; // Updated impor
 import ReportCustomFields from "@/components/ReportCustomFields";
 import { getReportEmail, saveReportEmail } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { saveEmailToSupabase } from "@/lib/supabase";
 
 interface EmailReportDialogProps {
   isOpen: boolean;
@@ -116,8 +117,9 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
       setIsSubmitting(true);
       try {
         saveReportEmail(localEmail); // Save for future use
-        console.log("Submitting with custom fields:", customFields);
-        console.log("Current housekeeper name:", housekeeperName);
+        
+        // Save email to Supabase
+        await saveEmailToSupabase(localEmail);
         
         // Pass the complete customFields object to onConfirm
         await onConfirm(localEmail, customFields);
@@ -145,12 +147,12 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md overflow-hidden flex flex-col max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-left">
             {housekeeperName 
               ? `Rapport de ${housekeeperName}`
               : 'Téléchargement des rapports'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-left">
             Saisissez votre email pour recevoir le rapport PDF
           </DialogDescription>
         </DialogHeader>
@@ -159,8 +161,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           <ScrollArea className="pr-4 mt-2" style={{ maxHeight: "400px", height: "auto" }}>
             <div className="space-y-4">
               <div className="grid gap-4 py-2">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right">
+                <div className="grid grid-cols-1 items-start gap-2">
+                  <Label htmlFor="email" className="text-left">
                     Email <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -169,16 +171,15 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                     placeholder="votre@email.com"
                     value={localEmail}
                     onChange={(e) => setLocalEmail(e.target.value)}
-                    className="col-span-3"
                     required
                   />
-                  <p className="text-xs text-muted-foreground col-span-4 text-center">
+                  <p className="text-xs text-muted-foreground text-left">
                     Un email valide est requis pour télécharger le rapport
                   </p>
                 </div>
                 
                 <div className="mt-2">
-                  <Label className="font-medium mb-2 block">Instructions générales (pour tous les rapports)</Label>
+                  <Label className="font-medium mb-2 block text-left">Instructions générales (pour tous les rapports)</Label>
                   <Textarea
                     id="generalInstructions"
                     placeholder="Instructions générales qui s'appliqueront à tous les rapports..."
@@ -189,7 +190,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                 </div>
                 
                 <div className="mt-2">
-                  <Label className="font-medium mb-2 block">À faire et à savoir (par rapport)</Label>
+                  <Label className="font-medium mb-2 block text-left">À faire et à savoir (par rapport)</Label>
                   <ReportCustomFields onChange={(fields) => {
                     setCustomFields(prev => ({
                       ...prev,
@@ -202,7 +203,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                 {/* Single housekeeper mode */}
                 {housekeeperName && (
                   <div className="mt-2">
-                    <Label htmlFor={`instructions-${housekeeperName}`} className="font-medium mb-2 block">
+                    <Label htmlFor={`instructions-${housekeeperName}`} className="font-medium mb-2 block text-left">
                       Instructions spécifiques pour {housekeeperName}
                     </Label>
                     <Textarea
@@ -218,10 +219,10 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                 {/* Multiple housekeepers mode - show instructions fields for each housekeeper */}
                 {!housekeeperName && allHousekeepers && allHousekeepers.length > 0 && (
                   <div className="mt-2">
-                    <Label className="font-medium mb-2 block">Instructions spécifiques par femme de chambre</Label>
+                    <Label className="font-medium mb-2 block text-left">Instructions spécifiques par femme de chambre</Label>
                     {allHousekeepers.map(name => (
                       <div key={name} className="mb-3 border-b pb-3">
-                        <Label htmlFor={`instructions-${name}`} className="mb-1 block text-sm">
+                        <Label htmlFor={`instructions-${name}`} className="mb-1 block text-sm text-left">
                           {name}
                         </Label>
                         <Textarea

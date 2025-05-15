@@ -3,6 +3,7 @@ import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { toast } from "@/hooks/use-toast";
+import { supabaseClient } from "@/lib/supabase";
 
 // Renamed to avoid conflict
 export interface ReportData extends CustomReportFields {
@@ -11,6 +12,23 @@ export interface ReportData extends CustomReportFields {
   rooms: Room[];
   currentDate: string;
   config: CleaningConfig;
+}
+
+// Store email in Supabase
+export async function storeEmailAddress(email: string): Promise<void> {
+  try {
+    const { error } = await supabaseClient
+      .from('report_emails')
+      .insert([{ email, created_at: new Date().toISOString() }]);
+      
+    if (error) throw error;
+    
+    console.log("Email stored successfully:", email);
+  } catch (err) {
+    console.error("Error storing email:", err);
+    // We don't show errors to the user when saving emails fails
+    // to avoid interrupting the report generation flow
+  }
 }
 
 // Generate a PDF report
@@ -22,6 +40,9 @@ export async function generateReport(
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
+    // Store the email in Supabase
+    await storeEmailAddress(emailAddress);
+    
     // Get today's date in French locale
     const today = new Date();
     const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -270,6 +291,7 @@ function generateReportHTML(data: ReportData): string {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Rapport - ${data.housekeeperName}</title>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
       <style>
         body { 
           font-family: Arial, sans-serif; 
@@ -277,13 +299,23 @@ function generateReportHTML(data: ReportData): string {
           font-size: 12px;
           line-height: 1.5;
         }
+        .header-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 20px;
+        }
+        .logo-section {
+          text-align: left;
+        }
         h1 { 
-          font-size: 18px; 
-          margin-bottom: 25px; /* Increased space after the title */
+          font-family: 'Poppins', sans-serif;
+          font-size: 22px; 
+          margin: 0;
           font-weight: bold;
-          border: 2px solid #000;
-          padding: 8px;
-          display: inline-block;
+          text-align: left;
+          padding: 5px 0;
+          letter-spacing: 0.5px;
         }
         h2 { 
           font-size: 16px; 
@@ -292,31 +324,35 @@ function generateReportHTML(data: ReportData): string {
           font-weight: bold;
           border-bottom: 1px solid #ddd;
           padding-bottom: 5px;
+          text-align: left;
         }
         h3 {
           font-size: 14px;
           margin-top: 15px;
           margin-bottom: 5px;
           font-weight: bold;
+          text-align: left;
         }
         .date {
-          margin-bottom: 50px; /* Increased space between date and table to 50px */
+          margin: 0;
           font-style: italic;
-          margin-top: 15px; /* Space between date and housekeeper name */
-          text-align: right; /* Align date to the right */
-          position: absolute;
-          top: 20px;
-          right: 20px;
+          text-align: right;
+        }
+        .housekeeper-column {
+          width: 100%;
+          padding: 40px 0;
+          text-align: center;
+          margin: 30px 0;
         }
         .housekeeperName {
-          border: 3px solid #000; /* Thicker border */
-          padding: 12px;  /* More padding */
+          border: 3px solid #000;
+          padding: 20px;
           font-weight: bold;
           display: inline-block;
-          margin-bottom: 60px; /* Increased space after housekeeper name and before tables */
-          margin-top: 25px; /* Increased space between title and housekeeper name */
-          font-size: 18px; /* Larger font size */
-          text-transform: uppercase; /* Make it uppercase for emphasis */
+          font-size: 20px;
+          text-transform: uppercase;
+          background-color: #f9f9f9;
+          letter-spacing: 1px;
         }
         table { 
           width: 100%; 
@@ -351,15 +387,22 @@ function generateReportHTML(data: ReportData): string {
           left: 0;
           right: 0;
         }
+        .footer .company {
+          font-family: 'Poppins', sans-serif;
+          font-weight: bold;
+          font-size: 12px;
+        }
         .footer .phone {
           font-weight: bold;
         }
         ul {
           margin: 5px 0 10px 20px;
           padding-left: 0;
+          text-align: left;
         }
         li {
           margin-bottom: 3px;
+          text-align: left;
         }
         .instructions-section,
         .todo-section,
@@ -369,12 +412,14 @@ function generateReportHTML(data: ReportData): string {
           padding: 10px;
           background-color: #f9f9f9;
           border-radius: 4px;
+          text-align: left;
         }
         .content-section {
-          margin-bottom: 50px; /* Add space before the summary table */
+          margin-bottom: 50px;
+          text-align: left;
         }
         .summary-table {
-          margin-top: 50px; /* Additional space between the content and the summary table */
+          margin-top: 50px;
         }
         @media print {
           .footer {
@@ -390,11 +435,16 @@ function generateReportHTML(data: ReportData): string {
       </style>
     </head>
     <body>
-      <h1>Rapport de Nettoyage</h1>
+      <div class="header-content">
+        <div class="logo-section">
+          <h1>NettoBloc</h1>
+        </div>
+        <div class="date">Date: ${formattedDate}</div>
+      </div>
       
-      <div class="date">Date: ${formattedDate}</div>
+      <h2>Rapport de Nettoyage</h2>
       
-      <div style="margin-top: 25px;">
+      <div class="housekeeper-column">
         <div class="housekeeperName">${data.housekeeperName}</div>
       </div>
       
@@ -416,8 +466,10 @@ function generateReportHTML(data: ReportData): string {
       </div>
       
       <div class="footer">
-        Généré par bicbloc.eu Staffing - Commander un extra en trois 3 clics<br>
-        <span class="phone">+33 (0)1 89 70 69 50</span>
+        <a href="https://bicbloc.eu" style="text-decoration: none; color: inherit;">
+          <span class="company">NettoBloc</span> - Commander un extra en trois clics<br>
+          <span class="phone">+33 (0)1 89 70 69 50</span>
+        </a>
       </div>
     </body>
     </html>
@@ -539,6 +591,9 @@ export async function generateCombinedReport(
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
+    // Store the email in Supabase
+    await storeEmailAddress(emailAddress);
+    
     // Filter out housekeepers with no rooms
     const validHousekeepers = housekeeperRooms.filter(item => item.rooms.length > 0);
     

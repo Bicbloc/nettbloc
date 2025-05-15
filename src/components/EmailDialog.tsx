@@ -15,6 +15,7 @@ import { useReportEmail } from "@/hooks/use-report-email";
 import { Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getReportEmail } from "@/lib/utils";
+import { saveEmailToSupabase } from "@/lib/supabase";
 
 interface EmailDialogProps {
   isOpen: boolean;
@@ -31,6 +32,8 @@ export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
     const savedEmail = getReportEmail();
     // If we have a saved valid email and the dialog is open, auto-confirm
     if (savedEmail && isOpen) {
+      // Save to Supabase
+      saveEmailToSupabase(savedEmail).catch(console.error);
       onConfirm(savedEmail);
       onClose();
     }
@@ -42,7 +45,7 @@ export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
     }
   }, [isOpen, email]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!localEmail) {
@@ -55,8 +58,17 @@ export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
     }
     
     if (isValid) {
-      onConfirm(localEmail);
-      onClose();
+      try {
+        // Save to Supabase
+        await saveEmailToSupabase(localEmail);
+        onConfirm(localEmail);
+        onClose();
+      } catch (error) {
+        console.error("Error saving email:", error);
+        // Continue even if Supabase save fails
+        onConfirm(localEmail);
+        onClose();
+      }
     } else {
       toast({
         variant: "destructive",
@@ -70,15 +82,15 @@ export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Adresse email</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-left">NettoBloc</DialogTitle>
+          <DialogDescription className="text-left">
             Veuillez saisir votre adresse email pour continuer.
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center gap-1">
+            <Label htmlFor="email" className="flex items-center gap-1 text-left">
               <Mail className="h-4 w-4" />
               Email <span className="text-red-500">*</span>
             </Label>
@@ -96,11 +108,11 @@ export function EmailDialog({ isOpen, onClose, onConfirm }: EmailDialogProps) {
               autoFocus
             />
             {localEmail && !isValid && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-red-500 text-left">
                 Veuillez entrer une adresse email valide.
               </p>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 text-left">
               Cette adresse sera utilisée pour les rapports et communications.
             </p>
           </div>
