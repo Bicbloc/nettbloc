@@ -163,7 +163,7 @@ function generateReportHTML(data: ReportData): string {
   const summaryHtml = generateRoomSummary(data);
   const roomsTableHtml = generateRoomsTable(data);
   
-  // Complete HTML with improved page break controls
+  // Complete HTML with improved page break controls and design
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -171,30 +171,197 @@ function generateReportHTML(data: ReportData): string {
       <meta charset="UTF-8">
       <title>Rapport - ${data.housekeeperName}</title>
       <style>
-        body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-        h1 { font-size: 18px; margin-bottom: 5px; }
-        h2 { font-size: 16px; margin-top: 10px; margin-bottom: 5px; }
-        h3 { font-size: 14px; margin-top: 15px; margin-bottom: 5px; }
-        .table-container { page-break-inside: avoid; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; table-layout: fixed; }
-        table, th, td { border: 1px solid #000; }
-        th, td { padding: 5px; text-align: left; font-size: 11px; }
-        th { background-color: #f0f0f0; }
-        .info { margin-bottom: 15px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .footer { margin-top: 20px; text-align: center; font-size: 10px; }
-        .todo-section, .toknow-section, .instructions-section { margin-top: 15px; }
-        ul { margin-top: 5px; padding-left: 20px; }
-        .room-type { font-weight: bold; }
-        .a-blanc { background-color: #FEC6A1; }
-        .recouche { background-color: #F2FCE2; }
-        .floor-section { page-break-inside: avoid; margin-bottom: 30px; }
-        .page-break { page-break-after: always; break-after: page; }
-        .page-break-before { page-break-before: always; break-before: page; }
-        .page-break-after { page-break-after: always; break-after: page; }
-        .avoid-break { page-break-inside: avoid; }
-        .signature { margin-top: 30px; border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
-        .housekeeping-icon { font-size: 24px; margin-right: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+        body { 
+          font-family: 'Montserrat', Arial, sans-serif; 
+          margin: 20px; 
+          font-size: 12px;
+          line-height: 1.5;
+          color: #333;
+          background-color: #fff; 
+        }
+        h1 { 
+          font-size: 22px; 
+          margin-bottom: 10px; 
+          color: #1A1F2C;
+          font-weight: 700;
+          border-bottom: 2px solid #9b87f5;
+          padding-bottom: 8px;
+        }
+        h2 { 
+          font-size: 18px; 
+          margin-top: 15px; 
+          margin-bottom: 10px;
+          color: #7E69AB;
+          font-weight: 600;
+        }
+        h3 { 
+          font-size: 16px; 
+          margin-top: 15px; 
+          margin-bottom: 8px;
+          color: #6E59A5;
+          font-weight: 500;
+        }
+        .table-container { 
+          page-break-inside: avoid; 
+          margin-bottom: 20px;
+          box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+          border-radius: 6px;
+          overflow: hidden;
+        }
+        table { 
+          width: 100%; 
+          border-collapse: collapse; 
+          margin-bottom: 0; 
+          table-layout: fixed; 
+          background: #fff;
+        }
+        table, th, td { 
+          border: 1px solid #ddd; 
+        }
+        th { 
+          background-color: #9b87f5; 
+          color: white; 
+          padding: 8px; 
+          text-align: left; 
+          font-size: 11px;
+          font-weight: 600;
+        }
+        td { 
+          padding: 8px; 
+          text-align: left; 
+          font-size: 11px;
+          border-bottom: 1px solid #eee;
+        }
+        tr:hover {
+          background-color: #f9f8ff;
+        }
+        .info { 
+          margin-bottom: 15px; 
+          color: #555;
+          font-style: italic;
+        }
+        .header { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          margin-bottom: 25px;
+          padding: 15px;
+          background: linear-gradient(to right, #f8f7ff, #fff);
+          border-radius: 8px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .footer { 
+          margin-top: 30px; 
+          text-align: center; 
+          font-size: 11px;
+          padding: 15px;
+          border-top: 1px solid #eee;
+          color: #666;
+          background-color: #f9f9f9;
+          border-radius: 0 0 8px 8px;
+        }
+        .footer-brand {
+          font-weight: 600;
+          color: #7E69AB;
+        }
+        .todo-section, .toknow-section, .instructions-section { 
+          margin-top: 20px;
+          background-color: #f9f8ff;
+          padding: 15px;
+          border-radius: 8px;
+          border-left: 4px solid #9b87f5;
+        }
+        ul { 
+          margin-top: 8px; 
+          padding-left: 20px; 
+        }
+        li {
+          margin-bottom: 5px;
+        }
+        .room-type { 
+          font-weight: 600; 
+        }
+        .a-blanc { 
+          background-color: #FEC6A1; 
+        }
+        .recouche { 
+          background-color: #F2FCE2; 
+        }
+        .floor-section { 
+          page-break-inside: avoid; 
+          margin-bottom: 30px; 
+        }
+        .floor-heading {
+          background-color: #e5deff;
+          padding: 10px;
+          border-radius: 5px;
+          margin-bottom: 10px;
+          font-weight: 600;
+          color: #6E59A5;
+        }
+        .page-break { 
+          page-break-after: always; 
+          break-after: page; 
+        }
+        .page-break-before { 
+          page-break-before: always; 
+          break-before: page; 
+        }
+        .page-break-after { 
+          page-break-after: always; 
+          break-after: page; 
+        }
+        .avoid-break { 
+          page-break-inside: avoid; 
+        }
+        .signature { 
+          margin-top: 40px; 
+          border-top: 1px solid #ddd; 
+          width: 200px; 
+          text-align: center; 
+          padding-top: 10px; 
+        }
+        .housekeeping-icon { 
+          font-size: 24px; 
+          margin-right: 10px; 
+          vertical-align: middle;
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+        .summary-card {
+          background: #fff;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          padding: 15px;
+          text-align: center;
+        }
+        .summary-title {
+          font-size: 14px;
+          color: #7E69AB;
+          margin-bottom: 5px;
+        }
+        .summary-value {
+          font-size: 22px;
+          font-weight: 700;
+          color: #1A1F2C;
+        }
+        .summary-card.a-blanc {
+          border-left: 4px solid #FEC6A1;
+        }
+        .summary-card.recouche {
+          border-left: 4px solid #F2FCE2;
+        }
+        .summary-card.total {
+          border-left: 4px solid #9b87f5;
+        }
+        .summary-card.time {
+          border-left: 4px solid #D3E4FD;
+        }
       </style>
     </head>
     <body>
@@ -226,14 +393,15 @@ function generateReportHTML(data: ReportData): string {
       </div>
       
       <div class="footer">
-        Généré le ${data.currentDate}
+        <p>Généré le ${data.currentDate}</p>
+        <p class="footer-brand">Généré par bicbloc.eu Staffing - Commander un extra en trois 3 clics</p>
       </div>
     </body>
     </html>
   `;
 }
 
-// Generate room summary HTML
+// Generate room summary HTML with enhanced design
 function generateRoomSummary(data: ReportData): string {
   // Count different room types
   const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full').length;
@@ -244,34 +412,28 @@ function generateRoomSummary(data: ReportData): string {
                         quickCleanCount * data.config.quickCleaningTime;
   
   return `
-    <div class="table-container">
-      <table>
-        <tr>
-          <th>Type de nettoyage</th>
-          <th>Nombre de chambres</th>
-        </tr>
-        <tr>
-          <td>À Blanc</td>
-          <td>${fullCleanCount}</td>
-        </tr>
-        <tr>
-          <td>Recouche</td>
-          <td>${quickCleanCount}</td>
-        </tr>
-        <tr>
-          <th>Total</th>
-          <th>${data.rooms.length}</th>
-        </tr>
-        <tr>
-          <td>Temps estimé</td>
-          <td>${estimatedTime} minutes</td>
-        </tr>
-      </table>
+    <div class="summary-grid">
+      <div class="summary-card a-blanc">
+        <div class="summary-title">À Blanc</div>
+        <div class="summary-value">${fullCleanCount}</div>
+      </div>
+      <div class="summary-card recouche">
+        <div class="summary-title">Recouche</div>
+        <div class="summary-value">${quickCleanCount}</div>
+      </div>
+      <div class="summary-card total">
+        <div class="summary-title">Total</div>
+        <div class="summary-value">${data.rooms.length}</div>
+      </div>
+      <div class="summary-card time">
+        <div class="summary-title">Temps estimé</div>
+        <div class="summary-value">${estimatedTime} min</div>
+      </div>
     </div>
   `;
 }
 
-// Generate rooms table HTML
+// Generate rooms table HTML with enhanced design
 function generateRoomsTable(data: ReportData): string {
   if (data.rooms.length === 0) {
     return '<p>Aucune chambre assignée.</p>';
@@ -326,7 +488,7 @@ function generateRoomsTable(data: ReportData): string {
     
     return `
       <div class="floor-section avoid-break ${pageBreakClass}">
-        <h3>Étage ${floor === 0 ? 'RDC' : floor}</h3>
+        <div class="floor-heading">Étage ${floor === 0 ? 'RDC' : floor}</div>
         <div class="table-container">
           <table>
             <tr>
