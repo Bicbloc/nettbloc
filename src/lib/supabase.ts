@@ -17,22 +17,12 @@ if (!supabaseKey) {
 // Create a mock client if URL or key is missing
 const isMissingCredentials = !supabaseUrl || !supabaseKey;
 
-// Create client or placeholder with properly mocked methods
+// Create client or placeholder
 export const supabaseClient = isMissingCredentials 
   ? {
       from: () => ({
         insert: () => ({ error: new Error("Supabase credentials not configured") }),
-        select: () => {
-          const mockSelectResponse = {
-            order: () => ({ 
-              data: [],
-              error: new Error("Supabase credentials not configured")
-            }),
-            data: [],
-            error: new Error("Supabase credentials not configured")
-          };
-          return mockSelectResponse;
-        },
+        select: () => ({ error: new Error("Supabase credentials not configured"), data: [] }),
       }),
       auth: {
         signIn: () => ({ error: new Error("Supabase credentials not configured") }),
