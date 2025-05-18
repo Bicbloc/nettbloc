@@ -99,13 +99,25 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       
       console.log("Données traitées:", data.length, "chambres");
       
+      // Identifier le format du rapport détecté
+      let formatDetecte = "standard";
+      if (data.some(room => room.notes?.includes("Apaleo") || 
+                          room.notes?.includes("DIR") || 
+                          room.notes?.includes("SAL") || 
+                          room.notes?.includes("CL") || 
+                          room.notes?.includes("INS"))) {
+        formatDetecte = "Apaleo";
+      } else if (data.some(room => room.notes?.includes("Korner"))) {
+        formatDetecte = "Hôtel Korner";
+      }
+      
       // Petit délai pour voir la progression à 100%
       setTimeout(() => {
         onPdfProcessed(data);
         setOpen(false);
         toast({
           title: "Téléversement réussi",
-          description: `${data.length} chambres traitées depuis ${selectedFile.name} avec Donut OCR`,
+          description: `${data.length} chambres traitées depuis ${selectedFile.name} (Format détecté: ${formatDetecte})`,
         });
         setProcessingProgress(0);
       }, 500);

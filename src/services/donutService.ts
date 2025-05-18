@@ -18,8 +18,9 @@ export async function processImageWithDonut(imageData: ArrayBuffer, prompt?: str
     console.log("Envoi de l'image au modèle Donut...");
     
     // Construire le prompt pour l'extraction d'informations spécifiques
+    // Mise à jour du prompt pour mieux reconnaître Apaleo et autres formats
     const task_prompt = prompt || 
-      "Extract these fields from this housekeeping report: room number, status (recouche/départ/arrivée/stayover/departure/clean/propre/maintenance), cleaning type, clients names";
+      "Extract these fields from this housekeeping report: room number, status (recouche/départ/arrivée/stayover/departure/clean/propre/maintenance/DIR/SAL/CL/INS), cleaning type, clients names. For Apaleo format, look for fields like DIR, SAL, CL, INS status codes and departure times.";
     
     // Créer un FormData pour envoyer l'image et le prompt
     const formData = new FormData();
@@ -160,13 +161,20 @@ function determineStatusAndCleaningType(line: string, statusInfo: string): { sta
     return { status: 'needs-cleaning', cleaningType: 'full' };
   }
   
+  // Format Apaleo - Départ (à blanc)
+  // Recherche spécifique pour le format Apaleo
+  if (lowerLine.match(/\d{1,2}[:h]\d{2}/) &&  // Format heure comme 11:00 ou 11h00
+      !lowerLine.includes('nuit')) {
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
   // Détection par présence de deux noms/clients différents
   const hasMultipleNames = 
     (line.match(/\b[A-Z][a-z]+ [A-Z][a-z]+\b/g) || []).length >= 2 || // Détecte au moins deux noms propres
     (lowerLine.includes('/') && !lowerLine.includes('nuit')); // Format "Dupont / Martin"
   
   // Détection par présence d'une heure (format 11:00, 15:00, etc.)
-  const hasTimePattern = /\d{1,2}:\d{2}/.test(lowerLine);
+  const hasTimePattern = /\d{1,2}[:h]\d{2}/.test(lowerLine);
   
   // Détection par présence de deux dates (probablement check-in et check-out)
   const hasTwoDates = (line.match(/\d{1,2}\/\d{1,2}\/\d{4}/g) || []).length >= 2;
@@ -190,8 +198,8 @@ function determineStatusAndCleaningType(line: string, statusInfo: string): { sta
   // 🟢 CHAMBRE PROPRE (Propre / Clean / INS / CL)
   if (lowerLine.includes('propre') || 
       lowerLine.includes('clean') ||
-      lowerLine.includes('ins') || 
-      lowerLine.includes('cl') ||
+      lowerLine.includes(' ins') || 
+      lowerLine.includes(' cl ') ||
       lowerLine.includes('inspected') ||
       lowerLine.includes('inspection')) {
     return { status: 'clean', cleaningType: 'none' };
