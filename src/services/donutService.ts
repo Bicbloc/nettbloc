@@ -17,10 +17,9 @@ export async function processImageWithDonut(imageData: ArrayBuffer, prompt?: str
   try {
     console.log("Envoi de l'image au modèle Donut...");
     
-    // Construire le prompt pour l'extraction d'informations spécifiques
-    // Mise à jour du prompt pour mieux reconnaître Apaleo et autres formats
+    // Prompt amélioré pour mieux reconnaître les formats Apaleo
     const task_prompt = prompt || 
-      "Extract these fields from this housekeeping report: room number, status (recouche/départ/arrivée/stayover/departure/clean/propre/maintenance/DIR/SAL/CL/INS), cleaning type, clients names. For Apaleo format, look for fields like DIR, SAL, CL, INS status codes and departure times.";
+      "Extract these fields from this housekeeping report: room number, status (DIR/SAL/CL/INS/OUT/recouche/départ/arrivée/stayover/departure/clean/propre/maintenance). For Apaleo format, look for room numbers (3 digits) at the beginning of lines or standalone followed by status codes (DIR, SAL, CL, INS). Parse each room entry.";
     
     // Créer un FormData pour envoyer l'image et le prompt
     const formData = new FormData();
@@ -134,8 +133,9 @@ function determineIfTwin(line: string, statusInfo: string): boolean {
  * @param statusInfo - Informations de statut extraites
  * @returns Objet contenant le statut et le type de nettoyage
  */
-function determineStatusAndCleaningType(line: string, statusInfo: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  const lowerLine = line.toLowerCase();
+function determineStatusAndCleaningType(line: string, statusInfo?: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+  const lowerLine = (line || '').toLowerCase();
+  const lowerStatus = (statusInfo || '').toLowerCase();
   
   // 🛠 CHAMBRE EN MAINTENANCE
   if (lowerLine.includes('maintenance') || 
@@ -144,27 +144,37 @@ function determineStatusAndCleaningType(line: string, statusInfo: string): { sta
       lowerLine.includes('hors d\'usage') ||
       lowerLine.includes('hors service') ||
       lowerLine.includes('punaises de lit') ||
-      lowerLine.includes('inutilisable')) {
+      lowerLine.includes('inutilisable') ||
+      lowerLine.includes(' out ') ||
+      lowerStatus.includes('maintenance')) {
     return { status: 'maintenance', cleaningType: 'none' };
   }
   
   // 🟥 CHAMBRE À BLANC (Départ)
+  // Détection directe par codes Apaleo
+  if (lowerLine.includes(' dir ') || lowerLine.includes(' sal ') ||
+      lowerLine.match(/\bdir\b/) || lowerLine.match(/\bsal\b/)) {
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
   // Détection prioritaire par mots-clés explicites
   if (lowerLine.includes('départ') || 
       lowerLine.includes('departure') || 
       lowerLine.includes('to clean') ||
       lowerLine.includes('parti') ||
-      lowerLine.includes('dir') || 
-      lowerLine.includes('sal') || 
       lowerLine.includes('dirty') ||
-      lowerLine.includes('check-out')) {
+      lowerLine.includes('check-out') ||
+      lowerStatus.includes('départ') ||
+      lowerStatus.includes('departure') ||
+      lowerStatus.includes('dir') ||
+      lowerStatus.includes('sal') ||
+      lowerStatus.includes('dirty')) {
     return { status: 'needs-cleaning', cleaningType: 'full' };
   }
   
   // Format Apaleo - Départ (à blanc)
-  // Recherche spécifique pour le format Apaleo
-  if (lowerLine.match(/\d{1,2}[:h]\d{2}/) &&  // Format heure comme 11:00 ou 11h00
-      !lowerLine.includes('nuit')) {
+  // Recherche spécifique pour le format Apaleo avec heure de départ
+  if (lowerLine.match(/\d{1,2}[:h]\d{2}/) && !lowerLine.includes('nuit')) {
     return { status: 'needs-cleaning', cleaningType: 'full' };
   }
   
@@ -173,38 +183,42 @@ function determineStatusAndCleaningType(line: string, statusInfo: string): { sta
     (line.match(/\b[A-Z][a-z]+ [A-Z][a-z]+\b/g) || []).length >= 2 || // Détecte au moins deux noms propres
     (lowerLine.includes('/') && !lowerLine.includes('nuit')); // Format "Dupont / Martin"
   
-  // Détection par présence d'une heure (format 11:00, 15:00, etc.)
-  const hasTimePattern = /\d{1,2}[:h]\d{2}/.test(lowerLine);
-  
   // Détection par présence de deux dates (probablement check-in et check-out)
   const hasTwoDates = (line.match(/\d{1,2}\/\d{1,2}\/\d{4}/g) || []).length >= 2;
   
-  if (hasMultipleNames || hasTimePattern || hasTwoDates) {
+  if (hasMultipleNames || hasTwoDates) {
     return { status: 'needs-cleaning', cleaningType: 'full' };
   }
   
   // 🔵 CHAMBRE EN RECOUCHE (Recouche / Stayover)
   if (lowerLine.includes('recouche') || 
       lowerLine.includes('stayover') ||
-      lowerLine.includes('stay over')) {
+      lowerLine.includes('stay over') ||
+      lowerStatus.includes('recouche') ||
+      lowerStatus.includes('stayover')) {
     return { status: 'needs-cleaning', cleaningType: 'quick' };
   }
   
   // Détection par "Nuit X/Y"
-  if (/nuit \d+\/\d+/.test(lowerLine)) {
+  if (lowerLine.match(/nuit \d+\/\d+/)) {
     return { status: 'needs-cleaning', cleaningType: 'quick' };
   }
   
   // 🟢 CHAMBRE PROPRE (Propre / Clean / INS / CL)
-  if (lowerLine.includes('propre') || 
+  if (lowerLine.includes(' cl ') || lowerLine.includes(' ins ') ||
+      lowerLine.match(/\bcl\b/) || lowerLine.match(/\bins\b/) ||
+      lowerLine.includes('propre') || 
       lowerLine.includes('clean') ||
-      lowerLine.includes(' ins') || 
-      lowerLine.includes(' cl ') ||
       lowerLine.includes('inspected') ||
-      lowerLine.includes('inspection')) {
+      lowerLine.includes('inspection') ||
+      lowerStatus.includes('cl') ||
+      lowerStatus.includes('ins') ||
+      lowerStatus.includes('propre') ||
+      lowerStatus.includes('clean')) {
     return { status: 'clean', cleaningType: 'none' };
   }
   
   // Par défaut - considérer comme chambre à nettoyer (à blanc)
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
+

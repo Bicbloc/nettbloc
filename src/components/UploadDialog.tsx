@@ -24,6 +24,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [open, setOpen] = useState(false);
+  const [detectedFormat, setDetectedFormat] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +87,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
 
     try {
       setIsUploading(true);
+      setDetectedFormat("");
       console.log("Traitement du fichier:", selectedFile.name);
       
       // Simuler une barre de progression
@@ -99,17 +101,24 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       
       console.log("Données traitées:", data.length, "chambres");
       
-      // Identifier le format du rapport détecté
+      // Identifier le format du rapport détecté de manière plus précise
       let formatDetecte = "standard";
-      if (data.some(room => room.notes?.includes("Apaleo") || 
-                          room.notes?.includes("DIR") || 
+      
+      // Vérifier en priorité le format Apaleo (plus spécifique)
+      if (data.some(room => room.notes?.includes("DIR") || 
                           room.notes?.includes("SAL") || 
                           room.notes?.includes("CL") || 
                           room.notes?.includes("INS"))) {
         formatDetecte = "Apaleo";
-      } else if (data.some(room => room.notes?.includes("Korner"))) {
+      } 
+      // Puis vérifier Korner (moins spécifique)
+      else if (data.some(room => room.notes?.includes("Korner") ||
+                               room.notes?.includes("Recouche") ||
+                               room.notes?.includes("Parti"))) {
         formatDetecte = "Hôtel Korner";
       }
+      
+      setDetectedFormat(formatDetecte);
       
       // Petit délai pour voir la progression à 100%
       setTimeout(() => {
@@ -153,7 +162,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         <DialogHeader>
           <DialogTitle>Importer un Rapport</DialogTitle>
           <DialogDescription>
-            Téléversez un rapport PDF (Format Hôtel Korner, Mews ou autre) pour analyser les statuts des chambres.
+            Téléversez un rapport PDF (Format Apaleo, Hôtel Korner ou autre) pour analyser les statuts des chambres.
           </DialogDescription>
         </DialogHeader>
         <div 
@@ -202,7 +211,11 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         {isUploading && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Analyse avec Donut OCR...</span>
+              <span className="text-sm text-muted-foreground">
+                {detectedFormat ? 
+                  `Format détecté: ${detectedFormat}...` : 
+                  "Analyse du PDF..."}
+              </span>
               <span className="text-sm font-medium">{processingProgress}%</span>
             </div>
             <Progress value={processingProgress} className="h-2" />
