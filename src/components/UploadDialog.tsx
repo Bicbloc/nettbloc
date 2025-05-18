@@ -24,7 +24,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [open, setOpen] = useState(false);
-  const [detectedFormat, setDetectedFormat] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,7 +86,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
 
     try {
       setIsUploading(true);
-      setDetectedFormat("");
       console.log("Traitement du fichier:", selectedFile.name);
       
       // Simuler une barre de progression
@@ -101,41 +99,13 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       
       console.log("Données traitées:", data.length, "chambres");
       
-      // Identifier le format du rapport détecté de manière plus précise
-      let formatDetecte = "standard";
-      
-      // Analyse des chambres pour détecter le format sur base des patterns spécifiques
-      // Vérifier en priorité le format Apaleo (plus spécifique)
-      if (data.some(room => 
-          room.notes?.includes("DIR") || 
-          room.notes?.includes("SAL") || 
-          room.notes?.includes("CL") || 
-          room.notes?.includes("INS") ||
-          // Détecter le modèle typique des chambres Apaleo (ex: 101 DBL DIR)
-          (room.notes && /^\d{2,3}\s+(DBL|SGL|TWN|ST|DIR|CL|INS|SAL)\b/i.test(room.notes))
-      )) {
-        formatDetecte = "Apaleo";
-      } 
-      // Puis vérifier Korner (moins spécifique)
-      else if (data.some(room => 
-          room.notes?.includes("Korner") ||
-          room.notes?.includes("Recouche") ||
-          room.notes?.includes("Parti") ||
-          // Détecter les patterns typiques de Korner
-          (room.notes && /^\d{2}\s+Chambre\s+/i.test(room.notes))
-      )) {
-        formatDetecte = "Hôtel Korner";
-      }
-      
-      setDetectedFormat(formatDetecte);
-      
       // Petit délai pour voir la progression à 100%
       setTimeout(() => {
         onPdfProcessed(data);
         setOpen(false);
         toast({
           title: "Téléversement réussi",
-          description: `${data.length} chambres traitées depuis ${selectedFile.name} (Format détecté: ${formatDetecte})`,
+          description: `${data.length} chambres traitées depuis ${selectedFile.name} avec Donut OCR`,
         });
         setProcessingProgress(0);
       }, 500);
@@ -171,7 +141,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         <DialogHeader>
           <DialogTitle>Importer un Rapport</DialogTitle>
           <DialogDescription>
-            Téléversez un rapport PDF (Format Apaleo, Hôtel Korner ou autre) pour analyser les statuts des chambres.
+            Téléversez un rapport PDF (Format Hôtel Korner, Mews ou autre) pour analyser les statuts des chambres.
           </DialogDescription>
         </DialogHeader>
         <div 
@@ -220,11 +190,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         {isUploading && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                {detectedFormat ? 
-                  `Format détecté: ${detectedFormat}...` : 
-                  "Analyse du PDF..."}
-              </span>
+              <span className="text-sm text-muted-foreground">Analyse avec Donut OCR...</span>
               <span className="text-sm font-medium">{processingProgress}%</span>
             </div>
             <Progress value={processingProgress} className="h-2" />
