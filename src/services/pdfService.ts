@@ -15,7 +15,7 @@ export interface Room {
   isUrgent?: boolean;
   notUrgent?: boolean;
   floor?: number;
-  notes?: string; // Added notes property
+  notes?: string;
 }
 
 export interface CleaningConfig {
@@ -53,12 +53,6 @@ export async function processPdf(file: File): Promise<Room[]> {
       console.warn("Échec de la reconnaissance Donut, repli sur PDF.js:", donutError);
     }
     
-    // Détections spécifiques pour le format Apaleo
-    // Format Apaleo peut avoir plusieurs formats
-    // 1. Format simple: "101 DIR" (numéro + statut)
-    // 2. Format avec info: "101 - DBL - DIR" (numéro + type + statut)
-    // 3. Format avec tiret: "101-A DIR" (numéro avec subdivision + statut)
-    
     // Charger le document PDF
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
@@ -75,11 +69,11 @@ export async function processPdf(file: File): Promise<Room[]> {
     
     console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
     
-    // Méthode de détection améliorée pour Apaleo
+    // Méthode de détection améliorée pour Apaleo avec la nouvelle règle d'identification des chambres
     const isApaleoFormat = fullText.includes("Apaleo") || 
                           fullText.includes("Room Status") ||
-                          (fullText.match(/\d{3}\s+(CL|DIR|SAL|INS|OUT)/) !== null) ||
-                          (fullText.match(/\b\d{3}[-–]?[A-Z]?\b\s+(CL|DIR|SAL|INS|OUT)\b/) !== null);
+                          // Numéro de chambre suivi d'un statut au format Apaleo
+                          (fullText.match(/\b\d{2,3}\s+(DBL|SGL|TWN|ST|DIR|CL|INS|SAL)\b/i) !== null);
     
     const isHotelKornerFormat = fullText.includes("Rapport Housekeeping - Hôtel Korner") || 
                                 fullText.includes("Toutes les chambres en statut tous") ||
@@ -124,95 +118,74 @@ export async function processPdf(file: File): Promise<Room[]> {
   }
 }
 
-// Analyseur amélioré pour le format Apaleo
+// Analyseur amélioré pour le format Apaleo avec règles d'identification strictes
 function parseApaleoFormat(text: string): Room[] {
   const rooms: Room[] = [];
   console.log("Analyse du format Apaleo...");
   
-  // Nouveaux patterns améliorés pour Apaleo
+  // Patterns améliorés spécifiquement pour Apaleo en suivant les règles d'identification
   const roomPatterns = [
-    // Pattern 1: Numéro simple + statut (ex: "101 DIR", "202 SAL", "303 INS")
-    /\b(\d{3})\s+(CL|DIR|SAL|INS|OUT)\b/gi,
+    // Pattern clé: Numéro à 2-3 chiffres suivi d'un type ou statut en début de ligne
+    /^\s*(\d{2,3})\s+(DBL|SGL|TWN|ST|DIR|CL|INS|SAL|CLEAN|OUT)\b/gim,
     
-    // Pattern 2: Numéro avec lettre + statut (ex: "101A DIR", "202-B SAL")
-    /\b(\d{3})[-–]?([A-Z])?\s+(CL|DIR|SAL|INS|OUT)\b/gi,
+    // Pattern secondaire: Numéro à 2-3 chiffres suivi d'un type ou statut n'importe où
+    /\b(\d{2,3})\s+(DBL|SGL|TWN|ST|DIR|CL|INS|SAL|CLEAN|OUT)\b/gi,
     
-    // Pattern 3: "Room" + numéro + statut (ex: "Room 101 - DIR")
-    /\bRoom\s+(\d{3})[-–]?([A-Z])?\s+[-–]?\s*(CL|DIR|SAL|INS|OUT)\b/gi,
+    // Pattern avec tiret: Numéro à 2-3 chiffres suivi d'un tiret puis type ou statut
+    /\b(\d{2,3})\s*[-–]\s*(DBL|SGL|TWN|ST|DIR|CL|INS|SAL|CLEAN|OUT)\b/gi,
     
-    // Pattern 4: Numéro en début de ligne + info de chambre
-    /^(\d{3})[-–]?([A-Z])?\s+/gim,
-    
-    // Pattern 5: Format avec espaces ou types (ex: "101 DBL DIR", "202 SGL SAL")
-    /\b(\d{3})\s+(SGL|DBL|TWN|TRP)\s+(CL|DIR|SAL|INS|OUT)\b/gi
+    // Pattern avec "Room": "Room" suivi d'un numéro à 2-3 chiffres
+    /\bRoom\s+(\d{2,3})\b/gi
   ];
   
-  // Chercher les numéros de chambre à partir des patterns
+  // On cherche les chambres avec les patterns en éliminant les faux positifs
   for (const pattern of roomPatterns) {
     let match;
     pattern.lastIndex = 0;
     
     while ((match = pattern.exec(text)) !== null) {
-      // Récupérer le numéro de chambre et d'éventuels éléments supplémentaires
-      let roomNumber = match[1];
-      let suffix = match[2] || '';
+      // Récupérer le numéro de chambre
+      const roomNumber = match[1].padStart(3, '0');
       
-      // Normaliser le numéro de chambre
-      roomNumber = roomNumber.padStart(3, '0');
-      
-      // Sauter si cette chambre a déjà été traitée
-      if (rooms.some(r => r.number === roomNumber + suffix)) {
+      // Vérifier que ce n'est pas une heure ou une date (éliminer les faux positifs)
+      const context = text.substring(Math.max(0, match.index - 5), Math.min(text.length, match.index + match[0].length + 5));
+      if (context.includes(':') || (context.includes('/') && context.match(/\d+\/\d+/))) {
+        // C'est probablement une heure ou une date, pas un numéro de chambre
+        console.log(`Faux positif éliminé: ${match[0]} dans "${context}"`);
         continue;
       }
       
-      // Extraire le contexte autour de la chambre (300 caractères)
-      const start = Math.max(0, match.index - 150);
-      const end = Math.min(text.length, match.index + 150);
-      const context = text.substring(start, end).toLowerCase();
-      
-      // Déterminer le statut et le type de nettoyage
-      let status = 'needs-cleaning';
-      let cleaningType: 'full' | 'quick' | 'none' = 'full';
-      
-      // Déterminer le statut en fonction du contexte
-      if (context.includes(' cl ') || context.includes(' ins ') || 
-          context.match(/\bcl\b/) || context.match(/\bins\b/)) {
-        // PROPRE: CL (clean) ou INS (inspecté)
-        status = 'clean';
-        cleaningType = 'none';
-      } else if (context.includes(' dir ') || context.includes(' sal ') || 
-                context.match(/\bdir\b/) || context.match(/\bsal\b/)) {
-        // À NETTOYER (à blanc): DIR (dirty) ou SAL (sale)
-        status = 'needs-cleaning';
-        cleaningType = 'full';
-      } else if (context.includes(' out ') || context.match(/\bout\b/)) {
-        // OUT OF ORDER / MAINTENANCE
-        status = 'maintenance';
-        cleaningType = 'none';
-      } else if (context.includes('stayover') || context.includes('stay over') ||
-                context.includes('recouche') || context.match(/nuit \d+\/\d+/)) {
-        // RECOUCHE
-        status = 'needs-cleaning';
-        cleaningType = 'quick';
+      // Éviter les doublons de chambres
+      if (rooms.some(r => r.number === roomNumber)) {
+        continue;
       }
       
+      // Extraction du contexte pour déterminer le statut
+      const contextStart = Math.max(0, match.index - 100);
+      const contextEnd = Math.min(text.length, match.index + 100);
+      const roomContext = text.substring(contextStart, contextEnd).toLowerCase();
+      
+      // Déterminer le statut et le type de nettoyage
+      const { status, cleaningType } = determineStatusAndCleaningType(roomContext);
+      
       // Déterminer si c'est une chambre twin
-      const isTwin = context.includes('twin') || context.includes('twn') || context.includes(' twn ');
+      const isTwin = roomContext.includes('twin') || roomContext.includes('twn') || 
+                    (match[2] && (match[2].toUpperCase() === 'TWN' || match[2].toUpperCase() === 'TWIN'));
       
       // Étage basé sur le premier chiffre du numéro
       const floor = parseInt(roomNumber[0]);
       
       // Déterminer la priorité
       let priority: 'high' | 'medium' | 'low' = 'medium';
-      if (context.includes('urgent') || context.includes('vip')) {
+      if (roomContext.includes('urgent') || roomContext.includes('vip')) {
         priority = 'high';
-      } else if (context.includes('basse') || context.includes('low')) {
+      } else if (roomContext.includes('basse') || roomContext.includes('low')) {
         priority = 'low';
       }
       
-      // Ajouter la chambre au tableau
+      // Ajouter la chambre avec toutes les informations
       rooms.push({
-        number: roomNumber + suffix,
+        number: roomNumber,
         status,
         cleaningType,
         priority,
@@ -220,55 +193,51 @@ function parseApaleoFormat(text: string): Room[] {
         isUrgent: priority === 'high',
         notUrgent: priority === 'low',
         floor,
-        notes: match[0] // Conserver l'occurrence complète comme note
+        notes: match[0] // Le pattern détecté comme note
       });
       
-      console.log(`Chambre Apaleo détectée: ${roomNumber}${suffix}, Statut: ${status}, Type: ${cleaningType}`);
+      console.log(`Chambre Apaleo détectée: ${roomNumber}, Statut: ${status}, Type: ${cleaningType}`);
     }
   }
   
-  // Si nous n'avons pas trouvé de chambres avec les patterns spécifiques,
-  // essayons avec une approche plus générique pour les numéros de chambre
+  // Si on n'a toujours pas trouvé de chambres, utiliser une approche plus agressive
   if (rooms.length === 0) {
-    const genericPattern = /\b(\d{3})\b/g;
-    let match;
+    console.log("Tentative de détection agressive des numéros de chambre...");
     
-    while ((match = genericPattern.exec(text)) !== null) {
-      const roomNumber = match[1];
+    // Diviser le texte en lignes pour analyse ligne par ligne
+    const lines = text.split(/\r?\n/);
+    
+    for (const line of lines) {
+      // Chercher un numéro à 2-3 chiffres au début de la ligne qui n'est pas suivi par ":" ou "/"
+      const roomMatch = line.match(/^\s*(\d{2,3})\b(?![\/:])/);
       
-      // Vérifications de base pour filtrer les faux positifs
-      if (parseInt(roomNumber) > 999 || roomNumber.startsWith('0')) {
-        continue;
+      if (roomMatch) {
+        const roomNumber = roomMatch[1].padStart(3, '0');
+        
+        // Si cette chambre existe déjà, passer à la suivante
+        if (rooms.some(r => r.number === roomNumber)) {
+          continue;
+        }
+        
+        // Analyser le reste de la ligne pour le statut
+        const { status, cleaningType } = determineStatusAndCleaningType(line);
+        const floor = parseInt(roomNumber[0]);
+        const isTwin = line.toLowerCase().includes('twin') || line.toLowerCase().includes('twn');
+        
+        rooms.push({
+          number: roomNumber,
+          status,
+          cleaningType,
+          priority: 'medium',
+          isTwin,
+          isUrgent: false,
+          notUrgent: false,
+          floor,
+          notes: line
+        });
+        
+        console.log(`Chambre détectée (méthode agressive): ${roomNumber}`);
       }
-      
-      // Vérifier que ce n'est pas une date ou une autre valeur numérique
-      const beforeText = text.substring(Math.max(0, match.index - 5), match.index);
-      const afterText = text.substring(match.index + roomNumber.length, Math.min(text.length, match.index + roomNumber.length + 5));
-      
-      // Sauter les dates, heures, etc.
-      if (beforeText.match(/\d[\/\-\.]$/) || afterText.match(/^[\/\-\.]/)) {
-        continue;
-      }
-      
-      // Contexte pour l'analyse
-      const start = Math.max(0, match.index - 100);
-      const end = Math.min(text.length, match.index + 100);
-      const context = text.substring(start, end).toLowerCase();
-      
-      const { status, cleaningType } = determineStatusAndCleaningType(context);
-      const isTwin = context.includes('twin') || context.includes('twn');
-      const floor = parseInt(roomNumber[0]);
-      
-      rooms.push({
-        number: roomNumber,
-        status,
-        cleaningType,
-        priority: 'medium',
-        isTwin,
-        isUrgent: false,
-        notUrgent: false,
-        floor
-      });
     }
   }
   

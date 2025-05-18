@@ -17,9 +17,20 @@ export async function processImageWithDonut(imageData: ArrayBuffer, prompt?: str
   try {
     console.log("Envoi de l'image au modèle Donut...");
     
-    // Prompt amélioré pour mieux reconnaître les formats Apaleo
+    // Prompt amélioré pour mieux reconnaître les formats Apaleo avec instructions explicites sur les numéros de chambre
     const task_prompt = prompt || 
-      "Extract these fields from this housekeeping report: room number, status (DIR/SAL/CL/INS/OUT/recouche/départ/arrivée/stayover/departure/clean/propre/maintenance). For Apaleo format, look for room numbers (3 digits) at the beginning of lines or standalone followed by status codes (DIR, SAL, CL, INS). Parse each room entry.";
+      `Extract room data from this housekeeping report.
+      
+      Room numbers are found at the beginning of lines, consisting of 2-3 digits (e.g. 101, 01) followed by room types/status (e.g. DBL, SGL, DIR, CL).
+      
+      Don't confuse with time (11:00) or date (11/05/2025).
+      
+      Valid examples:
+      - "101 DBL DIR"
+      - "011 SGL CL"
+      - "10 TWN SAL"
+      
+      Extract: room number, type, and status (DIR/SAL/CL/INS/OUT/recouche/départ/clean).`;
     
     // Créer un FormData pour envoyer l'image et le prompt
     const formData = new FormData();
@@ -63,31 +74,39 @@ export function parseDonutOutput(donutText: string) {
       // Si ce n'est pas du JSON, on continue avec le parsing de texte
     }
     
-    // Analyse ligne par ligne
+    // Analyse ligne par ligne avec règles améliorées
     const lines = donutText.split('\n');
     const rooms = [];
     
+    // REGEX améliorée pour détecter les numéros de chambre au début des lignes
+    // suivis d'un type ou statut de chambre (mais pas d'une heure ou date)
+    const roomPattern = /^\s*(\d{2,3})\s+(DBL|SGL|TWN|ST|DIR|CL|INS|SAL|CLEAN|REC|OUT)\b/i;
+    
     for (const line of lines) {
-      // Recherche de patterns comme "Chambre 01: Recouche" ou "01 - Recouche" ou "101 DBL DIR"
-      const roomMatch = line.match(/(?:Chambre\s*)?(\d{1,3})(?:\s*[-:]\s*|\s+)(.+)/i);
+      // Appliquer la REGEX pour vérifier si la ligne commence par un numéro de chambre valide
+      const roomMatch = line.match(roomPattern);
       
       if (roomMatch) {
         const roomNumber = roomMatch[1].padStart(3, '0');
-        const statusInfo = roomMatch[2].toLowerCase();
+        const roomType = roomMatch[2].toUpperCase();
+        
+        // S'assurer que ce n'est pas une heure ou une date
+        if (line.includes(':') && line.indexOf(':') < 5) continue; // Éviter les lignes commençant par une heure
+        if (line.includes('/') && line.indexOf('/') < 5) continue; // Éviter les lignes commençant par une date
         
         // Déterminer le statut et le type de nettoyage selon les règles avancées
-        const { status, cleaningType } = determineStatusAndCleaningType(line, statusInfo);
+        const { status, cleaningType } = determineStatusAndCleaningType(line);
         
         // Déterminer la priorité
         let priority: 'high' | 'medium' | 'low' = 'medium';
-        if (statusInfo.includes('urgent') || statusInfo.includes('vip')) {
+        if (line.toLowerCase().includes('urgent') || line.toLowerCase().includes('vip')) {
           priority = 'high';
-        } else if (statusInfo.includes('basse priorité') || statusInfo.includes('low priority')) {
+        } else if (line.toLowerCase().includes('basse priorité') || line.toLowerCase().includes('low priority')) {
           priority = 'low';
         }
         
         // Déterminer si c'est une chambre twin
-        const isTwin = determineIfTwin(line, statusInfo);
+        const isTwin = determineIfTwin(line, roomType);
         
         // Récupérer l'étage
         const floor = parseInt(roomNumber[0]);
@@ -103,6 +122,8 @@ export function parseDonutOutput(donutText: string) {
           floor,
           notes: line // Conserver la ligne complète comme note
         });
+        
+        console.log(`Chambre détectée: ${roomNumber}, Type: ${roomType}, Statut: ${status}, Nettoyage: ${cleaningType}`);
       }
     }
     
@@ -116,15 +137,15 @@ export function parseDonutOutput(donutText: string) {
 /**
  * Détermine si une chambre est de type Twin
  * @param line - Ligne complète contenant les informations de la chambre
- * @param statusInfo - Informations de statut extraites
+ * @param roomType - Type de chambre extrait
  * @returns Booléen indiquant si la chambre est twin
  */
-function determineIfTwin(line: string, statusInfo: string): boolean {
+function determineIfTwin(line: string, roomType: string): boolean {
   const lowerLine = line.toLowerCase();
   return lowerLine.includes('twin') || 
          lowerLine.includes('twn') || 
-         statusInfo.includes('twin') || 
-         statusInfo.includes('twn');
+         roomType.includes('TWN') ||
+         roomType.includes('TWIN');
 }
 
 /**
@@ -194,6 +215,8 @@ function determineStatusAndCleaningType(line: string, statusInfo?: string): { st
   if (lowerLine.includes('recouche') || 
       lowerLine.includes('stayover') ||
       lowerLine.includes('stay over') ||
+      lowerLine.includes(' rec ') ||
+      lowerLine.match(/\brec\b/) ||
       lowerStatus.includes('recouche') ||
       lowerStatus.includes('stayover')) {
     return { status: 'needs-cleaning', cleaningType: 'quick' };
@@ -221,4 +244,3 @@ function determineStatusAndCleaningType(line: string, statusInfo?: string): { st
   // Par défaut - considérer comme chambre à nettoyer (à blanc)
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
-

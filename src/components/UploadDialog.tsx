@@ -104,17 +104,26 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       // Identifier le format du rapport détecté de manière plus précise
       let formatDetecte = "standard";
       
+      // Analyse des chambres pour détecter le format sur base des patterns spécifiques
       // Vérifier en priorité le format Apaleo (plus spécifique)
-      if (data.some(room => room.notes?.includes("DIR") || 
-                          room.notes?.includes("SAL") || 
-                          room.notes?.includes("CL") || 
-                          room.notes?.includes("INS"))) {
+      if (data.some(room => 
+          room.notes?.includes("DIR") || 
+          room.notes?.includes("SAL") || 
+          room.notes?.includes("CL") || 
+          room.notes?.includes("INS") ||
+          // Détecter le modèle typique des chambres Apaleo (ex: 101 DBL DIR)
+          (room.notes && /^\d{2,3}\s+(DBL|SGL|TWN|ST|DIR|CL|INS|SAL)\b/i.test(room.notes))
+      )) {
         formatDetecte = "Apaleo";
       } 
       // Puis vérifier Korner (moins spécifique)
-      else if (data.some(room => room.notes?.includes("Korner") ||
-                               room.notes?.includes("Recouche") ||
-                               room.notes?.includes("Parti"))) {
+      else if (data.some(room => 
+          room.notes?.includes("Korner") ||
+          room.notes?.includes("Recouche") ||
+          room.notes?.includes("Parti") ||
+          // Détecter les patterns typiques de Korner
+          (room.notes && /^\d{2}\s+Chambre\s+/i.test(room.notes))
+      )) {
         formatDetecte = "Hôtel Korner";
       }
       
