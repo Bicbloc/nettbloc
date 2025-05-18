@@ -17,13 +17,16 @@ if (!supabaseKey) {
 // Create a mock client if URL or key is missing
 const isMissingCredentials = !supabaseUrl || !supabaseKey;
 
-// Create client or placeholder
+// Create client or placeholder with properly chained mock methods
 export const supabaseClient = isMissingCredentials 
   ? {
       from: () => ({
         insert: () => ({ error: new Error("Supabase credentials not configured") }),
-        select: () => ({ error: new Error("Supabase credentials not configured"), data: [] }),
-        order: () => ({ error: new Error("Supabase credentials not configured"), data: [] }),
+        select: () => ({
+          data: [],
+          error: new Error("Supabase credentials not configured"),
+          order: () => ({ data: [], error: new Error("Supabase credentials not configured") })
+        }),
       }),
       auth: {
         signIn: () => ({ error: new Error("Supabase credentials not configured") }),
@@ -61,14 +64,13 @@ export async function getEmailsFromSupabase() {
       return { success: false, data: [], error: "Supabase credentials not configured" };
     }
     
-    // Create query and execute it separately to fix TypeScript error
-    const query = supabaseClient
+    // Execute the query with proper chaining
+    const { data, error } = await supabaseClient
       .from('report_emails')
-      .select('email, created_at');
-    
-    const result = await query.order('created_at', { ascending: false });
+      .select('email, created_at')
+      .order('created_at', { ascending: false });
       
-    return { success: !result.error, data: result.data || [], error: result.error };
+    return { success: !error, data: data || [], error };
   } catch (err) {
     console.error("Error fetching emails from Supabase:", err);
     return { success: false, data: [], error: err };
