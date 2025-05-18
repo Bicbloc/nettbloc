@@ -95,6 +95,8 @@ export function parseDonutOutput(donutText: string) {
         let priority: 'high' | 'medium' | 'low' = 'medium';
         if (statusInfo.includes('urgent') || statusInfo.includes('vip')) {
           priority = 'high';
+        } else if (statusInfo.includes('basse priorité') || statusInfo.includes('low priority')) {
+          priority = 'low';
         }
         
         // Déterminer si c'est une chambre twin
