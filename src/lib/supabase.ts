@@ -23,6 +23,7 @@ export const supabaseClient = isMissingCredentials
       from: () => ({
         insert: () => ({ error: new Error("Supabase credentials not configured") }),
         select: () => ({ error: new Error("Supabase credentials not configured"), data: [] }),
+        order: () => ({ error: new Error("Supabase credentials not configured"), data: [] }),
       }),
       auth: {
         signIn: () => ({ error: new Error("Supabase credentials not configured") }),
@@ -60,12 +61,14 @@ export async function getEmailsFromSupabase() {
       return { success: false, data: [], error: "Supabase credentials not configured" };
     }
     
-    const { data, error } = await supabaseClient
+    // Create query and execute it separately to fix TypeScript error
+    const query = supabaseClient
       .from('report_emails')
-      .select('email, created_at')
-      .order('created_at', { ascending: false });
+      .select('email, created_at');
+    
+    const result = await query.order('created_at', { ascending: false });
       
-    return { success: !error, data: data || [], error };
+    return { success: !result.error, data: result.data || [], error: result.error };
   } catch (err) {
     console.error("Error fetching emails from Supabase:", err);
     return { success: false, data: [], error: err };
