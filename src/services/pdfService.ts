@@ -1,6 +1,7 @@
 
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
+import { processImageWithDonut, parseDonutOutput } from './donutService';
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -39,6 +40,21 @@ export async function processPdf(file: File): Promise<Room[]> {
     // Convertir le fichier en ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     
+    // Essayer d'abord avec le modèle Donut pour une meilleure reconnaissance
+    try {
+      console.log("Tentative de reconnaissance avec le modèle Donut...");
+      const donutText = await processImageWithDonut(arrayBuffer);
+      const donutResult = parseDonutOutput(donutText);
+      
+      if (donutResult.rooms && donutResult.rooms.length > 0) {
+        console.log(`Détecté ${donutResult.rooms.length} chambres avec Donut`);
+        return donutResult.rooms;
+      }
+    } catch (donutError) {
+      console.warn("Échec de la reconnaissance Donut, repli sur PDF.js:", donutError);
+    }
+    
+    // Méthode de repli avec PDF.js
     // Charger le document PDF
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     

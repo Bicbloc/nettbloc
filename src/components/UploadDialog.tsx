@@ -105,7 +105,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         setOpen(false);
         toast({
           title: "Téléversement réussi",
-          description: `${data.length} chambres traitées depuis ${selectedFile.name}`,
+          description: `${data.length} chambres traitées depuis ${selectedFile.name} avec Donut OCR`,
         });
         setProcessingProgress(0);
       }, 500);
@@ -141,7 +141,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         <DialogHeader>
           <DialogTitle>Importer un Rapport</DialogTitle>
           <DialogDescription>
-            Téléversez un rapport PDF (Format Hôtel Korner ou Mews standard) pour analyser les statuts des chambres.
+            Téléversez un rapport PDF (Format Hôtel Korner, Mews ou autre) pour analyser les statuts des chambres.
           </DialogDescription>
         </DialogHeader>
         <div 
@@ -190,7 +190,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         {isUploading && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Analyse en cours...</span>
+              <span className="text-sm text-muted-foreground">Analyse avec Donut OCR...</span>
               <span className="text-sm font-medium">{processingProgress}%</span>
             </div>
             <Progress value={processingProgress} className="h-2" />
