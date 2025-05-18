@@ -13,6 +13,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
 import { FileUp } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface UploadDialogProps {
   onPdfProcessed: (data: any) => void;
@@ -21,6 +22,7 @@ interface UploadDialogProps {
 export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
   const [open, setOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,6 +63,17 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     e.preventDefault();
   };
 
+  const simulateProgress = () => {
+    setProcessingProgress(0);
+    const interval = setInterval(() => {
+      setProcessingProgress((prev) => {
+        const next = Math.min(prev + 5, 90);
+        return next;
+      });
+    }, 200);
+    return interval;
+  };
+
   const handleSubmit = async () => {
     if (!selectedFile) {
       toast({
@@ -74,16 +87,31 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     try {
       setIsUploading(true);
       console.log("Traitement du fichier:", selectedFile.name);
+      
+      // Simuler une barre de progression
+      const progressInterval = simulateProgress();
+      
       const data = await processPdf(selectedFile);
+      
+      // Compléter la progression
+      clearInterval(progressInterval);
+      setProcessingProgress(100);
+      
       console.log("Données traitées:", data.length, "chambres");
-      onPdfProcessed(data);
-      setOpen(false);
-      toast({
-        title: "Téléversement réussi",
-        description: `${data.length} chambres traitées depuis ${selectedFile.name}`,
-      });
+      
+      // Petit délai pour voir la progression à 100%
+      setTimeout(() => {
+        onPdfProcessed(data);
+        setOpen(false);
+        toast({
+          title: "Téléversement réussi",
+          description: `${data.length} chambres traitées depuis ${selectedFile.name}`,
+        });
+        setProcessingProgress(0);
+      }, 500);
     } catch (error) {
       console.error("Erreur lors du traitement du PDF:", error);
+      setProcessingProgress(0);
       toast({
         variant: "destructive",
         title: "Échec du traitement",
@@ -111,9 +139,9 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Importer un Rapport Mews</DialogTitle>
+          <DialogTitle>Importer un Rapport</DialogTitle>
           <DialogDescription>
-            Téléversez un rapport PDF exporté depuis Mews pour analyser les statuts des chambres.
+            Téléversez un rapport PDF (Format Hôtel Korner ou Mews standard) pour analyser les statuts des chambres.
           </DialogDescription>
         </DialogHeader>
         <div 
@@ -158,6 +186,17 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
             </div>
           </div>
         </div>
+        
+        {isUploading && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Analyse en cours...</span>
+              <span className="text-sm font-medium">{processingProgress}%</span>
+            </div>
+            <Progress value={processingProgress} className="h-2" />
+          </div>
+        )}
+        
         <DialogFooter className="sm:justify-end">
           <Button
             type="button"

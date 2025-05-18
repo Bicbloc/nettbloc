@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 
@@ -54,8 +55,21 @@ export async function processPdf(file: File): Promise<Room[]> {
     
     console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
     
-    // Analyser le texte pour extraire les informations des chambres
-    const rooms = parseRoomsFromText(fullText);
+    // Détecter le type de rapport
+    const isHotelKornerFormat = fullText.includes("Rapport Housekeeping - Hôtel Korner") || 
+                               fullText.includes("Toutes les chambres en statut tous") ||
+                               (fullText.includes("Ch.") && fullText.includes("Type de chambre") && fullText.includes("Arrivée") && fullText.includes("Départ"));
+    
+    console.log("Format détecté:", isHotelKornerFormat ? "Hôtel Korner" : "Format standard");
+    
+    // Analyser le texte pour extraire les informations des chambres selon le format
+    let rooms: Room[] = [];
+    
+    if (isHotelKornerFormat) {
+      rooms = parseHotelKornerFormat(fullText);
+    } else {
+      rooms = parseRoomsFromText(fullText);
+    }
     
     toast({
       title: "PDF Processed",
@@ -80,6 +94,129 @@ export async function processPdf(file: File): Promise<Room[]> {
   }
 }
 
+// Nouveau parser pour le format Hôtel Korner
+function parseHotelKornerFormat(text: string): Room[] {
+  const rooms: Room[] = [];
+  console.log("Analyse du format Hôtel Korner...");
+  
+  // Rechercher les lignes qui commencent par un numéro de chambre à 2 chiffres
+  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+  
+  // Pattern pour détecter les lignes de chambre (commence par 01, 02, etc.)
+  const roomPattern = /^\s*(\d{2})\s+(Chambre\s+\w+)\s+(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})\s+(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})\s+(.*?)\s+(.*?)\s+(Recouche|Parti|En arrivée)\s+(.*?)$/i;
+  
+  let currentRoom: Partial<Room> | null = null;
+  let currentRoomNumber = '';
+  let additionalNotes = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Ignorer les entêtes et lignes vides
+    if (line.includes("Rapport Housekeeping") || line.includes("Ch.  Type de chambre") || line === '') {
+      continue;
+    }
+    
+    // Vérifier si la ligne commence par un numéro de chambre à 2 chiffres
+    const roomMatch = line.match(/^(\d{2})\s+/);
+    
+    if (roomMatch) {
+      // Si on a déjà une chambre en cours, l'ajouter à la liste
+      if (currentRoom) {
+        // Ajouter les notes supplémentaires si disponibles
+        if (additionalNotes.length > 0) {
+          currentRoom.notes = additionalNotes.join(' ');
+        }
+        
+        rooms.push(currentRoom as Room);
+        additionalNotes = [];
+      }
+      
+      // Extraire le numéro de chambre
+      const roomNumber = roomMatch[1].padStart(3, '0');
+      currentRoomNumber = roomNumber;
+      
+      // Déterminer si c'est une chambre twin
+      const isTwin = line.toLowerCase().includes('twin');
+      
+      // Détecter le statut de la chambre et le type de nettoyage
+      const status = determineStatusFromKornerFormat(line);
+      const cleaningType = determineCleaningTypeFromKornerFormat(line);
+      
+      // Déterminer la priorité
+      const priority = determinePriority(line);
+      
+      // Déterminer l'étage
+      const floor = getRoomFloor(roomNumber);
+      
+      currentRoom = {
+        number: roomNumber,
+        status: status,
+        cleaningType: cleaningType,
+        priority: priority,
+        isTwin: isTwin,
+        isUrgent: priority === 'high',
+        notUrgent: priority === 'low',
+        floor: floor
+      };
+      
+      console.log(`Chambre détectée: ${roomNumber}, Statut: ${status}, Type de nettoyage: ${cleaningType}`);
+    } else if (currentRoom) {
+      // Lignes supplémentaires associées à la chambre actuelle
+      additionalNotes.push(line);
+    }
+  }
+  
+  // Ne pas oublier d'ajouter la dernière chambre
+  if (currentRoom) {
+    if (additionalNotes.length > 0) {
+      currentRoom.notes = additionalNotes.join(' ');
+    }
+    rooms.push(currentRoom as Room);
+  }
+  
+  console.log(`Détecté ${rooms.length} chambres avec le format Hôtel Korner`);
+  
+  // Trier les chambres par numéro
+  return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+}
+
+// Déterminer le statut à partir du format Hôtel Korner
+function determineStatusFromKornerFormat(line: string): string {
+  if (line.includes('Parti')) {
+    return 'needs-cleaning';
+  } else if (line.includes('Recouche')) {
+    return 'needs-cleaning';
+  } else if (line.includes('En arrivée')) {
+    return 'needs-cleaning';
+  } else if (line.includes('maintenance') || line.toLowerCase().includes('hors d\'usage')) {
+    return 'maintenance';
+  } else {
+    // Par défaut
+    return 'needs-cleaning';
+  }
+}
+
+// Déterminer le type de nettoyage à partir du format Hôtel Korner
+function determineCleaningTypeFromKornerFormat(line: string): 'full' | 'quick' | 'none' {
+  // Nettoyage à blanc: Parti, A contrôler
+  if (line.includes('Parti') && line.includes('A contrôler')) {
+    return 'full';
+  } 
+  // Recouche: Recouche
+  else if (line.includes('Recouche')) {
+    return 'quick';
+  }
+  // En arrivée: potentiellement une chambre à blanc
+  else if (line.includes('En arrivée')) {
+    return 'full';
+  } 
+  else {
+    // Par défaut
+    return 'none';
+  }
+}
+
 // Analyse le texte pour extraire les informations des chambres
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
@@ -94,7 +231,9 @@ function parseRoomsFromText(text: string): Room[] {
     /\b([1-9]\d{2})\s*-\s*[A-Z]/gi, // Format 101-A
     /\b(No\.|N°)\s*(\d{3})\b/gi,     // Format No. 101 ou N° 101
     /\b(\d{3})\s*\(/gi,              // Format 101 (quelque chose)
-    /\b(\d{1,2})(\d{2})\b(?!\d)/g    // Capture numéro de chambre simple comme 101
+    /\b(\d{1,2})(\d{2})\b(?!\d)/g,   // Capture numéro de chambre simple comme 101
+    /^(\d{2})\s+Chambre/mi,          // Nouveau pattern pour format Hotel Korner: "01 Chambre..."
+    /^Ch\.\s+(\d{2})\b/mi            // Nouveau pattern pour "Ch. 01" en début de ligne
   ];
   
   // Utiliser chaque pattern pour trouver les numéros de chambre
@@ -108,8 +247,8 @@ function parseRoomsFromText(text: string): Room[] {
       // Récupérer le numéro de chambre correctement selon le pattern utilisé
       let roomNumber;
       
-      if (match[1] === 'Spaces' || match[1] === 'Espace' || match[1] === 'Room' || match[1] === 'Chambre' || match[1] === 'No.' || match[1] === 'N°') {
-        roomNumber = match[2];
+      if (match[1] === 'Spaces' || match[1] === 'Espace' || match[1] === 'Room' || match[1] === 'Chambre' || match[1] === 'No.' || match[1] === 'N°' || match[1] === 'Ch.') {
+        roomNumber = match[2] || match[1];
       } else if (pattern.source.includes('\\d{1,2})(\\d{2})')) {
         // Pour le pattern qui capture le numéro de chambre directement
         roomNumber = match[0];
@@ -136,7 +275,7 @@ function parseRoomsFromText(text: string): Room[] {
       const context = text.substring(start, end);
       
       // Analyser le statut et le type de nettoyage selon les règles définies
-      const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+      const { status, cleaningType } = determineStatusAndCleaningType(context);
       
       // Déterminer si c'est une chambre twin
       const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
@@ -160,9 +299,11 @@ function parseRoomsFromText(text: string): Room[] {
     }
   }
   
+  console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
+  
   // Deuxième passe pour essayer de trouver plus de numéros de chambres
   // Cette fois avec un pattern très générique mais qui vérifie si le nombre pourrait être une chambre
-  const genericRoomPattern = /\b(\d{3})\b/g;
+  const genericRoomPattern = /\b(\d{2,3})\b/g;
   let genericMatch;
   
   while ((genericMatch = genericRoomPattern.exec(text)) !== null) {
@@ -196,7 +337,7 @@ function parseRoomsFromText(text: string): Room[] {
     const end = Math.min(text.length, genericMatch.index + 200);
     const context = text.substring(start, end);
     
-    const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+    const { status, cleaningType } = determineStatusAndCleaningType(context);
     const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
     const priority = determinePriority(context);
     const floor = getRoomFloor(roomNumber);
@@ -236,110 +377,68 @@ function getRoomFloor(roomNumber: string): number {
   return isNaN(firstDigit) ? 0 : firstDigit;
 }
 
-// Nouvelle fonction d'analyse selon les règles définies
-function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+// Déterminer le statut et le type de nettoyage selon les règles définies
+function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
   // Valeurs par défaut
   let status = 'needs-cleaning';
   let cleaningType: 'full' | 'quick' | 'none' = 'none';
-
-  // 🟦 Chambre à blanc - CAS 1: Un bloc de réservation apparaît dans la colonne de gauche du rapport
-  const leftColumnReservation = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
-                               !context.includes("Adults.*\d{2}\/\d{2}\/\d{4}");
-                               
-  if (leftColumnReservation) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟦 Chambre à blanc - CAS 2: Un bloc de réservation en colonne droite ET statut DIR
-  const rightColumnWithDIR = /Adults.*\d{2}\/\d{2}\/\d{4}/.test(context) && 
-                             (context.includes('DIR') || context.toLowerCase().includes('dirty'));
   
-  if (rightColumnWithDIR) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟦 Chambre à blanc - CAS 3: Deux blocs distincts visibles
-  const twoDistinctBlocks = context.match(/\d{2}\/\d{2}\/\d{4}/g)?.length >= 2;
-  
-  if (twoDistinctBlocks) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🔵 Chambre en recouche: Une seule ligne avec date d'arrivée et départ ultérieure
-  const hasOneReservationLine = /\d{2}\/\d{2}\/\d{4}.*Night/.test(context) || 
-                               /\d{2}\/\d{2}\/\d{4}.*séjour/.test(context) ||
-                               /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
-  
-  if (hasOneReservationLine && !leftColumnReservation && !rightColumnWithDIR && !twoDistinctBlocks) {
-    cleaningType = 'quick';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-
-  // 🟩 Chambre propre - CAS 1: Case vide (aucun bloc client) ET statut CL ou INS
-  const emptyWithCleanStatus = (!context.match(/\d{2}\/\d{2}\/\d{4}/g) && 
-                              (context.includes('CL') || context.includes('INS') || 
-                               context.toLowerCase().includes('clean') || context.toLowerCase().includes('inspection')));
-  
-  // 🟩 Chambre propre - CAS 2: Chambre dans colonne de droite ET statut INS uniquement
-  const rightColumnINS = /Adults.*INS/.test(context) || 
-                         (context.includes('Adults') && context.toLowerCase().includes('inspection'));
-  
-  if (emptyWithCleanStatus || rightColumnINS) {
-    cleaningType = 'none';
-    status = 'clean';
-    return { status, cleaningType };
-  }
-
-  // Cas par défaut - si aucune règle ne correspond explicitement
-  // Vérifier s'il y a un statut DIR visible
-  if (context.includes('DIR') || context.toLowerCase().includes('dirty')) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    return { status, cleaningType };
-  }
-  
-  // Si des mots-clés comme "maintenance" ou "out of order" sont présents
+  // 🛠 CHAMBRE EN MAINTENANCE
   if (context.toLowerCase().includes('maintenance') || 
-      context.toLowerCase().includes('out of order') || 
-      context.toLowerCase().includes('hors service')) {
+      context.toLowerCase().includes('out of order') ||
+      context.toLowerCase().includes('hors d\'usage') ||
+      context.toLowerCase().includes('punaises de lit') ||
+      context.toLowerCase().includes('inutilisable')) {
     status = 'maintenance';
     cleaningType = 'none';
     return { status, cleaningType };
   }
   
-  // Si des mots-clés comme "occupé" ou "occupied" sont présents
-  if (context.toLowerCase().includes('occupied') || 
-      context.toLowerCase().includes('occupé') || 
-      context.includes('OCC')) {
-    status = 'occupied';
-    cleaningType = 'none';
+  // 🟦 CHAMBRE À BLANC (PRIORITÉ 1)
+  // CAS 1: Deux blocs client visibles
+  const hasMultipleReservations = (context.match(/\d{2}\/\d{2}\/\d{4}/g) || []).length >= 2;
+  
+  // CAS 2: Un bloc avec une heure (check-out)
+  const hasDepartureTime = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
+                          !context.includes("Nuit");
+  
+  // CAS 3: Bloc client en colonne de gauche
+  const hasLeftColumnReservation = context.includes('Parti') || context.includes('A contrôler');
+  
+  // CAS 4: Statut DIR (dirty)
+  const hasDirtyStatus = context.includes('DIR') || context.toLowerCase().includes('dirty');
+  
+  if (hasMultipleReservations || hasDepartureTime || hasLeftColumnReservation || hasDirtyStatus) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
     return { status, cleaningType };
   }
-
-  return { status: 'needs-cleaning', cleaningType: 'full' };
-}
-
-// Fonction historique laissée en place pour référence
-function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  if (context.includes('CL') || context.includes('INS') || context.toLowerCase().includes('clean')) {
-    return { status: 'clean', cleaningType: 'none' };
+  
+  // 🔵 CHAMBRE EN RECOUCHE (PRIORITÉ 2)
+  // Un seul bloc client avec Nuit X/Y et sans heure
+  const hasStayingGuest = /\d{2}\/\d{2}\/\d{4}.*Nuit/.test(context) || 
+                          context.includes('Recouche');
+  
+  if (hasStayingGuest) {
+    cleaningType = 'quick';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
   
-  if (context.includes('OCC') || context.toLowerCase().includes('occupied')) {
-    return { status: 'occupied', cleaningType: 'none' };
+  // 🟩 CHAMBRE PROPRE (PRIORITÉ 3)
+  // Aucun bloc client et statut propre
+  const isCleanRoom = (!context.match(/\d{2}\/\d{2}\/\d{4}/g) && 
+                     (context.includes('CL') || context.includes('INS') || 
+                      context.toLowerCase().includes('clean') || 
+                      context.toLowerCase().includes('inspection')));
+  
+  if (isCleanRoom) {
+    cleaningType = 'none';
+    status = 'clean';
+    return { status, cleaningType };
   }
   
-  if (context.toLowerCase().includes('maintenance') || context.toLowerCase().includes('out of order')) {
-    return { status: 'maintenance', cleaningType: 'none' };
-  }
-
+  // Si on arrive ici, appliquer les valeurs par défaut
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
