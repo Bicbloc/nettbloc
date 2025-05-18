@@ -14,13 +14,17 @@ export const getRoomFloor = (roomNumber: string): number => {
     return 0; // Consider as ground floor
   }
   
-  // If it's just a digit (like 1, 2, 3) or two digits (like 12, 24), it's ground floor
-  if (/^\d{1,2}$/.test(numericPart)) {
-    return 0;
+  // Si c'est un numéro à 1 ou 2 chiffres, c'est au RdC ou on prend le premier chiffre
+  if (numericPart.length <= 2) {
+    if (numericPart.length === 2) {
+      // Pour des chambres comme "11", le premier chiffre peut être l'étage
+      return parseInt(numericPart.charAt(0), 10);
+    }
+    return 0; // Chambres comme "1", "2", "3" sont au RdC
   }
   
-  // For longer numbers, the first digit typically indicates the floor
-  const firstDigit = parseInt(numericPart.charAt(0));
+  // Pour les numéros à 3 chiffres (format 101, 203, etc.)
+  const firstDigit = parseInt(numericPart.charAt(0), 10);
   return isNaN(firstDigit) ? 0 : firstDigit;
 };
 
