@@ -120,7 +120,7 @@ export async function processPdf(file: File): Promise<Room[]> {
 
 // Détecter le format Apaleo par différentes caractéristiques
 function detectApaleoFormat(text: string): boolean {
-  // Apaleo a souvent des chambres avec un numéro à gauche suivi directement par un code (DBL, DIR, etc.)
+  // Apaleo a souvent des chambres avec un numéro à gauche suivi directement par un code (DBL, SGL, etc.)
   const apaleoPatterns = [
     /\b\d{2,3}\s+(DBL|SGL|TWN|DIR|CL|INS|SAL|CLEAN)\b/i,
     /\bRoom\s+\d{2,3}\b/i,
@@ -175,7 +175,7 @@ function parseApaleoFormat(text: string): Room[] {
         priority,
         isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low',
+        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
         floor,
         notes: line.trim()
       });
@@ -247,7 +247,7 @@ function parseApaleoFormatAlternative(text: string): Room[] {
         priority,
         isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low',
+        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
         floor,
         notes: line.trim()
       });
@@ -380,7 +380,7 @@ function parseHotelKornerFormat(text: string): Room[] {
         priority: priority,
         isTwin: isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low',
+        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
         floor: floor
       };
       
@@ -517,7 +517,7 @@ function parseRoomsFromText(text: string): Room[] {
         priority,
         isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low',
+        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
         floor
       });
     }
@@ -573,7 +573,7 @@ function parseRoomsFromText(text: string): Room[] {
       priority,
       isTwin,
       isUrgent: priority === 'high',
-      notUrgent: priority === 'low',
+      notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
       floor
     });
   }
@@ -711,7 +711,7 @@ function generateMockRoomData(): Room[] {
       priority,
       isTwin,
       isUrgent: priority === 'high',
-      notUrgent: priority === 'low',
+      notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
       floor // Ajout du numéro d'étage
     };
   });
