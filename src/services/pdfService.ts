@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { processImageWithDonut, parseDonutOutput } from './donutService';
@@ -175,7 +176,7 @@ function parseApaleoFormat(text: string): Room[] {
         priority,
         isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
+        notUrgent: priority === 'low', // Removed type assertion as priority is correctly typed
         floor,
         notes: line.trim()
       });
@@ -247,7 +248,7 @@ function parseApaleoFormatAlternative(text: string): Room[] {
         priority,
         isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
+        notUrgent: priority === 'low', // Removed type assertion as priority is correctly typed
         floor,
         notes: line.trim()
       });
@@ -380,7 +381,7 @@ function parseHotelKornerFormat(text: string): Room[] {
         priority: priority,
         isTwin: isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
+        notUrgent: priority === 'low',
         floor: floor
       };
       
@@ -526,7 +527,6 @@ function parseRoomsFromText(text: string): Room[] {
   console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
   
   // Deuxième passe pour essayer de trouver plus de numéros de chambres
-  // Cette fois avec un pattern très générique mais qui vérifie si le nombre pourrait être une chambre
   const genericRoomPattern = /\b(\d{2,3})\b/g;
   let genericMatch;
   
@@ -573,7 +573,7 @@ function parseRoomsFromText(text: string): Room[] {
       priority,
       isTwin,
       isUrgent: priority === 'high',
-      notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
+      notUrgent: priority === 'low',
       floor
     });
   }
@@ -671,7 +671,8 @@ function determinePriority(context: string): 'high' | 'medium' | 'low' {
   if (context.includes('VIP') || 
       context.includes('urgent') || 
       context.includes('high priority') || 
-      context.includes('prioritaire')) {
+      context.includes('prioritaire') ||
+      context.includes('très urgent')) {
     return 'high';
   }
   
@@ -711,7 +712,7 @@ function generateMockRoomData(): Room[] {
       priority,
       isTwin,
       isUrgent: priority === 'high',
-      notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
+      notUrgent: priority === 'low',
       floor // Ajout du numéro d'étage
     };
   });
