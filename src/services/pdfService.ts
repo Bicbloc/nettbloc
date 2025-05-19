@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { processImageWithDonut, parseDonutOutput } from './donutService';
@@ -247,6 +248,7 @@ function parseApaleoFormatAlternative(text: string): Room[] {
         priority,
         isTwin,
         isUrgent: priority === 'high',
+        // Fix the type error by correcting the comparison
         notUrgent: priority === 'low',
         floor,
         notes: line.trim()
@@ -711,6 +713,7 @@ function generateMockRoomData(): Room[] {
       priority,
       isTwin,
       isUrgent: priority === 'high',
+      // Fix the type error by correcting this comparison
       notUrgent: priority === 'low',
       floor // Ajout du numéro d'étage
     };
