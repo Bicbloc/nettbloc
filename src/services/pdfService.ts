@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { processImageWithDonut, parseDonutOutput } from './donutService';
@@ -293,7 +294,7 @@ function parseRoomsFromText(text: string): Room[] {
       const { status, cleaningType } = determineStatusAndCleaningType(context);
       
       // Déterminer si c'est une chambre twin
-      const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN') || context.includes('TWS');
+      const isTwin = context.includes('TWN') || context.toLowerCase().includes('twin') || context.includes('TWIN') || context.includes('TWS');
       
       // Déterminer la priorité
       const priority = determinePriority(context);
@@ -353,7 +354,7 @@ function parseRoomsFromText(text: string): Room[] {
     const context = text.substring(start, end);
     
     const { status, cleaningType } = determineStatusAndCleaningType(context);
-    const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN') || context.includes('TWS');
+    const isTwin = context.includes('TWN') || context.toLowerCase().includes('twin') || context.includes('TWIN') || context.includes('TWS');
     const priority = determinePriority(context);
     const floor = getRoomFloor(roomNumber);
     
@@ -413,11 +414,13 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
     return { status, cleaningType };
   }
   
-  // 🟦 CHAMBRE À BLANC (PRIORITÉ 1) - FORMAT MEWS/STANDARD
+  // 🟦 CHAMBRE À BLANC (PRIORITÉ 1)
+  
   // ----- INDICATEURS DE DÉPART -----
   // Déterminer si la chambre a un statut "DIR" (dirty)
   const hasDirtyStatus = context.includes('DIR') || 
-                          context.toLowerCase().includes('dirty');
+                         context.toLowerCase().includes('dirty') ||
+                         context.toLowerCase().includes('sale');
 
   // Vérifier s'il y a des termes spécifiques de départ
   const hasCheckoutTerms = context.toLowerCase().includes('parti') || 
@@ -430,26 +433,35 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
   const hasMultipleReservations = multipleReservationDates.length >= 2;
   
   // CAS 2: Un bloc avec une heure spécifique mentionnée (souvent heure de départ)
-  const hasTimeReferences = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context);
+  const hasTimeReferences = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) || 
+                           /\d{1,2}:\d{2}.*\d{2}\/\d{2}\/\d{4}/.test(context);
   
   // CAS 3: Verifier s'il y a des nuitées avec la dernière nuit
   // Par exemple: "Nuit 3/3" ou "Night 2/2" (dernier jour d'un séjour)
   const lastNightPattern = /\bNuit\s+(\d+)\/\1\b|\bNight\s+(\d+)\/\2\b/i;
   const isLastNight = lastNightPattern.test(context);
   
+  // CAS 4: Vérifier si la date d'aujourd'hui est mentionnée comme date de départ
+  const currentDate = new Date();
+  const todayDateString = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
+  const isTodayCheckout = context.includes(todayDateString) && hasCheckoutTerms;
+  
   // ----- DÉCISION DÉPART (À BLANC) -----
-  if ((hasDirtyStatus && (hasCheckoutTerms || hasTimeReferences || isLastNight)) || 
-      (hasMultipleReservations && hasDirtyStatus)) {
+  if ((hasDirtyStatus && (hasCheckoutTerms || hasTimeReferences || isLastNight || isTodayCheckout)) || 
+      (hasMultipleReservations && hasDirtyStatus) ||
+      (isLastNight && (hasTimeReferences || hasCheckoutTerms))) {
     cleaningType = 'full';
     status = 'needs-cleaning';
     console.log("→ Détecté: NETTOYAGE À BLANC (départ)");
     return { status, cleaningType };
   }
   
-  // 🔵 CHAMBRE EN RECOUCHE (PRIORITÉ 2) - FORMAT MEWS/STANDARD
+  // 🔵 CHAMBRE EN RECOUCHE (PRIORITÉ 2)
+  
   // Un bloc client actif mais pas son dernier jour
   const hasStayingGuestTerms = context.toLowerCase().includes('recouche') || 
-                               context.toLowerCase().includes('séjour en cours');
+                               context.toLowerCase().includes('séjour en cours') ||
+                               context.toLowerCase().includes('stay in progress');
   
   // Vérifier le pattern "Nuit X/Y" où X < Y (pas le dernier jour)
   const currentNightPattern = /\bNuit\s+(\d+)\/(\d+)\b|\bNight\s+(\d+)\/(\d+)\b/i;
@@ -463,7 +475,7 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
     isMiddleOfStay = current < total;
   }
   
-  if ((hasStayingGuestTerms || isMiddleOfStay) && !hasDirtyStatus) {
+  if ((hasStayingGuestTerms || isMiddleOfStay) && !isLastNight) {
     cleaningType = 'quick';
     status = 'needs-cleaning';
     console.log("→ Détecté: RECOUCHE (séjour en cours)");
@@ -472,16 +484,42 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
   
   // 🟩 CHAMBRE PROPRE (PRIORITÉ 3)
   const isCleanRoom = (context.includes('CL') || 
-                       context.includes('INS') || 
-                       context.toLowerCase().includes('clean') || 
-                       context.toLowerCase().includes('inspection') ||
-                       context.toLowerCase().includes('propre'));
+                      context.includes('INS') || 
+                      context.toLowerCase().includes('clean') || 
+                      context.toLowerCase().includes('inspection') ||
+                      context.toLowerCase().includes('propre')) &&
+                      !hasDirtyStatus && !hasCheckoutTerms && !isLastNight;
   
-  if (isCleanRoom && !hasDirtyStatus && !hasCheckoutTerms) {
+  if (isCleanRoom) {
     cleaningType = 'none';
     status = 'clean';
     console.log("→ Détecté: CHAMBRE PROPRE");
     return { status, cleaningType };
+  }
+  
+  // 🟥 ARRIVÉES DU JOUR (SANS DÉPART AVANT)
+  // Vérifier s'il y a une arrivée aujourd'hui sans départ avant
+  const hasArrivalTerms = context.toLowerCase().includes('arrivée') || 
+                         context.toLowerCase().includes('arrival') ||
+                         context.toLowerCase().includes('check in') ||
+                         context.toLowerCase().includes('checkin');
+  
+  const isTodayArrival = context.includes(todayDateString) && hasArrivalTerms;
+  
+  if (isTodayArrival && !hasCheckoutTerms && !isLastNight) {
+    // Si la chambre a un statut INS (inspected), elle est prête
+    if (context.includes('INS') || context.toLowerCase().includes('propre') || context.toLowerCase().includes('clean')) {
+      cleaningType = 'none';
+      status = 'clean';
+      console.log("→ Détecté: CHAMBRE PROPRE (arrivée)");
+      return { status, cleaningType };
+    } else {
+      // Sinon, elle a besoin d'un nettoyage à blanc
+      cleaningType = 'full';
+      status = 'needs-cleaning';
+      console.log("→ Détecté: NETTOYAGE À BLANC (arrivée)");
+      return { status, cleaningType };
+    }
   }
   
   // En cas d'ambiguïté mais avec statut DIR, faire un nettoyage complet par défaut
@@ -501,24 +539,24 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
 function determinePriority(context: string): 'high' | 'medium' | 'low' {
   // Vérifier d'abord les termes spécifiques pour haute priorité
   if (context.includes('VIP') || 
-      context.includes('urgent') || 
-      context.includes('très urgent') ||
-      context.includes('high priority') || 
-      context.includes('prioritaire')) {
+      context.toLowerCase().includes('urgent') || 
+      context.toLowerCase().includes('très urgent') ||
+      context.toLowerCase().includes('high priority') || 
+      context.toLowerCase().includes('prioritaire')) {
     return 'high';
   }
   
   // Ensuite vérifier les termes spécifiques pour priorité moyenne
-  if (context.includes('medium priority') || 
-      context.includes('standard') || 
-      context.includes('normale')) {
+  if (context.toLowerCase().includes('medium priority') || 
+      context.toLowerCase().includes('standard') || 
+      context.toLowerCase().includes('normale')) {
     return 'medium';
   }
   
   // Enfin vérifier les termes spécifiques pour priorité basse
-  if (context.includes('low priority') || 
-      context.includes('basse') || 
-      context.includes('pas urgent')) {
+  if (context.toLowerCase().includes('low priority') || 
+      context.toLowerCase().includes('basse') || 
+      context.toLowerCase().includes('pas urgent')) {
     return 'low';
   }
   
