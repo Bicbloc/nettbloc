@@ -460,19 +460,23 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
 
 // Déterminer la priorité
 function determinePriority(context: string): 'high' | 'medium' | 'low' {
+  // Vérifier d'abord les termes spécifiques pour haute priorité
   if (context.includes('VIP') || 
       context.includes('urgent') || 
+      context.includes('très urgent') ||
       context.includes('high priority') || 
       context.includes('prioritaire')) {
     return 'high';
   }
   
+  // Ensuite vérifier les termes spécifiques pour priorité moyenne
   if (context.includes('medium priority') || 
       context.includes('standard') || 
       context.includes('normale')) {
     return 'medium';
   }
   
+  // Enfin vérifier les termes spécifiques pour priorité basse
   if (context.includes('low priority') || 
       context.includes('basse') || 
       context.includes('pas urgent')) {
