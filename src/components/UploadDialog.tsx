@@ -23,7 +23,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [detectedFormat, setDetectedFormat] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,7 +39,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       }
       console.log("Fichier sélectionné:", file.name);
       setSelectedFile(file);
-      setDetectedFormat(null); // Réinitialiser le format détecté
     }
   };
 
@@ -58,7 +56,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       }
       console.log("Fichier déposé:", file.name);
       setSelectedFile(file);
-      setDetectedFormat(null); // Réinitialiser le format détecté
     }
   };
 
@@ -96,26 +93,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       
       const data = await processPdf(selectedFile);
       
-      // Détecter le format basé sur les données
-      let format = "standard";
-      if (data.length > 0) {
-        const firstRoom = data[0];
-        if (firstRoom.notes) {
-          const notes = firstRoom.notes.toLowerCase();
-          if (notes.includes("hotel korner") || notes.includes("hôtel korner")) {
-            format = "Hôtel Korner";
-          } else if (notes.includes("apaleo")) {
-            format = "Apaleo";
-          } else if (notes.includes("clock") || notes.includes("opera")) {
-            format = "Clock/Opera";
-          } else if (notes.includes("mews")) {
-            format = "Mews";
-          }
-        }
-      }
-      
-      setDetectedFormat(format);
-      
       // Compléter la progression
       clearInterval(progressInterval);
       setProcessingProgress(100);
@@ -128,7 +105,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         setOpen(false);
         toast({
           title: "Téléversement réussi",
-          description: `${data.length} chambres traitées depuis ${selectedFile.name} (${format})`,
+          description: `${data.length} chambres traitées depuis ${selectedFile.name} avec Donut OCR`,
         });
         setProcessingProgress(0);
       }, 500);
@@ -164,7 +141,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         <DialogHeader>
           <DialogTitle>Importer un Rapport</DialogTitle>
           <DialogDescription>
-            Téléversez un rapport PDF (Format Hôtel Korner, Mews, Apaleo ou autre) pour analyser les statuts des chambres.
+            Téléversez un rapport PDF (Format Hôtel Korner, Mews ou autre) pour analyser les statuts des chambres.
           </DialogDescription>
         </DialogHeader>
         <div 
@@ -184,11 +161,6 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
               {!selectedFile && (
                 <p className="text-xs text-gray-500 mt-1">
                   Fichiers PDF uniquement, jusqu'à 10MB
-                </p>
-              )}
-              {detectedFormat && (
-                <p className="text-xs text-green-600 mt-1">
-                  Format détecté : {detectedFormat}
                 </p>
               )}
             </div>
