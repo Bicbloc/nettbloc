@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { processImageWithDonut, parseDonutOutput } from './donutService';
@@ -518,7 +517,7 @@ function parseRoomsFromText(text: string): Room[] {
         priority,
         isTwin,
         isUrgent: priority === 'high',
-        notUrgent: priority === 'low' as const, // Fix type issue with explicit type assertion
+        notUrgent: priority === 'low',
         floor
       });
     }
@@ -695,8 +694,8 @@ function determinePriority(context: string): 'high' | 'medium' | 'low' {
 // Helper function to generate mock room data
 function generateMockRoomData(): Room[] {
   const statuses = ['needs-cleaning', 'clean', 'occupied', 'maintenance'];
-  const cleaningTypes = ['full', 'quick', 'none'] as const;
-  const priorities = ['high', 'medium', 'low'] as const;
+  const cleaningTypes: Array<'full' | 'quick' | 'none'> = ['full', 'quick', 'none'];
+  const priorities: Array<'high' | 'medium' | 'low'> = ['high', 'medium', 'low'];
   
   return Array.from({ length: 50 }, (_, i) => {
     const floor = Math.floor(i / 20) + 1;
@@ -713,7 +712,7 @@ function generateMockRoomData(): Room[] {
       isTwin,
       isUrgent: priority === 'high',
       notUrgent: priority === 'low',
-      floor // Ajout du numéro d'étage
+      floor
     };
   });
 }
