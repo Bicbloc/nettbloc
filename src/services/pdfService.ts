@@ -395,143 +395,86 @@ function getRoomFloor(roomNumber: string): number {
 
 // Déterminer le statut et le type de nettoyage selon les règles définies
 function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  // AMÉLIORATION: Loguer le contexte pour débogage
+  // Logging le contexte pour le débogage
   console.log("Analyse du contexte pour détection:", context.substring(0, 100) + "...");
 
-  // Valeurs par défaut
-  let status = 'needs-cleaning';
-  let cleaningType: 'full' | 'quick' | 'none' = 'none';
-  
   // 🛠 CHAMBRE EN MAINTENANCE
   if (context.toLowerCase().includes('maintenance') || 
       context.toLowerCase().includes('out of order') ||
       context.toLowerCase().includes('hors d\'usage') ||
       context.toLowerCase().includes('punaises de lit') ||
       context.toLowerCase().includes('inutilisable')) {
-    status = 'maintenance';
-    cleaningType = 'none';
     console.log("→ Détecté: MAINTENANCE");
-    return { status, cleaningType };
+    return { status: 'maintenance', cleaningType: 'none' };
   }
+
+  // Compter les blocs client
+  // Bloc client = texte contient "× Adultes" ou "Adulte(s)"
+  const adultMatches = (context.match(/\d+\s*(?:×|x)\s*Adultes?|\d+\s*Adultes?/gi) || []).length;
   
-  // 🟦 CHAMBRE À BLANC (PRIORITÉ 1)
+  // Compter les blocs de réservation (gauche, droite, centré)
+  const hasLeftBlock = /Date d['']arrivée|Horaire de sortie|Nuitées/.test(context);
+  const hasRightBlock = /Heure d['']arrivée/.test(context);
+  const hasCenterBlock = /Date d['']arrivée.*Date de départ/.test(context);
   
-  // ----- INDICATEURS DE DÉPART -----
-  // Déterminer si la chambre a un statut "DIR" (dirty)
-  const hasDirtyStatus = context.includes('DIR') || 
+  const blockCount = (hasLeftBlock ? 1 : 0) + (hasRightBlock ? 1 : 0) + (hasCenterBlock ? 1 : 0);
+  
+  // Détecter le statut (DIR, INS, CL, SAL)
+  const hasDirtyStatus = /\bDIR\b|\bSAL\b/.test(context) ||
                          context.toLowerCase().includes('dirty') ||
                          context.toLowerCase().includes('sale');
-
-  // Vérifier s'il y a des termes spécifiques de départ
+                         
+  const hasCleanStatus = /\bINS\b|\bCL\b/.test(context) ||
+                         context.toLowerCase().includes('clean') ||
+                         context.toLowerCase().includes('propre');
+  
+  // Détecter les termes spécifiques
   const hasCheckoutTerms = context.toLowerCase().includes('parti') || 
                            context.toLowerCase().includes('départ') || 
                            context.toLowerCase().includes('check out') || 
                            context.toLowerCase().includes('checkout');
+                           
+  const hasTimeReference = /\d{1,2}:\d{2}/.test(context);
   
-  // CAS 1: Deux blocs de réservation dans le même contexte (indique souvent un départ suivi d'une arrivée)
-  const multipleReservationDates = (context.match(/\d{2}\/\d{2}\/\d{4}/g) || []);
-  const hasMultipleReservations = multipleReservationDates.length >= 2;
-  
-  // CAS 2: Un bloc avec une heure spécifique mentionnée (souvent heure de départ)
-  const hasTimeReferences = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) || 
-                           /\d{1,2}:\d{2}.*\d{2}\/\d{2}\/\d{4}/.test(context);
-  
-  // CAS 3: Verifier s'il y a des nuitées avec la dernière nuit
-  // Par exemple: "Nuit 3/3" ou "Night 2/2" (dernier jour d'un séjour)
+  // Détecter le format "Nuit X/Y"
   const lastNightPattern = /\bNuit\s+(\d+)\/\1\b|\bNight\s+(\d+)\/\2\b/i;
   const isLastNight = lastNightPattern.test(context);
   
-  // CAS 4: Vérifier si la date d'aujourd'hui est mentionnée comme date de départ
-  const currentDate = new Date();
-  const todayDateString = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
-  const isTodayCheckout = context.includes(todayDateString) && hasCheckoutTerms;
-  
-  // ----- DÉCISION DÉPART (À BLANC) -----
-  if ((hasDirtyStatus && (hasCheckoutTerms || hasTimeReferences || isLastNight || isTodayCheckout)) || 
-      (hasMultipleReservations && hasDirtyStatus) ||
-      (isLastNight && (hasTimeReferences || hasCheckoutTerms))) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    console.log("→ Détecté: NETTOYAGE À BLANC (départ)");
-    return { status, cleaningType };
-  }
-  
-  // 🔵 CHAMBRE EN RECOUCHE (PRIORITÉ 2)
-  
-  // Un bloc client actif mais pas son dernier jour
-  const hasStayingGuestTerms = context.toLowerCase().includes('recouche') || 
-                               context.toLowerCase().includes('séjour en cours') ||
-                               context.toLowerCase().includes('stay in progress');
-  
-  // Vérifier le pattern "Nuit X/Y" où X < Y (pas le dernier jour)
-  const currentNightPattern = /\bNuit\s+(\d+)\/(\d+)\b|\bNight\s+(\d+)\/(\d+)\b/i;
-  const currentNightMatch = context.match(currentNightPattern);
-  
+  const midStayPattern = /\bNuit\s+(\d+)\/(\d+)\b|\bNight\s+(\d+)\/(\d+)\b/i;
+  const midStayMatch = context.match(midStayPattern);
   let isMiddleOfStay = false;
-  if (currentNightMatch) {
-    // Groupe 1,2 ou 3,4 selon le pattern qui a matché
-    const current = parseInt(currentNightMatch[1] || currentNightMatch[3], 10);
-    const total = parseInt(currentNightMatch[2] || currentNightMatch[4], 10);
+  if (midStayMatch) {
+    const current = parseInt(midStayMatch[1] || midStayMatch[3], 10);
+    const total = parseInt(midStayMatch[2] || midStayMatch[4], 10);
     isMiddleOfStay = current < total;
   }
   
-  if ((hasStayingGuestTerms || isMiddleOfStay) && !isLastNight) {
-    cleaningType = 'quick';
-    status = 'needs-cleaning';
-    console.log("→ Détecté: RECOUCHE (séjour en cours)");
-    return { status, cleaningType };
+  // 🟥 À NETTOYER À BLANC
+  if ((blockCount >= 2 && !context.match(/même nom/i)) || // Deux blocs client différents
+      hasLeftBlock || // Bloc client dans la colonne gauche
+      (hasTimeReference && /\d{2}\/\d{2}\/\d{4}/.test(context)) || // Une date + une heure
+      hasDirtyStatus) { // Statut DIR
+    console.log("→ Détecté: NETTOYAGE À BLANC");
+    return { status: 'needs-cleaning', cleaningType: 'full' };
   }
   
-  // 🟩 CHAMBRE PROPRE (PRIORITÉ 3)
-  const isCleanRoom = (context.includes('CL') || 
-                      context.includes('INS') || 
-                      context.toLowerCase().includes('clean') || 
-                      context.toLowerCase().includes('inspection') ||
-                      context.toLowerCase().includes('propre')) &&
-                      !hasDirtyStatus && !hasCheckoutTerms && !isLastNight;
-  
-  if (isCleanRoom) {
-    cleaningType = 'none';
-    status = 'clean';
-    console.log("→ Détecté: CHAMBRE PROPRE");
-    return { status, cleaningType };
+  // 🔵 EN RECOUCHE
+  if ((adultMatches === 1 && isMiddleOfStay) || // Un seul bloc client avec Nuit X/Y (où X < Y)
+      (hasCenterBlock && !hasTimeReference) || // Bloc centré, pas d'heure
+      (blockCount >= 2 && context.match(/même nom/i))) { // Deux blocs avec même nom
+    console.log("→ Détecté: RECOUCHE");
+    return { status: 'needs-cleaning', cleaningType: 'quick' };
   }
   
-  // 🟥 ARRIVÉES DU JOUR (SANS DÉPART AVANT)
-  // Vérifier s'il y a une arrivée aujourd'hui sans départ avant
-  const hasArrivalTerms = context.toLowerCase().includes('arrivée') || 
-                         context.toLowerCase().includes('arrival') ||
-                         context.toLowerCase().includes('check in') ||
-                         context.toLowerCase().includes('checkin');
-  
-  const isTodayArrival = context.includes(todayDateString) && hasArrivalTerms;
-  
-  if (isTodayArrival && !hasCheckoutTerms && !isLastNight) {
-    // Si la chambre a un statut INS (inspected), elle est prête
-    if (context.includes('INS') || context.toLowerCase().includes('propre') || context.toLowerCase().includes('clean')) {
-      cleaningType = 'none';
-      status = 'clean';
-      console.log("→ Détecté: CHAMBRE PROPRE (arrivée)");
-      return { status, cleaningType };
-    } else {
-      // Sinon, elle a besoin d'un nettoyage à blanc
-      cleaningType = 'full';
-      status = 'needs-cleaning';
-      console.log("→ Détecté: NETTOYAGE À BLANC (arrivée)");
-      return { status, cleaningType };
-    }
+  // 🟩 PROPRE
+  if ((adultMatches === 0 && hasCleanStatus) || // Aucun bloc client + statut INS ou CL
+      (hasRightBlock && hasCleanStatus)) { // Bloc client à droite + statut INS
+    console.log("→ Détecté: PROPRE");
+    return { status: 'clean', cleaningType: 'none' };
   }
   
-  // En cas d'ambiguïté mais avec statut DIR, faire un nettoyage complet par défaut
-  if (hasDirtyStatus) {
-    cleaningType = 'full';
-    status = 'needs-cleaning';
-    console.log("→ Par défaut avec DIR: NETTOYAGE À BLANC");
-    return { status, cleaningType };
-  }
-
-  // Pour les autres cas ambigus, on considère quand même à nettoyer
-  console.log("→ Par défaut: NETTOYAGE À BLANC (ambiguité)");
+  // Par défaut, on considère à blanc si on n'a pas pu déterminer
+  console.log("→ Par défaut: NETTOYAGE À BLANC (ambiguïté)");
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
