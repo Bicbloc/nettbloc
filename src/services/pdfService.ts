@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { processImageWithDonut, parseDonutOutput } from './donutService';
@@ -241,7 +240,7 @@ function parseRoomsFromText(text: string): Room[] {
   // Ajout de nouveaux patterns pour capturer plus de formats de numéros de chambre
   const patterns = [
     /\b(Spaces|Espace)\s+(\d{3})\b/gi,
-    /\b([1-9]\d{2})\s+(SGL|DBL|TWN|DIR|CL|INS|SP|DX|CB)\b/gi,
+    /\b([1-9]\d{2})\s+(SGL|DBL|TWN|DIR|CL|INS|SP|DX|CB|TWS|DBS)\b/gi,  // Ajout de TWS et DBS au pattern
     /\b([1-9]\d{2})\b(?=\s*[A-Z]{2,3})/g,
     /\b(Room|Chambre)\s+(\d{3})\b/gi,
     /\b([1-9]\d{2})\s*-\s*[A-Z]/gi, // Format 101-A
@@ -294,7 +293,7 @@ function parseRoomsFromText(text: string): Room[] {
       const { status, cleaningType } = determineStatusAndCleaningType(context);
       
       // Déterminer si c'est une chambre twin
-      const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
+      const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN') || context.includes('TWS');
       
       // Déterminer la priorité
       const priority = determinePriority(context);
@@ -354,7 +353,7 @@ function parseRoomsFromText(text: string): Room[] {
     const context = text.substring(start, end);
     
     const { status, cleaningType } = determineStatusAndCleaningType(context);
-    const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
+    const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN') || context.includes('TWS');
     const priority = determinePriority(context);
     const floor = getRoomFloor(roomNumber);
     
@@ -395,6 +394,9 @@ function getRoomFloor(roomNumber: string): number {
 
 // Déterminer le statut et le type de nettoyage selon les règles définies
 function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+  // AMÉLIORATION: Loguer le contexte pour débogage
+  console.log("Analyse du contexte pour détection:", context.substring(0, 100) + "...");
+
   // Valeurs par défaut
   let status = 'needs-cleaning';
   let cleaningType: 'full' | 'quick' | 'none' = 'none';
@@ -407,54 +409,91 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
       context.toLowerCase().includes('inutilisable')) {
     status = 'maintenance';
     cleaningType = 'none';
+    console.log("→ Détecté: MAINTENANCE");
     return { status, cleaningType };
   }
   
-  // 🟦 CHAMBRE À BLANC (PRIORITÉ 1)
-  // CAS 1: Deux blocs client visibles
-  const hasMultipleReservations = (context.match(/\d{2}\/\d{2}\/\d{4}/g) || []).length >= 2;
+  // 🟦 CHAMBRE À BLANC (PRIORITÉ 1) - FORMAT MEWS/STANDARD
+  // ----- INDICATEURS DE DÉPART -----
+  // Déterminer si la chambre a un statut "DIR" (dirty)
+  const hasDirtyStatus = context.includes('DIR') || 
+                          context.toLowerCase().includes('dirty');
+
+  // Vérifier s'il y a des termes spécifiques de départ
+  const hasCheckoutTerms = context.toLowerCase().includes('parti') || 
+                           context.toLowerCase().includes('départ') || 
+                           context.toLowerCase().includes('check out') || 
+                           context.toLowerCase().includes('checkout');
   
-  // CAS 2: Un bloc avec une heure (check-out)
-  const hasDepartureTime = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
-                          !context.includes("Nuit");
+  // CAS 1: Deux blocs de réservation dans le même contexte (indique souvent un départ suivi d'une arrivée)
+  const multipleReservationDates = (context.match(/\d{2}\/\d{2}\/\d{4}/g) || []);
+  const hasMultipleReservations = multipleReservationDates.length >= 2;
   
-  // CAS 3: Bloc client en colonne de gauche
-  const hasLeftColumnReservation = context.includes('Parti') || context.includes('A contrôler');
+  // CAS 2: Un bloc avec une heure spécifique mentionnée (souvent heure de départ)
+  const hasTimeReferences = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context);
   
-  // CAS 4: Statut DIR (dirty)
-  const hasDirtyStatus = context.includes('DIR') || context.toLowerCase().includes('dirty');
+  // CAS 3: Verifier s'il y a des nuitées avec la dernière nuit
+  // Par exemple: "Nuit 3/3" ou "Night 2/2" (dernier jour d'un séjour)
+  const lastNightPattern = /\bNuit\s+(\d+)\/\1\b|\bNight\s+(\d+)\/\2\b/i;
+  const isLastNight = lastNightPattern.test(context);
   
-  if (hasMultipleReservations || hasDepartureTime || hasLeftColumnReservation || hasDirtyStatus) {
+  // ----- DÉCISION DÉPART (À BLANC) -----
+  if ((hasDirtyStatus && (hasCheckoutTerms || hasTimeReferences || isLastNight)) || 
+      (hasMultipleReservations && hasDirtyStatus)) {
     cleaningType = 'full';
     status = 'needs-cleaning';
+    console.log("→ Détecté: NETTOYAGE À BLANC (départ)");
     return { status, cleaningType };
   }
   
-  // 🔵 CHAMBRE EN RECOUCHE (PRIORITÉ 2)
-  // Un seul bloc client avec Nuit X/Y et sans heure
-  const hasStayingGuest = /\d{2}\/\d{2}\/\d{4}.*Nuit/.test(context) || 
-                          context.includes('Recouche');
+  // 🔵 CHAMBRE EN RECOUCHE (PRIORITÉ 2) - FORMAT MEWS/STANDARD
+  // Un bloc client actif mais pas son dernier jour
+  const hasStayingGuestTerms = context.toLowerCase().includes('recouche') || 
+                               context.toLowerCase().includes('séjour en cours');
   
-  if (hasStayingGuest) {
+  // Vérifier le pattern "Nuit X/Y" où X < Y (pas le dernier jour)
+  const currentNightPattern = /\bNuit\s+(\d+)\/(\d+)\b|\bNight\s+(\d+)\/(\d+)\b/i;
+  const currentNightMatch = context.match(currentNightPattern);
+  
+  let isMiddleOfStay = false;
+  if (currentNightMatch) {
+    // Groupe 1,2 ou 3,4 selon le pattern qui a matché
+    const current = parseInt(currentNightMatch[1] || currentNightMatch[3], 10);
+    const total = parseInt(currentNightMatch[2] || currentNightMatch[4], 10);
+    isMiddleOfStay = current < total;
+  }
+  
+  if ((hasStayingGuestTerms || isMiddleOfStay) && !hasDirtyStatus) {
     cleaningType = 'quick';
     status = 'needs-cleaning';
+    console.log("→ Détecté: RECOUCHE (séjour en cours)");
     return { status, cleaningType };
   }
   
   // 🟩 CHAMBRE PROPRE (PRIORITÉ 3)
-  // Aucun bloc client et statut propre
-  const isCleanRoom = (!context.match(/\d{2}\/\d{2}\/\d{4}/g) && 
-                     (context.includes('CL') || context.includes('INS') || 
-                      context.toLowerCase().includes('clean') || 
-                      context.toLowerCase().includes('inspection')));
+  const isCleanRoom = (context.includes('CL') || 
+                       context.includes('INS') || 
+                       context.toLowerCase().includes('clean') || 
+                       context.toLowerCase().includes('inspection') ||
+                       context.toLowerCase().includes('propre'));
   
-  if (isCleanRoom) {
+  if (isCleanRoom && !hasDirtyStatus && !hasCheckoutTerms) {
     cleaningType = 'none';
     status = 'clean';
+    console.log("→ Détecté: CHAMBRE PROPRE");
     return { status, cleaningType };
   }
   
-  // Si on arrive ici, appliquer les valeurs par défaut
+  // En cas d'ambiguïté mais avec statut DIR, faire un nettoyage complet par défaut
+  if (hasDirtyStatus) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    console.log("→ Par défaut avec DIR: NETTOYAGE À BLANC");
+    return { status, cleaningType };
+  }
+
+  // Pour les autres cas ambigus, on considère quand même à nettoyer
+  console.log("→ Par défaut: NETTOYAGE À BLANC (ambiguité)");
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
