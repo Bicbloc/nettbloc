@@ -392,20 +392,13 @@ function getRoomFloor(roomNumber: string): number {
   return isNaN(firstDigit) ? 0 : firstDigit;
 }
 
-// Nouvelle fonction pour analyser les blocs après la colonne Assignee
+// Nouvelle fonction améliorée pour analyser les blocs après la colonne Assignee
 function analyzeReservationBlocks(context: string, roomNumber: string): { 
   blockType: 'centered' | 'left-right' | 'left-center-right' | 'none',
   blocks: string[],
   hasMaintenanceKeywords: boolean,
   hasCleaningKeyword: boolean
 } {
-  // Rechercher les patterns pour identifier les blocs
-  const datePattern = /\d{1,2}\/\d{1,2}\/\d{4}/g;
-  const timePattern = /\d{1,2}:\d{2}/g;
-  const nightPattern = /Night\s+\d+\/\d+/gi;
-  const adultsPattern = /\d+\s*[×x]\s*Adults?/gi;
-  const namePattern = /[A-Z][a-z]+\s+[A-Z][A-Za-z]+/g;
-  
   // Mots-clés spéciaux
   const maintenanceKeywords = ['out of order', 'hors d\'usage', 'punaises de lit', 'inutilisable', 'block'];
   const hasMaintenanceKeywords = maintenanceKeywords.some(keyword => 
@@ -414,23 +407,25 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
   
   const hasCleaningKeyword = /\bcleaning\b/i.test(context);
   
-  // Extraire la partie après "Assignee" (simulé par recherche après le nom de l'assigné)
-  // On cherche un pattern typique d'assigné suivi d'informations de réservation
-  const assigneePattern = /([A-Z][a-z]+\s+[A-Z]+)\s+(.+)$/;
-  const match = context.match(assigneePattern);
+  // Amélioration 1: Détection plus flexible de l'assigné et début des infos de réservation
+  let reservationInfo = "";
   
-  if (!match) {
-    return { blockType: 'none', blocks: [], hasMaintenanceKeywords, hasCleaningKeyword };
+  // Chercher le début des informations de réservation avec un pattern plus flexible
+  const reservationStartPattern = /(?=\s*\d{1,2}\/\d{1,2}\/\d{4}|\s*Out of order|\s*Cleaning|\s*\d+\s*[x×]\s*Adults|\s*Night\s+\d+\/\d+)/i;
+  const match = context.search(reservationStartPattern);
+  
+  if (match !== -1) {
+    reservationInfo = context.substring(match).trim();
+  } else {
+    // Fallback: essayer avec l'ancien pattern d'assigné
+    const fallbackPattern = /([A-Z][a-z]+(?:\s+[A-Z]+)*)\s+(.+)$/;
+    const fallbackMatch = context.match(fallbackPattern);
+    if (fallbackMatch && fallbackMatch[2]) {
+      reservationInfo = fallbackMatch[2];
+    } else {
+      reservationInfo = context;
+    }
   }
-  
-  const reservationInfo = match[2];
-  
-  // Analyser la structure des blocs dans reservationInfo
-  const dates = reservationInfo.match(datePattern) || [];
-  const times = reservationInfo.match(timePattern) || [];
-  const nights = reservationInfo.match(nightPattern) || [];
-  const adults = reservationInfo.match(adultsPattern) || [];
-  const names = reservationInfo.match(namePattern) || [];
   
   // Cas spéciaux : maintenance ou cleaning
   if (hasMaintenanceKeywords || hasCleaningKeyword) {
@@ -442,11 +437,111 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
     };
   }
   
-  // Analyser la structure pour déterminer le nombre de blocs
-  const totalElements = dates.length + times.length + nights.length + adults.length;
+  // Amélioration 2: Prétraitement pour reconnaître "Night X/Y DATE" comme une entité unique
+  let processedInfo = reservationInfo;
+  const nightDeparturePattern = /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/gi;
+  const nightDepartures: string[] = [];
+  let nightMatch;
   
-  // Un seul bloc cohérent (centré)
-  if (adults.length === 1 && nights.length === 1 && dates.length === 1) {
+  // Extraire et marquer les patterns "Night X/Y DATE"
+  while ((nightMatch = nightDeparturePattern.exec(reservationInfo)) !== null) {
+    nightDepartures.push(nightMatch[0]);
+  }
+  processedInfo = processedInfo.replace(nightDeparturePattern, "NIGHT_BLOCK_PLACEHOLDER");
+  
+  // Compter les autres éléments dans le texte traité
+  const datePattern = /\d{1,2}\/\d{1,2}\/\d{4}/g;
+  const remainingDates = processedInfo.match(datePattern) || [];
+  const adultsPattern = /\d+\s*[×x]\s*Adults?/gi;
+  const adults = reservationInfo.match(adultsPattern) || [];
+  
+  // Amélioration 3: Segmentation plus robuste
+  const segments = [];
+  let remainingInfo = reservationInfo;
+  
+  // Patterns pour différents types de segments
+  const specialKeywordPattern = /(Out of order[\s\S]*|Cleaning)/i;
+  const nightDepartureSegmentPattern = /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/i;
+  const arrivalSegmentPattern = /(\d{1,2}\/\d{1,2}\/\d{4})?(\s*\d+\s*[x×]\s*Adults\s*[\w\s]+?)?(\s*\d{2}:\d{2})?/i;
+  
+  // Segmentation séquentielle
+  while (remainingInfo.trim().length > 0) {
+    let matched = false;
+    
+    // Chercher les mots-clés spéciaux en premier
+    const specialMatch = remainingInfo.match(specialKeywordPattern);
+    if (specialMatch && specialMatch.index === 0) {
+      segments.push({ type: 'special', text: specialMatch[0] });
+      remainingInfo = remainingInfo.substring(specialMatch[0].length).trim();
+      matched = true;
+    }
+    
+    // Chercher les patterns "Night X/Y DATE"
+    if (!matched) {
+      const nightMatch = remainingInfo.match(nightDepartureSegmentPattern);
+      if (nightMatch && nightMatch.index === 0) {
+        segments.push({ type: 'night_departure', text: nightMatch[0] });
+        remainingInfo = remainingInfo.substring(nightMatch[0].length).trim();
+        matched = true;
+      }
+    }
+    
+    // Chercher les segments d'arrivée/occupation
+    if (!matched) {
+      const arrivalMatch = remainingInfo.match(arrivalSegmentPattern);
+      if (arrivalMatch && arrivalMatch[0].trim() !== "" && arrivalMatch.index === 0) {
+        // Vérifier qu'au moins un groupe significatif est présent
+        if (arrivalMatch[1] || arrivalMatch[2] || arrivalMatch[3]) {
+          segments.push({ type: 'arrival_occupancy', text: arrivalMatch[0].trim() });
+          remainingInfo = remainingInfo.substring(arrivalMatch[0].length).trim();
+          matched = true;
+        }
+      }
+    }
+    
+    if (!matched) {
+      // Si on ne peut pas matcher, prendre le premier mot et continuer
+      const words = remainingInfo.split(/\s+/);
+      if (words.length > 0) {
+        segments.push({ type: 'unknown', text: words[0] });
+        remainingInfo = words.slice(1).join(' ');
+      } else {
+        break;
+      }
+    }
+  }
+  
+  // Analyser le nombre et le type de segments pour déterminer le type de bloc
+  if (segments.length === 0) {
+    return { 
+      blockType: 'none', 
+      blocks: [], 
+      hasMaintenanceKeywords, 
+      hasCleaningKeyword 
+    };
+  } else if (segments.length === 1) {
+    return { 
+      blockType: 'centered', 
+      blocks: [segments[0].text], 
+      hasMaintenanceKeywords, 
+      hasCleaningKeyword 
+    };
+  } else if (segments.length === 2) {
+    return { 
+      blockType: 'left-right', 
+      blocks: [segments[0].text, segments[1].text], 
+      hasMaintenanceKeywords, 
+      hasCleaningKeyword 
+    };
+  } else if (segments.length === 3) {
+    return { 
+      blockType: 'left-center-right', 
+      blocks: [segments[0].text, segments[1].text, segments[2].text], 
+      hasMaintenanceKeywords, 
+      hasCleaningKeyword 
+    };
+  } else {
+    // Plus de 3 segments - probablement un cas complexe, traiter comme centré
     return { 
       blockType: 'centered', 
       blocks: [reservationInfo], 
@@ -454,38 +549,6 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
       hasCleaningKeyword 
     };
   }
-  
-  // Deux blocs distincts (gauche-droite)
-  if (adults.length === 2 && dates.length === 2) {
-    // Tenter de séparer les blocs
-    const parts = reservationInfo.split(/\s+\d{1,2}:\d{2}\s+/);
-    if (parts.length === 2) {
-      return { 
-        blockType: 'left-right', 
-        blocks: parts, 
-        hasMaintenanceKeywords, 
-        hasCleaningKeyword 
-      };
-    }
-  }
-  
-  // Trois blocs (gauche-centre-droite)
-  if (hasCleaningKeyword && adults.length === 2) {
-    return { 
-      blockType: 'left-center-right', 
-      blocks: [reservationInfo], 
-      hasMaintenanceKeywords, 
-      hasCleaningKeyword 
-    };
-  }
-  
-  // Par défaut, considérer comme un bloc centré
-  return { 
-    blockType: 'centered', 
-    blocks: [reservationInfo], 
-    hasMaintenanceKeywords, 
-    hasCleaningKeyword 
-  };
 }
 
 // Fonction pour extraire la date de départ d'un bloc
