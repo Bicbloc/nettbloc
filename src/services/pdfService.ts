@@ -636,7 +636,7 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
         
         if (departureDate) {
           // Si départ = jour du rapport (06/05/2025) → À BLANC
-          if (departureDate.getTime() === reportDate.getTime()) {
+          if (departureDate.toDateString() === reportDate.toDateString()) {
             console.log("→ Détecté: À BLANC (bloc centré, départ le jour du rapport)");
             return { status: 'needs-cleaning', cleaningType: 'full' };
           }
@@ -644,6 +644,11 @@ function determineStatusAndCleaningType(context: string): { status: string, clea
           else if (departureDate > reportDate) {
             console.log("→ Détecté: RECOUCHE (bloc centré, départ futur)");
             return { status: 'needs-cleaning', cleaningType: 'quick' };
+          }
+          // Si départ < jour du rapport → À BLANC (client déjà parti)
+          else if (departureDate < reportDate) {
+            console.log("→ Détecté: À BLANC (bloc centré, départ passé)");
+            return { status: 'needs-cleaning', cleaningType: 'full' };
           }
         }
       }
