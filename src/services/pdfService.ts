@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { processImageWithDonut, parseDonutOutput } from './donutService';
@@ -25,6 +26,16 @@ export interface CleaningConfig {
   maxRoomsPerHousekeeper: number;
 }
 
+// Interface pour l'analyse détaillée des blocs
+interface BlockAnalysis {
+  layout: 'empty' | 'centered' | 'left_only' | 'right_only' | 'left_and_right' | 'left_center_right';
+  blocks: string[];
+  departureDate?: Date | null;
+  arrivalDate?: Date | null;
+  hasMaintenanceKeywords: boolean;
+  hasCleaningKeyword: boolean;
+}
+
 // Default configuration
 export const defaultCleaningConfig: CleaningConfig = {
   fullCleaningTime: 30,
@@ -32,6 +43,14 @@ export const defaultCleaningConfig: CleaningConfig = {
   minRoomsPerHousekeeper: 10,
   maxRoomsPerHousekeeper: 18
 };
+
+// Date du rapport (configurable)
+const REPORT_DATE_STRING = "06/05/2025";
+const reportDate = new Date(
+  parseInt(REPORT_DATE_STRING.split("/")[2]),
+  parseInt(REPORT_DATE_STRING.split("/")[1]) - 1,
+  parseInt(REPORT_DATE_STRING.split("/")[0])
+);
 
 // Process PDF file
 export async function processPdf(file: File): Promise<Room[]> {
@@ -392,21 +411,8 @@ function getRoomFloor(roomNumber: string): number {
   return isNaN(firstDigit) ? 0 : firstDigit;
 }
 
-// Nouvelle fonction améliorée pour analyser les blocs après la colonne Assignee
-function analyzeReservationBlocks(context: string, roomNumber: string): { 
-  blockType: 'centered' | 'left-right' | 'left-center-right' | 'none',
-  blocks: string[],
-  hasMaintenanceKeywords: boolean,
-  hasCleaningKeyword: boolean
-} {
-  // Mots-clés spéciaux
-  const maintenanceKeywords = ['out of order', 'hors d\'usage', 'punaises de lit', 'inutilisable', 'block'];
-  const hasMaintenanceKeywords = maintenanceKeywords.some(keyword => 
-    context.toLowerCase().includes(keyword.toLowerCase())
-  );
-  
-  const hasCleaningKeyword = /\bcleaning\b/i.test(context);
-  
+// Fonction améliorée pour extraire les informations de réservation après l'assigné
+function extractReservationInfoAfterAssignee(context: string): string {
   // Amélioration 1: Détection plus flexible de l'assigné et début des infos de réservation
   let reservationInfo = "";
   
@@ -427,41 +433,17 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
     }
   }
   
-  // Cas spéciaux : maintenance ou cleaning
-  if (hasMaintenanceKeywords || hasCleaningKeyword) {
-    return { 
-      blockType: 'centered', 
-      blocks: [reservationInfo], 
-      hasMaintenanceKeywords, 
-      hasCleaningKeyword 
-    };
-  }
-  
-  // Amélioration 2: Prétraitement pour reconnaître "Night X/Y DATE" comme une entité unique
-  let processedInfo = reservationInfo;
-  const nightDeparturePattern = /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/gi;
-  const nightDepartures: string[] = [];
-  let nightMatch;
-  
-  // Extraire et marquer les patterns "Night X/Y DATE"
-  while ((nightMatch = nightDeparturePattern.exec(reservationInfo)) !== null) {
-    nightDepartures.push(nightMatch[0]);
-  }
-  processedInfo = processedInfo.replace(nightDeparturePattern, "NIGHT_BLOCK_PLACEHOLDER");
-  
-  // Compter les autres éléments dans le texte traité
-  const datePattern = /\d{1,2}\/\d{1,2}\/\d{4}/g;
-  const remainingDates = processedInfo.match(datePattern) || [];
-  const adultsPattern = /\d+\s*[×x]\s*Adults?/gi;
-  const adults = reservationInfo.match(adultsPattern) || [];
-  
-  // Amélioration 3: Segmentation plus robuste
+  return reservationInfo;
+}
+
+// Fonction pour segmenter les informations de réservation
+function segmentReservationInfo(reservationInfo: string): string[] {
   const segments = [];
   let remainingInfo = reservationInfo;
   
   // Patterns pour différents types de segments
   const specialKeywordPattern = /(Out of order[\s\S]*|Cleaning)/i;
-  const nightDepartureSegmentPattern = /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/i;
+  const nightDeparturePattern = /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/i;
   const arrivalSegmentPattern = /(\d{1,2}\/\d{1,2}\/\d{4})?(\s*\d+\s*[x×]\s*Adults\s*[\w\s]+?)?(\s*\d{2}:\d{2})?/i;
   
   // Segmentation séquentielle
@@ -471,16 +453,16 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
     // Chercher les mots-clés spéciaux en premier
     const specialMatch = remainingInfo.match(specialKeywordPattern);
     if (specialMatch && specialMatch.index === 0) {
-      segments.push({ type: 'special', text: specialMatch[0] });
+      segments.push(specialMatch[0]);
       remainingInfo = remainingInfo.substring(specialMatch[0].length).trim();
       matched = true;
     }
     
     // Chercher les patterns "Night X/Y DATE"
     if (!matched) {
-      const nightMatch = remainingInfo.match(nightDepartureSegmentPattern);
+      const nightMatch = remainingInfo.match(nightDeparturePattern);
       if (nightMatch && nightMatch.index === 0) {
-        segments.push({ type: 'night_departure', text: nightMatch[0] });
+        segments.push(nightMatch[0]);
         remainingInfo = remainingInfo.substring(nightMatch[0].length).trim();
         matched = true;
       }
@@ -492,7 +474,7 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
       if (arrivalMatch && arrivalMatch[0].trim() !== "" && arrivalMatch.index === 0) {
         // Vérifier qu'au moins un groupe significatif est présent
         if (arrivalMatch[1] || arrivalMatch[2] || arrivalMatch[3]) {
-          segments.push({ type: 'arrival_occupancy', text: arrivalMatch[0].trim() });
+          segments.push(arrivalMatch[0].trim());
           remainingInfo = remainingInfo.substring(arrivalMatch[0].length).trim();
           matched = true;
         }
@@ -503,7 +485,7 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
       // Si on ne peut pas matcher, prendre le premier mot et continuer
       const words = remainingInfo.split(/\s+/);
       if (words.length > 0) {
-        segments.push({ type: 'unknown', text: words[0] });
+        segments.push(words[0]);
         remainingInfo = words.slice(1).join(' ');
       } else {
         break;
@@ -511,65 +493,58 @@ function analyzeReservationBlocks(context: string, roomNumber: string): {
     }
   }
   
-  // Analyser le nombre et le type de segments pour déterminer le type de bloc
-  if (segments.length === 0) {
-    return { 
-      blockType: 'none', 
-      blocks: [], 
-      hasMaintenanceKeywords, 
-      hasCleaningKeyword 
-    };
-  } else if (segments.length === 1) {
-    return { 
-      blockType: 'centered', 
-      blocks: [segments[0].text], 
-      hasMaintenanceKeywords, 
-      hasCleaningKeyword 
-    };
-  } else if (segments.length === 2) {
-    return { 
-      blockType: 'left-right', 
-      blocks: [segments[0].text, segments[1].text], 
-      hasMaintenanceKeywords, 
-      hasCleaningKeyword 
-    };
-  } else if (segments.length === 3) {
-    return { 
-      blockType: 'left-center-right', 
-      blocks: [segments[0].text, segments[1].text, segments[2].text], 
-      hasMaintenanceKeywords, 
-      hasCleaningKeyword 
-    };
-  } else {
-    // Plus de 3 segments - probablement un cas complexe, traiter comme centré
-    return { 
-      blockType: 'centered', 
-      blocks: [reservationInfo], 
-      hasMaintenanceKeywords, 
-      hasCleaningKeyword 
-    };
-  }
+  return segments.filter(segment => segment.trim() !== "");
 }
 
-// Fonction pour extraire la date de départ d'un bloc
-function extractDepartureDate(block: string): Date | null {
-  const datePattern = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+// Fonctions d'analyse des types de blocs
+function isLikelyCenteredBlock(segmentText: string): boolean {
+  return /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/i.test(segmentText);
+}
+
+function isLikelyLeftBlockDeparture(segmentText: string): boolean {
+  // Pattern pour départ: commence par date, contient adults, finit par heure
+  return /^\d{1,2}\/\d{1,2}\/\d{4}.*\d+\s*[x×]\s*Adults.*\d{2}:\d{2}$/i.test(segmentText);
+}
+
+function isLikelyRightBlockArrival(segmentText: string): boolean {
+  // Pattern pour arrivée: commence par heure, contient adults, finit par date
+  return /^\d{2}:\d{2}.*\d+\s*[x×]\s*Adults.*\d{1,2}\/\d{1,2}\/\d{4}$/i.test(segmentText);
+}
+
+// Fonctions d'extraction de dates
+function extractDepartureDateFromCenteredBlock(segmentText: string): Date | null {
   const nightPattern = /Night\s+\d+\/\d+\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i;
+  const match = segmentText.match(nightPattern);
   
-  // Chercher d'abord dans le pattern "Night X/Y DD/MM/YYYY"
-  const nightMatch = block.match(nightPattern);
-  if (nightMatch) {
-    const day = parseInt(nightMatch[1]);
-    const month = parseInt(nightMatch[2]) - 1; // JavaScript months are 0-indexed
-    const year = parseInt(nightMatch[3]);
+  if (match) {
+    const day = parseInt(match[1]);
+    const month = parseInt(match[2]) - 1;
+    const year = parseInt(match[3]);
     return new Date(year, month, day);
   }
   
-  // Sinon, prendre la dernière date trouvée dans le bloc
-  const dates = block.match(/\d{1,2}\/\d{1,2}\/\d{4}/g);
+  return null;
+}
+
+function extractDateFromLeftBlock(segmentText: string): Date | null {
+  const datePattern = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+  const match = segmentText.match(datePattern);
+  
+  if (match) {
+    const day = parseInt(match[1]);
+    const month = parseInt(match[2]) - 1;
+    const year = parseInt(match[3]);
+    return new Date(year, month, day);
+  }
+  
+  return null;
+}
+
+function extractDateFromRightBlock(segmentText: string): Date | null {
+  const dates = segmentText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g);
   if (dates && dates.length > 0) {
     const lastDate = dates[dates.length - 1];
-    const match = lastDate.match(datePattern);
+    const match = lastDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (match) {
       const day = parseInt(match[1]);
       const month = parseInt(match[2]) - 1;
@@ -581,100 +556,183 @@ function extractDepartureDate(block: string): Date | null {
   return null;
 }
 
+function extractDepartureDateFromGenericBlock(segmentText: string): Date | null {
+  // Prendre la dernière date trouvée dans le bloc
+  const dates = segmentText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g);
+  if (dates && dates.length > 0) {
+    const lastDate = dates[dates.length - 1];
+    const match = lastDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (match) {
+      const day = parseInt(match[1]);
+      const month = parseInt(match[2]) - 1;
+      const year = parseInt(match[3]);
+      return new Date(year, month, day);
+    }
+  }
+  
+  return null;
+}
+
+// Nouvelle fonction améliorée pour analyser les blocs de réservation
+function analyzeReservationBlocks(context: string): BlockAnalysis {
+  console.log("Nouvelle analyse des blocs de réservation:", context.substring(0, 200) + "...");
+  
+  // Mots-clés spéciaux
+  const maintenanceKeywords = ['out of order', 'hors d\'usage', 'punaises de lit', 'inutilisable', 'block'];
+  const hasMaintenanceKeywords = maintenanceKeywords.some(keyword => 
+    context.toLowerCase().includes(keyword.toLowerCase())
+  );
+  
+  const hasCleaningKeyword = /\bcleaning\b/i.test(context);
+  
+  // Extraire les informations de réservation
+  const reservationInfo = extractReservationInfoAfterAssignee(context);
+  
+  let layout: BlockAnalysis['layout'] = 'empty';
+  let blocks: string[] = [];
+  let departureDate: Date | null = null;
+  let arrivalDate: Date | null = null;
+  
+  if (reservationInfo.trim() === "" && !hasMaintenanceKeywords && !hasCleaningKeyword) {
+    layout = 'empty';
+  } else if (hasMaintenanceKeywords || hasCleaningKeyword) {
+    layout = 'centered';
+    blocks = [reservationInfo];
+  } else {
+    // Segmenter les informations de réservation
+    const detectedSegments = segmentReservationInfo(reservationInfo);
+    
+    if (detectedSegments.length === 1) {
+      const segmentText = detectedSegments[0];
+      
+      if (isLikelyCenteredBlock(segmentText)) {
+        layout = 'centered';
+        departureDate = extractDepartureDateFromCenteredBlock(segmentText);
+      } else if (isLikelyLeftBlockDeparture(segmentText)) {
+        layout = 'left_only';
+        departureDate = extractDateFromLeftBlock(segmentText);
+      } else if (isLikelyRightBlockArrival(segmentText)) {
+        layout = 'right_only';
+        arrivalDate = extractDateFromRightBlock(segmentText);
+      } else {
+        layout = 'centered';
+        departureDate = extractDepartureDateFromGenericBlock(segmentText);
+      }
+      blocks = [segmentText];
+    } else if (detectedSegments.length === 2) {
+      layout = 'left_and_right';
+      blocks = detectedSegments;
+      // Extraire departure du premier bloc et arrival du second
+      departureDate = extractDateFromLeftBlock(detectedSegments[0]);
+      arrivalDate = extractDateFromRightBlock(detectedSegments[1]);
+    } else if (detectedSegments.length >= 3) {
+      layout = 'left_center_right';
+      blocks = detectedSegments;
+    }
+  }
+  
+  console.log(`Layout détecté: ${layout}, Blocs: ${blocks.length}, Départ: ${departureDate?.toLocaleDateString()}, Arrivée: ${arrivalDate?.toLocaleDateString()}`);
+  
+  return {
+    layout,
+    blocks,
+    departureDate,
+    arrivalDate,
+    hasMaintenanceKeywords,
+    hasCleaningKeyword
+  };
+}
+
 // Déterminer le statut et le type de nettoyage selon les nouvelles règles
 function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  console.log("Analyse du contexte pour détection:", context.substring(0, 200) + "...");
-  
-  // Date du rapport (06/05/2025 selon votre exemple)
-  const reportDate = new Date(2025, 4, 6); // 6 mai 2025
-  
-  // Analyser les blocs de réservation
-  const roomNumberMatch = context.match(/(\d{3})\s+/);
-  const roomNumber = roomNumberMatch ? roomNumberMatch[1] : '';
-  
-  const analysis = analyzeReservationBlocks(context, roomNumber);
-  
-  // 🛠 MAINTENANCE - Priorité absolue
+  console.log("Nouveau cycle d'analyse du contexte:", context.substring(0, 200) + "...");
+
+  // Analyse améliorée des blocs de réservation
+  const analysis: BlockAnalysis = analyzeReservationBlocks(context);
+
+  // --- RÈGLES PRIORITAIRES (Maintenance, Cleaning explicite) ---
   if (analysis.hasMaintenanceKeywords) {
-    console.log("→ Détecté: MAINTENANCE (mots-clés)");
+    console.log("→ RÈGLE: MAINTENANCE (mots-clés)");
     return { status: 'maintenance', cleaningType: 'none' };
   }
-  
-  // Détecter le statut de la chambre (DIR, INS, CL)
-  const hasDirtyStatus = /\bDIR\b|\bSAL\b/i.test(context);
-  const hasCleanStatus = /\bINS\b|\bCL\b|\bPropre\b/i.test(context);
-  
-  // Vérifier s'il y a des informations de client
-  const hasClientInfo = /\d+\s*[×x]\s*Adults?/i.test(context) || 
-                        /Night\s+\d+\/\d+/i.test(context) ||
-                        analysis.blocks.length > 0;
-  
-  // 🟩 PROPRE - Pas de nettoyage requis
-  if (!hasClientInfo && hasCleanStatus) {
-    console.log("→ Détecté: PROPRE (statut INS/CL sans client)");
+  if (analysis.hasCleaningKeyword) {
+    console.log("→ RÈGLE: À BLANC (mention 'Cleaning' explicite)");
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+
+  // --- Détection du statut de la chambre à partir du contexte (DIR, INS, etc.) ---
+  const isDirty = /\b(DIR|SALE)\b/i.test(context);
+  const isCleanInspected = /\b(INS|CL|PROPRE|PRO)\b/i.test(context);
+
+  // --- APPLICATION DES RÈGLES SPÉCIFIQUES ---
+
+  // Règle: "si le bloc est vide et que le statut est DIR SALE : c'est nettoyage à blanc."
+  if (analysis.layout === 'empty' && isDirty) {
+    console.log("→ RÈGLE: À BLANC (Vide + DIR/SALE)");
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+
+  // Règle: "si le bloc est vide et que le statut INS, CL c'est donc propre pas besoin de nettoyage"
+  if (analysis.layout === 'empty' && isCleanInspected) {
+    console.log("→ RÈGLE: PROPRE (Vide + INS/CL/PROPRE)");
     return { status: 'clean', cleaningType: 'none' };
   }
-  
-  // 🟥 À BLANC - Mention explicite "Cleaning"
-  if (analysis.hasCleaningKeyword) {
-    console.log("→ Détecté: À BLANC (mention Cleaning)");
+
+  // Règle: "lorsque une chambre contient DIR ou SALE, ou INS ou PRO, CL peut importe le statut et qu'il y a un seul bloc centré avec un seul client c'est recouche."
+  if (analysis.layout === 'centered') {
+    if (analysis.departureDate) {
+      if (analysis.departureDate > reportDate) {
+        console.log("→ RÈGLE: RECOUCHE (Bloc centré, départ futur > jour du rapport)");
+        return { status: 'needs-cleaning', cleaningType: 'quick' };
+      } else if (analysis.departureDate.toDateString() === reportDate.toDateString()) {
+        console.log("→ RÈGLE: À BLANC (Bloc centré, départ = jour du rapport)");
+        return { status: 'needs-cleaning', cleaningType: 'full' };
+      } else {
+        console.log("→ RÈGLE: À BLANC (Bloc centré, départ passé, statut DIR implicite si pas déjà nettoyé)");
+        return { status: 'needs-cleaning', cleaningType: 'full' };
+      }
+    } else {
+      console.warn("Cas ambigu: Bloc centré sans date de départ claire. Défaut: À BLANC.");
+      return { status: 'needs-cleaning', cleaningType: 'full' };
+    }
+  }
+
+  // Règle: "lorsque c'est INS ou CL ou PROPRE et qu'il y a bloc à droite (arrivé) c'est donc propre"
+  if (analysis.layout === 'right_only' && isCleanInspected) {
+    console.log("→ RÈGLE: PROPRE (Bloc droite/arrivée + INS/CL/PROPRE)");
+    return { status: 'clean', cleaningType: 'none' };
+  }
+
+  // Règle: "et si le statut et DIR SALE c'est nettoyage à blanc." (pour le cas 'bloc à droite')
+  if (analysis.layout === 'right_only' && isDirty) {
+    console.log("→ RÈGLE: À BLANC (Bloc droite/arrivée + DIR/SALE)");
     return { status: 'needs-cleaning', cleaningType: 'full' };
   }
-  
-  // 🟥 À BLANC - Statut DIR sans info client
-  if (hasDirtyStatus && !hasClientInfo) {
-    console.log("→ Détecté: À BLANC (DIR sans client)");
+
+  // Règle: "si le bloc est à gauche peut importe le statut donc cest nettoyage à blanc (départ)"
+  if (analysis.layout === 'left_only') {
+    console.log("→ RÈGLE: À BLANC (Bloc gauche/départ)");
     return { status: 'needs-cleaning', cleaningType: 'full' };
   }
-  
-  // Analyser selon le type de bloc
-  switch (analysis.blockType) {
-    case 'centered':
-      // Bloc centré - extraire la date de départ
-      if (analysis.blocks.length > 0) {
-        const departureDate = extractDepartureDate(analysis.blocks[0]);
-        
-        if (departureDate) {
-          // Si départ = jour du rapport (06/05/2025) → À BLANC
-          if (departureDate.toDateString() === reportDate.toDateString()) {
-            console.log("→ Détecté: À BLANC (bloc centré, départ le jour du rapport)");
-            return { status: 'needs-cleaning', cleaningType: 'full' };
-          }
-          // Si départ > jour du rapport → RECOUCHE
-          else if (departureDate > reportDate) {
-            console.log("→ Détecté: RECOUCHE (bloc centré, départ futur)");
-            return { status: 'needs-cleaning', cleaningType: 'quick' };
-          }
-          // Si départ < jour du rapport → À BLANC (client déjà parti)
-          else if (departureDate < reportDate) {
-            console.log("→ Détecté: À BLANC (bloc centré, départ passé)");
-            return { status: 'needs-cleaning', cleaningType: 'full' };
-          }
-        }
-      }
-      break;
-      
-    case 'left-right':
-      // Deux blocs distincts - généralement turnaround (À BLANC)
-      console.log("→ Détecté: À BLANC (deux blocs distincts - turnaround)");
-      return { status: 'needs-cleaning', cleaningType: 'full' };
-      
-    case 'left-center-right':
-      // Trois blocs - cas spécial déjà géré par "Cleaning"
-      console.log("→ Détecté: À BLANC (trois blocs)");
-      return { status: 'needs-cleaning', cleaningType: 'full' };
-      
-    case 'none':
-      // Pas d'info de réservation
-      if (hasCleanStatus) {
-        console.log("→ Détecté: PROPRE (pas d'info client, statut clean)");
-        return { status: 'clean', cleaningType: 'none' };
-      }
-      break;
+
+  // Règle: "si il ya deux blocs peut importe le statut c'est nettoyage à blanc."
+  if (analysis.layout === 'left_and_right' || analysis.layout === 'left_center_right') {
+    console.log("→ RÈGLE: À BLANC (Deux ou trois blocs - turnaround)");
+    return { status: 'needs-cleaning', cleaningType: 'full' };
   }
-  
-  // Par défaut - À BLANC si incertain
-  console.log("→ Par défaut: À BLANC (cas non déterminé)");
+
+  // --- CAS PAR DÉFAUT OU NON COUVERTS EXPLICITEMENT ---
+  if (isDirty) {
+    console.warn("Cas non couvert par règles spécifiques, statut DIR/SALE. Défaut: À BLANC.");
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  if (isCleanInspected) {
+    console.warn("Cas non couvert par règles spécifiques, statut INS/CL/PROPRE. Défaut: PROPRE.");
+    return { status: 'clean', cleaningType: 'none' };
+  }
+
+  // Si même le statut n'est pas clair, le plus sûr est de demander un nettoyage.
+  console.warn("Cas TRÈS ambigu (pas de statut clair, pas de layout clair). Défaut: À BLANC.");
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
