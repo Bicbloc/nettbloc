@@ -18,7 +18,16 @@ export async function processImageWithTesseract(imageData: ArrayBuffer | HTMLCan
     
     const tesseractWorker = await initializeWorker();
     
-    const { data: { text } } = await tesseractWorker.recognize(imageData, {
+    // Convert ArrayBuffer to Uint8Array for Tesseract compatibility
+    let processableInput: HTMLCanvasElement | string | Uint8Array;
+    
+    if (imageData instanceof ArrayBuffer) {
+      processableInput = new Uint8Array(imageData);
+    } else {
+      processableInput = imageData;
+    }
+    
+    const { data: { text } } = await tesseractWorker.recognize(processableInput, {
       logger: m => {
         if (m.status === 'recognizing text') {
           console.log(`Reconnaissance OCR: ${Math.round(m.progress * 100)}%`);
