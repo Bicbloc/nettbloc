@@ -1,7 +1,6 @@
-
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
-import { processImageWithDonut, parseDonutOutput } from './donutService';
+import { processPdfWithTesseract, parseTesseractOutput } from './tesseractService';
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -53,21 +52,25 @@ export async function processPdf(file: File): Promise<Room[]> {
   try {
     const arrayBuffer = await file.arrayBuffer();
     
-    // Tentative avec Donut d'abord
+    // Tentative avec Tesseract d'abord
     try {
-      console.log("Tentative de reconnaissance avec le modèle Donut...");
-      const donutText = await processImageWithDonut(arrayBuffer);
-      const donutResult = parseDonutOutput(donutText);
+      console.log("Tentative de reconnaissance avec Tesseract.js...");
+      const tesseractText = await processPdfWithTesseract(arrayBuffer);
+      const tesseractResult = parseTesseractOutput(tesseractText);
       
-      if (donutResult.rooms && donutResult.rooms.length > 0) {
-        console.log(`Détecté ${donutResult.rooms.length} chambres avec Donut`);
-        return donutResult.rooms;
+      if (tesseractResult.rooms && tesseractResult.rooms.length > 0) {
+        console.log(`Détecté ${tesseractResult.rooms.length} chambres avec Tesseract`);
+        toast({
+          title: "PDF Traité avec Tesseract",
+          description: `${tesseractResult.rooms.length} chambres détectées dans ${file.name}`,
+        });
+        return tesseractResult.rooms;
       }
-    } catch (donutError) {
-      console.warn("Échec de la reconnaissance Donut, repli sur PDF.js:", donutError);
+    } catch (tesseractError) {
+      console.warn("Échec de la reconnaissance Tesseract, repli sur PDF.js:", tesseractError);
     }
     
-    // Méthode de repli avec PDF.js
+    // Méthode de repli avec PDF.js (extraction de texte simple)
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
     let fullText = '';
@@ -96,11 +99,6 @@ export async function processPdf(file: File): Promise<Room[]> {
     } else {
       rooms = parseRoomsFromText(fullText);
     }
-    
-    toast({
-      title: "PDF Traité",
-      description: `${rooms.length} chambres détectées dans ${file.name}`,
-    });
     
     if (rooms.length === 0) {
       console.log("Aucune chambre détectée, utilisation des données simulées");
