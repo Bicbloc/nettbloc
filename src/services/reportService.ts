@@ -63,12 +63,6 @@ export async function generateReport(
       return a.number.localeCompare(b.number, undefined, { numeric: true });
     });
     
-    // Log the housekeeper name to debug
-    console.log(`Generating report for housekeeper: "${housekeeper}"`, {
-      housekeeperName: housekeeper,
-      roomCount: sortedRooms.length
-    });
-    
     // Prepare the report data
     const reportData: ReportData = {
       roomCount: sortedRooms.length,
@@ -133,10 +127,8 @@ export async function generateReport(
   }
 }
 
-// Generate HTML for report
+// Generate HTML for report - Enhanced to match the provided template with improved tables
 function generateReportHTML(data: ReportData): string {
-  console.log("Generating HTML with housekeeper name:", data.housekeeperName);
-
   // Instructions section - use specific housekeeper instructions if available
   const housekeeperInstructions = data.housekeeperInstructions?.[data.housekeeperName] || data.instructions || '';
   const generalInstructions = data.generalInstructions || '';
@@ -292,6 +284,7 @@ function generateReportHTML(data: ReportData): string {
   });
   
   // Complete HTML with improved styling and encadré for housekeeper name with bold text
+  // Added more padding for housekeeper name and increased space between it and tables
   return `
     <!DOCTYPE html>
     <html lang="fr">

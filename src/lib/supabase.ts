@@ -17,16 +17,12 @@ if (!supabaseKey) {
 // Create a mock client if URL or key is missing
 const isMissingCredentials = !supabaseUrl || !supabaseKey;
 
-// Create client or placeholder with properly chained mock methods
+// Create client or placeholder
 export const supabaseClient = isMissingCredentials 
   ? {
       from: () => ({
         insert: () => ({ error: new Error("Supabase credentials not configured") }),
-        select: () => ({
-          data: [],
-          error: new Error("Supabase credentials not configured"),
-          order: () => ({ data: [], error: new Error("Supabase credentials not configured") })
-        }),
+        select: () => ({ error: new Error("Supabase credentials not configured") }),
       }),
       auth: {
         signIn: () => ({ error: new Error("Supabase credentials not configured") }),
@@ -55,24 +51,4 @@ export async function saveEmailToSupabase(email: string) {
   }
 }
 
-// Helper function to get emails from Supabase
-export async function getEmailsFromSupabase() {
-  try {
-    // If we're missing credentials, log and return empty array
-    if (isMissingCredentials) {
-      console.warn("Cannot fetch emails: Supabase credentials not configured");
-      return { success: false, data: [], error: "Supabase credentials not configured" };
-    }
-    
-    // Execute the query with proper chaining
-    const { data, error } = await supabaseClient
-      .from('report_emails')
-      .select('email, created_at')
-      .order('created_at', { ascending: false });
-      
-    return { success: !error, data: data || [], error };
-  } catch (err) {
-    console.error("Error fetching emails from Supabase:", err);
-    return { success: false, data: [], error: err };
-  }
-}
+// Also update vite-env.d.ts to include environment variable types

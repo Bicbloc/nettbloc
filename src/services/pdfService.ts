@@ -1,6 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
-import { processPdfWithTesseract, parseTesseractOutput } from './tesseractService';
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -15,25 +14,17 @@ export interface Room {
   isUrgent?: boolean;
   notUrgent?: boolean;
   floor?: number;
-  notes?: string;
+  notes?: string; // Added notes property
 }
 
 export interface CleaningConfig {
-  fullCleaningTime: number;
-  quickCleaningTime: number;
+  fullCleaningTime: number; // in minutes
+  quickCleaningTime: number; // in minutes
   minRoomsPerHousekeeper: number;
   maxRoomsPerHousekeeper: number;
 }
 
-interface BlockAnalysis {
-  layout: 'empty' | 'centered' | 'left_only' | 'right_only' | 'left_and_right' | 'left_center_right';
-  blocks: string[];
-  departureDate?: Date | null;
-  arrivalDate?: Date | null;
-  hasMaintenanceKeywords: boolean;
-  hasCleaningKeyword: boolean;
-}
-
+// Default configuration
 export const defaultCleaningConfig: CleaningConfig = {
   fullCleaningTime: 30,
   quickCleaningTime: 15,
@@ -41,38 +32,16 @@ export const defaultCleaningConfig: CleaningConfig = {
   maxRoomsPerHousekeeper: 18
 };
 
-// Configuration de la date du rapport
-const getReportDate = (): Date => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
-};
-
+// Process PDF file
 export async function processPdf(file: File): Promise<Room[]> {
   try {
+    // Convertir le fichier en ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     
-    // Tentative avec Tesseract d'abord
-    try {
-      console.log("Tentative de reconnaissance avec Tesseract.js...");
-      const tesseractText = await processPdfWithTesseract(arrayBuffer);
-      const tesseractResult = parseTesseractOutput(tesseractText);
-      
-      if (tesseractResult.rooms && tesseractResult.rooms.length > 0) {
-        console.log(`Détecté ${tesseractResult.rooms.length} chambres avec Tesseract`);
-        toast({
-          title: "PDF Traité avec Tesseract",
-          description: `${tesseractResult.rooms.length} chambres détectées dans ${file.name}`,
-        });
-        return tesseractResult.rooms;
-      }
-    } catch (tesseractError) {
-      console.warn("Échec de la reconnaissance Tesseract, repli sur PDF.js:", tesseractError);
-    }
-    
-    // Méthode de repli avec PDF.js (extraction de texte simple)
+    // Charger le document PDF
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
+    // Extraire le texte de toutes les pages
     let fullText = '';
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
@@ -85,21 +54,15 @@ export async function processPdf(file: File): Promise<Room[]> {
     
     console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
     
-    // Détecter le format
-    const isHotelKornerFormat = fullText.includes("Rapport Housekeeping - Hôtel Korner") || 
-                               fullText.includes("Toutes les chambres en statut tous") ||
-                               (fullText.includes("Ch.") && fullText.includes("Type de chambre"));
+    // Analyser le texte pour extraire les informations des chambres
+    const rooms = parseRoomsFromText(fullText);
     
-    console.log("Format détecté:", isHotelKornerFormat ? "Hôtel Korner" : "Format standard");
+    toast({
+      title: "PDF Processed",
+      description: `Successfully processed ${file.name}`,
+    });
     
-    let rooms: Room[] = [];
-    
-    if (isHotelKornerFormat) {
-      rooms = parseHotelKornerFormat(fullText);
-    } else {
-      rooms = parseRoomsFromText(fullText);
-    }
-    
+    // Si aucune chambre n'a été trouvée, retourner des données de test
     if (rooms.length === 0) {
       console.log("Aucune chambre détectée, utilisation des données simulées");
       return generateMockRoomData();
@@ -107,117 +70,81 @@ export async function processPdf(file: File): Promise<Room[]> {
     
     return rooms;
   } catch (error) {
-    console.error("Erreur lors du traitement du PDF:", error);
+    console.error("Error processing PDF:", error);
     toast({
       variant: "destructive",
-      title: "Échec du traitement",
-      description: "Impossible de traiter le fichier PDF. Veuillez réessayer.",
+      title: "Processing Failed",
+      description: "Failed to process the PDF file. Please try again.",
     });
     throw error;
   }
 }
 
-function parseHotelKornerFormat(text: string): Room[] {
-  const rooms: Room[] = [];
-  console.log("=== ANALYSE FORMAT HÔTEL KORNER ===");
-  
-  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-  
-  let currentRoom: Partial<Room> | null = null;
-  let additionalNotes: string[] = [];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Ignorer les en-têtes
-    if (line.includes("Rapport Housekeeping") || line.includes("Ch.  Type de chambre") || line === '') {
-      continue;
-    }
-    
-    // Pattern pour numéro de chambre en début de ligne
-    const roomMatch = line.match(/^(\d{1,3})\s+/);
-    
-    if (roomMatch) {
-      // Sauvegarder la chambre précédente
-      if (currentRoom) {
-        if (additionalNotes.length > 0) {
-          currentRoom.notes = additionalNotes.join(' ');
-        }
-        rooms.push(currentRoom as Room);
-        additionalNotes = [];
-      }
-      
-      const roomNumber = roomMatch[1].padStart(3, '0');
-      const isTwin = /\b(TWN|TWIN|TWS)\b/i.test(line);
-      
-      const { status, cleaningType } = determineStatusAndCleaningType(line);
-      const priority = determinePriority(line);
-      const floor = getRoomFloor(roomNumber);
-      
-      currentRoom = {
-        number: roomNumber,
-        status: status,
-        cleaningType: cleaningType,
-        priority: priority,
-        isTwin: isTwin,
-        isUrgent: priority === 'high',
-        notUrgent: priority === 'low',
-        floor: floor
-      };
-      
-      console.log(`Chambre ${roomNumber}: Status=${status}, CleaningType=${cleaningType}`);
-    } else if (currentRoom) {
-      additionalNotes.push(line);
-    }
-  }
-  
-  // N'oublier pas la dernière chambre
-  if (currentRoom) {
-    if (additionalNotes.length > 0) {
-      currentRoom.notes = additionalNotes.join(' ');
-    }
-    rooms.push(currentRoom as Room);
-  }
-  
-  console.log(`=== RÉSULTAT: ${rooms.length} chambres détectées ===`);
-  return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
-}
-
+// Analyse le texte pour extraire les informations des chambres
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
-  const foundRooms = new Set<string>();
   
-  // Patterns améliorés pour détecter les numéros de chambre
+  // Patterns améliorés pour détecter les numéros de chambre dans différents formats
+  // Ajout de nouveaux patterns pour capturer plus de formats de numéros de chambre
   const patterns = [
-    /\b([1-9]\d{2})\s+(SGL|DBL|TWN|DIR|CL|INS|SP|DX|CB|TWS|DBS)\b/gi,
+    /\b(Spaces|Espace)\s+(\d{3})\b/gi,
+    /\b([1-9]\d{2})\s+(SGL|DBL|TWN|DIR|CL|INS|SP|DX|CB)\b/gi,
     /\b([1-9]\d{2})\b(?=\s*[A-Z]{2,3})/g,
-    /\b(\d{1,2})(\d{2})\b(?!\d)/g,
-    /^(\d{2,3})\s+/gm
+    /\b(Room|Chambre)\s+(\d{3})\b/gi,
+    /\b([1-9]\d{2})\s*-\s*[A-Z]/gi, // Format 101-A
+    /\b(No\.|N°)\s*(\d{3})\b/gi,     // Format No. 101 ou N° 101
+    /\b(\d{3})\s*\(/gi,              // Format 101 (quelque chose)
+    /\b(\d{1,2})(\d{2})\b(?!\d)/g    // Capture numéro de chambre simple comme 101
   ];
+  
+  // Utiliser chaque pattern pour trouver les numéros de chambre
+  const foundRooms = new Set();
   
   for (const pattern of patterns) {
     let match;
-    pattern.lastIndex = 0;
+    pattern.lastIndex = 0; // Réinitialiser l'index pour chaque nouvelle recherche
     
     while ((match = pattern.exec(text)) !== null) {
-      let roomNumber = match[1] || match[0];
+      // Récupérer le numéro de chambre correctement selon le pattern utilisé
+      let roomNumber;
       
+      if (match[1] === 'Spaces' || match[1] === 'Espace' || match[1] === 'Room' || match[1] === 'Chambre' || match[1] === 'No.' || match[1] === 'N°') {
+        roomNumber = match[2];
+      } else if (pattern.source.includes('\\d{1,2})(\\d{2})')) {
+        // Pour le pattern qui capture le numéro de chambre directement
+        roomNumber = match[0];
+      } else {
+        roomNumber = match[1];
+      }
+      
+      // Vérifier que le numéro de chambre est un nombre valide
       if (!/^\d+$/.test(roomNumber)) continue;
-      if (/^20(2[5-9]|3[0-9])$/.test(roomNumber)) continue; // Éviter les années
       
+      // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
+      if (/^20(2[5-8])$/.test(roomNumber)) continue;
+      
+      // Normaliser le format du numéro (éliminer les zéros au début mais assurer au moins 3 chiffres)
       roomNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
       
+      // Éviter les doublons
       if (foundRooms.has(roomNumber)) continue;
       foundRooms.add(roomNumber);
       
-      // Contexte plus large pour l'analyse
-      const start = Math.max(0, match.index - 300);
-      const end = Math.min(text.length, match.index + 300);
+      // Extraire le contexte autour du numéro de chambre (un plus grand contexte pour mieux analyser)
+      const start = Math.max(0, match.index - 200);
+      const end = Math.min(text.length, match.index + 200);
       const context = text.substring(start, end);
       
-      const { status, cleaningType } = determineStatusAndCleaningType(context);
-      const isTwin = /\b(TWN|TWIN|TWS)\b/i.test(context);
+      // Analyser le statut et le type de nettoyage selon les règles définies
+      const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+      
+      // Déterminer si c'est une chambre twin
+      const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
+      
+      // Déterminer la priorité
       const priority = determinePriority(context);
+      
+      // Déterminer l'étage
       const floor = getRoomFloor(roomNumber);
       
       rooms.push({
@@ -233,365 +160,223 @@ function parseRoomsFromText(text: string): Room[] {
     }
   }
   
+  // Deuxième passe pour essayer de trouver plus de numéros de chambres
+  // Cette fois avec un pattern très générique mais qui vérifie si le nombre pourrait être une chambre
+  const genericRoomPattern = /\b(\d{3})\b/g;
+  let genericMatch;
+  
+  while ((genericMatch = genericRoomPattern.exec(text)) !== null) {
+    const potentialRoomNumber = genericMatch[1];
+    
+    // Vérifier que ce n'est pas un nombre qui fait partie d'une date, heure, etc.
+    const beforeText = text.substring(Math.max(0, genericMatch.index - 10), genericMatch.index);
+    const afterText = text.substring(genericMatch.index + potentialRoomNumber.length, Math.min(text.length, genericMatch.index + potentialRoomNumber.length + 10));
+    
+    // Ignorer si ce semble être une date, heure, prix, etc.
+    if (beforeText.match(/\d[\/\-\.:]$/) || afterText.match(/^[\/\-\.:]/) || 
+        beforeText.match(/\$|€|£|\d+[.,]\d+$/) || afterText.match(/^[.,]\d+/)) {
+      continue;
+    }
+    
+    // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
+    if (/^20(2[5-8])$/.test(potentialRoomNumber)) continue;
+    
+    // Normaliser le format et vérifier qu'il n'est pas déjà trouvé
+    const roomNumber = String(parseInt(potentialRoomNumber, 10)).padStart(3, '0');
+    if (foundRooms.has(roomNumber)) continue;
+    
+    // Inclure seulement si le premier chiffre est 0-9 (étage plausible)
+    const firstDigit = parseInt(roomNumber[0]);
+    if (firstDigit > 9) continue;
+    
+    foundRooms.add(roomNumber);
+    
+    // Extraire le contexte pour l'analyse
+    const start = Math.max(0, genericMatch.index - 200);
+    const end = Math.min(text.length, genericMatch.index + 200);
+    const context = text.substring(start, end);
+    
+    const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+    const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
+    const priority = determinePriority(context);
+    const floor = getRoomFloor(roomNumber);
+    
+    rooms.push({
+      number: roomNumber,
+      status,
+      cleaningType,
+      priority,
+      isTwin,
+      isUrgent: priority === 'high',
+      notUrgent: priority === 'low',
+      floor
+    });
+  }
+  
   console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
+  
+  // Trier les chambres par numéro
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
 }
 
+// Updated consistent floor detection function that matches the one in other files
 function getRoomFloor(roomNumber: string): number {
-  if (/^20(2[5-9]|3[0-9])$/.test(roomNumber)) {
-    return 0;
+  // Ignore years like 2025, 2026, 2027, 2028
+  if (/^20(2[5-8])$/.test(roomNumber)) {
+    return 0; // Considérer comme RDC
   }
   
+  // Si le numéro a deux chiffres ou moins, c'est au RDC
   if (roomNumber.length <= 2) {
     return 0;
   }
   
+  // Sinon, le premier chiffre indique l'étage
   const firstDigit = parseInt(roomNumber[0]);
   return isNaN(firstDigit) ? 0 : firstDigit;
 }
 
-function extractReservationInfoAfterAssignee(context: string): string {
-  // Chercher après le nom de l'assigné (format: "NOM Prenom")
-  const patterns = [
-    /([A-Z][A-Z]+\s+[A-Z][a-z]+)\s+(.+)$/,
-    /(?=\s*\d{1,2}\/\d{1,2}\/\d{4}|\s*\d{2}:\d{2}|\s*Night|\s*Cleaning)(.+)$/
-  ];
-  
-  for (const pattern of patterns) {
-    const match = context.match(pattern);
-    if (match && match[match.length - 1]) {
-      return match[match.length - 1].trim();
-    }
-  }
-  
-  return "";
-}
+// Nouvelle fonction d'analyse selon les règles définies
+function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+  // Valeurs par défaut
+  let status = 'needs-cleaning';
+  let cleaningType: 'full' | 'quick' | 'none' = 'none';
 
-function segmentReservationInfo(reservationInfo: string): string[] {
-  if (!reservationInfo.trim()) return [];
-  
-  const patterns = [
-    /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/gi,
-    /\d{1,2}\/\d{1,2}\/\d{4}\s+\d+\s*[x×]\s*Adults.*?\d{2}:\d{2}/gi,
-    /\d{2}:\d{2}.*?\d+\s*[x×]\s*Adults.*?\d{1,2}\/\d{1,2}\/\d{4}/gi,
-    /Cleaning/gi,
-    /Out of order/gi
-  ];
-  
-  const segments: string[] = [];
-  let remaining = reservationInfo;
-  
-  for (const pattern of patterns) {
-    pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(remaining)) !== null) {
-      segments.push(match[0]);
-      remaining = remaining.replace(match[0], '').trim();
-      pattern.lastIndex = 0;
-    }
-  }
-  
-  if (remaining.trim()) {
-    segments.push(remaining.trim());
-  }
-  
-  return segments.filter(s => s.trim() !== '');
-}
-
-function isLikelyCenteredBlock(segmentText: string): boolean {
-  return /Night\s+\d+\/\d+\s+\d{1,2}\/\d{1,2}\/\d{4}/i.test(segmentText);
-}
-
-function isLikelyLeftBlockDeparture(segmentText: string): boolean {
-  return /^\d{1,2}\/\d{1,2}\/\d{4}.*\d+\s*[x×]\s*Adults.*\d{2}:\d{2}$/i.test(segmentText);
-}
-
-function isLikelyRightBlockArrival(segmentText: string): boolean {
-  return /^\d{2}:\d{2}.*\d+\s*[x×]\s*Adults.*\d{1,2}\/\d{1,2}\/\d{4}$/i.test(segmentText);
-}
-
-function extractDepartureDateFromCenteredBlock(segmentText: string): Date | null {
-  const nightPattern = /Night\s+\d+\/\d+\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i;
-  const match = segmentText.match(nightPattern);
-  
-  if (match) {
-    const day = parseInt(match[1]);
-    const month = parseInt(match[2]) - 1;
-    const year = parseInt(match[3]);
-    const date = new Date(year, month, day);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  }
-  
-  return extractDepartureDateFromGenericBlock(segmentText);
-}
-
-function extractDateFromLeftBlock(segmentText: string): Date | null {
-  const datePattern = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
-  const match = segmentText.match(datePattern);
-  
-  if (match) {
-    const day = parseInt(match[1]);
-    const month = parseInt(match[2]) - 1;
-    const year = parseInt(match[3]);
-    const date = new Date(year, month, day);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  }
-  
-  return null;
-}
-
-function extractDateFromRightBlock(segmentText: string): Date | null {
-  const dates = segmentText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g);
-  if (dates && dates.length > 0) {
-    const lastDate = dates[dates.length - 1];
-    const match = lastDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (match) {
-      const day = parseInt(match[1]);
-      const month = parseInt(match[2]) - 1;
-      const year = parseInt(match[3]);
-      const date = new Date(year, month, day);
-      date.setHours(0, 0, 0, 0);
-      return date;
-    }
-  }
-  
-  return null;
-}
-
-function extractDepartureDateFromGenericBlock(segmentText: string): Date | null {
-  const dates = segmentText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g);
-  if (dates && dates.length > 0) {
-    const lastDate = dates[dates.length - 1];
-    const match = lastDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (match) {
-      const day = parseInt(match[1]);
-      const month = parseInt(match[2]) - 1;
-      const year = parseInt(match[3]);
-      const date = new Date(year, month, day);
-      date.setHours(0, 0, 0, 0);
-      return date;
-    }
-  }
-  
-  return null;
-}
-
-function analyzeReservationBlocks(context: string): BlockAnalysis {
-  console.log("=== ANALYSE DES BLOCS DE RÉSERVATION ===");
-  console.log("Contexte:", context.substring(0, 200) + "...");
-  
-  const maintenanceKeywords = ['out of order', 'hors d\'usage', 'punaises de lit', 'inutilisable', 'block', 'maintenance'];
-  const hasMaintenanceKeywords = maintenanceKeywords.some(keyword => 
-    context.toLowerCase().includes(keyword.toLowerCase())
-  );
-  
-  const hasCleaningKeyword = /\bcleaning\b/i.test(context);
-  
-  if (hasMaintenanceKeywords || hasCleaningKeyword) {
-    console.log("→ Détecté: Maintenance ou Cleaning explicite");
-    return {
-      layout: 'centered',
-      blocks: [context],
-      departureDate: null,
-      arrivalDate: null,
-      hasMaintenanceKeywords,
-      hasCleaningKeyword
-    };
-  }
-  
-  const reservationInfo = extractReservationInfoAfterAssignee(context);
-  console.log("Info réservation extraite:", reservationInfo);
-  
-  if (!reservationInfo.trim()) {
-    console.log("→ Layout: EMPTY (pas d'info client)");
-    return {
-      layout: 'empty',
-      blocks: [],
-      departureDate: null,
-      arrivalDate: null,
-      hasMaintenanceKeywords: false,
-      hasCleaningKeyword: false
-    };
-  }
-  
-  const segments = segmentReservationInfo(reservationInfo);
-  console.log("Segments détectés:", segments);
-  
-  let layout: BlockAnalysis['layout'] = 'centered';
-  let departureDate: Date | null = null;
-  let arrivalDate: Date | null = null;
-  
-  if (segments.length === 1) {
-    const segment = segments[0];
-    
-    if (isLikelyCenteredBlock(segment)) {
-      layout = 'centered';
-      departureDate = extractDepartureDateFromCenteredBlock(segment);
-      console.log("→ Layout: CENTERED (Night pattern), Départ:", departureDate?.toLocaleDateString());
-    } else if (isLikelyLeftBlockDeparture(segment)) {
-      layout = 'left_only';
-      departureDate = extractDateFromLeftBlock(segment);
-      console.log("→ Layout: LEFT_ONLY (départ), Départ:", departureDate?.toLocaleDateString());
-    } else if (isLikelyRightBlockArrival(segment)) {
-      layout = 'right_only';
-      arrivalDate = extractDateFromRightBlock(segment);
-      console.log("→ Layout: RIGHT_ONLY (arrivée), Arrivée:", arrivalDate?.toLocaleDateString());
-    } else {
-      layout = 'centered';
-      departureDate = extractDepartureDateFromGenericBlock(segment);
-      console.log("→ Layout: CENTERED (générique), Départ:", departureDate?.toLocaleDateString());
-    }
-  } else if (segments.length === 2) {
-    layout = 'left_and_right';
-    departureDate = extractDateFromLeftBlock(segments[0]);
-    arrivalDate = extractDateFromRightBlock(segments[1]);
-    console.log("→ Layout: LEFT_AND_RIGHT, Départ:", departureDate?.toLocaleDateString(), "Arrivée:", arrivalDate?.toLocaleDateString());
-  } else if (segments.length >= 3) {
-    layout = 'left_center_right';
-    console.log("→ Layout: LEFT_CENTER_RIGHT");
-  }
-  
-  return {
-    layout,
-    blocks: segments,
-    departureDate,
-    arrivalDate,
-    hasMaintenanceKeywords: false,
-    hasCleaningKeyword: false
-  };
-}
-
-function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  console.log("=== CLASSIFICATION CHAMBRE ===");
-  console.log("Contexte analysé:", context.substring(0, 150) + "...");
-
-  const analysis = analyzeReservationBlocks(context);
-  console.log("Analyse:", {
-    layout: analysis.layout,
-    departureDate: analysis.departureDate?.toLocaleDateString() || 'none',
-    arrivalDate: analysis.arrivalDate?.toLocaleDateString() || 'none',
-    maintenance: analysis.hasMaintenanceKeywords,
-    cleaning: analysis.hasCleaningKeyword
-  });
-
-  // RÈGLES PRIORITAIRES
-  if (analysis.hasMaintenanceKeywords) {
-    console.log("→ RÉSULTAT: MAINTENANCE");
-    return { status: 'maintenance', cleaningType: 'none' };
-  }
-  
-  if (analysis.hasCleaningKeyword) {
-    console.log("→ RÉSULTAT: À BLANC (Cleaning explicite)");
-    return { status: 'needs-cleaning', cleaningType: 'full' };
+  // 🟦 Chambre à blanc - CAS 1: Un bloc de réservation apparaît dans la colonne de gauche du rapport
+  const leftColumnReservation = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
+                               !context.includes("Adults.*\d{2}\/\d{2}\/\d{4}");
+                               
+  if (leftColumnReservation) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
 
-  // Détection du statut de la chambre
-  const isDirty = /\b(DIR|SALE|SAL)\b/i.test(context);
-  const isCleanInspected = /\b(INS|CL|PROPRE|PRO|CLEAN)\b/i.test(context);
+  // 🟦 Chambre à blanc - CAS 2: Un bloc de réservation en colonne droite ET statut DIR
+  const rightColumnWithDIR = /Adults.*\d{2}\/\d{2}\/\d{4}/.test(context) && 
+                             (context.includes('DIR') || context.toLowerCase().includes('dirty'));
   
-  console.log("Statuts détectés:", { isDirty, isCleanInspected });
+  if (rightColumnWithDIR) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
+  }
 
-  const reportDate = getReportDate();
-
-  // APPLICATION DES RÈGLES SPÉCIFIQUES
+  // 🟦 Chambre à blanc - CAS 3: Deux blocs distincts visibles
+  const twoDistinctBlocks = context.match(/\d{2}\/\d{2}\/\d{4}/g)?.length >= 2;
   
-  // Bloc vide
-  if (analysis.layout === 'empty') {
-    if (isDirty) {
-      console.log("→ RÉSULTAT: À BLANC (Vide + DIR/SALE)");
-      return { status: 'needs-cleaning', cleaningType: 'full' };
-    }
-    if (isCleanInspected) {
-      console.log("→ RÉSULTAT: PROPRE (Vide + INS/CL)");
-      return { status: 'clean', cleaningType: 'none' };
-    }
+  if (twoDistinctBlocks) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
 
-  // Bloc centré
-  if (analysis.layout === 'centered') {
-    if (analysis.departureDate) {
-      const departure = new Date(analysis.departureDate);
-      departure.setHours(0, 0, 0, 0);
-      
-      if (departure > reportDate) {
-        console.log("→ RÉSULTAT: RECOUCHE (Bloc centré, départ futur)");
-        return { status: 'needs-cleaning', cleaningType: 'quick' };
-      } else {
-        console.log("→ RÉSULTAT: À BLANC (Bloc centré, départ aujourd'hui/passé)");
-        return { status: 'needs-cleaning', cleaningType: 'full' };
-      }
-    } else {
-      console.log("→ RÉSULTAT: À BLANC (Bloc centré sans date claire)");
-      return { status: 'needs-cleaning', cleaningType: 'full' };
-    }
+  // 🔵 Chambre en recouche: Une seule ligne avec date d'arrivée et départ ultérieure
+  const hasOneReservationLine = /\d{2}\/\d{2}\/\d{4}.*Night/.test(context) || 
+                               /\d{2}\/\d{2}\/\d{4}.*séjour/.test(context) ||
+                               /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
+  
+  if (hasOneReservationLine && !leftColumnReservation && !rightColumnWithDIR && !twoDistinctBlocks) {
+    cleaningType = 'quick';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
   }
 
-  // Bloc droite seulement (arrivée)
-  if (analysis.layout === 'right_only') {
-    if (isCleanInspected) {
-      console.log("→ RÉSULTAT: PROPRE (Bloc droite + INS/CL)");
-      return { status: 'clean', cleaningType: 'none' };
-    }
-    if (isDirty) {
-      console.log("→ RÉSULTAT: À BLANC (Bloc droite + DIR/SALE)");
-      return { status: 'needs-cleaning', cleaningType: 'full' };
-    }
+  // 🟩 Chambre propre - CAS 1: Case vide (aucun bloc client) ET statut CL ou INS
+  const emptyWithCleanStatus = (!context.match(/\d{2}\/\d{2}\/\d{4}/g) && 
+                              (context.includes('CL') || context.includes('INS') || 
+                               context.toLowerCase().includes('clean') || context.toLowerCase().includes('inspection')));
+  
+  // 🟩 Chambre propre - CAS 2: Chambre dans colonne de droite ET statut INS uniquement
+  const rightColumnINS = /Adults.*INS/.test(context) || 
+                         (context.includes('Adults') && context.toLowerCase().includes('inspection'));
+  
+  if (emptyWithCleanStatus || rightColumnINS) {
+    cleaningType = 'none';
+    status = 'clean';
+    return { status, cleaningType };
   }
 
-  // Bloc gauche seulement (départ)
-  if (analysis.layout === 'left_only') {
-    console.log("→ RÉSULTAT: À BLANC (Bloc gauche/départ)");
-    return { status: 'needs-cleaning', cleaningType: 'full' };
+  // Cas par défaut - si aucune règle ne correspond explicitement
+  // Vérifier s'il y a un statut DIR visible
+  if (context.includes('DIR') || context.toLowerCase().includes('dirty')) {
+    cleaningType = 'full';
+    status = 'needs-cleaning';
+    return { status, cleaningType };
+  }
+  
+  // Si des mots-clés comme "maintenance" ou "out of order" sont présents
+  if (context.toLowerCase().includes('maintenance') || 
+      context.toLowerCase().includes('out of order') || 
+      context.toLowerCase().includes('hors service')) {
+    status = 'maintenance';
+    cleaningType = 'none';
+    return { status, cleaningType };
+  }
+  
+  // Si des mots-clés comme "occupé" ou "occupied" sont présents
+  if (context.toLowerCase().includes('occupied') || 
+      context.toLowerCase().includes('occupé') || 
+      context.includes('OCC')) {
+    status = 'occupied';
+    cleaningType = 'none';
+    return { status, cleaningType };
   }
 
-  // Deux ou trois blocs (turnaround)
-  if (analysis.layout === 'left_and_right' || analysis.layout === 'left_center_right') {
-    console.log("→ RÉSULTAT: À BLANC (Turnaround - plusieurs blocs)");
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-
-  // CAS PAR DÉFAUT
-  if (isDirty) {
-    console.log("→ RÉSULTAT: À BLANC (Défaut - DIR/SALE)");
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  if (isCleanInspected) {
-    console.log("→ RÉSULTAT: PROPRE (Défaut - INS/CL)");
-    return { status: 'clean', cleaningType: 'none' };
-  }
-
-  console.log("→ RÉSULTAT: À BLANC (Défaut général)");
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
+// Fonction historique laissée en place pour référence
+function determineStatusAndCleaningType(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+  if (context.includes('CL') || context.includes('INS') || context.toLowerCase().includes('clean')) {
+    return { status: 'clean', cleaningType: 'none' };
+  }
+  
+  if (context.includes('OCC') || context.toLowerCase().includes('occupied')) {
+    return { status: 'occupied', cleaningType: 'none' };
+  }
+  
+  if (context.toLowerCase().includes('maintenance') || context.toLowerCase().includes('out of order')) {
+    return { status: 'maintenance', cleaningType: 'none' };
+  }
+
+  return { status: 'needs-cleaning', cleaningType: 'full' };
+}
+
+// Déterminer la priorité
 function determinePriority(context: string): 'high' | 'medium' | 'low' {
   if (context.includes('VIP') || 
-      context.toLowerCase().includes('urgent') || 
-      context.toLowerCase().includes('très urgent') ||
-      context.toLowerCase().includes('high priority') || 
-      context.toLowerCase().includes('prioritaire')) {
+      context.includes('urgent') || 
+      context.includes('high priority') || 
+      context.includes('prioritaire')) {
     return 'high';
   }
   
-  if (context.toLowerCase().includes('low priority') || 
-      context.toLowerCase().includes('basse') || 
-      context.toLowerCase().includes('pas urgent')) {
+  if (context.includes('medium priority') || 
+      context.includes('standard') || 
+      context.includes('normale')) {
+    return 'medium';
+  }
+  
+  if (context.includes('low priority') || 
+      context.includes('basse') || 
+      context.includes('pas urgent')) {
     return 'low';
   }
   
+  // Par défaut, priorité moyenne
   return 'medium';
 }
 
+// Helper function to generate mock room data
 function generateMockRoomData(): Room[] {
   const statuses = ['needs-cleaning', 'clean', 'occupied', 'maintenance'];
   const cleaningTypes = ['full', 'quick', 'none'] as const;
   const priorities = ['high', 'medium', 'low'] as const;
   
-  return Array.from({ length: 20 }, (_, i) => {
-    const floor = Math.floor(i / 10) + 1;
-    const room = (i % 10) + 1;
+  return Array.from({ length: 50 }, (_, i) => {
+    const floor = Math.floor(i / 20) + 1;
+    const room = (i % 20) + 1;
     const roomNumber = `${floor}${room.toString().padStart(2, '0')}`;
     const isTwin = Math.random() > 0.7;
     const priority = priorities[Math.floor(Math.random() * priorities.length)];
@@ -604,7 +389,7 @@ function generateMockRoomData(): Room[] {
       isTwin,
       isUrgent: priority === 'high',
       notUrgent: priority === 'low',
-      floor
+      floor // Ajout du numéro d'étage
     };
   });
 }
