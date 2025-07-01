@@ -1,4 +1,3 @@
-
 import { createWorker, Worker } from 'tesseract.js';
 import * as pdfjs from 'pdfjs-dist';
 
@@ -28,13 +27,7 @@ export async function processImageWithTesseract(imageData: ArrayBuffer | HTMLCan
       processableInput = imageData;
     }
     
-    const { data: { text } } = await tesseractWorker.recognize(processableInput, {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          console.log(`Reconnaissance OCR: ${Math.round(m.progress * 100)}%`);
-        }
-      }
-    });
+    const { data: { text } } = await tesseractWorker.recognize(processableInput);
     
     console.log("Texte extrait par Tesseract:", text.substring(0, 200) + "...");
     return text;
