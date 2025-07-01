@@ -135,8 +135,16 @@ function parseRoomsFromText(text: string): Room[] {
       const end = Math.min(text.length, match.index + 200);
       const context = text.substring(start, end);
       
+      // DEBUG: Ajouter des logs détaillés pour chaque chambre
+      console.log(`=== ANALYSE CHAMBRE ${roomNumber} ===`);
+      console.log(`Contexte extrait:`, context);
+      
       // Analyser le statut et le type de nettoyage selon les règles définies
-      const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+      const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context, roomNumber);
+      
+      // DEBUG: Afficher le résultat de l'analyse
+      console.log(`Résultat pour chambre ${roomNumber}:`, { status, cleaningType });
+      console.log(`=== FIN ANALYSE CHAMBRE ${roomNumber} ===\n`);
       
       // Déterminer si c'est une chambre twin
       const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
@@ -196,7 +204,15 @@ function parseRoomsFromText(text: string): Room[] {
     const end = Math.min(text.length, genericMatch.index + 200);
     const context = text.substring(start, end);
     
-    const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context);
+    // DEBUG: Ajouter des logs détaillés pour les chambres trouvées en seconde passe
+    console.log(`=== ANALYSE CHAMBRE ${roomNumber} (2ème passe) ===`);
+    console.log(`Contexte extrait:`, context);
+    
+    const { status, cleaningType } = determineStatusAndCleaningTypeNewRules(context, roomNumber);
+    
+    console.log(`Résultat pour chambre ${roomNumber}:`, { status, cleaningType });
+    console.log(`=== FIN ANALYSE CHAMBRE ${roomNumber} (2ème passe) ===\n`);
+    
     const isTwin = context.includes('TWN') || context.includes('twin') || context.includes('TWIN');
     const priority = determinePriority(context);
     const floor = getRoomFloor(roomNumber);
@@ -236,19 +252,23 @@ function getRoomFloor(roomNumber: string): number {
   return isNaN(firstDigit) ? 0 : firstDigit;
 }
 
-// Nouvelle fonction d'analyse selon les règles définies
-function determineStatusAndCleaningTypeNewRules(context: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+// Nouvelle fonction d'analyse selon les règles définies avec logs de débogage
+function determineStatusAndCleaningTypeNewRules(context: string, roomNumber: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
   // Valeurs par défaut
   let status = 'needs-cleaning';
   let cleaningType: 'full' | 'quick' | 'none' = 'none';
 
+  console.log(`  Analyse des règles pour chambre ${roomNumber}:`);
+
   // 🟦 Chambre à blanc - CAS 1: Un bloc de réservation apparaît dans la colonne de gauche du rapport
   const leftColumnReservation = /\d{2}\/\d{2}\/\d{4}.*\d{1,2}:\d{2}/.test(context) && 
                                !context.includes("Adults.*\d{2}\/\d{2}\/\d{4}");
-                               
+  
+  console.log(`  - CAS 1 (Colonne gauche): ${leftColumnReservation}`);
   if (leftColumnReservation) {
     cleaningType = 'full';
     status = 'needs-cleaning';
+    console.log(`  → Règle appliquée: Chambre à blanc (colonne gauche)`);
     return { status, cleaningType };
   }
 
@@ -256,18 +276,23 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
   const rightColumnWithDIR = /Adults.*\d{2}\/\d{2}\/\d{4}/.test(context) && 
                              (context.includes('DIR') || context.toLowerCase().includes('dirty'));
   
+  console.log(`  - CAS 2 (Colonne droite + DIR): ${rightColumnWithDIR}`);
   if (rightColumnWithDIR) {
     cleaningType = 'full';
     status = 'needs-cleaning';
+    console.log(`  → Règle appliquée: Chambre à blanc (colonne droite + DIR)`);
     return { status, cleaningType };
   }
 
   // 🟦 Chambre à blanc - CAS 3: Deux blocs distincts visibles
-  const twoDistinctBlocks = context.match(/\d{2}\/\d{2}\/\d{4}/g)?.length >= 2;
+  const dateMatches = context.match(/\d{2}\/\d{2}\/\d{4}/g);
+  const twoDistinctBlocks = dateMatches?.length >= 2;
   
+  console.log(`  - CAS 3 (Deux blocs): ${twoDistinctBlocks} (${dateMatches?.length || 0} dates trouvées)`);
   if (twoDistinctBlocks) {
     cleaningType = 'full';
     status = 'needs-cleaning';
+    console.log(`  → Règle appliquée: Chambre à blanc (deux blocs)`);
     return { status, cleaningType };
   }
 
@@ -276,9 +301,11 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
                                /\d{2}\/\d{2}\/\d{4}.*séjour/.test(context) ||
                                /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
   
+  console.log(`  - Recouche (une ligne): ${hasOneReservationLine}`);
   if (hasOneReservationLine && !leftColumnReservation && !rightColumnWithDIR && !twoDistinctBlocks) {
     cleaningType = 'quick';
     status = 'needs-cleaning';
+    console.log(`  → Règle appliquée: Chambre en recouche`);
     return { status, cleaningType };
   }
 
@@ -287,21 +314,27 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
                               (context.includes('CL') || context.includes('INS') || 
                                context.toLowerCase().includes('clean') || context.toLowerCase().includes('inspection')));
   
+  console.log(`  - Propre CAS 1 (vide + CL/INS): ${emptyWithCleanStatus}`);
+  
   // 🟩 Chambre propre - CAS 2: Chambre dans colonne de droite ET statut INS uniquement
   const rightColumnINS = /Adults.*INS/.test(context) || 
                          (context.includes('Adults') && context.toLowerCase().includes('inspection'));
   
+  console.log(`  - Propre CAS 2 (colonne droite + INS): ${rightColumnINS}`);
+  
   if (emptyWithCleanStatus || rightColumnINS) {
     cleaningType = 'none';
     status = 'clean';
+    console.log(`  → Règle appliquée: Chambre propre`);
     return { status, cleaningType };
   }
 
   // Cas par défaut - si aucune règle ne correspond explicitement
-  // Vérifier s'il y a un statut DIR visible
+  console.log(`  - Vérification statut DIR: ${context.includes('DIR')}`);
   if (context.includes('DIR') || context.toLowerCase().includes('dirty')) {
     cleaningType = 'full';
     status = 'needs-cleaning';
+    console.log(`  → Règle appliquée: DIR trouvé - nettoyage complet`);
     return { status, cleaningType };
   }
   
@@ -311,6 +344,7 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
       context.toLowerCase().includes('hors service')) {
     status = 'maintenance';
     cleaningType = 'none';
+    console.log(`  → Règle appliquée: Maintenance`);
     return { status, cleaningType };
   }
   
@@ -320,9 +354,11 @@ function determineStatusAndCleaningTypeNewRules(context: string): { status: stri
       context.includes('OCC')) {
     status = 'occupied';
     cleaningType = 'none';
+    console.log(`  → Règle appliquée: Occupé`);
     return { status, cleaningType };
   }
 
+  console.log(`  → Règle par défaut appliquée: needs-cleaning / full`);
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
