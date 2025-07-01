@@ -18,11 +18,12 @@ export async function processImageWithTesseract(imageData: ArrayBuffer | HTMLCan
     
     const tesseractWorker = await initializeWorker();
     
-    // Convert ArrayBuffer to Uint8Array for Tesseract compatibility
-    let processableInput: HTMLCanvasElement | string | Uint8Array;
+    // Pour Tesseract.js dans le navigateur, utiliser directement les types supportés
+    let processableInput: HTMLCanvasElement | string | Blob;
     
     if (imageData instanceof ArrayBuffer) {
-      processableInput = new Uint8Array(imageData);
+      // Convertir ArrayBuffer en Blob pour la compatibilité navigateur
+      processableInput = new Blob([imageData]);
     } else {
       processableInput = imageData;
     }
