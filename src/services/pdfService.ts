@@ -188,96 +188,70 @@ function getRoomFloor(roomNumber: string): number {
 
 // Nouvelle fonction d'analyse améliorée avec logique plus précise
 function determineCleaningTypeImproved(context: string, roomNumber: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  console.log(`  🔍 ANALYSE AMÉLIORÉE pour chambre ${roomNumber}:`);
+  console.log(`🔍 ANALYSE AMÉLIORÉE pour chambre ${roomNumber}:`);
+  console.log(`📝 Contexte:`, context.substring(0, 400));
   
-  // Nettoyer le contexte pour l'analyse
-  const cleanContext = context.replace(/\s+/g, ' ').trim();
-  console.log(`  📝 Contexte nettoyé:`, cleanContext.substring(0, 200) + "...");
+  // Patterns spécifiques basés sur le format du PDF
+  const hasINS = /\bINS\b/.test(context);
+  const hasDIR = /\bDIR\b/.test(context);
+  const hasCL = /\bCL\b/.test(context);
+  const hasOCC = /\bOCC\b/.test(context);
   
-  // Rechercher les patterns de date dans le contexte
-  const datePattern = /\d{2}\/\d{2}\/\d{4}/g;
-  const dates = cleanContext.match(datePattern) || [];
-  console.log(`  📅 Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
+  // Pattern pour Night X/Y (recouche - même client qui reste)
+  const nightPattern = /Night\s+\d+\/\d+/.test(context);
   
-  // Rechercher les statuts de chambre
-  const statusPatterns = {
-    DIR: /\b(DIR|Dirty)\b/i,
-    CL: /\b(CL|Clean)\b/i,
-    INS: /\b(INS|Inspection)\b/i,
-    OCC: /\b(OCC|Occupied)\b/i
-  };
+  // Pattern de dates multiples (changement de client)
+  const dates = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
   
-  const foundStatuses = [];
-  for (const [status, pattern] of Object.entries(statusPatterns)) {
-    if (pattern.test(cleanContext)) {
-      foundStatuses.push(status);
-    }
-  }
-  console.log(`  🏷️ Statuts trouvés:`, foundStatuses);
+  // Pattern Adults (présence de réservation)
+  const hasAdults = /Adults/.test(context);
   
-  // Rechercher les patterns de réservation
-  const reservationPatterns = {
-    adultsPattern: /Adults/i,
-    nightPattern: /Night\s+\d+\/\d+/i,
-    timePattern: /\d{1,2}:\d{2}/
-  };
+  console.log(`📊 Analyse: INS=${hasINS}, DIR=${hasDIR}, CL=${hasCL}, OCC=${hasOCC}`);
+  console.log(`🏨 Réservation: Night=${nightPattern}, Adults=${hasAdults}, Dates=${dates.length}`);
   
-  const reservationIndicators = [];
-  for (const [name, pattern] of Object.entries(reservationPatterns)) {
-    if (pattern.test(cleanContext)) {
-      reservationIndicators.push(name);
-    }
-  }
-  console.log(`  🏨 Indicateurs de réservation:`, reservationIndicators);
-  
-  // RÈGLE 1: Chambre propre (CL ou INS sans réservation active)
-  if ((foundStatuses.includes('CL') || foundStatuses.includes('INS')) && dates.length === 0) {
-    console.log(`  ✅ RÈGLE 1 - Chambre propre: statut ${foundStatuses.join('+')} sans réservation`);
-    return { status: 'clean', cleaningType: 'none' };
-  }
-  
-  // RÈGLE 2: Chambre occupée
-  if (foundStatuses.includes('OCC')) {
-    console.log(`  🚪 RÈGLE 2 - Chambre occupée`);
+  // RÈGLE 1: Chambre occupée
+  if (hasOCC) {
+    console.log(`✅ RÉSULTAT: Occupée`);
     return { status: 'occupied', cleaningType: 'none' };
   }
   
-  // RÈGLE 3: Chambre à blanc (DIR + réservation OU plusieurs dates)
-  if (foundStatuses.includes('DIR') && (dates.length >= 1 || reservationIndicators.includes('adultsPattern'))) {
-    console.log(`  🧹 RÈGLE 3 - Chambre à blanc: DIR + réservation (${dates.length} dates, indicateurs: ${reservationIndicators.join(', ')})`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  
-  // RÈGLE 4: Chambre à blanc (plusieurs dates trouvées - changement de client)
-  if (dates.length >= 2) {
-    console.log(`  🧹 RÈGLE 4 - Chambre à blanc: ${dates.length} dates = changement de client`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  
-  // RÈGLE 5: Recouche (une seule réservation continue)
-  if (dates.length === 1 && reservationIndicators.includes('nightPattern') && !foundStatuses.includes('DIR')) {
-    console.log(`  🛏️ RÈGLE 5 - Recouche: 1 date + Night pattern, pas de DIR`);
-    return { status: 'needs-cleaning', cleaningType: 'quick' };
-  }
-  
-  // RÈGLE 6: Chambre propre avec inspection
-  if (foundStatuses.includes('INS') && reservationIndicators.includes('adultsPattern')) {
-    console.log(`  ✅ RÈGLE 6 - Chambre propre: INS + réservation future`);
+  // RÈGLE 2: Chambre propre (INS seul, sans réservation active)
+  if (hasINS && !hasAdults && dates.length === 0) {
+    console.log(`✅ RÉSULTAT: Propre (INS sans réservation)`);
     return { status: 'clean', cleaningType: 'none' };
   }
   
-  // RÈGLE PAR DÉFAUT: Analyser plus finement
-  if (foundStatuses.includes('DIR')) {
-    console.log(`  🧹 RÈGLE DÉFAUT - DIR détecté: nettoyage complet`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
+  // RÈGLE 3: Chambre propre (CL sans réservation)
+  if (hasCL && !hasAdults && dates.length === 0) {
+    console.log(`✅ RÉSULTAT: Propre (CL sans réservation)`);
+    return { status: 'clean', cleaningType: 'none' };
   }
   
-  if (dates.length > 0) {
-    console.log(`  🛏️ RÈGLE DÉFAUT - Dates présentes: recouche probable`);
+  // RÈGLE 4: Recouche (Night pattern = même client qui reste)
+  if (nightPattern && dates.length === 1 && !hasDIR) {
+    console.log(`✅ RÉSULTAT: Recouche (Night pattern)`);
     return { status: 'needs-cleaning', cleaningType: 'quick' };
   }
   
-  console.log(`  ❓ RÈGLE DÉFAUT - Cas non identifié: nettoyage complet par sécurité`);
+  // RÈGLE 5: Chambre à blanc (DIR ou changement de client)
+  if (hasDIR || dates.length >= 2) {
+    console.log(`✅ RÉSULTAT: Chambre à blanc (DIR=${hasDIR}, dates=${dates.length})`);
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
+  // RÈGLE 6: Chambre à blanc (réservation future après nettoyage)
+  if (hasAdults && dates.length >= 1) {
+    console.log(`✅ RÉSULTAT: Chambre à blanc (réservation)`);
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
+  // Par défaut: analyser si c'est propre ou à nettoyer
+  if (hasINS || hasCL) {
+    console.log(`✅ RÉSULTAT: Propre par défaut`);
+    return { status: 'clean', cleaningType: 'none' };
+  }
+  
+  console.log(`✅ RÉSULTAT: Nettoyage complet par défaut`);
   return { status: 'needs-cleaning', cleaningType: 'full' };
 }
 
