@@ -140,6 +140,11 @@ function parseRoomsFromText(text: string): Room[] {
     const hasDIR = roomStatusCode === 'DIR';
     const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext) && dates.length === 0;
     
+    // Debug pour mieux comprendre le contexte
+    console.log(`DEBUG - Texte complet après chambre:`, roomSpecificContext.substring(0, 200));
+    console.log(`DEBUG - Recherche de dates dans:`, roomSpecificContext);
+    console.log(`DEBUG - roomStatusCode détecté:`, roomStatusCode);
+    
     console.log(`Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
     console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}, DIR=${hasDIR}`);
     console.log(`Heure seule: ${hasTimeOnly}`);
