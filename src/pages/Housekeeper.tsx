@@ -5,43 +5,63 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Building, Plus, Key, Trash2, ArrowLeft, Check, Play, MessageSquare, AlertCircle, Bed } from 'lucide-react';
+import { ArrowLeft, Check, Play, MessageSquare, AlertCircle, Bed } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Room } from '@/services/pdfService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
-import { useNavigate } from 'react-router-dom';
-import { SupabaseService } from '@/services/supabaseService';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function Housekeeper() {
-  const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus } = useHousekeeping();
+  const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus, housekeeperAccessCodes } = useHousekeeping();
   const navigate = useNavigate();
-  const [hotelCode, setHotelCode] = useState<string>('');
-  const [accessCode, setAccessCode] = useState<string>('');
-  const [step, setStep] = useState<'hotel' | 'login'>('hotel');
-  const [selectedHotel, setSelectedHotel] = useState<any>(null);
+  const [searchParams] = useSearchParams();
+  
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>('');
-  const [housekeeperId, setHousekeeperId] = useState<string>('');
+  const [accessCode, setAccessCode] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [remarkText, setRemarkText] = useState('');
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
 
-  console.log("Housekeeper - isDistributed:", isDistributed, "rooms:", rooms.length, "housekeepers:", housekeeperNames.length); // Debug
-  console.log("LocalStorage check - isDistributed:", localStorage.getItem('isDistributed')); // Debug localStorage
+  // Vérifier les paramètres URL ou localStorage pour auto-connexion
+  useEffect(() => {
+    const nameFromUrl = searchParams.get('name');
+    const codeFromUrl = searchParams.get('code');
+    const savedName = localStorage.getItem('currentHousekeeper');
+    const savedCode = localStorage.getItem('currentAccessCode');
+
+    if (nameFromUrl && codeFromUrl) {
+      // Vérifier que le code correspond bien
+      if (housekeeperAccessCodes[nameFromUrl] === codeFromUrl) {
+        setSelectedHousekeeper(nameFromUrl);
+        setAccessCode(codeFromUrl);
+        setIsLoggedIn(true);
+        
+        toast({
+          title: "Connexion automatique",
+          description: `Bienvenue ${nameFromUrl} !`
+        });
+      }
+    } else if (savedName && savedCode && housekeeperAccessCodes[savedName] === savedCode) {
+      setSelectedHousekeeper(savedName);
+      setAccessCode(savedCode);
+      setIsLoggedIn(true);
+    }
+  }, [searchParams, housekeeperAccessCodes]);
 
   // Mettre à jour les chambres de la femme de chambre quand les données changent
   useEffect(() => {
     if (selectedHousekeeper && isLoggedIn) {
       const assignedRooms = getHousekeeperRooms(selectedHousekeeper);
       setHousekeeperRooms(assignedRooms);
-      console.log("Chambres assignées à", selectedHousekeeper, ":", assignedRooms.length); // Debug
+      console.log("Chambres assignées à", selectedHousekeeper, ":", assignedRooms.length);
     }
   }, [selectedHousekeeper, isLoggedIn, rooms, getHousekeeperRooms]);
 
   // Vérifier si la distribution a été faite
   if (!isDistributed) {
     return (
-      <div className="min-h-screen bg-gradient-secondary p-4 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-center text-2xl">Distribution Requise</CardTitle>
@@ -55,7 +75,7 @@ export default function Housekeeper() {
             </div>
             <Button 
               onClick={() => navigate('/')}
-              className="w-full bg-gradient-primary"
+              className="w-full bg-blue-600 hover:bg-blue-700"
               size="lg"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -67,102 +87,102 @@ export default function Housekeeper() {
     );
   }
 
-  const handleHotelLogin = async () => {
-    if (!hotelCode.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Code requis",
-        description: "Veuillez saisir le code de votre établissement"
-      });
-      return;
-    }
+  // Interface de connexion simplifiée si pas encore connecté
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-gray-800">NettoBloc Mobile</CardTitle>
+            <p className="text-muted-foreground">Entrez votre code d'accès</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="access-code" className="text-sm font-medium">
+                Code d'accès (généré lors de la distribution)
+              </label>
+              <Input
+                id="access-code"
+                type="text"
+                placeholder="Ex: 1234"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                className="text-center text-lg font-mono h-12"
+                autoFocus
+                maxLength={4}
+              />
+              {Object.keys(housekeeperAccessCodes).length > 0 && (
+                <div className="text-xs text-gray-500 text-center mt-2">
+                  Codes disponibles: {Object.values(housekeeperAccessCodes).join(', ')}
+                </div>
+              )}
+            </div>
+            
+            <Button 
+              onClick={() => {
+                if (!accessCode.trim()) {
+                  toast({
+                    variant: "destructive",
+                    title: "Code requis",
+                    description: "Veuillez saisir votre code d'accès"
+                  });
+                  return;
+                }
 
-    try {
-      const hotel = await SupabaseService.getHotelByCode(hotelCode);
-      
-      if (hotel) {
-        setSelectedHotel(hotel);
-        setStep('login');
-        
-        toast({
-          title: "Établissement trouvé",
-          description: `Connecté à ${hotel.name}`
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Code incorrect",
-          description: "Code d'établissement invalide."
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur de connexion",
-        description: "Impossible de se connecter. Vérifiez votre connexion."
-      });
-    }
-  };
+                // Chercher le code d'accès
+                const matchingHousekeeper = Object.entries(housekeeperAccessCodes).find(
+                  ([name, code]) => code === accessCode
+                );
 
-  const handleHousekeeperLogin = async () => {
-    if (!accessCode.trim() || accessCode.length !== 4) {
-      toast({
-        variant: "destructive",
-        title: "Code invalide",
-        description: "Veuillez saisir un code d'accès à 4 chiffres"
-      });
-      return;
-    }
+                if (matchingHousekeeper) {
+                  const [housekeeperName] = matchingHousekeeper;
+                  setSelectedHousekeeper(housekeeperName);
+                  setIsLoggedIn(true);
+                  
+                  // Sauvegarder la connexion
+                  localStorage.setItem('currentHousekeeper', housekeeperName);
+                  localStorage.setItem('currentAccessCode', accessCode);
+                  
+                  toast({
+                    title: "Connexion réussie",
+                    description: `Bienvenue ${housekeeperName} !`
+                  });
+                } else {
+                  toast({
+                    variant: "destructive",
+                    title: "Code incorrect",
+                    description: "Code d'accès non reconnu"
+                  });
+                }
+              }}
+              className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
+            >
+              Se connecter
+            </Button>
+            
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/')}
+              className="w-full flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour à l'accueil
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-    try {
-      const housekeeper = await SupabaseService.authenticateHousekeeper(accessCode);
-      
-      if (housekeeper) {
-        if (housekeeper.hotel_id) {
-          localStorage.setItem('selectedHotelId', housekeeper.hotel_id);
-        }
-        
-        setSelectedHousekeeper(housekeeper.name);
-        setHousekeeperId(housekeeper.id);
-        const assignedRooms = getHousekeeperRooms(housekeeper.name);
-        setHousekeeperRooms(assignedRooms);
-        setIsLoggedIn(true);
-        
-        toast({
-          title: "Connexion réussie",
-          description: `Bienvenue ${housekeeper.name} !`
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Code incorrect",
-          description: "Code d'accès invalide ou inactif."
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur de connexion",
-        description: "Impossible de se connecter. Vérifiez votre connexion."
-      });
-    }
-  };
+  const pendingRooms = housekeeperRooms.filter(room => room.status === 'needs-cleaning' || room.status === 'ready-to-clean');
+  const inProgressRooms = housekeeperRooms.filter(room => room.status === 'in-progress');
+  const completedRooms = housekeeperRooms.filter(room => room.status === 'clean');
+  const remarkRooms = housekeeperRooms.filter(room => room.status === 'needs-attention');
 
+  // Fonction pour gérer la mise à jour du statut des chambres
   const handleUpdateRoomStatus = async (roomNumber: string, newStatus: string) => {
     // Utiliser la fonction du contexte qui gère les notifications
     updateRoomStatus(roomNumber, newStatus, selectedHousekeeper);
-    
-    // Sauvegarder dans Supabase
-    const selectedHotelId = localStorage.getItem('selectedHotelId');
-    if (selectedHotelId && housekeeperId) {
-      await SupabaseService.createRoomStatusUpdate(
-        selectedHotelId,
-        housekeeperId,
-        roomNumber,
-        newStatus,
-        remarkText
-      );
-    }
     
     const statusMessages = {
       'clean': 'Chambre marquée comme nettoyée !',
@@ -227,116 +247,6 @@ export default function Housekeeper() {
       default: return 'À nettoyer';
     }
   };
-
-  // Écran de sélection de l'établissement
-  if (step === 'hotel') {
-    return (
-      <div className="min-h-screen bg-gradient-secondary p-4 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl flex items-center justify-center gap-2">
-              <Building className="h-6 w-6" />
-              NettBloc Mobile
-            </CardTitle>
-            <p className="text-center text-muted-foreground">Saisissez le code de votre établissement</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="hotel-code" className="text-sm font-medium">
-                Code établissement
-              </label>
-              <Input
-                id="hotel-code"
-                type="text"
-                placeholder="HOTEL2024"
-                value={hotelCode}
-                onChange={(e) => setHotelCode(e.target.value.toUpperCase())}
-                className="text-center text-lg font-mono"
-              />
-            </div>
-            
-            <Button 
-              onClick={handleHotelLogin}
-              disabled={!hotelCode.trim()}
-              className="w-full bg-gradient-primary"
-              size="lg"
-            >
-              <Building className="h-4 w-4 mr-2" />
-              Se connecter à l'établissement
-            </Button>
-            
-            <Button 
-              variant="outline"
-              onClick={() => navigate('/')}
-              className="w-full"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour à l'interface principale
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Écran de connexion avec code d'accès
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-gradient-secondary p-4 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl flex items-center justify-center gap-2">
-              <Key className="h-6 w-6" />
-              {selectedHotel?.name}
-            </CardTitle>
-            <p className="text-center text-muted-foreground">Saisissez votre code d'accès</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="access-code" className="text-sm font-medium">
-                Code d'accès (4 chiffres)
-              </label>
-              <Input
-                id="access-code"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={4}
-                placeholder="0000"
-                value={accessCode}
-                onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                className="text-center text-lg font-mono"
-              />
-            </div>
-            
-            <Button 
-              onClick={handleHousekeeperLogin}
-              disabled={accessCode.length !== 4}
-              className="w-full bg-gradient-primary"
-              size="lg"
-            >
-              <Key className="h-4 w-4 mr-2" />
-              Se connecter
-            </Button>
-            
-            <Button 
-              variant="outline"
-              onClick={() => setStep('hotel')}
-              className="w-full"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Changer d'établissement
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const pendingRooms = housekeeperRooms.filter(room => room.status === 'needs-cleaning' || room.status === 'ready-to-clean');
-  const inProgressRooms = housekeeperRooms.filter(room => room.status === 'in-progress');
-  const completedRooms = housekeeperRooms.filter(room => room.status === 'clean');
-  const remarkRooms = housekeeperRooms.filter(room => room.status === 'needs-attention');
 
   return (
     <div className="min-h-screen bg-gradient-secondary p-4">
