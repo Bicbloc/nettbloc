@@ -65,33 +65,46 @@ export default function Housekeeper() {
   }
 
   const handleHousekeeperLogin = async () => {
-    if (!accessCode.trim()) {
+    if (!accessCode.trim() || accessCode.length !== 4) {
       toast({
         variant: "destructive",
-        title: "Code requis",
-        description: "Veuillez saisir votre code d'accès à 4 chiffres"
+        title: "Code invalide",
+        description: "Veuillez saisir un code d'accès à 4 chiffres"
       });
       return;
     }
 
-    const housekeeper = await SupabaseService.authenticateHousekeeper(accessCode);
-    
-    if (housekeeper) {
-      setSelectedHousekeeper(housekeeper.name);
-      setHousekeeperId(housekeeper.id);
-      const assignedRooms = getHousekeeperRooms(housekeeper.name);
-      setHousekeeperRooms(assignedRooms);
-      setIsLoggedIn(true);
+    try {
+      const housekeeper = await SupabaseService.authenticateHousekeeper(accessCode);
       
-      toast({
-        title: "Connexion réussie",
-        description: `Bienvenue ${housekeeper.name} !`
-      });
-    } else {
+      if (housekeeper) {
+        // Sauvegarder l'hôtel associé
+        if (housekeeper.hotel_id) {
+          localStorage.setItem('selectedHotelId', housekeeper.hotel_id);
+        }
+        
+        setSelectedHousekeeper(housekeeper.name);
+        setHousekeeperId(housekeeper.id);
+        const assignedRooms = getHousekeeperRooms(housekeeper.name);
+        setHousekeeperRooms(assignedRooms);
+        setIsLoggedIn(true);
+        
+        toast({
+          title: "Connexion réussie",
+          description: `Bienvenue ${housekeeper.name} !`
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Code incorrect",
+          description: "Code d'accès invalide ou inactif."
+        });
+      }
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Code incorrect",
-        description: "Code d'accès invalide. Vérifiez votre code à 4 chiffres."
+        title: "Erreur de connexion",
+        description: "Impossible de se connecter. Vérifiez votre connexion."
       });
     }
   };
