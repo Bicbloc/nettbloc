@@ -29,14 +29,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailReportDialog from "@/components/EmailReportDialog";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
+import { useHousekeeping } from "@/contexts/HousekeepingContext";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
-  const [housekeeperNames, setHousekeeperNames] = useState<string[]>([
-    "Housekeeper 1", "Housekeeper 2", "Housekeeper 3", "Housekeeper 4"
-  ]);
+  const { 
+    housekeeperNames, 
+    setHousekeeperNames,
+    rooms,
+    setRooms,
+    isDistributed,
+    setIsDistributed 
+  } = useHousekeeping();
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
@@ -454,10 +459,11 @@ const Index = () => {
       }
       
       setRooms(updatedRooms);
+      setIsDistributed(true); // Marquer comme distribué
       
       toast({
         title: "Chambres redistribuées",
-        description: "Les chambres ont été réparties entre les femmes de chambre par premier chiffre du numéro.",
+        description: "Les chambres ont été redistribuées selon le premier chiffre du numéro de chambre.",
       });
     }
   };

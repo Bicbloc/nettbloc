@@ -5,56 +5,67 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Check, Clock, Bed, AlertCircle, Play, MessageSquare } from 'lucide-react';
+import { Check, Clock, Bed, AlertCircle, Play, MessageSquare, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Room } from '@/services/pdfService';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function Housekeeper() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [housekeeperName, setHousekeeperName] = useState('');
+  const { housekeeperNames, rooms, setRooms, isDistributed, getHousekeeperRooms } = useHousekeeping();
+  const navigate = useNavigate();
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [remarkText, setRemarkText] = useState('');
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
+  const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
 
-  // Liste des femmes de chambre disponibles
-  const housekeepers = ['Marie', 'Sophie', 'Julie', 'Amélie', 'Claire'];
-
-  // Simuler des chambres assignées par femme de chambre
-  const getRoomsForHousekeeper = (name: string): Room[] => {
-    const roomsData: Record<string, Room[]> = {
-      'Marie': [
-        { number: '101', status: 'needs-cleaning', cleaningType: 'full', priority: 'high', floor: 1, isTwin: false, isUrgent: true },
-        { number: '102', status: 'needs-cleaning', cleaningType: 'quick', priority: 'medium', floor: 1, isTwin: true, isUrgent: false },
-      ],
-      'Sophie': [
-        { number: '103', status: 'needs-cleaning', cleaningType: 'full', priority: 'medium', floor: 1, isTwin: false, isUrgent: false },
-        { number: '205', status: 'needs-cleaning', cleaningType: 'quick', priority: 'high', floor: 2, isTwin: true, isUrgent: true },
-      ],
-      'Julie': [
-        { number: '201', status: 'needs-cleaning', cleaningType: 'full', priority: 'medium', floor: 2, isTwin: false, isUrgent: false },
-        { number: '304', status: 'needs-cleaning', cleaningType: 'quick', priority: 'high', floor: 3, isTwin: true, isUrgent: false },
-      ],
-      'Amélie': [
-        { number: '301', status: 'needs-cleaning', cleaningType: 'full', priority: 'high', floor: 3, isTwin: false, isUrgent: true },
-      ],
-      'Claire': [
-        { number: '105', status: 'needs-cleaning', cleaningType: 'quick', priority: 'medium', floor: 1, isTwin: true, isUrgent: false },
-        { number: '203', status: 'needs-cleaning', cleaningType: 'full', priority: 'medium', floor: 2, isTwin: false, isUrgent: false },
-      ],
-    };
-    return roomsData[name] || [];
-  };
+  // Vérifier si la distribution a été faite
+  if (!isDistributed) {
+    return (
+      <div className="min-h-screen bg-gradient-secondary p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-2xl">Distribution Requise</CardTitle>
+            <p className="text-center text-muted-foreground">
+              Vous devez d'abord distribuer les chambres depuis l'interface principale
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center text-sm text-muted-foreground mb-4">
+              Pour accéder à l'interface mobile, retournez à l'interface principale et cliquez sur "Distribuer les Chambres"
+            </div>
+            <Button 
+              onClick={() => navigate('/')}
+              className="w-full bg-gradient-primary"
+              size="lg"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour à l'interface principale
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleHousekeeperLogin = () => {
     if (selectedHousekeeper) {
-      setHousekeeperName(selectedHousekeeper);
-      setRooms(getRoomsForHousekeeper(selectedHousekeeper));
+      const assignedRooms = getHousekeeperRooms(selectedHousekeeper);
+      setHousekeeperRooms(assignedRooms);
       setIsLoggedIn(true);
     }
   };
 
   const updateRoomStatus = (roomNumber: string, newStatus: string) => {
+    // Mettre à jour localement
+    setHousekeeperRooms(prev => prev.map(room => 
+      room.number === roomNumber 
+        ? { ...room, status: newStatus }
+        : room
+    ));
+    
+    // Mettre à jour dans le contexte global
     setRooms(prev => prev.map(room => 
       room.number === roomNumber 
         ? { ...room, status: newStatus }
@@ -130,7 +141,7 @@ export default function Housekeeper() {
                 <SelectValue placeholder="Choisir une femme de chambre" />
               </SelectTrigger>
               <SelectContent>
-                {housekeepers.map((name) => (
+                {housekeeperNames.map((name) => (
                   <SelectItem key={name} value={name}>
                     {name}
                   </SelectItem>
@@ -146,16 +157,25 @@ export default function Housekeeper() {
             >
               Accéder à mon planning
             </Button>
+            
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/')}
+              className="w-full"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour à l'interface principale
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const pendingRooms = rooms.filter(room => room.status === 'needs-cleaning');
-  const inProgressRooms = rooms.filter(room => room.status === 'in-progress');
-  const completedRooms = rooms.filter(room => room.status === 'clean');
-  const remarkRooms = rooms.filter(room => room.status === 'needs-attention');
+  const pendingRooms = housekeeperRooms.filter(room => room.status === 'needs-cleaning');
+  const inProgressRooms = housekeeperRooms.filter(room => room.status === 'in-progress');
+  const completedRooms = housekeeperRooms.filter(room => room.status === 'clean');
+  const remarkRooms = housekeeperRooms.filter(room => room.status === 'needs-attention');
 
   return (
     <div className="min-h-screen bg-gradient-secondary p-4">
@@ -163,16 +183,25 @@ export default function Housekeeper() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Bonjour {housekeeperName} !</h1>
+            <h1 className="text-2xl font-bold text-foreground">Bonjour {selectedHousekeeper} !</h1>
             <p className="text-muted-foreground">Votre planning aujourd'hui</p>
           </div>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsLoggedIn(false)}
-            size="sm"
-          >
-            Changer
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsLoggedIn(false)}
+              size="sm"
+            >
+              Changer
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/')}
+              size="sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         {/* Barre de progression */}
@@ -198,14 +227,14 @@ export default function Housekeeper() {
         <div className="w-full bg-muted rounded-full h-2">
           <div 
             className="bg-gradient-primary h-2 rounded-full transition-all duration-300"
-            style={{ width: `${(completedRooms.length / rooms.length) * 100}%` }}
+            style={{ width: `${housekeeperRooms.length > 0 ? (completedRooms.length / housekeeperRooms.length) * 100 : 0}%` }}
           />
         </div>
       </div>
 
       {/* Chambres à nettoyer */}
       <div className="space-y-4">
-        {rooms.map((room) => (
+        {housekeeperRooms.map((room) => (
           <Card key={room.number} className="card-modern">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -369,14 +398,14 @@ export default function Housekeeper() {
           </Card>
         ))}
         
-        {rooms.length === 0 && (
+        {housekeeperRooms.length === 0 && (
           <div className="text-center py-8">
             <div className="text-6xl mb-4">📋</div>
             <h3 className="text-xl font-semibold text-foreground mb-2">
               Aucune chambre assignée
             </h3>
             <p className="text-muted-foreground">
-              Votre planning est vide pour aujourd'hui.
+              Vous n'avez aucune chambre assignée pour aujourd'hui.
             </p>
           </div>
         )}
