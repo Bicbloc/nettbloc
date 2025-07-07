@@ -125,13 +125,23 @@ function parseRoomsFromText(text: string): Room[] {
     
     // Analyser les dates dans le contexte spécifique à cette chambre
     // On cherche les dates qui suivent le numéro de chambre
-    const roomSection = context.substring(context.indexOf(normalizedRoomNumber));
-    const nextRoomMatch = roomSection.match(/\b[1-9]\d{2}\s/);
-    const roomSpecificContext = nextRoomMatch ? 
-      roomSection.substring(0, nextRoomMatch.index) : 
-      roomSection;
+    const roomIndex = context.indexOf(normalizedRoomNumber);
+    if (roomIndex === -1) {
+      console.log(`❌ Chambre ${normalizedRoomNumber} non trouvée dans le contexte`);
+      continue;
+    }
     
-    console.log(`Contexte spécifique chambre:`, roomSpecificContext);
+    // Prendre tout ce qui suit le numéro de chambre jusqu'à la prochaine chambre
+    const afterRoom = context.substring(roomIndex);
+    const nextRoomPattern = /\b([1-9]\d{2})\b/g;
+    nextRoomPattern.exec(afterRoom); // Skip current room
+    const nextRoomMatch = nextRoomPattern.exec(afterRoom);
+    
+    const roomSpecificContext = nextRoomMatch ? 
+      afterRoom.substring(0, nextRoomMatch.index) : 
+      afterRoom;
+    
+    console.log(`Contexte spécifique chambre:`, roomSpecificContext.substring(0, 150) + "...");
     
     const dates: string[] = roomSpecificContext.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
     const hasOCC = roomStatusCode === 'OCC';
@@ -141,9 +151,9 @@ function parseRoomsFromText(text: string): Room[] {
     const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext) && dates.length === 0;
     
     // Debug pour mieux comprendre le contexte
-    console.log(`DEBUG - Texte complet après chambre:`, roomSpecificContext.substring(0, 200));
-    console.log(`DEBUG - Recherche de dates dans:`, roomSpecificContext);
-    console.log(`DEBUG - roomStatusCode détecté:`, roomStatusCode);
+    console.log(`DEBUG - Dates trouvées:`, dates);
+    console.log(`DEBUG - Contient horaires:`, /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext));
+    console.log(`DEBUG - roomStatusCode:`, roomStatusCode);
     
     console.log(`Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
     console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}, DIR=${hasDIR}`);
