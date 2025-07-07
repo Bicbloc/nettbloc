@@ -31,6 +31,9 @@ import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationPanel } from "@/components/NotificationPanel";
+import { HotelSetup } from "@/components/HotelSetup";
+import { HousekeeperSetup } from "@/components/HousekeeperSetup";
+import { SupabaseService } from "@/services/supabaseService";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -444,8 +447,11 @@ const Index = () => {
     }
   };
   
-  const redistributeRooms = () => {
+  const redistributeRooms = async () => {
     console.log("Début redistribution, rooms:", rooms.length, "housekeepers:", housekeeperNames.length); // Debug
+    
+    // Générer des codes d'accès pour les femmes de chambre
+    const accessCodes = await SupabaseService.generateAccessCodesForHousekeepers(housekeeperNames);
     
     // Utiliser autoDistributeRooms au lieu de distributeRooms pour la distribution par premier chiffre
     const assignments = autoDistributeRooms(rooms, housekeeperNames, false);
@@ -464,16 +470,24 @@ const Index = () => {
       }
       
       setRooms(updatedRooms);
-      setIsDistributed(true); // Marquer comme distribué
+      setIsDistributed(true);
       
-      console.log("Distribution terminée, isDistributed défini à true"); // Debug
+      // Afficher les codes d'accès dans le toast
+      const codesMessage = Object.entries(accessCodes)
+        .map(([name, code]) => `${name}: ${code}`)
+        .join(', ');
       
       toast({
-        title: "Chambres redistribuées",
-        description: "Les chambres ont été redistribuées selon le premier chiffre du numéro de chambre.",
+        title: "Chambres redistribuées !",
+        description: `Les ${updatedRooms.filter(r => r.assignedTo).length} chambres ont été redistribuées. Codes d'accès: ${codesMessage}`,
+        duration: 10000, // 10 secondes pour laisser le temps de noter les codes
       });
     } else {
-      console.log("Erreur: aucune assignation générée"); // Debug
+      toast({
+        variant: "destructive",
+        title: "Erreur de redistribution",
+        description: "Impossible de redistribuer les chambres automatiquement.",
+      });
     }
   };
   

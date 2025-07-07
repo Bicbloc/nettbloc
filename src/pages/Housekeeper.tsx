@@ -2,19 +2,22 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Check, Clock, Bed, AlertCircle, Play, MessageSquare, ArrowLeft } from 'lucide-react';
+import { Check, Clock, Bed, AlertCircle, Play, MessageSquare, ArrowLeft, Key } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Room } from '@/services/pdfService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useNavigate } from 'react-router-dom';
+import { SupabaseService } from '@/services/supabaseService';
 
 export default function Housekeeper() {
   const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus } = useHousekeeping();
   const navigate = useNavigate();
+  const [accessCode, setAccessCode] = useState<string>('');
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>('');
+  const [housekeeperId, setHousekeeperId] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [remarkText, setRemarkText] = useState('');
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
@@ -61,17 +64,53 @@ export default function Housekeeper() {
     );
   }
 
-  const handleHousekeeperLogin = () => {
-    if (selectedHousekeeper) {
-      const assignedRooms = getHousekeeperRooms(selectedHousekeeper);
+  const handleHousekeeperLogin = async () => {
+    if (!accessCode.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Code requis",
+        description: "Veuillez saisir votre code d'accès à 4 chiffres"
+      });
+      return;
+    }
+
+    const housekeeper = await SupabaseService.authenticateHousekeeper(accessCode);
+    
+    if (housekeeper) {
+      setSelectedHousekeeper(housekeeper.name);
+      setHousekeeperId(housekeeper.id);
+      const assignedRooms = getHousekeeperRooms(housekeeper.name);
       setHousekeeperRooms(assignedRooms);
       setIsLoggedIn(true);
+      
+      toast({
+        title: "Connexion réussie",
+        description: `Bienvenue ${housekeeper.name} !`
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Code incorrect",
+        description: "Code d'accès invalide. Vérifiez votre code à 4 chiffres."
+      });
     }
   };
 
-  const handleUpdateRoomStatus = (roomNumber: string, newStatus: string) => {
+  const handleUpdateRoomStatus = async (roomNumber: string, newStatus: string) => {
     // Utiliser la fonction du contexte qui gère les notifications
     updateRoomStatus(roomNumber, newStatus, selectedHousekeeper);
+    
+    // Sauvegarder dans Supabase
+    const selectedHotelId = localStorage.getItem('selectedHotelId');
+    if (selectedHotelId && housekeeperId) {
+      await SupabaseService.createRoomStatusUpdate(
+        selectedHotelId,
+        housekeeperId,
+        roomNumber,
+        newStatus,
+        remarkText
+      );
+    }
     
     const statusMessages = {
       'clean': 'Chambre marquée comme nettoyée !',
@@ -127,36 +166,44 @@ export default function Housekeeper() {
     }
   };
 
-  // Écran de sélection de la femme de chambre
+  // Écran de connexion avec code d'accès
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-secondary p-4 flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-2xl">Interface Mobile</CardTitle>
-            <p className="text-center text-muted-foreground">Sélectionnez votre nom</p>
+            <CardTitle className="text-center text-2xl flex items-center justify-center gap-2">
+              <Key className="h-6 w-6" />
+              Interface Mobile
+            </CardTitle>
+            <p className="text-center text-muted-foreground">Saisissez votre code d'accès</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Select value={selectedHousekeeper} onValueChange={setSelectedHousekeeper}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir une femme de chambre" />
-              </SelectTrigger>
-              <SelectContent>
-                {housekeeperNames.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <label htmlFor="access-code" className="text-sm font-medium">
+                Code d'accès (4 chiffres)
+              </label>
+              <Input
+                id="access-code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                placeholder="0000"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                className="text-center text-lg font-mono"
+              />
+            </div>
             
             <Button 
               onClick={handleHousekeeperLogin}
-              disabled={!selectedHousekeeper}
+              disabled={accessCode.length !== 4}
               className="w-full bg-gradient-primary"
               size="lg"
             >
-              Accéder à mon planning
+              <Key className="h-4 w-4 mr-2" />
+              Se connecter
             </Button>
             
             <Button 
@@ -285,7 +332,7 @@ export default function Housekeeper() {
                       size="sm"
                     >
                       <Check className="h-4 w-4 mr-1" />
-                      Nettoyée
+                      Prête à nettoyer
                     </Button>
                     <Dialog>
                       <DialogTrigger asChild>
