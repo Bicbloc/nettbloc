@@ -20,11 +20,14 @@ export default function Housekeeper() {
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
 
+  console.log("Housekeeper - isDistributed:", isDistributed, "rooms:", rooms.length, "housekeepers:", housekeeperNames.length); // Debug
+
   // Mettre à jour les chambres de la femme de chambre quand les données changent
   useEffect(() => {
     if (selectedHousekeeper && isLoggedIn) {
       const assignedRooms = getHousekeeperRooms(selectedHousekeeper);
       setHousekeeperRooms(assignedRooms);
+      console.log("Chambres assignées à", selectedHousekeeper, ":", assignedRooms.length); // Debug
     }
   }, [selectedHousekeeper, isLoggedIn, rooms, getHousekeeperRooms]);
 

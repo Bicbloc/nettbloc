@@ -43,6 +43,8 @@ const Index = () => {
     isDistributed,
     setIsDistributed 
   } = useHousekeeping();
+  
+  console.log("Index - isDistributed:", isDistributed); // Debug log
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
@@ -443,6 +445,8 @@ const Index = () => {
   };
   
   const redistributeRooms = () => {
+    console.log("Début redistribution, rooms:", rooms.length, "housekeepers:", housekeeperNames.length); // Debug
+    
     // Utiliser autoDistributeRooms au lieu de distributeRooms pour la distribution par premier chiffre
     const assignments = autoDistributeRooms(rooms, housekeeperNames, false);
     
@@ -462,10 +466,14 @@ const Index = () => {
       setRooms(updatedRooms);
       setIsDistributed(true); // Marquer comme distribué
       
+      console.log("Distribution terminée, isDistributed défini à true"); // Debug
+      
       toast({
         title: "Chambres redistribuées",
         description: "Les chambres ont été redistribuées selon le premier chiffre du numéro de chambre.",
       });
+    } else {
+      console.log("Erreur: aucune assignation générée"); // Debug
     }
   };
   
