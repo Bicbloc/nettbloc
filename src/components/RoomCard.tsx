@@ -133,7 +133,7 @@ export function RoomCard({
     });
     
     toast({
-      description: `Chambre ${room.number} : ${type === 'full' ? 'À blanc (départ aujourd\'hui)' : 'Recouche (départ ultérieur)'}`
+      description: `Chambre ${room.number} : ${type === 'full' ? '🧼 À blanc' : '🛏️ Recouche'}`
     });
   };
 
@@ -284,7 +284,7 @@ export function RoomCard({
               htmlFor={`full-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
             >
-              À Blanc (Départ)
+              🧼 À blanc
             </Label>
           </div>
           <div className="flex items-center space-x-1">
@@ -293,7 +293,7 @@ export function RoomCard({
               htmlFor={`quick-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-blue-800"
             >
-              Recouche
+              🛏️ Recouche
             </Label>
           </div>
         </RadioGroup>
