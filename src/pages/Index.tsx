@@ -458,7 +458,7 @@ const Index = () => {
   const getCleaningTypeBadge = (type: string) => {
     switch (type) {
       case 'full':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">À Blanc</Badge>;
+        return <Badge variant="outline" className="bg-red-100 text-red-800">Recouche</Badge>;
       case 'quick':
         return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
       case 'none':
@@ -478,95 +478,117 @@ const Index = () => {
     }
     
     // Sauvegarder les codes dans le contexte
+    console.log("Codes d'accès générés:", accessCodes);
     setHousekeeperAccessCodes(accessCodes);
     
-    // Sauvegarder les femmes de chambre avec leurs codes dans Supabase
-    if (selectedHotel) {
-      for (const name of housekeeperNames) {
-        await SupabaseService.createOrUpdateHousekeeper(selectedHotel.id, name, accessCodes[name]);
-      }
-    }
-    
-    // Utiliser autoDistributeRooms pour la distribution
-    const assignments = autoDistributeRooms(rooms, housekeeperNames, false);
-    
-    if (assignments) {
-      // Mettre à jour toutes les chambres avec leurs assignations
-      const updatedRooms = [...rooms];
+    // Créer ou mettre à jour les femmes de chambre dans Supabase
+    try {
+      const selectedHotelData = selectedHotel || {
+        id: localStorage.getItem('selectedHotelId') || hotelCode,
+        name: hotelCode,
+        hotel_code: hotelCode
+      };
       
-      for (const housekeeper of housekeeperNames) {
-        for (const room of assignments[housekeeper]) {
-          const index = updatedRooms.findIndex(r => r.number === room.number);
-          if (index !== -1) {
-            updatedRooms[index] = { ...updatedRooms[index], assignedTo: housekeeper };
-          }
+      if (selectedHotelData.id) {
+        for (const name of housekeeperNames) {
+          await SupabaseService.createOrUpdateHousekeeper(
+            name,
+            accessCodes[name],
+            selectedHotelData.id
+          );
         }
+        console.log("Femmes de chambre mises à jour dans Supabase");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la création des femmes de chambre:", error);
+    }
+    
+    // Effectuer la distribution automatique
+    distributeRooms(rooms, housekeeperNames, housekeeperFloorPreferences, housekeeperMaxRoomsOverrides);
+    
+    // Mettre à jour l'état de distribution
+    setIsDistributed(true);
+    console.log("Distribution terminée, isDistributed mis à true");
+    
+    // Changer d'onglet vers la distribution
+    setActiveTab("distribution");
+    
+    toast({
+      title: "Distribution terminée",
+      description: `Les chambres ont été automatiquement réparties entre ${housekeeperNames.length} femme(s) de chambre.`
+    });
+  };
+  
+  const handleDistributeWithValidation = async () => {
+    console.log("handleDistributeWithValidation appelé");
+    
+    // Validation des données requises
+    if (!hotelCode.trim() || !userEmail.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Informations manquantes",
+        description: "Veuillez renseigner le code de l'hôtel et votre email."
+      });
+      return;
+    }
+    
+    if (housekeeperNames.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Aucune femme de chambre",
+        description: "Veuillez ajouter au moins une femme de chambre."
+      });
+      return;
+    }
+    
+    if (rooms.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Aucune chambre",
+        description: "Veuillez importer la liste des chambres."
+      });
+      return;
+    }
+
+    // Créer ou récupérer l'hôtel
+    try {
+      let hotel = await SupabaseService.getHotelByCode(hotelCode);
+      
+      if (!hotel) {
+        // Créer l'hôtel s'il n'existe pas
+        hotel = await SupabaseService.createHotel(
+          hotelCode,
+          hotelCode,
+          userEmail
+        );
+        console.log("Hôtel créé:", hotel);
       }
       
-      setRooms(updatedRooms);
-      setIsDistributed(true);
+      if (!hotel) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de créer ou récupérer l'hôtel."
+        });
+        return;
+      }
+
+      // Sauvegarder les informations dans localStorage
+      localStorage.setItem('selectedHotelCode', hotelCode);
+      localStorage.setItem('userEmail', userEmail);
       
-      // Afficher les codes d'accès dans le toast
-      const codesMessage = Object.entries(accessCodes)
-        .map(([name, code]) => `${name}: ${code}`)
-        .join(' | ');
-      
-      toast({
-        title: "Chambres redistribuées !",
-        description: `Codes d'accès générés: ${codesMessage}`,
-        duration: 15000, // 15 secondes pour laisser le temps de noter les codes
-      });
-    } else {
+      console.log("Début redistribution avec hôtel:", hotel);
+      setSelectedHotel(hotel);
+      await doRedistribution();
+    } catch (error) {
+      console.error("Erreur lors de la création/récupération de l'hôtel:", error);
       toast({
         variant: "destructive",
-        title: "Erreur de redistribution",
-        description: "Impossible de redistribuer les chambres automatiquement.",
-      });
-    }
-  };
-
-  const redistributeRooms = async () => {
-    console.log("redistributeRooms appelé");
-    console.log("hotelCode:", hotelCode);
-    console.log("userEmail:", userEmail);
-    
-    // Vérifier si le code d'hôtel et l'email sont remplis
-    if (!hotelCode.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Code d'hôtel manquant",
-        description: "Veuillez entrer le code de votre hôtel."
+        title: "Erreur",
+        description: "Impossible de créer ou récupérer l'hôtel."
       });
       return;
     }
-
-    if (!userEmail.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Email manquant",
-        description: "Veuillez entrer votre adresse email."
-      });
-      return;
-    }
-
-    // Vérifier si l'hôtel existe avec ce code
-    const hotel = await SupabaseService.getHotelByCode(hotelCode);
-    if (!hotel) {
-      toast({
-        variant: "destructive",
-        title: "Code d'hôtel invalide",
-        description: "Aucun hôtel trouvé avec ce code."
-      });
-      return;
-    }
-
-    // Sauvegarder les informations dans localStorage
-    localStorage.setItem('selectedHotelCode', hotelCode);
-    localStorage.setItem('userEmail', userEmail);
-    
-    console.log("Début redistribution avec hôtel:", hotel);
-    setSelectedHotel(hotel);
-    await doRedistribution();
   };
 
   const handleHotelSelection = (hotel: any) => {
@@ -591,92 +613,71 @@ const Index = () => {
   };
   
   const handleManualAssign = (housekeeperName: string, selectedRooms: Room[]) => {
-    const updatedRooms = [...rooms];
-    
-    for (const room of selectedRooms) {
-      const index = updatedRooms.findIndex(r => r.number === room.number);
-      if (index !== -1) {
-        updatedRooms[index] = { ...updatedRooms[index], assignedTo: housekeeperName };
+    // Unassign rooms from other housekeepers first
+    const updatedRooms = rooms.map(room => {
+      if (selectedRooms.some(selectedRoom => selectedRoom.number === room.number)) {
+        return { ...room, assignedTo: housekeeperName };
       }
-    }
+      return room;
+    });
     
     setRooms(updatedRooms);
+    setIsManualAssignmentOpen(false);
+    
+    toast({
+      title: "Assignation manuelle",
+      description: `${selectedRooms.length} chambre(s) ont été assignées à ${housekeeperName}.`
+    });
   };
   
-  const roomsByFloor = rooms.reduce((acc, room) => {
-    const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
-    if (!acc[floor]) acc[floor] = [];
-    acc[floor].push(room);
-    return acc;
-  }, {} as Record<number, Room[]>);
-  
-  Object.keys(roomsByFloor).forEach(floor => {
-    roomsByFloor[parseInt(floor)].sort((a, b) => 
-      a.number.localeCompare(b.number, undefined, { numeric: true })
-    );
-  });
-
-  const unassignedRooms = getUnassignedRooms();
-  
-  const handleEmailConfirm = async (emailAddress: string) => {
-    // After email is confirmed, open the report dialog for custom fields
+  const handleEmailConfirm = (confirmedEmail: string) => {
+    setEmail(confirmedEmail);
     setIsEmailDialogOpen(false);
+    
+    // Ouvrir le dialog pour les champs personnalisés
     setIsReportDialogOpen(true);
   };
   
-  const handleReportConfirm = async (emailAddress: string, customFields?: CustomReportFields) => {
+  const handleReportConfirm = async (
+    confirmedEmail: string,
+    customFields: CustomReportFields
+  ) => {
+    setEmail(confirmedEmail);
+    setReportCustomFields(customFields);
+    setIsReportDialogOpen(false);
+    
     try {
-      if (reportAction === "single" && reportHousekeeper) {
-        // Générer le rapport pour une seule femme de chambre
-        await generateReport(
-          reportHousekeeper, 
-          getHousekeeperRooms(reportHousekeeper), 
-          cleaningConfig, 
-          emailAddress,
-          customFields
-        );
+      if (reportAction === "single") {
+        const housekeeperRooms = getHousekeeperRooms(reportHousekeeper);
+        await generateReport(reportHousekeeper, housekeeperRooms, confirmedEmail, cleaningConfig, customFields);
         
         toast({
-          title: "Rapport généré",
-          description: `Le rapport pour ${reportHousekeeper} a été créé et envoyé à ${emailAddress}.`,
+          title: "Rapport envoyé",
+          description: `Le rapport pour ${reportHousekeeper} a été envoyé à ${confirmedEmail}.`,
         });
-      } else if (reportAction === "all") {
-        // Générer uniquement les rapports pour les femmes de chambre qui ont des chambres assignées
-        const housekeepersWithRooms = housekeeperNames
-          .filter(name => getHousekeeperRooms(name).length > 0)
-          .map(name => ({
-            name,
-            rooms: getHousekeeperRooms(name)
-          }));
-        
-        // Ajouter les chambres non assignées si elles existent
-        const unassignedRooms = rooms.filter(room => !room.assignedTo && room.cleaningType !== 'none');
-        if (unassignedRooms.length > 0) {
-          housekeepersWithRooms.push({
-            name: "Chambres non assignées",
-            rooms: unassignedRooms
-          });
-        }
+      } else {
+        // Generate reports for all housekeepers with rooms
+        const housekeepersWithRooms = housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0);
         
         if (housekeepersWithRooms.length === 0) {
           toast({
             variant: "destructive",
-            title: "Aucun rapport à générer",
+            title: "Aucune chambre assignée",
             description: "Aucune femme de chambre n'a de chambres assignées.",
           });
           return;
         }
         
-        // Utiliser la fonction pour générer un PDF combiné
+        // Generate combined report
         await generateCombinedReport(
-          housekeepersWithRooms, 
-          cleaningConfig, 
-          emailAddress, 
+          housekeepersWithRooms.map(name => ({ name, rooms: getHousekeeperRooms(name) })), 
+          confirmedEmail, 
+          cleaningConfig,
           customFields
         );
         
         toast({
-          title: "Rapport combiné généré",
+          title: "Rapports envoyés",
           description: `Un rapport combiné pour ${housekeepersWithRooms.length} femme(s) de chambre a été créé.`,
         });
       }
@@ -728,613 +729,478 @@ const Index = () => {
                     <Input
                       id="user-email"
                       type="email"
-                      placeholder="votre.email@hotel.com"
+                      placeholder="votre@email.com"
                       value={userEmail}
                       onChange={(e) => setUserEmail(e.target.value)}
                     />
                   </div>
                 </div>
-                
-                {/* Affichage de l'hôtel trouvé */}
-                {selectedHotel && (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Building className="h-4 w-4 text-blue-600" />
-                      <div>
-                        <div className="font-semibold text-blue-800">{selectedHotel.name}</div>
-                        <div className="text-sm text-blue-600">Code: {selectedHotel.hotel_code}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
+                {hotelCode && userEmail && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium text-green-600">Configuré</span>
+                      <span className="text-sm text-green-700">
+                        Configuration prête - Hôtel: <strong>{hotelCode}</strong>
+                      </span>
                     </div>
                   </div>
-                 )}
-               </CardContent>
-             </Card>
-           </div>
-        </div>
-          <div className="w-full max-w-md mb-4">
-            <div className="flex items-center space-x-2">
-              <Input 
-                type="email" 
-                placeholder="Email pour les rapports" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1"
-              />
-              {isValid ? (
-                <Badge variant="outline" className="bg-green-100 text-green-800">
-                  Valide
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="bg-red-100 text-red-800">
-                  Invalide
-                </Badge>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center w-full">
-            <div />
-            <div className="flex gap-2 items-center">
-              <NotificationPanel />
-              <Button
-                variant="outline"
-                onClick={() => window.open('/housekeeper', '_blank')}
-                className="btn-modern bg-gradient-accent hover:bg-gradient-accent/90"
-              >
-                <Smartphone className="h-4 w-4 mr-2" />
-                Interface Mobile
-              </Button>
-              <ConfigDialog 
-                config={cleaningConfig} 
-                onConfigChange={handleConfigChange}
-                housekeeperNames={housekeeperNames}
-                onHousekeeperNamesChange={handleHousekeeperNamesChange}
-              />
-              <UploadDialog onPdfProcessed={handlePdfProcessed} />
-            </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
-        
-        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="w-full flex overflow-auto">
-            <TabsTrigger value="overview" className="flex-1">Tableau de Bord</TabsTrigger>
-            <TabsTrigger value="housekeeping" className="flex-1">Femmes de Chambre</TabsTrigger>
-            <TabsTrigger value="rooms" className="flex-1">Toutes les Chambres</TabsTrigger>
-            <TabsTrigger value="clean-rooms" className="flex-1">Chambres Propres</TabsTrigger>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Vue d'ensemble
+            </TabsTrigger>
+            <TabsTrigger value="rooms" className="flex items-center gap-2">
+              <Bed className="h-4 w-4" />
+              Chambres
+            </TabsTrigger>
+            <TabsTrigger value="housekeepers" className="flex items-center gap-2">
+              <UserIcon className="h-4 w-4" />
+              Femmes de chambre
+            </TabsTrigger>
+            <TabsTrigger value="distribution" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Distribution
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Rapports
+            </TabsTrigger>
+            <TabsTrigger value="mobile" className="flex items-center gap-2">
+              <Smartphone className="h-4 w-4" />
+              Mobile
+            </TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="overview" className="space-y-4">
+
+          <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Chambres</CardTitle>
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <Bed className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{totalRooms}</div>
-                  <p className="text-xs text-muted-foreground">Chambres dans le rapport</p>
+                  <p className="text-xs text-muted-foreground">
+                    {roomsToClean} à nettoyer
+                  </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Femmes de Chambre</CardTitle>
+                  <CardTitle className="text-sm font-medium">Femmes de chambre</CardTitle>
                   <UserIcon className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{housekeeperNames.length}</div>
-                  <p className="text-xs text-muted-foreground">Disponibles aujourd'hui</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">À Nettoyer</CardTitle>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{roomsToClean}</div>
-                  <div className="text-xs text-muted-foreground flex flex-col">
-                    <span>{fullCleaningRooms} à blanc / {quickCleaningRooms} recouches</span>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Étages</CardTitle>
-                  <Layers className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{availableFloors.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    {availableFloors.map(f => f === 0 ? 'RDC' : f).join(', ')}
+                    {recommendedHousekeepers} recommandées
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Nettoyage complet</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{fullCleaningRooms}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {quickCleaningRooms} recouches
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Priorité élevée</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">{priorityRooms}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {cleanRooms} déjà propres
                   </p>
                 </CardContent>
               </Card>
             </div>
-            
-            <div className="grid gap-4 md:grid-cols-2">
+
+            <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Importer un Rapport</CardTitle>
+                  <CardTitle>Actions rapides</CardTitle>
                   <CardDescription>
-                    Uploadez un rapport PDF de Mews pour analyser les statuts des chambres
+                    Gérez votre planning de nettoyage
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="border-2 border-dashed border-gray-300 rounded-md p-10 text-center">
-                    <p className="text-gray-500 mb-2">Glissez-déposez votre rapport PDF Mews ici</p>
-                    <p className="text-gray-400 text-sm mb-4">ou</p>
-                    <UploadDialog onPdfProcessed={handlePdfProcessed} />
-                  </div>
+                  <UploadDialog onPdfProcessed={handlePdfProcessed} />
+                  <ConfigDialog 
+                    config={cleaningConfig} 
+                    onConfigChange={handleConfigChange}
+                    housekeeperNames={housekeeperNames}
+                    onHousekeeperNamesChange={handleHousekeeperNamesChange}
+                  />
+                  <Button 
+                    onClick={handleDistributeWithValidation}
+                    className="w-full"
+                    disabled={housekeeperNames.length === 0 || rooms.length === 0}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Distribuer
+                  </Button>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader>
-                  <CardTitle>Statut du Nettoyage</CardTitle>
+                  <CardTitle>Résumé du planning</CardTitle>
                   <CardDescription>
-                    Progression actuelle du nettoyage des chambres
+                    Aperçu des chambres et nettoyages
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <span className="text-sm font-medium flex-1">Chambres Propres</span>
-                        <span className="text-sm text-gray-500">{cleanRooms}/{totalRooms}</span>
-                      </div>
-                      <div className="relative w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className="absolute h-full bg-green-500" 
-                          style={{ width: totalRooms > 0 ? `${(cleanRooms/totalRooms)*100}%` : '0%' }}
-                        ></div>
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Chambres doubles:</span>
+                      <span className="text-sm font-medium">{twinRooms}</span>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <span className="text-sm font-medium flex-1">Chambres Prioritaires</span>
-                        <span className="text-sm text-gray-500">
-                          {priorityRooms > 0 ? 
-                            `${rooms.filter(r => r.priority === 'high' && r.status === 'clean').length}/${priorityRooms}` : 
-                            '0/0'}
-                        </span>
-                      </div>
-                      <div className="relative w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className="absolute h-full bg-red-500" 
-                          style={{ 
-                            width: priorityRooms > 0 ? 
-                              `${(rooms.filter(r => r.priority === 'high' && r.status === 'clean').length/priorityRooms)*100}%` : 
-                              '0%' 
-                          }}
-                        ></div>
-                      </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Temps total estimé:</span>
+                      <span className="text-sm font-medium">
+                        {Math.round(
+                          (fullCleaningRooms * cleaningConfig.fullCleaningTime + 
+                           quickCleaningRooms * cleaningConfig.quickCleaningTime) / 60
+                        )}h
+                      </span>
                     </div>
-                    
-                    {recommendedHousekeepers > 0 && roomsToClean > 0 && (
-                      <Alert className="mt-4 bg-indigo-50">
-                        <AlertTriangle className="h-5 w-5 text-indigo-600" />
-                        <AlertTitle className="text-indigo-700">Recommandation</AlertTitle>
-                        <AlertDescription className="text-indigo-600">
-                          Pour {roomsToClean} chambres à nettoyer, nous recommandons {recommendedHousekeepers} femmes de chambre.
-                          {housekeeperNames.length < recommendedHousekeepers && (
-                            <div className="mt-1 text-xs">
-                              ⚠️ Vous avez actuellement {housekeeperNames.length} femmes de chambre configurées, 
-                              ce qui est insuffisant pour nettoyer toutes les chambres dans un temps raisonnable.
-                            </div>
-                          )}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    <div className="mt-6 space-y-2">
-                      <Button onClick={redistributeRooms} className="w-full">
-                        Distribuer les Chambres
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => openManualAssignment()} 
-                        className="w-full flex items-center justify-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" /> Assigner Manuellement
-                      </Button>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Temps moyen/personne:</span>
+                      <span className="text-sm font-medium">
+                        {housekeeperNames.length > 0 ? 
+                          Math.round(
+                            (fullCleaningRooms * cleaningConfig.fullCleaningTime + 
+                             quickCleaningRooms * cleaningConfig.quickCleaningTime) / 
+                            (60 * housekeeperNames.length)
+                          ) : 0
+                        }h
+                      </span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
-          
-          <TabsContent value="housekeeping" className="space-y-4">
+
+          <TabsContent value="rooms" className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold">Attribution des Chambres</h2>
+              <h2 className="text-2xl font-bold">Gestion des chambres</h2>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <UploadDialog onPdfProcessed={handlePdfProcessed} />
+                <Button
                   onClick={() => openManualAssignment()}
-                  className="flex items-center gap-1"
+                  variant="outline"
+                  disabled={housekeeperNames.length === 0}
                 >
-                  <Plus className="h-4 w-4" /> Assigner manuellement
+                  <Plus className="mr-2 h-4 w-4" />
+                  Assignation manuelle
+                </Button>
+              </div>
+            </div>
+
+            {rooms.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Aucune chambre importée</h3>
+                  <p className="text-muted-foreground text-center mb-4">
+                    Importez un fichier PDF pour commencer à gérer vos chambres
+                  </p>
+                  <UploadDialog onPdfProcessed={handlePdfProcessed} />
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>N° Chambre</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Type de nettoyage</TableHead>
+                      <TableHead>Priorité</TableHead>
+                      <TableHead>Assignée à</TableHead>
+                      <TableHead>Jumelle</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rooms.map((room) => (
+                      <TableRow key={room.number}>
+                        <TableCell className="font-medium">{room.number}</TableCell>
+                        <TableCell>{getStatusBadge(room.status)}</TableCell>
+                        <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
+                        <TableCell>
+                          {room.priority === 'high' ? (
+                            <Badge variant="destructive">Élevée</Badge>
+                          ) : (
+                            <Badge variant="secondary">Normale</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {room.assignedTo ? (
+                            <Badge variant="outline">{room.assignedTo}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">Non assignée</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Checkbox
+                            checked={room.isTwin || false}
+                            onCheckedChange={(checked) => {
+                              handleRoomUpdate({ ...room, isTwin: checked as boolean });
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <RoomCard
+                            room={room}
+                            onUpdate={handleRoomUpdate}
+                            onUnassign={handleRoomUnassign}
+                            housekeeperNames={housekeeperNames}
+                            compact={true}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="housekeepers" className="space-y-6">
+            <HousekeeperSetup
+              housekeeperNames={housekeeperNames}
+              onHousekeeperNamesChange={handleHousekeeperNamesChange}
+              availableFloors={availableFloors}
+              housekeeperFloorPreferences={housekeeperFloorPreferences}
+              onFloorPreferenceChange={handleFloorPreferenceChange}
+              cleaningConfig={cleaningConfig}
+              housekeeperMaxRoomsOverrides={housekeeperMaxRoomsOverrides}
+              onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
+              recommendedHousekeepers={recommendedHousekeepers}
+            />
+          </TabsContent>
+
+          <TabsContent value="distribution" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Distribution des chambres</h2>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleDistributeWithValidation}
+                  disabled={housekeeperNames.length === 0 || rooms.length === 0}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Redistribuer
                 </Button>
                 <Button
+                  onClick={() => openManualAssignment()}
                   variant="outline"
-                  onClick={handleGenerateAllReports}
-                  className="flex items-center gap-1"
-                  disabled={!isValid && rooms.length === 0}
+                  disabled={housekeeperNames.length === 0}
                 >
-                  <FileDown className="h-4 w-4" /> Télécharger tous les rapports
-                </Button>
-                <Button 
-                  onClick={redistributeRooms} 
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Distribuer les Chambres
+                  <Plus className="mr-2 h-4 w-4" />
+                  Assignation manuelle
                 </Button>
               </div>
             </div>
-            
-            {/* Recommandation pour le nombre de femmes de chambre */}
-            {recommendedHousekeepers > 0 && roomsToClean > 0 && (
-              <Alert className="bg-indigo-50 mb-4">
-                <AlertTriangle className="h-5 w-5 text-indigo-600" />
-                <AlertTitle className="text-indigo-700">Recommandation de personnel</AlertTitle>
-                <AlertDescription className="text-indigo-600">
-                  Pour nettoyer {roomsToClean} chambres ({fullCleaningRooms} à blanc, {quickCleaningRooms} recouches), 
-                  nous recommandons {recommendedHousekeepers} femmes de chambre.
-                  {housekeeperNames.length < recommendedHousekeepers && (
-                    <div className="mt-1 font-medium">
-                      ⚠️ Vous avez actuellement {housekeeperNames.length} femmes de chambre configurées, 
-                      ce qui est insuffisant pour la charge de travail actuelle.
-                    </div>
-                  )}
+
+            {!isDistributed ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Distribution non effectuée</h3>
+                  <p className="text-muted-foreground text-center mb-4">
+                    Cliquez sur "Distribuer" pour répartir automatiquement les chambres
+                  </p>
+                  <Button
+                    onClick={handleDistributeWithValidation}
+                    disabled={housekeeperNames.length === 0 || rooms.length === 0}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Distribuer maintenant
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {housekeeperNames.map((name) => {
+                    const housekeeperRooms = getHousekeeperRooms(name);
+                    return (
+                      <HousekeeperCard
+                        key={name}
+                        name={name}
+                        rooms={housekeeperRooms}
+                        cleaningConfig={cleaningConfig}
+                        onGenerateReport={handleGenerateReport}
+                        onDeleteHousekeeper={handleDeleteHousekeeper}
+                        onRenameHousekeeper={handleRenameHousekeeper}
+                        onOpenManualAssignment={openManualAssignment}
+                        accessCode={housekeeperAccessCodes[name] || ''}
+                      />
+                    );
+                  })}
+                  <UnassignedRoomsColumn
+                    unassignedRooms={getUnassignedRooms()}
+                    onOpenManualAssignment={openManualAssignment}
+                  />
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Rapports</h2>
+              <Button
+                onClick={handleGenerateAllReports}
+                disabled={!isDistributed || housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0).length === 0}
+              >
+                <FileDown className="mr-2 h-4 w-4" />
+                Générer tous les rapports
+              </Button>
+            </div>
+
+            {!isDistributed ? (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Distribution requise</AlertTitle>
+                <AlertDescription>
+                  Vous devez d'abord distribuer les chambres pour générer des rapports.
                 </AlertDescription>
               </Alert>
-            )}
-            
-            {unassignedRooms.length > 0 && (
-              <div className="mb-6">
-                <UnassignedRoomsColumn
-                  rooms={unassignedRooms}
-                  onRoomUpdate={handleRoomUpdate}
-                  draggable={true}
-                />
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className={`grid gap-4 md:col-span-4 grid-cols-1 md:grid-cols-2`}>
-                {housekeeperNames.map((name) => (
-                  <HousekeeperCard 
-                    key={name}
-                    name={name}
-                    onRename={(newName) => handleRenameHousekeeper(name, newName)}
-                    rooms={getHousekeeperRooms(name)}
-                    onRoomUpdate={handleRoomUpdate}
-                    onRoomUnassign={handleRoomUnassign}
-                    onGenerateReport={handleGenerateReport}
-                    cleaningConfig={cleaningConfig}
-                    draggable={true}
-                    availableFloors={availableFloors}
-                    preferredFloors={housekeeperFloorPreferences[name] || []}
-                    onFloorPreferenceChange={handleFloorPreferenceChange}
-                    onManualAssign={() => openManualAssignment(name)}
-                    unassignedRooms={rooms.filter(room => room.cleaningType !== 'none')} // Passer toutes les chambres, pas seulement les non-assignées
-                    showUnassignedColumn={false} // On n'affiche plus les chambres non assignées dans la carte
-                    onAssignRoom={(room) => handleRoomUpdate({...room, assignedTo: name})}
-                    accessCode={housekeeperAccessCodes[name]}
-                    onDelete={handleDeleteHousekeeper}
-                    maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
-                    onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
-                  />
-                ))}
-                
-                {housekeeperNames.length === 0 && (
-                  <div className="col-span-full text-center py-8 text-gray-500">
-                    <p>Aucune femme de chambre configurée.</p>
-                    <Button 
-                      onClick={() => setActiveTab("overview")} 
-                      variant="link" 
-                      className="mt-2"
-                    >
-                      Configurer les femmes de chambre
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="rooms" className="space-y-4">
-            <Card>
-              <CardHeader className="flex justify-between items-start">
-                <div>
-                  <CardTitle>Toutes les Chambres</CardTitle>
-                  <CardDescription>
-                    Visualiser et gérer toutes les chambres de l'hôtel
-                  </CardDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => openManualAssignment()}
-                  className="flex items-center gap-1"
-                >
-                  <Plus className="h-4 w-4" /> Assigner chambres
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {Object.entries(roomsByFloor)
-                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                    .map(([floor, floorRooms]) => (
-                      <div key={floor} className="space-y-2">
-                        <h3 className="font-semibold flex items-center gap-2">
-                          <Layers className="h-4 w-4" /> 
-                          Étage {floor === '0' ? 'RDC' : floor}
-                          <Badge variant="outline" className="bg-gray-100 ml-2">
-                            {floorRooms.length} chambres
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {housekeeperNames.map((name) => {
+                  const housekeeperRooms = getHousekeeperRooms(name);
+                  if (housekeeperRooms.length === 0) return null;
+                  
+                  return (
+                    <Card key={name}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <span>{name}</span>
+                          <Badge variant="secondary">
+                            {housekeeperRooms.length} chambres
                           </Badge>
-                        </h3>
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Chambre</TableHead>
-                                <TableHead>Statut</TableHead>
-                                <TableHead>Type Nettoyage</TableHead>
-                                <TableHead>Twin</TableHead>
-                                <TableHead>Priorité</TableHead>
-                                <TableHead>Assignée À</TableHead>
-                                <TableHead>Action</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {floorRooms.map((room) => (
-                                <TableRow key={room.number} className="hover:bg-gray-50">
-                                  <TableCell>{room.number}</TableCell>
-                                  <TableCell>{getStatusBadge(room.status)}</TableCell>
-                                  <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
-                                  <TableCell>
-                                    <Checkbox 
-                                      checked={room.isTwin || false}
-                                      onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex gap-2">
-                                      <Checkbox 
-                                        id={`urgent-table-${room.number}`}
-                                        checked={room.isUrgent || false}
-                                        onCheckedChange={(checked) => {
-                                          handleRoomUpdate({
-                                            ...room, 
-                                            isUrgent: !!checked,
-                                            notUrgent: false,
-                                            priority: !!checked ? 'high' : 'medium'
-                                          });
-                                        }}
-                                      />
-                                      <label htmlFor={`urgent-table-${room.number}`} className="text-xs text-red-500">
-                                        Urgent
-                                      </label>
-                                      
-                                      <Checkbox 
-                                        id={`noturgent-table-${room.number}`}
-                                        checked={room.notUrgent || false}
-                                        onCheckedChange={(checked) => {
-                                          handleRoomUpdate({
-                                            ...room, 
-                                            notUrgent: !!checked,
-                                            isUrgent: false,
-                                            priority: !!checked ? 'low' : 'medium'
-                                          });
-                                        }}
-                                      />
-                                      <label htmlFor={`noturgent-table-${room.number}`} className="text-xs text-green-500">
-                                        Pas urgent
-                                      </label>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    {room.assignedTo || 'Non assignée'}
-                                  </TableCell>
-                                  <TableCell>
-                                    <select 
-                                      className="border rounded px-2 py-1 text-sm"
-                                      value={room.assignedTo || ''}
-                                      onChange={(e) => {
-                                        const newAssignee = e.target.value;
-                                        if (newAssignee) {
-                                          // Vérifier si l'housekeeper a atteint sa limite de chambres
-                                          const currentRoomsCount = getHousekeeperRooms(newAssignee).length;
-                                          const maxRooms = housekeeperMaxRoomsOverrides[newAssignee] || cleaningConfig.maxRoomsPerHousekeeper;
-                                          
-                                          if (currentRoomsCount >= maxRooms) {
-                                            toast({
-                                              variant: "destructive",
-                                              title: "Limite atteinte",
-                                              description: `${newAssignee} a déjà ${currentRoomsCount} chambres assignées (limite: ${maxRooms}).`,
-                                            });
-                                            return;
-                                          }
-                                        }
-                                        
-                                        handleRoomUpdate({...room, assignedTo: e.target.value || undefined})
-                                      }}
-                                    >
-                                      <option value="">Non assignée</option>
-                                      {housekeeperNames.map(name => (
-                                        <option key={name} value={name}>{name}</option>
-                                      ))}
-                                    </select>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 mb-4">
+                          <div className="text-sm">
+                            <span className="font-medium">Nettoyage complet:</span>{" "}
+                            {housekeeperRooms.filter(r => r.cleaningType === 'full').length}
+                          </div>
+                          <div className="text-sm">
+                            <span className="font-medium">Recouches:</span>{" "}
+                            {housekeeperRooms.filter(r => r.cleaningType === 'quick').length}
+                          </div>
+                          <div className="text-sm">
+                            <span className="font-medium">Temps estimé:</span>{" "}
+                            {Math.round(calculateHousekeeperLoad(housekeeperRooms, cleaningConfig) / 60)}h
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
-              {rooms.filter(room => room.cleaningType !== 'none' && !room.assignedTo).map(room => (
-                <RoomCard 
-                  key={room.number} 
-                  room={room} 
-                  onUpdate={handleRoomUpdate} 
-                  draggable={true}
-                />
-              ))}
-            </div>
+                        <Button
+                          onClick={() => handleGenerateReport(name, housekeeperRooms)}
+                          className="w-full"
+                          size="sm"
+                        >
+                          <FileDown className="mr-2 h-4 w-4" />
+                          Générer rapport
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
-          
-          <TabsContent value="clean-rooms" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Chambres Propres</CardTitle>
-                  <CardDescription>
-                    Liste des chambres propres disponibles
-                  </CardDescription>
-                </div>
-                <Badge className="bg-green-100 text-green-800 hover:bg-green-200 text-base py-1 px-3">
-                  {cleanRooms} Chambres
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                {cleanRooms === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Check className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-                    <p className="text-lg">Aucune chambre propre disponible</p>
-                    <p className="text-sm mt-1">Toutes les chambres sont à nettoyer ou en maintenance</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {Object.entries(roomsByFloor)
-                      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                      .map(([floor, floorRooms]) => {
-                        const cleanFloorRooms = floorRooms.filter(room => room.status === 'clean');
-                        if (cleanFloorRooms.length === 0) return null;
-                        
-                        return (
-                          <div key={floor} className="space-y-2">
-                            <h3 className="font-semibold flex items-center gap-2">
-                              <Layers className="h-4 w-4" /> 
-                              Étage {floor === '0' ? 'RDC' : floor}
-                              <Badge variant="outline" className="bg-green-100 ml-2">
-                                {cleanFloorRooms.length} propres
-                              </Badge>
-                            </h3>
-                            <div className="overflow-x-auto">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Chambre</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Twin</TableHead>
-                                    <TableHead>Priorité</TableHead>
-                                    <TableHead>Action</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {cleanFloorRooms
-                                    .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }))
-                                    .map((room) => (
-                                      <TableRow key={room.number} className="hover:bg-gray-50">
-                                        <TableCell className="font-medium">{room.number}</TableCell>
-                                        <TableCell>{getStatusBadge(room.status)}</TableCell>
-                                        <TableCell>
-                                          <Checkbox 
-                                            checked={room.isTwin || false}
-                                            onCheckedChange={(checked) => handleRoomUpdate({...room, isTwin: !!checked})}
-                                          />
-                                        </TableCell>
-                                        <TableCell>
-                                          <div className="flex gap-2">
-                                            <Checkbox 
-                                              id={`urgent-clean-${room.number}`}
-                                              checked={room.isUrgent || false}
-                                              onCheckedChange={(checked) => {
-                                                handleRoomUpdate({
-                                                  ...room, 
-                                                  isUrgent: !!checked,
-                                                  notUrgent: false,
-                                                  priority: !!checked ? 'high' : 'medium'
-                                                });
-                                              }}
-                                            />
-                                            <label htmlFor={`urgent-clean-${room.number}`} className="text-xs text-red-500">
-                                              Urgent
-                                            </label>
-                                            
-                                            <Checkbox 
-                                              id={`noturgent-clean-${room.number}`}
-                                              checked={room.notUrgent || false}
-                                              onCheckedChange={(checked) => {
-                                                handleRoomUpdate({
-                                                  ...room, 
-                                                  notUrgent: !!checked,
-                                                  isUrgent: false,
-                                                  priority: !!checked ? 'low' : 'medium'
-                                                });
-                                              }}
-                                            />
-                                            <label htmlFor={`noturgent-clean-${room.number}`} className="text-xs text-green-500">
-                                              Pas urgent
-                                            </label>
-                                          </div>
-                                        </TableCell>
-                                        <TableCell>
-                                          <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            onClick={() => handleRoomUpdate({
-                                              ...room,
-                                              status: 'needs-cleaning',
-                                              cleaningType: 'full'
-                                            })}
-                                          >
-                                            Marquer à nettoyer
-                                          </Button>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                </TableBody>
-                              </Table>
+
+          <TabsContent value="mobile" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Accès mobile</h2>
+            </div>
+
+            {!isDistributed ? (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Distribution requise</AlertTitle>
+                <AlertDescription>
+                  Vous devez d'abord distribuer les chambres pour générer les codes d'accès mobile.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <NotificationPanel />
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {housekeeperNames.map((name) => {
+                    const housekeeperRooms = getHousekeeperRooms(name);
+                    const accessCode = housekeeperAccessCodes[name] || '';
+                    
+                    return (
+                      <Card key={name}>
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <span>{name}</span>
+                            <Badge variant="secondary">
+                              {housekeeperRooms.length} chambres
+                            </Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="text-center">
+                              <div className="text-sm text-muted-foreground mb-2">
+                                Code d'accès mobile
+                              </div>
+                              <div className="text-2xl font-mono font-bold bg-slate-100 rounded-lg py-3 px-4">
+                                {accessCode}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <Button
+                                onClick={() => navigate(`/housekeeper?code=${accessCode}`)}
+                                className="w-full"
+                                size="sm"
+                              >
+                                <Smartphone className="mr-2 h-4 w-4" />
+                                Ouvrir interface mobile
+                              </Button>
                             </div>
                           </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
-              {rooms.filter(room => room.status === 'clean').map(room => (
-                <RoomCard 
-                  key={room.number} 
-                  room={room} 
-                  onUpdate={handleRoomUpdate} 
-                  draggable={true}
-                />
-              ))}
-            </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       </div>
-      
+
       <ManualAssignmentDialog
         isOpen={isManualAssignmentOpen}
         onClose={() => setIsManualAssignmentOpen(false)}
+        onConfirm={handleManualAssign}
         rooms={rooms}
         housekeeperNames={housekeeperNames}
-        onAssignRooms={handleManualAssign}
-        housekeeperPreferredFloors={housekeeperFloorPreferences}
+        selectedHousekeeper={selectedHousekeeper}
       />
       
       <EmailDialog
