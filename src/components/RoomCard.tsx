@@ -125,15 +125,15 @@ export function RoomCard({
     }
   };
 
-  const setCleaningType = (type: 'full' | 'quick' | 'none') => {
+  const setCleaningType = (type: 'full' | 'quick') => {
     onUpdate({
       ...room,
       cleaningType: type,
-      status: type === 'none' ? 'clean' : 'needs-cleaning'
+      status: 'needs-cleaning'
     });
     
     toast({
-      description: `Chambre ${room.number} : nettoyage ${type === 'full' ? 'à blanc' : type === 'quick' ? 'recouche' : 'aucun'}`
+      description: `Chambre ${room.number} : nettoyage ${type === 'full' ? 'départ (à blanc)' : 'recouche'}`
     });
   };
 
@@ -206,7 +206,13 @@ export function RoomCard({
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
-                setCleaningType('none');
+                onUpdate({
+                  ...room,
+                  status: 'clean'
+                });
+                toast({
+                  description: `Chambre ${room.number} marquée comme propre`
+                });
               }}
               title="Marquer comme propre"
             >
@@ -270,7 +276,7 @@ export function RoomCard({
         <RadioGroup 
           value={room.cleaningType} 
           className="flex gap-2"
-          onValueChange={(value) => setCleaningType(value as 'full' | 'quick' | 'none')}
+          onValueChange={(value) => setCleaningType(value as 'full' | 'quick')}
         >
           <div className="flex items-center space-x-1">
             <RadioGroupItem value="full" id={`full-${room.number}`} />
@@ -278,7 +284,7 @@ export function RoomCard({
               htmlFor={`full-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
             >
-              À Blanc
+              Départ (À Blanc)
             </Label>
           </div>
           <div className="flex items-center space-x-1">
