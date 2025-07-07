@@ -181,13 +181,16 @@ export default function Housekeeper() {
 
   // Fonction pour gérer la mise à jour du statut des chambres
   const handleUpdateRoomStatus = async (roomNumber: string, newStatus: string) => {
+    console.log('Housekeeper - updateRoomStatus:', roomNumber, newStatus, selectedHousekeeper); // Debug
+    
     // Utiliser la fonction du contexte qui gère les notifications
     updateRoomStatus(roomNumber, newStatus, selectedHousekeeper);
     
     const statusMessages = {
       'clean': 'Chambre marquée comme nettoyée !',
       'in-progress': 'Nettoyage en cours',
-      'needs-attention': 'Remarque signalée'
+      'needs-attention': 'Remarque signalée',
+      'ready-to-clean': 'Chambre marquée comme prête à nettoyer'
     };
     
     // Si la chambre est marquée comme "clean" (terminée), envoyer une notification spéciale

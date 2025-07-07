@@ -159,22 +159,29 @@ export function RoomCard({
         onDragEnd={handleDragEnd}
         onClick={handleClick}
       >
-        <span className="font-semibold text-sm">{room.number}</span>
-        {room.cleaningType !== 'none' && (
-          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-            room.cleaningType === 'full' 
-              ? 'bg-purple-100 text-purple-700' 
-              : 'bg-blue-100 text-blue-700'
-          }`}>
-            {room.cleaningType === 'full' ? 'B' : 'R'}
-          </span>
-        )}
-        {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground" />}
-        <span className="text-xs text-muted-foreground ml-auto font-medium">{floorDisplay}</span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="font-semibold text-sm whitespace-nowrap">{room.number}</span>
+          {room.cleaningType !== 'none' && (
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+              room.cleaningType === 'full' 
+                ? 'bg-purple-100 text-purple-700' 
+                : 'bg-blue-100 text-blue-700'
+            }`}>
+              {room.cleaningType === 'full' ? 'B' : 'R'}
+            </span>
+          )}
+          {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+          {room.status === 'ready-to-clean' && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+              🚪
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground font-medium flex-shrink-0">{floorDisplay}</span>
         
         {/* Boutons de changement rapide */}
         {showActions && (
-          <div className="ml-2 flex items-center gap-1">
+          <div className="ml-2 flex items-center gap-1 flex-shrink-0">
             <button 
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-purple-100 text-purple-700 transition-colors font-semibold text-xs"
               onClick={(e) => {

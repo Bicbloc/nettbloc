@@ -79,11 +79,13 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     const statusMessages = {
       'clean': 'a terminé le nettoyage de la chambre',
       'in-progress': 'a commencé le nettoyage de la chambre',
-      'needs-attention': 'a signalé une remarque pour la chambre'
+      'needs-attention': 'a signalé une remarque pour la chambre',
+      'ready-to-clean': 'a marqué la chambre comme prête à nettoyer'
     };
 
     const message = statusMessages[newStatus as keyof typeof statusMessages];
     if (message && housekeeperName) {
+      console.log('Envoi notification:', housekeeperName, roomNumber, newStatus); // Debug
       addNotification({
         title: `${housekeeperName} - Chambre ${roomNumber}`,
         description: `${housekeeperName} ${message} ${roomNumber}`,
