@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ConfigDialog } from "@/components/ConfigDialog";
@@ -596,6 +596,14 @@ const Index = () => {
           <div className="flex justify-between items-center w-full">
             <div />
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => window.open('/housekeeper', '_blank')}
+                className="btn-modern bg-gradient-accent hover:bg-gradient-accent/90"
+              >
+                <Smartphone className="h-4 w-4 mr-2" />
+                Interface Mobile
+              </Button>
               <ConfigDialog 
                 config={cleaningConfig} 
                 onConfigChange={handleConfigChange}
