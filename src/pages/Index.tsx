@@ -649,7 +649,7 @@ const Index = () => {
     try {
       if (reportAction === "single") {
         const housekeeperRooms = getHousekeeperRooms(reportHousekeeper);
-        await generateReport(reportHousekeeper, housekeeperRooms, confirmedEmail, cleaningConfig, customFields);
+        await generateReport(reportHousekeeper, housekeeperRooms, cleaningConfig, confirmedEmail, customFields);
         
         toast({
           title: "Rapport envoyé",
@@ -671,8 +671,8 @@ const Index = () => {
         // Generate combined report
         await generateCombinedReport(
           housekeepersWithRooms.map(name => ({ name, rooms: getHousekeeperRooms(name) })), 
-          confirmedEmail, 
           cleaningConfig,
+          confirmedEmail, 
           customFields
         );
         
@@ -971,7 +971,6 @@ const Index = () => {
                             room={room}
                             onUpdate={handleRoomUpdate}
                             onUnassign={handleRoomUnassign}
-                            housekeeperNames={housekeeperNames}
                             compact={true}
                           />
                         </TableCell>
@@ -984,17 +983,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="housekeepers" className="space-y-6">
-            <HousekeeperSetup
-              housekeeperNames={housekeeperNames}
-              onHousekeeperNamesChange={handleHousekeeperNamesChange}
-              availableFloors={availableFloors}
-              housekeeperFloorPreferences={housekeeperFloorPreferences}
-              onFloorPreferenceChange={handleFloorPreferenceChange}
-              cleaningConfig={cleaningConfig}
-              housekeeperMaxRoomsOverrides={housekeeperMaxRoomsOverrides}
-              onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
-              recommendedHousekeepers={recommendedHousekeepers}
-            />
+            <HousekeeperSetup />
           </TabsContent>
 
           <TabsContent value="distribution" className="space-y-6">
@@ -1048,16 +1037,22 @@ const Index = () => {
                         rooms={housekeeperRooms}
                         cleaningConfig={cleaningConfig}
                         onGenerateReport={handleGenerateReport}
-                        onDeleteHousekeeper={handleDeleteHousekeeper}
-                        onRenameHousekeeper={handleRenameHousekeeper}
-                        onOpenManualAssignment={openManualAssignment}
+                        onRoomUpdate={handleRoomUpdate}
+                        onRoomUnassign={handleRoomUnassign}
+                        availableFloors={availableFloors}
+                        onFloorPreferenceChange={handleFloorPreferenceChange}
+                        preferredFloors={housekeeperFloorPreferences[name] || []}
+                        onDelete={handleDeleteHousekeeper}
+                        maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
+                        onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
+                        onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
                         accessCode={housekeeperAccessCodes[name] || ''}
                       />
                     );
                   })}
                   <UnassignedRoomsColumn
-                    unassignedRooms={getUnassignedRooms()}
-                    onOpenManualAssignment={openManualAssignment}
+                    rooms={getUnassignedRooms()}
+                    onRoomUpdate={handleRoomUpdate}
                   />
                 </div>
               </div>
@@ -1197,10 +1192,10 @@ const Index = () => {
       <ManualAssignmentDialog
         isOpen={isManualAssignmentOpen}
         onClose={() => setIsManualAssignmentOpen(false)}
-        onConfirm={handleManualAssign}
         rooms={rooms}
         housekeeperNames={housekeeperNames}
-        selectedHousekeeper={selectedHousekeeper}
+        onAssignRooms={handleManualAssign}
+        housekeeperPreferredFloors={housekeeperFloorPreferences}
       />
       
       <EmailDialog
