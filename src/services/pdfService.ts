@@ -84,83 +84,91 @@ export async function processPdf(file: File): Promise<Room[]> {
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
   
-  // Patterns améliorés pour détecter les numéros de chambre dans différents formats
-  const patterns = [
-    /\b(Spaces|Espace)\s+(\d{3})\b/gi,
-    /\b([1-9]\d{2})\s+(SGL|DBL|TWN|DBS|TWS|DIR|CL|INS|SP|DX|CB)\b/gi,
-    /\b([1-9]\d{2})\b(?=\s*[A-Z]{2,3})/g,
-    /\b(Room|Chambre)\s+(\d{3})\b/gi,
-    /\b([1-9]\d{2})\s*-\s*[A-Z]/gi,
-    /\b(No\.|N°)\s*(\d{3})\b/gi,
-    /\b(\d{3})\s*\(/gi,
-    /\b(\d{1,2})(\d{2})\b(?!\d)/g
-  ];
-  
-  // Utiliser chaque pattern pour trouver les numéros de chambre
+// Pattern simplifié et plus efficace basé sur la logique Express.js
+  const roomPattern = /\b([1-9]\d{2})\s+(DIR|CL|INS)?/g;
   const foundRooms = new Set();
   
-  for (const pattern of patterns) {
-    let match;
-    pattern.lastIndex = 0;
+  let match;
+  while ((match = roomPattern.exec(text)) !== null) {
+    const roomNumber = match[1];
+    const status = match[2] || '';
     
-    while ((match = pattern.exec(text)) !== null) {
-      let roomNumber;
-      
-      if (match[1] === 'Spaces' || match[1] === 'Espace' || match[1] === 'Room' || match[1] === 'Chambre' || match[1] === 'No.' || match[1] === 'N°') {
-        roomNumber = match[2];
-      } else if (pattern.source.includes('\\d{1,2})(\\d{2})')) {
-        roomNumber = match[0];
-      } else {
-        roomNumber = match[1];
-      }
-      
-      if (!/^\d+$/.test(roomNumber)) continue;
-      
-      // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
-      if (/^20(2[5-8])$/.test(roomNumber)) continue;
-      
-      // Normaliser le format du numéro
-      roomNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
-      
-      // Éviter les doublons
-      if (foundRooms.has(roomNumber)) continue;
-      foundRooms.add(roomNumber);
-      
-      // Extraire un contexte plus large (400 caractères au lieu de 200)
-      const start = Math.max(0, match.index - 400);
-      const end = Math.min(text.length, match.index + 400);
-      const context = text.substring(start, end);
-      
-      console.log(`=== ANALYSE DÉTAILLÉE CHAMBRE ${roomNumber} ===`);
-      console.log(`Position dans le texte: ${match.index}`);
-      console.log(`Contexte complet (800 chars):`, context);
-      
-      // Analyser le statut et le type de nettoyage avec la nouvelle logique améliorée
-      const { status, cleaningType } = determineCleaningTypeImproved(context, roomNumber);
-      
-      console.log(`RÉSULTAT FINAL pour chambre ${roomNumber}: status=${status}, cleaningType=${cleaningType}`);
-      console.log(`=== FIN ANALYSE CHAMBRE ${roomNumber} ===\n`);
-      
-      // Déterminer si c'est une chambre twin
-      const isTwin = /TWN|TWS/.test(context);
-      
-      // Déterminer la priorité
-      const priority = determinePriority(context);
-      
-      // Déterminer l'étage
-      const floor = getRoomFloor(roomNumber);
-      
-      rooms.push({
-        number: roomNumber,
-        status,
-        cleaningType,
-        priority,
-        isTwin,
-        isUrgent: priority === 'high',
-        notUrgent: priority === 'low',
-        floor
-      });
+    // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
+    if (/^20(2[5-8])$/.test(roomNumber)) continue;
+    
+    // Normaliser le format du numéro
+    const normalizedRoomNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
+    
+    // Éviter les doublons
+    if (foundRooms.has(normalizedRoomNumber)) continue;
+    foundRooms.add(normalizedRoomNumber);
+    
+    // Extraire un contexte plus large (300 caractères de chaque côté)
+    const start = Math.max(0, match.index - 300);
+    const end = Math.min(text.length, match.index + 300);
+    const context = text.substring(start, end);
+    
+    console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
+    console.log(`Statut détecté: ${status}`);
+    console.log(`Contexte:`, context.substring(0, 200) + "...");
+    
+    // Logique simplifiée basée sur votre code Express.js
+    let cleaningType: 'full' | 'quick' | 'none' = 'none';
+    let roomStatus = 'clean';
+    
+    // Chambre à blanc (nettoyage complet)
+    if (/DIR/.test(context) || /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context)) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ Chambre à blanc détectée`);
     }
+    // Recouche (nettoyage rapide)  
+    else if (/Night \d+\/\d+/.test(context)) {
+      cleaningType = 'quick';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ Recouche détectée`);
+    }
+    // Chambre propre
+    else if (/CL|INS/.test(status)) {
+      cleaningType = 'none';
+      roomStatus = 'clean';
+      console.log(`→ Chambre propre`);
+    }
+    // Occupée
+    else if (/OCC/.test(context)) {
+      cleaningType = 'none';
+      roomStatus = 'occupied';
+      console.log(`→ Chambre occupée`);
+    }
+    // Par défaut: nettoyage complet
+    else {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ Nettoyage complet par défaut`);
+    }
+    
+    console.log(`RÉSULTAT: ${roomStatus} / ${cleaningType}`);
+    console.log(`=== FIN ANALYSE CHAMBRE ${normalizedRoomNumber} ===\n`);
+    
+    // Déterminer si c'est une chambre twin
+    const isTwin = /TWN|TWS/.test(context);
+    
+    // Déterminer la priorité
+    const priority = determinePriority(context);
+    
+    // Déterminer l'étage
+    const floor = getRoomFloor(normalizedRoomNumber);
+    
+    rooms.push({
+      number: normalizedRoomNumber,
+      status: roomStatus,
+      cleaningType,
+      priority,
+      isTwin,
+      isUrgent: priority === 'high',
+      notUrgent: priority === 'low',
+      floor
+    });
   }
   
   console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
