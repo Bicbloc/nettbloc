@@ -36,6 +36,7 @@ import { NotificationPanel } from "@/components/NotificationPanel";
 import { HotelSetup } from "@/components/HotelSetup";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
+import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -75,6 +76,7 @@ const Index = () => {
   const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
   const [hotelCode, setHotelCode] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -84,13 +86,22 @@ const Index = () => {
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
 
-  // Charger les valeurs depuis localStorage
+  // Charger les valeurs depuis localStorage et vérifier l'authentification
   useEffect(() => {
     const savedHotelCode = localStorage.getItem('selectedHotelCode');
     const savedUserEmail = localStorage.getItem('userEmail');
     
-    if (savedHotelCode) setHotelCode(savedHotelCode);
-    if (savedUserEmail) setUserEmail(savedUserEmail);
+    if (savedHotelCode && savedUserEmail) {
+      setHotelCode(savedHotelCode);
+      setUserEmail(savedUserEmail);
+      
+      // Vérifier l'association email/code hôtel
+      const storedCode = getHotelCodeForEmail(savedUserEmail);
+      
+      if (storedCode === savedHotelCode) {
+        setIsAuthenticated(true);
+      }
+    }
   }, []);
   
   // Calculer le nombre recommandé de femmes de chambre
@@ -690,7 +701,57 @@ const Index = () => {
     }
   };
   
-  return (
+  // Interface de connexion si pas encore authentifié
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">NettoBloc</CardTitle>
+            <CardDescription>
+              Veuillez vous identifier pour accéder à l'interface
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="votre@email.com"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hotelCode">Code de l'hôtel</Label>
+              <Input
+                id="hotelCode"
+                type="text"
+                placeholder="CODE123"
+                value={hotelCode}
+                onChange={(e) => setHotelCode(e.target.value)}
+              />
+            </div>
+            <Button 
+              onClick={() => handleEmailHotelSetup(userEmail, hotelCode)}
+              className="w-full"
+            >
+              Confirmer
+            </Button>
+            <div className="text-center pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate("/housekeeper-login")}
+              >
+                Accès Femme de Chambre
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
     <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container mx-auto py-6">
         <div className="flex flex-col items-center mb-6">
