@@ -224,7 +224,7 @@ function parseRoomsFromText(text: string): Room[] {
     
     console.log(`Détection recouche: ${dates.length} dates, pas d'horaires=${!hasTimeOnly}, isRecouche=${isRecouche}`);
     
-    // LOGIQUE RÉVISÉE AVEC PRIORITÉ AUX BLOCS MULTIPLES
+    // LOGIQUE RÉVISÉE AVEC PRIORITÉ CORRECTE
     
     // 1. Chambre occupée (OCC)
     if (hasOCC) {
@@ -232,23 +232,23 @@ function parseRoomsFromText(text: string): Room[] {
       roomStatus = 'occupied';
       console.log(`→ Chambre occupée (OCC)`);
     }
-    // 2. PRIORITÉ: Deux blocs ou plus → À blanc (MÊME AVEC INS)
-    else if (reservationBlocks >= 2) {
-      cleaningType = 'full';
-      roomStatus = 'needs-cleaning';
-      console.log(`→ À BLANC (${reservationBlocks} blocs détectés - départ + arrivée même jour)`);
-    }
-    // 3. DIR ou Dirty présent → À blanc
+    // 2. DIR ou Dirty présent → À blanc (priorité haute)
     else if (hasDIR) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
       console.log(`→ À blanc (DIR/Dirty détecté)`);
     }
-    // 4. Recouche détectée → Quick cleaning
+    // 3. Recouche détectée → Quick cleaning (AVANT les blocs multiples)
     else if (isRecouche) {
       cleaningType = 'quick';
       roomStatus = 'needs-cleaning';
       console.log(`→ Recouche (deux dates sans horaires: ${dates.join(', ')})`);
+    }
+    // 4. Deux blocs distincts (non recouche) → À blanc
+    else if (reservationBlocks >= 2 && !isRecouche) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ À BLANC (${reservationBlocks} blocs distincts détectés)`);
     }
     // 5. Pas de dates + statut CL/INS ET un seul bloc → Propre
     else if (dates.length === 0 && (hasINS || hasCL) && reservationBlocks <= 1) {
