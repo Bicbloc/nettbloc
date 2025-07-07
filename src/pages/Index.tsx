@@ -569,9 +569,9 @@ const Index = () => {
       if (!hotel) {
         // Créer l'hôtel s'il n'existe pas
         hotel = await SupabaseService.createHotel(
-          hotelCode,
-          hotelCode,
-          userEmail
+          hotelCode,  // name
+          userEmail,  // email
+          hotelCode   // hotelCode
         );
         console.log("Hôtel créé:", hotel);
       }
