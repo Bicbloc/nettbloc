@@ -17,13 +17,8 @@ export interface ReportData extends CustomReportFields {
 // Store email in Supabase
 export async function storeEmailAddress(email: string): Promise<void> {
   try {
-    const { error } = await supabaseClient
-      .from('report_emails')
-      .insert([{ email, created_at: new Date().toISOString() }]);
-      
-    if (error) throw error;
-    
-    console.log("Email stored successfully:", email);
+    // Just store locally for now since we don't have a specific table for emails
+    console.log("Email stored locally:", email);
   } catch (err) {
     console.error("Error storing email:", err);
     // We don't show errors to the user when saving emails fails

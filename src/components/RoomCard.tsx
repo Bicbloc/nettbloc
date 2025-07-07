@@ -68,6 +68,8 @@ export function RoomCard({
     switch (status) {
       case 'needs-cleaning':
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">À Nettoyer</Badge>;
+      case 'ready-to-clean':
+        return <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">Prêt à Nettoyer</Badge>;
       case 'clean':
         return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">Propre</Badge>;
       case 'occupied':
@@ -123,15 +125,15 @@ export function RoomCard({
     }
   };
 
-  const setCleaningType = (type: 'full' | 'quick' | 'none') => {
+  const setCleaningType = (type: 'full' | 'quick') => {
     onUpdate({
       ...room,
       cleaningType: type,
-      status: type === 'none' ? 'clean' : 'needs-cleaning'
+      status: 'needs-cleaning'
     });
     
     toast({
-      description: `Chambre ${room.number} : nettoyage ${type === 'full' ? 'à blanc' : type === 'quick' ? 'recouche' : 'aucun'}`
+      description: `Chambre ${room.number} : ${type === 'full' ? '🧼 À blanc' : '🛏️ Recouche'}`
     });
   };
 
@@ -143,34 +145,45 @@ export function RoomCard({
     return (
       <div 
         ref={cardRef}
-        className={`px-2 py-1 text-xs border rounded flex items-center gap-1 transition-all duration-200 ${
+        className={`px-3 py-2 text-xs border rounded-xl bg-card shadow-modern flex items-center gap-2 transition-all duration-300 ${
           dragging ? 'opacity-50' : ''
         } ${
-          isSelected ? 'bg-blue-100 border-blue-500 border-2' :
-          room.isUrgent ? 'border-red-500 border-2' : 
-          room.notUrgent ? 'border-green-500' : 'border-gray-200'
+          isSelected ? 'bg-gradient-primary text-primary-foreground border-2' :
+          room.isUrgent ? 'border-destructive border-2 bg-destructive/5' : 
+          room.notUrgent ? 'border-green-500 bg-green-50' : 'border-border hover:shadow-modern-md'
         } ${
-          selectable ? 'cursor-pointer' : ''
-        }`}
+          selectable ? 'cursor-pointer hover:scale-[1.02]' : ''
+        } animate-fade-in`}
         draggable={draggable}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={handleClick}
       >
-        <span className="font-medium">{room.number}</span>
-        {room.cleaningType !== 'none' && (
-          <span className={`text-xs font-bold ${room.cleaningType === 'full' ? 'text-purple-600' : 'text-blue-600'}`}>
-            {room.cleaningType === 'full' ? '(B)' : '(R)'}
-          </span>
-        )}
-        {room.isTwin && <Bed className="h-3 w-3 text-gray-500" />}
-        <span className="text-xs text-gray-500 ml-auto">{floorDisplay}</span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="font-semibold text-sm whitespace-nowrap">{room.number}</span>
+          {room.cleaningType !== 'none' && (
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+              room.cleaningType === 'full' 
+                ? 'bg-purple-100 text-purple-700' 
+                : 'bg-blue-100 text-blue-700'
+            }`}>
+              {room.cleaningType === 'full' ? 'B' : 'R'}
+            </span>
+          )}
+          {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+          {room.status === 'ready-to-clean' && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+              🚪
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground font-medium flex-shrink-0">{floorDisplay}</span>
         
         {/* Boutons de changement rapide */}
         {showActions && (
-          <div className="ml-1 flex items-center gap-1">
+          <div className="ml-2 flex items-center gap-1 flex-shrink-0">
             <button 
-              className="h-4 w-4 flex items-center justify-center rounded hover:bg-purple-100 text-purple-700"
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-purple-100 text-purple-700 transition-colors font-semibold text-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 setCleaningType('full');
@@ -180,7 +193,7 @@ export function RoomCard({
               B
             </button>
             <button 
-              className="h-4 w-4 flex items-center justify-center rounded hover:bg-blue-100 text-blue-700"
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors font-semibold text-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 setCleaningType('quick');
@@ -190,14 +203,36 @@ export function RoomCard({
               R
             </button>
             <button
-              className="h-4 w-4 flex items-center justify-center rounded hover:bg-green-100 text-green-700"
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
-                setCleaningType('none');
+                onUpdate({
+                  ...room,
+                  status: 'clean'
+                });
+                toast({
+                  description: `Chambre ${room.number} marquée comme propre`
+                });
               }}
               title="Marquer comme propre"
             >
               <Check className="h-3 w-3" />
+            </button>
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-orange-100 text-orange-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate({
+                  ...room,
+                  status: 'ready-to-clean'
+                });
+                toast({
+                  description: `Chambre ${room.number} marquée comme prête à nettoyer (client sorti)`
+                });
+              }}
+              title="Client sorti - Prêt à nettoyer"
+            >
+              🚪
             </button>
           </div>
         )}
@@ -241,7 +276,7 @@ export function RoomCard({
         <RadioGroup 
           value={room.cleaningType} 
           className="flex gap-2"
-          onValueChange={(value) => setCleaningType(value as 'full' | 'quick' | 'none')}
+          onValueChange={(value) => setCleaningType(value as 'full' | 'quick')}
         >
           <div className="flex items-center space-x-1">
             <RadioGroupItem value="full" id={`full-${room.number}`} />
@@ -249,7 +284,7 @@ export function RoomCard({
               htmlFor={`full-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
             >
-              <Check className="h-3 w-3" /> À Blanc
+              🧼 À blanc
             </Label>
           </div>
           <div className="flex items-center space-x-1">
@@ -258,16 +293,7 @@ export function RoomCard({
               htmlFor={`quick-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-blue-800"
             >
-              <Bed className="h-3 w-3" /> Recouche
-            </Label>
-          </div>
-          <div className="flex items-center space-x-1">
-            <RadioGroupItem value="none" id={`none-${room.number}`} />
-            <Label 
-              htmlFor={`none-${room.number}`}
-              className="text-xs cursor-pointer text-gray-800"
-            >
-              Aucun
+              🛏️ Recouche
             </Label>
           </div>
         </RadioGroup>
