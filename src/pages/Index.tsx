@@ -450,31 +450,18 @@ const Index = () => {
   const redistributeRooms = async () => {
     console.log("Début redistribution, rooms:", rooms.length, "housekeepers:", housekeeperNames.length);
     
-    const selectedHotelId = localStorage.getItem('selectedHotelId');
-    if (!selectedHotelId) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Veuillez d'abord sélectionner un hôtel dans l'onglet Gestion Hôtel"
-      });
-      return;
-    }
-    
-    // Créer les femmes de chambre en base avec leurs codes d'accès
-    const accessCodes: Record<string, string> = {};
-    for (const name of housekeeperNames) {
-      const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, name);
-      if (housekeeper) {
-        accessCodes[name] = housekeeper.access_code;
-      }
-    }
-    
     // Utiliser autoDistributeRooms pour la distribution
     const assignments = autoDistributeRooms(rooms, housekeeperNames, false);
     
     if (assignments) {
       // Mettre à jour toutes les chambres avec leurs assignations
       const updatedRooms = [...rooms];
+      
+      // Générer des codes d'accès simples pour chaque femme de chambre
+      const accessCodes: Record<string, string> = {};
+      for (const name of housekeeperNames) {
+        accessCodes[name] = Math.floor(1000 + Math.random() * 9000).toString();
+      }
       
       for (const housekeeper of housekeeperNames) {
         for (const room of assignments[housekeeper]) {
