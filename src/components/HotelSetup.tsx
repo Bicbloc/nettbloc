@@ -12,6 +12,7 @@ interface Hotel {
   id: string;
   name: string;
   email: string;
+  hotel_code: string;
   created_at: string;
   updated_at: string;
 }
@@ -20,6 +21,7 @@ export const HotelSetup = () => {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [newHotelName, setNewHotelName] = useState('');
   const [newHotelEmail, setNewHotelEmail] = useState('');
+  const [newHotelCode, setNewHotelCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedHotelId, setSelectedHotelId] = useState<string>('');
 
@@ -38,7 +40,7 @@ export const HotelSetup = () => {
   };
 
   const handleCreateHotel = async () => {
-    if (!newHotelName.trim() || !newHotelEmail.trim()) {
+    if (!newHotelName.trim() || !newHotelEmail.trim() || !newHotelCode.trim()) {
       toast({
         variant: "destructive",
         title: "Erreur",
@@ -48,21 +50,22 @@ export const HotelSetup = () => {
     }
 
     setIsLoading(true);
-    const hotel = await SupabaseService.createHotel(newHotelName, newHotelEmail);
+    const hotel = await SupabaseService.createHotel(newHotelName, newHotelEmail, newHotelCode);
     
     if (hotel) {
       toast({
         title: "Hôtel créé",
-        description: `L'hôtel "${newHotelName}" a été créé avec succès`
+        description: `L'hôtel "${newHotelName}" a été créé avec le code ${newHotelCode}`
       });
       setNewHotelName('');
       setNewHotelEmail('');
+      setNewHotelCode('');
       await loadHotels();
     } else {
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de créer l'hôtel"
+        description: "Impossible de créer l'hôtel (le code existe peut-être déjà)"
       });
     }
     setIsLoading(false);
@@ -95,6 +98,15 @@ export const HotelSetup = () => {
                 placeholder="Ex: Hôtel Bellevue"
                 value={newHotelName}
                 onChange={(e) => setNewHotelName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hotel-code">Code établissement (pour l'accès mobile)</Label>
+              <Input
+                id="hotel-code"
+                placeholder="Ex: HOTEL2024"
+                value={newHotelCode}
+                onChange={(e) => setNewHotelCode(e.target.value.toUpperCase())}
               />
             </div>
             <div className="space-y-2">
