@@ -7,9 +7,11 @@ interface HousekeepingContextType {
   rooms: Room[];
   isDistributed: boolean;
   notifications: Notification[];
+  housekeeperAccessCodes: Record<string, string>;
   setHousekeeperNames: React.Dispatch<React.SetStateAction<string[]>>;
   setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
   setIsDistributed: (distributed: boolean) => void;
+  setHousekeeperAccessCodes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   getHousekeeperRooms: (name: string) => Room[];
   updateRoomStatus: (roomNumber: string, newStatus: string, housekeeperName?: string) => void;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
@@ -46,6 +48,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   });
   
   const { notifications, addNotification } = useNotifications();
+  const [housekeeperAccessCodes, setHousekeeperAccessCodes] = useState<Record<string, string>>({});
 
   // Sauvegarder dans localStorage quand les données changent
   useEffect(() => {
@@ -96,9 +99,11 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     rooms,
     isDistributed,
     notifications,
+    housekeeperAccessCodes,
     setHousekeeperNames,
     setRooms,
     setIsDistributed,
+    setHousekeeperAccessCodes,
     getHousekeeperRooms,
     updateRoomStatus,
     addNotification,

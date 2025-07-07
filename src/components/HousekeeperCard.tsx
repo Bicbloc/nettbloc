@@ -41,6 +41,7 @@ interface HousekeeperCardProps {
   maxRoomsOverride?: number;
   onMaxRoomsOverrideChange?: (name: string, maxRooms: number) => void;
   onRename?: (newName: string) => void;
+  accessCode?: string; // Nouveau prop pour le code d'accès
 }
 
 export function HousekeeperCard({ 
@@ -61,7 +62,8 @@ export function HousekeeperCard({
   onDelete,
   maxRoomsOverride,
   onMaxRoomsOverrideChange,
-  onRename
+  onRename,
+  accessCode
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -411,13 +413,16 @@ export function HousekeeperCard({
                   </Button>
                 </div>
               ) : (
-                <h3 
-                  className="font-bold text-lg cursor-pointer hover:underline"
-                  onClick={handleNameEdit}
-                  title="Cliquer pour modifier le nom"
-                >
-                  {name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg">
+                    {name}
+                  </h3>
+                  {accessCode && (
+                    <div className="bg-primary/10 px-2 py-1 rounded text-sm font-mono font-bold text-primary">
+                      {accessCode}
+                    </div>
+                  )}
+                </div>
               )}
               <Button
                 variant="ghost"
@@ -534,6 +539,17 @@ export function HousekeeperCard({
           
         {expanded && (
           <CardContent className="p-4 pt-2">
+            {/* Affichage du code d'accès */}
+            {accessCode && (
+              <div className="bg-muted/50 p-2 rounded text-center mb-4">
+                <div className="text-xs text-muted-foreground">Code d'accès mobile</div>
+                <div className="font-mono font-bold text-lg text-primary">
+                  {accessCode}
+                </div>
+                <div className="text-xs text-muted-foreground">Pour l'interface mobile</div>
+              </div>
+            )}
+            
             {isFloorSelectorOpen && (
               <div className="mb-4 p-3 border rounded-md bg-slate-50">
                 <div className="text-sm font-medium mb-2">Étages à afficher:</div>

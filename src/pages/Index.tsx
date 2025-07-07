@@ -36,6 +36,7 @@ import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
 
 const Index = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
   const { 
@@ -44,7 +45,9 @@ const Index = () => {
     rooms,
     setRooms,
     isDistributed,
-    setIsDistributed 
+    setIsDistributed,
+    housekeeperAccessCodes,
+    setHousekeeperAccessCodes
   } = useHousekeeping();
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
@@ -450,18 +453,21 @@ const Index = () => {
   const redistributeRooms = async () => {
     console.log("Début redistribution, rooms:", rooms.length, "housekeepers:", housekeeperNames.length);
     
+    // Générer des codes d'accès simples pour chaque femme de chambre
+    const accessCodes: Record<string, string> = {};
+    for (const name of housekeeperNames) {
+      accessCodes[name] = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+    
+    // Sauvegarder les codes dans le contexte
+    setHousekeeperAccessCodes(accessCodes);
+    
     // Utiliser autoDistributeRooms pour la distribution
     const assignments = autoDistributeRooms(rooms, housekeeperNames, false);
     
     if (assignments) {
       // Mettre à jour toutes les chambres avec leurs assignations
       const updatedRooms = [...rooms];
-      
-      // Générer des codes d'accès simples pour chaque femme de chambre
-      const accessCodes: Record<string, string> = {};
-      for (const name of housekeeperNames) {
-        accessCodes[name] = Math.floor(1000 + Math.random() * 9000).toString();
-      }
       
       for (const housekeeper of housekeeperNames) {
         for (const room of assignments[housekeeper]) {
@@ -478,12 +484,12 @@ const Index = () => {
       // Afficher les codes d'accès dans le toast
       const codesMessage = Object.entries(accessCodes)
         .map(([name, code]) => `${name}: ${code}`)
-        .join(', ');
+        .join(' | ');
       
       toast({
         title: "Chambres redistribuées !",
-        description: `Les ${updatedRooms.filter(r => r.assignedTo).length} chambres ont été redistribuées. Codes d'accès: ${codesMessage}`,
-        duration: 10000, // 10 secondes pour laisser le temps de noter les codes
+        description: `Codes d'accès générés: ${codesMessage}`,
+        duration: 15000, // 15 secondes pour laisser le temps de noter les codes
       });
     } else {
       toast({
@@ -872,6 +878,7 @@ const Index = () => {
                     unassignedRooms={rooms.filter(room => room.cleaningType !== 'none')} // Passer toutes les chambres, pas seulement les non-assignées
                     showUnassignedColumn={false} // On n'affiche plus les chambres non assignées dans la carte
                     onAssignRoom={(room) => handleRoomUpdate({...room, assignedTo: name})}
+                    accessCode={housekeeperAccessCodes[name]}
                     onDelete={handleDeleteHousekeeper}
                     maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
                     onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
