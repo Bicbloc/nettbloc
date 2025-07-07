@@ -217,14 +217,7 @@ function parseRoomsFromText(text: string): Room[] {
     let cleaningType: 'full' | 'quick' | 'none' = 'none';
     let roomStatus = 'clean';
     
-    // Détecter si c'est une recouche: une seule ligne avec deux dates sans horaires
-    const isRecouche = dates.length === 2 && 
-                      !hasTimeOnly && 
-                      !/\b\d{1,2}:\d{2}\b/.test(roomSpecificContext.replace(/\d{2}\/\d{2}\/\d{4}/g, ''));
-    
-    console.log(`Détection recouche: ${dates.length} dates, pas d'horaires=${!hasTimeOnly}, isRecouche=${isRecouche}`);
-    
-    // LOGIQUE RÉVISÉE AVEC PRIORITÉ CORRECTE
+    // RÈGLES SIMPLIFIÉES ET CORRECTES
     
     // 1. Chambre occupée (OCC)
     if (hasOCC) {
@@ -238,17 +231,22 @@ function parseRoomsFromText(text: string): Room[] {
       roomStatus = 'needs-cleaning';
       console.log(`→ À blanc (DIR/Dirty détecté)`);
     }
-    // 3. Recouche détectée → Quick cleaning (AVANT les blocs multiples)
-    else if (isRecouche) {
+    // 3. Recouche: exactement 2 dates consécutives pour le même client (Night pattern ou dates proches)
+    else if (dates.length === 2 && 
+             !hasTimeOnly && 
+             !hasDIR &&
+             (roomSpecificContext.includes('Night') || 
+              roomSpecificContext.includes('Séjour') ||
+              Math.abs(Date.parse(dates[1].split('/').reverse().join('-')) - Date.parse(dates[0].split('/').reverse().join('-'))) < 7 * 24 * 60 * 60 * 1000)) {
       cleaningType = 'quick';
       roomStatus = 'needs-cleaning';
-      console.log(`→ Recouche (deux dates sans horaires: ${dates.join(', ')})`);
+      console.log(`→ Recouche (${dates.join(' - ')})`);
     }
-    // 4. Deux blocs distincts (non recouche) → À blanc
-    else if (reservationBlocks >= 2 && !isRecouche) {
+    // 4. Deux blocs distincts (départ + arrivée même jour ou changement client) → À blanc
+    else if (reservationBlocks >= 2) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
-      console.log(`→ À BLANC (${reservationBlocks} blocs distincts détectés)`);
+      console.log(`→ À BLANC (${reservationBlocks} blocs détectés - départ + arrivée)`);
     }
     // 5. Pas de dates + statut CL/INS ET un seul bloc → Propre
     else if (dates.length === 0 && (hasINS || hasCL) && reservationBlocks <= 1) {
