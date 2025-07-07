@@ -12,13 +12,21 @@ import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function Housekeeper() {
-  const { housekeeperNames, rooms, setRooms, isDistributed, getHousekeeperRooms } = useHousekeeping();
+  const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus } = useHousekeeping();
   const navigate = useNavigate();
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [remarkText, setRemarkText] = useState('');
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
+
+  // Mettre à jour les chambres de la femme de chambre quand les données changent
+  useEffect(() => {
+    if (selectedHousekeeper && isLoggedIn) {
+      const assignedRooms = getHousekeeperRooms(selectedHousekeeper);
+      setHousekeeperRooms(assignedRooms);
+    }
+  }, [selectedHousekeeper, isLoggedIn, rooms, getHousekeeperRooms]);
 
   // Vérifier si la distribution a été faite
   if (!isDistributed) {
@@ -57,20 +65,9 @@ export default function Housekeeper() {
     }
   };
 
-  const updateRoomStatus = (roomNumber: string, newStatus: string) => {
-    // Mettre à jour localement
-    setHousekeeperRooms(prev => prev.map(room => 
-      room.number === roomNumber 
-        ? { ...room, status: newStatus }
-        : room
-    ));
-    
-    // Mettre à jour dans le contexte global
-    setRooms(prev => prev.map(room => 
-      room.number === roomNumber 
-        ? { ...room, status: newStatus }
-        : room
-    ));
+  const handleUpdateRoomStatus = (roomNumber: string, newStatus: string) => {
+    // Utiliser la fonction du contexte qui gère les notifications
+    updateRoomStatus(roomNumber, newStatus, selectedHousekeeper);
     
     const statusMessages = {
       'clean': 'Chambre marquée comme nettoyée !',
@@ -86,7 +83,7 @@ export default function Housekeeper() {
 
   const handleRemark = () => {
     if (remarkText.trim()) {
-      updateRoomStatus(remarkRoomNumber, 'needs-attention');
+      handleUpdateRoomStatus(remarkRoomNumber, 'needs-attention');
       setRemarkText('');
       setRemarkRoomNumber('');
     }
@@ -270,7 +267,7 @@ export default function Housekeeper() {
               {room.status === 'needs-cleaning' && (
                 <div className="grid grid-cols-1 gap-2">
                   <Button
-                    onClick={() => updateRoomStatus(room.number, 'in-progress')}
+                    onClick={() => handleUpdateRoomStatus(room.number, 'in-progress')}
                     className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
                     size="sm"
                   >
@@ -279,7 +276,7 @@ export default function Housekeeper() {
                   </Button>
                   <div className="grid grid-cols-2 gap-2">
                     <Button
-                      onClick={() => updateRoomStatus(room.number, 'clean')}
+                      onClick={() => handleUpdateRoomStatus(room.number, 'clean')}
                       className="bg-green-600 hover:bg-green-700 text-white"
                       size="sm"
                     >
@@ -326,7 +323,7 @@ export default function Housekeeper() {
               {room.status === 'in-progress' && (
                 <div className="grid grid-cols-2 gap-2">
                   <Button
-                    onClick={() => updateRoomStatus(room.number, 'clean')}
+                    onClick={() => handleUpdateRoomStatus(room.number, 'clean')}
                     className="bg-green-600 hover:bg-green-700 text-white"
                     size="sm"
                   >
@@ -385,7 +382,7 @@ export default function Housekeeper() {
                     <span className="font-medium">Remarque signalée</span>
                   </div>
                   <Button
-                    onClick={() => updateRoomStatus(room.number, 'needs-cleaning')}
+                    onClick={() => handleUpdateRoomStatus(room.number, 'needs-cleaning')}
                     variant="outline"
                     size="sm"
                     className="mt-2"

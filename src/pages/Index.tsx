@@ -30,6 +30,7 @@ import EmailReportDialog from "@/components/EmailReportDialog";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
+import { NotificationPanel } from "@/components/NotificationPanel";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -601,7 +602,8 @@ const Index = () => {
           
           <div className="flex justify-between items-center w-full">
             <div />
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <NotificationPanel />
               <Button
                 variant="outline"
                 onClick={() => window.open('/housekeeper', '_blank')}
