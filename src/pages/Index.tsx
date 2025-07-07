@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { UploadDialog } from "@/components/UploadDialog";
@@ -35,6 +35,7 @@ import { NotificationPanel } from "@/components/NotificationPanel";
 import { HotelSetup } from "@/components/HotelSetup";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -67,6 +68,11 @@ const Index = () => {
     toDoItems: [], 
     toKnowItems: [] 
   });
+
+  // États pour la gestion des hôtels
+  const [availableHotels, setAvailableHotels] = useState<any[]>([]);
+  const [selectedHotel, setSelectedHotel] = useState<any | null>(null);
+  const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -75,6 +81,25 @@ const Index = () => {
     });
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
+
+  // Charger les hôtels disponibles et l'hôtel sélectionné
+  useEffect(() => {
+    const loadHotels = async () => {
+      const hotels = await SupabaseService.getHotels();
+      setAvailableHotels(hotels);
+      
+      // Charger l'hôtel sélectionné depuis localStorage
+      const savedHotelId = localStorage.getItem('selectedHotelId');
+      if (savedHotelId) {
+        const selectedHotel = hotels.find((h: any) => h.id === savedHotelId);
+        if (selectedHotel) {
+          setSelectedHotel(selectedHotel);
+        }
+      }
+    };
+    
+    loadHotels();
+  }, []);
   
   // Calculer le nombre recommandé de femmes de chambre
   useEffect(() => {
@@ -451,7 +476,7 @@ const Index = () => {
     }
   };
   
-  const redistributeRooms = async () => {
+  const doRedistribution = async () => {
     console.log("Début redistribution, rooms:", rooms.length, "housekeepers:", housekeeperNames.length);
     
     // Générer des codes d'accès simples pour chaque femme de chambre
@@ -499,6 +524,32 @@ const Index = () => {
         description: "Impossible de redistribuer les chambres automatiquement.",
       });
     }
+  };
+
+  const redistributeRooms = async () => {
+    // Vérifier si un hôtel est sélectionné
+    if (!selectedHotel) {
+      setIsHotelSelectionOpen(true);
+      return;
+    }
+
+    await doRedistribution();
+  };
+
+  const handleHotelSelection = (hotel: any) => {
+    setSelectedHotel(hotel);
+    localStorage.setItem('selectedHotelId', hotel.id);
+    setIsHotelSelectionOpen(false);
+    
+    toast({
+      title: "Hôtel sélectionné",
+      description: `Hôtel "${hotel.name}" (${hotel.hotel_code}) sélectionné pour cette session.`
+    });
+    
+    // Maintenant on peut faire la redistribution
+    setTimeout(() => {
+      doRedistribution();
+    }, 500);
   };
   
   const openManualAssignment = (housekeeperName?: string) => {
@@ -610,6 +661,33 @@ const Index = () => {
       <div className="container mx-auto py-6">
         <div className="flex flex-col items-center mb-6">
           <h1 className="text-3xl font-bold tracking-tight text-center mb-4">NettoBloc</h1>
+          
+          {/* Affichage de l'hôtel sélectionné */}
+          {selectedHotel && (
+            <div className="w-full max-w-md mb-4">
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Building className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <div className="font-semibold text-blue-800">{selectedHotel.name}</div>
+                        <div className="text-sm text-blue-600">Code: {selectedHotel.hotel_code}</div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsHotelSelectionOpen(true)}
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      Changer
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
           
           <div className="w-full max-w-md mb-4">
             <div className="flex items-center space-x-2">
