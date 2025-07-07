@@ -17,6 +17,7 @@ import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { EmailDialog } from "@/components/EmailDialog";
 import { useReportEmail } from "@/hooks/use-report-email";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -734,7 +735,10 @@ const Index = () => {
               />
             </div>
             <Button 
-              onClick={() => handleEmailHotelSetup(userEmail, hotelCode)}
+              onClick={() => {
+                setEmail(userEmail);
+                setIsAuthenticated(true);
+              }}
               className="w-full"
             >
               Confirmer
@@ -752,6 +756,8 @@ const Index = () => {
       </div>
     );
   }
+
+  return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container mx-auto py-6">
         <div className="flex flex-col items-center mb-6">
