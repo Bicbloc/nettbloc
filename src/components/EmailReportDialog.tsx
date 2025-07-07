@@ -15,7 +15,7 @@ import { saveEmailToSupabase } from "@/lib/supabase";
 interface EmailReportDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (email: string, customFields?: ReportFields) => void;
+  onConfirm: (email: string, customFields?: ReportFields, hotelName?: string) => void;
   initialEmail?: string;
   housekeeperName?: string;
   allHousekeepers?: string[];
@@ -32,6 +32,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   // Get saved email or use initialEmail
   const savedEmail = getReportEmail();
   const [localEmail, setLocalEmail] = useState(savedEmail || initialEmail);
+  const [hotelName, setHotelName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customFields, setCustomFields] = useState<ReportFields>({ 
     toDoItems: [], 
@@ -113,33 +114,43 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const isValidEmail = emailRegex.test(localEmail);
     
-    if (isValidEmail) {
-      setIsSubmitting(true);
-      try {
-        saveReportEmail(localEmail); // Save for future use
-        
-        // Save email to Supabase
-        await saveEmailToSupabase(localEmail);
-        
-        // Pass the complete customFields object to onConfirm
-        await onConfirm(localEmail, customFields);
-        onClose();
-      } catch (error) {
-        console.error("Erreur lors de la génération du rapport:", error);
-        toast({
-          variant: "destructive",
-          title: "Erreur de téléchargement",
-          description: "Une erreur est survenue lors de la génération du PDF. Veuillez réessayer."
-        });
-      } finally {
-        setIsSubmitting(false);
-      }
-    } else {
+    if (!isValidEmail) {
       toast({
         variant: "destructive",
         title: "Email invalide",
         description: "Veuillez saisir une adresse email valide."
       });
+      return;
+    }
+    
+    if (!hotelName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Nom d'hôtel requis",
+        description: "Veuillez saisir le nom de votre hôtel."
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      saveReportEmail(localEmail); // Save for future use
+      
+      // Save email to Supabase
+      await saveEmailToSupabase(localEmail);
+      
+      // Pass the complete customFields object and hotel name to onConfirm
+      await onConfirm(localEmail, customFields, hotelName);
+      onClose();
+    } catch (error) {
+      console.error("Erreur lors de la génération du rapport:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de téléchargement",
+        description: "Une erreur est survenue lors de la génération du PDF. Veuillez réessayer."
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -175,6 +186,23 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                   />
                   <p className="text-xs text-muted-foreground text-left">
                     Un email valide est requis pour télécharger le rapport
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 items-start gap-2">
+                  <Label htmlFor="hotelName" className="text-left">
+                    Nom de l'hôtel <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="hotelName"
+                    type="text"
+                    placeholder="Nom de votre hôtel"
+                    value={hotelName}
+                    onChange={(e) => setHotelName(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground text-left">
+                    Le nom de l'hôtel apparaîtra sur tous les rapports
                   </p>
                 </div>
                 
