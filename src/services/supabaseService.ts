@@ -35,8 +35,8 @@ export class SupabaseService {
     try {
       const { data, error } = await supabase
         .from('hotels')
-        .insert({ name, email })
-        .select('id, name, email, created_at, updated_at')
+        .insert({ name, email, hotel_code: hotelCode })
+        .select('id, name, email, hotel_code, created_at, updated_at')
         .single();
       
       if (error || !data) {
@@ -54,8 +54,8 @@ export class SupabaseService {
     try {
       const { data, error } = await supabase
         .from('hotels')
-        .select('id, name, email, created_at, updated_at')
-        .eq('name', hotelCode) // Using name field temporarily since hotel_code may not exist yet
+        .select('id, name, email, hotel_code, created_at, updated_at')
+        .eq('hotel_code', hotelCode)
         .maybeSingle();
       
       if (error || !data) {
@@ -101,6 +101,54 @@ export class SupabaseService {
       return null;
     }
     return data as Housekeeper;
+  }
+
+  static async createOrUpdateHousekeeper(hotelId: string, name: string, accessCode: string): Promise<Housekeeper | null> {
+    try {
+      // Chercher si la femme de chambre existe déjà
+      const { data: existingHousekeeper } = await supabase
+        .from('housekeepers')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('name', name)
+        .maybeSingle();
+
+      if (existingHousekeeper) {
+        // Mettre à jour le code d'accès
+        const { data, error } = await supabase
+          .from('housekeepers')
+          .update({ access_code: accessCode, is_active: true })
+          .eq('id', existingHousekeeper.id)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('Erreur mise à jour femme de chambre:', error);
+          return null;
+        }
+        return data as Housekeeper;
+      } else {
+        // Créer une nouvelle femme de chambre
+        const { data, error } = await supabase
+          .from('housekeepers')
+          .insert({ 
+            hotel_id: hotelId, 
+            name, 
+            access_code: accessCode 
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('Erreur création femme de chambre:', error);
+          return null;
+        }
+        return data as Housekeeper;
+      }
+    } catch (err) {
+      console.error('Erreur createOrUpdateHousekeeper:', err);
+      return null;
+    }
   }
 
   static async authenticateHousekeeper(accessCode: string): Promise<Housekeeper | null> {

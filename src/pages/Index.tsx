@@ -488,6 +488,13 @@ const Index = () => {
     // Sauvegarder les codes dans le contexte
     setHousekeeperAccessCodes(accessCodes);
     
+    // Sauvegarder les femmes de chambre avec leurs codes dans Supabase
+    if (selectedHotel) {
+      for (const name of housekeeperNames) {
+        await SupabaseService.createOrUpdateHousekeeper(selectedHotel.id, name, accessCodes[name]);
+      }
+    }
+    
     // Utiliser autoDistributeRooms pour la distribution
     const assignments = autoDistributeRooms(rooms, housekeeperNames, false);
     
