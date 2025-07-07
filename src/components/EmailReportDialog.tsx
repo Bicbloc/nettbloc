@@ -156,8 +156,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md overflow-hidden flex flex-col max-h-[80vh]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-left">
             {housekeeperName 
               ? `Rapport de ${housekeeperName}`
@@ -168,9 +168,9 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-          <ScrollArea className="pr-4 mt-2" style={{ maxHeight: "400px", height: "auto" }}>
-            <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4 pb-4">
               <div className="grid gap-4 py-2">
                 <div className="grid grid-cols-1 items-start gap-2">
                   <Label htmlFor="email" className="text-left">
