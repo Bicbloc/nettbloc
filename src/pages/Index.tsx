@@ -1,48 +1,32 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone } from "lucide-react";
-import { useEffect, useState } from "react";
-import { UploadDialog } from "@/components/UploadDialog";
-import { ConfigDialog } from "@/components/ConfigDialog";
-import { Room, CleaningConfig, defaultCleaningConfig } from "@/services/pdfService";
-import { Badge } from "@/components/ui/badge";
-import { RoomCard } from "@/components/RoomCard";
-import { HousekeeperCard } from "@/components/HousekeeperCard";
-import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
-import { generateReport, generateCombinedReport } from "@/services/reportService";
-import { toast } from "@/hooks/use-toast";
-import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
-import { EmailDialog } from "@/components/EmailDialog";
-import { useReportEmail } from "@/hooks/use-report-email";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import EmailReportDialog from "@/components/EmailReportDialog";
-import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
-import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
-import { useHousekeeping } from "@/contexts/HousekeepingContext";
-import { NotificationPanel } from "@/components/NotificationPanel";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Upload, FileText, Users, Settings, Bell, Smartphone, FileSpreadsheet, Hotel } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { UploadDialog } from '@/components/UploadDialog';
+import { ConfigDialog } from '@/components/ConfigDialog';
+import { EmailDialog } from '@/components/EmailDialog';
+import { EmailReportDialog } from '@/components/EmailReportDialog';
+import { AssignmentSection } from '@/components/assignment/AssignmentSection';
+import { HousekeeperCard } from '@/components/HousekeeperCard';
+import { UnassignedRoomsColumn } from '@/components/UnassignedRoomsColumn'; 
+import { NotificationPanel } from '@/components/NotificationPanel';
+import { BicblocBranding } from '@/components/BicblocBranding';
+import { HotelSetup } from '@/components/HotelSetup';
+import { HousekeeperSetup } from '@/components/HousekeeperSetup';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
+import { useNavigate } from 'react-router-dom';
 
-const Index = () => {
-  const [activeTab, setActiveTab] = useState("overview");
-  const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
-  const { 
-    housekeeperNames, 
-    setHousekeeperNames,
-    rooms,
-    setRooms,
-    isDistributed,
-    setIsDistributed 
-  } = useHousekeeping();
+export default function Index() {
+  const { housekeeperNames, rooms, isDistributed } = useHousekeeping();
+  const navigate = useNavigate();
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
+  const [isEmailReportOpen, setIsEmailReportOpen] = useState(false);
+  const [currentHotelId, setCurrentHotelId] = useState<string | null>(null);
+  const [showHotelSetup, setShowHotelSetup] = useState(false);
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});

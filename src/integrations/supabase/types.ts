@@ -14,7 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      hotels: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      housekeepers: {
+        Row: {
+          access_code: string
+          created_at: string
+          hotel_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          access_code: string
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_housekeepers_hotel"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_status_updates: {
+        Row: {
+          created_at: string
+          hotel_id: string | null
+          housekeeper_id: string | null
+          id: string
+          message: string | null
+          room_number: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          hotel_id?: string | null
+          housekeeper_id?: string | null
+          id?: string
+          message?: string | null
+          room_number: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string | null
+          housekeeper_id?: string | null
+          id?: string
+          message?: string | null
+          room_number?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_status_updates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_status_updates_housekeeper_id_fkey"
+            columns: ["housekeeper_id"]
+            isOneToOne: false
+            referencedRelation: "housekeepers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
