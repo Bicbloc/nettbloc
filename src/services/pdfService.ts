@@ -109,42 +109,60 @@ function parseRoomsFromText(text: string): Room[] {
     const context = text.substring(start, end);
     
     console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
-    console.log(`Statut détecté: ${status}`);
-    console.log(`Contexte:`, context.substring(0, 200) + "...");
+    console.log(`Statut détecté: "${status}"`);
+    console.log(`Contexte complet:`, context);
     
-    // Logique simplifiée basée sur votre code Express.js
+    // Tests de détection détaillés
+    const hasDIR = /DIR/.test(context);
+    const hasMultipleDates = /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context);
+    const hasNight = /Night \d+\/\d+/.test(context);
+    const hasCL = /CL/.test(status);
+    const hasINS = /INS/.test(status);
+    const hasOCC = /OCC/.test(context);
+    
+    console.log(`Tests: DIR=${hasDIR}, MultDates=${hasMultipleDates}, Night=${hasNight}, CL=${hasCL}, INS=${hasINS}, OCC=${hasOCC}`);
+    
+    // Logique de détection corrigée
     let cleaningType: 'full' | 'quick' | 'none' = 'none';
     let roomStatus = 'clean';
     
-    // Chambre à blanc (nettoyage complet)
-    if (/DIR/.test(context) || /\d{2}\/\d{2}\/\d{4}.*\d{2}\/\d{2}\/\d{4}/.test(context)) {
-      cleaningType = 'full';
-      roomStatus = 'needs-cleaning';
-      console.log(`→ Chambre à blanc détectée`);
-    }
-    // Recouche (nettoyage rapide)  
-    else if (/Night \d+\/\d+/.test(context)) {
-      cleaningType = 'quick';
-      roomStatus = 'needs-cleaning';
-      console.log(`→ Recouche détectée`);
-    }
-    // Chambre propre
-    else if (/CL|INS/.test(status)) {
-      cleaningType = 'none';
-      roomStatus = 'clean';
-      console.log(`→ Chambre propre`);
-    }
-    // Occupée
-    else if (/OCC/.test(context)) {
+    // 1. Chambre occupée (priorité absolue)
+    if (hasOCC) {
       cleaningType = 'none';
       roomStatus = 'occupied';
-      console.log(`→ Chambre occupée`);
+      console.log(`→ Chambre occupée (OCC détecté)`);
     }
-    // Par défaut: nettoyage complet
-    else {
+    // 2. Chambre propre (CL ou INS dans le statut)
+    else if (hasCL || hasINS) {
+      cleaningType = 'none';
+      roomStatus = 'clean';
+      console.log(`→ Chambre propre (${hasCL ? 'CL' : 'INS'} détecté)`);
+    }
+    // 3. Recouche (Night pattern)
+    else if (hasNight) {
+      cleaningType = 'quick';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ Recouche détectée (Night pattern)`);
+    }
+    // 4. Chambre à blanc (DIR ou dates multiples)
+    else if (hasDIR || hasMultipleDates) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
-      console.log(`→ Nettoyage complet par défaut`);
+      console.log(`→ Chambre à blanc (${hasDIR ? 'DIR' : 'dates multiples'} détecté)`);
+    }
+    // 5. Par défaut: analyser si pas de statut clair
+    else {
+      // Si pas de statut spécifique, regarder s'il y a une réservation
+      const hasReservation = /\d{2}\/\d{2}\/\d{4}/.test(context);
+      if (hasReservation) {
+        cleaningType = 'full';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ Nettoyage complet (réservation détectée)`);
+      } else {
+        cleaningType = 'none';
+        roomStatus = 'clean';
+        console.log(`→ Chambre propre par défaut`);
+      }
     }
     
     console.log(`RÉSULTAT: ${roomStatus} / ${cleaningType}`);
