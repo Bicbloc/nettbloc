@@ -21,6 +21,7 @@ export default function Housekeeper() {
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
 
   console.log("Housekeeper - isDistributed:", isDistributed, "rooms:", rooms.length, "housekeepers:", housekeeperNames.length); // Debug
+  console.log("LocalStorage check - isDistributed:", localStorage.getItem('isDistributed')); // Debug localStorage
 
   // Mettre à jour les chambres de la femme de chambre quand les données changent
   useEffect(() => {

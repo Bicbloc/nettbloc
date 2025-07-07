@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Room } from '@/services/pdfService';
 import { useNotifications, Notification } from '@/hooks/use-notifications';
 
@@ -30,12 +30,36 @@ interface HousekeepingProviderProps {
 }
 
 export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ children }) => {
-  const [housekeeperNames, setHousekeeperNames] = useState<string[]>([
-    "Housekeeper 1", "Housekeeper 2", "Housekeeper 3", "Housekeeper 4"
-  ]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [isDistributed, setIsDistributed] = useState<boolean>(false);
+  const [housekeeperNames, setHousekeeperNames] = useState<string[]>(() => {
+    const saved = localStorage.getItem('housekeeperNames');
+    return saved ? JSON.parse(saved) : ["Housekeeper 1", "Housekeeper 2", "Housekeeper 3", "Housekeeper 4"];
+  });
+  
+  const [rooms, setRooms] = useState<Room[]>(() => {
+    const saved = localStorage.getItem('rooms');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [isDistributed, setIsDistributed] = useState<boolean>(() => {
+    const saved = localStorage.getItem('isDistributed');
+    return saved === 'true';
+  });
+  
   const { notifications, addNotification } = useNotifications();
+
+  // Sauvegarder dans localStorage quand les données changent
+  useEffect(() => {
+    localStorage.setItem('housekeeperNames', JSON.stringify(housekeeperNames));
+  }, [housekeeperNames]);
+
+  useEffect(() => {
+    localStorage.setItem('rooms', JSON.stringify(rooms));
+  }, [rooms]);
+
+  useEffect(() => {
+    localStorage.setItem('isDistributed', isDistributed.toString());
+    console.log("LocalStorage - isDistributed sauvegardé:", isDistributed);
+  }, [isDistributed]);
 
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
