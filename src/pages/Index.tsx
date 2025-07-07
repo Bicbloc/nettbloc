@@ -73,6 +73,8 @@ const Index = () => {
   const [availableHotels, setAvailableHotels] = useState<any[]>([]);
   const [selectedHotel, setSelectedHotel] = useState<any | null>(null);
   const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
+  const [hotelCode, setHotelCode] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -82,23 +84,13 @@ const Index = () => {
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
 
-  // Charger les hôtels disponibles et l'hôtel sélectionné
+  // Charger les valeurs depuis localStorage
   useEffect(() => {
-    const loadHotels = async () => {
-      const hotels = await SupabaseService.getHotels();
-      setAvailableHotels(hotels);
-      
-      // Charger l'hôtel sélectionné depuis localStorage
-      const savedHotelId = localStorage.getItem('selectedHotelId');
-      if (savedHotelId) {
-        const selectedHotel = hotels.find((h: any) => h.id === savedHotelId);
-        if (selectedHotel) {
-          setSelectedHotel(selectedHotel);
-        }
-      }
-    };
+    const savedHotelCode = localStorage.getItem('selectedHotelCode');
+    const savedUserEmail = localStorage.getItem('userEmail');
     
-    loadHotels();
+    if (savedHotelCode) setHotelCode(savedHotelCode);
+    if (savedUserEmail) setUserEmail(savedUserEmail);
   }, []);
   
   // Calculer le nombre recommandé de femmes de chambre
@@ -534,12 +526,46 @@ const Index = () => {
   };
 
   const redistributeRooms = async () => {
-    // Vérifier si un hôtel est sélectionné
-    if (!selectedHotel) {
-      setIsHotelSelectionOpen(true);
+    console.log("redistributeRooms appelé");
+    console.log("hotelCode:", hotelCode);
+    console.log("userEmail:", userEmail);
+    
+    // Vérifier si le code d'hôtel et l'email sont remplis
+    if (!hotelCode.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Code d'hôtel manquant",
+        description: "Veuillez entrer le code de votre hôtel."
+      });
       return;
     }
 
+    if (!userEmail.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Email manquant",
+        description: "Veuillez entrer votre adresse email."
+      });
+      return;
+    }
+
+    // Vérifier si l'hôtel existe avec ce code
+    const hotel = await SupabaseService.getHotelByCode(hotelCode);
+    if (!hotel) {
+      toast({
+        variant: "destructive",
+        title: "Code d'hôtel invalide",
+        description: "Aucun hôtel trouvé avec ce code."
+      });
+      return;
+    }
+
+    // Sauvegarder les informations dans localStorage
+    localStorage.setItem('selectedHotelCode', hotelCode);
+    localStorage.setItem('userEmail', userEmail);
+    
+    console.log("Début redistribution avec hôtel:", hotel);
+    setSelectedHotel(hotel);
     await doRedistribution();
   };
 
@@ -669,33 +695,66 @@ const Index = () => {
         <div className="flex flex-col items-center mb-6">
           <h1 className="text-3xl font-bold tracking-tight text-center mb-4">NettoBloc</h1>
           
-          {/* Affichage de l'hôtel sélectionné */}
-          {selectedHotel && (
-            <div className="w-full max-w-md mb-4">
-              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+          {/* Configuration de l'hôtel - Entrée directe du code */}
+          <div className="w-full max-w-2xl mb-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="h-5 w-5 text-blue-600" />
+                  Configuration Hôtel
+                </CardTitle>
+                <CardDescription>
+                  Entrez le code de votre hôtel et votre email pour commencer
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label htmlFor="hotel-code" className="text-sm font-medium">
+                      Code Hôtel
+                    </label>
+                    <Input
+                      id="hotel-code"
+                      placeholder="Ex: HOTEL2024"
+                      value={hotelCode}
+                      onChange={(e) => setHotelCode(e.target.value.toUpperCase())}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="user-email" className="text-sm font-medium">
+                      Votre Email
+                    </label>
+                    <Input
+                      id="user-email"
+                      type="email"
+                      placeholder="votre.email@hotel.com"
+                      value={userEmail}
+                      onChange={(e) => setUserEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {/* Affichage de l'hôtel trouvé */}
+                {selectedHotel && (
+                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-3">
                       <Building className="h-4 w-4 text-blue-600" />
                       <div>
                         <div className="font-semibold text-blue-800">{selectedHotel.name}</div>
                         <div className="text-sm text-blue-600">Code: {selectedHotel.hotel_code}</div>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsHotelSelectionOpen(true)}
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                    >
-                      Changer
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-600">Configuré</span>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-          
+                 )}
+               </CardContent>
+             </Card>
+           </div>
+        </div>
           <div className="w-full max-w-md mb-4">
             <div className="flex items-center space-x-2">
               <Input 
