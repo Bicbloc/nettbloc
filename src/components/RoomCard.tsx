@@ -68,6 +68,8 @@ export function RoomCard({
     switch (status) {
       case 'needs-cleaning':
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">À Nettoyer</Badge>;
+      case 'ready-to-clean':
+        return <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">Prêt à Nettoyer</Badge>;
       case 'clean':
         return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">Propre</Badge>;
       case 'occupied':
@@ -202,6 +204,22 @@ export function RoomCard({
               title="Marquer comme propre"
             >
               <Check className="h-3 w-3" />
+            </button>
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-orange-100 text-orange-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate({
+                  ...room,
+                  status: 'ready-to-clean'
+                });
+                toast({
+                  description: `Chambre ${room.number} marquée comme prête à nettoyer (client sorti)`
+                });
+              }}
+              title="Client sorti - Prêt à nettoyer"
+            >
+              🚪
             </button>
           </div>
         )}

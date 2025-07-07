@@ -417,6 +417,15 @@ export function HousekeeperCard({
                   <h3 className="font-bold text-lg">
                     {name}
                   </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleNameEdit}
+                    className="h-6 px-2 text-xs opacity-70 hover:opacity-100"
+                    title="Modifier le nom"
+                  >
+                    ✏️
+                  </Button>
                   {accessCode && (
                     <div className="bg-primary/10 px-2 py-1 rounded text-sm font-mono font-bold text-primary">
                       {accessCode}

@@ -170,10 +170,18 @@ export default function Housekeeper() {
       'needs-attention': 'Remarque signalée'
     };
     
-    toast({
-      title: statusMessages[newStatus as keyof typeof statusMessages] || 'Statut mis à jour',
-      description: `Chambre ${roomNumber}`,
-    });
+    // Si la chambre est marquée comme "clean" (terminée), envoyer une notification spéciale
+    if (newStatus === 'clean') {
+      toast({
+        title: '✅ Chambre terminée !',
+        description: `Chambre ${roomNumber} - Nettoyage terminé par ${selectedHousekeeper}`,
+      });
+    } else {
+      toast({
+        title: statusMessages[newStatus as keyof typeof statusMessages] || 'Statut mis à jour',
+        description: `Chambre ${roomNumber}`,
+      });
+    }
   };
 
   const handleRemark = () => {
@@ -205,6 +213,7 @@ export default function Housekeeper() {
       case 'clean': return 'bg-green-100 text-green-800';
       case 'in-progress': return 'bg-yellow-100 text-yellow-800';
       case 'needs-attention': return 'bg-red-100 text-red-800';
+      case 'ready-to-clean': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -214,6 +223,7 @@ export default function Housekeeper() {
       case 'clean': return 'Nettoyée';
       case 'in-progress': return 'En cours';
       case 'needs-attention': return 'Remarque';
+      case 'ready-to-clean': return 'Prêt à nettoyer';
       default: return 'À nettoyer';
     }
   };
@@ -323,7 +333,7 @@ export default function Housekeeper() {
     );
   }
 
-  const pendingRooms = housekeeperRooms.filter(room => room.status === 'needs-cleaning');
+  const pendingRooms = housekeeperRooms.filter(room => room.status === 'needs-cleaning' || room.status === 'ready-to-clean');
   const inProgressRooms = housekeeperRooms.filter(room => room.status === 'in-progress');
   const completedRooms = housekeeperRooms.filter(room => room.status === 'clean');
   const remarkRooms = housekeeperRooms.filter(room => room.status === 'needs-attention');
@@ -418,8 +428,15 @@ export default function Housekeeper() {
                 </Badge>
               </div>
               
-              {room.status === 'needs-cleaning' && (
+              {(room.status === 'needs-cleaning' || room.status === 'ready-to-clean') && (
                 <div className="grid grid-cols-1 gap-2">
+                  {room.status === 'ready-to-clean' && (
+                    <div className="p-2 bg-orange-50 border border-orange-200 rounded-md text-center">
+                      <p className="text-sm text-orange-700 font-medium">
+                        🚪 Client sorti - Chambre prête à nettoyer
+                      </p>
+                    </div>
+                  )}
                   <Button
                     onClick={() => handleUpdateRoomStatus(room.number, 'in-progress')}
                     className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
@@ -435,7 +452,7 @@ export default function Housekeeper() {
                       size="sm"
                     >
                       <Check className="h-4 w-4 mr-1" />
-                      Prête à nettoyer
+                      Terminé
                     </Button>
                     <Dialog>
                       <DialogTrigger asChild>

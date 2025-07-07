@@ -1039,6 +1039,7 @@ const Index = () => {
                             onUpdate={handleRoomUpdate}
                             onUnassign={handleRoomUnassign}
                             compact={true}
+                            showActions={true}
                           />
                         </TableCell>
                       </TableRow>
