@@ -150,6 +150,13 @@ function parseRoomsFromText(text: string): Room[] {
     let cleaningType: 'full' | 'quick' | 'none' = 'none';
     let roomStatus = 'clean';
     
+    // Détecter si c'est une recouche: une seule ligne avec deux dates sans horaires
+    const isRecouche = dates.length === 2 && 
+                      !hasTimeOnly && 
+                      !/\b\d{1,2}:\d{2}\b/.test(roomSpecificContext.replace(/\d{2}\/\d{2}\/\d{4}/g, ''));
+    
+    console.log(`Détection recouche: ${dates.length} dates, pas d'horaires=${!hasTimeOnly}, isRecouche=${isRecouche}`);
+    
     // 1. Chambre occupée (OCC)
     if (hasOCC) {
       cleaningType = 'none';
@@ -162,19 +169,25 @@ function parseRoomsFromText(text: string): Room[] {
       roomStatus = 'clean';
       console.log(`→ Propre (pas de dates + CL/INS)`);
     }
-    // 3. DIR ou Dirty présent → À blanc
+    // 3. Recouche détectée → Quick cleaning
+    else if (isRecouche) {
+      cleaningType = 'quick';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ Recouche (deux dates sans horaires: ${dates.join(', ')})`);
+    }
+    // 4. DIR ou Dirty présent → À blanc
     else if (hasDIR) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
       console.log(`→ À blanc (DIR/Dirty détecté)`);
     }
-    // 4. Une seule ligne horaire → À blanc
+    // 5. Une seule ligne horaire → À blanc
     else if (hasTimeOnly) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
       console.log(`→ À blanc (heure seule)`);
     }
-    // 5. Analyser les dates par rapport à aujourd'hui
+    // 6. Analyser les dates par rapport à aujourd'hui
     else if (dates.length > 0) {
       const hasTodayDeparture = dates.includes(today);
       const hasLaterDeparture = dates.some(date => {
@@ -202,7 +215,7 @@ function parseRoomsFromText(text: string): Room[] {
         console.log(`→ À blanc (dates détectées)`);
       }
     }
-    // 6. Par défaut - propre
+    // 7. Par défaut - propre
     else {
       cleaningType = 'none';
       roomStatus = 'clean';
