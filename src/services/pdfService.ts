@@ -196,7 +196,19 @@ function parseRoomsFromText(text: string): Room[] {
       roomStatus = 'needs-cleaning';
       console.log(`→ À blanc (DIR/Dirty détecté)`);
     }
-    // 5. Une seule ligne horaire → À blanc
+    // 5. Une seule date → Regarder le statut en priorité
+    else if (dates.length === 1) {
+      if (hasINS || hasCL) {
+        cleaningType = 'none';
+        roomStatus = 'clean';
+        console.log(`→ Propre (une date + statut CL/INS)`);
+      } else {
+        cleaningType = 'full';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ À blanc (une date + statut non propre)`);
+      }
+    }
+    // 6. Une seule ligne horaire → À blanc
     else if (hasTimeOnly) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
