@@ -278,7 +278,7 @@ export function RoomCard({
               htmlFor={`full-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
             >
-              <Check className="h-3 w-3" /> À Blanc
+              À Blanc
             </Label>
           </div>
           <div className="flex items-center space-x-1">
@@ -287,16 +287,7 @@ export function RoomCard({
               htmlFor={`quick-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-blue-800"
             >
-              <Bed className="h-3 w-3" /> Recouche
-            </Label>
-          </div>
-          <div className="flex items-center space-x-1">
-            <RadioGroupItem value="none" id={`none-${room.number}`} />
-            <Label 
-              htmlFor={`none-${room.number}`}
-              className="text-xs cursor-pointer text-gray-800"
-            >
-              Aucun
+              Recouche
             </Label>
           </div>
         </RadioGroup>

@@ -21,7 +21,14 @@ export const useNotifications = () => {
       timestamp: new Date(),
     };
 
-    setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Garder seulement les 50 dernières
+    console.log('🎯 addNotification appelée avec:', notification);
+    console.log('✅ Nouvelle notification créée:', newNotification);
+
+    setNotifications(prev => {
+      const updated = [newNotification, ...prev].slice(0, 50);
+      console.log('📋 Notifications après ajout:', updated.length, 'total');
+      return updated;
+    }); // Garder seulement les 50 dernières
 
     // Afficher la notification toast
     toast({
