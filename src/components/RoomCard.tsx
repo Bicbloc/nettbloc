@@ -167,7 +167,7 @@ export function RoomCard({
                 ? 'bg-purple-100 text-purple-700' 
                 : 'bg-blue-100 text-blue-700'
             }`}>
-              {room.cleaningType === 'full' ? 'B' : 'R'}
+              {room.cleaningType === 'full' ? 'B' : 'D'}
             </span>
           )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
@@ -200,7 +200,7 @@ export function RoomCard({
               }}
               title="Départ"
             >
-              R
+              D
             </button>
             <button
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
