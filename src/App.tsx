@@ -6,9 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import Housekeeper from "./pages/Housekeeper";
 import { BicblocFooter } from "./components/BicblocBranding";
-import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 
 // Minimal header space with no title
 const HeaderSpace = () => (
@@ -21,29 +19,26 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <HousekeepingProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <div className="flex flex-col min-h-screen">
-          <HeaderSpace />
-          {/* Footer positioned at the top, before the main content, with increased width and less padding */}
-          <div className="container mx-auto mb-2 px-0">
-            <BicblocFooter />
-          </div>
-          <div className="flex-grow">
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/housekeeper" element={<Housekeeper />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </div>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <div className="flex flex-col min-h-screen">
+        <HeaderSpace />
+        {/* Footer positioned at the top, before the main content, with increased width and less padding */}
+        <div className="container mx-auto mb-2 px-0">
+          <BicblocFooter />
         </div>
-      </TooltipProvider>
-    </HousekeepingProvider>
+        <div className="flex-grow">
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </div>
+      </div>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 
