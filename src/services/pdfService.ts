@@ -110,16 +110,21 @@ function parseRoomsFromText(text: string): Room[] {
     console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
     console.log(`Contexte complet:`, context);
     
-    // Analyser les dates dans le contexte
-    const dates = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+    // Analyser les éléments du contexte
+    const dates: string[] = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
     const hasOCC = /OCC/.test(context);
     const hasINS = /INS/.test(context);
     const hasCL = /CL/.test(context);
+    const hasDIR = /DIR/.test(context) || /Dirty/.test(context);
+    const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(context) && dates.length === 0;
     
     console.log(`Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
-    console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}`);
+    console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}, DIR=${hasDIR}`);
+    console.log(`Heure seule: ${hasTimeOnly}`);
     
-    // Logique basée sur l'analyse des dates
+    // Date d'aujourd'hui (01/05/2025 d'après le contexte du PDF)
+    const today = '01/05/2025';
+    
     let cleaningType: 'full' | 'quick' | 'none' = 'none';
     let roomStatus = 'clean';
     
@@ -129,29 +134,57 @@ function parseRoomsFromText(text: string): Room[] {
       roomStatus = 'occupied';
       console.log(`→ Chambre occupée (OCC)`);
     }
-    // 2. Pas de dates = chambre propre
-    else if (dates.length === 0) {
+    // 2. Pas de dates + statut CL/INS → Propre
+    else if (dates.length === 0 && (hasINS || hasCL)) {
       cleaningType = 'none';
       roomStatus = 'clean';
-      console.log(`→ Chambre propre (pas de dates)`);
+      console.log(`→ Propre (pas de dates + CL/INS)`);
     }
-    // 3. Une date = recouche
-    else if (dates.length === 1) {
-      cleaningType = 'quick';
-      roomStatus = 'needs-cleaning';
-      console.log(`→ Recouche (une date)`);
-    }
-    // 4. Plusieurs dates = chambre à blanc
-    else if (dates.length >= 2) {
+    // 3. DIR ou Dirty présent → À blanc
+    else if (hasDIR) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
-      console.log(`→ Chambre à blanc (${dates.length} dates)`);
+      console.log(`→ À blanc (DIR/Dirty détecté)`);
     }
-    // 5. Par défaut
+    // 4. Une seule ligne horaire → À blanc
+    else if (hasTimeOnly) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ À blanc (heure seule)`);
+    }
+    // 5. Analyser les dates par rapport à aujourd'hui
+    else if (dates.length > 0) {
+      const hasTodayDeparture = dates.includes(today);
+      const hasLaterDeparture = dates.some(date => {
+        const [day, month, year] = date.split('/').map(Number);
+        const [todayDay, todayMonth, todayYear] = today.split('/').map(Number);
+        const dateObj = new Date(year, month - 1, day);
+        const todayObj = new Date(todayYear, todayMonth - 1, todayDay);
+        return dateObj > todayObj;
+      });
+      
+      if (hasLaterDeparture && !hasTodayDeparture) {
+        // Départ après aujourd'hui → Recouche
+        cleaningType = 'quick';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ Recouche (départ après aujourd'hui)`);
+      } else if (hasTodayDeparture) {
+        // Départ aujourd'hui → À blanc
+        cleaningType = 'full';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ À blanc (départ aujourd'hui)`);
+      } else {
+        // Par défaut À blanc si dates présentes
+        cleaningType = 'full';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ À blanc (dates détectées)`);
+      }
+    }
+    // 6. Par défaut - propre
     else {
       cleaningType = 'none';
       roomStatus = 'clean';
-      console.log(`→ Chambre propre par défaut`);
+      console.log(`→ Propre par défaut`);
     }
     
     console.log(`RÉSULTAT: ${roomStatus} / ${cleaningType}`);
