@@ -102,21 +102,43 @@ function parseRoomsFromText(text: string): Room[] {
     if (foundRooms.has(normalizedRoomNumber)) continue;
     foundRooms.add(normalizedRoomNumber);
     
-    // Extraire un contexte plus large (300 caractères de chaque côté)
-    const start = Math.max(0, match.index - 300);
+    // Extraire un contexte plus large pour analyser cette chambre spécifique
+    const start = Math.max(0, match.index - 50);
     const end = Math.min(text.length, match.index + 300);
     const context = text.substring(start, end);
     
     console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
     console.log(`Contexte complet:`, context);
     
-    // Analyser les éléments du contexte
-    const dates: string[] = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-    const hasOCC = /OCC/.test(context);
-    const hasINS = /INS/.test(context);
-    const hasCL = /CL/.test(context);
-    const hasDIR = /DIR/.test(context) || /Dirty/.test(context);
-    const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(context) && dates.length === 0;
+    // Trouver la ligne spécifique de cette chambre
+    const roomLinePattern = new RegExp(`\\b${normalizedRoomNumber}\\s+(\\w+)\\s+(\\w+)`, 'g');
+    const roomLineMatch = roomLinePattern.exec(context);
+    
+    let roomType = '';
+    let roomStatusCode = '';
+    
+    if (roomLineMatch) {
+      roomType = roomLineMatch[1]; // SGL, DBS, TWS, DBL
+      roomStatusCode = roomLineMatch[2]; // DIR, CL, INS, OCC
+      console.log(`Ligne chambre: ${normalizedRoomNumber} ${roomType} ${roomStatusCode}`);
+    }
+    
+    // Analyser les dates dans le contexte spécifique à cette chambre
+    // On cherche les dates qui suivent le numéro de chambre
+    const roomSection = context.substring(context.indexOf(normalizedRoomNumber));
+    const nextRoomMatch = roomSection.match(/\b[1-9]\d{2}\s/);
+    const roomSpecificContext = nextRoomMatch ? 
+      roomSection.substring(0, nextRoomMatch.index) : 
+      roomSection;
+    
+    console.log(`Contexte spécifique chambre:`, roomSpecificContext);
+    
+    const dates: string[] = roomSpecificContext.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+    const hasOCC = roomStatusCode === 'OCC';
+    const hasINS = roomStatusCode === 'INS';
+    const hasCL = roomStatusCode === 'CL';
+    const hasDIR = roomStatusCode === 'DIR';
+    const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext) && dates.length === 0;
     
     console.log(`Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
     console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}, DIR=${hasDIR}`);
