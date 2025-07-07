@@ -80,54 +80,6 @@ export async function processPdf(file: File): Promise<Room[]> {
   }
 }
 
-// Fonction pour détecter les blocs de réservation multiples
-function detectReservationBlocks(context: string): number {
-  const blockIndicators = [
-    // Dates complètes
-    /\d{2}\/\d{2}\/\d{4}/g,
-    // Lignes avec Adults/Night
-    /\b(Adults|Night)\b/gi,
-    // Lignes avec horaires
-    /\b\d{1,2}:\d{2}\b/g,
-    // Noms de clients (séquences de mots en majuscules)
-    /\b[A-Z]{2,}\s+[A-Z]{2,}\b/g,
-    // Codes de séjour
-    /\b(Arrival|Departure|Séjour|Stay)\b/gi
-  ];
-
-  let totalIndicators = 0;
-  let uniqueLines = new Set();
-
-  for (const pattern of blockIndicators) {
-    const matches = context.match(pattern);
-    if (matches) {
-      // Compter les lignes uniques contenant ces indicateurs
-      const lines = context.split('\n');
-      lines.forEach((line, index) => {
-        if (pattern.test(line)) {
-          uniqueLines.add(index);
-        }
-      });
-      totalIndicators += matches.length;
-    }
-  }
-
-  // Détecter les blocs multiples:
-  // - Si plus de 2 dates distinctes = 2+ blocs
-  // - Si plus de 3 indicateurs au total = probablement 2+ blocs  
-  // - Si plus de 2 lignes uniques avec indicateurs = 2+ blocs
-  const dates = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-  const uniqueDates = [...new Set(dates)];
-  
-  console.log(`  🔍 Analyse blocs - Dates uniques: ${uniqueDates.length}, Indicateurs totaux: ${totalIndicators}, Lignes uniques: ${uniqueLines.size}`);
-  
-  if (uniqueDates.length >= 2) return 2;
-  if (totalIndicators >= 4) return 2; 
-  if (uniqueLines.size >= 3) return 2;
-  
-  return uniqueDates.length > 0 || totalIndicators > 0 ? 1 : 0;
-}
-
 // Analyse le texte pour extraire les informations des chambres
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
@@ -152,7 +104,7 @@ function parseRoomsFromText(text: string): Room[] {
     
     // Extraire un contexte plus large pour analyser cette chambre spécifique
     const start = Math.max(0, match.index - 50);
-    const end = Math.min(text.length, match.index + 400); // Contexte plus large
+    const end = Math.min(text.length, match.index + 300);
     const context = text.substring(start, end);
     
     console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
@@ -189,11 +141,7 @@ function parseRoomsFromText(text: string): Room[] {
       afterRoom.substring(0, nextRoomMatch.index) : 
       afterRoom;
     
-    console.log(`Contexte spécifique chambre:`, roomSpecificContext.substring(0, 200) + "...");
-    
-    // NOUVELLE LOGIQUE: Détecter les blocs de réservation multiples
-    const reservationBlocks = detectReservationBlocks(roomSpecificContext);
-    console.log(`🏨 BLOCS DÉTECTÉS: ${reservationBlocks} pour chambre ${normalizedRoomNumber}`);
+    console.log(`Contexte spécifique chambre:`, roomSpecificContext.substring(0, 150) + "...");
     
     const dates: string[] = roomSpecificContext.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
     const hasOCC = roomStatusCode === 'OCC';
@@ -217,7 +165,12 @@ function parseRoomsFromText(text: string): Room[] {
     let cleaningType: 'full' | 'quick' | 'none' = 'none';
     let roomStatus = 'clean';
     
-    // RÈGLES SIMPLIFIÉES ET CORRECTES
+    // Détecter si c'est une recouche: une seule ligne avec deux dates sans horaires
+    const isRecouche = dates.length === 2 && 
+                      !hasTimeOnly && 
+                      !/\b\d{1,2}:\d{2}\b/.test(roomSpecificContext.replace(/\d{2}\/\d{2}\/\d{4}/g, ''));
+    
+    console.log(`Détection recouche: ${dates.length} dates, pas d'horaires=${!hasTimeOnly}, isRecouche=${isRecouche}`);
     
     // 1. Chambre occupée (OCC)
     if (hasOCC) {
@@ -225,36 +178,25 @@ function parseRoomsFromText(text: string): Room[] {
       roomStatus = 'occupied';
       console.log(`→ Chambre occupée (OCC)`);
     }
-    // 2. DIR ou Dirty présent → À blanc (priorité haute)
+    // 2. Pas de dates + statut CL/INS → Propre
+    else if (dates.length === 0 && (hasINS || hasCL)) {
+      cleaningType = 'none';
+      roomStatus = 'clean';
+      console.log(`→ Propre (pas de dates + CL/INS)`);
+    }
+    // 3. Recouche détectée → Quick cleaning
+    else if (isRecouche) {
+      cleaningType = 'quick';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ Recouche (deux dates sans horaires: ${dates.join(', ')})`);
+    }
+    // 4. DIR ou Dirty présent → À blanc
     else if (hasDIR) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
       console.log(`→ À blanc (DIR/Dirty détecté)`);
     }
-    // 3. Recouche: exactement 2 dates consécutives pour le même client (Night pattern ou dates proches)
-    else if (dates.length === 2 && 
-             !hasTimeOnly && 
-             !hasDIR &&
-             (roomSpecificContext.includes('Night') || 
-              roomSpecificContext.includes('Séjour') ||
-              Math.abs(Date.parse(dates[1].split('/').reverse().join('-')) - Date.parse(dates[0].split('/').reverse().join('-'))) < 7 * 24 * 60 * 60 * 1000)) {
-      cleaningType = 'quick';
-      roomStatus = 'needs-cleaning';
-      console.log(`→ Recouche (${dates.join(' - ')})`);
-    }
-    // 4. Deux blocs distincts (départ + arrivée même jour ou changement client) → À blanc
-    else if (reservationBlocks >= 2) {
-      cleaningType = 'full';
-      roomStatus = 'needs-cleaning';
-      console.log(`→ À BLANC (${reservationBlocks} blocs détectés - départ + arrivée)`);
-    }
-    // 5. Pas de dates + statut CL/INS ET un seul bloc → Propre
-    else if (dates.length === 0 && (hasINS || hasCL) && reservationBlocks <= 1) {
-      cleaningType = 'none';
-      roomStatus = 'clean';
-      console.log(`→ Propre (pas de dates + CL/INS + un seul bloc)`);
-    }
-    // 6. Une seule date → Regarder le statut en priorité
+    // 5. Une seule date → Regarder le statut en priorité
     else if (dates.length === 1) {
       if (hasINS || hasCL) {
         cleaningType = 'none';
@@ -266,13 +208,13 @@ function parseRoomsFromText(text: string): Room[] {
         console.log(`→ À blanc (une date + statut non propre)`);
       }
     }
-    // 7. Une seule ligne horaire → À blanc
+    // 6. Une seule ligne horaire → À blanc
     else if (hasTimeOnly) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
       console.log(`→ À blanc (heure seule)`);
     }
-    // 8. Analyser les dates par rapport à aujourd'hui
+    // 6. Analyser les dates par rapport à aujourd'hui
     else if (dates.length > 0) {
       const hasTodayDeparture = dates.includes(today);
       const hasLaterDeparture = dates.some(date => {
@@ -300,7 +242,7 @@ function parseRoomsFromText(text: string): Room[] {
         console.log(`→ À blanc (dates détectées)`);
       }
     }
-    // 9. Par défaut - propre
+    // 7. Par défaut - propre
     else {
       cleaningType = 'none';
       roomStatus = 'clean';
