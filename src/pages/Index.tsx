@@ -470,9 +470,9 @@ const Index = () => {
   const getCleaningTypeBadge = (type: string) => {
     switch (type) {
       case 'full':
-        return <Badge variant="outline" className="bg-red-100 text-red-800">Recouche</Badge>;
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800">🧼 À blanc</Badge>;
       case 'quick':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">🛏️ Recouche</Badge>;
       case 'none':
         return <Badge variant="outline" className="bg-gray-100 text-gray-800">Aucun</Badge>;
       default:
