@@ -86,7 +86,7 @@ export function RoomCard({
       case 'full':
         return <Badge variant="outline" className="bg-purple-100 text-purple-800">À Blanc</Badge>;
       case 'quick':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Départ</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
       case 'none':
         return null;
       default:
@@ -133,7 +133,7 @@ export function RoomCard({
     });
     
     toast({
-      description: `Chambre ${room.number} : ${type === 'full' ? '🧼 À blanc' : '🚪 Départ'}`
+      description: `Chambre ${room.number} : ${type === 'full' ? '🧼 À blanc' : '🛏️ Recouche'}`
     });
   };
 
@@ -167,7 +167,7 @@ export function RoomCard({
                 ? 'bg-purple-100 text-purple-700' 
                 : 'bg-blue-100 text-blue-700'
             }`}>
-              {room.cleaningType === 'full' ? 'B' : 'D'}
+              {room.cleaningType === 'full' ? 'B' : 'R'}
             </span>
           )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
@@ -198,9 +198,9 @@ export function RoomCard({
                 e.stopPropagation();
                 setCleaningType('quick');
               }}
-              title="Départ"
+              title="Recouche"
             >
-              D
+              R
             </button>
             <button
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
@@ -293,7 +293,7 @@ export function RoomCard({
               htmlFor={`quick-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-blue-800"
             >
-              🚪 Départ
+              🛏️ Recouche
             </Label>
           </div>
         </RadioGroup>
