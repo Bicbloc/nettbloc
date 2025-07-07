@@ -2,24 +2,20 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Check, Clock, Bed, AlertCircle, Play, MessageSquare, ArrowLeft, LogIn } from 'lucide-react';
+import { Check, Clock, Bed, AlertCircle, Play, MessageSquare, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Room } from '@/services/pdfService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useNavigate } from 'react-router-dom';
-import { authenticateHousekeeper, createRoomStatusUpdate, subscribeToRoomUpdates, type Housekeeper } from '@/services/supabaseService';
 
 export default function Housekeeper() {
   const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus } = useHousekeeping();
   const navigate = useNavigate();
-  const [accessCode, setAccessCode] = useState('');
-  const [authenticatedHousekeeper, setAuthenticatedHousekeeper] = useState<Housekeeper | null>(null);
+  const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [remarkText, setRemarkText] = useState('');
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
@@ -27,30 +23,14 @@ export default function Housekeeper() {
   console.log("Housekeeper - isDistributed:", isDistributed, "rooms:", rooms.length, "housekeepers:", housekeeperNames.length); // Debug
   console.log("LocalStorage check - isDistributed:", localStorage.getItem('isDistributed')); // Debug localStorage
 
-  // Set up real-time notifications
-  useEffect(() => {
-    if (authenticatedHousekeeper?.hotel_id) {
-      const subscription = subscribeToRoomUpdates((payload) => {
-        console.log('Real-time update:', payload);
-        toast({
-          title: 'Notification temps réel',
-          description: `Chambre ${payload.new.room_number}: ${payload.new.status}`,
-        });
-      }, authenticatedHousekeeper.hotel_id);
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    }
-  }, [authenticatedHousekeeper]);
-
   // Mettre à jour les chambres de la femme de chambre quand les données changent
   useEffect(() => {
-    if (authenticatedHousekeeper && isLoggedIn) {
-      const assignedRooms = getHousekeeperRooms(authenticatedHousekeeper.name);
+    if (selectedHousekeeper && isLoggedIn) {
+      const assignedRooms = getHousekeeperRooms(selectedHousekeeper);
       setHousekeeperRooms(assignedRooms);
+      console.log("Chambres assignées à", selectedHousekeeper, ":", assignedRooms.length); // Debug
     }
-  }, [authenticatedHousekeeper, isLoggedIn, rooms, getHousekeeperRooms]);
+  }, [selectedHousekeeper, isLoggedIn, rooms, getHousekeeperRooms]);
 
   // Vérifier si la distribution a été faite
   if (!isDistributed) {
@@ -81,71 +61,22 @@ export default function Housekeeper() {
     );
   }
 
-  const handleAuthentication = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!accessCode.trim() || accessCode.length !== 4) {
-      toast({
-        title: 'Erreur',
-        description: 'Veuillez entrer un code à 4 chiffres',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setIsAuthenticating(true);
-    
-    try {
-      const { data, error } = await authenticateHousekeeper(accessCode);
-      
-      if (error || !data) {
-        throw new Error('Code d\'accès invalide');
-      }
-      
-      setAuthenticatedHousekeeper(data);
-      const assignedRooms = getHousekeeperRooms(data.name);
+  const handleHousekeeperLogin = () => {
+    if (selectedHousekeeper) {
+      const assignedRooms = getHousekeeperRooms(selectedHousekeeper);
       setHousekeeperRooms(assignedRooms);
       setIsLoggedIn(true);
-      
-      toast({
-        title: 'Connexion réussie',
-        description: `Bienvenue ${data.name}!`
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Erreur de connexion',
-        description: error.message || 'Code d\'accès invalide',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsAuthenticating(false);
     }
   };
 
-  const handleUpdateRoomStatus = async (roomNumber: string, newStatus: string) => {
+  const handleUpdateRoomStatus = (roomNumber: string, newStatus: string) => {
     // Utiliser la fonction du contexte qui gère les notifications
-    updateRoomStatus(roomNumber, newStatus, authenticatedHousekeeper?.name);
-    
-    // Envoyer notification temps réel
-    if (authenticatedHousekeeper) {
-      try {
-        await createRoomStatusUpdate(
-          roomNumber,
-          newStatus,
-          authenticatedHousekeeper.id,
-          authenticatedHousekeeper.hotel_id,
-          `${authenticatedHousekeeper.name} a mis à jour la chambre ${roomNumber}`
-        );
-      } catch (error) {
-        console.error('Erreur lors de l\'envoi de la notification:', error);
-      }
-    }
+    updateRoomStatus(roomNumber, newStatus, selectedHousekeeper);
     
     const statusMessages = {
       'clean': 'Chambre marquée comme nettoyée !',
       'in-progress': 'Nettoyage en cours',
-      'needs-attention': 'Remarque signalée',
-      'ready-to-clean': 'Chambre prête à nettoyer'
+      'needs-attention': 'Remarque signalée'
     };
     
     toast({
@@ -196,44 +127,37 @@ export default function Housekeeper() {
     }
   };
 
-  // Écran de connexion avec code d'accès
+  // Écran de sélection de la femme de chambre
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-secondary p-4 flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-2xl flex items-center justify-center gap-2">
-              <LogIn className="h-6 w-6" />
-              Interface Mobile
-            </CardTitle>
-            <p className="text-center text-muted-foreground">Entrez votre code d'accès à 4 chiffres</p>
+            <CardTitle className="text-center text-2xl">Interface Mobile</CardTitle>
+            <p className="text-center text-muted-foreground">Sélectionnez votre nom</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleAuthentication} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="accessCode">Code d'accès</Label>
-                <Input
-                  id="accessCode"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={4}
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="0000"
-                  className="text-center text-2xl font-mono tracking-widest"
-                  required
-                />
-              </div>
-              
-              <Button 
-                type="submit"
-                disabled={isAuthenticating || accessCode.length !== 4}
-                className="w-full bg-gradient-primary"
-                size="lg"
-              >
-                {isAuthenticating ? 'Connexion...' : 'Se connecter'}
-              </Button>
-            </form>
+            <Select value={selectedHousekeeper} onValueChange={setSelectedHousekeeper}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choisir une femme de chambre" />
+              </SelectTrigger>
+              <SelectContent>
+                {housekeeperNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              onClick={handleHousekeeperLogin}
+              disabled={!selectedHousekeeper}
+              className="w-full bg-gradient-primary"
+              size="lg"
+            >
+              Accéder à mon planning
+            </Button>
             
             <Button 
               variant="outline"
@@ -260,7 +184,7 @@ export default function Housekeeper() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Bonjour {authenticatedHousekeeper?.name} !</h1>
+            <h1 className="text-2xl font-bold text-foreground">Bonjour {selectedHousekeeper} !</h1>
             <p className="text-muted-foreground">Votre planning aujourd'hui</p>
           </div>
           <div className="flex gap-2">
@@ -346,14 +270,6 @@ export default function Housekeeper() {
               
               {room.status === 'needs-cleaning' && (
                 <div className="grid grid-cols-1 gap-2">
-                  <Button
-                    onClick={() => handleUpdateRoomStatus(room.number, 'ready-to-clean')}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    size="sm"
-                  >
-                    <Clock className="h-4 w-4 mr-2" />
-                    Prête à nettoyer
-                  </Button>
                   <Button
                     onClick={() => handleUpdateRoomStatus(room.number, 'in-progress')}
                     className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
