@@ -86,7 +86,7 @@ export function RoomCard({
       case 'full':
         return <Badge variant="outline" className="bg-purple-100 text-purple-800">À Blanc</Badge>;
       case 'quick':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
+        return <Badge variant="outline" className="bg-red-100 text-red-800">À blanc</Badge>;
       case 'none':
         return null;
       default:
