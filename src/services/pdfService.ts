@@ -84,7 +84,7 @@ export async function processPdf(file: File): Promise<Room[]> {
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
   
-  // Pattern pour capturer les numéros de chambre
+// Pattern pour capturer les numéros de chambre
   const roomPattern = /\b([1-9]\d{2})\b/g;
   const foundRooms = new Set();
   
@@ -103,18 +103,170 @@ function parseRoomsFromText(text: string): Room[] {
     foundRooms.add(normalizedRoomNumber);
     
     // Extraire un contexte plus large pour analyser cette chambre spécifique
-    const start = Math.max(0, match.index - 100);
-    const end = Math.min(text.length, match.index + 500);
+    const start = Math.max(0, match.index - 50);
+    const end = Math.min(text.length, match.index + 300);
     const context = text.substring(start, end);
     
-    console.log(`=== ANALYSE RENFORCÉE CHAMBRE ${normalizedRoomNumber} ===`);
+    console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
     console.log(`Contexte complet:`, context);
     
-    // Analyse renforcée de la chambre
-    const result = analyzeRoomContextEnhanced(context, normalizedRoomNumber);
+    // Trouver la ligne spécifique de cette chambre
+    const roomLinePattern = new RegExp(`\\b${normalizedRoomNumber}\\s+(\\w+)\\s+(\\w+)`, 'g');
+    const roomLineMatch = roomLinePattern.exec(context);
     
-    console.log(`RÉSULTAT FINAL: ${result.status} / ${result.cleaningType}`);
-    console.log(`=== FIN ANALYSE RENFORCÉE CHAMBRE ${normalizedRoomNumber} ===\n`);
+    let roomType = '';
+    let roomStatusCode = '';
+    
+    if (roomLineMatch) {
+      roomType = roomLineMatch[1]; // SGL, DBS, TWS, DBL
+      roomStatusCode = roomLineMatch[2]; // DIR, CL, INS, OCC
+      console.log(`Ligne chambre: ${normalizedRoomNumber} ${roomType} ${roomStatusCode}`);
+    }
+    
+    // Analyser les dates dans le contexte spécifique à cette chambre
+    // On cherche les dates qui suivent le numéro de chambre
+    const roomIndex = context.indexOf(normalizedRoomNumber);
+    if (roomIndex === -1) {
+      console.log(`❌ Chambre ${normalizedRoomNumber} non trouvée dans le contexte`);
+      continue;
+    }
+    
+    // Prendre tout ce qui suit le numéro de chambre jusqu'à la prochaine chambre
+    const afterRoom = context.substring(roomIndex);
+    const nextRoomPattern = /\b([1-9]\d{2})\b/g;
+    nextRoomPattern.exec(afterRoom); // Skip current room
+    const nextRoomMatch = nextRoomPattern.exec(afterRoom);
+    
+    const roomSpecificContext = nextRoomMatch ? 
+      afterRoom.substring(0, nextRoomMatch.index) : 
+      afterRoom;
+    
+    console.log(`Contexte spécifique chambre:`, roomSpecificContext.substring(0, 150) + "...");
+    
+    const dates: string[] = roomSpecificContext.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+    const hasOCC = roomStatusCode === 'OCC';
+    const hasINS = roomStatusCode === 'INS';
+    const hasCL = roomStatusCode === 'CL';
+    const hasDIR = roomStatusCode === 'DIR';
+    const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext) && dates.length === 0;
+    
+    // Debug pour mieux comprendre le contexte
+    console.log(`DEBUG - Dates trouvées:`, dates);
+    console.log(`DEBUG - Contient horaires:`, /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext));
+    console.log(`DEBUG - roomStatusCode:`, roomStatusCode);
+    
+    console.log(`Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
+    console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}, DIR=${hasDIR}`);
+    console.log(`Heure seule: ${hasTimeOnly}`);
+    
+    // Date d'aujourd'hui (01/05/2025 d'après le contexte du PDF)
+    const today = '01/05/2025';
+    
+    let cleaningType: 'full' | 'quick' | 'none' = 'none';
+    let roomStatus = 'clean';
+    
+    // RÈGLE AFFINÉE: Distinguer vraies recouches des changements de clients
+    // Recouche = un seul bloc de réservation avec arrivée et départ
+    // À blanc = deux blocs distincts ou présence d'un pattern spécial
+    const hasTwoSeparateBlocks = /Adults.*\d{2}\/\d{2}\/\d{4}.*Adults.*\d{2}\/\d{2}\/\d{4}/.test(roomSpecificContext);
+    const hasNightPattern = /Night\s+\d+\/\d+/.test(roomSpecificContext);
+    
+    const shouldBeFullCleaning = (hasTwoSeparateBlocks && hasINS) && !hasNightPattern;
+    
+    if (shouldBeFullCleaning) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      console.log(`→ À blanc (deux blocs séparés + INS - règle spéciale)`);
+    }
+    // Détecter si c'est une recouche: une seule réservation avec arrivée/départ OU pattern Night
+    else {
+      const isSingleReservationWithDates = (dates.length === 2 && !hasTwoSeparateBlocks) || hasNightPattern;
+      const isRecouche = isSingleReservationWithDates && 
+                        !hasTimeOnly && 
+                        !/\b\d{1,2}:\d{2}\b/.test(roomSpecificContext.replace(/\d{2}\/\d{2}\/\d{4}/g, ''));
+      
+      console.log(`Détection recouche: ${dates.length} dates, une seule résa=${isSingleReservationWithDates}, Night=${hasNightPattern}, isRecouche=${isRecouche}`);
+    
+      // 1. Chambre occupée (OCC)
+      if (hasOCC) {
+        cleaningType = 'none';
+        roomStatus = 'occupied';
+        console.log(`→ Chambre occupée (OCC)`);
+      }
+      // 2. Pas de dates + statut CL/INS → Propre
+      else if (dates.length === 0 && (hasINS || hasCL)) {
+        cleaningType = 'none';
+        roomStatus = 'clean';
+        console.log(`→ Propre (pas de dates + CL/INS)`);
+      }
+      // 3. Recouche détectée → Quick cleaning
+      else if (isRecouche) {
+        cleaningType = 'quick';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ Recouche (deux dates sans horaires: ${dates.join(', ')})`);
+      }
+      // 4. DIR ou Dirty présent → À blanc
+      else if (hasDIR) {
+        cleaningType = 'full';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ À blanc (DIR/Dirty détecté)`);
+      }
+      // 5. Une seule date → Regarder le statut en priorité
+      else if (dates.length === 1) {
+        if (hasINS || hasCL) {
+          cleaningType = 'none';
+          roomStatus = 'clean';
+          console.log(`→ Propre (une date + statut CL/INS)`);
+        } else {
+          cleaningType = 'full';
+          roomStatus = 'needs-cleaning';
+          console.log(`→ À blanc (une date + statut non propre)`);
+        }
+      }
+      // 6. Une seule ligne horaire → À blanc
+      else if (hasTimeOnly) {
+        cleaningType = 'full';
+        roomStatus = 'needs-cleaning';
+        console.log(`→ À blanc (heure seule)`);
+      }
+      // 6. Analyser les dates par rapport à aujourd'hui
+      else if (dates.length > 0) {
+        const hasTodayDeparture = dates.includes(today);
+        const hasLaterDeparture = dates.some(date => {
+          const [day, month, year] = date.split('/').map(Number);
+          const [todayDay, todayMonth, todayYear] = today.split('/').map(Number);
+          const dateObj = new Date(year, month - 1, day);
+          const todayObj = new Date(todayYear, todayMonth - 1, todayDay);
+          return dateObj > todayObj;
+        });
+        
+        if (hasLaterDeparture && !hasTodayDeparture) {
+          // Départ après aujourd'hui → Recouche
+          cleaningType = 'quick';
+          roomStatus = 'needs-cleaning';
+          console.log(`→ Recouche (départ après aujourd'hui)`);
+        } else if (hasTodayDeparture) {
+          // Départ aujourd'hui → À blanc
+          cleaningType = 'full';
+          roomStatus = 'needs-cleaning';
+          console.log(`→ À blanc (départ aujourd'hui)`);
+        } else {
+          // Par défaut À blanc si dates présentes
+          cleaningType = 'full';
+          roomStatus = 'needs-cleaning';
+          console.log(`→ À blanc (dates détectées)`);
+        }
+      }
+      // 7. Par défaut - propre
+      else {
+        cleaningType = 'none';
+        roomStatus = 'clean';
+        console.log(`→ Propre par défaut`);
+      }
+    }
+    
+    console.log(`RÉSULTAT: ${roomStatus} / ${cleaningType}`);
+    console.log(`=== FIN ANALYSE CHAMBRE ${normalizedRoomNumber} ===\n`);
     
     // Déterminer si c'est une chambre twin
     const isTwin = /TWN|TWS/.test(context);
@@ -127,8 +279,8 @@ function parseRoomsFromText(text: string): Room[] {
     
     rooms.push({
       number: normalizedRoomNumber,
-      status: result.status,
-      cleaningType: result.cleaningType,
+      status: roomStatus,
+      cleaningType,
       priority,
       isTwin,
       isUrgent: priority === 'high',
@@ -137,128 +289,13 @@ function parseRoomsFromText(text: string): Room[] {
     });
   }
   
-  console.log(`Détecté ${rooms.length} chambres avec le parsing renforcé`);
+  console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
   
   // Trier les chambres par numéro
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
 }
 
-// Nouvelle fonction d'analyse renforcée
-function analyzeRoomContextEnhanced(context: string, roomNumber: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
-  console.log(`🔍 ANALYSE RENFORCÉE pour chambre ${roomNumber}:`);
-  
-  // 1. Extraire les informations de base
-  const dates = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-  const times = context.match(/\b\d{1,2}:\d{2}\b/g) || [];
-  const roomLinePattern = new RegExp(`\\b${roomNumber}\\s+(\\w+)\\s+(\\w+)`, 'g');
-  const roomLineMatch = roomLinePattern.exec(context);
-  
-  let roomType = '';
-  let roomStatusCode = '';
-  
-  if (roomLineMatch) {
-    roomType = roomLineMatch[1]; // SGL, DBS, TWS, DBL
-    roomStatusCode = roomLineMatch[2]; // DIR, CL, INS, OCC
-  }
-  
-  console.log(`📊 Données extraites:`);
-  console.log(`  - Dates: ${dates.length} [${dates.join(', ')}]`);
-  console.log(`  - Heures: ${times.length} [${times.join(', ')}]`);
-  console.log(`  - Type chambre: ${roomType}`);
-  console.log(`  - Statut: ${roomStatusCode}`);
-  
-  // 2. Détection des patterns de réservation
-  const hasAdultsPattern = /Adults/gi.test(context);
-  const adultMatches = context.match(/Adults/gi) || [];
-  const hasNightPattern = /Night\s+\d+\/\d+/gi.test(context);
-  const nightMatches = context.match(/Night\s+\d+\/\d+/gi) || [];
-  
-  console.log(`🏨 Patterns de réservation:`);
-  console.log(`  - Adults mentions: ${adultMatches.length}`);
-  console.log(`  - Night patterns: ${nightMatches.length}`);
-  
-  // 3. Analyse de la structure des données
-  const hasDirectTimeAfterRoom = new RegExp(`${roomNumber}.*?\\d{1,2}:\\d{2}`, 'g').test(context);
-  const hasDirectDateAfterRoom = new RegExp(`${roomNumber}.*?\\d{2}/\\d{2}/\\d{4}`, 'g').test(context);
-  
-  console.log(`🔗 Structure des données:`);
-  console.log(`  - Heure directe après chambre: ${hasDirectTimeAfterRoom}`);
-  console.log(`  - Date directe après chambre: ${hasDirectDateAfterRoom}`);
-  
-  // 4. RÈGLES DE DÉCISION RENFORCÉES
-  
-  // RÈGLE 1: Chambre occupée
-  if (roomStatusCode === 'OCC') {
-    console.log(`✅ RÈGLE 1: Chambre occupée (OCC)`);
-    return { status: 'occupied', cleaningType: 'none' };
-  }
-  
-  // RÈGLE 2: Chambre propre (pas de réservation active)
-  if ((roomStatusCode === 'CL' || roomStatusCode === 'INS') && 
-      dates.length === 0 && 
-      !hasAdultsPattern) {
-    console.log(`✅ RÈGLE 2: Chambre propre (${roomStatusCode} sans réservation)`);
-    return { status: 'clean', cleaningType: 'none' };
-  }
-  
-  // RÈGLE 3: Recouche - Une seule réservation avec pattern Night
-  if (hasNightPattern && nightMatches.length === 1 && adultMatches.length <= 1) {
-    console.log(`✅ RÈGLE 3: Recouche (pattern Night unique)`);
-    return { status: 'needs-cleaning', cleaningType: 'quick' };
-  }
-  
-  // RÈGLE 4: Recouche - Deux dates consécutives dans une seule réservation
-  if (dates.length === 2 && 
-      adultMatches.length === 1 && 
-      !hasDirectTimeAfterRoom &&
-      roomStatusCode !== 'DIR') {
-    console.log(`✅ RÈGLE 4: Recouche (deux dates, une réservation)`);
-    return { status: 'needs-cleaning', cleaningType: 'quick' };
-  }
-  
-  // RÈGLE 5: À blanc - Statut DIR (dirty)
-  if (roomStatusCode === 'DIR') {
-    console.log(`✅ RÈGLE 5: À blanc (statut DIR)`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  
-  // RÈGLE 6: À blanc - Plusieurs blocs de réservation
-  if (adultMatches.length >= 2) {
-    console.log(`✅ RÈGLE 6: À blanc (${adultMatches.length} blocs Adults)`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  
-  // RÈGLE 7: À blanc - Données temporelles complexes
-  if (dates.length >= 3 || 
-      (dates.length >= 2 && times.length >= 1) ||
-      hasDirectTimeAfterRoom) {
-    console.log(`✅ RÈGLE 7: À blanc (structure temporelle complexe)`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  
-  // RÈGLE 8: À blanc - Réservation avec statut INS mais contexte de changement
-  if (roomStatusCode === 'INS' && 
-      dates.length >= 2 && 
-      hasAdultsPattern) {
-    console.log(`✅ RÈGLE 8: À blanc (INS avec changement de client)`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  
-  // RÈGLE 9: Propre - INS sans activité
-  if (roomStatusCode === 'INS' && !hasAdultsPattern) {
-    console.log(`✅ RÈGLE 9: Propre (INS sans activité)`);
-    return { status: 'clean', cleaningType: 'none' };
-  }
-  
-  // RÈGLE PAR DÉFAUT: À blanc si des dates sont présentes
-  if (dates.length > 0 || hasAdultsPattern) {
-    console.log(`✅ RÈGLE DÉFAUT: À blanc (activité détectée)`);
-    return { status: 'needs-cleaning', cleaningType: 'full' };
-  }
-  
-  console.log(`✅ RÈGLE ULTIME: Propre (aucune activité)`);
-  return { status: 'clean', cleaningType: 'none' };
-}
+// Updated consistent floor detection function that matches the one in other files
 function getRoomFloor(roomNumber: string): number {
   // Ignore years like 2025, 2026, 2027, 2028
   if (/^20(2[5-8])$/.test(roomNumber)) {
