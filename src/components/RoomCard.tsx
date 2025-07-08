@@ -86,7 +86,7 @@ export function RoomCard({
       case 'full':
         return <Badge variant="outline" className="bg-purple-100 text-purple-800">À Blanc</Badge>;
       case 'quick':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">À Blanc</Badge>;
+        return <Badge variant="outline" className="bg-red-100 text-red-800">Départ</Badge>;
       case 'none':
         return null;
       default:
@@ -133,7 +133,7 @@ export function RoomCard({
     });
     
     toast({
-      description: `Chambre ${room.number} : ${type === 'full' ? '🧼 À blanc' : '🧼 À blanc'}`
+      description: `Chambre ${room.number} : ${type === 'full' ? '🧼 À blanc' : '🚪 Départ'}`
     });
   };
 
@@ -165,9 +165,9 @@ export function RoomCard({
             <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
               room.cleaningType === 'full' 
                 ? 'bg-purple-100 text-purple-700' 
-                : 'bg-purple-100 text-purple-700'
+                : 'bg-red-100 text-red-700'
             }`}>
-              {room.cleaningType === 'full' ? 'B' : 'B'}
+              {room.cleaningType === 'full' ? 'B' : 'D'}
             </span>
           )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
@@ -193,14 +193,14 @@ export function RoomCard({
               B
             </button>
             <button 
-              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors font-semibold text-xs"
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-red-700 transition-colors font-semibold text-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 setCleaningType('quick');
               }}
-              title="Recouche"
+              title="Départ"
             >
-              R
+              D
             </button>
             <button
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
@@ -291,9 +291,9 @@ export function RoomCard({
             <RadioGroupItem value="quick" id={`quick-${room.number}`} />
             <Label 
               htmlFor={`quick-${room.number}`}
-              className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
+              className="flex items-center text-xs gap-1 cursor-pointer text-red-800"
             >
-              🧼 À blanc
+              🚪 Départ
             </Label>
           </div>
         </RadioGroup>
