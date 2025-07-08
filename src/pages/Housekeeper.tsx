@@ -218,7 +218,7 @@ export default function Housekeeper() {
   const getCleaningTypeText = (type: string) => {
     switch (type) {
       case 'full': return 'À Blanc';
-      case 'quick': return 'Départ';
+      case 'quick': return 'Recouche';
       default: return 'Aucun';
     }
   };
@@ -226,7 +226,7 @@ export default function Housekeeper() {
   const getCleaningTypeColor = (type: string) => {
     switch (type) {
       case 'full': return 'bg-purple-100 text-purple-800';
-      case 'quick': return 'bg-red-100 text-red-800';
+      case 'quick': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };

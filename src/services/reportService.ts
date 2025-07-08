@@ -196,7 +196,7 @@ function generateReportHTML(data: ReportData): string {
         <td style="border:1px solid #000;">${fullCleanCount}</td>
       </tr>
       <tr style="background-color:#F2FCE2;">
-        <td style="border:1px solid #000;">Départ</td>
+        <td style="border:1px solid #000;">Recouche</td>
         <td style="border:1px solid #000;">${quickCleanCount}</td>
       </tr>
       <tr>
@@ -242,7 +242,7 @@ function generateReportHTML(data: ReportData): string {
     roomsOnFloor.forEach(room => {
       // Determine background color based on cleaning type
       const bgColor = room.cleaningType === 'full' ? '#FEC6A1' : '#F2FCE2'; // Orange for full, Green for quick
-      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Départ';
+      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
       const priorityText = room.priority === 'high' ? 'Haute' : 'Normale';
       
       rowsHtml += `
@@ -492,8 +492,8 @@ function generateRoomSummaryTable(data: ReportData): string {
         <td>À Blanc</td>
         <td>${fullCleanCount}</td>
       </tr>
-      <tr class="depart">
-        <td>Départ</td>
+      <tr class="recouche">
+        <td>Recouche</td>
         <td>${quickCleanCount}</td>
       </tr>
       <tr>
@@ -542,8 +542,8 @@ function generateRoomsTablesByFloor(data: ReportData): string {
     // Create rows for each room
     const rowsHtml = roomsOnFloor.map(room => {
       // Apply highlighting based on cleaning type
-      const rowClass = room.cleaningType === 'full' ? 'a-blanc' : 'depart';
-      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Départ';
+      const rowClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
+      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
       
       return `
         <tr class="${rowClass}">

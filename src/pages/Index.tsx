@@ -470,9 +470,9 @@ const Index = () => {
   const getCleaningTypeBadge = (type: string) => {
     switch (type) {
       case 'full':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">À Blanc</Badge>;
+        return <Badge variant="outline" className="bg-red-100 text-red-800">Recouche</Badge>;
       case 'quick':
-        return <Badge variant="outline" className="bg-red-100 text-red-800">Départ</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
       case 'none':
         return <Badge variant="outline" className="bg-gray-100 text-gray-800">Aucun</Badge>;
       default:
@@ -879,7 +879,7 @@ const Index = () => {
                 <CardContent>
                   <div className="text-2xl font-bold">{fullCleaningRooms}</div>
                   <p className="text-xs text-muted-foreground">
-                    {quickCleaningRooms} départs
+                    {quickCleaningRooms} recouches
                   </p>
                 </CardContent>
               </Card>
@@ -1170,7 +1170,7 @@ const Index = () => {
                             {housekeeperRooms.filter(r => r.cleaningType === 'full').length}
                           </div>
                           <div className="text-sm">
-                            <span className="font-medium">Départs:</span>{" "}
+                            <span className="font-medium">Recouches:</span>{" "}
                             {housekeeperRooms.filter(r => r.cleaningType === 'quick').length}
                           </div>
                           <div className="text-sm">
