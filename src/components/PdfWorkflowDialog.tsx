@@ -11,9 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle } from "lucide-react";
 import { HousekeeperSetupDialog } from "./HousekeeperSetupDialog";
 import { ManualAssignmentDialog } from "./ManualAssignmentDialog";
+import { HotelSessionService } from "@/services/hotelSessionService";
+import { Badge } from "@/components/ui/badge";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers: string[]) => void;
@@ -78,12 +80,18 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
 
     try {
       setIsUploading(true);
+      
+      // Traiter le PDF
       const data = await processPdf(selectedFile);
       setPdfData(data);
+      
+      // Sauvegarder les données de chambre dans la session
+      await HotelSessionService.updateRoomData(data);
+      
       setStep('housekeepers');
       toast({
-        title: "PDF analysé",
-        description: `${data.length} chambres détectées. Configurez maintenant vos femmes de chambre.`,
+        title: "PDF analysé et sauvegardé",
+        description: `${data.length} chambres détectées. Session créée avec votre adresse IP. Configurez maintenant vos femmes de chambre.`,
       });
     } catch (error) {
       toast({
@@ -129,9 +137,12 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const renderUploadStep = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Étape 1: Importer un Rapport Mews</DialogTitle>
+        <DialogTitle className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">Étape 1/3</Badge>
+          Importer un Rapport Mews
+        </DialogTitle>
         <DialogDescription>
-          Téléversez un rapport PDF exporté depuis Mews pour analyser les statuts des chambres.
+          Téléversez un rapport PDF exporté depuis Mews. Les données seront associées à votre session IP pour permettre la synchronisation en temps réel entre l'admin et les interfaces des femmes de chambre.
         </DialogDescription>
       </DialogHeader>
       
@@ -196,28 +207,51 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const renderHousekeepersStep = () => (
     <>
       <DialogHeader>
-        <DialogTitle>Étape 2: Configurer les femmes de chambre</DialogTitle>
+        <DialogTitle className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">Étape 2/3</Badge>
+          Configurer les femmes de chambre
+        </DialogTitle>
         <DialogDescription>
-          {pdfData?.length} chambres détectées. Configurez maintenant vos femmes de chambre.
+          {pdfData?.length} chambres détectées et sauvegardées. Configurez maintenant vos femmes de chambre.
         </DialogDescription>
       </DialogHeader>
       
       <div className="space-y-4">
+        {/* Résumé de l'étape précédente */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-green-800">
+            <CheckCircle className="h-4 w-4" />
+            <span className="font-medium">PDF traité avec succès</span>
+          </div>
+          <p className="text-green-700 text-sm mt-1">
+            {pdfData?.length} chambres analysées et stockées avec votre session IP
+          </p>
+        </div>
+
         <div className="text-center p-6 border rounded-lg">
           <Users className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Configuration requise</h3>
+          <h3 className="text-lg font-semibold mb-2">Configuration des équipes</h3>
           <p className="text-muted-foreground mb-4">
             Ajoutez les femmes de chambre qui seront responsables du nettoyage des {pdfData?.length} chambres détectées.
+            Chaque femme de chambre recevra un code d'accès pour son interface.
           </p>
           <Button onClick={() => setIsHousekeeperDialogOpen(true)}>
             <Users className="mr-2 h-4 w-4" />
-            Configurer les femmes de chambre
+            {housekeepers.length > 0 ? "Modifier les équipes" : "Configurer les femmes de chambre"}
           </Button>
         </div>
         
         {housekeepers.length > 0 && (
-          <div className="text-center text-green-600">
-            ✓ {housekeepers.length} femme(s) de chambre configurée(s)
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-blue-800">
+              <CheckCircle className="h-4 w-4" />
+              <span className="font-medium">{housekeepers.length} femme(s) de chambre configurée(s)</span>
+            </div>
+            <div className="text-blue-700 text-sm mt-1">
+              {housekeepers.map((name, index) => (
+                <Badge key={index} variant="outline" className="mr-1 mt-1">{name}</Badge>
+              ))}
+            </div>
           </div>
         )}
       </div>

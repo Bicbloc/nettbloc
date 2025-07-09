@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Room } from '@/services/pdfService';
 import { useNotifications, Notification } from '@/hooks/use-notifications';
+import { HotelSessionService } from '@/services/hotelSessionService';
 
 interface HousekeepingContextType {
   housekeeperNames: string[];
@@ -32,48 +33,92 @@ interface HousekeepingProviderProps {
 }
 
 export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ children }) => {
-  const [housekeeperNames, setHousekeeperNames] = useState<string[]>(() => {
-    const saved = localStorage.getItem('housekeeperNames');
-    return saved ? JSON.parse(saved) : ["Housekeeper 1", "Housekeeper 2", "Housekeeper 3", "Housekeeper 4"];
-  });
-  
-  const [rooms, setRooms] = useState<Room[]>(() => {
-    const saved = localStorage.getItem('rooms');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [isDistributed, setIsDistributed] = useState<boolean>(() => {
-    const saved = localStorage.getItem('isDistributed');
-    return saved === 'true';
-  });
+  const [housekeeperNames, setHousekeeperNames] = useState<string[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [isDistributed, setIsDistributed] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
   const { notifications, addNotification } = useNotifications();
   const [housekeeperAccessCodes, setHousekeeperAccessCodes] = useState<Record<string, string>>({});
 
-  // Sauvegarder dans localStorage quand les données changent
+  // Initialiser la session au chargement
   useEffect(() => {
-    localStorage.setItem('housekeeperNames', JSON.stringify(housekeeperNames));
-  }, [housekeeperNames]);
+    const initializeSession = async () => {
+      try {
+        const token = await HotelSessionService.initializeSession();
+        if (token) {
+          console.log('Session initialisée:', token);
+          await loadSessionData();
+        }
+      } catch (error) {
+        console.error('Erreur initialisation session:', error);
+      }
+    };
+
+    initializeSession();
+  }, []);
+
+  // Charger les données de la session
+  const loadSessionData = async () => {
+    try {
+      const session = await HotelSessionService.getSession();
+      if (session) {
+        setHousekeeperNames(session.housekeeper_names || []);
+        setRooms(session.room_data || []);
+        setIsDistributed(session.is_distributed || false);
+        setIsInitialized(true);
+        console.log('Données de session chargées:', {
+          housekeepers: session.housekeeper_names?.length || 0,
+          rooms: session.room_data?.length || 0,
+          distributed: session.is_distributed
+        });
+      }
+    } catch (error) {
+      console.error('Erreur chargement session:', error);
+      setIsInitialized(true);
+    }
+  };
+
+  // Sauvegarder les changements en base de données
+  useEffect(() => {
+    if (isInitialized && housekeeperNames.length > 0) {
+      HotelSessionService.updateHousekeeperNames(housekeeperNames);
+    }
+  }, [housekeeperNames, isInitialized]);
 
   useEffect(() => {
-    localStorage.setItem('rooms', JSON.stringify(rooms));
-  }, [rooms]);
+    if (isInitialized && rooms.length > 0) {
+      HotelSessionService.updateRoomData(rooms);
+    }
+  }, [rooms, isInitialized]);
 
   useEffect(() => {
-    localStorage.setItem('isDistributed', isDistributed.toString());
-    console.log("LocalStorage - isDistributed sauvegardé:", isDistributed);
-  }, [isDistributed]);
+    if (isInitialized) {
+      if (isDistributed) {
+        HotelSessionService.markAsDistributed();
+      }
+      console.log("Session - isDistributed sauvegardé:", isDistributed);
+    }
+  }, [isDistributed, isInitialized]);
 
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
   };
 
-  const updateRoomStatus = (roomNumber: string, newStatus: string, housekeeperName?: string) => {
+  const updateRoomStatus = async (roomNumber: string, newStatus: string, housekeeperName?: string) => {
+    // Mettre à jour localement
     setRooms(prev => prev.map(room => 
       room.number === roomNumber 
         ? { ...room, status: newStatus }
         : room
     ));
+
+    // Mettre à jour en base de données
+    try {
+      await HotelSessionService.updateRoomStatus(roomNumber, newStatus);
+    } catch (error) {
+      console.error('Erreur mise à jour statut chambre:', error);
+    }
 
     // Ajouter notification pour l'admin
     const statusMessages = {
@@ -85,7 +130,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
     const message = statusMessages[newStatus as keyof typeof statusMessages];
     if (message && housekeeperName) {
-      console.log('🔔 Envoi notification:', housekeeperName, roomNumber, newStatus); // Debug amélioré
+      console.log('🔔 Envoi notification:', housekeeperName, roomNumber, newStatus);
       const notification = {
         title: `${housekeeperName} - Chambre ${roomNumber}`,
         description: `${housekeeperName} ${message} ${roomNumber}`,
@@ -93,7 +138,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         housekeeperName,
         roomNumber,
       };
-      console.log('📝 Notification créée:', notification); // Debug amélioré
+      console.log('📝 Notification créée:', notification);
       addNotification(notification);
     }
   };

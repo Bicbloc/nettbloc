@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      hotel_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          hotel_id: string | null
+          housekeeper_assignments: Json
+          housekeeper_names: Json
+          id: string
+          ip_address: unknown | null
+          is_active: boolean
+          is_distributed: boolean
+          room_data: Json
+          session_token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          hotel_id?: string | null
+          housekeeper_assignments?: Json
+          housekeeper_names?: Json
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean
+          is_distributed?: boolean
+          room_data?: Json
+          session_token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          hotel_id?: string | null
+          housekeeper_assignments?: Json
+          housekeeper_names?: Json
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean
+          is_distributed?: boolean
+          room_data?: Json
+          session_token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_sessions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotels: {
         Row: {
           created_at: string
@@ -176,6 +229,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_hotel_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
