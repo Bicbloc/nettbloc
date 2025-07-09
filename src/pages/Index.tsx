@@ -36,6 +36,7 @@ import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationPanel } from "@/components/NotificationPanel";
+import { ActionLogPanel } from "@/components/ActionLogPanel";
 import { HotelSetup } from "@/components/HotelSetup";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
@@ -81,6 +82,7 @@ const Index = () => {
   const [hotelCode, setHotelCode] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isActionLogOpen, setIsActionLogOpen] = useState(false);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -1232,7 +1234,17 @@ const Index = () => {
               </Alert>
             ) : (
               <>
-                <NotificationPanel />
+                <div className="flex items-center justify-between mb-4">
+                  <NotificationPanel />
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsActionLogOpen(true)}
+                    className="ml-2"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Journal des Actions
+                  </Button>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {housekeeperNames.map((name) => {
                     const housekeeperRooms = getHousekeeperRooms(name);
@@ -1354,6 +1366,13 @@ const Index = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Panneau Journal des Actions */}
+      <ActionLogPanel 
+        hotelId={selectedHotel?.id}
+        isOpen={isActionLogOpen}
+        onClose={() => setIsActionLogOpen(false)}
+      />
     </div>
   );
 };

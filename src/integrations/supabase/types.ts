@@ -98,7 +98,7 @@ export type Database = {
         Row: {
           access_code: string
           created_at: string
-          hotel_id: string | null
+          hotel_id: string
           id: string
           is_active: boolean
           name: string
@@ -107,7 +107,7 @@ export type Database = {
         Insert: {
           access_code: string
           created_at?: string
-          hotel_id?: string | null
+          hotel_id: string
           id?: string
           is_active?: boolean
           name: string
@@ -116,7 +116,7 @@ export type Database = {
         Update: {
           access_code?: string
           created_at?: string
-          hotel_id?: string | null
+          hotel_id?: string
           id?: string
           is_active?: boolean
           name?: string
@@ -132,11 +132,50 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          description: string
+          hotel_id: string
+          housekeeper_name: string | null
+          id: string
+          is_read: boolean
+          room_number: string | null
+          title: string
+          type: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          hotel_id: string
+          housekeeper_name?: string | null
+          id?: string
+          is_read?: boolean
+          room_number?: string | null
+          title: string
+          type: string
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          hotel_id?: string
+          housekeeper_name?: string | null
+          id?: string
+          is_read?: boolean
+          room_number?: string | null
+          title?: string
+          type?: string
+          user_type?: string
+        }
+        Relationships: []
+      }
       room_status_updates: {
         Row: {
           created_at: string
-          hotel_id: string | null
-          housekeeper_id: string | null
+          hotel_id: string
+          housekeeper_id: string
           id: string
           message: string | null
           room_number: string
@@ -144,8 +183,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          hotel_id?: string | null
-          housekeeper_id?: string | null
+          hotel_id: string
+          housekeeper_id: string
           id?: string
           message?: string | null
           room_number: string
@@ -153,8 +192,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          hotel_id?: string | null
-          housekeeper_id?: string | null
+          hotel_id?: string
+          housekeeper_id?: string
           id?: string
           message?: string | null
           room_number?: string
@@ -236,6 +275,14 @@ export type Database = {
       cleanup_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      generate_hotel_access_code: {
+        Args: { hotel_uuid: string }
+        Returns: string
+      }
+      validate_access_code_for_hotel: {
+        Args: { access_code: string; hotel_uuid: string }
+        Returns: boolean
       }
     }
     Enums: {

@@ -10,6 +10,8 @@ import { toast } from '@/hooks/use-toast';
 import { Room } from '@/services/pdfService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNotifications } from '@/hooks/use-notifications';
+import { SupabaseService } from '@/services/supabaseService';
 
 export default function Housekeeper() {
   const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus, housekeeperAccessCodes } = useHousekeeping();
@@ -22,6 +24,8 @@ export default function Housekeeper() {
   const [remarkText, setRemarkText] = useState('');
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
+  const [hotelId, setHotelId] = useState<string | null>(null);
+  const { addNotification } = useNotifications(hotelId || undefined);
 
   // Vérifier les paramètres URL ou localStorage pour auto-connexion
   useEffect(() => {
@@ -203,6 +207,29 @@ export default function Housekeeper() {
       'ready-to-clean': 'Chambre marquée comme prête à nettoyer'
     };
     
+    // Envoyer des notifications spécifiques pour les femmes de chambre
+    if (hotelId && addNotification) {
+      if (newStatus === 'clean') {
+        addNotification({
+          title: `Nettoyage terminé - Chambre ${roomNumber}`,
+          description: `${selectedHousekeeper} a terminé le nettoyage de la chambre ${roomNumber}`,
+          type: 'cleaning-end',
+          housekeeperName: selectedHousekeeper,
+          roomNumber: roomNumber,
+          user_type: 'admin'
+        });
+      } else if (newStatus === 'in-progress') {
+        addNotification({
+          title: `Nettoyage commencé - Chambre ${roomNumber}`,
+          description: `${selectedHousekeeper} a commencé le nettoyage de la chambre ${roomNumber}`,
+          type: 'cleaning-start',
+          housekeeperName: selectedHousekeeper,
+          roomNumber: roomNumber,
+          user_type: 'admin'
+        });
+      }
+    }
+
     // Si la chambre est marquée comme "clean" (terminée), envoyer une notification spéciale
     if (newStatus === 'clean') {
       toast({

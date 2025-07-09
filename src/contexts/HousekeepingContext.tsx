@@ -15,7 +15,7 @@ interface HousekeepingContextType {
   setHousekeeperAccessCodes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   getHousekeeperRooms: (name: string) => Room[];
   updateRoomStatus: (roomNumber: string, newStatus: string, housekeeperName?: string) => void;
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read' | 'hotel_id'>) => void;
 }
 
 const HousekeepingContext = createContext<HousekeepingContextType | undefined>(undefined);
@@ -38,7 +38,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const [isDistributed, setIsDistributed] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
-  const { notifications, addNotification } = useNotifications();
+  const [hotelId, setHotelId] = useState<string | null>(null);
+  const { notifications, addNotification } = useNotifications(hotelId || undefined);
   const [housekeeperAccessCodes, setHousekeeperAccessCodes] = useState<Record<string, string>>({});
 
   // Initialiser la session au chargement
@@ -110,6 +111,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         setHousekeeperNames(session.housekeeper_names || []);
         setRooms(session.room_data || []);
         setIsDistributed(session.is_distributed || false);
+        setHotelId(session.hotel_id); // Récupérer l'ID de l'hôtel
         
         // Générer des codes d'accès pour les femmes de chambre
         const codes: Record<string, string> = {};
@@ -123,6 +125,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           housekeepers: session.housekeeper_names?.length || 0,
           rooms: session.room_data?.length || 0,
           distributed: session.is_distributed,
+          hotelId: session.hotel_id,
           codes: Object.keys(codes).length
         });
       }
@@ -190,6 +193,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         type: 'room-status' as const,
         housekeeperName,
         roomNumber,
+        user_type: 'admin' as const,
       };
       console.log('📝 Notification créée:', notification);
       addNotification(notification);
