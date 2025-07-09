@@ -86,8 +86,14 @@ const Index = () => {
   const [isActionLogOpen, setIsActionLogOpen] = useState(false);
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   
+  // Récupérer l'ID de l'hôtel depuis localStorage si selectedHotel n'est pas disponible
+  const storedHotelId = localStorage.getItem("hotelId");
+  const currentHotelId = selectedHotel?.id || storedHotelId;
+  
+  console.log("🏨 Hotel ID pour notifications:", currentHotelId, "selectedHotel:", selectedHotel);
+  
   // Notifications pour l'admin
-  const { notifications, hasUnread, addNotification, markAsRead, markAllAsRead, clearNotifications } = useNotifications(selectedHotel?.id);
+  const { notifications, hasUnread, addNotification, markAsRead, markAllAsRead, clearNotifications } = useNotifications(currentHotelId);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -651,6 +657,35 @@ const Index = () => {
       description: `${selectedRooms.length} chambre(s) ont été assignées à ${housekeeperName}.`
     });
   };
+
+  // Fonction pour l'assignation directe depuis les chambres non assignées
+  const handleDirectRoomAssignment = (roomNumber: string, housekeeperName: string) => {
+    const updatedRooms = rooms.map(room => {
+      if (room.number === roomNumber) {
+        return { ...room, assignedTo: housekeeperName };
+      }
+      return room;
+    });
+    
+    setRooms(updatedRooms);
+    
+    toast({
+      title: "Chambre assignée",
+      description: `Chambre ${roomNumber} assignée à ${housekeeperName}.`
+    });
+
+    // Créer une notification pour l'assignation
+    if (currentHotelId) {
+      addNotification({
+        title: `Assignation chambre ${roomNumber}`,
+        description: `Admin - CH ${roomNumber} assignée à ${housekeeperName}`,
+        type: 'assignment',
+        housekeeperName: housekeeperName,
+        roomNumber: roomNumber,
+        user_type: 'admin'
+      });
+    }
+  };
   
   const handleEmailConfirm = (confirmedEmail: string) => {
     setEmail(confirmedEmail);
@@ -1155,6 +1190,8 @@ const Index = () => {
                       onRoomUpdate={handleRoomUpdate}
                       allRooms={rooms}
                       forceHide={false}
+                      housekeeperNames={housekeeperNames}
+                      onDirectAssign={handleDirectRoomAssignment}
                     />
                   </div>
                   

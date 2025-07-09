@@ -2,6 +2,7 @@
 import { Room } from "@/services/pdfService";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { RoomCard } from "./RoomCard";
+import { RoomAssignmentButton } from "./RoomAssignmentButton";
 import { AlertTriangle, Layers } from "lucide-react";
 import { Badge } from "./ui/badge";
 
@@ -11,6 +12,8 @@ interface UnassignedRoomsColumnProps {
   draggable?: boolean;
   allRooms?: Room[]; // Pour afficher toutes les chambres non assignées
   forceHide?: boolean; // New prop to force hide the component
+  housekeeperNames?: string[]; // Noms des femmes de chambre pour assignation directe
+  onDirectAssign?: (roomNumber: string, housekeeperName: string) => void; // Callback pour assignation directe
 }
 
 export function UnassignedRoomsColumn({ 
@@ -18,7 +21,9 @@ export function UnassignedRoomsColumn({
   onRoomUpdate,
   draggable = true,
   allRooms = [], // Par défaut, c'est un tableau vide
-  forceHide = false // Default is false, so the component will show
+  forceHide = false, // Default is false, so the component will show
+  housekeeperNames = [], // Noms des femmes de chambre
+  onDirectAssign // Callback pour assignation directe
 }: UnassignedRoomsColumnProps) {
   
   // If forceHide is true, don't render the component
@@ -71,14 +76,23 @@ export function UnassignedRoomsColumn({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {sortRoomsByNumber(floorRooms).map(room => (
-                    <RoomCard 
-                      key={`unassigned-${room.number}`} 
-                      room={room} 
-                      onUpdate={onRoomUpdate}
-                      compact 
-                      draggable={draggable}
-                      showActions={true}
-                    />
+                    <div key={`unassigned-${room.number}`} className="space-y-1">
+                      <RoomCard 
+                        room={room} 
+                        onUpdate={onRoomUpdate}
+                        compact 
+                        draggable={draggable}
+                        showActions={true}
+                      />
+                      {housekeeperNames.length > 0 && onDirectAssign && (
+                        <RoomAssignmentButton
+                          room={room}
+                          housekeeperNames={housekeeperNames}
+                          onAssign={onDirectAssign}
+                          className="w-full"
+                        />
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>

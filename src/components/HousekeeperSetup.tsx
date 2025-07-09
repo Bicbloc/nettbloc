@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { UserIcon, Plus, Key, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
+import { QuickAddHousekeeperButton } from './QuickAddHousekeeperButton';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
 
 interface Housekeeper {
   id: string;
@@ -23,6 +25,9 @@ export const HousekeeperSetup = () => {
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedHotelId, setSelectedHotelId] = useState<string>('');
+  
+  // Utiliser le contexte pour synchroniser avec la liste globale
+  const { housekeeperNames, setHousekeeperNames } = useHousekeeping();
 
   useEffect(() => {
     // Charger l'hôtel sélectionné
@@ -36,6 +41,10 @@ export const HousekeeperSetup = () => {
   const loadHousekeepers = async (hotelId: string) => {
     const housekeepersData = await SupabaseService.getHousekeepers(hotelId);
     setHousekeepers(housekeepersData as Housekeeper[]);
+    
+    // Synchroniser avec le contexte global
+    const names = housekeepersData.filter(h => h.is_active).map(h => h.name);
+    setHousekeeperNames(names);
   };
 
   const handleCreateHousekeeper = async () => {
@@ -77,6 +86,30 @@ export const HousekeeperSetup = () => {
     setIsLoading(false);
   };
 
+  // Fonction pour l'ajout rapide depuis le bouton
+  const handleQuickAdd = async (name: string) => {
+    if (!selectedHotelId) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Veuillez d'abord sélectionner un hôtel"
+      });
+      return;
+    }
+
+    const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, name);
+    
+    if (housekeeper) {
+      await loadHousekeepers(selectedHotelId);
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de créer la femme de chambre"
+      });
+    }
+  };
+
   const handleDeactivateHousekeeper = async (id: string, name: string) => {
     const success = await SupabaseService.deactivateHousekeeper(id);
     
@@ -113,10 +146,16 @@ export const HousekeeperSetup = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserIcon className="h-5 w-5" />
-            Gestion des Femmes de Chambre
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <UserIcon className="h-5 w-5" />
+              Gestion des Femmes de Chambre
+            </CardTitle>
+            <QuickAddHousekeeperButton 
+              onAddHousekeeper={handleQuickAdd}
+              className="shrink-0"
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -143,7 +182,12 @@ export const HousekeeperSetup = () => {
       {housekeepers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Femmes de chambre</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Femmes de chambre ({housekeepers.filter(h => h.is_active).length} actives)</CardTitle>
+              <Badge variant="outline">
+                Total: {housekeepers.length}
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
