@@ -165,27 +165,24 @@ function parseRoomsFromText(text: string): Room[] {
     let cleaningType: 'full' | 'quick' | 'none' = 'none';
     let roomStatus = 'clean';
     
-    // RÈGLE AFFINÉE: Distinguer vraies recouches des changements de clients
-    // Recouche = un seul bloc de réservation avec arrivée et départ
-    // À blanc = deux blocs distincts ou présence d'un pattern spécial
-    const hasTwoSeparateBlocks = /Adults.*\d{2}\/\d{2}\/\d{4}.*Adults.*\d{2}\/\d{2}\/\d{4}/.test(roomSpecificContext);
-    const hasNightPattern = /Night\s+\d+\/\d+/.test(roomSpecificContext);
-    
-    const shouldBeFullCleaning = (hasTwoSeparateBlocks && hasINS) && !hasNightPattern;
+    // RÈGLE SPÉCIALE: Si deux blocs de réservation ET statut INS → À blanc (pas recouche)
+    const hasTwoReservationBlocks = dates.length >= 2;
+    const shouldBeFullCleaning = (hasTwoReservationBlocks && hasINS) || 
+                                 (/Adults.*\d{2}\/\d{2}\/\d{4}.*Adults.*\d{2}\/\d{2}\/\d{4}/.test(roomSpecificContext) && hasINS);
     
     if (shouldBeFullCleaning) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
-      console.log(`→ À blanc (deux blocs séparés + INS - règle spéciale)`);
+      console.log(`→ À blanc (deux blocs + INS - règle spéciale)`);
     }
-    // Détecter si c'est une recouche: une seule réservation avec arrivée/départ OU pattern Night
+    // Détecter si c'est une recouche: une seule ligne avec deux dates sans horaires ET pas INS
     else {
-      const isSingleReservationWithDates = (dates.length === 2 && !hasTwoSeparateBlocks) || hasNightPattern;
-      const isRecouche = isSingleReservationWithDates && 
+      const isRecouche = dates.length === 2 && 
                         !hasTimeOnly && 
+                        !hasINS &&
                         !/\b\d{1,2}:\d{2}\b/.test(roomSpecificContext.replace(/\d{2}\/\d{2}\/\d{4}/g, ''));
       
-      console.log(`Détection recouche: ${dates.length} dates, une seule résa=${isSingleReservationWithDates}, Night=${hasNightPattern}, isRecouche=${isRecouche}`);
+      console.log(`Détection recouche: ${dates.length} dates, pas d'horaires=${!hasTimeOnly}, pas INS=${!hasINS}, isRecouche=${isRecouche}`);
     
       // 1. Chambre occupée (OCC)
       if (hasOCC) {
