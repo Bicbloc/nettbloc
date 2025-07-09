@@ -84,110 +84,148 @@ export async function processPdf(file: File): Promise<Room[]> {
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
   
-  // Pattern pour capturer les numéros de chambre
-  const roomPattern = /\b([1-9]\d{2})\b/g;
-  const foundRooms = new Set();
+  // Diviser le texte en lignes pour une analyse ligne par ligne
+  const lines = text.split('\n');
   
-  let match;
-  while ((match = roomPattern.exec(text)) !== null) {
-    const roomNumber = match[1];
+  console.log("=== DÉBUT ANALYSE PDF ===");
+  console.log("Nombre de lignes:", lines.length);
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
     
-    // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
+    // Chercher les numéros de chambre dans cette ligne
+    const roomMatch = line.match(/\b([1-9]\d{2})\b/);
+    if (!roomMatch) continue;
+    
+    const roomNumber = roomMatch[1];
+    
+    // Ignorer les années
     if (/^20(2[5-8])$/.test(roomNumber)) continue;
     
-    // Normaliser le format du numéro
     const normalizedRoomNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
     
     // Éviter les doublons
-    if (foundRooms.has(normalizedRoomNumber)) continue;
-    foundRooms.add(normalizedRoomNumber);
+    if (rooms.some(r => r.number === normalizedRoomNumber)) continue;
     
-    // Extraire un contexte plus large pour analyser cette chambre spécifique
-    const start = Math.max(0, match.index - 100);
-    const end = Math.min(text.length, match.index + 500);
-    const context = text.substring(start, end);
+    console.log(`\n🏨 CHAMBRE ${normalizedRoomNumber} - Ligne: "${line}"`);
     
-    console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
-    console.log(`Contexte complet:`, context);
+    // Analyser cette ligne spécifiquement
+    const result = analyzeRoomLine(line, normalizedRoomNumber);
     
-    // Pattern flexible pour le statut et le type
-    const roomDetailPattern = new RegExp(`\\b${normalizedRoomNumber}\\s+(\\w+(?:\\s\\w+)?)\\s+(\\w+(?:\\s\\w+)?)?`, 'i');
-    const roomDetailMatch = roomDetailPattern.exec(context);
+    console.log(`📊 RÉSULTAT: Status="${result.status}", Cleaning="${result.cleaningType}"`);
     
-    let roomType = '';
-    let rawStatus = '';
-    
-    if (roomDetailMatch) {
-      roomType = roomDetailMatch[1] || ''; // e.g., TWN, DBL, SGL
-      rawStatus = roomDetailMatch[2] || ''; // e.g., DIR, INS, PARTI, RECOUCHE
-      console.log(`Ligne chambre: ${normalizedRoomNumber} ${roomType} ${rawStatus}`);
-    }
-    
-    // Mapper le statut brut vers des termes standardisés
-    const statusMap: { [key: string]: string } = {
-      'PARTI': 'departed',
-      'RECOUCHE': 'recouche',
-      'DIR': 'dirty',
-      'INS': 'inspected', 
-      'CL': 'clean',
-      'OCC': 'occupied',
-      'Arrived': 'occupied',
-      'Depart': 'departed'
-    };
-    
-    const mappedStatus = statusMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
-    
-    // Analyser le contexte pour les dates et autres indicateurs
-    const dates = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-    const hasAdults = /Adults/i.test(context);
-    const hasNight = /Night\s+\d+\/\d+/.test(context);
-    const hasPARTI = /PARTI|depart/i.test(context);
-    const hasRECOUCHE = /RECOUCHE|recouche/i.test(context);
-    
-    console.log(`Analyse - Status: ${rawStatus} -> ${mappedStatus}`);
-    console.log(`Dates: ${dates.length}, Adults: ${hasAdults}, Night: ${hasNight}`);
-    console.log(`PARTI: ${hasPARTI}, RECOUCHE: ${hasRECOUCHE}`);
-    
-    // Déterminer le statut et le type de nettoyage
-    const { status: roomStatus, cleaningType } = determineStatusAndCleaningTypeFlexible(
-      context, 
-      normalizedRoomNumber, 
-      mappedStatus, 
-      dates, 
-      hasAdults, 
-      hasNight, 
-      hasPARTI, 
-      hasRECOUCHE
-    );
-    
-    console.log(`RÉSULTAT: ${roomStatus} / ${cleaningType}`);
-    console.log(`=== FIN ANALYSE CHAMBRE ${normalizedRoomNumber} ===\n`);
-    
-    // Déterminer si c'est une chambre twin
-    const isTwin = /TWN|TWS/i.test(context);
-    
-    // Déterminer la priorité
-    const priority = determinePriority(context);
-    
-    // Déterminer l'étage
+    const isTwin = /TWN|TWS/i.test(line);
     const floor = getRoomFloor(normalizedRoomNumber);
     
     rooms.push({
       number: normalizedRoomNumber,
-      status: roomStatus,
-      cleaningType,
-      priority,
+      status: result.status,
+      cleaningType: result.cleaningType,
+      priority: 'medium',
       isTwin,
-      isUrgent: priority === 'high',
-      notUrgent: priority === 'low',
+      isUrgent: false,
+      notUrgent: false,
       floor
     });
   }
   
-  console.log(`Détecté ${rooms.length} chambres avec le parsing avancé`);
+  console.log(`=== FIN ANALYSE PDF - ${rooms.length} chambres détectées ===`);
   
-  // Trier les chambres par numéro
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+}
+
+// Analyser une ligne de chambre spécifique
+function analyzeRoomLine(line: string, roomNumber: string): { status: string, cleaningType: 'full' | 'quick' | 'none' } {
+  console.log(`📝 Analyse ligne: "${line}"`);
+  
+  // Détecter les mots-clés explicites
+  const hasRECOUCHE = /RECOUCHE/i.test(line);
+  const hasPARTI = /PARTI/i.test(line);
+  const hasDIR = /\bDIR\b/i.test(line);
+  const hasINS = /\bINS\b/i.test(line);
+  const hasCL = /\bCL\b/i.test(line);
+  const hasOCC = /\bOCC\b/i.test(line);
+  
+  // Détecter les patterns de dates et indicateurs
+  const dates = line.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+  const hasNight = /Night\s+\d+\/\d+/i.test(line);
+  const hasAdults = /Adults/i.test(line);
+  const hasTime = /\d{1,2}:\d{2}/.test(line);
+  
+  console.log(`🔍 Mots-clés: RECOUCHE=${hasRECOUCHE}, PARTI=${hasPARTI}, DIR=${hasDIR}, INS=${hasINS}, CL=${hasCL}, OCC=${hasOCC}`);
+  console.log(`📅 Patterns: Dates=${dates.length} [${dates.join(', ')}], Night=${hasNight}, Adults=${hasAdults}, Time=${hasTime}`);
+  
+  // RÈGLES SIMPLIFIÉES ET PRIORITAIRES
+  
+  // 1. Mot-clé explicite RECOUCHE
+  if (hasRECOUCHE) {
+    console.log(`✅ RECOUCHE explicite détectée`);
+    return { status: 'needs-cleaning', cleaningType: 'quick' };
+  }
+  
+  // 2. Mot-clé explicite PARTI  
+  if (hasPARTI) {
+    console.log(`✅ PARTI explicite détecté`);
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
+  // 3. Statut OCC = occupée
+  if (hasOCC) {
+    console.log(`✅ OCC = Occupée`);
+    return { status: 'occupied', cleaningType: 'none' };
+  }
+  
+  // 4. Statut DIR = sale
+  if (hasDIR) {
+    console.log(`✅ DIR = Nettoyage à blanc`);
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
+  // 5. Statut CL = propre
+  if (hasCL) {
+    console.log(`✅ CL = Propre`);
+    return { status: 'clean', cleaningType: 'none' };
+  }
+  
+  // 6. Night pattern = recouche
+  if (hasNight) {
+    console.log(`✅ Night pattern = Recouche`);
+    return { status: 'needs-cleaning', cleaningType: 'quick' };
+  }
+  
+  // 7. Statut INS avec réservation = propre en attente
+  if (hasINS && (hasAdults || dates.length > 0)) {
+    console.log(`✅ INS avec réservation = Propre en attente`);
+    return { status: 'clean', cleaningType: 'none' };
+  }
+  
+  // 8. Statut INS seul = propre
+  if (hasINS) {
+    console.log(`✅ INS seul = Propre`);
+    return { status: 'clean', cleaningType: 'none' };
+  }
+  
+  // 9. Plusieurs dates = changement de client
+  if (dates.length >= 2) {
+    console.log(`✅ ${dates.length} dates = Changement de client = Nettoyage à blanc`);
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
+  // 10. Une date avec heure = départ
+  if (dates.length === 1 && hasTime) {
+    console.log(`✅ Date + heure = Départ = Nettoyage à blanc`);
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
+  // 11. Adults sans autre indicateur = nettoyage à blanc
+  if (hasAdults) {
+    console.log(`✅ Adults détecté = Nettoyage à blanc`);
+    return { status: 'needs-cleaning', cleaningType: 'full' };
+  }
+  
+  // Par défaut : propre
+  console.log(`⚪ Par défaut = Propre`);
+  return { status: 'clean', cleaningType: 'none' };
 }
 
 // Updated consistent floor detection function that matches the one in other files
