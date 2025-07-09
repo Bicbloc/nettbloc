@@ -41,6 +41,7 @@ import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
+import { useNotifications } from "@/hooks/use-notifications";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -84,6 +85,9 @@ const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isActionLogOpen, setIsActionLogOpen] = useState(false);
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
+  
+  // Notifications pour l'admin
+  const { notifications, hasUnread, addNotification, markAsRead, markAllAsRead, clearNotifications } = useNotifications(selectedHotel?.id);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -821,6 +825,14 @@ const Index = () => {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Panneau de notifications global */}
+        <div className="fixed top-4 right-4 z-50">
+          <NotificationPanel 
+            notifications={notifications}
+            hasUnread={hasUnread}
+          />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
