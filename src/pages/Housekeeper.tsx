@@ -271,38 +271,6 @@ export default function Housekeeper() {
       'needs-attention': 'Remarque signalée',
       'ready-to-clean': 'Chambre marquée comme prête à nettoyer'
     };
-    
-    // Envoyer des notifications spécifiques pour les femmes de chambre
-    if (hotelId && addNotification) {
-      if (newStatus === 'clean') {
-        addNotification({
-          title: `Femme de chambre (${selectedHousekeeper}) - CH ${roomNumber} - Propre`,
-          description: `${selectedHousekeeper} a terminé le nettoyage de la chambre ${roomNumber}`,
-          type: 'cleaning-end',
-          housekeeperName: selectedHousekeeper,
-          roomNumber: roomNumber,
-          user_type: 'admin'
-        });
-      } else if (newStatus === 'in-progress') {
-        addNotification({
-          title: `Femme de chambre (${selectedHousekeeper}) - CH ${roomNumber} - En cours`,
-          description: `${selectedHousekeeper} a commencé le nettoyage de la chambre ${roomNumber}`,
-          type: 'cleaning-start',
-          housekeeperName: selectedHousekeeper,
-          roomNumber: roomNumber,
-          user_type: 'admin'
-        });
-      } else if (newStatus === 'needs-attention') {
-        addNotification({
-          title: `Remarque de la femme de chambre (${selectedHousekeeper}) - CH ${roomNumber} - Problème signalé`,
-          description: remarkText || `${selectedHousekeeper} a signalé un problème dans la chambre ${roomNumber}`,
-          type: 'remark',
-          housekeeperName: selectedHousekeeper,
-          roomNumber: roomNumber,
-          user_type: 'admin'
-        });
-      }
-    }
 
     // Si la chambre est marquée comme "clean" (terminée), envoyer une notification spéciale
     if (newStatus === 'clean') {
@@ -320,18 +288,6 @@ export default function Housekeeper() {
 
   const handleRemark = () => {
     if (remarkText.trim()) {
-      // Envoi notification avec remarque
-      if (hotelId && addNotification) {
-        addNotification({
-          title: `Remarque de la femme de chambre (${selectedHousekeeper}) - CH ${remarkRoomNumber} - ${remarkText}`,
-          description: `${selectedHousekeeper} : "${remarkText}"`,
-          type: 'remark',
-          housekeeperName: selectedHousekeeper,
-          roomNumber: remarkRoomNumber,
-          user_type: 'admin'
-        });
-      }
-      
       handleUpdateRoomStatus(remarkRoomNumber, 'needs-attention');
       setRemarkText('');
       setRemarkRoomNumber('');

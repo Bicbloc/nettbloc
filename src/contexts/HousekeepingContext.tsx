@@ -112,18 +112,23 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         setRooms(session.room_data || []);
         setIsDistributed(session.is_distributed || false);
         
-        // Récupérer l'ID de l'hôtel depuis la session ou localStorage
+        // Récupérer l'ID de l'hôtel depuis localStorage - CORRIGÉ
         let sessionHotelId = session.hotel_id;
+        const savedHotelId = localStorage.getItem('selectedHotelId');
         const savedHotelCode = localStorage.getItem('selectedHotelCode');
         
-        // Si pas d'hotelId dans la session, récupérer depuis selectedHotel
-        if (!sessionHotelId) {
+        // Priorité au hotelId sauvegardé dans localStorage
+        if (savedHotelId) {
+          sessionHotelId = savedHotelId;
+          console.log('✅ Hotel ID récupéré depuis localStorage:', sessionHotelId);
+        } else if (!sessionHotelId) {
+          // Fallback sur selectedHotel si disponible
           const selectedHotelData = localStorage.getItem('selectedHotel');
           if (selectedHotelData) {
             try {
               const hotelData = JSON.parse(selectedHotelData);
               sessionHotelId = hotelData.id;
-              console.log('Hotel ID récupéré depuis localStorage:', sessionHotelId);
+              console.log('✅ Hotel ID récupéré depuis selectedHotel:', sessionHotelId);
             } catch (error) {
               console.error('Erreur parsing selectedHotel:', error);
             }
@@ -135,7 +140,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           setHotelId(sessionHotelId);
           console.log('✅ Hotel ID défini pour les notifications:', sessionHotelId);
         } else {
-          console.warn('⚠️ Impossible de définir hotelId pour les notifications');
+          console.warn('⚠️ Aucun hotelId trouvé - notifications désactivées');
         }
         
         // Générer des codes d'accès sécurisés pour les femmes de chambre
@@ -189,6 +194,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   };
 
   const updateRoomStatus = async (roomNumber: string, newStatus: string, housekeeperName?: string) => {
+    console.log('🔄 updateRoomStatus appelé:', { roomNumber, newStatus, housekeeperName, hotelId });
+    
     // Mettre à jour localement
     setRooms(prev => prev.map(room => 
       room.number === roomNumber 
@@ -203,27 +210,54 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       console.error('Erreur mise à jour statut chambre:', error);
     }
 
-    // Ajouter notification pour l'admin
-    const statusMessages = {
-      'clean': 'a terminé le nettoyage de la chambre',
-      'in-progress': 'a commencé le nettoyage de la chambre',
-      'needs-attention': 'a signalé une remarque pour la chambre',
-      'ready-to-clean': 'a marqué la chambre comme prête à nettoyer'
-    };
+    // Ajouter notification pour l'admin - FORMAT AMÉLIORÉ
+    if (housekeeperName && hotelId) {
+      console.log('🔔 Création notification avec hotelId:', hotelId);
+      
+      let notification;
+      
+      if (newStatus === 'clean') {
+        notification = {
+          title: `Femme de chambre (${housekeeperName}) - CH ${roomNumber} - Propre`,
+          description: `${housekeeperName} a terminé le nettoyage de la chambre ${roomNumber}`,
+          type: 'cleaning-end' as const,
+          housekeeperName,
+          roomNumber,
+          user_type: 'admin' as const,
+        };
+      } else if (newStatus === 'in-progress') {
+        notification = {
+          title: `Femme de chambre (${housekeeperName}) - CH ${roomNumber} - En cours`,
+          description: `${housekeeperName} a commencé le nettoyage de la chambre ${roomNumber}`,
+          type: 'cleaning-start' as const,
+          housekeeperName,
+          roomNumber,
+          user_type: 'admin' as const,
+        };
+      } else if (newStatus === 'needs-attention') {
+        notification = {
+          title: `Remarque de la femme de chambre (${housekeeperName}) - CH ${roomNumber} - Problème signalé`,
+          description: `${housekeeperName} a signalé un problème dans la chambre ${roomNumber}`,
+          type: 'remark' as const,
+          housekeeperName,
+          roomNumber,
+          user_type: 'admin' as const,
+        };
+      } else {
+        notification = {
+          title: `Femme de chambre (${housekeeperName}) - CH ${roomNumber}`,
+          description: `${housekeeperName} a mis à jour le statut de la chambre ${roomNumber}`,
+          type: 'room-status' as const,
+          housekeeperName,
+          roomNumber,
+          user_type: 'admin' as const,
+        };
+      }
 
-    const message = statusMessages[newStatus as keyof typeof statusMessages];
-    if (message && housekeeperName) {
-      console.log('🔔 Envoi notification avec son renforcé:', housekeeperName, roomNumber, newStatus);
-      const notification = {
-        title: `${housekeeperName} - Chambre ${roomNumber}`,
-        description: `${housekeeperName} ${message} ${roomNumber}`,
-        type: 'room-status' as const,
-        housekeeperName,
-        roomNumber,
-        user_type: 'admin' as const,
-      };
-      console.log('📝 Notification créée avec sons renforcés:', notification);
+      console.log('📝 Envoi notification:', notification);
       addNotification(notification);
+    } else {
+      console.warn('⚠️ Notification non créée - manque housekeeperName ou hotelId:', { housekeeperName, hotelId });
     }
   };
 

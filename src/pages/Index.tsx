@@ -1158,12 +1158,12 @@ const Index = () => {
                     />
                   </div>
                   
-                  {/* Grid responsive pour les femmes de chambres */}
-                  <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {/* Grid responsive pour 2 sections en largeur */}
+                  <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-2">
                     {housekeeperNames.map((name) => {
                       const housekeeperRooms = getHousekeeperRooms(name);
                       return (
-                        <div key={name} className="min-w-0">
+                        <div key={name} className="min-w-0 w-full">
                           <HousekeeperCard
                             name={name}
                             rooms={housekeeperRooms}
