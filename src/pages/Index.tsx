@@ -595,7 +595,7 @@ const Index = () => {
   };
   
   // Nouvelle fonction de redistribution avec méthode
-  const handleRedistributeWithMethod = (method: RedistributionMethod) => {
+  const handleRedistributeWithMethod = async (method: RedistributionMethod) => {
     console.log(`🔄 Redistribution avec méthode: ${method}`);
     
     const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
@@ -617,15 +617,27 @@ const Index = () => {
       description: `${redistributedRooms.filter(r => r.assignedTo).length} chambres redistribuées entre ${housekeeperNames.length} femmes de chambre`,
     });
     
-    // Notification de redistribution
-    const currentHotelId = selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId");
-    if (currentHotelId && isValidUUID(currentHotelId)) {
-      addNotification({
+    // Notification de redistribution avec ID déterministe
+    const notificationHotelId = hotelCode ? generateHotelId(hotelCode) : 
+      (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
+    
+    console.log("📨 Tentative création notification redistribution avec ID:", notificationHotelId);
+    
+    if (notificationHotelId && addNotification) {
+      const notificationResult = await addNotification({
         title: "Redistribution effectuée",
         description: `Admin - Redistribution ${methodName} de ${redistributedRooms.filter(r => r.assignedTo).length} chambres`,
         type: 'assignment',
         user_type: 'admin'
       });
+      
+      if (notificationResult) {
+        console.log("✅ Notification redistribution créée:", notificationResult.id);
+      } else {
+        console.log("❌ Échec création notification redistribution");
+      }
+    } else {
+      console.log("❌ Pas d'ID hôtel valide pour notification:", { notificationHotelId, hasAddNotification: !!addNotification });
     }
     
     console.log('📊 Statistiques de distribution:', stats);

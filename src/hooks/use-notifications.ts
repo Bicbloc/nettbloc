@@ -19,25 +19,32 @@ export const useNotifications = (hotelId?: string) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [hasUnread, setHasUnread] = useState(false);
 
-  // Valider UUID de façon stricte
-  const isValidUUID = useCallback((uuid: string) => {
-    if (!uuid || typeof uuid !== 'string') return false;
+  // Valider l'ID d'hôtel (UUID standard ou ID déterministe)
+  const isValidHotelId = useCallback((id: string) => {
+    if (!id || typeof id !== 'string') return false;
+    
+    // Accepter les IDs déterministes qui commencent par 'hotel-'
+    if (id.startsWith('hotel-')) {
+      return id.length >= 15; // Longueur minimale pour un ID déterministe
+    }
+    
+    // Accepter les UUIDs standards
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
+    return uuidRegex.test(id);
   }, []);
 
   // Debug de l'hotel ID
   useEffect(() => {
     console.log('🏨 useNotifications - Hotel ID reçu:', {
       hotelId,
-      isValid: hotelId ? isValidUUID(hotelId) : false,
+      isValid: hotelId ? isValidHotelId(hotelId) : false,
       type: typeof hotelId
     });
-  }, [hotelId, isValidUUID]);
+  }, [hotelId, isValidHotelId]);
 
   // Charger les notifications
   const loadNotifications = useCallback(async () => {
-    if (!hotelId || !isValidUUID(hotelId)) {
+    if (!hotelId || !isValidHotelId(hotelId)) {
       console.warn('❌ Hotel ID invalide pour notifications:', hotelId);
       setNotifications([]);
       setHasUnread(false);
@@ -71,11 +78,11 @@ export const useNotifications = (hotelId?: string) => {
     } catch (error) {
       console.error('❌ Exception notifications:', error);
     }
-  }, [hotelId, isValidUUID]);
+  }, [hotelId, isValidHotelId]);
 
   // Setup realtime avec gestion d'erreur
   useEffect(() => {
-    if (!hotelId || !isValidUUID(hotelId)) {
+    if (!hotelId || !isValidHotelId(hotelId)) {
       return;
     }
 
@@ -120,11 +127,11 @@ export const useNotifications = (hotelId?: string) => {
       console.log('🔌 Cleanup realtime channel');
       supabase.removeChannel(channel);
     };
-  }, [hotelId, isValidUUID, loadNotifications]);
+  }, [hotelId, isValidHotelId, loadNotifications]);
 
   // Créer notification avec validation stricte
   const addNotification = useCallback(async (notification: Omit<Notification, 'id' | 'created_at' | 'is_read' | 'hotel_id'>) => {
-    if (!hotelId || !isValidUUID(hotelId)) {
+    if (!hotelId || !isValidHotelId(hotelId)) {
       console.error('❌ Impossible de créer notification - Hotel ID invalide:', hotelId);
       toast({
         variant: "destructive",
@@ -171,7 +178,7 @@ export const useNotifications = (hotelId?: string) => {
       console.error('❌ Exception création notification:', error);
       return null;
     }
-  }, [hotelId, isValidUUID]);
+  }, [hotelId, isValidHotelId]);
 
   // Marquer comme lu
   const markAsRead = useCallback(async (notificationId: string) => {
@@ -196,7 +203,7 @@ export const useNotifications = (hotelId?: string) => {
 
   // Marquer toutes comme lues
   const markAllAsRead = useCallback(async () => {
-    if (!hotelId || !isValidUUID(hotelId)) return;
+    if (!hotelId || !isValidHotelId(hotelId)) return;
 
     try {
       await supabase
@@ -210,11 +217,11 @@ export const useNotifications = (hotelId?: string) => {
     } catch (error) {
       console.error('Erreur marquage toutes lues:', error);
     }
-  }, [hotelId, isValidUUID]);
+  }, [hotelId, isValidHotelId]);
 
   // Effacer toutes
   const clearNotifications = useCallback(async () => {
-    if (!hotelId || !isValidUUID(hotelId)) return;
+    if (!hotelId || !isValidHotelId(hotelId)) return;
 
     try {
       await supabase
@@ -232,7 +239,7 @@ export const useNotifications = (hotelId?: string) => {
     } catch (error) {
       console.error('Erreur suppression notifications:', error);
     }
-  }, [hotelId, isValidUUID]);
+  }, [hotelId, isValidHotelId]);
 
   return {
     notifications,
