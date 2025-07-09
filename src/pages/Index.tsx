@@ -93,12 +93,14 @@ const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
+  const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   
   // Récupérer et valider l'ID de l'hôtel depuis localStorage
   const storedHotelId = localStorage.getItem("hotelId");
   const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
   
   // Prioriser selectedHotel?.id, puis selectedHotelId, puis hotelId
+  const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
   
   console.log("🏨 Hotel ID pour notifications:", {
     selectedHotel: selectedHotel?.id,
