@@ -36,8 +36,7 @@ import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
-import { NotificationPanel } from "@/components/NotificationPanel";
-import { ActionLogPanel } from "@/components/ActionLogPanel";
+import { NotificationBell } from "@/components/NotificationBell";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
@@ -90,7 +89,7 @@ const Index = () => {
   const [hotelCode, setHotelCode] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isActionLogOpen, setIsActionLogOpen] = useState(false);
+  
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   
   // Récupérer et valider l'ID de l'hôtel depuis localStorage
@@ -108,7 +107,7 @@ const Index = () => {
   });
   
   // Notifications pour l'admin - seulement si on a un UUID valide
-  const { notifications, hasUnread, addNotification, markAsRead, markAllAsRead, clearNotifications } = useNotifications(
+  const { addNotification } = useNotifications(
     currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined
   );
   
@@ -697,14 +696,17 @@ const Index = () => {
     const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
     
     if (currentHotelId && isValidUUID(currentHotelId)) {
+      console.log('✅ Création notification assignation pour hotel:', currentHotelId);
       addNotification({
         title: `Assignation chambre ${roomNumber}`,
         description: `Admin - CH ${roomNumber} assignée à ${housekeeperName}`,
         type: 'assignment',
-        housekeeperName: housekeeperName,
-        roomNumber: roomNumber,
+        housekeeper_name: housekeeperName,
+        room_number: roomNumber,
         user_type: 'admin'
       });
+    } else {
+      console.warn('❌ Hotel ID invalide pour notification:', currentHotelId);
     }
   };
   
@@ -885,10 +887,10 @@ const Index = () => {
 
         {/* Panneau de notifications global */}
         <div className="fixed top-4 right-4 z-50">
-          <NotificationPanel 
-            notifications={notifications}
-            hasUnread={hasUnread}
-          />
+                <NotificationBell 
+                  hotelId={currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined}
+                  className="ml-2"
+                />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -1335,14 +1337,7 @@ const Index = () => {
             ) : (
               <>
                 <div className="flex items-center justify-between mb-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsActionLogOpen(true)}
-                    className="ml-2"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Journal des Actions
-                  </Button>
+                  <NotificationBell hotelId={currentHotelId} />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {housekeeperNames.map((name) => {
@@ -1466,12 +1461,6 @@ const Index = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Panneau Journal des Actions */}
-      <ActionLogPanel 
-        hotelId={selectedHotel?.id}
-        isOpen={isActionLogOpen}
-        onClose={() => setIsActionLogOpen(false)}
-      />
     </div>
   );
 };
