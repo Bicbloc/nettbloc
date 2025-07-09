@@ -99,6 +99,12 @@ const Index = () => {
   const storedHotelId = localStorage.getItem("hotelId");
   const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
   
+  console.log("🔍 Valeurs localStorage brutes:", {
+    storedHotelId,
+    storedSelectedHotelId,
+    selectedHotelId: selectedHotel?.id
+  });
+  
   // Prioriser selectedHotel?.id, puis selectedHotelId, puis hotelId
   const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
   
@@ -257,7 +263,9 @@ const Index = () => {
     }));
   };
   
-  const handlePdfProcessed = (data: Room[]) => {
+  const handlePdfProcessed = (data: Room[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
+    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune');
+    
     const floors = new Set<number>();
     data.forEach(room => {
       const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
@@ -272,7 +280,25 @@ const Index = () => {
       a.number.localeCompare(b.number, undefined, { numeric: true })
     );
     
-    setRooms(sortedData);
+    // Appliquer la méthode de redistribution si spécifiée et si on a des femmes de chambre
+    if (distributionMethod && housekeeperNames.length > 0) {
+      console.log("🔄 Application de la redistribution automatique:", distributionMethod);
+      const redistributedRooms = redistributeRooms(sortedData, housekeeperNames, distributionMethod);
+      setRooms(redistributedRooms);
+      setIsDistributed(true);
+      
+      const methodName = distributionMethod === 'random' ? 'aléatoire' : 
+                        distributionMethod === 'floor' ? 'par étage' : 'par type de nettoyage';
+      
+      toast({
+        title: "Import et redistribution terminés",
+        description: `${sortedData.length} chambres importées et redistribuées (méthode: ${methodName})`
+      });
+    } else {
+      setRooms(sortedData);
+      setIsDistributed(false);
+    }
+    
     setActiveTab("rooms");
   };
 
@@ -648,21 +674,24 @@ const Index = () => {
 
     // Créer ou récupérer l'hôtel
     try {
+      console.log("🔍 Recherche hôtel avec code:", hotelCode);
       let hotel = await SupabaseService.getHotelByCode(hotelCode);
       
       if (!hotel) {
+        console.log("🏨 Création nouvel hôtel...");
         // Créer l'hôtel s'il n'existe pas
         hotel = await SupabaseService.createHotel(
-          hotelCode,  // name
-          userEmail,  // email
-          hotelCode   // hotelCode
+          `Hôtel ${hotelCode}`,  // name
+          userEmail,             // email
+          hotelCode              // hotelCode
         );
-        console.log("🏨 Hôtel créé:", hotel);
+        console.log("✅ Hôtel créé:", hotel);
       } else {
-        console.log("🏨 Hôtel existant trouvé:", hotel);
+        console.log("✅ Hôtel existant trouvé:", hotel);
       }
       
-      if (!hotel) {
+      if (!hotel || !hotel.id) {
+        console.error("❌ Hotel ou hotel.id manquant:", hotel);
         toast({
           variant: "destructive",
           title: "Erreur",
@@ -672,17 +701,22 @@ const Index = () => {
       }
 
       // Sauvegarder toutes les informations importantes dans localStorage
+      console.log("💾 Sauvegarde localStorage avec hotelId:", hotel.id);
       localStorage.setItem('selectedHotelCode', hotelCode);
       localStorage.setItem('userEmail', userEmail);
       localStorage.setItem('selectedHotelId', hotel.id);
       localStorage.setItem('hotelId', hotel.id);
+      
+      // Vérifier que la sauvegarde a bien fonctionné
+      const savedId = localStorage.getItem('hotelId');
+      console.log("🔍 Vérification localStorage hotelId:", savedId);
       
       console.log("🏨 Hôtel configuré avec ID:", hotel.id);
       setSelectedHotel(hotel);
       
       await handleRedistributeWithMethod('random');
     } catch (error) {
-      console.error("Erreur lors de la création/récupération de l'hôtel:", error);
+      console.error("❌ Erreur lors de la création/récupération de l'hôtel:", error);
       toast({
         variant: "destructive",
         title: "Erreur",
@@ -1050,8 +1084,8 @@ const Index = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <PdfWorkflowDialog 
-                    onWorkflowComplete={(data, housekeepers) => {
-                      handlePdfProcessed(data);
+                    onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                      handlePdfProcessed(data, distributionMethod);
                       setHousekeeperNames(housekeepers);
                     }}
                     currentHousekeepers={housekeeperNames}
@@ -1144,13 +1178,13 @@ const Index = () => {
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Gestion des chambres</h2>
               <div className="flex gap-2">
-                <PdfWorkflowDialog 
-                  onWorkflowComplete={(data, housekeepers) => {
-                    handlePdfProcessed(data);
-                    setHousekeeperNames(housekeepers);
-                  }}
-                  currentHousekeepers={housekeeperNames}
-                />
+                  <PdfWorkflowDialog 
+                    onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                      handlePdfProcessed(data, distributionMethod);
+                      setHousekeeperNames(housekeepers);
+                    }}
+                    currentHousekeepers={housekeeperNames}
+                  />
                 <Button
                   onClick={() => openManualAssignment()}
                   variant="outline"
@@ -1170,13 +1204,13 @@ const Index = () => {
                   <p className="text-muted-foreground text-center mb-4">
                     Importez un fichier PDF pour commencer à gérer vos chambres
                   </p>
-                  <PdfWorkflowDialog 
-                    onWorkflowComplete={(data, housekeepers) => {
-                      handlePdfProcessed(data);
-                      setHousekeeperNames(housekeepers);
-                    }}
-                    currentHousekeepers={housekeeperNames}
-                  />
+                <PdfWorkflowDialog 
+                  onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                    handlePdfProcessed(data, distributionMethod);
+                    setHousekeeperNames(housekeepers);
+                  }}
+                  currentHousekeepers={housekeeperNames}
+                />
                 </CardContent>
               </Card>
             ) : (

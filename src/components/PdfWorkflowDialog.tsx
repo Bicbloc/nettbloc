@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 
 interface PdfWorkflowDialogProps {
-  onWorkflowComplete: (data: any, housekeepers: string[]) => void;
+  onWorkflowComplete: (data: any, housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
   currentHousekeepers?: string[];
 }
 
@@ -32,6 +32,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const [housekeepers, setHousekeepers] = useState<string[]>(currentHousekeepers);
   const [isHousekeeperDialogOpen, setIsHousekeeperDialogOpen] = useState(false);
   const [isDistributionDialogOpen, setIsDistributionDialogOpen] = useState(false);
+  const [showDistributionOptions, setShowDistributionOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -324,18 +325,81 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
           Retour
         </Button>
         <Button
-          onClick={() => setIsDistributionDialogOpen(true)}
+          onClick={() => setShowDistributionOptions(true)}
           disabled={housekeepers.length === 0}
         >
           Distribuer les chambres
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
         <Button
-          onClick={handleWorkflowComplete}
+          onClick={() => onWorkflowComplete(pdfData, housekeepers)}
           disabled={housekeepers.length === 0}
           variant="outline"
         >
           Terminer sans distribution
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  const renderDistributionOptionsStep = () => (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">Étape 3/3</Badge>
+          Choisir la méthode de redistribution
+        </DialogTitle>
+        <DialogDescription>
+          Comment souhaitez-vous distribuer les chambres aux femmes de chambre ?
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4">
+        <Button
+          variant="outline"
+          className="w-full h-16 flex flex-col items-start p-4"
+          onClick={() => {
+            onWorkflowComplete(pdfData, housekeepers, 'random');
+            setOpen(false);
+            resetDialog();
+          }}
+        >
+          <div className="font-medium">🎲 Distribution aléatoire</div>
+          <div className="text-sm text-muted-foreground">Répartition équitable et aléatoire</div>
+        </Button>
+        
+        <Button
+          variant="outline"
+          className="w-full h-16 flex flex-col items-start p-4"
+          onClick={() => {
+            onWorkflowComplete(pdfData, housekeepers, 'floor');
+            setOpen(false);
+            resetDialog();
+          }}
+        >
+          <div className="font-medium">🏢 Par étage</div>
+          <div className="text-sm text-muted-foreground">Chambres d'étages proches pour la même femme de chambre</div>
+        </Button>
+        
+        <Button
+          variant="outline"
+          className="w-full h-16 flex flex-col items-start p-4"
+          onClick={() => {
+            onWorkflowComplete(pdfData, housekeepers, 'cleaning-type');
+            setOpen(false);
+            resetDialog();
+          }}
+        >
+          <div className="font-medium">🔴⚪ Par type de nettoyage</div>
+          <div className="text-sm text-muted-foreground">Séparer les chambres rouge et blanc</div>
+        </Button>
+      </div>
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setShowDistributionOptions(false)}
+        >
+          Retour
         </Button>
       </DialogFooter>
     </>
@@ -353,6 +417,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
           {step === 'upload' && renderUploadStep()}
           {step === 'housekeepers' && renderHousekeepersStep()}
+          {showDistributionOptions && renderDistributionOptionsStep()}
         </DialogContent>
       </Dialog>
 

@@ -15,13 +15,15 @@ import { processPdf } from "@/services/pdfService";
 import { FileUp } from "lucide-react";
 
 interface UploadDialogProps {
-  onPdfProcessed: (data: any) => void;
+  onPdfProcessed: (data: any, distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
 }
 
 export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [showDistributionOptions, setShowDistributionOptions] = useState(false);
+  const [processedData, setProcessedData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,8 +78,10 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       console.log("Traitement du fichier:", selectedFile.name);
       const data = await processPdf(selectedFile);
       console.log("Données traitées:", data.length, "chambres");
-      onPdfProcessed(data);
-      setOpen(false);
+      
+      setProcessedData(data);
+      setShowDistributionOptions(true);
+      
       toast({
         title: "Téléversement réussi",
         description: `${data.length} chambres traitées depuis ${selectedFile.name}`,
@@ -91,6 +95,16 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       });
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleDistributionSelect = (method: 'random' | 'floor' | 'cleaning-type') => {
+    if (processedData) {
+      onPdfProcessed(processedData, method);
+      setOpen(false);
+      setShowDistributionOptions(false);
+      setProcessedData(null);
+      setSelectedFile(null);
     }
   };
 
@@ -110,71 +124,124 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Importer un Rapport Mews</DialogTitle>
-          <DialogDescription>
-            Téléversez un rapport PDF exporté depuis Mews pour analyser les statuts des chambres.
-          </DialogDescription>
-        </DialogHeader>
-        <div 
-          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onClick={triggerFileInput}
-        >
-          <div className="space-y-4">
-            <div className="flex justify-center">
-              <FileUp className="h-10 w-10 text-gray-400" />
+        {!showDistributionOptions ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Importer un Rapport Mews</DialogTitle>
+              <DialogDescription>
+                Téléversez un rapport PDF exporté depuis Mews pour analyser les statuts des chambres.
+              </DialogDescription>
+            </DialogHeader>
+            <div 
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onClick={triggerFileInput}
+            >
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  <FileUp className="h-10 w-10 text-gray-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {selectedFile ? selectedFile.name : "Glissez et déposez votre fichier ici"}
+                  </p>
+                  {!selectedFile && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Fichiers PDF uniquement, jusqu'à 10MB
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerFileInput();
+                    }}
+                  >
+                    Sélectionner un fichier
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium">
-                {selectedFile ? selectedFile.name : "Glissez et déposez votre fichier ici"}
-              </p>
-              {!selectedFile && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Fichiers PDF uniquement, jusqu'à 10MB
-                </p>
-              )}
-            </div>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                className="hidden"
-                onChange={handleFileChange}
-              />
+            <DialogFooter className="sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setOpen(false)}
+                disabled={isUploading}
+              >
+                Annuler
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!selectedFile || isUploading}
+              >
+                {isUploading ? "Traitement en cours..." : "Téléverser"}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Choisir la méthode de redistribution</DialogTitle>
+              <DialogDescription>
+                Comment souhaitez-vous distribuer les chambres aux femmes de chambre ?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
               <Button
                 variant="outline"
-                size="sm"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  triggerFileInput();
-                }}
+                className="w-full h-16 flex flex-col items-start p-4"
+                onClick={() => handleDistributionSelect('random')}
               >
-                Sélectionner un fichier
+                <div className="font-medium">🎲 Distribution aléatoire</div>
+                <div className="text-sm text-muted-foreground">Répartition équitable et aléatoire</div>
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="w-full h-16 flex flex-col items-start p-4"
+                onClick={() => handleDistributionSelect('floor')}
+              >
+                <div className="font-medium">🏢 Par étage</div>
+                <div className="text-sm text-muted-foreground">Chambres d'étages proches pour la même femme de chambre</div>
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="w-full h-16 flex flex-col items-start p-4"
+                onClick={() => handleDistributionSelect('cleaning-type')}
+              >
+                <div className="font-medium">🔴⚪ Par type de nettoyage</div>
+                <div className="text-sm text-muted-foreground">Séparer les chambres rouge et blanc</div>
               </Button>
             </div>
-          </div>
-        </div>
-        <DialogFooter className="sm:justify-end">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setOpen(false)}
-            disabled={isUploading}
-          >
-            Annuler
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!selectedFile || isUploading}
-          >
-            {isUploading ? "Traitement en cours..." : "Téléverser"}
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setShowDistributionOptions(false);
+                  setProcessedData(null);
+                }}
+              >
+                Retour
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
