@@ -35,9 +35,11 @@ export function ManualAssignmentDialog({
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterFloor, setFilterFloor] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterCleaningType, setFilterCleaningType] = useState<string>("all");
   const [excludeTwin, setExcludeTwin] = useState<boolean>(true);
   const [useSmartAssignment, setUseSmartAssignment] = useState<boolean>(true);
   const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
   
   // Reset selections when dialog opens/closes
   useEffect(() => {
@@ -47,9 +49,11 @@ export function ManualAssignmentDialog({
       setSearchTerm("");
       setFilterFloor("all");
       setFilterStatus("all");
+      setFilterCleaningType("all");
       setExcludeTwin(true);
       setUseSmartAssignment(true);
       setSelectedFloors([]);
+      setSortOrder('none');
     }
   }, [isOpen, housekeeperNames]);
   
@@ -57,7 +61,7 @@ export function ManualAssignmentDialog({
   useEffect(() => {
     // When filtering, we want to show all rooms, even if they're already assigned
     // This allows users to select rooms from any housekeeper
-    const filtered = filterRooms(
+    let filtered = filterRooms(
       rooms, 
       searchTerm, 
       filterFloor, 
@@ -65,8 +69,21 @@ export function ManualAssignmentDialog({
       excludeTwin,
       selectedFloors
     );
+
+    // Apply cleaning type filter
+    if (filterCleaningType !== "all") {
+      filtered = filtered.filter(room => room.cleaningType === filterCleaningType);
+    }
+
+    // Apply sorting
+    if (sortOrder === 'asc') {
+      filtered.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+    } else if (sortOrder === 'desc') {
+      filtered.sort((a, b) => b.number.localeCompare(a.number, undefined, { numeric: true }));
+    }
+
     setFilteredRooms(filtered);
-  }, [rooms, searchTerm, filterFloor, filterStatus, excludeTwin, selectedFloors]);
+  }, [rooms, searchTerm, filterFloor, filterStatus, filterCleaningType, excludeTwin, selectedFloors, sortOrder]);
   
   const handleRoomSelect = (room: Room) => {
     setSelectedRooms(prev => {
@@ -235,26 +252,30 @@ export function ManualAssignmentDialog({
         
         <div className="grid grid-cols-12 gap-4">
           {/* Filters */}
-          <FilterControls 
-            rooms={rooms}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            filterFloor={filterFloor}
-            setFilterFloor={setFilterFloor}
-            filterStatus={filterStatus}
-            setFilterStatus={setFilterStatus}
-            excludeTwin={excludeTwin}
-            setExcludeTwin={setExcludeTwin}
-            useSmartAssignment={useSmartAssignment}
-            setUseSmartAssignment={setUseSmartAssignment}
-            selectedFloors={selectedFloors}
-            setSelectedFloors={setSelectedFloors}
-            onSelectAll={selectAll}
-            onClearSelection={clearSelection}
-            onSmartAssign={handleSmartAssign}
-            onDistributeRooms={handleDistributeRooms}
-            toggleFloor={toggleFloor}
-          />
+            <FilterControls 
+              rooms={rooms}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              filterFloor={filterFloor}
+              setFilterFloor={setFilterFloor}
+              filterStatus={filterStatus}
+              setFilterStatus={setFilterStatus}
+              filterCleaningType={filterCleaningType}
+              setFilterCleaningType={setFilterCleaningType}
+              excludeTwin={excludeTwin}
+              setExcludeTwin={setExcludeTwin}
+              useSmartAssignment={useSmartAssignment}
+              setUseSmartAssignment={setUseSmartAssignment}
+              selectedFloors={selectedFloors}
+              setSelectedFloors={setSelectedFloors}
+              sortOrder={sortOrder}
+              setSortOrder={setSortOrder}
+              onSelectAll={selectAll}
+              onClearSelection={clearSelection}
+              onSmartAssign={handleSmartAssign}
+              onDistributeRooms={handleDistributeRooms}
+              toggleFloor={toggleFloor}
+            />
           
           {/* Room Selection */}
           <div className="col-span-7">

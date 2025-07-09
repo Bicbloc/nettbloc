@@ -26,13 +26,13 @@ export function AssignmentSection({
   onClose
 }: AssignmentSectionProps) {
   return (
-    <div className="col-span-5">
-      <div className="mb-4">
-        <Label htmlFor="housekeeper-select" className="mb-2 block">
+    <div className="col-span-5 space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="housekeeper-select" className="text-sm font-medium">
           Femme de chambre
         </Label>
         <Select value={selectedHousekeeper} onValueChange={setSelectedHousekeeper}>
-          <SelectTrigger id="housekeeper-select">
+          <SelectTrigger id="housekeeper-select" className="h-10">
             <SelectValue placeholder="Sélectionner une femme de chambre" />
           </SelectTrigger>
           <SelectContent>
@@ -43,34 +43,44 @@ export function AssignmentSection({
         </Select>
       </div>
       
-      <Label className="mb-2 block">Chambres sélectionnées ({selectedRooms.length})</Label>
-      <ScrollArea className="h-[300px] border rounded-md p-2">
-        <div className="grid grid-cols-2 gap-2">
-          {selectedRooms.map(room => (
-            <RoomCard
-              key={room.number}
-              room={room}
-              onUpdate={() => {}}
-              compact
-              selectable
-              isSelected={true}
-              onSelect={onRoomSelect}
-            />
-          ))}
-          
-          {selectedRooms.length === 0 && (
-            <div className="col-span-2 text-center py-8 text-gray-500">
-              Aucune chambre sélectionnée
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">
+          Chambres sélectionnées ({selectedRooms.length})
+        </Label>
+        <ScrollArea className="h-[280px] border rounded-md p-3 bg-muted/20">
+          <div className="grid grid-cols-1 gap-2">
+            {selectedRooms.map(room => (
+              <div key={room.number} className="bg-background border rounded-lg p-2 hover:bg-accent/50 transition-colors">
+                <RoomCard
+                  room={room}
+                  onUpdate={() => {}}
+                  compact
+                  selectable
+                  isSelected={true}
+                  onSelect={onRoomSelect}
+                />
+              </div>
+            ))}
+            
+            {selectedRooms.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <div className="text-sm">Aucune chambre sélectionnée</div>
+                <div className="text-xs mt-1">Cliquez sur les chambres à gauche pour les sélectionner</div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
       
-      <div className="mt-4 flex justify-end gap-2">
-        <Button variant="outline" onClick={onClose}>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-none">
           Annuler
         </Button>
-        <Button onClick={onAssign}>
+        <Button 
+          onClick={onAssign} 
+          disabled={!selectedHousekeeper || selectedRooms.length === 0}
+          className="flex-1 sm:flex-none"
+        >
           Assigner {selectedRooms.length} chambre(s)
         </Button>
       </div>

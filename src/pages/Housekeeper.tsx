@@ -5,13 +5,15 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Check, Play, MessageSquare, AlertCircle, Bed } from 'lucide-react';
+import { ArrowLeft, Check, Play, MessageSquare, AlertCircle, Bed, Bell, History } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Room } from '@/services/pdfService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useNotifications } from '@/hooks/use-notifications';
 import { SupabaseService } from '@/services/supabaseService';
+import { ActionLogPanel } from '@/components/ActionLogPanel';
+import { NotificationPanel } from '@/components/NotificationPanel';
 
 export default function Housekeeper() {
   const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus, housekeeperAccessCodes } = useHousekeeping();
@@ -26,7 +28,9 @@ export default function Housekeeper() {
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
   const [hotelId, setHotelId] = useState<string | null>(null);
   const [hotelInfo, setHotelInfo] = useState<{ name: string; code: string } | null>(null);
-  const { addNotification } = useNotifications(hotelId || undefined);
+  const { addNotification, notifications, hasUnread } = useNotifications(hotelId || undefined);
+  const [isActionLogOpen, setIsActionLogOpen] = useState(false);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
   // Vérifier les paramètres URL ou localStorage pour auto-connexion
   useEffect(() => {
@@ -301,6 +305,24 @@ export default function Housekeeper() {
           <div className="flex gap-2">
             <Button 
               variant="outline" 
+              onClick={() => setIsNotificationPanelOpen(true)}
+              size="sm"
+              className="relative"
+            >
+              <Bell className="h-4 w-4" />
+              {hasUnread && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsActionLogOpen(true)}
+              size="sm"
+            >
+              <History className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
               onClick={() => setIsLoggedIn(false)}
               size="sm"
             >
@@ -315,6 +337,15 @@ export default function Housekeeper() {
             </Button>
           </div>
         </div>
+        
+        {/* ID Hôtel */}
+        {hotelInfo && (
+          <div className="mb-4 p-3 bg-card border rounded-lg">
+            <div className="text-sm text-muted-foreground">Hôtel connecté</div>
+            <div className="font-medium">{hotelInfo.name}</div>
+            <div className="text-sm text-muted-foreground">Code: {hotelInfo.code}</div>
+          </div>
+        )}
         
         {/* Barre de progression */}
         <div className="grid grid-cols-4 gap-2 text-center text-sm mb-4">

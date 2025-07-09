@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { getAvailableFloors } from "@/utils/roomUtils";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface FilterControlsProps {
   rooms: Room[];
@@ -17,12 +18,16 @@ interface FilterControlsProps {
   setFilterFloor: (value: string) => void;
   filterStatus: string;
   setFilterStatus: (value: string) => void;
+  filterCleaningType: string;
+  setFilterCleaningType: (value: string) => void;
   excludeTwin: boolean;
   setExcludeTwin: (value: boolean) => void;
   useSmartAssignment: boolean;
   setUseSmartAssignment: (value: boolean) => void;
   selectedFloors: number[];
   setSelectedFloors: (floors: number[]) => void;
+  sortOrder: 'asc' | 'desc' | 'none';
+  setSortOrder: (order: 'asc' | 'desc' | 'none') => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
   onSmartAssign: () => void;
@@ -38,11 +43,15 @@ export function FilterControls({
   setFilterFloor,
   filterStatus,
   setFilterStatus,
+  filterCleaningType,
+  setFilterCleaningType,
   excludeTwin,
   setExcludeTwin,
   useSmartAssignment,
   setUseSmartAssignment,
   selectedFloors,
+  sortOrder,
+  setSortOrder,
   onSelectAll,
   onClearSelection,
   onSmartAssign,
@@ -54,7 +63,7 @@ export function FilterControls({
   return (
     <>
       {/* Search and Filters */}
-      <div className="col-span-12 grid grid-cols-4 gap-2 mb-2">
+      <div className="col-span-12 grid grid-cols-6 gap-2 mb-2">
         <div>
           <Label htmlFor="search">Recherche</Label>
           <Input
@@ -98,12 +107,46 @@ export function FilterControls({
           </Select>
         </div>
         
-        <div className="flex gap-2 items-end">
-          <Button variant="outline" className="flex-1" onClick={onSelectAll}>
-            Tout sélectionner
+        <div>
+          <Label htmlFor="cleaning-type-filter">Type de nettoyage</Label>
+          <Select value={filterCleaningType} onValueChange={setFilterCleaningType}>
+            <SelectTrigger id="cleaning-type-filter">
+              <SelectValue placeholder="Tous les types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les types</SelectItem>
+              <SelectItem value="full">À Blanc</SelectItem>
+              <SelectItem value="quick">Recouche</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div>
+          <Label htmlFor="sort-order">Tri par numéro</Label>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => {
+              if (sortOrder === 'none') setSortOrder('asc');
+              else if (sortOrder === 'asc') setSortOrder('desc');
+              else setSortOrder('none');
+            }}
+          >
+            {sortOrder === 'none' && <ArrowUpDown className="h-4 w-4 mr-2" />}
+            {sortOrder === 'asc' && <ArrowUp className="h-4 w-4 mr-2" />}
+            {sortOrder === 'desc' && <ArrowDown className="h-4 w-4 mr-2" />}
+            {sortOrder === 'none' && 'Aucun tri'}
+            {sortOrder === 'asc' && 'Croissant'}
+            {sortOrder === 'desc' && 'Décroissant'}
           </Button>
-          <Button variant="outline" className="flex-1" onClick={onClearSelection}>
-            Effacer
+        </div>
+        
+        <div className="flex gap-1 items-end">
+          <Button variant="outline" className="flex-1 text-xs px-2" onClick={onSelectAll}>
+            Tout
+          </Button>
+          <Button variant="outline" className="flex-1 text-xs px-2" onClick={onClearSelection}>
+            Rien
           </Button>
         </div>
       </div>
