@@ -201,7 +201,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
     const message = statusMessages[newStatus as keyof typeof statusMessages];
     if (message && housekeeperName) {
-      console.log('🔔 Envoi notification:', housekeeperName, roomNumber, newStatus);
+      console.log('🔔 Envoi notification avec son renforcé:', housekeeperName, roomNumber, newStatus);
       const notification = {
         title: `${housekeeperName} - Chambre ${roomNumber}`,
         description: `${housekeeperName} ${message} ${roomNumber}`,
@@ -210,7 +210,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         roomNumber,
         user_type: 'admin' as const,
       };
-      console.log('📝 Notification créée:', notification);
+      console.log('📝 Notification créée avec sons renforcés:', notification);
       addNotification(notification);
     }
   };

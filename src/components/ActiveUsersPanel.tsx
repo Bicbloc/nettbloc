@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Clock, Wifi } from 'lucide-react';
+import { Users, Clock, Wifi, Bed, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
 
 interface ActiveSession {
   id: string;
@@ -13,16 +14,28 @@ interface ActiveSession {
   login_time: string;
   last_activity: string;
   is_active: boolean;
+  hotel_id?: string;
+}
+
+interface HousekeeperConnection {
+  name: string;
+  accessCode: string;
+  loginTime: Date;
+  rooms: string[];
+  isOnline: boolean;
 }
 
 export function ActiveUsersPanel() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [housekeeperConnections, setHousekeeperConnections] = useState<HousekeeperConnection[]>([]);
   const [loading, setLoading] = useState(true);
+  const { housekeeperNames, housekeeperAccessCodes, getHousekeeperRooms } = useHousekeeping();
 
   useEffect(() => {
     fetchActiveSessions();
+    updateHousekeeperConnections();
     
-    // Set up real-time subscription
+    // Set up real-time subscription for sessions
     const channel = supabase
       .channel('active-sessions')
       .on(
@@ -39,13 +52,38 @@ export function ActiveUsersPanel() {
       .subscribe();
 
     // Update activity every 30 seconds
-    const activityInterval = setInterval(updateActivity, 30000);
+    const activityInterval = setInterval(() => {
+      updateActivity();
+      updateHousekeeperConnections();
+    }, 30000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(activityInterval);
     };
-  }, []);
+  }, [housekeeperNames, housekeeperAccessCodes]);
+
+  const updateHousekeeperConnections = () => {
+    const connections: HousekeeperConnection[] = housekeeperNames.map(name => {
+      const accessCode = housekeeperAccessCodes[name] || '';
+      const rooms = getHousekeeperRooms(name).map(room => room.number);
+      
+      // Vérifier s'il y a une session active pour cette femme de chambre
+      const activeSession = sessions.find(s => 
+        s.user_name === name && s.user_type === 'housekeeper' && s.is_active
+      );
+      
+      return {
+        name,
+        accessCode,
+        loginTime: activeSession ? new Date(activeSession.login_time) : new Date(),
+        rooms,
+        isOnline: !!activeSession
+      };
+    });
+    
+    setHousekeeperConnections(connections);
+  };
 
   const fetchActiveSessions = async () => {
     try {
@@ -53,12 +91,16 @@ export function ActiveUsersPanel() {
         .from('user_sessions')
         .select('*')
         .eq('is_active', true)
-        .order('login_time', { ascending: false });
+        .order('last_activity', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching sessions:', error);
+        return;
+      }
+
       setSessions(data || []);
     } catch (error) {
-      console.error('Error fetching sessions:', error);
+      console.error('Error in fetchActiveSessions:', error);
     } finally {
       setLoading(false);
     }
@@ -66,12 +108,12 @@ export function ActiveUsersPanel() {
 
   const updateActivity = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      const currentUser = localStorage.getItem('userEmail');
+      if (currentUser) {
         await supabase
           .from('user_sessions')
           .update({ last_activity: new Date().toISOString() })
-          .eq('user_id', user.id)
+          .eq('user_name', currentUser)
           .eq('is_active', true);
       }
     } catch (error) {
@@ -79,94 +121,127 @@ export function ActiveUsersPanel() {
     }
   };
 
-  const getStatusColor = (lastActivity: string) => {
-    const diff = Date.now() - new Date(lastActivity).getTime();
-    const minutes = diff / (1000 * 60);
-    
-    if (minutes < 5) return 'bg-green-500';
-    if (minutes < 15) return 'bg-yellow-500';
-    return 'bg-red-500';
+  const getTimeAgo = (timestamp: string) => {
+    try {
+      return formatDistanceToNow(new Date(timestamp), { 
+        addSuffix: true, 
+        locale: fr 
+      });
+    } catch (error) {
+      return 'Temps inconnu';
+    }
   };
 
-  const getActivityText = (lastActivity: string) => {
-    const diff = Date.now() - new Date(lastActivity).getTime();
-    const minutes = diff / (1000 * 60);
-    
-    if (minutes < 1) return 'En ligne maintenant';
-    return `Actif il y a ${Math.round(minutes)} min`;
-  };
+  const adminSessions = sessions.filter(s => s.user_type === 'admin');
+  const housekeeperSessions = sessions.filter(s => s.user_type === 'housekeeper');
 
   if (loading) {
     return (
-      <Card>
+      <Card className="animate-pulse">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Utilisateurs connectés
+            <Users className="h-4 w-4" />
+            Chargement...
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-muted-foreground">Chargement...</div>
-        </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5" />
-          Utilisateurs connectés ({sessions.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {sessions.length === 0 ? (
-          <div className="text-muted-foreground text-center py-4">
-            Aucun utilisateur connecté
+    <div className="grid gap-4 md:grid-cols-2">
+      {/* Panel Administrateurs */}
+      <Card className="animate-fade-in">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Administrateurs connectés ({adminSessions.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {adminSessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Aucun administrateur connecté
+              </p>
+            ) : (
+              adminSessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary/70 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="font-medium">{session.user_name}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {getTimeAgo(session.last_activity)}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        ) : (
-          sessions.map((session) => (
-            <div
-              key={session.id}
-              className="flex items-center justify-between p-3 rounded-lg border"
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div
-                    className={`w-3 h-3 rounded-full ${getStatusColor(session.last_activity)}`}
-                  />
-                  {getStatusColor(session.last_activity) === 'bg-green-500' && (
-                    <div className="absolute -top-0.5 -right-0.5">
-                      <Wifi className="h-2 w-2 text-green-500" />
+        </CardContent>
+      </Card>
+
+      {/* Panel Femmes de chambre */}
+      <Card className="animate-fade-in">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Femmes de chambre ({housekeeperConnections.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {housekeeperConnections.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Aucune femme de chambre configurée
+              </p>
+            ) : (
+              housekeeperConnections.map((connection) => (
+                <div
+                  key={connection.name}
+                  className="p-3 bg-secondary/50 rounded-lg hover:bg-secondary/70 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        connection.isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                      }`} />
+                      <span className="font-medium">{connection.name}</span>
+                      <Badge variant={connection.isOnline ? 'default' : 'secondary'} className="text-xs">
+                        {connection.accessCode}
+                      </Badge>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      <Bed className="h-3 w-3 mr-1" />
+                      {connection.rooms.length}
+                    </Badge>
+                  </div>
+                  
+                  {connection.isOnline && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Wifi className="h-3 w-3" />
+                      Connectée {getTimeAgo(connection.loginTime.toISOString())}
+                    </div>
+                  )}
+                  
+                  {connection.rooms.length > 0 && (
+                    <div className="mt-2 text-xs">
+                      <span className="text-muted-foreground">Chambres assignées: </span>
+                      <span className="font-mono">{connection.rooms.join(', ')}</span>
                     </div>
                   )}
                 </div>
-                <div>
-                  <div className="font-medium">{session.user_name}</div>
-                  <div className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Connecté {formatDistanceToNow(new Date(session.login_time), { 
-                      addSuffix: true, 
-                      locale: fr 
-                    })}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <Badge 
-                  variant={session.user_type === 'admin' ? 'default' : 'secondary'}
-                >
-                  {session.user_type === 'admin' ? 'Admin' : 'Femme de chambre'}
-                </Badge>
-                <div className="text-xs text-muted-foreground">
-                  {getActivityText(session.last_activity)}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </CardContent>
-    </Card>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

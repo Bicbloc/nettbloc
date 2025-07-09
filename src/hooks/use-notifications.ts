@@ -93,13 +93,14 @@ export const useNotifications = (hotelId?: string) => {
           setNotifications(prev => [newNotification, ...prev].slice(0, 50));
           setHasUnread(true);
 
-          // Jouer un son de notification
+          // Jouer un son de notification renforcé
           playNotificationSound(newNotification.type);
 
-          // Afficher la notification toast
+          // Afficher la notification toast avec animation
           toast({
             title: newNotification.title,
             description: newNotification.description,
+            className: "notification-bounce",
           });
         }
       )
@@ -210,39 +211,69 @@ export const useNotifications = (hotelId?: string) => {
   };
 };
 
-// Fonction pour jouer des sons de notification différents selon le type
+// Fonction pour jouer des sons de notification plus forts et distinctifs
 const playNotificationSound = (type: Notification['type']) => {
-  // Créer un contexte audio pour les sons
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-  
-  // Fréquences différentes selon le type de notification
-  const frequencies = {
-    'room-status': [800, 600],
-    'remark': [600, 800, 600],
-    'assignment': [400, 600, 800],
-    'cleaning-start': [500, 700],
-    'cleaning-end': [700, 500, 700]
-  };
+  try {
+    // Créer un contexte audio pour les sons
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Configurations sonores plus distinctives et plus fortes
+    const soundConfigs = {
+      'room-status': {
+        frequencies: [800, 1000, 800],
+        duration: 0.4,
+        volume: 0.6,
+        wave: 'sine' as OscillatorType
+      },
+      'remark': {
+        frequencies: [600, 800, 600, 800, 600],
+        duration: 0.3,
+        volume: 0.7,
+        wave: 'triangle' as OscillatorType
+      },
+      'assignment': {
+        frequencies: [440, 550, 660, 770],
+        duration: 0.35,
+        volume: 0.5,
+        wave: 'square' as OscillatorType
+      },
+      'cleaning-start': {
+        frequencies: [523, 659, 784],
+        duration: 0.5,
+        volume: 0.6,
+        wave: 'sine' as OscillatorType
+      },
+      'cleaning-end': {
+        frequencies: [784, 1047, 1319, 1568],
+        duration: 0.6,
+        volume: 0.7,
+        wave: 'sine' as OscillatorType
+      }
+    };
 
-  const freq = frequencies[type] || [600];
-  
-  freq.forEach((frequency, index) => {
-    setTimeout(() => {
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-      oscillator.type = 'sine';
-      
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.3);
-    }, index * 150);
-  });
+    const config = soundConfigs[type] || soundConfigs['room-status'];
+    
+    config.frequencies.forEach((frequency, index) => {
+      setTimeout(() => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+        oscillator.type = config.wave;
+        
+        // Enveloppe sonore plus marquée
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(config.volume, audioContext.currentTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + config.duration);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + config.duration);
+      }, index * 200);
+    });
+  } catch (error) {
+    console.log('Audio non disponible:', error);
+  }
 };

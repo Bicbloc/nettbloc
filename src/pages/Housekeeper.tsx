@@ -25,6 +25,7 @@ export default function Housekeeper() {
   const [remarkRoomNumber, setRemarkRoomNumber] = useState('');
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
   const [hotelId, setHotelId] = useState<string | null>(null);
+  const [hotelInfo, setHotelInfo] = useState<{ name: string; code: string } | null>(null);
   const { addNotification } = useNotifications(hotelId || undefined);
 
   // Vérifier les paramètres URL ou localStorage pour auto-connexion

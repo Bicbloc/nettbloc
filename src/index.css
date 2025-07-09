@@ -142,7 +142,55 @@
   /* Gradient backgrounds */
   .bg-gradient-primary {
     background: var(--gradient-primary);
-  }
+/* Animations supplémentaires pour les notifications */
+@keyframes notification-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.05); }
+}
+
+@keyframes notification-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Classes utilitaires pour les notifications */
+.notification-bounce {
+  animation: notification-bounce 0.6s ease-in-out;
+}
+
+.notification-shake {
+  animation: notification-shake 0.5s ease-in-out;
+}
+
+/* Classe hover-scale pour les animations */
+.hover-scale {
+  transition: all 0.2s ease-in-out;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Corrections pour les grilles auto-rows-fr */
+.auto-rows-fr {
+  grid-auto-rows: 1fr;
+}
+
+/* Amélioration des cards */
+.card-fixed-height {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-fixed-height .card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+}
   
   .bg-gradient-secondary {
     background: var(--gradient-secondary);

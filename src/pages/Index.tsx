@@ -1261,19 +1261,19 @@ const Index = () => {
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-4">
+                          <div className="space-y-4 flex-1">
                             <div className="text-center">
                               <div className="text-sm text-muted-foreground mb-2">
                                 Code d'accès mobile
                               </div>
-                              <div className="text-2xl font-mono font-bold bg-slate-100 rounded-lg py-3 px-4">
+                              <div className="text-2xl font-mono font-bold bg-slate-100 rounded-lg py-3 px-4 min-h-[60px] flex items-center justify-center">
                                 {accessCode}
                               </div>
                             </div>
-                            <div className="text-center">
+                            <div className="text-center mt-auto">
                               <Button
                                 onClick={() => window.open(`/housekeeper?code=${accessCode}`, '_blank')}
-                                className="w-full"
+                                className="w-full hover-scale"
                                 size="sm"
                               >
                                 <Smartphone className="mr-2 h-4 w-4" />
