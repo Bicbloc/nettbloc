@@ -1235,7 +1235,6 @@ const Index = () => {
             ) : (
               <>
                 <div className="flex items-center justify-between mb-4">
-                  <NotificationPanel />
                   <Button
                     variant="outline"
                     onClick={() => setIsActionLogOpen(true)}

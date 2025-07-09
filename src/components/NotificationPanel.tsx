@@ -4,21 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bell, BellOff, X, Clock } from 'lucide-react';
-import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-export const NotificationPanel = () => {
-  const { notifications } = useHousekeeping();
+interface NotificationPanelProps {
+  notifications: any[];
+  hasUnread: boolean;
+}
+
+export const NotificationPanel = ({ notifications, hasUnread }: NotificationPanelProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasUnread, setHasUnread] = useState(false);
 
   // Marquer comme lu quand on ouvre le panneau
   const handleToggle = () => {
     setIsOpen(!isOpen);
-    if (!isOpen) {
-      setHasUnread(false);
-    }
   };
 
   // Fermer le panneau

@@ -30,7 +30,9 @@ export default function Housekeeper() {
   const [hotelInfo, setHotelInfo] = useState<{ name: string; code: string } | null>(null);
   const { addNotification, notifications, hasUnread } = useNotifications(hotelId || undefined);
   const [isActionLogOpen, setIsActionLogOpen] = useState(false);
-  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'number' | 'status' | 'type'>('number');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
 
   // Vérifier les paramètres URL ou localStorage pour auto-connexion
   useEffect(() => {
@@ -193,10 +195,53 @@ export default function Housekeeper() {
     );
   }
 
-  const pendingRooms = housekeeperRooms.filter(room => room.status === 'needs-cleaning' || room.status === 'ready-to-clean');
-  const inProgressRooms = housekeeperRooms.filter(room => room.status === 'in-progress');
-  const completedRooms = housekeeperRooms.filter(room => room.status === 'clean');
-  const remarkRooms = housekeeperRooms.filter(room => room.status === 'needs-attention');
+  // Fonction de tri
+  const sortRooms = (rooms: Room[]) => {
+    return [...rooms].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case 'number':
+          comparison = parseInt(a.number) - parseInt(b.number);
+          break;
+        case 'status':
+          const statusOrder = {
+            'needs-cleaning': 1,
+            'ready-to-clean': 2,
+            'in-progress': 3,
+            'clean': 4,
+            'needs-attention': 5
+          };
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] || 0) - 
+                      (statusOrder[b.status as keyof typeof statusOrder] || 0);
+          break;
+        case 'type':
+          const typeOrder = { 'full': 1, 'quick': 2 };
+          comparison = (typeOrder[a.cleaningType as keyof typeof typeOrder] || 0) - 
+                      (typeOrder[b.cleaningType as keyof typeof typeOrder] || 0);
+          break;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  const sortedRooms = sortRooms(housekeeperRooms);
+  
+  const pendingRooms = sortedRooms.filter(room => room.status === 'needs-cleaning' || room.status === 'ready-to-clean');
+  const inProgressRooms = sortedRooms.filter(room => room.status === 'in-progress');
+  const completedRooms = sortedRooms.filter(room => room.status === 'clean');
+  const remarkRooms = sortedRooms.filter(room => room.status === 'needs-attention');
+
+  // Fonction pour changer le tri
+  const handleSort = (newSortBy: 'number' | 'status' | 'type') => {
+    if (sortBy === newSortBy) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(newSortBy);
+      setSortOrder('asc');
+    }
+  };
 
   // Fonction pour gérer la mise à jour du statut des chambres
   const handleUpdateRoomStatus = async (roomNumber: string, newStatus: string) => {
@@ -303,17 +348,10 @@ export default function Housekeeper() {
             <p className="text-muted-foreground">Votre planning aujourd'hui</p>
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsNotificationPanelOpen(true)}
-              size="sm"
-              className="relative"
-            >
-              <Bell className="h-4 w-4" />
-              {hasUnread && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
-              )}
-            </Button>
+            <NotificationPanel 
+              notifications={notifications}
+              hasUnread={hasUnread}
+            />
             <Button 
               variant="outline" 
               onClick={() => setIsActionLogOpen(true)}
@@ -375,9 +413,39 @@ export default function Housekeeper() {
         </div>
       </div>
 
+      {/* Boutons de tri */}
+      <div className="mb-4">
+        <div className="flex flex-wrap gap-2 justify-center">
+          <Button
+            variant={sortBy === 'number' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSort('number')}
+            className="text-xs"
+          >
+            N° chambre {sortBy === 'number' && (sortOrder === 'asc' ? '↑' : '↓')}
+          </Button>
+          <Button
+            variant={sortBy === 'status' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSort('status')}
+            className="text-xs"
+          >
+            Statut {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+          </Button>
+          <Button
+            variant={sortBy === 'type' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handleSort('type')}
+            className="text-xs"
+          >
+            Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
+          </Button>
+        </div>
+      </div>
+
       {/* Chambres à nettoyer */}
-      <div className="space-y-4">
-        {housekeeperRooms.map((room) => (
+      <div className="space-y-3">
+        {sortedRooms.map((room) => (
           <Card key={room.number} className="card-modern">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -411,36 +479,47 @@ export default function Housekeeper() {
               </div>
               
               {(room.status === 'needs-cleaning' || room.status === 'ready-to-clean') && (
-                <div className="grid grid-cols-1 gap-2">
+                <div className="space-y-3">
                   {room.status === 'ready-to-clean' && (
-                    <div className="p-2 bg-orange-50 border border-orange-200 rounded-md text-center">
-                      <p className="text-sm text-orange-700 font-medium">
-                        🚪 Client sorti - Chambre prête à nettoyer
-                      </p>
+                    <div className="p-3 bg-orange-50 border-l-4 border-orange-400 rounded-md">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <Check className="h-5 w-5 text-orange-400" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-orange-800">
+                            Client sorti
+                          </p>
+                          <p className="text-xs text-orange-600 mt-1">
+                            Chambre prête à nettoyer
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
                   <Button
                     onClick={() => handleUpdateRoomStatus(room.number, 'in-progress')}
-                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
-                    size="sm"
+                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium"
+                    size="lg"
                   >
                     <Play className="h-4 w-4 mr-2" />
                     Commencer le nettoyage
                   </Button>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Button
                       onClick={() => handleUpdateRoomStatus(room.number, 'clean')}
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      variant="outline"
+                      className="border-green-200 text-green-700 hover:bg-green-50 font-medium"
                       size="sm"
                     >
                       <Check className="h-4 w-4 mr-1" />
-                      Terminé
+                      Marquer propre
                     </Button>
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button
                           variant="outline"
-                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          className="border-red-200 text-red-700 hover:bg-red-50 font-medium"
                           size="sm"
                           onClick={() => setRemarkRoomNumber(room.number)}
                         >
@@ -474,25 +553,40 @@ export default function Housekeeper() {
               )}
               
               {room.status === 'in-progress' && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-3">
+                  <div className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <Play className="h-5 w-5 text-yellow-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-yellow-800">
+                          Nettoyage en cours
+                        </p>
+                        <p className="text-xs text-yellow-600 mt-1">
+                          Commencé à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   <Button
                     onClick={() => handleUpdateRoomStatus(room.number, 'clean')}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    size="sm"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium"
+                    size="lg"
                   >
-                    <Check className="h-4 w-4 mr-1" />
-                    Terminée
+                    <Check className="h-4 w-4 mr-2" />
+                    Marquer comme propre
                   </Button>
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button
                         variant="outline"
-                        className="border-red-300 text-red-600 hover:bg-red-50"
+                        className="w-full border-red-200 text-red-700 hover:bg-red-50 font-medium"
                         size="sm"
                         onClick={() => setRemarkRoomNumber(room.number)}
                       >
                         <MessageSquare className="h-4 w-4 mr-1" />
-                        Remarque
+                        Signaler une remarque
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -520,25 +614,45 @@ export default function Housekeeper() {
               )}
               
               {room.status === 'clean' && (
-                <div className="text-center py-2">
-                  <div className="flex items-center justify-center gap-2 text-green-600">
-                    <Check className="h-5 w-5" />
-                    <span className="font-medium">Chambre nettoyée</span>
+                <div className="p-3 bg-green-50 border-l-4 border-green-400 rounded-md">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <Check className="h-5 w-5 text-green-400" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-green-800">
+                        Chambre nettoyée
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Terminé à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
               
               {room.status === 'needs-attention' && (
-                <div className="text-center py-2">
-                  <div className="flex items-center justify-center gap-2 text-red-600">
-                    <MessageSquare className="h-5 w-5" />
-                    <span className="font-medium">Remarque signalée</span>
+                <div className="space-y-3">
+                  <div className="p-3 bg-red-50 border-l-4 border-red-400 rounded-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <AlertCircle className="h-5 w-5 text-red-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-red-800">
+                          Remarque signalée
+                        </p>
+                        <p className="text-xs text-red-600 mt-1">
+                          Nécessite une attention particulière
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <Button
                     onClick={() => handleUpdateRoomStatus(room.number, 'needs-cleaning')}
                     variant="outline"
                     size="sm"
-                    className="mt-2"
+                    className="w-full"
                   >
                     Remettre en attente
                   </Button>
@@ -560,6 +674,13 @@ export default function Housekeeper() {
           </div>
         )}
       </div>
+
+      {/* Action Log Panel */}
+      <ActionLogPanel 
+        hotelId={hotelId || undefined}
+        isOpen={isActionLogOpen}
+        onClose={() => setIsActionLogOpen(false)}
+      />
     </div>
   );
 }
