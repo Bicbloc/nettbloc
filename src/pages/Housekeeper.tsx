@@ -125,12 +125,11 @@ export default function Housekeeper() {
               <Input
                 id="access-code"
                 type="text"
-                placeholder="Ex: 1234"
+                placeholder="Ex: HTL-1234"
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
                 className="text-center text-lg font-mono h-12"
                 autoFocus
-                maxLength={4}
               />
               {Object.keys(housekeeperAccessCodes).length > 0 && (
                 <div className="text-xs text-gray-500 text-center mt-2">
@@ -386,22 +385,22 @@ export default function Housekeeper() {
         )}
         
         {/* Barre de progression */}
-        <div className="grid grid-cols-4 gap-2 text-center text-sm mb-4">
-          <div>
+        <div className="grid grid-cols-2 xs:grid-cols-4 gap-2 text-center text-sm mb-4">
+          <div className="p-2 bg-card border rounded-lg">
             <div className="font-semibold text-orange-600">{pendingRooms.length}</div>
-            <div className="text-muted-foreground">À faire</div>
+            <div className="text-muted-foreground text-xs">À faire</div>
           </div>
-          <div>
+          <div className="p-2 bg-card border rounded-lg">
             <div className="font-semibold text-yellow-600">{inProgressRooms.length}</div>
-            <div className="text-muted-foreground">En cours</div>
+            <div className="text-muted-foreground text-xs">En cours</div>
           </div>
-          <div>
+          <div className="p-2 bg-card border rounded-lg">
             <div className="font-semibold text-green-600">{completedRooms.length}</div>
-            <div className="text-muted-foreground">Terminées</div>
+            <div className="text-muted-foreground text-xs">Terminées</div>
           </div>
-          <div>
+          <div className="p-2 bg-card border rounded-lg">
             <div className="font-semibold text-red-600">{remarkRooms.length}</div>
-            <div className="text-muted-foreground">Remarques</div>
+            <div className="text-muted-foreground text-xs">Remarques</div>
           </div>
         </div>
         
@@ -415,30 +414,40 @@ export default function Housekeeper() {
 
       {/* Boutons de tri */}
       <div className="mb-4">
-        <div className="flex flex-wrap gap-2 justify-center">
+        <div className="grid grid-cols-3 gap-2 max-w-sm mx-auto">
           <Button
             variant={sortBy === 'number' ? 'default' : 'outline'}
             size="sm"
             onClick={() => handleSort('number')}
-            className="text-xs"
+            className="text-xs px-2"
           >
-            N° chambre {sortBy === 'number' && (sortOrder === 'asc' ? '↑' : '↓')}
+            <span className="hidden xs:inline">N° chambre</span>
+            <span className="xs:hidden">N°</span>
+            {sortBy === 'number' && (
+              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+            )}
           </Button>
           <Button
             variant={sortBy === 'status' ? 'default' : 'outline'}
             size="sm"
             onClick={() => handleSort('status')}
-            className="text-xs"
+            className="text-xs px-2"
           >
-            Statut {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+            Statut
+            {sortBy === 'status' && (
+              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+            )}
           </Button>
           <Button
             variant={sortBy === 'type' ? 'default' : 'outline'}
             size="sm"
             onClick={() => handleSort('type')}
-            className="text-xs"
+            className="text-xs px-2"
           >
-            Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
+            Type
+            {sortBy === 'type' && (
+              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+            )}
           </Button>
         </div>
       </div>
@@ -448,30 +457,32 @@ export default function Housekeeper() {
         {sortedRooms.map((room) => (
           <Card key={room.number} className="card-modern">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">Chambre {room.number}</CardTitle>
-                <div className="flex gap-2">
-                  <Badge className={getStatusColor(room.status)}>
+              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                <CardTitle className="text-lg sm:text-xl">Chambre {room.number}</CardTitle>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className={`${getStatusColor(room.status)} text-xs`}>
                     {getStatusText(room.status)}
                   </Badge>
                   {room.isUrgent && (
-                    <Badge variant="destructive" className="flex items-center gap-1">
+                    <Badge variant="destructive" className="flex items-center gap-1 text-xs">
                       <AlertCircle className="h-3 w-3" />
-                      Urgent
+                      <span className="hidden xs:inline">Urgent</span>
+                      <span className="xs:hidden">!</span>
                     </Badge>
                   )}
                   {room.isTwin && (
-                    <Badge variant="outline" className="flex items-center gap-1">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs">
                       <Bed className="h-3 w-3" />
-                      Twin
+                      <span className="hidden xs:inline">Twin</span>
+                      <span className="xs:hidden">2</span>
                     </Badge>
                   )}
                 </div>
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+            <CardContent className="space-y-3">
+              <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2">
                 <span className="text-sm text-muted-foreground">Type de nettoyage:</span>
                 <Badge className={getCleaningTypeColor(room.cleaningType)}>
                   {getCleaningTypeText(room.cleaningType)}
@@ -505,7 +516,7 @@ export default function Housekeeper() {
                     <Play className="h-4 w-4 mr-2" />
                     Commencer le nettoyage
                   </Button>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
                     <Button
                       onClick={() => handleUpdateRoomStatus(room.number, 'clean')}
                       variant="outline"

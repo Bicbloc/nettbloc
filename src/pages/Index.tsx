@@ -37,7 +37,7 @@ import { ReportFields as CustomReportFields } from "@/components/ReportCustomFie
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationPanel } from "@/components/NotificationPanel";
 import { ActionLogPanel } from "@/components/ActionLogPanel";
-import { HotelSetup } from "@/components/HotelSetup";
+import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
@@ -83,6 +83,7 @@ const Index = () => {
   const [userEmail, setUserEmail] = useState<string>("");
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isActionLogOpen, setIsActionLogOpen] = useState(false);
+  const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -1017,61 +1018,75 @@ const Index = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>N° Chambre</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Type de nettoyage</TableHead>
-                      <TableHead>Priorité</TableHead>
-                      <TableHead>Assignée à</TableHead>
-                      <TableHead>Jumelle</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rooms.map((room) => (
-                      <TableRow key={room.number}>
-                        <TableCell className="font-medium">{room.number}</TableCell>
-                        <TableCell>{getStatusBadge(room.status)}</TableCell>
-                        <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
-                        <TableCell>
-                          {room.priority === 'high' ? (
-                            <Badge variant="destructive">Élevée</Badge>
-                          ) : (
-                            <Badge variant="secondary">Normale</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {room.assignedTo ? (
-                            <Badge variant="outline">{room.assignedTo}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">Non assignée</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Checkbox
-                            checked={room.isTwin || false}
-                            onCheckedChange={(checked) => {
-                              handleRoomUpdate({ ...room, isTwin: checked as boolean });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <RoomCard
-                            room={room}
-                            onUpdate={handleRoomUpdate}
-                            onUnassign={handleRoomUnassign}
-                            compact={true}
-                            showActions={true}
-                          />
-                        </TableCell>
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Filtres et options</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <RoomFilters 
+                      rooms={rooms}
+                      onFiltersChange={(filteredRooms) => setFilteredRooms(filteredRooms)}
+                    />
+                  </CardContent>
+                </Card>
+                
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>N° Chambre</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead>Type de nettoyage</TableHead>
+                        <TableHead>Priorité</TableHead>
+                        <TableHead>Assignée à</TableHead>
+                        <TableHead>Jumelle</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {(filteredRooms || rooms).map((room) => (
+                        <TableRow key={room.number}>
+                          <TableCell className="font-medium">{room.number}</TableCell>
+                          <TableCell>{getStatusBadge(room.status)}</TableCell>
+                          <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
+                          <TableCell>
+                            {room.priority === 'high' ? (
+                              <Badge variant="destructive">Élevée</Badge>
+                            ) : (
+                              <Badge variant="secondary">Normale</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {room.assignedTo ? (
+                              <Badge variant="outline">{room.assignedTo}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">Non assignée</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Checkbox
+                              checked={room.isTwin || false}
+                              onCheckedChange={(checked) => {
+                                handleRoomUpdate({ ...room, isTwin: checked as boolean });
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <RoomCard
+                              room={room}
+                              onUpdate={handleRoomUpdate}
+                              onUnassign={handleRoomUnassign}
+                              compact={true}
+                              showActions={true}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </TabsContent>
 
