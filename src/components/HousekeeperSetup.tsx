@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { UserIcon, Plus, Key, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
-import { QuickAddHousekeeperButton } from './QuickAddHousekeeperButton';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 
 interface Housekeeper {
@@ -146,16 +145,10 @@ export const HousekeeperSetup = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <UserIcon className="h-5 w-5" />
-              Gestion des Femmes de Chambre
-            </CardTitle>
-            <QuickAddHousekeeperButton 
-              onAddHousekeeper={handleQuickAdd}
-              className="shrink-0"
-            />
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <UserIcon className="h-5 w-5" />
+            Gestion des Femmes de Chambre
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
