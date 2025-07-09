@@ -24,21 +24,21 @@ export function TestNotificationButton({ hotelId }: TestNotificationButtonProps)
 
     const success = await addNotification({
       title: "Test système",
-      description: "Notification de test créée avec succès",
+      description: `Notification de test créée avec succès pour l'hôtel ID: ${hotelId.slice(0, 12)}...`,
       type: 'assignment',
       user_type: 'admin'
     });
 
     if (success) {
       toast({
-        title: "Test réussi",
-        description: "La notification de test a été créée"
+        title: "Test réussi ✅",
+        description: "La notification de test a été créée avec succès"
       });
     } else {
       toast({
         variant: "destructive",
-        title: "Test échoué",
-        description: "Impossible de créer la notification"
+        title: "Test échoué ❌",
+        description: "Impossible de créer la notification de test"
       });
     }
   };

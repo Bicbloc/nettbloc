@@ -96,24 +96,18 @@ const Index = () => {
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   
-  // Générer un ID d'hôtel déterministe basé sur le code
-  const storedHotelId = localStorage.getItem("hotelId");
-  const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
-  
+  // ID d'hôtel déterministe - toujours généré depuis le code si disponible
   const currentHotelId = hotelCode ? generateHotelId(hotelCode) : 
-    (selectedHotel?.id || storedSelectedHotelId || storedHotelId);
+    (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
   
   console.log("🏨 Hotel ID pour notifications:", {
     hotelCode,
     currentHotelId,
-    selectedHotelId: selectedHotel?.id,
-    storedSelectedHotelId,
-    storedHotelId
+    generatedFromCode: hotelCode ? generateHotelId(hotelCode) : null,
+    selectedHotelId: selectedHotel?.id
   });
   
-  const { addNotification } = useNotifications(
-    currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined
-  );
+  const { addNotification } = useNotifications(currentHotelId);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -794,18 +788,19 @@ const Index = () => {
       description: `Chambre ${roomNumber} assignée à ${housekeeperName}.`
     });
 
-    // Test de création de notification avec l'hotel ID valide
-    const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
+    // Test de création de notification avec l'hotel ID déterministe
+    const notificationHotelId = hotelCode ? generateHotelId(hotelCode) : 
+      (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
     
     console.log('🧪 Test notification - Hotel ID:', {
-      currentHotelId,
-      isValid: currentHotelId && isValidUUID(currentHotelId),
-      selectedHotel: selectedHotel?.id,
-      stored: { storedSelectedHotelId, storedHotelId }
+      hotelCode,
+      notificationHotelId,
+      generatedId: hotelCode ? generateHotelId(hotelCode) : null,
+      selectedHotel: selectedHotel?.id
     });
     
-    if (currentHotelId && isValidUUID(currentHotelId)) {
-      console.log('✅ Création notification assignation pour hotel:', currentHotelId);
+    if (notificationHotelId) {
+      console.log('✅ Création notification assignation pour hotel:', notificationHotelId);
       addNotification({
         title: `Assignation chambre ${roomNumber}`,
         description: `Admin - CH ${roomNumber} assignée à ${housekeeperName}`,
