@@ -49,27 +49,35 @@ function distributeByFloor(rooms: Room[], housekeeperNames: string[]): Room[] {
   });
   
   // Trier les étages par ordre croissant
-  const floors = Object.keys(roomsByFloor).sort((a, b) => parseInt(a) - parseInt(b));
+  const floors = Object.keys(roomsByFloor)
+    .map(f => parseInt(f))
+    .sort((a, b) => a - b);
+  
   const totalRooms = Object.values(roomsByFloor).reduce((sum, rooms) => sum + rooms.length, 0);
   const roomsPerHousekeeper = Math.ceil(totalRooms / housekeeperNames.length);
   
   let currentHousekeeperIndex = 0;
   let roomsAssignedToCurrentHousekeeper = 0;
   
-  floors.forEach(floorKey => {
-    const floorRooms = roomsByFloor[parseInt(floorKey)];
+  console.log(`📊 Distribution par étage: ${floors.length} étages, ${totalRooms} chambres, ${roomsPerHousekeeper} chambres par femme de chambre`);
+  
+  floors.forEach(floor => {
+    const floorRooms = roomsByFloor[floor];
+    console.log(`🏢 Étage ${floor}: ${floorRooms.length} chambres`);
     
     floorRooms.forEach(room => {
       // Si la femme de chambre actuelle a déjà assez de chambres, passer à la suivante
       if (roomsAssignedToCurrentHousekeeper >= roomsPerHousekeeper && currentHousekeeperIndex < housekeeperNames.length - 1) {
         currentHousekeeperIndex++;
         roomsAssignedToCurrentHousekeeper = 0;
+        console.log(`➡️ Passage à la femme de chambre suivante: ${housekeeperNames[currentHousekeeperIndex]}`);
       }
       
       const assignedRoom = result.find(r => r.number === room.number);
       if (assignedRoom) {
         assignedRoom.assignedTo = housekeeperNames[currentHousekeeperIndex];
         roomsAssignedToCurrentHousekeeper++;
+        console.log(`✅ Chambre ${room.number} (étage ${floor}) → ${housekeeperNames[currentHousekeeperIndex]}`);
       }
     });
   });
@@ -91,27 +99,38 @@ function distributeByCleaningType(rooms: Room[], housekeeperNames: string[]): Ro
     r.cleaningType === 'quick' && r.status !== 'maintenance'
   );
   
+  console.log(`🔴 ${fullCleaningRooms.length} chambres rouge (nettoyage complet)`);
+  console.log(`⚪ ${quickCleaningRooms.length} chambres blanc (recouche)`);
+  
   // Calculer la répartition optimale
-  const totalRooms = fullCleaningRooms.length + quickCleaningRooms.length;
   const halfHousekeepers = Math.ceil(housekeeperNames.length / 2);
   
-  // Assigner les nettoyages complets (rouge) à la première moitié des femmes de chambre
+  // Groupe 1: Femmes de chambre pour les chambres rouge (nettoyage complet)
+  const redGroup = housekeeperNames.slice(0, halfHousekeepers);
+  // Groupe 2: Femmes de chambre pour les chambres blanc (recouche)  
+  const whiteGroup = housekeeperNames.slice(halfHousekeepers);
+  
+  console.log(`👥 Groupe ROUGE: ${redGroup.join(', ')}`);
+  console.log(`👥 Groupe BLANC: ${whiteGroup.length > 0 ? whiteGroup.join(', ') : 'Aucun (mélangé avec rouge)'}`);
+  
+  // Assigner les nettoyages complets (rouge) au premier groupe
   fullCleaningRooms.forEach((room, index) => {
-    const housekeeperIndex = index % halfHousekeepers;
+    const housekeeperIndex = index % redGroup.length;
     const assignedRoom = result.find(r => r.number === room.number);
     if (assignedRoom) {
-      assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
+      assignedRoom.assignedTo = redGroup[housekeeperIndex];
+      console.log(`🔴 Chambre ${room.number} (rouge) → ${redGroup[housekeeperIndex]}`);
     }
   });
   
-  // Assigner les recouches (blanc) à l'autre moitié des femmes de chambre
-  const remainingHousekeepers = housekeeperNames.slice(halfHousekeepers);
-  if (remainingHousekeepers.length > 0) {
+  // Assigner les recouches (blanc) au deuxième groupe (ou au premier si pas assez de femmes de chambre)
+  if (whiteGroup.length > 0) {
     quickCleaningRooms.forEach((room, index) => {
-      const housekeeperIndex = index % remainingHousekeepers.length;
+      const housekeeperIndex = index % whiteGroup.length;
       const assignedRoom = result.find(r => r.number === room.number);
       if (assignedRoom) {
-        assignedRoom.assignedTo = remainingHousekeepers[housekeeperIndex];
+        assignedRoom.assignedTo = whiteGroup[housekeeperIndex];
+        console.log(`⚪ Chambre ${room.number} (blanc) → ${whiteGroup[housekeeperIndex]}`);
       }
     });
   } else {
@@ -121,6 +140,7 @@ function distributeByCleaningType(rooms: Room[], housekeeperNames: string[]): Ro
       const assignedRoom = result.find(r => r.number === room.number);
       if (assignedRoom) {
         assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
+        console.log(`⚪ Chambre ${room.number} (blanc mélangé) → ${housekeeperNames[housekeeperIndex]}`);
       }
     });
   }

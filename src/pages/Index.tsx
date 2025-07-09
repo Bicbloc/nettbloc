@@ -657,7 +657,9 @@ const Index = () => {
           userEmail,  // email
           hotelCode   // hotelCode
         );
-        console.log("Hôtel créé:", hotel);
+        console.log("🏨 Hôtel créé:", hotel);
+      } else {
+        console.log("🏨 Hôtel existant trouvé:", hotel);
       }
       
       if (!hotel) {
@@ -669,12 +671,15 @@ const Index = () => {
         return;
       }
 
-      // Sauvegarder les informations dans localStorage
+      // Sauvegarder toutes les informations importantes dans localStorage
       localStorage.setItem('selectedHotelCode', hotelCode);
       localStorage.setItem('userEmail', userEmail);
+      localStorage.setItem('selectedHotelId', hotel.id);
+      localStorage.setItem('hotelId', hotel.id);
       
-      console.log("Début redistribution avec hôtel:", hotel);
+      console.log("🏨 Hôtel configuré avec ID:", hotel.id);
       setSelectedHotel(hotel);
+      
       await handleRedistributeWithMethod('random');
     } catch (error) {
       console.error("Erreur lors de la création/récupération de l'hôtel:", error);
