@@ -110,7 +110,7 @@ const Index = () => {
   });
   
   const { addNotification } = useNotifications(
-    currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : "default-hotel-id"
+    currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined
   );
   
   useEffect(() => {
@@ -476,9 +476,13 @@ const Index = () => {
       return;
     }
 
-    if (rooms.length === 0) {
+    const availableRooms = rooms.filter(room => 
+      room.cleaningType !== 'none' && room.status !== 'maintenance'
+    );
+
+    if (availableRooms.length === 0) {
       toast({
-        variant: "destructive", 
+        variant: "destructive",
         title: "Erreur de redistribution",
         description: "Aucune chambre disponible pour la redistribution."
       });
@@ -489,6 +493,7 @@ const Index = () => {
       const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
       setRooms(redistributedRooms);
       setIsDistributed(true);
+      setIsRedistributionDialogOpen(false);
 
       const methodName = method === 'random' ? 'aléatoire' : 
                         method === 'floor' ? 'par étage' : 'par type de nettoyage';
@@ -502,8 +507,8 @@ const Index = () => {
         description: `${assignedCount} chambres redistribuées avec la méthode ${methodName}.`
       });
 
-      // Ajouter une notification
-      if (currentHotelId && addNotification) {
+      // Ajouter une notification seulement si on a un hotel valide
+      if (currentHotelId && isValidUUID(currentHotelId) && addNotification) {
         addNotification({
           type: 'assignment',
           title: 'Redistribution des chambres',

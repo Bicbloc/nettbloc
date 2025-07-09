@@ -32,13 +32,13 @@ function distributeRandomly(rooms: Room[], housekeeperNames: string[]): Room[] {
   return result;
 }
 
-// Distribution par étage
+// Distribution par étage - donner toutes les chambres d'étages proches à la même femme de chambre
 function distributeByFloor(rooms: Room[], housekeeperNames: string[]): Room[] {
   if (housekeeperNames.length === 0) return rooms;
   
   const result = [...rooms];
   
-  // Grouper par étage
+  // Grouper par étage et trier
   const roomsByFloor: Record<number, Room[]> = {};
   rooms.forEach(room => {
     if (room.cleaningType !== 'none' && room.status !== 'maintenance') {
@@ -48,38 +48,36 @@ function distributeByFloor(rooms: Room[], housekeeperNames: string[]): Room[] {
     }
   });
   
-  // Distribuer par étage
+  // Trier les étages par ordre croissant
   const floors = Object.keys(roomsByFloor).sort((a, b) => parseInt(a) - parseInt(b));
-  let housekeeperIndex = 0;
+  const totalRooms = Object.values(roomsByFloor).reduce((sum, rooms) => sum + rooms.length, 0);
+  const roomsPerHousekeeper = Math.ceil(totalRooms / housekeeperNames.length);
+  
+  let currentHousekeeperIndex = 0;
+  let roomsAssignedToCurrentHousekeeper = 0;
   
   floors.forEach(floorKey => {
-    const floor = parseInt(floorKey);
-    const floorRooms = roomsByFloor[floor];
+    const floorRooms = roomsByFloor[parseInt(floorKey)];
     
-    // Estimer le nombre de femmes de chambre nécessaires pour cet étage
-    const roomsPerHousekeeper = Math.ceil(floorRooms.length / housekeeperNames.length);
-    const housekeepersForFloor = Math.min(
-      Math.ceil(floorRooms.length / Math.max(roomsPerHousekeeper, 1)),
-      housekeeperNames.length
-    );
-    
-    floorRooms.forEach((room, index) => {
-      const localIndex = housekeeperIndex + (index % housekeepersForFloor);
-      const finalIndex = localIndex % housekeeperNames.length;
+    floorRooms.forEach(room => {
+      // Si la femme de chambre actuelle a déjà assez de chambres, passer à la suivante
+      if (roomsAssignedToCurrentHousekeeper >= roomsPerHousekeeper && currentHousekeeperIndex < housekeeperNames.length - 1) {
+        currentHousekeeperIndex++;
+        roomsAssignedToCurrentHousekeeper = 0;
+      }
       
       const assignedRoom = result.find(r => r.number === room.number);
       if (assignedRoom) {
-        assignedRoom.assignedTo = housekeeperNames[finalIndex];
+        assignedRoom.assignedTo = housekeeperNames[currentHousekeeperIndex];
+        roomsAssignedToCurrentHousekeeper++;
       }
     });
-    
-    housekeeperIndex = (housekeeperIndex + housekeepersForFloor) % housekeeperNames.length;
   });
   
   return result;
 }
 
-// Distribution par type de nettoyage
+// Distribution par type de nettoyage - séparer rouge/blanc entre femmes de chambre
 function distributeByCleaningType(rooms: Room[], housekeeperNames: string[]): Room[] {
   if (housekeeperNames.length === 0) return rooms;
   
@@ -93,23 +91,39 @@ function distributeByCleaningType(rooms: Room[], housekeeperNames: string[]): Ro
     r.cleaningType === 'quick' && r.status !== 'maintenance'
   );
   
-  // Distribuer les nettoyages complets en premier (plus longs)
+  // Calculer la répartition optimale
+  const totalRooms = fullCleaningRooms.length + quickCleaningRooms.length;
+  const halfHousekeepers = Math.ceil(housekeeperNames.length / 2);
+  
+  // Assigner les nettoyages complets (rouge) à la première moitié des femmes de chambre
   fullCleaningRooms.forEach((room, index) => {
-    const housekeeperIndex = index % housekeeperNames.length;
+    const housekeeperIndex = index % halfHousekeepers;
     const assignedRoom = result.find(r => r.number === room.number);
     if (assignedRoom) {
       assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
     }
   });
   
-  // Distribuer les recouches pour équilibrer la charge
-  quickCleaningRooms.forEach((room, index) => {
-    const housekeeperIndex = index % housekeeperNames.length;
-    const assignedRoom = result.find(r => r.number === room.number);
-    if (assignedRoom) {
-      assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
-    }
-  });
+  // Assigner les recouches (blanc) à l'autre moitié des femmes de chambre
+  const remainingHousekeepers = housekeeperNames.slice(halfHousekeepers);
+  if (remainingHousekeepers.length > 0) {
+    quickCleaningRooms.forEach((room, index) => {
+      const housekeeperIndex = index % remainingHousekeepers.length;
+      const assignedRoom = result.find(r => r.number === room.number);
+      if (assignedRoom) {
+        assignedRoom.assignedTo = remainingHousekeepers[housekeeperIndex];
+      }
+    });
+  } else {
+    // Si pas assez de femmes de chambre, mélanger avec les nettoyages complets
+    quickCleaningRooms.forEach((room, index) => {
+      const housekeeperIndex = index % housekeeperNames.length;
+      const assignedRoom = result.find(r => r.number === room.number);
+      if (assignedRoom) {
+        assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
+      }
+    });
+  }
   
   return result;
 }
