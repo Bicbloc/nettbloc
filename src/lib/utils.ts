@@ -31,3 +31,28 @@ export function getFirstDigitFromRoomNumber(roomNumber: string): number {
   const digit = roomNumber.replace(/^\D+/, '').charAt(0);
   return parseInt(digit, 10) || 0;
 }
+
+/**
+ * Générer un UUID déterministe basé sur le code hôtel
+ * @param hotelCode Le code de l'hôtel
+ * @returns Un UUID déterministe basé sur le code
+ */
+export function generateHotelId(hotelCode: string): string {
+  if (!hotelCode) return '';
+  
+  // Créer un hash simple mais déterministe du code hôtel
+  let hash = 0;
+  for (let i = 0; i < hotelCode.length; i++) {
+    const char = hotelCode.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convertir en 32 bits
+  }
+  
+  // Convertir en UUID v4 format (mais déterministe)
+  const abs = Math.abs(hash);
+  const hex = abs.toString(16).padStart(8, '0');
+  const uuid = `hotel-${hex.slice(0, 8)}-${hex.slice(0, 4)}-${hex.slice(1, 4)}-${hex.slice(2, 5)}-${hex.padEnd(12, '0').slice(0, 12)}`;
+  
+  console.log(`🆔 UUID généré pour ${hotelCode}:`, uuid);
+  return uuid;
+}

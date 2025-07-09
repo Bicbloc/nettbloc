@@ -43,6 +43,7 @@ import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
+import { generateHotelId } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 
 const Index = () => {
@@ -95,24 +96,19 @@ const Index = () => {
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   
-  // Récupérer et valider l'ID de l'hôtel depuis localStorage
+  // Générer un ID d'hôtel déterministe basé sur le code
   const storedHotelId = localStorage.getItem("hotelId");
   const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
   
-  console.log("🔍 Valeurs localStorage brutes:", {
-    storedHotelId,
-    storedSelectedHotelId,
-    selectedHotelId: selectedHotel?.id
-  });
-  
-  // Prioriser selectedHotel?.id, puis selectedHotelId, puis hotelId
-  const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
+  const currentHotelId = hotelCode ? generateHotelId(hotelCode) : 
+    (selectedHotel?.id || storedSelectedHotelId || storedHotelId);
   
   console.log("🏨 Hotel ID pour notifications:", {
-    selectedHotel: selectedHotel?.id,
+    hotelCode,
+    currentHotelId,
+    selectedHotelId: selectedHotel?.id,
     storedSelectedHotelId,
-    storedHotelId,
-    currentHotelId
+    storedHotelId
   });
   
   const { addNotification } = useNotifications(
@@ -672,22 +668,33 @@ const Index = () => {
       return;
     }
 
-    // Créer ou récupérer l'hôtel
+    // Créer ou récupérer l'hôtel avec un ID déterministe
     try {
       console.log("🔍 Recherche hôtel avec code:", hotelCode);
+      
+      // Générer un ID déterministe pour cet hôtel
+      const deterministicHotelId = generateHotelId(hotelCode);
+      console.log("🆔 ID déterministe généré:", deterministicHotelId);
+      
       let hotel = await SupabaseService.getHotelByCode(hotelCode);
       
       if (!hotel) {
-        console.log("🏨 Création nouvel hôtel...");
-        // Créer l'hôtel s'il n'existe pas
-        hotel = await SupabaseService.createHotel(
-          `Hôtel ${hotelCode}`,  // name
-          userEmail,             // email
-          hotelCode              // hotelCode
+        console.log("🏨 Création nouvel hôtel avec ID déterministe...");
+        // Créer l'hôtel avec l'ID déterministe
+        hotel = await SupabaseService.createHotelWithId(
+          deterministicHotelId,     // id déterministe
+          `Hôtel ${hotelCode}`,     // name
+          userEmail,                // email
+          hotelCode                 // hotelCode
         );
-        console.log("✅ Hôtel créé:", hotel);
+        console.log("✅ Hôtel créé avec ID déterministe:", hotel);
       } else {
         console.log("✅ Hôtel existant trouvé:", hotel);
+        // Mettre à jour l'ID de l'hôtel existant si nécessaire (mais seulement si différent)
+        if (hotel.id !== deterministicHotelId) {
+          console.log("🔄 Mise à jour ID hôtel vers déterministe");
+          hotel = await SupabaseService.updateHotelId(hotel.id, deterministicHotelId) || hotel;
+        }
       }
       
       if (!hotel || !hotel.id) {
@@ -706,6 +713,7 @@ const Index = () => {
       localStorage.setItem('userEmail', userEmail);
       localStorage.setItem('selectedHotelId', hotel.id);
       localStorage.setItem('hotelId', hotel.id);
+      localStorage.setItem('hotelIdDeterministic', deterministicHotelId);
       
       // Vérifier que la sauvegarde a bien fonctionné
       const savedId = localStorage.getItem('hotelId');
@@ -713,6 +721,11 @@ const Index = () => {
       
       console.log("🏨 Hôtel configuré avec ID:", hotel.id);
       setSelectedHotel(hotel);
+      
+      toast({
+        title: "Hôtel configuré",
+        description: `Hôtel "${hotel.name}" configuré avec ID: ${hotel.id.slice(0, 8)}...`
+      });
       
       await handleRedistributeWithMethod('random');
     } catch (error) {

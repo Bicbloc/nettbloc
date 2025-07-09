@@ -50,6 +50,76 @@ export class SupabaseService {
     }
   }
 
+  // Créer un hôtel avec un ID spécifique
+  static async createHotelWithId(id: string, name: string, email: string, hotelCode: string): Promise<Hotel | null> {
+    try {
+      const { data, error } = await supabase
+        .from('hotels')
+        .insert({ id, name, email, hotel_code: hotelCode })
+        .select('id, name, email, hotel_code, created_at, updated_at')
+        .single();
+      
+      if (error || !data) {
+        console.error('Erreur création hôtel avec ID:', error);
+        return null;
+      }
+      return data as Hotel;
+    } catch (err) {
+      console.error('Erreur createHotelWithId:', err);
+      return null;
+    }
+  }
+
+  // Mettre à jour l'ID d'un hôtel existant
+  static async updateHotelId(oldId: string, newId: string): Promise<Hotel | null> {
+    try {
+      // D'abord récupérer l'hôtel existant
+      const { data: existingHotel, error: fetchError } = await supabase
+        .from('hotels')
+        .select('*')
+        .eq('id', oldId)
+        .single();
+
+      if (fetchError || !existingHotel) {
+        console.error('Erreur récupération hôtel pour mise à jour ID:', fetchError);
+        return null;
+      }
+
+      // Créer un nouvel hôtel avec le nouvel ID
+      const { data: newHotel, error: createError } = await supabase
+        .from('hotels')
+        .insert({ 
+          id: newId,
+          name: existingHotel.name,
+          email: existingHotel.email,
+          hotel_code: existingHotel.hotel_code
+        })
+        .select('id, name, email, hotel_code, created_at, updated_at')
+        .single();
+
+      if (createError || !newHotel) {
+        console.error('Erreur création nouvel hôtel avec ID:', createError);
+        return null;
+      }
+
+      // Supprimer l'ancien hôtel
+      const { error: deleteError } = await supabase
+        .from('hotels')
+        .delete()
+        .eq('id', oldId);
+
+      if (deleteError) {
+        console.error('Erreur suppression ancien hôtel:', deleteError);
+        // Ne pas retourner null car le nouvel hôtel a été créé
+      }
+
+      return newHotel as Hotel;
+    } catch (err) {
+      console.error('Erreur updateHotelId:', err);
+      return null;
+    }
+  }
+
   static async getHotelByCode(hotelCode: string): Promise<Hotel | null> {
     try {
       const { data, error } = await supabase

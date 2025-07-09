@@ -11,11 +11,13 @@ export function TestNotificationButton({ hotelId }: TestNotificationButtonProps)
   const { addNotification } = useNotifications(hotelId);
 
   const handleTest = async () => {
+    console.log("🧪 Test notification avec hotelId:", hotelId);
+    
     if (!hotelId) {
       toast({
-        variant: "destructive",
+        variant: "destructive", 
         title: "Erreur",
-        description: "Aucun hôtel configuré"
+        description: "Aucun hôtel configuré pour les notifications"
       });
       return;
     }
