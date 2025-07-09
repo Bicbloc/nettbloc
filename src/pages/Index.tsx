@@ -462,6 +462,65 @@ const Index = () => {
       room.status !== 'maintenance'
     );
   };
+
+  // Fonction pour gérer la redistribution des chambres
+  const handleRedistribute = (method: RedistributionMethod) => {
+    console.log(`🔄 Redistribution via ${method}`);
+    
+    if (housekeeperNames.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Erreur de redistribution",
+        description: "Aucune femme de chambre disponible pour la redistribution."
+      });
+      return;
+    }
+
+    if (rooms.length === 0) {
+      toast({
+        variant: "destructive", 
+        title: "Erreur de redistribution",
+        description: "Aucune chambre disponible pour la redistribution."
+      });
+      return;
+    }
+
+    try {
+      const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
+      setRooms(redistributedRooms);
+      setIsDistributed(true);
+
+      const methodName = method === 'random' ? 'aléatoire' : 
+                        method === 'floor' ? 'par étage' : 'par type de nettoyage';
+      
+      const assignedCount = redistributedRooms.filter(r => 
+        r.assignedTo && r.cleaningType !== 'none' && r.status !== 'maintenance'
+      ).length;
+
+      toast({
+        title: "Redistribution terminée",
+        description: `${assignedCount} chambres redistribuées avec la méthode ${methodName}.`
+      });
+
+      // Ajouter une notification
+      if (currentHotelId && addNotification) {
+        addNotification({
+          type: 'assignment',
+          title: 'Redistribution des chambres',
+          description: `${assignedCount} chambres redistribuées (méthode: ${methodName})`,
+          user_type: 'admin'
+        });
+      }
+
+    } catch (error) {
+      console.error('Erreur lors de la redistribution:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de redistribution", 
+        description: "Une erreur s'est produite lors de la redistribution des chambres."
+      });
+    }
+  };
   
   const handleConfigChange = (newConfig: CleaningConfig) => {
     setCleaningConfig(newConfig);
@@ -1484,6 +1543,15 @@ const Index = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de redistribution */}
+      <RedistributionDialog
+        isOpen={isRedistributionDialogOpen}
+        onClose={() => setIsRedistributionDialogOpen(false)}
+        onRedistribute={handleRedistribute}
+        housekeeperCount={housekeeperNames.length}
+        roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
+      />
 
     </div>
   );
