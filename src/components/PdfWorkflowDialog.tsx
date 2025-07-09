@@ -16,6 +16,7 @@ import { HousekeeperSetupDialog } from "./HousekeeperSetupDialog";
 import { ManualAssignmentDialog } from "./ManualAssignmentDialog";
 import { HotelSessionService } from "@/services/hotelSessionService";
 import { Badge } from "@/components/ui/badge";
+import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers: string[]) => void;
@@ -128,7 +129,36 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
     }
     
     setIsHousekeeperDialogOpen(false);
-    setStep('distribution');
+    
+    // Après configuration des femmes de chambre, procéder automatiquement à la distribution
+    if (pdfData && configuredHousekeepers.length > 0) {
+      // Distribution automatique par étages
+      const roomAssignments = autoDistributeRooms(pdfData, configuredHousekeepers);
+      
+      if (roomAssignments) {
+        // Convertir les assignations en format Record<string, string> pour la base de données
+        const assignments: Record<string, string> = {};
+        Object.entries(roomAssignments).forEach(([housekeeper, rooms]) => {
+          rooms.forEach(room => {
+            assignments[room.number] = housekeeper;
+          });
+        });
+        
+        // Sauvegarder les assignations
+        await HotelSessionService.updateHousekeeperAssignments(assignments);
+        await HotelSessionService.markAsDistributed();
+        
+        // Terminer le workflow
+        onWorkflowComplete(pdfData, configuredHousekeepers);
+        setOpen(false);
+        resetDialog();
+        
+        toast({
+          title: "Configuration terminée",
+          description: `Les ${pdfData.length} chambres ont été automatiquement distribuées entre ${configuredHousekeepers.length} femme(s) de chambre.`,
+        });
+      }
+    }
   };
 
   const handleDistributionComplete = (housekeeperName: string, rooms: Room[]) => {
@@ -325,6 +355,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         onClose={() => setIsHousekeeperDialogOpen(false)}
         onHousekeepersConfirmed={handleHousekeepersConfigured}
         initialHousekeepers={housekeepers}
+        roomCount={pdfData?.length || 0}
       />
 
       {pdfData && (
