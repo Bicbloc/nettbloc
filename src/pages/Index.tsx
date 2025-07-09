@@ -690,10 +690,15 @@ const Index = () => {
       description: `Chambre ${roomNumber} assignée à ${housekeeperName}.`
     });
 
-    // Créer une notification pour l'assignation
-    const storedHotelId = localStorage.getItem("hotelId");
-    const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
+    // Test de création de notification avec l'hotel ID valide
     const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
+    
+    console.log('🧪 Test notification - Hotel ID:', {
+      currentHotelId,
+      isValid: currentHotelId && isValidUUID(currentHotelId),
+      selectedHotel: selectedHotel?.id,
+      stored: { storedSelectedHotelId, storedHotelId }
+    });
     
     if (currentHotelId && isValidUUID(currentHotelId)) {
       console.log('✅ Création notification assignation pour hotel:', currentHotelId);
@@ -707,6 +712,11 @@ const Index = () => {
       });
     } else {
       console.warn('❌ Hotel ID invalide pour notification:', currentHotelId);
+      toast({
+        variant: "destructive",
+        title: "Erreur notification",
+        description: "ID hôtel non valide - vérifiez la configuration"
+      });
     }
   };
   
@@ -995,6 +1005,31 @@ const Index = () => {
                     housekeeperNames={housekeeperNames}
                     onHousekeeperNamesChange={handleHousekeeperNamesChange}
                   />
+                  <Button 
+                    onClick={() => {
+                      // Test notification
+                      const currentHotelId = selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId");
+                      if (currentHotelId && isValidUUID(currentHotelId)) {
+                        addNotification({
+                          title: "Test notification",
+                          description: "Ceci est un test de notification système",
+                          type: 'assignment',
+                          user_type: 'admin'
+                        });
+                        toast({ title: "Test envoyé", description: "Notification de test créée" });
+                      } else {
+                        toast({ 
+                          variant: "destructive", 
+                          title: "Erreur", 
+                          description: "Aucun hôtel configuré pour les notifications" 
+                        });
+                      }
+                    }}
+                    className="w-full mb-2"
+                    variant="outline"
+                  >
+                    🧪 Tester les notifications
+                  </Button>
                   <Button 
                     onClick={handleDistributeWithValidation}
                     className="w-full"
