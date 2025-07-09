@@ -81,6 +81,12 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
     try {
       setIsUploading(true);
       
+      // Initialiser ou récupérer la session avant tout traitement
+      const sessionToken = await HotelSessionService.initializeSession();
+      if (!sessionToken) {
+        throw new Error("Impossible de créer une session");
+      }
+      
       // Traiter le PDF
       const data = await processPdf(selectedFile);
       setPdfData(data);
@@ -104,8 +110,23 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
     }
   };
 
-  const handleHousekeepersConfigured = (configuredHousekeepers: string[]) => {
+  const handleHousekeepersConfigured = async (configuredHousekeepers: string[]) => {
     setHousekeepers(configuredHousekeepers);
+    
+    // Sauvegarder les noms des femmes de chambre dans la session
+    try {
+      await HotelSessionService.updateHousekeeperNames(configuredHousekeepers);
+      console.log('Noms des femmes de chambre sauvegardés:', configuredHousekeepers);
+    } catch (error) {
+      console.error('Erreur sauvegarde noms femmes de chambre:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de sauvegarde",
+        description: "Impossible de sauvegarder les noms des femmes de chambre.",
+      });
+      return;
+    }
+    
     setIsHousekeeperDialogOpen(false);
     setStep('distribution');
   };
