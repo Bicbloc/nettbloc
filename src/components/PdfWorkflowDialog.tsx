@@ -162,9 +162,15 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   };
 
   const handleDistributionComplete = (housekeeperName: string, rooms: Room[]) => {
-    // This function is called when rooms are assigned in the distribution dialog
-    // We don't need to do anything specific here since the assignment is handled
-    // by the parent component through the workflow completion
+    // Fermer le dialogue de distribution et terminer le workflow
+    setIsDistributionDialogOpen(false);
+    onWorkflowComplete(pdfData, housekeepers);
+    setOpen(false);
+    resetDialog();
+    toast({
+      title: "Distribution terminée",
+      description: "Les chambres ont été distribuées avec succès.",
+    });
   };
 
   const handleWorkflowComplete = () => {
@@ -344,7 +350,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
             Importer un Rapport
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
           {step === 'upload' && renderUploadStep()}
           {step === 'housekeepers' && renderHousekeepersStep()}
         </DialogContent>
