@@ -1147,35 +1147,42 @@ const Index = () => {
               </Card>
             ) : (
               <div className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {housekeeperNames.map((name) => {
-                    const housekeeperRooms = getHousekeeperRooms(name);
-                    return (
-                      <div key={name} className="w-full">
-                        <HousekeeperCard
-                          name={name}
-                          rooms={housekeeperRooms}
-                          cleaningConfig={cleaningConfig}
-                          onGenerateReport={handleGenerateReport}
-                          onRoomUpdate={handleRoomUpdate}
-                          onRoomUnassign={handleRoomUnassign}
-                          availableFloors={availableFloors}
-                          onFloorPreferenceChange={handleFloorPreferenceChange}
-                          preferredFloors={housekeeperFloorPreferences[name] || []}
-                          onDelete={handleDeleteHousekeeper}
-                          maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
-                          onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
-                          onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
-                          accessCode={housekeeperAccessCodes[name] || ''}
-                        />
-                      </div>
-                    );
-                  })}
+                <div className="space-y-6">
+                  {/* Chambres non assignées en haut - toujours visible */}
                   <div className="w-full">
                     <UnassignedRoomsColumn
                       rooms={getUnassignedRooms()}
                       onRoomUpdate={handleRoomUpdate}
+                      allRooms={rooms}
+                      forceHide={false}
                     />
+                  </div>
+                  
+                  {/* Grid responsive pour les femmes de chambres */}
+                  <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {housekeeperNames.map((name) => {
+                      const housekeeperRooms = getHousekeeperRooms(name);
+                      return (
+                        <div key={name} className="min-w-0">
+                          <HousekeeperCard
+                            name={name}
+                            rooms={housekeeperRooms}
+                            cleaningConfig={cleaningConfig}
+                            onGenerateReport={handleGenerateReport}
+                            onRoomUpdate={handleRoomUpdate}
+                            onRoomUnassign={handleRoomUnassign}
+                            availableFloors={availableFloors}
+                            onFloorPreferenceChange={handleFloorPreferenceChange}
+                            preferredFloors={housekeeperFloorPreferences[name] || []}
+                            onDelete={handleDeleteHousekeeper}
+                            maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
+                            onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
+                            onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
+                            accessCode={housekeeperAccessCodes[name] || ''}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

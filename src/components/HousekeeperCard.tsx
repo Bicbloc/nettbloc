@@ -612,12 +612,12 @@ export function HousekeeperCard({
                           <div className="text-xs font-semibold mb-1">
                             Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {sortRoomsByNumber(floorRooms).map(room => (
-                              <div 
-                                key={`unassigned-${room.number}`} 
-                                className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                                onClick={() => handleAssignRoom(room)}
+                           <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
+                             {sortRoomsByNumber(floorRooms).map(room => (
+                               <div 
+                                 key={`unassigned-${room.number}`} 
+                                 className="min-w-0 cursor-pointer hover:bg-gray-100 rounded p-1"
+                                 onClick={() => handleAssignRoom(room)}
                                 title="Cliquer pour assigner à cette personne"
                               >
                                 <RoomCard 
@@ -656,25 +656,23 @@ export function HousekeeperCard({
                       <div className="text-xs font-semibold mb-1">
                         Étage {floor === '0' ? 'RDC' : floor} ({floorRooms.length})
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {sortRoomsByNumber(floorRooms).map(room => (
-                          <div 
-                            key={room.number} 
-                            className="cursor-pointer hover:bg-gray-100 rounded p-1"
-                            onClick={() => handleUnassignRoom(room)}
-                            title="Cliquer pour retirer l'assignation"
-                          >
-                            <RoomCard 
-                              room={room} 
-                              onUpdate={onRoomUpdate} 
-                              compact 
-                              draggable={draggable}
-                              onUnassign={() => handleUnassignRoom(room)}
-                              showActions={true}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
+                         {sortRoomsByNumber(floorRooms).map(room => (
+                           <div 
+                             key={room.number} 
+                             className="min-w-0"
+                           >
+                             <RoomCard 
+                               room={room} 
+                               onUpdate={onRoomUpdate} 
+                               compact 
+                               draggable={draggable}
+                               onUnassign={() => handleUnassignRoom(room)}
+                               showActions={true}
+                             />
+                           </div>
+                         ))}
+                       </div>
                     </div>
                   ))}
                 </div>
