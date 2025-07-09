@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { processPdf } from "@/services/pdfService";
+import { processPdf, Room } from "@/services/pdfService";
 import { FileUp, Users, ArrowRight, CheckCircle } from "lucide-react";
 import { HousekeeperSetupDialog } from "./HousekeeperSetupDialog";
 import { ManualAssignmentDialog } from "./ManualAssignmentDialog";
@@ -110,7 +110,13 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
     setStep('distribution');
   };
 
-  const handleDistributionComplete = () => {
+  const handleDistributionComplete = (housekeeperName: string, rooms: Room[]) => {
+    // This function is called when rooms are assigned in the distribution dialog
+    // We don't need to do anything specific here since the assignment is handled
+    // by the parent component through the workflow completion
+  };
+
+  const handleWorkflowComplete = () => {
     setIsDistributionDialogOpen(false);
     onWorkflowComplete(pdfData, housekeepers);
     setOpen(false);
@@ -266,6 +272,13 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         >
           Distribuer les chambres
           <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+        <Button
+          onClick={handleWorkflowComplete}
+          disabled={housekeepers.length === 0}
+          variant="outline"
+        >
+          Terminer sans distribution
         </Button>
       </DialogFooter>
     </>
