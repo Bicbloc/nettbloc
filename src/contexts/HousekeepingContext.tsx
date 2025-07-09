@@ -52,11 +52,55 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         }
       } catch (error) {
         console.error('Erreur initialisation session:', error);
+        setIsInitialized(true);
       }
     };
 
     initializeSession();
   }, []);
+
+  // Synchronisation en temps réel - vérifier les changements toutes les 5 secondes
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const session = await HotelSessionService.getSession();
+        if (session) {
+          // Mettre à jour les données si elles ont changé
+          setHousekeeperNames(prev => {
+            const newNames = session.housekeeper_names || [];
+            return JSON.stringify(prev) !== JSON.stringify(newNames) ? newNames : prev;
+          });
+          
+          setRooms(prev => {
+            const newRooms = session.room_data || [];
+            return JSON.stringify(prev) !== JSON.stringify(newRooms) ? newRooms : prev;
+          });
+          
+          setIsDistributed(prev => {
+            const newDistributed = session.is_distributed || false;
+            return prev !== newDistributed ? newDistributed : prev;
+          });
+
+          // Générer des codes d'accès pour les nouvelles femmes de chambre
+          setHousekeeperAccessCodes(prev => {
+            const newCodes = { ...prev };
+            (session.housekeeper_names || []).forEach((name, index) => {
+              if (!newCodes[name]) {
+                newCodes[name] = String(1000 + index).slice(-4);
+              }
+            });
+            return newCodes;
+          });
+        }
+      } catch (error) {
+        console.error('Erreur synchronisation:', error);
+      }
+    }, 5000); // Vérifier toutes les 5 secondes
+
+    return () => clearInterval(interval);
+  }, [isInitialized]);
 
   // Charger les données de la session
   const loadSessionData = async () => {
@@ -66,11 +110,20 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         setHousekeeperNames(session.housekeeper_names || []);
         setRooms(session.room_data || []);
         setIsDistributed(session.is_distributed || false);
+        
+        // Générer des codes d'accès pour les femmes de chambre
+        const codes: Record<string, string> = {};
+        (session.housekeeper_names || []).forEach((name, index) => {
+          codes[name] = String(1000 + index).slice(-4);
+        });
+        setHousekeeperAccessCodes(codes);
+        
         setIsInitialized(true);
         console.log('Données de session chargées:', {
           housekeepers: session.housekeeper_names?.length || 0,
           rooms: session.room_data?.length || 0,
-          distributed: session.is_distributed
+          distributed: session.is_distributed,
+          codes: Object.keys(codes).length
         });
       }
     } catch (error) {

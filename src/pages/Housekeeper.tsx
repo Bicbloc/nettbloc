@@ -25,22 +25,32 @@ export default function Housekeeper() {
 
   // Vérifier les paramètres URL ou localStorage pour auto-connexion
   useEffect(() => {
-    const nameFromUrl = searchParams.get('name');
     const codeFromUrl = searchParams.get('code');
     const savedName = localStorage.getItem('currentHousekeeper');
     const savedCode = localStorage.getItem('currentAccessCode');
 
-    if (nameFromUrl && codeFromUrl) {
-      // Vérifier que le code correspond bien
-      if (housekeeperAccessCodes[nameFromUrl] === codeFromUrl) {
-        setSelectedHousekeeper(nameFromUrl);
+    if (codeFromUrl) {
+      // Trouver la femme de chambre correspondant au code
+      const matchingHousekeeper = Object.entries(housekeeperAccessCodes).find(
+        ([name, code]) => code === codeFromUrl
+      );
+      
+      if (matchingHousekeeper) {
+        const [housekeeperName] = matchingHousekeeper;
+        setSelectedHousekeeper(housekeeperName);
         setAccessCode(codeFromUrl);
         setIsLoggedIn(true);
         
+        // Sauvegarder la connexion
+        localStorage.setItem('currentHousekeeper', housekeeperName);
+        localStorage.setItem('currentAccessCode', codeFromUrl);
+        
         toast({
           title: "Connexion automatique",
-          description: `Bienvenue ${nameFromUrl} !`
+          description: `Bienvenue ${housekeeperName} !`
         });
+      } else {
+        console.log('Code non trouvé:', codeFromUrl, 'Codes disponibles:', Object.values(housekeeperAccessCodes));
       }
     } else if (savedName && savedCode && housekeeperAccessCodes[savedName] === savedCode) {
       setSelectedHousekeeper(savedName);

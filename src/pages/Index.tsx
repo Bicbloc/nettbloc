@@ -1260,7 +1260,7 @@ const Index = () => {
                             </div>
                             <div className="text-center">
                               <Button
-                                onClick={() => navigate(`/housekeeper?code=${accessCode}`)}
+                                onClick={() => window.open(`/housekeeper?code=${accessCode}`, '_blank')}
                                 className="w-full"
                                 size="sm"
                               >
