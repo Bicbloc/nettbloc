@@ -18,7 +18,7 @@ export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
   const [filterFloor, setFilterFloor] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCleaningType, setFilterCleaningType] = useState('all');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('asc');
 
   const availableFloors = getAvailableFloors(rooms);
 
@@ -49,21 +49,19 @@ export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
       filtered = filtered.filter(room => room.cleaningType === filterCleaningType);
     }
 
-    // Tri
-    if (sortOrder !== 'none') {
-      filtered.sort((a, b) => {
-        const comparison = parseInt(a.number) - parseInt(b.number);
-        return sortOrder === 'asc' ? comparison : -comparison;
-      });
-    }
+    // Tri par défaut par numéro de chambre (croissant)
+    filtered.sort((a, b) => {
+      const comparison = parseInt(a.number) - parseInt(b.number);
+      return sortOrder === 'asc' ? comparison : sortOrder === 'desc' ? -comparison : comparison;
+    });
 
     onFiltersChange(filtered);
   }, [rooms, searchTerm, filterFloor, filterStatus, filterCleaningType, sortOrder, onFiltersChange]);
 
   const handleSortToggle = () => {
-    if (sortOrder === 'none') setSortOrder('asc');
-    else if (sortOrder === 'asc') setSortOrder('desc');
-    else setSortOrder('none');
+    if (sortOrder === 'asc') setSortOrder('desc');
+    else if (sortOrder === 'desc') setSortOrder('asc');
+    else setSortOrder('asc');
   };
 
   return (
@@ -131,14 +129,12 @@ export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
           variant="outline"
           className="w-full justify-start"
           onClick={handleSortToggle}
-        >
-          {sortOrder === 'none' && <ArrowUpDown className="h-4 w-4 mr-2" />}
-          {sortOrder === 'asc' && <ArrowUp className="h-4 w-4 mr-2" />}
-          {sortOrder === 'desc' && <ArrowDown className="h-4 w-4 mr-2" />}
-          {sortOrder === 'none' && 'Aucun tri'}
-          {sortOrder === 'asc' && 'Croissant'}
-          {sortOrder === 'desc' && 'Décroissant'}
-        </Button>
+          >
+            {sortOrder === 'asc' && <ArrowUp className="h-4 w-4 mr-2" />}
+            {sortOrder === 'desc' && <ArrowDown className="h-4 w-4 mr-2" />}
+            {sortOrder === 'asc' && 'Croissant'}
+            {sortOrder === 'desc' && 'Décroissant'}
+          </Button>
       </div>
     </div>
   );

@@ -28,10 +28,12 @@ export default function Housekeeper() {
   const [housekeeperRooms, setHousekeeperRooms] = useState<Room[]>([]);
   const [hotelId, setHotelId] = useState<string | null>(null);
   const [hotelInfo, setHotelInfo] = useState<{ name: string; code: string } | null>(null);
-  const { addNotification, notifications, hasUnread } = useNotifications(hotelId || undefined);
   const [isActionLogOpen, setIsActionLogOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'number' | 'status' | 'type'>('number');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Initialiser les notifications avec l'ID de l'hôtel
+  const { addNotification, notifications, hasUnread } = useNotifications(hotelId || undefined);
   
 
   // Vérifier les paramètres URL ou localStorage pour auto-connexion
@@ -70,6 +72,20 @@ export default function Housekeeper() {
     }
   }, [searchParams, housekeeperAccessCodes]);
 
+  // Récupérer l'hotelId depuis le contexte ou localStorage
+  useEffect(() => {
+    const savedHotelId = localStorage.getItem('selectedHotelId');
+    const savedHotelCode = localStorage.getItem('selectedHotelCode');
+    const savedHotelName = localStorage.getItem('selectedHotelName');
+    
+    if (savedHotelId) {
+      setHotelId(savedHotelId);
+    }
+    
+    if (savedHotelCode && savedHotelName) {
+      setHotelInfo({ code: savedHotelCode, name: savedHotelName });
+    }
+  }, []);
   // Mettre à jour les chambres de la femme de chambre quand les données changent
   useEffect(() => {
     if (selectedHousekeeper && isLoggedIn) {
