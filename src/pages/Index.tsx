@@ -4,7 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { UploadDialog } from "@/components/UploadDialog";
+import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
+import { ActiveUsersPanel } from "@/components/ActiveUsersPanel";
+import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { ConfigDialog } from "@/components/ConfigDialog";
 import { Room, CleaningConfig, defaultCleaningConfig } from "@/services/pdfService";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,7 @@ import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase"
 
 const Index = () => {
   const navigate = useNavigate();
+  useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState("overview");
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
   const { 
@@ -897,7 +900,7 @@ const Index = () => {
               </Card>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-3">
               <Card>
                 <CardHeader>
                   <CardTitle>Actions rapides</CardTitle>
@@ -906,7 +909,13 @@ const Index = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <UploadDialog onPdfProcessed={handlePdfProcessed} />
+                  <PdfWorkflowDialog 
+                    onWorkflowComplete={(data, housekeepers) => {
+                      handlePdfProcessed(data);
+                      setHousekeeperNames(housekeepers);
+                    }}
+                    currentHousekeepers={housekeeperNames}
+                  />
                   <ConfigDialog 
                     config={cleaningConfig} 
                     onConfigChange={handleConfigChange}
@@ -961,6 +970,8 @@ const Index = () => {
                   </div>
                 </CardContent>
               </Card>
+              
+              <ActiveUsersPanel />
             </div>
           </TabsContent>
 
@@ -968,7 +979,13 @@ const Index = () => {
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Gestion des chambres</h2>
               <div className="flex gap-2">
-                <UploadDialog onPdfProcessed={handlePdfProcessed} />
+                <PdfWorkflowDialog 
+                  onWorkflowComplete={(data, housekeepers) => {
+                    handlePdfProcessed(data);
+                    setHousekeeperNames(housekeepers);
+                  }}
+                  currentHousekeepers={housekeeperNames}
+                />
                 <Button
                   onClick={() => openManualAssignment()}
                   variant="outline"
@@ -988,7 +1005,13 @@ const Index = () => {
                   <p className="text-muted-foreground text-center mb-4">
                     Importez un fichier PDF pour commencer à gérer vos chambres
                   </p>
-                  <UploadDialog onPdfProcessed={handlePdfProcessed} />
+                  <PdfWorkflowDialog 
+                    onWorkflowComplete={(data, housekeepers) => {
+                      handlePdfProcessed(data);
+                      setHousekeeperNames(housekeepers);
+                    }}
+                    currentHousekeepers={housekeeperNames}
+                  />
                 </CardContent>
               </Card>
             ) : (

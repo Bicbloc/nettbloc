@@ -124,12 +124,62 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string
+          hotel_id: string | null
+          id: string
+          is_active: boolean
+          last_activity: string
+          login_time: string
+          session_token: string | null
+          user_id: string | null
+          user_name: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_activity?: string
+          login_time?: string
+          session_token?: string | null
+          user_id?: string | null
+          user_name: string
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_activity?: string
+          login_time?: string
+          session_token?: string | null
+          user_id?: string | null
+          user_name?: string
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_inactive_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
