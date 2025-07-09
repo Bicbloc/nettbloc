@@ -104,19 +104,12 @@ export const useNotifications = (hotelId?: string) => {
           setNotifications(prev => [newNotification, ...prev].slice(0, 50));
           setHasUnread(true);
 
-          // Toast avec son
+          // Toast avec animation
           toast({
             title: newNotification.title,
             description: newNotification.description,
-            className: "animate-fade-in",
+            className: "animate-fade-in border-primary/20",
           });
-
-          // Son de notification
-          try {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+H230kODFKs5fKudh8ELnvA7s2AKwgZdM7w4I48BRpjtf3K');
-            audio.volume = 0.3;
-            audio.play().catch(() => {});
-          } catch (e) {}
         }
       )
       .subscribe((status) => {

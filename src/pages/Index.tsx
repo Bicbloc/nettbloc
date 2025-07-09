@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import EmailReportDialog from "@/components/EmailReportDialog";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
+import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -42,6 +43,7 @@ import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
+import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -97,7 +99,6 @@ const Index = () => {
   const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
   
   // Prioriser selectedHotel?.id, puis selectedHotelId, puis hotelId
-  const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
   
   console.log("🏨 Hotel ID pour notifications:", {
     selectedHotel: selectedHotel?.id,
@@ -106,7 +107,6 @@ const Index = () => {
     currentHotelId
   });
   
-  // Notifications pour l'admin - seulement si on a un UUID valide
   const { addNotification } = useNotifications(
     currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined
   );
@@ -512,55 +512,41 @@ const Index = () => {
     }
   };
   
-  const doRedistribution = async () => {
-    console.log("Début redistribution, rooms:", rooms.length, "housekeepers:", housekeeperNames.length);
+  // Nouvelle fonction de redistribution avec méthode
+  const handleRedistributeWithMethod = (method: RedistributionMethod) => {
+    console.log(`🔄 Redistribution avec méthode: ${method}`);
     
-    // Générer des codes d'accès simples pour chaque femme de chambre
-    const accessCodes: Record<string, string> = {};
-    for (const name of housekeeperNames) {
-      accessCodes[name] = Math.floor(1000 + Math.random() * 9000).toString();
-    }
-    
-    // Sauvegarder les codes dans le contexte
-    console.log("Codes d'accès générés:", accessCodes);
-    setHousekeeperAccessCodes(accessCodes);
-    
-    // Créer ou mettre à jour les femmes de chambre dans Supabase
-    try {
-      const selectedHotelData = selectedHotel || {
-        id: localStorage.getItem('selectedHotelId') || hotelCode,
-        name: hotelCode,
-        hotel_code: hotelCode
-      };
-      
-      if (selectedHotelData.id) {
-        for (const name of housekeeperNames) {
-          await SupabaseService.createOrUpdateHousekeeper(
-            name,
-            accessCodes[name],
-            selectedHotelData.id
-          );
-        }
-        console.log("Femmes de chambre mises à jour dans Supabase");
-      }
-    } catch (error) {
-      console.error("Erreur lors de la création des femmes de chambre:", error);
-    }
-    
-    // Effectuer la distribution automatique
-    distributeRooms(rooms, housekeeperNames, housekeeperFloorPreferences, housekeeperMaxRoomsOverrides);
-    
-    // Mettre à jour l'état de distribution
+    const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
+    setRooms(redistributedRooms);
     setIsDistributed(true);
-    console.log("Distribution terminée, isDistributed mis à true");
     
-    // Changer d'onglet vers la distribution
-    setActiveTab("distribution");
+    // Statistiques de distribution
+    const stats = getDistributionStats(redistributedRooms, housekeeperNames);
+    
+    let methodName = '';
+    switch (method) {
+      case 'random': methodName = 'aléatoire'; break;
+      case 'floor': methodName = 'par étage'; break;
+      case 'cleaning-type': methodName = 'par type de nettoyage'; break;
+    }
     
     toast({
-      title: "Distribution terminée",
-      description: `Les chambres ont été automatiquement réparties entre ${housekeeperNames.length} femme(s) de chambre.`
+      title: `Redistribution ${methodName} terminée`,
+      description: `${redistributedRooms.filter(r => r.assignedTo).length} chambres redistribuées entre ${housekeeperNames.length} femmes de chambre`,
     });
+    
+    // Notification de redistribution
+    const currentHotelId = selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId");
+    if (currentHotelId && isValidUUID(currentHotelId)) {
+      addNotification({
+        title: "Redistribution effectuée",
+        description: `Admin - Redistribution ${methodName} de ${redistributedRooms.filter(r => r.assignedTo).length} chambres`,
+        type: 'assignment',
+        user_type: 'admin'
+      });
+    }
+    
+    console.log('📊 Statistiques de distribution:', stats);
   };
   
   const handleDistributeWithValidation = async () => {
@@ -623,7 +609,7 @@ const Index = () => {
       
       console.log("Début redistribution avec hôtel:", hotel);
       setSelectedHotel(hotel);
-      await doRedistribution();
+      await handleRedistributeWithMethod('random');
     } catch (error) {
       console.error("Erreur lors de la création/récupération de l'hôtel:", error);
       toast({
@@ -647,7 +633,7 @@ const Index = () => {
     
     // Maintenant on peut faire la redistribution
     setTimeout(() => {
-      doRedistribution();
+      handleRedistributeWithMethod('random');
     }, 500);
   };
   
@@ -1209,8 +1195,9 @@ const Index = () => {
                   }}
                 />
                 <Button
-                  onClick={handleDistributeWithValidation}
+                  onClick={() => setIsRedistributionDialogOpen(true)}
                   disabled={housekeeperNames.length === 0 || rooms.length === 0}
+                  className="hover-scale"
                 >
                   <Calendar className="mr-2 h-4 w-4" />
                   Redistribuer
