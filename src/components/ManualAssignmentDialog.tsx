@@ -242,16 +242,17 @@ export function ManualAssignmentDialog({
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[95vw] md:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-[98vw] max-h-[95vh] overflow-hidden w-[98vw] mx-auto">
+        <DialogHeader className="pb-2">
           <DialogTitle>Assigner manuellement des chambres</DialogTitle>
           <DialogDescription>
             Sélectionnez les chambres et assignez-les à une femme de chambre
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid grid-cols-12 gap-4">
-          {/* Filters */}
+        <div className="flex flex-col gap-3 h-full max-h-[calc(95vh-120px)] overflow-hidden">
+          {/* Filters - Responsive */}
+          <div className="flex-shrink-0">
             <FilterControls 
               rooms={rooms}
               searchTerm={searchTerm}
@@ -277,27 +278,34 @@ export function ManualAssignmentDialog({
               toggleFloor={toggleFloor}
             />
           
-          {/* Room Selection */}
-          <div className="col-span-7">
-            <RoomSelection
-              title="Chambres disponibles"
-              rooms={filteredRooms}
-              onSelect={handleRoomSelect}
-              isSelected={(room) => selectedRooms.some(r => r.number === room.number)}
-              emptyMessage="Aucune chambre ne correspond aux critères de recherche"
-            />
           </div>
           
-          {/* Assignment Section */}
-          <AssignmentSection
-            housekeeperNames={housekeeperNames}
-            selectedHousekeeper={selectedHousekeeper}
-            setSelectedHousekeeper={setSelectedHousekeeper}
-            selectedRooms={selectedRooms}
-            onRoomSelect={handleRoomSelect}
-            onAssign={handleAssign}
-            onClose={onClose}
-          />
+          {/* Main Content - Responsive Grid */}
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden min-h-0">
+            {/* Room Selection - Takes more space on large screens */}
+            <div className="lg:col-span-2 min-h-0">
+              <RoomSelection
+                title="Chambres disponibles"
+                rooms={filteredRooms}
+                onSelect={handleRoomSelect}
+                isSelected={(room) => selectedRooms.some(r => r.number === room.number)}
+                emptyMessage="Aucune chambre ne correspond aux critères de recherche"
+              />
+            </div>
+            
+            {/* Assignment Section - Adaptive size */}
+            <div className="lg:col-span-1 min-h-0">
+              <AssignmentSection
+                housekeeperNames={housekeeperNames}
+                selectedHousekeeper={selectedHousekeeper}
+                setSelectedHousekeeper={setSelectedHousekeeper}
+                selectedRooms={selectedRooms}
+                onRoomSelect={handleRoomSelect}
+                onAssign={handleAssign}
+                onClose={onClose}
+              />
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -116,15 +116,27 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         let sessionHotelId = session.hotel_id;
         const savedHotelCode = localStorage.getItem('selectedHotelCode');
         
-        // Si pas d'hotelId dans la session, essayer de le récupérer depuis les données utilisateur
+        // Si pas d'hotelId dans la session, récupérer depuis selectedHotel
         if (!sessionHotelId) {
-          if (savedHotelCode) {
-            // TODO: Récupérer l'hotel_id depuis le code
-            console.log('Recherche hotel_id pour le code:', savedHotelCode);
+          const selectedHotelData = localStorage.getItem('selectedHotel');
+          if (selectedHotelData) {
+            try {
+              const hotelData = JSON.parse(selectedHotelData);
+              sessionHotelId = hotelData.id;
+              console.log('Hotel ID récupéré depuis localStorage:', sessionHotelId);
+            } catch (error) {
+              console.error('Erreur parsing selectedHotel:', error);
+            }
           }
         }
         
-        setHotelId(sessionHotelId);
+        // Assurer qu'on a un hotelId valide
+        if (sessionHotelId) {
+          setHotelId(sessionHotelId);
+          console.log('✅ Hotel ID défini pour les notifications:', sessionHotelId);
+        } else {
+          console.warn('⚠️ Impossible de définir hotelId pour les notifications');
+        }
         
         // Générer des codes d'accès sécurisés pour les femmes de chambre
         const codes: Record<string, string> = {};

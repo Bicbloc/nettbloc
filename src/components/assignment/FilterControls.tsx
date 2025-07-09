@@ -61,9 +61,9 @@ export function FilterControls({
   const availableFloors = getAvailableFloors(rooms);
   
   return (
-    <>
-      {/* Search and Filters */}
-      <div className="col-span-12 grid grid-cols-6 gap-2 mb-2">
+    <div className="space-y-3">
+      {/* Search and Filters - Responsive Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2">
         <div>
           <Label htmlFor="search">Recherche</Label>
           <Input
@@ -141,19 +141,19 @@ export function FilterControls({
           </Button>
         </div>
         
-        <div className="flex gap-1 items-end">
-          <Button variant="outline" className="flex-1 text-xs px-2" onClick={onSelectAll}>
+        <div className="grid grid-cols-2 gap-1">
+          <Button variant="outline" className="text-xs px-2" onClick={onSelectAll}>
             Tout
           </Button>
-          <Button variant="outline" className="flex-1 text-xs px-2" onClick={onClearSelection}>
+          <Button variant="outline" className="text-xs px-2" onClick={onClearSelection}>
             Rien
           </Button>
         </div>
       </div>
       
       {/* Options additionnelles */}
-      <div className="col-span-12 mb-2">
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex items-center gap-2">
             <Checkbox 
               id="exclude-twin" 
@@ -197,6 +197,7 @@ export function FilterControls({
             variant="secondary" 
             size="sm" 
             onClick={onDistributeRooms}
+            className="shrink-0"
           >
             Distribuer équitablement
           </Button>
@@ -204,8 +205,8 @@ export function FilterControls({
       </div>
       
       {/* Sélection des étages */}
-      <div className="col-span-12 mb-2">
-        <Label className="mb-2 block">Sélectionner des étages spécifiques (sélectionne automatiquement toutes les chambres de l'étage)</Label>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Sélectionner des étages spécifiques (sélectionne automatiquement toutes les chambres de l'étage)</Label>
         <div className="flex flex-wrap gap-2">
           {availableFloors.map(floor => (
             <Badge
@@ -217,12 +218,12 @@ export function FilterControls({
             </Badge>
           ))}
         </div>
-        <div className="text-xs text-gray-500 mt-1">
+        <div className="text-xs text-muted-foreground">
           {selectedFloors.length > 0 ? 
             `${selectedFloors.length} étage(s) sélectionné(s)` : 
             "Aucun étage sélectionné - toutes les chambres seront affichées"}
         </div>
       </div>
-    </>
+    </div>
   );
 }
