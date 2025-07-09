@@ -33,6 +33,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import EmailReportDialog from "@/components/EmailReportDialog";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
+import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationPanel } from "@/components/NotificationPanel";
@@ -60,6 +61,12 @@ const Index = () => {
   } = useHousekeeping();
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
+
+  // Fonction utilitaire pour valider les UUIDs
+  const isValidUUID = (uuid: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  };
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
@@ -86,14 +93,24 @@ const Index = () => {
   const [isActionLogOpen, setIsActionLogOpen] = useState(false);
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   
-  // Récupérer l'ID de l'hôtel depuis localStorage si selectedHotel n'est pas disponible
+  // Récupérer et valider l'ID de l'hôtel depuis localStorage
   const storedHotelId = localStorage.getItem("hotelId");
-  const currentHotelId = selectedHotel?.id || storedHotelId;
+  const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
   
-  console.log("🏨 Hotel ID pour notifications:", currentHotelId, "selectedHotel:", selectedHotel);
+  // Prioriser selectedHotel?.id, puis selectedHotelId, puis hotelId
+  const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
   
-  // Notifications pour l'admin
-  const { notifications, hasUnread, addNotification, markAsRead, markAllAsRead, clearNotifications } = useNotifications(currentHotelId);
+  console.log("🏨 Hotel ID pour notifications:", {
+    selectedHotel: selectedHotel?.id,
+    storedSelectedHotelId,
+    storedHotelId,
+    currentHotelId
+  });
+  
+  // Notifications pour l'admin - seulement si on a un UUID valide
+  const { notifications, hasUnread, addNotification, markAsRead, markAllAsRead, clearNotifications } = useNotifications(
+    currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined
+  );
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
@@ -675,7 +692,11 @@ const Index = () => {
     });
 
     // Créer une notification pour l'assignation
-    if (currentHotelId) {
+    const storedHotelId = localStorage.getItem("hotelId");
+    const storedSelectedHotelId = localStorage.getItem("selectedHotelId");
+    const currentHotelId = selectedHotel?.id || storedSelectedHotelId || storedHotelId;
+    
+    if (currentHotelId && isValidUUID(currentHotelId)) {
       addNotification({
         title: `Assignation chambre ${roomNumber}`,
         description: `Admin - CH ${roomNumber} assignée à ${housekeeperName}`,
@@ -1145,6 +1166,11 @@ const Index = () => {
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Distribution des chambres</h2>
               <div className="flex gap-2">
+                <QuickAddHousekeeperButton 
+                  onAddHousekeeper={(name) => {
+                    setHousekeeperNames([...housekeeperNames, name]);
+                  }}
+                />
                 <Button
                   onClick={handleDistributeWithValidation}
                   disabled={housekeeperNames.length === 0 || rooms.length === 0}
