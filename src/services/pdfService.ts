@@ -80,52 +80,99 @@ export async function processPdf(file: File): Promise<Room[]> {
   }
 }
 
-// Analyse le texte pour extraire les informations des chambres - Nouvelle version avec règles ultra-précises
+// Analyse le texte pour extraire les informations des chambres - Version hybride avec logs ultra-détaillés
 function parseRoomsFromText(text: string): Room[] {
   const rooms: Room[] = [];
   
-  // Découper le texte ligne par ligne pour une analyse précise
-  const lines = text.split(/[\n\r]+/);
-  console.log(`📄 Total de lignes à analyser: ${lines.length}`);
+  console.log(`📄 TEXTE COMPLET DU PDF:`, text.substring(0, 1000) + "...");
   
+  // Diviser le texte en sections plus intelligemment
+  // D'abord essayer ligne par ligne, puis par blocs si ça ne marche pas
+  const lines = text.split(/[\n\r]+/).filter(line => line.trim().length > 0);
+  console.log(`📋 Lignes trouvées: ${lines.length}`);
+  lines.forEach((line, i) => {
+    console.log(`Ligne ${i}: "${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`);
+  });
+  
+  // Si peu de lignes, le PDF a peut-être tout mis sur une seule ligne
+  if (lines.length < 10) {
+    console.log(`⚠️ Peu de lignes détectées, analyse par blocs de texte`);
+    return parseRoomsFromTextBlocks(text);
+  }
+  
+  // Analyse ligne par ligne
   for (const line of lines) {
     const trimmedLine = line.trim();
     if (!trimmedLine) continue;
     
-    // 🔍 Détection du numéro de chambre: toujours 2 ou 3 chiffres à gauche de la ligne
-    const roomNumberMatch = trimmedLine.match(/^(\d{2,3})\s/);
-    if (!roomNumberMatch) continue;
+    // 🔍 Détection du numéro de chambre: toujours 2 ou 3 chiffres
+    const roomMatches = trimmedLine.match(/\b(\d{2,3})\b/g);
+    if (!roomMatches) continue;
     
-    const roomNumber = roomNumberMatch[1];
+    for (const potentialRoom of roomMatches) {
+      // ❌ Éviter les années, heures, etc.
+      if (/^20(2[5-9]|[3-9]\d)$/.test(potentialRoom)) continue;
+      if (/^\d{1,2}:\d{2}$/.test(potentialRoom)) continue;
+      if (parseInt(potentialRoom) < 10) continue; // Trop petit pour être une chambre
+      
+      const normalizedRoomNumber = potentialRoom.padStart(3, '0');
+      
+      // Éviter les doublons
+      const existingRoom = rooms.find(r => r.number === normalizedRoomNumber);
+      if (existingRoom) continue;
+      
+      console.log(`\n🏨 === ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
+      console.log(`📋 Ligne: "${trimmedLine}"`);
+      
+      // Analyser cette ligne de chambre
+      const roomData = analyzeRoomLine(trimmedLine, normalizedRoomNumber);
+      rooms.push(roomData);
+    }
+  }
+  
+  console.log(`✅ Détecté ${rooms.length} chambres avec l'analyse ligne par ligne`);
+  return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+}
+
+// Version de secours pour analyser par blocs de texte
+function parseRoomsFromTextBlocks(text: string): Room[] {
+  const rooms: Room[] = [];
+  console.log(`🔄 ANALYSE PAR BLOCS DE TEXTE`);
+  
+  // Pattern pour capturer les numéros de chambre avec contexte
+  const roomPattern = /\b(\d{2,3})\s+(\w+)\s+(\w+)/g;
+  const foundRooms = new Set();
+  
+  let match;
+  while ((match = roomPattern.exec(text)) !== null) {
+    const roomNumber = match[1];
+    const roomType = match[2]; // SGL, DBS, TWS, DBL
+    const roomStatusCode = match[3]; // DIR, CL, INS, OCC
     
-    // ❌ Éviter les années (2025, 2026, etc.) comme numéros de chambre
+    // ❌ Éviter les années comme 2025, 2026, etc.
     if (/^20(2[5-9]|[3-9]\d)$/.test(roomNumber)) continue;
     
-    // ❌ Éviter les heures (format HH:MM) comme numéros de chambre
-    if (/^\d{1,2}:\d{2}$/.test(roomNumber)) continue;
-    
-    // Normaliser le numéro de chambre
     const normalizedRoomNumber = roomNumber.padStart(3, '0');
     
-    // Éviter les doublons (regrouper les blocs de la même chambre)
-    const existingRoom = rooms.find(r => r.number === normalizedRoomNumber);
-    if (existingRoom) {
-      console.log(`🔗 Regroupement: Chambre ${normalizedRoomNumber} déjà trouvée, mise à jour des infos`);
-      // Mettre à jour les informations avec la nouvelle ligne
-      const updatedRoom = analyzeRoomLine(trimmedLine, normalizedRoomNumber, existingRoom);
-      Object.assign(existingRoom, updatedRoom);
-      continue;
-    }
+    // Éviter les doublons
+    if (foundRooms.has(normalizedRoomNumber)) continue;
+    foundRooms.add(normalizedRoomNumber);
+    
+    // Extraire le contexte autour de cette chambre
+    const start = Math.max(0, match.index - 100);
+    const end = Math.min(text.length, match.index + 400);
+    const context = text.substring(start, end);
     
     console.log(`\n🏨 === ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
-    console.log(`📋 Ligne complète: "${trimmedLine}"`);
+    console.log(`📋 Match: ${roomNumber} ${roomType} ${roomStatusCode}`);
+    console.log(`📄 Contexte: "${context}"`);
     
-    // Analyser cette ligne de chambre
-    const roomData = analyzeRoomLine(trimmedLine, normalizedRoomNumber);
+    // Analyser ce contexte de chambre
+    const roomData = analyzeRoomLine(context, normalizedRoomNumber);
     rooms.push(roomData);
   }
   
-  console.log(`✅ Détecté ${rooms.length} chambres avec la nouvelle logique`);
+  console.log(`✅ Détecté ${rooms.length} chambres avec l'analyse par blocs`);
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
 }
 
