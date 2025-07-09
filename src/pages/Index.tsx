@@ -110,7 +110,7 @@ const Index = () => {
   });
   
   const { addNotification } = useNotifications(
-    currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined
+    currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : "default-hotel-id"
   );
   
   useEffect(() => {
