@@ -56,12 +56,23 @@ export class HotelSessionService {
     try {
       const sessionToken = this.generateSessionToken();
       const ipAddress = await this.getClientIP();
+      
+      // Si pas d'hotelId fourni, essayer de le récupérer depuis localStorage
+      let finalHotelId = hotelId;
+      if (!finalHotelId) {
+        const savedHotelCode = localStorage.getItem('selectedHotelCode');
+        if (savedHotelCode) {
+          // Pour l'instant, créer un hotelId basé sur le code
+          // En production, faire une requête pour récupérer l'ID réel
+          finalHotelId = `hotel_${savedHotelCode}`;
+        }
+      }
 
       const { data, error } = await supabase
         .from('hotel_sessions')
         .insert({
           session_token: sessionToken,
-          hotel_id: hotelId || null,
+          hotel_id: finalHotelId || null,
           ip_address: ipAddress,
           room_data: [],
           housekeeper_names: [],
@@ -81,6 +92,7 @@ export class HotelSessionService {
       this.sessionToken = sessionToken;
       localStorage.setItem('hotel_session_token', sessionToken);
       
+      console.log('Session créée avec hotelId:', finalHotelId);
       return sessionToken;
     } catch (err) {
       console.error('Erreur createSession:', err);

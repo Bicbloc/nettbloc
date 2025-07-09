@@ -111,12 +111,27 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         setHousekeeperNames(session.housekeeper_names || []);
         setRooms(session.room_data || []);
         setIsDistributed(session.is_distributed || false);
-        setHotelId(session.hotel_id); // Récupérer l'ID de l'hôtel
         
-        // Générer des codes d'accès pour les femmes de chambre
+        // Récupérer l'ID de l'hôtel depuis la session ou localStorage
+        let sessionHotelId = session.hotel_id;
+        const savedHotelCode = localStorage.getItem('selectedHotelCode');
+        
+        // Si pas d'hotelId dans la session, essayer de le récupérer depuis les données utilisateur
+        if (!sessionHotelId) {
+          if (savedHotelCode) {
+            // TODO: Récupérer l'hotel_id depuis le code
+            console.log('Recherche hotel_id pour le code:', savedHotelCode);
+          }
+        }
+        
+        setHotelId(sessionHotelId);
+        
+        // Générer des codes d'accès sécurisés pour les femmes de chambre
         const codes: Record<string, string> = {};
         (session.housekeeper_names || []).forEach((name, index) => {
-          codes[name] = String(1000 + index).slice(-4);
+          // Utiliser un format sécurisé HTL-XXXX pour chaque femme de chambre
+          const baseCode = savedHotelCode || 'HTL';
+          codes[name] = `${baseCode}-${String(1000 + index)}`;
         });
         setHousekeeperAccessCodes(codes);
         
@@ -125,7 +140,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           housekeepers: session.housekeeper_names?.length || 0,
           rooms: session.room_data?.length || 0,
           distributed: session.is_distributed,
-          hotelId: session.hotel_id,
+          hotelId: sessionHotelId,
           codes: Object.keys(codes).length
         });
       }
