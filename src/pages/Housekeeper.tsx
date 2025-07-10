@@ -16,7 +16,7 @@ import { ActionLogPanel } from '@/components/ActionLogPanel';
 import { NotificationPanel } from '@/components/NotificationPanel';
 
 export default function Housekeeper() {
-  const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus, housekeeperAccessCodes } = useHousekeeping();
+  const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus, housekeeperAccessCodes, validateHotelConnection } = useHousekeeping();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -72,37 +72,77 @@ export default function Housekeeper() {
     }
   }, [searchParams, housekeeperAccessCodes]);
 
-  // Récupérer l'hotelId depuis le contexte ou localStorage - CORRIGÉ UUID
+  // Récupérer l'hotelId réel depuis la base de données
   useEffect(() => {
-    const savedHotelId = localStorage.getItem('selectedHotelId');
     const savedHotelCode = localStorage.getItem('selectedHotelCode');
     const savedHotelName = localStorage.getItem('selectedHotelName');
     
-    // Valider l'UUID
-    const isValidUUID = (uuid: string) => {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      return uuidRegex.test(uuid);
+    const loadHotelData = async () => {
+      if (savedHotelCode) {
+        try {
+          // Récupérer l'hôtel réel depuis la base de données par son code
+          const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
+          
+          if (hotel) {
+            setHotelId(hotel.id);
+            setHotelInfo({ code: savedHotelCode, name: hotel.name });
+            
+            // Mettre à jour localStorage avec l'ID réel
+            localStorage.setItem('selectedHotelId', hotel.id);
+            localStorage.setItem('selectedHotelName', hotel.name);
+            
+            console.log('✅ Housekeeper - Hotel ID réel chargé:', hotel.id);
+          } else {
+            console.error('❌ Housekeeper - Hôtel non trouvé pour le code:', savedHotelCode);
+            toast({
+              variant: "destructive",
+              title: "Hôtel non trouvé",
+              description: `Aucun hôtel trouvé avec le code ${savedHotelCode}`
+            });
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors du chargement de l\'hôtel:', error);
+          toast({
+            variant: "destructive",
+            title: "Erreur de connexion",
+            description: "Impossible de charger les données de l'hôtel"
+          });
+        }
+      } else if (savedHotelName) {
+        setHotelInfo({ code: 'HTL', name: savedHotelName });
+        console.warn('⚠️ Housekeeper - Code hôtel manquant, utilisation des données sauvegardées');
+      } else {
+        console.warn('⚠️ Housekeeper - Aucune information d\'hôtel trouvée');
+      }
     };
     
-    if (savedHotelId && isValidUUID(savedHotelId)) {
-      setHotelId(savedHotelId);
-      console.log('✅ Housekeeper - Hotel ID valide chargé:', savedHotelId);
-    } else if (savedHotelCode) {
-      // Générer un UUID valide depuis le code hôtel
-      import('@/lib/utils').then(({ generateHotelId }) => {
-        const validHotelId = generateHotelId(savedHotelCode);
-        localStorage.setItem('selectedHotelId', validHotelId);
-        setHotelId(validHotelId);
-        console.log('✅ Housekeeper - Hotel ID valide généré:', validHotelId);
-      });
-    } else {
-      console.warn('⚠️ Housekeeper - Aucun Hotel ID valide trouvé');
-    }
-    
-    if (savedHotelCode && savedHotelName) {
-      setHotelInfo({ code: savedHotelCode, name: savedHotelName });
-    }
+    loadHotelData();
   }, []);
+
+  // Valider la connexion hôtel lors de la connexion de la femme de chambre
+  useEffect(() => {
+    const validateConnection = async () => {
+      if (isLoggedIn && selectedHousekeeper) {
+        try {
+          const validatedHotelId = await validateHotelConnection();
+          if (validatedHotelId) {
+            console.log('✅ Housekeeper - Connexion hôtel validée pour', selectedHousekeeper, ':', validatedHotelId);
+          } else {
+            console.warn('⚠️ Housekeeper - Impossible de valider la connexion hôtel');
+            toast({
+              variant: "destructive",
+              title: "Problème de connexion",
+              description: "Impossible de valider la connexion à l'hôtel"
+            });
+          }
+        } catch (error) {
+          console.error('❌ Erreur validation connexion hôtel:', error);
+        }
+      }
+    };
+
+    validateConnection();
+  }, [isLoggedIn, selectedHousekeeper, validateHotelConnection]);
   // Mettre à jour les chambres de la femme de chambre quand les données changent
   useEffect(() => {
     if (selectedHousekeeper && isLoggedIn) {

@@ -16,6 +16,7 @@ interface HousekeepingContextType {
   getHousekeeperRooms: (name: string) => Room[];
   updateRoomStatus: (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => void;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read' | 'hotel_id'>) => void;
+  validateHotelConnection: () => Promise<string | null>;
 }
 
 const HousekeepingContext = createContext<HousekeepingContextType | undefined>(undefined);
@@ -114,10 +115,10 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         setRooms(session.room_data || []);
         setIsDistributed(session.is_distributed || false);
         
-        // Récupérer l'ID de l'hôtel depuis localStorage - CORRIGÉ UUID
+        // Récupérer l'ID réel de l'hôtel depuis la base de données
         let sessionHotelId = session.hotel_id;
-        const savedHotelId = localStorage.getItem('selectedHotelId');
         const savedHotelCode = localStorage.getItem('selectedHotelCode');
+        const savedHotelId = localStorage.getItem('selectedHotelId');
         
         // Valider l'UUID
         const isValidUUID = (uuid: string) => {
@@ -125,38 +126,35 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           return uuidRegex.test(uuid);
         };
         
-        // Priorité au hotelId sauvegardé dans localStorage s'il est valide
+        // Priorité au hotelId sauvegardé s'il est valide
         if (savedHotelId && isValidUUID(savedHotelId)) {
           sessionHotelId = savedHotelId;
-          console.log('✅ Hotel ID valide récupéré depuis localStorage:', sessionHotelId);
+          console.log('✅ Context - Hotel ID valide récupéré depuis localStorage:', sessionHotelId);
         } else if (savedHotelCode) {
-          // Générer un UUID valide depuis le code hôtel
-          const { generateHotelId } = await import('@/lib/utils');
-          sessionHotelId = generateHotelId(savedHotelCode);
-          localStorage.setItem('selectedHotelId', sessionHotelId);
-          console.log('✅ Hotel ID valide généré depuis le code:', sessionHotelId);
-        } else if (!sessionHotelId || !isValidUUID(sessionHotelId)) {
-          // Fallback sur selectedHotel si disponible
-          const selectedHotelData = localStorage.getItem('selectedHotel');
-          if (selectedHotelData) {
-            try {
-              const hotelData = JSON.parse(selectedHotelData);
-              if (hotelData.id && isValidUUID(hotelData.id)) {
-                sessionHotelId = hotelData.id;
-                console.log('✅ Hotel ID valide récupéré depuis selectedHotel:', sessionHotelId);
-              }
-            } catch (error) {
-              console.error('Erreur parsing selectedHotel:', error);
+          // Récupérer l'hôtel réel depuis la base de données par son code
+          try {
+            const { SupabaseService } = await import('@/services/supabaseService');
+            const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
+            
+            if (hotel) {
+              sessionHotelId = hotel.id;
+              localStorage.setItem('selectedHotelId', hotel.id);
+              localStorage.setItem('selectedHotelName', hotel.name);
+              console.log('✅ Context - Hotel ID réel récupéré depuis la base:', sessionHotelId);
+            } else {
+              console.error('❌ Context - Hôtel non trouvé pour le code:', savedHotelCode);
             }
+          } catch (error) {
+            console.error('❌ Context - Erreur récupération hôtel:', error);
           }
         }
         
         // Assurer qu'on a un hotelId valide
         if (sessionHotelId && isValidUUID(sessionHotelId)) {
           setHotelId(sessionHotelId);
-          console.log('✅ Hotel ID valide défini pour les notifications:', sessionHotelId);
+          console.log('✅ Context - Hotel ID valide défini pour les notifications:', sessionHotelId);
         } else {
-          console.warn('⚠️ Aucun hotelId valide trouvé - notifications désactivées');
+          console.warn('⚠️ Context - Aucun hotelId valide trouvé - notifications désactivées');
         }
         
         // Générer des codes d'accès sécurisés pour les femmes de chambre
@@ -277,6 +275,34 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   };
 
+  // Fonction pour valider la connexion hôtel
+  const validateHotelConnection = async (): Promise<string | null> => {
+    const savedHotelCode = localStorage.getItem('selectedHotelCode');
+    const savedHotelId = localStorage.getItem('selectedHotelId');
+    
+    if (savedHotelCode && (!savedHotelId || !hotelId)) {
+      console.log('⚙️ Context - Validation de la connexion hôtel...');
+      try {
+        const { SupabaseService } = await import('@/services/supabaseService');
+        const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
+        
+        if (hotel) {
+          localStorage.setItem('selectedHotelId', hotel.id);
+          localStorage.setItem('selectedHotelName', hotel.name);
+          setHotelId(hotel.id);
+          console.log('✅ Context - Connexion hôtel validée:', hotel.id);
+          return hotel.id;
+        } else {
+          console.error('❌ Context - Hôtel non trouvé pour le code:', savedHotelCode);
+        }
+      } catch (error) {
+        console.error('❌ Context - Erreur validation hôtel:', error);
+      }
+    }
+    
+    return hotelId || savedHotelId;
+  };
+
   const value = {
     housekeeperNames,
     rooms,
@@ -290,6 +316,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     getHousekeeperRooms,
     updateRoomStatus,
     addNotification,
+    validateHotelConnection,
   };
 
   return (
