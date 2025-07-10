@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
+import AnalysisWorkflow from "./pages/AnalysisWorkflow";
 import { BicblocFooter } from "./components/BicblocBranding";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -46,6 +47,7 @@ const App = () => (
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<Reports />} />
+                  <Route path="/analysis" element={<AnalysisWorkflow />} />
                   <Route path="/housekeeper" element={<Housekeeper />} />
                   <Route path="/housekeeper-login" element={<HousekeeperLogin />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

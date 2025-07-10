@@ -156,6 +156,19 @@ const Auth = () => {
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Se connecter
                   </Button>
+                  <div className="text-center">
+                    <Button 
+                      variant="link" 
+                      type="button"
+                      onClick={() => toast({
+                        title: "Réinitialisation du mot de passe",
+                        description: "Fonctionnalité à venir. Contactez votre administrateur."
+                      })}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Mot de passe oublié ?
+                    </Button>
+                  </div>
                 </form>
               </TabsContent>
               
