@@ -40,10 +40,11 @@ import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
+import { HotelSetup } from "@/components/HotelSetup";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
-import { generateHotelId } from "@/lib/utils";
+import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 
 const Index = () => {
@@ -64,11 +65,10 @@ const Index = () => {
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
 
-  // Fonction utilitaire pour valider les UUIDs
-  const isValidUUID = (uuid: string) => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
-  };
+  // Nettoyer les anciens IDs invalides au chargement
+  useEffect(() => {
+    cleanupInvalidHotelIds();
+  }, []);
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
@@ -125,6 +125,11 @@ const Index = () => {
     if (savedHotelCode && savedUserEmail) {
       setHotelCode(savedHotelCode);
       setUserEmail(savedUserEmail);
+      
+      // Générer un nouvel ID UUID valide et le sauvegarder
+      const validHotelId = generateHotelId(savedHotelCode);
+      localStorage.setItem('selectedHotelId', validHotelId);
+      console.log('✅ ID hôtel valide généré et sauvegardé:', validHotelId);
       
       // Vérifier l'association email/code hôtel
       const storedCode = getHotelCodeForEmail(savedUserEmail);
@@ -1015,10 +1020,14 @@ const Index = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Layers className="h-4 w-4" />
               Vue d'ensemble
+            </TabsTrigger>
+            <TabsTrigger value="configuration" className="flex items-center gap-2">
+              <Building className="h-4 w-4" />
+              Configuration
             </TabsTrigger>
             <TabsTrigger value="rooms" className="flex items-center gap-2">
               <Bed className="h-4 w-4" />
@@ -1304,6 +1313,10 @@ const Index = () => {
                 </div>
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="configuration" className="space-y-6">
+            <HotelSetup />
           </TabsContent>
 
           <TabsContent value="housekeepers" className="space-y-6">

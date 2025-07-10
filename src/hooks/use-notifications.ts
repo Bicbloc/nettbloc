@@ -19,16 +19,11 @@ export const useNotifications = (hotelId?: string) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [hasUnread, setHasUnread] = useState(false);
 
-  // Valider l'ID d'hôtel (UUID standard ou ID déterministe)
+  // Valider l'ID d'hôtel (UUID standard uniquement)
   const isValidHotelId = useCallback((id: string) => {
     if (!id || typeof id !== 'string') return false;
     
-    // Accepter les IDs déterministes qui commencent par 'hotel-'
-    if (id.startsWith('hotel-')) {
-      return id.length >= 15; // Longueur minimale pour un ID déterministe
-    }
-    
-    // Accepter les UUIDs standards
+    // Accepter uniquement les UUIDs v4 valides
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(id);
   }, []);

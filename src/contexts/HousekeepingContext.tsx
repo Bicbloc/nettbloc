@@ -112,23 +112,37 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         setRooms(session.room_data || []);
         setIsDistributed(session.is_distributed || false);
         
-        // Récupérer l'ID de l'hôtel depuis localStorage - CORRIGÉ
+        // Récupérer l'ID de l'hôtel depuis localStorage - CORRIGÉ UUID
         let sessionHotelId = session.hotel_id;
         const savedHotelId = localStorage.getItem('selectedHotelId');
         const savedHotelCode = localStorage.getItem('selectedHotelCode');
         
-        // Priorité au hotelId sauvegardé dans localStorage
-        if (savedHotelId) {
+        // Valider l'UUID
+        const isValidUUID = (uuid: string) => {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          return uuidRegex.test(uuid);
+        };
+        
+        // Priorité au hotelId sauvegardé dans localStorage s'il est valide
+        if (savedHotelId && isValidUUID(savedHotelId)) {
           sessionHotelId = savedHotelId;
-          console.log('✅ Hotel ID récupéré depuis localStorage:', sessionHotelId);
-        } else if (!sessionHotelId) {
+          console.log('✅ Hotel ID valide récupéré depuis localStorage:', sessionHotelId);
+        } else if (savedHotelCode) {
+          // Générer un UUID valide depuis le code hôtel
+          const { generateHotelId } = await import('@/lib/utils');
+          sessionHotelId = generateHotelId(savedHotelCode);
+          localStorage.setItem('selectedHotelId', sessionHotelId);
+          console.log('✅ Hotel ID valide généré depuis le code:', sessionHotelId);
+        } else if (!sessionHotelId || !isValidUUID(sessionHotelId)) {
           // Fallback sur selectedHotel si disponible
           const selectedHotelData = localStorage.getItem('selectedHotel');
           if (selectedHotelData) {
             try {
               const hotelData = JSON.parse(selectedHotelData);
-              sessionHotelId = hotelData.id;
-              console.log('✅ Hotel ID récupéré depuis selectedHotel:', sessionHotelId);
+              if (hotelData.id && isValidUUID(hotelData.id)) {
+                sessionHotelId = hotelData.id;
+                console.log('✅ Hotel ID valide récupéré depuis selectedHotel:', sessionHotelId);
+              }
             } catch (error) {
               console.error('Erreur parsing selectedHotel:', error);
             }
@@ -136,11 +150,11 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         }
         
         // Assurer qu'on a un hotelId valide
-        if (sessionHotelId) {
+        if (sessionHotelId && isValidUUID(sessionHotelId)) {
           setHotelId(sessionHotelId);
-          console.log('✅ Hotel ID défini pour les notifications:', sessionHotelId);
+          console.log('✅ Hotel ID valide défini pour les notifications:', sessionHotelId);
         } else {
-          console.warn('⚠️ Aucun hotelId trouvé - notifications désactivées');
+          console.warn('⚠️ Aucun hotelId valide trouvé - notifications désactivées');
         }
         
         // Générer des codes d'accès sécurisés pour les femmes de chambre

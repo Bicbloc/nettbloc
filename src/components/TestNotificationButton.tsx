@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
 import { TestTube } from 'lucide-react';
+import { isValidUUID } from '@/lib/utils';
 
 interface TestNotificationButtonProps {
   hotelId?: string;
@@ -22,9 +23,18 @@ export function TestNotificationButton({ hotelId }: TestNotificationButtonProps)
       return;
     }
 
+    if (!isValidUUID(hotelId)) {
+      toast({
+        variant: "destructive", 
+        title: "Erreur UUID",
+        description: `Hotel ID invalide: ${hotelId.slice(0, 15)}... - Veuillez reconfigurer l'hôtel`
+      });
+      return;
+    }
+
     const success = await addNotification({
-      title: "Test système",
-      description: `Notification de test créée avec succès pour l'hôtel ID: ${hotelId.slice(0, 12)}...`,
+      title: "🧪 Test système - Notifications opérationnelles",
+      description: `Notification de test créée avec succès pour l'hôtel ID: ${hotelId.slice(0, 8)}... - ${new Date().toLocaleTimeString()}`,
       type: 'assignment',
       user_type: 'admin'
     });

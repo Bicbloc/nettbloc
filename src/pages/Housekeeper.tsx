@@ -72,14 +72,31 @@ export default function Housekeeper() {
     }
   }, [searchParams, housekeeperAccessCodes]);
 
-  // Récupérer l'hotelId depuis le contexte ou localStorage
+  // Récupérer l'hotelId depuis le contexte ou localStorage - CORRIGÉ UUID
   useEffect(() => {
     const savedHotelId = localStorage.getItem('selectedHotelId');
     const savedHotelCode = localStorage.getItem('selectedHotelCode');
     const savedHotelName = localStorage.getItem('selectedHotelName');
     
-    if (savedHotelId) {
+    // Valider l'UUID
+    const isValidUUID = (uuid: string) => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(uuid);
+    };
+    
+    if (savedHotelId && isValidUUID(savedHotelId)) {
       setHotelId(savedHotelId);
+      console.log('✅ Housekeeper - Hotel ID valide chargé:', savedHotelId);
+    } else if (savedHotelCode) {
+      // Générer un UUID valide depuis le code hôtel
+      import('@/lib/utils').then(({ generateHotelId }) => {
+        const validHotelId = generateHotelId(savedHotelCode);
+        localStorage.setItem('selectedHotelId', validHotelId);
+        setHotelId(validHotelId);
+        console.log('✅ Housekeeper - Hotel ID valide généré:', validHotelId);
+      });
+    } else {
+      console.warn('⚠️ Housekeeper - Aucun Hotel ID valide trouvé');
     }
     
     if (savedHotelCode && savedHotelName) {

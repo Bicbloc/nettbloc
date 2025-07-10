@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { UserIcon, Plus, Key, Trash2, Clock, Activity, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
+import { generateHotelId, isValidUUID } from '@/lib/utils';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -50,11 +51,25 @@ export const HousekeeperSetup = () => {
   const { housekeeperNames, setHousekeeperNames } = useHousekeeping();
 
   useEffect(() => {
-    const savedHotelId = localStorage.getItem('selectedHotelId') || localStorage.getItem('hotelId');
-    if (savedHotelId) {
+    // Charger l'hôtel sélectionné depuis localStorage avec validation UUID
+    const savedHotelId = localStorage.getItem('selectedHotelId');
+    const savedHotelCode = localStorage.getItem('selectedHotelCode');
+    
+    if (savedHotelId && isValidUUID(savedHotelId)) {
       setSelectedHotelId(savedHotelId);
       loadHousekeepers(savedHotelId);
       loadSessions(savedHotelId);
+      console.log('✅ HousekeeperSetup - Hotel ID valide chargé:', savedHotelId);
+    } else if (savedHotelCode) {
+      // Générer un UUID valide depuis le code hôtel
+      const validHotelId = generateHotelId(savedHotelCode);
+      localStorage.setItem('selectedHotelId', validHotelId);
+      setSelectedHotelId(validHotelId);
+      loadHousekeepers(validHotelId);
+      loadSessions(validHotelId);
+      console.log('✅ HousekeeperSetup - Hotel ID valide généré:', validHotelId);
+    } else {
+      console.warn('⚠️ HousekeeperSetup - Aucun Hotel ID valide trouvé');
     }
   }, []);
 

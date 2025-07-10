@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Building, Mail, Plus, Check } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
+import { generateHotelId, isValidUUID } from '@/lib/utils';
+import { TestNotificationButton } from '@/components/TestNotificationButton';
 
 interface Hotel {
   id: string;
@@ -71,12 +73,24 @@ export const HotelSetup = () => {
     setIsLoading(false);
   };
 
-  const handleSelectHotel = (hotelId: string) => {
-    setSelectedHotelId(hotelId);
-    localStorage.setItem('selectedHotelId', hotelId);
+  const handleSelectHotel = (hotel: Hotel) => {
+    // Générer un UUID valide basé sur le code hôtel
+    const validHotelId = generateHotelId(hotel.hotel_code);
+    
+    setSelectedHotelId(validHotelId);
+    localStorage.setItem('selectedHotelId', validHotelId);
+    localStorage.setItem('selectedHotelCode', hotel.hotel_code);
+    localStorage.setItem('selectedHotelName', hotel.name);
+    
+    console.log('✅ Hôtel sélectionné avec ID valide:', {
+      name: hotel.name,
+      code: hotel.hotel_code,
+      id: validHotelId
+    });
+    
     toast({
       title: "Hôtel sélectionné",
-      description: "L'hôtel a été sélectionné pour cette session"
+      description: `${hotel.name} (${hotel.hotel_code}) - ID: ${validHotelId.slice(0, 8)}...`
     });
   };
 
@@ -156,19 +170,24 @@ export const HotelSetup = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {selectedHotelId === hotel.id && (
+                    {selectedHotelId === generateHotelId(hotel.hotel_code) && (
                       <Badge variant="secondary" className="flex items-center gap-1">
                         <Check className="h-3 w-3" />
                         Sélectionné
                       </Badge>
                     )}
-                    <Button
-                      variant={selectedHotelId === hotel.id ? "secondary" : "outline"}
-                      size="sm"
-                      onClick={() => handleSelectHotel(hotel.id)}
-                    >
-                      {selectedHotelId === hotel.id ? 'Actuel' : 'Sélectionner'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={selectedHotelId === generateHotelId(hotel.hotel_code) ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => handleSelectHotel(hotel)}
+                      >
+                        {selectedHotelId === generateHotelId(hotel.hotel_code) ? 'Actuel' : 'Sélectionner'}
+                      </Button>
+                      {selectedHotelId === generateHotelId(hotel.hotel_code) && (
+                        <TestNotificationButton hotelId={selectedHotelId} />
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -33,14 +33,14 @@ export function getFirstDigitFromRoomNumber(roomNumber: string): number {
 }
 
 /**
- * Générer un UUID déterministe basé sur le code hôtel
+ * Générer un UUID v4 valide et déterministe basé sur le code hôtel
  * @param hotelCode Le code de l'hôtel
- * @returns Un UUID déterministe basé sur le code
+ * @returns Un UUID v4 valide basé sur le code
  */
 export function generateHotelId(hotelCode: string): string {
   if (!hotelCode) return '';
   
-  // Créer un hash simple mais déterministe du code hôtel
+  // Créer un hash déterministe du code hôtel
   let hash = 0;
   for (let i = 0; i < hotelCode.length; i++) {
     const char = hotelCode.charCodeAt(i);
@@ -48,11 +48,43 @@ export function generateHotelId(hotelCode: string): string {
     hash = hash & hash; // Convertir en 32 bits
   }
   
-  // Convertir en UUID v4 format (mais déterministe)
+  // Convertir en UUID v4 valide format avec version et variant bits corrects
   const abs = Math.abs(hash);
-  const hex = abs.toString(16).padStart(8, '0');
-  const uuid = `hotel-${hex.slice(0, 8)}-${hex.slice(0, 4)}-${hex.slice(1, 4)}-${hex.slice(2, 5)}-${hex.padEnd(12, '0').slice(0, 12)}`;
+  const hex = abs.toString(16).padStart(8, '0').repeat(4).slice(0, 32);
   
-  console.log(`🆔 UUID généré pour ${hotelCode}:`, uuid);
+  // Format UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  // où y est 8, 9, a, ou b
+  const uuid = [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    '4' + hex.slice(13, 16),  // Version 4
+    (parseInt(hex[16], 16) & 0x3 | 0x8).toString(16) + hex.slice(17, 20), // Variant bits
+    hex.slice(20, 32)
+  ].join('-');
+  
+  console.log(`🆔 UUID v4 valide généré pour ${hotelCode}:`, uuid);
   return uuid;
+}
+
+/**
+ * Nettoyer les anciens IDs d'hôtel non-UUID du localStorage
+ */
+export function cleanupInvalidHotelIds(): void {
+  const keys = ['selectedHotelId', 'hotelId', 'selectedHotelCode'];
+  
+  keys.forEach(key => {
+    const value = localStorage.getItem(key);
+    if (value && value.startsWith('hotel-') && !isValidUUID(value)) {
+      console.log(`🧹 Nettoyage ancien ID invalide (${key}):`, value);
+      localStorage.removeItem(key);
+    }
+  });
+}
+
+/**
+ * Valider qu'une chaîne est un UUID valide
+ */
+export function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
 }
