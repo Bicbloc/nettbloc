@@ -403,6 +403,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      request_password_reset: {
+        Args: { user_email: string }
+        Returns: boolean
+      }
       validate_access_code_for_hotel: {
         Args: { access_code: string; hotel_uuid: string }
         Returns: boolean

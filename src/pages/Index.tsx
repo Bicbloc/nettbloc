@@ -1153,15 +1153,26 @@ const Index = () => {
                 Mobile
               </TabsTrigger>
             </TabsList>
-            <Button
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/reports')}
-              className="flex items-center gap-2"
-            >
-              <Archive className="h-4 w-4" />
-              Archives
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/reports')}
+                className="flex items-center gap-2"
+              >
+                <Archive className="h-4 w-4" />
+                Archives
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => navigate('/analysis')}
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Analyse guidée
+              </Button>
+            </div>
           </div>
 
           <TabsContent value="overview" className="space-y-6">
@@ -1428,13 +1439,7 @@ const Index = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="configuration" className="space-y-6">
-            <HotelSetup />
-          </TabsContent>
 
-          <TabsContent value="housekeepers" className="space-y-6">
-            <HousekeeperSetup />
-          </TabsContent>
 
           <TabsContent value="distribution" className="space-y-6">
             <div className="flex justify-between items-center">
