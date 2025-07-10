@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      daily_reports: {
+        Row: {
+          action_log: Json
+          created_at: string
+          hotel_id: string
+          housekeeper_assignments: Json
+          housekeeper_names: Json
+          id: string
+          report_date: string
+          room_data: Json
+          user_id: string
+        }
+        Insert: {
+          action_log?: Json
+          created_at?: string
+          hotel_id: string
+          housekeeper_assignments?: Json
+          housekeeper_names?: Json
+          id?: string
+          report_date?: string
+          room_data?: Json
+          user_id: string
+        }
+        Update: {
+          action_log?: Json
+          created_at?: string
+          hotel_id?: string
+          housekeeper_assignments?: Json
+          housekeeper_names?: Json
+          id?: string
+          report_date?: string
+          room_data?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       hotel_sessions: {
         Row: {
           created_at: string
@@ -28,6 +64,7 @@ export type Database = {
           room_data: Json
           session_token: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -42,6 +79,7 @@ export type Database = {
           room_data?: Json
           session_token: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -56,6 +94,7 @@ export type Database = {
           room_data?: Json
           session_token?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -75,6 +114,7 @@ export type Database = {
           id: string
           name: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -83,6 +123,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -91,8 +132,47 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
+      }
+      housekeeper_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          housekeeper_id: string
+          id: string
+          is_active: boolean
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          housekeeper_id: string
+          id?: string
+          is_active?: boolean
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          housekeeper_id?: string
+          id?: string
+          is_active?: boolean
+          token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "housekeeper_tokens_housekeeper_id_fkey"
+            columns: ["housekeeper_id"]
+            isOneToOne: false
+            referencedRelation: "housekeepers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       housekeepers: {
         Row: {
@@ -103,6 +183,7 @@ export type Database = {
           is_active: boolean
           name: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           access_code: string
@@ -112,6 +193,7 @@ export type Database = {
           is_active?: boolean
           name: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           access_code?: string
@@ -121,6 +203,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -143,6 +226,7 @@ export type Database = {
           room_number: string | null
           title: string
           type: string
+          user_id: string | null
           user_type: string
         }
         Insert: {
@@ -155,6 +239,7 @@ export type Database = {
           room_number?: string | null
           title: string
           type: string
+          user_id?: string | null
           user_type: string
         }
         Update: {
@@ -167,7 +252,35 @@ export type Database = {
           room_number?: string | null
           title?: string
           type?: string
+          user_id?: string | null
           user_type?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          email: string
+          id: string
+          subscription_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          email: string
+          id: string
+          subscription_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          subscription_type?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -180,6 +293,7 @@ export type Database = {
           message: string | null
           room_number: string
           status: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -189,6 +303,7 @@ export type Database = {
           message?: string | null
           room_number: string
           status: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -198,6 +313,7 @@ export type Database = {
           message?: string | null
           room_number?: string
           status?: string
+          user_id?: string | null
         }
         Relationships: [
           {

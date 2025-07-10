@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import UserMenu from "@/components/UserMenu";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { ActiveUsersPanel } from "@/components/ActiveUsersPanel";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
@@ -50,7 +52,15 @@ import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/util
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 
 const Index = () => {
+  const [searchParams] = useSearchParams();
+  const { isAuthenticated, loading } = useAuth();
+  const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
+
+  // Redirect to auth if not authenticated and not in guest mode
+  if (!loading && !isAuthenticated && !isGuestMode) {
+    return <Navigate to="/auth" replace />;
+  }
   useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState("overview");
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
@@ -93,7 +103,6 @@ const Index = () => {
   const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
   const [hotelCode, setHotelCode] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
@@ -144,9 +153,8 @@ const Index = () => {
           // Vérifier l'association email/code hôtel
           const storedCode = getHotelCodeForEmail(savedUserEmail);
           
-          if (storedCode === savedHotelCode) {
-            setIsAuthenticated(true);
-          }
+          // Code authentifié pour le mode invité
+          console.log('✅ Code hôtel vérifié pour le mode invité');
         } else {
           console.error('❌ Aucun hôtel trouvé pour le code:', savedHotelCode);
           toast({
@@ -979,7 +987,8 @@ const Index = () => {
             <Button 
               onClick={() => {
                 setEmail(userEmail);
-                setIsAuthenticated(true);
+                // En mode invité, pas besoin d'authentification
+                console.log('Configuration sauvegardée en mode invité');
               }}
               className="w-full"
             >
@@ -1002,8 +1011,32 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container mx-auto py-6">
+        {/* Header avec navigation et authentification */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Building className="h-8 w-8 text-primary" />
+            NettoBloc
+            {isGuestMode && (
+              <Badge variant="outline" className="ml-2">
+                Mode Invité
+              </Badge>
+            )}
+          </h1>
+          
+          <div className="flex items-center space-x-4">
+            {!isAuthenticated && !isGuestMode && (
+              <Button asChild>
+                <a href="/auth">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Se connecter
+                </a>
+              </Button>
+            )}
+            {isAuthenticated && <UserMenu />}
+          </div>
+        </div>
+
         <div className="flex flex-col items-center mb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-center mb-4">NettoBloc</h1>
           
           {/* Configuration de l'hôtel - Entrée directe du code */}
           <div className="w-full max-w-2xl mb-4">
