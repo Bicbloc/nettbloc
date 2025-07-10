@@ -5,18 +5,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { SupabaseService } from '@/services/supabaseService';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
 
 interface QuickAddHousekeeperButtonProps {
-  onAddHousekeeper: (name: string) => void;
+  onAddHousekeeper?: (name: string) => void;
   className?: string;
 }
 
 export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: QuickAddHousekeeperButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { setHousekeeperNames, refreshHousekeepers } = useHousekeeping();
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name.trim()) {
       toast({
         title: "Erreur",
@@ -26,14 +30,60 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
       return;
     }
 
-    onAddHousekeeper(name.trim());
-    setName('');
-    setIsOpen(false);
+    setIsLoading(true);
     
-    toast({
-      title: "Succès",
-      description: `${name.trim()} a été ajouté(e)`,
-    });
+    try {
+      // Récupérer l'ID de l'hôtel sélectionné
+      const selectedHotelId = localStorage.getItem('selectedHotelId');
+      
+      if (!selectedHotelId) {
+        toast({
+          title: "Erreur",
+          description: "Aucun hôtel sélectionné",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Créer la femme de chambre dans Supabase
+      const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, name.trim());
+      
+      if (housekeeper) {
+        // Mettre à jour le contexte local
+        setHousekeeperNames(prev => [...prev, name.trim()]);
+        
+        // Rafraîchir la liste depuis la base
+        await refreshHousekeepers();
+        
+        // Appeler le callback si fourni
+        if (onAddHousekeeper) {
+          onAddHousekeeper(name.trim());
+        }
+        
+        toast({
+          title: "Succès",
+          description: `${name.trim()} a été créé(e) avec le code ${housekeeper.access_code}`,
+        });
+        
+        setName('');
+        setIsOpen(false);
+      } else {
+        toast({
+          title: "Erreur",
+          description: "Impossible de créer la femme de chambre",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Erreur création femme de chambre:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la création",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -80,9 +130,9 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
               <Button variant="outline" onClick={() => setIsOpen(false)} className="flex-1">
                 Annuler
               </Button>
-              <Button onClick={handleAdd} className="flex-1" disabled={!name.trim()}>
+              <Button onClick={handleAdd} className="flex-1" disabled={!name.trim() || isLoading}>
                 <Plus className="h-4 w-4 mr-2" />
-                Ajouter
+                {isLoading ? 'Création...' : 'Ajouter'}
               </Button>
             </div>
           </div>

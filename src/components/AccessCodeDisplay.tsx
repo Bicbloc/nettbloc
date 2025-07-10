@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Key, Copy, Eye, EyeOff, Users, Building, Loader2, User } from 'lucide-react';
+import { Key, Copy, Eye, EyeOff, Users, Building, Loader2, User, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
 
 interface Housekeeper {
   id: string;
@@ -28,17 +29,39 @@ export const AccessCodeDisplay = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showCodes, setShowCodes] = useState(false);
   const [selectedHotelId, setSelectedHotelId] = useState<string>('');
+  const { refreshHousekeepers } = useHousekeeping();
 
+  // Surveiller les changements d'hôtel
   useEffect(() => {
-    const savedHotelId = localStorage.getItem('selectedHotelId');
-    if (savedHotelId) {
-      setSelectedHotelId(savedHotelId);
-      loadData(savedHotelId);
-    }
-  }, []);
+    const checkHotelChange = () => {
+      const savedHotelId = localStorage.getItem('selectedHotelId');
+      if (savedHotelId && savedHotelId !== selectedHotelId) {
+        setSelectedHotelId(savedHotelId);
+        loadData(savedHotelId);
+      }
+    };
 
-  const loadData = async (hotelId: string) => {
-    setIsLoading(true);
+    checkHotelChange();
+    
+    // Vérifier les changements d'hôtel toutes les 2 secondes
+    const interval = setInterval(checkHotelChange, 2000);
+    return () => clearInterval(interval);
+  }, [selectedHotelId]);
+
+  // Rafraîchissement automatique des données toutes les 10 secondes
+  useEffect(() => {
+    if (!selectedHotelId) return;
+
+    const interval = setInterval(() => {
+      loadData(selectedHotelId);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [selectedHotelId]);
+
+  const loadData = async (hotelId: string, showLoading = true) => {
+    if (showLoading) setIsLoading(true);
+    
     try {
       // Charger l'hôtel
       const hotels = await SupabaseService.getHotels();
@@ -51,6 +74,8 @@ export const AccessCodeDisplay = () => {
       // Charger les femmes de chambre
       const housekeepersData = await SupabaseService.getHousekeepers(hotelId);
       setHousekeepers(housekeepersData.filter(h => h.is_active));
+      
+      console.log('✅ Codes d\'accès chargés:', housekeepersData.length, 'femmes de chambre');
     } catch (error) {
       console.error('Erreur chargement données:', error);
       toast({
@@ -59,7 +84,20 @@ export const AccessCodeDisplay = () => {
         description: "Impossible de charger les données"
       });
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
+    }
+  };
+
+  // Fonction de rafraîchissement manuel
+  const handleRefresh = async () => {
+    if (selectedHotelId) {
+      await loadData(selectedHotelId);
+      // Aussi rafraîchir le contexte global
+      await refreshHousekeepers();
+      toast({
+        title: "Actualisé",
+        description: "Codes d'accès mis à jour"
+      });
     }
   };
 
@@ -160,6 +198,16 @@ export const AccessCodeDisplay = () => {
                 >
                   {showCodes ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   {showCodes ? 'Masquer' : 'Afficher'} les codes
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Actualiser
                 </Button>
                 
                 {showCodes && (

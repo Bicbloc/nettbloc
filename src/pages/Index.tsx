@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import EmailReportDialog from "@/components/EmailReportDialog";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
+import { SyncHousekeepersButton } from "@/components/SyncHousekeepersButton";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
@@ -1374,26 +1375,8 @@ const Index = () => {
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Distribution des chambres</h2>
               <div className="flex gap-2">
-                <QuickAddHousekeeperButton 
-                  onAddHousekeeper={async (name) => {
-                    // Ajouter localement d'abord
-                    setHousekeeperNames([...housekeeperNames, name]);
-                    
-                    // Créer en base de données si on a un hôtel sélectionné
-                    const hotelId = localStorage.getItem('selectedHotelId');
-                    if (hotelId) {
-                      try {
-                        const { SupabaseService } = await import('@/services/supabaseService');
-                        await SupabaseService.createHousekeeper(hotelId, name);
-                        // Recharger les femmes de chambre pour avoir les codes d'accès
-                        refreshHousekeepers();
-                        console.log('✅ Femme de chambre créée en base:', name);
-                      } catch (error) {
-                        console.error('❌ Erreur création femme de chambre:', error);
-                      }
-                    }
-                  }}
-                />
+                <QuickAddHousekeeperButton />
+                <SyncHousekeepersButton />
                 <Button
                   onClick={() => setIsRedistributionDialogOpen(true)}
                   disabled={housekeeperNames.length === 0 || rooms.length === 0}
