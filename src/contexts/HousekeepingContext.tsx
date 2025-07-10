@@ -14,7 +14,7 @@ interface HousekeepingContextType {
   setIsDistributed: (distributed: boolean) => void;
   setHousekeeperAccessCodes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   getHousekeeperRooms: (name: string) => Room[];
-  updateRoomStatus: (roomNumber: string, newStatus: string, housekeeperName?: string) => void;
+  updateRoomStatus: (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => void;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read' | 'hotel_id'>) => void;
 }
 
@@ -207,13 +207,13 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     return rooms.filter(room => room.assignedTo === name);
   };
 
-  const updateRoomStatus = async (roomNumber: string, newStatus: string, housekeeperName?: string) => {
-    console.log('🔄 updateRoomStatus appelé:', { roomNumber, newStatus, housekeeperName, hotelId });
+  const updateRoomStatus = async (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => {
+    console.log('🔄 updateRoomStatus appelé:', { roomNumber, newStatus, housekeeperName, remark, hotelId });
     
     // Mettre à jour localement
     setRooms(prev => prev.map(room => 
       room.number === roomNumber 
-        ? { ...room, status: newStatus }
+        ? { ...room, status: newStatus, remark: remark || room.remark }
         : room
     ));
 
@@ -251,7 +251,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       } else if (newStatus === 'needs-attention') {
         notification = {
           title: `Remarque de la femme de chambre (${housekeeperName}) - CH ${roomNumber} - Problème signalé`,
-          description: `${housekeeperName} a signalé un problème dans la chambre ${roomNumber}`,
+          description: remark ? `${housekeeperName} a signalé: "${remark}"` : `${housekeeperName} a signalé un problème dans la chambre ${roomNumber}`,
           type: 'remark' as const,
           housekeeperName,
           roomNumber,

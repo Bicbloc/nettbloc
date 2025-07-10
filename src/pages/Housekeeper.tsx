@@ -305,7 +305,7 @@ export default function Housekeeper() {
 
   const handleRemark = () => {
     if (remarkText.trim()) {
-      handleUpdateRoomStatus(remarkRoomNumber, 'needs-attention');
+      updateRoomStatus(remarkRoomNumber, 'needs-attention', selectedHousekeeper, remarkText.trim());
       setRemarkText('');
       setRemarkRoomNumber('');
     }

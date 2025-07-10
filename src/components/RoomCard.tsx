@@ -171,6 +171,11 @@ export function RoomCard({
             </span>
           )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+          {room.status === 'needs-attention' && room.remark && (
+            <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
+              <AlertCircle className="h-2 w-2" /> Remarque
+            </span>
+          )}
           {room.status === 'ready-to-clean' && (
             <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
               🚪
@@ -263,12 +268,30 @@ export function RoomCard({
           <Badge variant="outline" className="bg-gray-100 text-gray-700">
             <Layers className="h-3 w-3 mr-1" /> {floorDisplay}
           </Badge>
+          {room.status === 'needs-attention' && room.remark && (
+            <Badge variant="outline" className="bg-red-100 text-red-800">
+              <AlertCircle className="h-3 w-3 mr-1" /> Remarque
+            </Badge>
+          )}
         </div>
         <div className="flex gap-1">
           {getStatusBadge(room.status)}
           {getCleaningTypeBadge(room.cleaningType)}
         </div>
       </div>
+      
+      {/* Afficher la remarque si présente */}
+      {room.status === 'needs-attention' && room.remark && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-red-800">Remarque signalée :</p>
+              <p className="text-sm text-red-700 mt-1">{room.remark}</p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* New Cleaning Type Selection */}
       <div className="mb-3 mt-2 p-2 border border-gray-200 rounded-md bg-gray-50">

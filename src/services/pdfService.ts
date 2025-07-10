@@ -15,6 +15,7 @@ export interface Room {
   notUrgent?: boolean;
   floor?: number;
   notes?: string; // Added notes property
+  remark?: string; // Added remark property for housekeeper remarks
 }
 
 export interface CleaningConfig {
