@@ -113,14 +113,7 @@ const Index = () => {
   
   const { addNotification } = useNotifications(currentHotelId);
 
-  // Redirect to auth if not authenticated and not in guest mode - AFTER ALL HOOKS
-  if (!loading && !isAuthenticated && !isGuestMode) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  console.log("Index - isDistributed:", isDistributed); // Debug log
-
-  // Nettoyer les anciens IDs invalides au chargement
+  // ALL useEffect hooks must be here too - before any conditional returns
   useEffect(() => {
     cleanupInvalidHotelIds();
   }, []);
@@ -196,6 +189,13 @@ const Index = () => {
     setRecommendedHousekeepers(recommended);
     
   }, [rooms, cleaningConfig]);
+
+  // Redirect to auth if not authenticated and not in guest mode - AFTER ALL HOOKS
+  if (!loading && !isAuthenticated && !isGuestMode) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  console.log("Index - isDistributed:", isDistributed); // Debug log
   
   const handleRoomUpdate = (updatedRoom: Room) => {
     setRooms(prevRooms => 
