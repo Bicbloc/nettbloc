@@ -61,6 +61,7 @@ const Index = () => {
   if (!loading && !isAuthenticated && !isGuestMode) {
     return <Navigate to="/auth" replace />;
   }
+  
   useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState("overview");
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
