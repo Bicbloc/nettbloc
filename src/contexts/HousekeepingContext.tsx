@@ -8,15 +8,15 @@ interface HousekeepingContextType {
   rooms: Room[];
   isDistributed: boolean;
   notifications: Notification[];
-  housekeeperAccessCodes: Record<string, string>;
+  housekeepers: Array<{id: string, name: string, access_code: string}>;
   setHousekeeperNames: React.Dispatch<React.SetStateAction<string[]>>;
   setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
   setIsDistributed: (distributed: boolean) => void;
-  setHousekeeperAccessCodes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   getHousekeeperRooms: (name: string) => Room[];
   updateRoomStatus: (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => void;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read' | 'hotel_id'>) => void;
   validateHotelConnection: () => Promise<string | null>;
+  refreshHousekeepers: () => Promise<void>;
 }
 
 const HousekeepingContext = createContext<HousekeepingContextType | undefined>(undefined);
@@ -41,7 +41,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   
   const [hotelId, setHotelId] = useState<string | null>(null);
   const { notifications, addNotification } = useNotifications(hotelId || undefined);
-  const [housekeeperAccessCodes, setHousekeeperAccessCodes] = useState<Record<string, string>>({});
+  const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
 
   // Initialiser la session au chargement
   useEffect(() => {
@@ -85,18 +85,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             return prev !== newDistributed ? newDistributed : prev;
           });
 
-          // Générer des codes d'accès pour les nouvelles femmes de chambre
-          setHousekeeperAccessCodes(prev => {
-            const newCodes = { ...prev };
-            const savedHotelCode = localStorage.getItem('selectedHotelCode');
-            const baseCode = savedHotelCode || 'HTL';
-            (session.housekeeper_names || []).forEach((name, index) => {
-              if (!newCodes[name]) {
-                newCodes[name] = `${baseCode}-${String(1000 + index)}`;
-              }
-            });
-            return newCodes;
-          });
+          // Charger les vraies femmes de chambre depuis la base si on a un hotelId
+          refreshHousekeepers();
         }
       } catch (error) {
         console.error('Erreur synchronisation:', error);
@@ -157,22 +147,17 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           console.warn('⚠️ Context - Aucun hotelId valide trouvé - notifications désactivées');
         }
         
-        // Générer des codes d'accès sécurisés pour les femmes de chambre
-        const codes: Record<string, string> = {};
-        (session.housekeeper_names || []).forEach((name, index) => {
-          // Utiliser un format sécurisé HTL-XXXX pour chaque femme de chambre
-          const baseCode = savedHotelCode || 'HTL';
-          codes[name] = `${baseCode}-${String(1000 + index)}`;
-        });
-        setHousekeeperAccessCodes(codes);
+        // Charger les vraies femmes de chambre depuis la base
+        if (sessionHotelId) {
+          await refreshHousekeepers();
+        }
         
         setIsInitialized(true);
         console.log('Données de session chargées:', {
           housekeepers: session.housekeeper_names?.length || 0,
           rooms: session.room_data?.length || 0,
           distributed: session.is_distributed,
-          hotelId: sessionHotelId,
-          codes: Object.keys(codes).length
+          hotelId: sessionHotelId
         });
       }
     } catch (error) {
@@ -303,20 +288,41 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     return hotelId || savedHotelId;
   };
 
+  // Fonction pour charger les femmes de chambre depuis la base
+  const refreshHousekeepers = async () => {
+    const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
+    if (!currentHotelId) return;
+    
+    try {
+      const { SupabaseService } = await import('@/services/supabaseService');
+      const dbHousekeepers = await SupabaseService.getHousekeepers(currentHotelId);
+      
+      setHousekeepers(dbHousekeepers.map(h => ({
+        id: h.id,
+        name: h.name,
+        access_code: h.access_code
+      })));
+      
+      console.log('✅ Femmes de chambre chargées depuis la base:', dbHousekeepers.length);
+    } catch (error) {
+      console.error('❌ Erreur chargement femmes de chambre:', error);
+    }
+  };
+
   const value = {
     housekeeperNames,
     rooms,
     isDistributed,
     notifications,
-    housekeeperAccessCodes,
+    housekeepers,
     setHousekeeperNames,
     setRooms,
     setIsDistributed,
-    setHousekeeperAccessCodes,
     getHousekeeperRooms,
     updateRoomStatus,
     addNotification,
     validateHotelConnection,
+    refreshHousekeepers,
   };
 
   return (

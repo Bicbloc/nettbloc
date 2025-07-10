@@ -16,7 +16,7 @@ import { ActionLogPanel } from '@/components/ActionLogPanel';
 import { NotificationPanel } from '@/components/NotificationPanel';
 
 export default function Housekeeper() {
-  const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus, housekeeperAccessCodes, validateHotelConnection } = useHousekeeping();
+  const { housekeeperNames, rooms, isDistributed, getHousekeeperRooms, updateRoomStatus, housekeepers, validateHotelConnection } = useHousekeeping();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -44,33 +44,30 @@ export default function Housekeeper() {
 
     if (codeFromUrl) {
       // Trouver la femme de chambre correspondant au code
-      const matchingHousekeeper = Object.entries(housekeeperAccessCodes).find(
-        ([name, code]) => code === codeFromUrl
-      );
+      const matchingHousekeeper = housekeepers.find(h => h.access_code === codeFromUrl);
       
       if (matchingHousekeeper) {
-        const [housekeeperName] = matchingHousekeeper;
-        setSelectedHousekeeper(housekeeperName);
+        setSelectedHousekeeper(matchingHousekeeper.name);
         setAccessCode(codeFromUrl);
         setIsLoggedIn(true);
         
         // Sauvegarder la connexion
-        localStorage.setItem('currentHousekeeper', housekeeperName);
+        localStorage.setItem('currentHousekeeper', matchingHousekeeper.name);
         localStorage.setItem('currentAccessCode', codeFromUrl);
         
         toast({
           title: "Connexion automatique",
-          description: `Bienvenue ${housekeeperName} !`
+          description: `Bienvenue ${matchingHousekeeper.name} !`
         });
       } else {
-        console.log('Code non trouvé:', codeFromUrl, 'Codes disponibles:', Object.values(housekeeperAccessCodes));
+        console.log('Code non trouvé:', codeFromUrl, 'Codes disponibles:', housekeepers.map(h => h.access_code));
       }
-    } else if (savedName && savedCode && housekeeperAccessCodes[savedName] === savedCode) {
+    } else if (savedName && savedCode && housekeepers.find(h => h.name === savedName && h.access_code === savedCode)) {
       setSelectedHousekeeper(savedName);
       setAccessCode(savedCode);
       setIsLoggedIn(true);
     }
-  }, [searchParams, housekeeperAccessCodes]);
+  }, [searchParams, housekeepers]);
 
   // Récupérer l'hotelId réel depuis la base de données
   useEffect(() => {
@@ -204,9 +201,9 @@ export default function Housekeeper() {
                 className="text-center text-lg font-mono h-12"
                 autoFocus
               />
-              {Object.keys(housekeeperAccessCodes).length > 0 && (
+              {housekeepers.length > 0 && (
                 <div className="text-xs text-gray-500 text-center mt-2">
-                  Codes disponibles: {Object.values(housekeeperAccessCodes).join(', ')}
+                  Codes disponibles: {housekeepers.map(h => h.access_code).join(', ')}
                 </div>
               )}
             </div>
@@ -223,22 +220,19 @@ export default function Housekeeper() {
                 }
 
                 // Chercher le code d'accès
-                const matchingHousekeeper = Object.entries(housekeeperAccessCodes).find(
-                  ([name, code]) => code === accessCode
-                );
+                const matchingHousekeeper = housekeepers.find(h => h.access_code === accessCode);
 
                 if (matchingHousekeeper) {
-                  const [housekeeperName] = matchingHousekeeper;
-                  setSelectedHousekeeper(housekeeperName);
+                  setSelectedHousekeeper(matchingHousekeeper.name);
                   setIsLoggedIn(true);
                   
                   // Sauvegarder la connexion
-                  localStorage.setItem('currentHousekeeper', housekeeperName);
+                  localStorage.setItem('currentHousekeeper', matchingHousekeeper.name);
                   localStorage.setItem('currentAccessCode', accessCode);
                   
                   toast({
                     title: "Connexion réussie",
-                    description: `Bienvenue ${housekeeperName} !`
+                    description: `Bienvenue ${matchingHousekeeper.name} !`
                   });
                 } else {
                   toast({

@@ -59,8 +59,8 @@ const Index = () => {
     setRooms,
     isDistributed,
     setIsDistributed,
-    housekeeperAccessCodes,
-    setHousekeeperAccessCodes
+    housekeepers,
+    refreshHousekeepers
   } = useHousekeeping();
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
@@ -198,8 +198,21 @@ const Index = () => {
     handleRoomUpdate(updatedRoom);
   };
 
-  const handleDeleteHousekeeper = (housekeeperName: string) => {
+  const handleDeleteHousekeeper = async (housekeeperName: string) => {
     setHousekeeperNames(prev => prev.filter(name => name !== housekeeperName));
+    
+    // Désactiver en base de données
+    const housekeeper = housekeepers.find(h => h.name === housekeeperName);
+    if (housekeeper) {
+      try {
+        const { SupabaseService } = await import('@/services/supabaseService');
+        await SupabaseService.deactivateHousekeeper(housekeeper.id);
+        refreshHousekeepers();
+        console.log('✅ Femme de chambre désactivée en base:', housekeeperName);
+      } catch (error) {
+        console.error('❌ Erreur désactivation femme de chambre:', error);
+      }
+    }
     
     // Also remove from floor preferences and max rooms overrides
     setHousekeeperFloorPreferences(prev => {
@@ -1347,8 +1360,23 @@ const Index = () => {
               <h2 className="text-2xl font-bold">Distribution des chambres</h2>
               <div className="flex gap-2">
                 <QuickAddHousekeeperButton 
-                  onAddHousekeeper={(name) => {
+                  onAddHousekeeper={async (name) => {
+                    // Ajouter localement d'abord
                     setHousekeeperNames([...housekeeperNames, name]);
+                    
+                    // Créer en base de données si on a un hôtel sélectionné
+                    const hotelId = localStorage.getItem('selectedHotelId');
+                    if (hotelId) {
+                      try {
+                        const { SupabaseService } = await import('@/services/supabaseService');
+                        await SupabaseService.createHousekeeper(hotelId, name);
+                        // Recharger les femmes de chambre pour avoir les codes d'accès
+                        refreshHousekeepers();
+                        console.log('✅ Femme de chambre créée en base:', name);
+                      } catch (error) {
+                        console.error('❌ Erreur création femme de chambre:', error);
+                      }
+                    }
                   }}
                 />
                 <Button
@@ -1422,7 +1450,7 @@ const Index = () => {
                             maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
                             onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
                             onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
-                            accessCode={housekeeperAccessCodes[name] || ''}
+                            accessCode={housekeepers.find(h => h.name === name)?.access_code || ''}
                           />
                         </div>
                       );
@@ -1521,7 +1549,7 @@ const Index = () => {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {housekeeperNames.map((name) => {
                     const housekeeperRooms = getHousekeeperRooms(name);
-                    const accessCode = housekeeperAccessCodes[name] || '';
+                    const accessCode = housekeepers.find(h => h.name === name)?.access_code || '';
                     
                     return (
                       <Card key={name}>

@@ -29,7 +29,7 @@ export function ActiveUsersPanel() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [housekeeperConnections, setHousekeeperConnections] = useState<HousekeeperConnection[]>([]);
   const [loading, setLoading] = useState(true);
-  const { housekeeperNames, housekeeperAccessCodes, getHousekeeperRooms } = useHousekeeping();
+  const { housekeeperNames, housekeepers, getHousekeeperRooms } = useHousekeeping();
 
   useEffect(() => {
     fetchActiveSessions();
@@ -61,11 +61,12 @@ export function ActiveUsersPanel() {
       supabase.removeChannel(channel);
       clearInterval(activityInterval);
     };
-  }, [housekeeperNames, housekeeperAccessCodes]);
+  }, [housekeeperNames, housekeepers]);
 
   const updateHousekeeperConnections = () => {
     const connections: HousekeeperConnection[] = housekeeperNames.map(name => {
-      const accessCode = housekeeperAccessCodes[name] || '';
+      const housekeeper = housekeepers.find(h => h.name === name);
+      const accessCode = housekeeper?.access_code || '';
       const rooms = getHousekeeperRooms(name).map(room => room.number);
       
       // Vérifier s'il y a une session active pour cette femme de chambre

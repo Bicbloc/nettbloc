@@ -12,7 +12,7 @@ export default function HousekeeperLogin() {
   const [accessCode, setAccessCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { housekeeperAccessCodes, housekeeperNames, isDistributed } = useHousekeeping();
+  const { housekeepers, housekeeperNames, isDistributed } = useHousekeeping();
 
   // Vérifier si la distribution a été faite
   useEffect(() => {
@@ -49,25 +49,23 @@ export default function HousekeeperLogin() {
     setIsLoading(true);
     
     try {
-      // Chercher le code d'accès dans les codes générés localement
-      const matchingHousekeeper = Object.entries(housekeeperAccessCodes).find(
-        ([name, code]) => code === accessCode
-      );
+      // Authentifier avec la base de données
+      const { SupabaseService } = await import('@/services/supabaseService');
+      const authenticatedHousekeeper = await SupabaseService.authenticateHousekeeper(accessCode);
 
-      if (matchingHousekeeper) {
-        const [housekeeperName, code] = matchingHousekeeper;
-        
+      if (authenticatedHousekeeper) {
         // Sauvegarder les infos de connexion
-        localStorage.setItem('currentHousekeeper', housekeeperName);
-        localStorage.setItem('currentAccessCode', code);
+        localStorage.setItem('currentHousekeeper', authenticatedHousekeeper.name);
+        localStorage.setItem('currentAccessCode', authenticatedHousekeeper.access_code);
+        localStorage.setItem('currentHousekeeperId', authenticatedHousekeeper.id);
         
         toast({
           title: "Connexion réussie",
-          description: `Bonjour ${housekeeperName} !`
+          description: `Bonjour ${authenticatedHousekeeper.name} !`
         });
         
-        // Rediriger vers l'interface femme de chambre avec le paramètre
-        navigate(`/housekeeper?name=${encodeURIComponent(housekeeperName)}&code=${code}`);
+        // Rediriger vers l'interface femme de chambre
+        navigate(`/housekeeper?name=${encodeURIComponent(authenticatedHousekeeper.name)}&code=${authenticatedHousekeeper.access_code}`);
       } else {
         toast({
           variant: "destructive",
@@ -120,16 +118,16 @@ export default function HousekeeperLogin() {
               <Input
                 id="accessCode"
                 type="text"
-                placeholder="Ex: HTL-1000"
+                placeholder="Ex: HTL-1234"
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
                 className="text-center text-lg font-mono h-12"
                 autoFocus
                 maxLength={8}
               />
-              {isDistributed && Object.keys(housekeeperAccessCodes).length > 0 && (
+              {isDistributed && housekeepers.length > 0 && (
                 <div className="text-xs text-gray-500 text-center">
-                  Codes disponibles: {Object.values(housekeeperAccessCodes).join(', ')}
+                  Codes disponibles: {housekeepers.map(h => h.access_code).join(', ')}
                 </div>
               )}
             </div>
