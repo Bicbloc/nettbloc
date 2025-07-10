@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Smartphone, User, ArrowLeft } from "lucide-react";
+import { Smartphone, User, ArrowLeft, Users, Loader2 } from "lucide-react";
 import { SupabaseService } from "@/services/supabaseService";
 
 export default function HousekeeperLogin() {
   const [accessCode, setAccessCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCodes, setIsLoadingCodes] = useState(true);
   const [allHousekeepers, setAllHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -18,26 +19,39 @@ export default function HousekeeperLogin() {
   // Charger toutes les femmes de chambre actives au chargement de la page
   useEffect(() => {
     const loadAllHousekeepers = async () => {
+      setIsLoadingCodes(true);
       try {
         console.log('🔍 Chargement de toutes les femmes de chambre actives...');
         const dbHousekeepers = await SupabaseService.getHousekeepers(); // Sans filtrage par hotelId
+        console.log('📊 Données brutes reçues:', dbHousekeepers.length, 'femmes de chambre');
         
         const activeHousekeepers = dbHousekeepers.filter(h => h.is_active);
-        setAllHousekeepers(activeHousekeepers.map(h => ({
+        console.log('🔍 Filtrées actives:', activeHousekeepers.length);
+        
+        const mappedHousekeepers = activeHousekeepers.map(h => ({
           id: h.id,
           name: h.name,
           access_code: h.access_code
-        })));
+        }));
         
-        console.log('✅ Femmes de chambre actives chargées:', activeHousekeepers.length);
-        console.log('📝 Codes disponibles:', activeHousekeepers.map(h => h.access_code));
+        console.log('🗂️ Codes mappés:', mappedHousekeepers.map(h => `${h.name}: ${h.access_code}`));
+        setAllHousekeepers(mappedHousekeepers);
+        
+        console.log('✅ État mis à jour avec', mappedHousekeepers.length, 'femmes de chambre actives');
       } catch (error) {
         console.error('❌ Erreur chargement femmes de chambre:', error);
+        toast({
+          variant: "destructive",
+          title: "Erreur de chargement",
+          description: "Impossible de charger les codes d'accès."
+        });
+      } finally {
+        setIsLoadingCodes(false);
       }
     };
 
     loadAllHousekeepers();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (allHousekeepers.length === 0) {
@@ -141,8 +155,31 @@ export default function HousekeeperLogin() {
         </CardHeader>
         
         <CardContent>
-          {allHousekeepers.length === 0 && (
-            <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
+          {/* Section d'affichage des codes d'accès */}
+          {isLoadingCodes ? (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-blue-600" />
+              <p className="text-sm text-blue-700">Chargement des codes d'accès...</p>
+            </div>
+          ) : allHousekeepers.length > 0 ? (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-5 w-5 text-green-600" />
+                <h3 className="font-semibold text-green-800">Codes d'accès disponibles</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {allHousekeepers.map((housekeeper) => (
+                  <div key={housekeeper.id} className="flex justify-between items-center p-2 bg-white rounded border">
+                    <span className="text-sm font-medium text-gray-700">{housekeeper.name}</span>
+                    <span className="text-lg font-mono font-bold text-green-600 bg-green-100 px-3 py-1 rounded">
+                      {housekeeper.access_code}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg text-center">
               <p className="text-sm text-orange-700">
                 Aucune femme de chambre créée. Allez dans l'interface admin pour créer des femmes de chambre.
               </p>
@@ -164,20 +201,23 @@ export default function HousekeeperLogin() {
                 className="text-center text-lg font-mono h-12"
                 autoFocus
                 maxLength={4}
+                disabled={isLoadingCodes}
               />
-              {allHousekeepers.length > 0 && (
-                <div className="text-xs text-gray-500 text-center">
-                  Codes disponibles: {allHousekeepers.map(h => h.access_code).join(', ')}
-                </div>
-              )}
             </div>
             
             <Button 
               type="submit" 
               className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading || allHousekeepers.length === 0}
+              disabled={isLoading || allHousekeepers.length === 0 || isLoadingCodes}
             >
-              {isLoading ? "Connexion..." : "Se connecter"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Connexion...
+                </>
+              ) : (
+                "Se connecter"
+              )}
             </Button>
           </form>
           
