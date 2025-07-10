@@ -4,30 +4,50 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Smartphone, User, ArrowLeft } from "lucide-react";
-import { useHousekeeping } from "@/contexts/HousekeepingContext";
+import { SupabaseService } from "@/services/supabaseService";
 
 export default function HousekeeperLogin() {
   const [accessCode, setAccessCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [allHousekeepers, setAllHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
   const navigate = useNavigate();
-  const { housekeepers, housekeeperNames, isDistributed, refreshHousekeepers } = useHousekeeping();
+  const { toast } = useToast();
 
-  // Charger les femmes de chambre au chargement de la page
+  // Charger toutes les femmes de chambre actives au chargement de la page
   useEffect(() => {
-    refreshHousekeepers();
-  }, [refreshHousekeepers]);
+    const loadAllHousekeepers = async () => {
+      try {
+        console.log('🔍 Chargement de toutes les femmes de chambre actives...');
+        const dbHousekeepers = await SupabaseService.getHousekeepers(); // Sans filtrage par hotelId
+        
+        const activeHousekeepers = dbHousekeepers.filter(h => h.is_active);
+        setAllHousekeepers(activeHousekeepers.map(h => ({
+          id: h.id,
+          name: h.name,
+          access_code: h.access_code
+        })));
+        
+        console.log('✅ Femmes de chambre actives chargées:', activeHousekeepers.length);
+        console.log('📝 Codes disponibles:', activeHousekeepers.map(h => h.access_code));
+      } catch (error) {
+        console.error('❌ Erreur chargement femmes de chambre:', error);
+      }
+    };
+
+    loadAllHousekeepers();
+  }, []);
 
   useEffect(() => {
-    if (housekeepers.length === 0) {
+    if (allHousekeepers.length === 0) {
       toast({
         variant: "destructive",
         title: "Aucune femme de chambre créée",
         description: "Aucune femme de chambre n'a été créée. Allez dans l'interface admin pour en créer."
       });
     }
-  }, [housekeepers]);
+  }, [allHousekeepers, toast]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +61,7 @@ export default function HousekeeperLogin() {
       return;
     }
 
-    if (housekeepers.length === 0) {
+    if (allHousekeepers.length === 0) {
       toast({
         variant: "destructive",
         title: "Aucune femme de chambre créée",
@@ -54,22 +74,38 @@ export default function HousekeeperLogin() {
     
     try {
       // Authentifier avec la base de données
-      const { SupabaseService } = await import('@/services/supabaseService');
       const authenticatedHousekeeper = await SupabaseService.authenticateHousekeeper(accessCode);
 
       if (authenticatedHousekeeper) {
-        // Sauvegarder les infos de connexion
-        localStorage.setItem('currentHousekeeper', authenticatedHousekeeper.name);
-        localStorage.setItem('currentAccessCode', authenticatedHousekeeper.access_code);
-        localStorage.setItem('currentHousekeeperId', authenticatedHousekeeper.id);
+        // Sauvegarder les données utilisateur dans localStorage
+        localStorage.setItem('housekeeper', JSON.stringify({
+          id: authenticatedHousekeeper.id,
+          name: authenticatedHousekeeper.name,
+          accessCode: authenticatedHousekeeper.access_code
+        }));
         
-        toast({
-          title: "Connexion réussie",
-          description: `Bonjour ${authenticatedHousekeeper.name} !`
-        });
+        // Récupérer et sauvegarder l'hôtel associé automatiquement
+        try {
+          const hotels = await SupabaseService.getHotels();
+          const housekeeperDetails = await SupabaseService.getHousekeepers();
+          const currentHousekeeper = housekeeperDetails.find(h => h.id === authenticatedHousekeeper.id);
+          
+          if (currentHousekeeper) {
+            const associatedHotel = hotels.find(hotel => hotel.id === currentHousekeeper.hotel_id);
+            
+            if (associatedHotel) {
+              localStorage.setItem('selectedHotelId', associatedHotel.id);
+              localStorage.setItem('selectedHotelName', associatedHotel.name);
+              localStorage.setItem('selectedHotelCode', associatedHotel.hotel_code || '');
+              console.log('✅ Hôtel associé automatiquement:', associatedHotel.name);
+            }
+          }
+        } catch (error) {
+          console.error('⚠️ Erreur récupération hôtel associé:', error);
+        }
         
-        // Rediriger vers l'interface femme de chambre
-        navigate(`/housekeeper?name=${encodeURIComponent(authenticatedHousekeeper.name)}&code=${authenticatedHousekeeper.access_code}`);
+        console.log('✅ Connexion femme de chambre réussie:', authenticatedHousekeeper.name);
+        navigate('/housekeeper');
       } else {
         toast({
           variant: "destructive",
@@ -105,7 +141,7 @@ export default function HousekeeperLogin() {
         </CardHeader>
         
         <CardContent>
-          {housekeepers.length === 0 && (
+          {allHousekeepers.length === 0 && (
             <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
               <p className="text-sm text-orange-700">
                 Aucune femme de chambre créée. Allez dans l'interface admin pour créer des femmes de chambre.
@@ -129,9 +165,9 @@ export default function HousekeeperLogin() {
                 autoFocus
                 maxLength={4}
               />
-              {housekeepers.length > 0 && (
+              {allHousekeepers.length > 0 && (
                 <div className="text-xs text-gray-500 text-center">
-                  Codes disponibles: {housekeepers.map(h => h.access_code).join(', ')}
+                  Codes disponibles: {allHousekeepers.map(h => h.access_code).join(', ')}
                 </div>
               )}
             </div>
@@ -139,7 +175,7 @@ export default function HousekeeperLogin() {
             <Button 
               type="submit" 
               className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading || housekeepers.length === 0}
+              disabled={isLoading || allHousekeepers.length === 0}
             >
               {isLoading ? "Connexion..." : "Se connecter"}
             </Button>
