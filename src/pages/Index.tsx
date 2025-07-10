@@ -57,11 +57,7 @@ const Index = () => {
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
 
-  // Redirect to auth if not authenticated and not in guest mode
-  if (!loading && !isAuthenticated && !isGuestMode) {
-    return <Navigate to="/auth" replace />;
-  }
-  
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState("overview");
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
@@ -76,12 +72,6 @@ const Index = () => {
     refreshHousekeepers
   } = useHousekeeping();
   
-  console.log("Index - isDistributed:", isDistributed); // Debug log
-
-  // Nettoyer les anciens IDs invalides au chargement
-  useEffect(() => {
-    cleanupInvalidHotelIds();
-  }, []);
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
@@ -122,6 +112,18 @@ const Index = () => {
   });
   
   const { addNotification } = useNotifications(currentHotelId);
+
+  // Redirect to auth if not authenticated and not in guest mode - AFTER ALL HOOKS
+  if (!loading && !isAuthenticated && !isGuestMode) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  console.log("Index - isDistributed:", isDistributed); // Debug log
+
+  // Nettoyer les anciens IDs invalides au chargement
+  useEffect(() => {
+    cleanupInvalidHotelIds();
+  }, []);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};
