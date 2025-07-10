@@ -108,6 +108,7 @@ export type Database = {
       }
       hotels: {
         Row: {
+          address: string | null
           created_at: string
           email: string
           hotel_code: string | null
@@ -117,6 +118,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string
           email: string
           hotel_code?: string | null
@@ -126,6 +128,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string
           email?: string
           hotel_code?: string | null
@@ -394,6 +397,10 @@ export type Database = {
       }
       generate_hotel_access_code: {
         Args: { hotel_uuid: string }
+        Returns: string
+      }
+      generate_short_hotel_id: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       validate_access_code_for_hotel: {

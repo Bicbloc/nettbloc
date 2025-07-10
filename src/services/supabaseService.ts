@@ -4,6 +4,7 @@ interface Hotel {
   id: string;
   name: string;
   email: string;
+  address?: string; // Nouvelle adresse
   hotel_code?: string; // Optional for compatibility
   created_at: string;
   updated_at: string;
@@ -30,7 +31,27 @@ interface RoomStatusUpdate {
 }
 
 export class SupabaseService {
-  // Gestion des hôtels
+  // Gestion des hôtels - Version simplifiée
+  static async createSimpleHotel(name: string, address: string, userEmail: string): Promise<Hotel | null> {
+    try {
+      const { data, error } = await supabase
+        .from('hotels')
+        .insert({ name, address, email: userEmail })
+        .select('id, name, email, address, hotel_code, created_at, updated_at')
+        .single();
+      
+      if (error || !data) {
+        console.error('Erreur création hôtel simple:', error);
+        return null;
+      }
+      return data as Hotel;
+    } catch (err) {
+      console.error('Erreur createSimpleHotel:', err);
+      return null;
+    }
+  }
+
+  // Version legacy pour compatibilité
   static async createHotel(name: string, email: string, hotelCode: string): Promise<Hotel | null> {
     try {
       const { data, error } = await supabase

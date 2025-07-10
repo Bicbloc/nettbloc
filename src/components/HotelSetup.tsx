@@ -4,26 +4,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Building, Mail, Plus, Check } from 'lucide-react';
+import { Building, Mail, Plus, Check, MapPin } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
 import { generateHotelId, isValidUUID } from '@/lib/utils';
 import { TestNotificationButton } from '@/components/TestNotificationButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Hotel {
   id: string;
   name: string;
   email: string;
+  address?: string;
   hotel_code: string;
   created_at: string;
   updated_at: string;
 }
 
 export const HotelSetup = () => {
+  const { user } = useAuth();
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [newHotelName, setNewHotelName] = useState('');
-  const [newHotelEmail, setNewHotelEmail] = useState('');
-  const [newHotelCode, setNewHotelCode] = useState('');
+  const [newHotelAddress, setNewHotelAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedHotelId, setSelectedHotelId] = useState<string>('');
 
@@ -42,32 +44,40 @@ export const HotelSetup = () => {
   };
 
   const handleCreateHotel = async () => {
-    if (!newHotelName.trim() || !newHotelEmail.trim() || !newHotelCode.trim()) {
+    if (!newHotelName.trim() || !newHotelAddress.trim()) {
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Veuillez remplir tous les champs"
+        description: "Veuillez remplir le nom et l'adresse de l'hôtel"
+      });
+      return;
+    }
+
+    if (!user?.email) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Vous devez être connecté pour créer un hôtel"
       });
       return;
     }
 
     setIsLoading(true);
-    const hotel = await SupabaseService.createHotel(newHotelName, newHotelEmail, newHotelCode);
+    const hotel = await SupabaseService.createSimpleHotel(newHotelName, newHotelAddress, user.email);
     
     if (hotel) {
       toast({
-        title: "Hôtel créé",
-        description: `L'hôtel "${newHotelName}" a été créé avec le code ${newHotelCode}`
+        title: "Établissement créé",
+        description: `L'établissement "${newHotelName}" a été créé avec le code ${hotel.hotel_code}`
       });
       setNewHotelName('');
-      setNewHotelEmail('');
-      setNewHotelCode('');
+      setNewHotelAddress('');
       await loadHotels();
     } else {
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de créer l'hôtel (le code existe peut-être déjà)"
+        description: "Impossible de créer l'établissement"
       });
     }
     setIsLoading(false);
@@ -87,8 +97,8 @@ export const HotelSetup = () => {
     });
     
     toast({
-      title: "Hôtel sélectionné",
-      description: `${hotel.name} (${hotel.hotel_code}) - ID: ${hotel.id.slice(0, 8)}...`
+      title: "Établissement sélectionné",
+      description: `${hotel.name} (${hotel.hotel_code})`
     });
   };
 
@@ -98,13 +108,13 @@ export const HotelSetup = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building className="h-5 w-5" />
-            Configuration Hôtel
+            Créer votre établissement
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="hotel-name">Nom de l'hôtel</Label>
+              <Label htmlFor="hotel-name">Nom de l'établissement</Label>
               <Input
                 id="hotel-name"
                 placeholder="Ex: Hôtel Bellevue"
@@ -113,25 +123,21 @@ export const HotelSetup = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hotel-code">Code établissement (pour l'accès mobile)</Label>
+              <Label htmlFor="hotel-address">Adresse de l'établissement</Label>
               <Input
-                id="hotel-code"
-                placeholder="Ex: HOTEL2024"
-                value={newHotelCode}
-                onChange={(e) => setNewHotelCode(e.target.value.toUpperCase())}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hotel-email">Email de contact</Label>
-              <Input
-                id="hotel-email"
-                type="email"
-                placeholder="contact@hotel-bellevue.com"
-                value={newHotelEmail}
-                onChange={(e) => setNewHotelEmail(e.target.value)}
+                id="hotel-address"
+                placeholder="Ex: 123 Rue de la Paix, 75001 Paris"
+                value={newHotelAddress}
+                onChange={(e) => setNewHotelAddress(e.target.value)}
               />
             </div>
           </div>
+          
+          {user?.email && (
+            <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
+              <span className="font-medium">Email de contact :</span> {user.email}
+            </div>
+          )}
           
           <Button 
             onClick={handleCreateHotel}
@@ -139,7 +145,7 @@ export const HotelSetup = () => {
             className="w-full"
           >
             <Plus className="h-4 w-4 mr-2" />
-            {isLoading ? 'Création en cours...' : 'Créer l\'hôtel'}
+            {isLoading ? 'Création en cours...' : 'Créer l\'établissement'}
           </Button>
         </CardContent>
       </Card>
@@ -147,7 +153,7 @@ export const HotelSetup = () => {
       {hotels.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Hôtels existants</CardTitle>
+            <CardTitle>Vos établissements</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -158,11 +164,20 @@ export const HotelSetup = () => {
                 >
                   <div className="flex items-center gap-3">
                     <Building className="h-4 w-4 text-muted-foreground" />
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium">{hotel.name}</div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-1">
+                      <div className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
                         <Mail className="h-3 w-3" />
                         {hotel.email}
+                      </div>
+                      {hotel.address && (
+                        <div className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {hotel.address}
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground mt-1 font-mono">
+                        Code: {hotel.hotel_code}
                       </div>
                     </div>
                   </div>
@@ -198,9 +213,9 @@ export const HotelSetup = () => {
         <Card>
           <CardContent className="text-center py-8">
             <Building className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Aucun hôtel configuré</h3>
+            <h3 className="text-lg font-semibold mb-2">Aucun établissement configuré</h3>
             <p className="text-muted-foreground">
-              Créez votre premier hôtel pour commencer à utiliser le système
+              Créez votre premier établissement pour commencer à utiliser le système
             </p>
           </CardContent>
         </Card>
