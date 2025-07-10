@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
@@ -41,6 +41,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HotelSetup } from "@/components/HotelSetup";
+import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -1052,7 +1053,7 @@ const Index = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Layers className="h-4 w-4" />
               Vue d'ensemble
@@ -1065,13 +1066,13 @@ const Index = () => {
               <Bed className="h-4 w-4" />
               Chambres
             </TabsTrigger>
-            <TabsTrigger value="housekeepers" className="flex items-center gap-2">
+            <TabsTrigger value="assignment" className="flex items-center gap-2">
               <UserIcon className="h-4 w-4" />
-              Femmes de chambre
+              Affectation
             </TabsTrigger>
-            <TabsTrigger value="distribution" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Distribution
+            <TabsTrigger value="access-codes" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              Codes d'accès
             </TabsTrigger>
             <TabsTrigger value="reports" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -1526,6 +1527,10 @@ const Index = () => {
                 })}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="access-codes" className="space-y-6">
+            <AccessCodeDisplay />
           </TabsContent>
 
           <TabsContent value="mobile" className="space-y-6">
