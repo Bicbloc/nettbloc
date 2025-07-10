@@ -22,8 +22,16 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Redirect if already authenticated
-  if (!loading && isAuthenticated) {
+  // Debug auth state
+  console.log('🔐 Auth State:', { isAuthenticated, loading, user: isAuthenticated ? 'Connected' : 'Not connected' });
+
+  // Check for forced access parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const forceAuth = urlParams.get('force') === 'true';
+
+  // Redirect if already authenticated (unless forced)
+  if (!loading && isAuthenticated && !forceAuth) {
+    console.log('🔄 Redirecting authenticated user to home');
     return <Navigate to="/" replace />;
   }
 
@@ -135,6 +143,7 @@ const Auth = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-4 text-muted-foreground">Vérification de l'authentification...</p>
       </div>
     );
   }
@@ -152,10 +161,31 @@ const Auth = () => {
           <CardHeader>
             <CardTitle>Bienvenue</CardTitle>
             <CardDescription>
-              Connectez-vous ou créez un compte pour gérer vos hôtels
+              {isAuthenticated && forceAuth ? 
+                "Vous êtes déjà connecté. Vous pouvez vous déconnecter ou changer de compte." :
+                "Connectez-vous ou créez un compte pour gérer vos hôtels"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {isAuthenticated && forceAuth && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 mb-2">Vous êtes déjà connecté.</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    toast({
+                      title: "Déconnexion réussie",
+                      description: "Vous pouvez maintenant vous reconnecter."
+                    });
+                  }}
+                >
+                  Se déconnecter
+                </Button>
+              </div>
+            )}
             <Tabs defaultValue="signin" className="space-y-4">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Connexion</TabsTrigger>

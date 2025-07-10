@@ -61,6 +61,10 @@ const UserMenu = () => {
           <span>Paramètres</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate('/auth?force=true')}>
+          <User className="mr-2 h-4 w-4" />
+          <span>Changer de compte</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Se déconnecter</span>
