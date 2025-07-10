@@ -12,18 +12,22 @@ export default function HousekeeperLogin() {
   const [accessCode, setAccessCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { housekeepers, housekeeperNames, isDistributed } = useHousekeeping();
+  const { housekeepers, housekeeperNames, isDistributed, refreshHousekeepers } = useHousekeeping();
 
-  // Vérifier si la distribution a été faite
+  // Charger les femmes de chambre au chargement de la page
   useEffect(() => {
-    if (!isDistributed) {
+    refreshHousekeepers();
+  }, [refreshHousekeepers]);
+
+  useEffect(() => {
+    if (housekeepers.length === 0) {
       toast({
         variant: "destructive",
-        title: "Distribution requise",
-        description: "Les codes d'accès ne sont pas encore générés. Veuillez d'abord distribuer les chambres."
+        title: "Aucune femme de chambre créée",
+        description: "Aucune femme de chambre n'a été créée. Allez dans l'interface admin pour en créer."
       });
     }
-  }, [isDistributed]);
+  }, [housekeepers]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,11 +41,11 @@ export default function HousekeeperLogin() {
       return;
     }
 
-    if (!isDistributed) {
+    if (housekeepers.length === 0) {
       toast({
         variant: "destructive",
-        title: "Codes non générés",
-        description: "Les codes d'accès ne sont pas encore générés. Retournez à l'interface principale pour distribuer les chambres."
+        title: "Aucune femme de chambre créée",
+        description: "Aucune femme de chambre n'a été créée. Allez dans l'interface admin pour en créer."
       });
       return;
     }
@@ -101,10 +105,10 @@ export default function HousekeeperLogin() {
         </CardHeader>
         
         <CardContent>
-          {!isDistributed && (
+          {housekeepers.length === 0 && (
             <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
               <p className="text-sm text-orange-700">
-                Les codes d'accès ne sont pas encore générés. Retournez à l'interface principale pour distribuer les chambres.
+                Aucune femme de chambre créée. Allez dans l'interface admin pour créer des femmes de chambre.
               </p>
             </div>
           )}
@@ -118,14 +122,14 @@ export default function HousekeeperLogin() {
               <Input
                 id="accessCode"
                 type="text"
-                placeholder="Ex: HTL-1234"
+                placeholder="Ex: 1234"
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
                 className="text-center text-lg font-mono h-12"
                 autoFocus
-                maxLength={8}
+                maxLength={4}
               />
-              {isDistributed && housekeepers.length > 0 && (
+              {housekeepers.length > 0 && (
                 <div className="text-xs text-gray-500 text-center">
                   Codes disponibles: {housekeepers.map(h => h.access_code).join(', ')}
                 </div>
@@ -135,7 +139,7 @@ export default function HousekeeperLogin() {
             <Button 
               type="submit" 
               className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading || !isDistributed}
+              disabled={isLoading || housekeepers.length === 0}
             >
               {isLoading ? "Connexion..." : "Se connecter"}
             </Button>
