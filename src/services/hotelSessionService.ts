@@ -62,9 +62,8 @@ export class HotelSessionService {
       if (!finalHotelId) {
         const savedHotelCode = localStorage.getItem('selectedHotelCode');
         if (savedHotelCode) {
-          // Pour l'instant, créer un hotelId basé sur le code
-          // En production, faire une requête pour récupérer l'ID réel
-          finalHotelId = `hotel_${savedHotelCode}`;
+          // Créer un UUID valide pour le mode invité
+          finalHotelId = crypto.randomUUID();
         }
       }
 

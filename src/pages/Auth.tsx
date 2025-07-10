@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Building, Users, Shield } from 'lucide-react';
+import { Loader2, Building, Users, Shield, UserCheck } from 'lucide-react';
 
 const Auth = () => {
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
@@ -83,6 +83,10 @@ const Auth = () => {
 
   const handleGuestMode = () => {
     navigate('/?mode=guest');
+  };
+
+  const handleHousekeeperAccess = () => {
+    navigate('/housekeeper-login');
   };
 
   if (loading) {
@@ -196,7 +200,7 @@ const Auth = () => {
               </TabsContent>
             </Tabs>
 
-            <div className="mt-6 pt-6 border-t">
+            <div className="mt-6 pt-6 border-t space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Shield className="h-4 w-4" />
@@ -213,6 +217,25 @@ const Auth = () => {
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   En mode invité, vos données ne seront pas sauvegardées et seront réinitialisées à chaque session.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <UserCheck className="h-4 w-4" />
+                  <span>Accès personnel de ménage :</span>
+                </div>
+                <Button 
+                  variant="secondary" 
+                  className="w-full" 
+                  onClick={handleHousekeeperAccess}
+                  type="button"
+                >
+                  <UserCheck className="mr-2 h-4 w-4" />
+                  Accès Femme de Chambre
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Interface dédiée pour le personnel de ménage avec code d'accès.
                 </p>
               </div>
             </div>
