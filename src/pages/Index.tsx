@@ -1398,6 +1398,30 @@ const Index = () => {
                 </Button>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="assignment" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Affectation des chambres</h2>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => openManualAssignment()}
+                  disabled={!isDistributed}
+                  variant="outline"
+                >
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Assignation manuelle
+                </Button>
+                <Button
+                  onClick={() => setIsRedistributionDialogOpen(true)}
+                  disabled={!isDistributed}
+                  variant="outline"
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Redistribuer
+                </Button>
+              </div>
+            </div>
 
             {!isDistributed ? (
               <Card>
