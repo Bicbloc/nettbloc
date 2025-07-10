@@ -34,9 +34,22 @@ export class SupabaseService {
   // Gestion des hôtels - Version simplifiée
   static async createSimpleHotel(name: string, address: string, userEmail: string): Promise<Hotel | null> {
     try {
+      // Récupérer l'utilisateur actuel pour obtenir son ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('Aucun utilisateur connecté');
+        return null;
+      }
+
       const { data, error } = await supabase
         .from('hotels')
-        .insert({ name, address, email: userEmail })
+        .insert({ 
+          name, 
+          address, 
+          email: userEmail,
+          user_id: user.id  // Assigner explicitement le user_id
+        })
         .select('id, name, email, address, hotel_code, created_at, updated_at')
         .single();
       

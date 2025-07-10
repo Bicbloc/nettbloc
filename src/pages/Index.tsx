@@ -1026,17 +1026,35 @@ const Index = () => {
             )}
           </h1>
           
-          <div className="flex items-center space-x-4">
-            {!isAuthenticated && !isGuestMode && (
-              <Button asChild>
-                <a href="/auth">
-                  <LogIn className="mr-2 h-4 w-4" />
-                  Se connecter
-                </a>
-              </Button>
-            )}
-            {isAuthenticated && <UserMenu />}
-          </div>
+           <div className="flex items-center space-x-4">
+             {!isAuthenticated && !isGuestMode && (
+               <>
+                 <Button asChild variant="outline">
+                   <a href="/housekeeper-login">
+                     <Smartphone className="mr-2 h-4 w-4" />
+                     Accès Femme de Chambre
+                   </a>
+                 </Button>
+                 <Button asChild>
+                   <a href="/auth">
+                     <LogIn className="mr-2 h-4 w-4" />
+                     Se connecter
+                   </a>
+                 </Button>
+               </>
+             )}
+             {isAuthenticated && (
+               <>
+                 <Button asChild variant="outline">
+                   <a href="/housekeeper-login">
+                     <Smartphone className="mr-2 h-4 w-4" />
+                     Accès Femme de Chambre
+                   </a>
+                 </Button>
+                 <UserMenu />
+               </>
+             )}
+           </div>
         </div>
 
         <div className="flex flex-col items-center mb-6">

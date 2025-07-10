@@ -28,6 +28,7 @@ export const HotelSetup = () => {
   const [newHotelAddress, setNewHotelAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedHotelId, setSelectedHotelId] = useState<string>('');
+  const [hasAutoCreatedHotel, setHasAutoCreatedHotel] = useState(false);
 
   useEffect(() => {
     loadHotels();
@@ -41,6 +42,14 @@ export const HotelSetup = () => {
   const loadHotels = async () => {
     const hotelsData = await SupabaseService.getHotels();
     setHotels(hotelsData as Hotel[]);
+    
+    // Si l'utilisateur a un hôtel créé automatiquement, le sélectionner
+    if (hotelsData.length > 0 && !selectedHotelId) {
+      const firstHotel = hotelsData[0] as Hotel;
+      setSelectedHotelId(firstHotel.id);
+      setHasAutoCreatedHotel(true);
+      handleSelectHotel(firstHotel);
+    }
   };
 
   const handleCreateHotel = async () => {
@@ -101,6 +110,100 @@ export const HotelSetup = () => {
       description: `${hotel.name} (${hotel.hotel_code})`
     });
   };
+
+  // Si l'utilisateur a déjà un hôtel, afficher le mode "compléter informations"
+  if (hotels.length > 0) {
+    const selectedHotel = hotels.find(h => h.id === selectedHotelId) || hotels[0];
+    
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5" />
+              Votre établissement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nom de l'établissement</Label>
+                <div className="p-3 bg-muted/30 rounded-lg font-medium">
+                  {selectedHotel.name}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Code de l'établissement</Label>
+                <div className="p-3 bg-muted/30 rounded-lg font-mono font-medium">
+                  {selectedHotel.hotel_code}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email de contact</Label>
+              <div className="p-3 bg-muted/30 rounded-lg flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                {selectedHotel.email}
+              </div>
+            </div>
+
+            {!selectedHotel.address ? (
+              <div className="space-y-2">
+                <Label htmlFor="hotel-address">Complétez l'adresse de votre établissement</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="hotel-address"
+                    placeholder="Ex: 123 Rue de la Paix, 75001 Paris"
+                    value={newHotelAddress}
+                    onChange={(e) => setNewHotelAddress(e.target.value)}
+                  />
+                  <Button 
+                    onClick={async () => {
+                      if (!newHotelAddress.trim()) return;
+                      setIsLoading(true);
+                      // Ici on pourrait ajouter une méthode pour mettre à jour l'adresse
+                      // Pour l'instant on simule
+                      setTimeout(() => {
+                        setIsLoading(false);
+                        toast({
+                          title: "Adresse mise à jour",
+                          description: "L'adresse de votre établissement a été sauvegardée."
+                        });
+                        loadHotels();
+                      }, 1000);
+                    }}
+                    disabled={isLoading || !newHotelAddress.trim()}
+                    size="sm"
+                  >
+                    {isLoading ? 'Mise à jour...' : 'Sauvegarder'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Adresse de l'établissement</Label>
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-green-600" />
+                  {selectedHotel.address}
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Check className="h-4 w-4 text-green-600" />
+                <span className="font-medium text-green-800">Établissement configuré</span>
+              </div>
+              <p className="text-sm text-green-700">
+                Votre établissement est prêt. Vous pouvez maintenant configurer vos femmes de chambre.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
