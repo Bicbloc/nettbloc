@@ -52,6 +52,15 @@ const Auth = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.companyName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Le nom de l'entreprise est obligatoire."
+      });
+      return;
+    }
+    
     if (formData.password !== formData.confirmPassword) {
       toast({
         variant: "destructive",
@@ -153,13 +162,17 @@ const Auth = () => {
               <TabsContent value="signup" className="space-y-4">
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-company">Nom de l'entreprise (optionnel)</Label>
+                    <Label htmlFor="signup-company">Nom de l'entreprise *</Label>
                     <Input
                       id="signup-company"
                       placeholder="Mon Hôtel"
                       value={formData.companyName}
                       onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                      required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Obligatoire pour créer votre hôtel et gérer votre compte
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>

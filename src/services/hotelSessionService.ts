@@ -306,7 +306,9 @@ export class HotelSessionService {
   }
 
   // Transformer les données brutes de Supabase vers le type HotelSession
-  private static transformSession(raw: HotelSessionRaw): HotelSession {
+  private static transformSession(raw: HotelSessionRaw | null): HotelSession | null {
+    if (!raw) return null;
+    
     return {
       id: raw.id,
       session_token: raw.session_token,
