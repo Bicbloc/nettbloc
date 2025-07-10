@@ -1,18 +1,21 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 interface RoomCardProps {
   room: Room;
   onUpdate: (room: Room) => void;
   onAssign?: (room: Room, housekeeperName: string) => void;
   onUnassign?: (room: Room) => void;
+  onReassign?: (room: Room, newHousekeeper: string | null) => void;
+  housekeeperNames?: string[];
   draggable?: boolean;
   compact?: boolean;
   selectable?: boolean;
@@ -26,6 +29,8 @@ export function RoomCard({
   onUpdate, 
   onAssign, 
   onUnassign,
+  onReassign,
+  housekeeperNames = [],
   draggable = false, 
   compact = false, 
   selectable = false,
@@ -184,7 +189,7 @@ export function RoomCard({
         </div>
         <span className="text-xs text-muted-foreground font-medium flex-shrink-0">{floorDisplay}</span>
         
-        {/* Boutons de changement rapide */}
+        {/* Boutons de changement rapide et menu réassignation */}
         {showActions && (
           <div className="ml-2 flex items-center gap-1 flex-shrink-0">
             <button 
@@ -239,6 +244,51 @@ export function RoomCard({
             >
               🚪
             </button>
+            
+            {/* Menu de réassignation si la chambre est assignée */}
+            {room.assignedTo && onReassign && housekeeperNames.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Options de réassignation"
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onUnassign) onUnassign(room);
+                    }}
+                    className="text-orange-600"
+                  >
+                    <UserX className="mr-2 h-4 w-4" />
+                    Désassigner
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {housekeeperNames
+                    .filter(name => name !== room.assignedTo)
+                    .map(name => (
+                    <DropdownMenuItem
+                      key={name}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onReassign(room, name);
+                        toast({
+                          description: `Chambre ${room.number} réassignée à ${name}`
+                        });
+                      }}
+                    >
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      Réassigner à {name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         )}
       </div>

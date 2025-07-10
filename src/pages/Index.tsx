@@ -199,6 +199,20 @@ const Index = () => {
     handleRoomUpdate(updatedRoom);
   };
 
+  const handleRoomReassign = (room: Room, newHousekeeper: string | null) => {
+    const updatedRoom = { 
+      ...room, 
+      assignedTo: newHousekeeper || undefined 
+    };
+    handleRoomUpdate(updatedRoom);
+    
+    toast({
+      description: newHousekeeper 
+        ? `Chambre ${room.number} réassignée à ${newHousekeeper}`
+        : `Chambre ${room.number} désassignée`
+    });
+  };
+
   const handleDeleteHousekeeper = async (housekeeperName: string) => {
     setHousekeeperNames(prev => prev.filter(name => name !== housekeeperName));
     
@@ -1468,6 +1482,7 @@ const Index = () => {
                             onGenerateReport={handleGenerateReport}
                             onRoomUpdate={handleRoomUpdate}
                             onRoomUnassign={handleRoomUnassign}
+                            onReassign={handleRoomReassign}
                             availableFloors={availableFloors}
                             onFloorPreferenceChange={handleFloorPreferenceChange}
                             preferredFloors={housekeeperFloorPreferences[name] || []}
@@ -1476,6 +1491,7 @@ const Index = () => {
                             onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
                             onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
                             accessCode={housekeepers.find(h => h.name === name)?.access_code || ''}
+                            housekeeperNames={housekeeperNames}
                           />
                         </div>
                       );
@@ -1554,7 +1570,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="access-codes" className="space-y-6">
-            <AccessCodeDisplay />
+            <AccessCodeDisplay key={`access-codes-${currentHotelId}`} />
           </TabsContent>
 
           <TabsContent value="mobile" className="space-y-6">

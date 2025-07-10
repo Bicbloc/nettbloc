@@ -27,6 +27,7 @@ interface HousekeeperCardProps {
   rooms: Room[];
   onRoomUpdate: (room: Room) => void;
   onRoomUnassign: (room: Room) => void;
+  onReassign?: (room: Room, newHousekeeper: string | null) => void;
   onGenerateReport: (name: string, rooms: Room[]) => void;
   cleaningConfig: CleaningConfig;
   draggable?: boolean;
@@ -41,13 +42,15 @@ interface HousekeeperCardProps {
   maxRoomsOverride?: number;
   onMaxRoomsOverrideChange?: (name: string, maxRooms: number) => void;
   onRename?: (newName: string) => void;
-  accessCode?: string; // Nouveau prop pour le code d'accès
+  accessCode?: string;
+  housekeeperNames?: string[];
 }
 
 export function HousekeeperCard({ 
   name, 
   rooms, 
-  onRoomUpdate, 
+  onRoomUpdate,
+  onReassign,
   onRoomUnassign,
   onGenerateReport,
   cleaningConfig,
@@ -63,7 +66,8 @@ export function HousekeeperCard({
   maxRoomsOverride,
   onMaxRoomsOverrideChange,
   onRename,
-  accessCode
+  accessCode,
+  housekeeperNames = []
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -662,14 +666,16 @@ export function HousekeeperCard({
                              key={room.number} 
                              className="min-w-0"
                            >
-                             <RoomCard 
-                               room={room} 
-                               onUpdate={onRoomUpdate} 
-                               compact 
-                               draggable={draggable}
-                               onUnassign={() => handleUnassignRoom(room)}
-                               showActions={true}
-                             />
+                              <RoomCard 
+                                room={room} 
+                                onUpdate={onRoomUpdate}
+                                onReassign={onReassign}
+                                onUnassign={() => handleUnassignRoom(room)}
+                                housekeeperNames={housekeeperNames}
+                                compact 
+                                draggable={draggable}
+                                showActions={true}
+                              />
                            </div>
                          ))}
                        </div>
