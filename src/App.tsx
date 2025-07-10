@@ -9,6 +9,9 @@ import NotFound from "./pages/NotFound";
 import Housekeeper from "./pages/Housekeeper";
 import HousekeeperLogin from "./pages/HousekeeperLogin";
 import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Reports from "./pages/Reports";
 import { BicblocFooter } from "./components/BicblocBranding";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -40,6 +43,9 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/reports" element={<Reports />} />
                   <Route path="/housekeeper" element={<Housekeeper />} />
                   <Route path="/housekeeper-login" element={<HousekeeperLogin />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

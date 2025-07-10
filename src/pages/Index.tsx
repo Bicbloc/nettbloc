@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1122,36 +1122,47 @@ const Index = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-8">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Layers className="h-4 w-4" />
-              Vue d'ensemble
-            </TabsTrigger>
-            <TabsTrigger value="configuration" className="flex items-center gap-2">
-              <Building className="h-4 w-4" />
-              Configuration
-            </TabsTrigger>
-            <TabsTrigger value="rooms" className="flex items-center gap-2">
-              <Bed className="h-4 w-4" />
-              Chambres
-            </TabsTrigger>
-            <TabsTrigger value="assignment" className="flex items-center gap-2">
-              <UserIcon className="h-4 w-4" />
-              Affectation
-            </TabsTrigger>
-            <TabsTrigger value="access-codes" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              Codes d'accès
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Rapports
-            </TabsTrigger>
-            <TabsTrigger value="mobile" className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4" />
-              Mobile
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-4">
+            <TabsList className="grid w-full grid-cols-7 max-w-fit">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Vue d'ensemble
+              </TabsTrigger>
+              <TabsTrigger value="configuration" className="flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Configuration
+              </TabsTrigger>
+              <TabsTrigger value="rooms" className="flex items-center gap-2">
+                <Bed className="h-4 w-4" />
+                Chambres
+              </TabsTrigger>
+              <TabsTrigger value="assignment" className="flex items-center gap-2">
+                <UserIcon className="h-4 w-4" />
+                Affectation
+              </TabsTrigger>
+              <TabsTrigger value="access-codes" className="flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                Codes d'accès
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Rapports
+              </TabsTrigger>
+              <TabsTrigger value="mobile" className="flex items-center gap-2">
+                <Smartphone className="h-4 w-4" />
+                Mobile
+              </TabsTrigger>
+            </TabsList>
+            <Button
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/reports')}
+              className="flex items-center gap-2"
+            >
+              <Archive className="h-4 w-4" />
+              Archives
+            </Button>
+          </div>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

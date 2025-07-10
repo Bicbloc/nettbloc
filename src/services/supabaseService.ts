@@ -189,13 +189,25 @@ export class SupabaseService {
   // Gestion des femmes de chambre
   static async createHousekeeper(hotelId: string, name: string): Promise<Housekeeper | null> {
     try {
+      console.log('🔧 Début création femme de chambre:', { hotelId, name });
+      
       // Générer un code d'accès sécurisé pour l'hôtel
       const { data: accessCodeData, error: codeError } = await supabase.rpc('generate_hotel_access_code', {
         hotel_uuid: hotelId
       });
 
+      console.log('🔑 Résultat génération code:', { accessCodeData, codeError });
+
       if (codeError || !accessCodeData) {
-        console.error('Erreur génération code d\'accès:', codeError);
+        console.error('❌ Erreur génération code d\'accès:', codeError);
+        return null;
+      }
+
+      // Récupérer l'utilisateur actuel pour obtenir son ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('❌ Aucun utilisateur connecté');
         return null;
       }
 
@@ -204,18 +216,23 @@ export class SupabaseService {
         .insert({ 
           hotel_id: hotelId, 
           name, 
-          access_code: accessCodeData 
+          access_code: accessCodeData,
+          user_id: user.id  // Assigner explicitement le user_id pour RLS
         })
         .select()
         .single();
       
+      console.log('👩‍🏠 Résultat création femme de chambre:', { data, error });
+      
       if (error) {
-        console.error('Erreur création femme de chambre:', error);
+        console.error('❌ Erreur création femme de chambre:', error);
         return null;
       }
+      
+      console.log('✅ Femme de chambre créée avec succès:', data);
       return data as Housekeeper;
     } catch (err) {
-      console.error('Erreur createHousekeeper:', err);
+      console.error('❌ Erreur createHousekeeper:', err);
       return null;
     }
   }
