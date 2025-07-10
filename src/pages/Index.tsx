@@ -96,14 +96,16 @@ const Index = () => {
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   
-  // ID d'hôtel déterministe - toujours généré depuis le code si disponible
-  const currentHotelId = hotelCode ? generateHotelId(hotelCode) : 
-    (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
+  // État pour l'ID hôtel réel depuis la base de données
+  const [realHotelId, setRealHotelId] = useState<string | null>(null);
+  
+  // ID d'hôtel - utilise l'ID réel de la base ou le localStorage
+  const currentHotelId = realHotelId || selectedHotel?.id || localStorage.getItem("selectedHotelId");
   
   console.log("🏨 Hotel ID pour notifications:", {
     hotelCode,
+    realHotelId,
     currentHotelId,
-    generatedFromCode: hotelCode ? generateHotelId(hotelCode) : null,
     selectedHotelId: selectedHotel?.id
   });
   
@@ -117,27 +119,44 @@ const Index = () => {
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
 
-  // Charger les valeurs depuis localStorage et vérifier l'authentification
+  // Charger les valeurs depuis localStorage et récupérer l'ID réel de l'hôtel
   useEffect(() => {
-    const savedHotelCode = localStorage.getItem('selectedHotelCode');
-    const savedUserEmail = localStorage.getItem('userEmail');
-    
-    if (savedHotelCode && savedUserEmail) {
-      setHotelCode(savedHotelCode);
-      setUserEmail(savedUserEmail);
+    const loadHotelData = async () => {
+      const savedHotelCode = localStorage.getItem('selectedHotelCode');
+      const savedUserEmail = localStorage.getItem('userEmail');
       
-      // Générer un nouvel ID UUID valide et le sauvegarder
-      const validHotelId = generateHotelId(savedHotelCode);
-      localStorage.setItem('selectedHotelId', validHotelId);
-      console.log('✅ ID hôtel valide généré et sauvegardé:', validHotelId);
-      
-      // Vérifier l'association email/code hôtel
-      const storedCode = getHotelCodeForEmail(savedUserEmail);
-      
-      if (storedCode === savedHotelCode) {
-        setIsAuthenticated(true);
+      if (savedHotelCode && savedUserEmail) {
+        setHotelCode(savedHotelCode);
+        setUserEmail(savedUserEmail);
+        
+        console.log('🔍 Récupération de l\'hôtel par code:', savedHotelCode);
+        
+        // Récupérer l'ID réel de l'hôtel depuis la base de données
+        const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
+        
+        if (hotel) {
+          console.log('✅ Hôtel trouvé dans la base:', hotel);
+          setRealHotelId(hotel.id);
+          localStorage.setItem('selectedHotelId', hotel.id);
+          
+          // Vérifier l'association email/code hôtel
+          const storedCode = getHotelCodeForEmail(savedUserEmail);
+          
+          if (storedCode === savedHotelCode) {
+            setIsAuthenticated(true);
+          }
+        } else {
+          console.error('❌ Aucun hôtel trouvé pour le code:', savedHotelCode);
+          toast({
+            variant: "destructive",
+            title: "Hôtel introuvable",
+            description: `Aucun hôtel trouvé avec le code ${savedHotelCode}. Veuillez configurer un hôtel.`
+          });
+        }
       }
-    }
+    };
+    
+    loadHotelData();
   }, []);
   
   // Calculer le nombre recommandé de femmes de chambre

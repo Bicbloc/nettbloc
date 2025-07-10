@@ -137,7 +137,34 @@ export const useNotifications = (hotelId?: string) => {
     }
 
     try {
-      console.log('📝 Création notification:', {
+      // Vérifier que l'hôtel existe avant de créer la notification
+      const { data: hotelExists, error: hotelError } = await supabase
+        .from('hotels')
+        .select('id')
+        .eq('id', hotelId)
+        .maybeSingle();
+
+      if (hotelError) {
+        console.error('❌ Erreur vérification hôtel:', hotelError);
+        toast({
+          variant: "destructive",
+          title: "Erreur base de données",
+          description: "Impossible de vérifier l'hôtel"
+        });
+        return null;
+      }
+
+      if (!hotelExists) {
+        console.error('❌ Hôtel introuvable avec ID:', hotelId);
+        toast({
+          variant: "destructive",
+          title: "Hôtel introuvable",
+          description: "L'hôtel spécifié n'existe pas dans la base de données"
+        });
+        return null;
+      }
+
+      console.log('✅ Hôtel trouvé, création de la notification...', {
         hotel_id: hotelId,
         ...notification
       });

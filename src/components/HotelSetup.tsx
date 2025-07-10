@@ -74,23 +74,21 @@ export const HotelSetup = () => {
   };
 
   const handleSelectHotel = (hotel: Hotel) => {
-    // Générer un UUID valide basé sur le code hôtel
-    const validHotelId = generateHotelId(hotel.hotel_code);
-    
-    setSelectedHotelId(validHotelId);
-    localStorage.setItem('selectedHotelId', validHotelId);
+    // Utiliser l'ID réel de l'hôtel depuis la base de données
+    setSelectedHotelId(hotel.id);
+    localStorage.setItem('selectedHotelId', hotel.id);
     localStorage.setItem('selectedHotelCode', hotel.hotel_code);
     localStorage.setItem('selectedHotelName', hotel.name);
     
-    console.log('✅ Hôtel sélectionné avec ID valide:', {
+    console.log('✅ Hôtel sélectionné avec ID réel:', {
       name: hotel.name,
       code: hotel.hotel_code,
-      id: validHotelId
+      realId: hotel.id
     });
     
     toast({
       title: "Hôtel sélectionné",
-      description: `${hotel.name} (${hotel.hotel_code}) - ID: ${validHotelId.slice(0, 8)}...`
+      description: `${hotel.name} (${hotel.hotel_code}) - ID: ${hotel.id.slice(0, 8)}...`
     });
   };
 
@@ -170,7 +168,7 @@ export const HotelSetup = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {selectedHotelId === generateHotelId(hotel.hotel_code) && (
+                    {selectedHotelId === hotel.id && (
                       <Badge variant="secondary" className="flex items-center gap-1">
                         <Check className="h-3 w-3" />
                         Sélectionné
@@ -178,14 +176,14 @@ export const HotelSetup = () => {
                     )}
                     <div className="flex gap-2">
                       <Button
-                        variant={selectedHotelId === generateHotelId(hotel.hotel_code) ? "secondary" : "outline"}
+                        variant={selectedHotelId === hotel.id ? "secondary" : "outline"}
                         size="sm"
                         onClick={() => handleSelectHotel(hotel)}
                       >
-                        {selectedHotelId === generateHotelId(hotel.hotel_code) ? 'Actuel' : 'Sélectionner'}
+                        {selectedHotelId === hotel.id ? 'Actuel' : 'Sélectionner'}
                       </Button>
-                      {selectedHotelId === generateHotelId(hotel.hotel_code) && (
-                        <TestNotificationButton hotelId={selectedHotelId} />
+                      {selectedHotelId === hotel.id && (
+                        <TestNotificationButton hotelId={hotel.id} />
                       )}
                     </div>
                   </div>
