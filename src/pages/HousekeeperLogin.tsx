@@ -120,12 +120,12 @@ export default function HousekeeperLogin() {
               <Input
                 id="accessCode"
                 type="text"
-                placeholder="Ex: 1234"
+                placeholder="Ex: HTL-1000"
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
                 className="text-center text-lg font-mono h-12"
                 autoFocus
-                maxLength={4}
+                maxLength={8}
               />
               {isDistributed && Object.keys(housekeeperAccessCodes).length > 0 && (
                 <div className="text-xs text-gray-500 text-center">

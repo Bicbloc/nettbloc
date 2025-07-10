@@ -87,9 +87,11 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           // Générer des codes d'accès pour les nouvelles femmes de chambre
           setHousekeeperAccessCodes(prev => {
             const newCodes = { ...prev };
+            const savedHotelCode = localStorage.getItem('selectedHotelCode');
+            const baseCode = savedHotelCode || 'HTL';
             (session.housekeeper_names || []).forEach((name, index) => {
               if (!newCodes[name]) {
-                newCodes[name] = String(1000 + index).slice(-4);
+                newCodes[name] = `${baseCode}-${String(1000 + index)}`;
               }
             });
             return newCodes;
