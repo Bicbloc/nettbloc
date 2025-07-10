@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Building, Users, Shield, UserCheck } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Auth = () => {
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
@@ -98,6 +99,38 @@ const Auth = () => {
     navigate('/housekeeper-login');
   };
 
+  const handlePasswordReset = async () => {
+    if (!formData.email.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Email requis",
+        description: "Veuillez saisir votre email avant de demander une réinitialisation."
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/auth`
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Email envoyé",
+        description: "Un email de réinitialisation a été envoyé à votre adresse."
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible d'envoyer l'email de réinitialisation."
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -160,10 +193,7 @@ const Auth = () => {
                     <Button 
                       variant="link" 
                       type="button"
-                      onClick={() => toast({
-                        title: "Réinitialisation du mot de passe",
-                        description: "Fonctionnalité à venir. Contactez votre administrateur."
-                      })}
+                      onClick={handlePasswordReset}
                       className="text-sm text-muted-foreground"
                     >
                       Mot de passe oublié ?

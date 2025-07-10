@@ -1123,14 +1123,10 @@ const Index = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between mb-4">
-            <TabsList className="grid w-full grid-cols-7 max-w-fit">
+            <TabsList className="grid w-full grid-cols-6 max-w-fit">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <Layers className="h-4 w-4" />
                 Vue d'ensemble
-              </TabsTrigger>
-              <TabsTrigger value="configuration" className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                Configuration
               </TabsTrigger>
               <TabsTrigger value="rooms" className="flex items-center gap-2">
                 <Bed className="h-4 w-4" />
