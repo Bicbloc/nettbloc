@@ -107,6 +107,22 @@ const Auth = () => {
     navigate('/housekeeper-login');
   };
 
+  // Handle password reset from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReset = urlParams.get('reset') === 'true';
+    
+    if (isReset) {
+      // Clear the URL parameter
+      window.history.replaceState({}, '', '/auth');
+      
+      toast({
+        title: "Réinitialisation activée",
+        description: "Vous pouvez maintenant définir un nouveau mot de passe dans l'onglet connexion."
+      });
+    }
+  }, []);
+
   const handlePasswordReset = async () => {
     if (!formData.email.trim()) {
       toast({
@@ -119,7 +135,7 @@ const Auth = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth`
+        redirectTo: `${window.location.origin}/auth?reset=true`
       });
 
       if (error) {

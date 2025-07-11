@@ -48,6 +48,7 @@ import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useAutoSetup } from "@/hooks/use-auto-setup";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 
@@ -71,6 +72,9 @@ const Index = () => {
     housekeepers,
     refreshHousekeepers
   } = useHousekeeping();
+  
+  // Auto-setup automatique de l'hôtel et génération des codes
+  const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
   
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
@@ -955,7 +959,7 @@ const Index = () => {
     }
   };
   
-  // Interface de connexion si pas encore authentifié
+  // Interface de connexion si pas encore authentifié - redirection automatique
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
@@ -963,48 +967,45 @@ const Index = () => {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">NettoBloc</CardTitle>
             <CardDescription>
-              Veuillez vous identifier pour accéder à l'interface
+              Accès nécessaire pour continuer
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 text-center">
+            <p className="text-muted-foreground">
+              Vous devez être connecté pour accéder à l'interface de gestion.
+            </p>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="votre@email.com"
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hotelCode">Code de l'hôtel</Label>
-              <Input
-                id="hotelCode"
-                type="text"
-                placeholder="CODE123"
-                value={hotelCode}
-                onChange={(e) => setHotelCode(e.target.value)}
-              />
-            </div>
-            <Button 
-              onClick={() => {
-                setEmail(userEmail);
-                // En mode invité, pas besoin d'authentification
-                console.log('Configuration sauvegardée en mode invité');
-              }}
-              className="w-full"
-            >
-              Confirmer
-            </Button>
-            <div className="text-center pt-4">
+              <Button 
+                onClick={() => navigate("/auth")}
+                className="w-full"
+              >
+                Se connecter / S'inscrire
+              </Button>
               <Button 
                 variant="outline" 
                 onClick={() => navigate("/housekeeper-login")}
+                className="w-full"
               >
                 Accès Femme de Chambre
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Affichage pendant la configuration automatique
+  if (setupLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <div className="h-8 w-8 animate-spin mx-auto mb-4 border-2 border-primary border-t-transparent rounded-full" />
+            <h3 className="text-lg font-semibold mb-2">Configuration automatique</h3>
+            <p className="text-muted-foreground">
+              Initialisation de votre hôtel et génération des codes d'accès...
+            </p>
           </CardContent>
         </Card>
       </div>

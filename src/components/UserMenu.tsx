@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAdminRole } from '@/hooks/use-admin-role';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,11 +12,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings } from 'lucide-react';
+import { LogOut, User, Settings, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const UserMenu = () => {
   const { user, signOut, isAuthenticated } = useAuth();
+  const { isSuperAdmin } = useAdminRole();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -60,6 +62,12 @@ const UserMenu = () => {
           <Settings className="mr-2 h-4 w-4" />
           <span>Paramètres</span>
         </DropdownMenuItem>
+        {isSuperAdmin && (
+          <DropdownMenuItem onClick={() => navigate('/admin')}>
+            <Shield className="mr-2 h-4 w-4" />
+            <span>Administration</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate('/auth?force=true')}>
           <User className="mr-2 h-4 w-4" />
