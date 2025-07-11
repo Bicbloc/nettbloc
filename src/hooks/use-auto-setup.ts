@@ -41,18 +41,18 @@ export const useAutoSetup = () => {
 
         let hotelData = existingHotel;
 
-        // 2. Si pas d'hôtel, le créer automatiquement
+        // 2. Si pas d'hôtel, créer un nouveau systématiquement avec le company_name du profil
         if (!existingHotel) {
-          console.log('🏨 Auto-setup: Création de l\'hôtel...');
+          console.log('🏨 Auto-setup: Création d\'un nouvel hôtel...');
           
-          // Récupérer le profil utilisateur pour le company_name
+          // Récupérer le profil utilisateur pour le company_name actuel
           const { data: profile } = await supabase
             .from('profiles')
             .select('company_name')
             .eq('id', user.id)
             .single();
 
-          const hotelName = profile?.company_name || `Hôtel de ${user.email}`;
+          const hotelName = profile?.company_name || `Établissement de ${user.email}`;
 
           const { data: newHotel, error: createError } = await supabase
             .from('hotels')
@@ -67,7 +67,30 @@ export const useAutoSetup = () => {
           if (createError) throw createError;
           hotelData = newHotel;
           
-          console.log('🏨 Auto-setup: Hôtel créé:', hotelData);
+          console.log('🏨 Auto-setup: Nouvel hôtel créé:', hotelData);
+        } else {
+          // 2bis. Mettre à jour le nom de l'hôtel existant avec le company_name actuel
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_name')
+            .eq('id', user.id)
+            .single();
+
+          const updatedHotelName = profile?.company_name || existingHotel.name;
+          
+          if (updatedHotelName !== existingHotel.name) {
+            const { data: updatedHotel, error: updateError } = await supabase
+              .from('hotels')
+              .update({ name: updatedHotelName })
+              .eq('id', existingHotel.id)
+              .select()
+              .single();
+
+            if (!updateError && updatedHotel) {
+              hotelData = updatedHotel;
+              console.log('🏨 Auto-setup: Nom d\'hôtel mis à jour:', updatedHotelName);
+            }
+          }
         }
 
         if (hotelData) {

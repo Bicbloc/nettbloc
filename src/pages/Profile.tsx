@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import BackButton from '@/components/BackButton';
 
 interface UserProfile {
   id: string;
@@ -138,13 +139,16 @@ const Profile = () => {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header avec bouton retour */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Mon Profil</h1>
-            <p className="text-muted-foreground">
-              Gérez vos informations personnelles et votre compte
-            </p>
+          <div className="flex items-center gap-4">
+            <BackButton />
+            <div>
+              <h1 className="text-3xl font-bold">Mon Profil</h1>
+              <p className="text-muted-foreground">
+                Gérez vos informations personnelles et votre compte
+              </p>
+            </div>
           </div>
           <Badge variant="secondary" className="text-sm">
             {profile.subscription_type === 'premium' ? 'Premium' : 'Gratuit'}
@@ -182,17 +186,20 @@ const Profile = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <Label className="flex items-center gap-2">
                 <Building className="h-4 w-4" />
-                Nom de l'entreprise
+                Nom de l'établissement
               </Label>
               <div className="md:col-span-2">
                 {isEditing ? (
                   <div className="space-y-3">
-                    <Input
-                      value={editedCompanyName}
-                      onChange={(e) => setEditedCompanyName(e.target.value)}
-                      placeholder="Nom de votre établissement"
-                      className="w-full"
-                    />
+                      <Input
+                        value={editedCompanyName}
+                        onChange={(e) => setEditedCompanyName(e.target.value)}
+                        placeholder="Nom de votre établissement (hôtel, résidence, etc.)"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Ce nom sera utilisé pour identifier votre établissement
+                      </p>
                     <div className="flex gap-2">
                       <Button
                         size="sm"

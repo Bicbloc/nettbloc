@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Building, Users, Shield, UserCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
