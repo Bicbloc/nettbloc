@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide-react";
 import { SupabaseService } from "@/services/supabaseService";
+import BackButton from '@/components/BackButton';
 
 export default function HousekeeperLogin() {
   const [step, setStep] = useState<"hotel" | "housekeeper">("hotel");
@@ -125,7 +126,10 @@ export default function HousekeeperLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 left-4">
+        <BackButton to="/" />
+      </div>
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">

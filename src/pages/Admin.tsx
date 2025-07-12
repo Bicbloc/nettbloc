@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { User, Shield, Database, Activity, Trash2, UserPlus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import BackButton from '@/components/BackButton';
 
 interface UserWithRole {
   id: string;
@@ -186,11 +187,14 @@ const Admin = () => {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Shield className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">Administration NettoBloc</h1>
-          <p className="text-muted-foreground">Gestion des utilisateurs et sessions</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <Shield className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">Administration NettoBloc</h1>
+            <p className="text-muted-foreground">Gestion des utilisateurs et sessions</p>
+          </div>
         </div>
       </div>
 

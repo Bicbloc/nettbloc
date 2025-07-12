@@ -166,7 +166,10 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4 relative">
+      <div className="absolute top-4 left-4">
+        <BackButton to="/" />
+      </div>
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <Building className="h-12 w-12 mx-auto text-primary" />
