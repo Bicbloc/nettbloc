@@ -43,7 +43,6 @@ import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
-import { HotelSetup } from "@/components/HotelSetup";
 import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
@@ -1017,15 +1016,22 @@ const Index = () => {
       <div className="container mx-auto py-6">
         {/* Header avec navigation et authentification */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Building className="h-8 w-8 text-primary" />
-            NettoBloc
-            {isGuestMode && (
-              <Badge variant="outline" className="ml-2">
-                Mode Invité
-              </Badge>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <Building className="h-8 w-8 text-primary" />
+              NettoBloc
+              {isGuestMode && (
+                <Badge variant="outline" className="ml-2">
+                  Mode Invité
+                </Badge>
+              )}
+            </h1>
+            {hotel && (
+              <div className="text-sm text-muted-foreground mt-1">
+                <strong>Hôtel:</strong> {hotel.name} | <strong>ID:</strong> <code className="bg-muted px-1 rounded">{hotel.hotel_code}</code>
+              </div>
             )}
-          </h1>
+          </div>
           
            <div className="flex items-center space-x-4">
              {!isAuthenticated && !isGuestMode && (
@@ -1058,61 +1064,6 @@ const Index = () => {
            </div>
         </div>
 
-        <div className="flex flex-col items-center mb-6">
-          
-          {/* Configuration de l'hôtel - Entrée directe du code */}
-          <div className="w-full max-w-2xl mb-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building className="h-5 w-5 text-blue-600" />
-                  Configuration Hôtel
-                </CardTitle>
-                <CardDescription>
-                  Entrez le code de votre hôtel et votre email pour commencer
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="hotel-code" className="text-sm font-medium">
-                      Code Hôtel
-                    </label>
-                    <Input
-                      id="hotel-code"
-                      placeholder="Ex: HOTEL2024"
-                      value={hotelCode}
-                      onChange={(e) => setHotelCode(e.target.value.toUpperCase())}
-                      className="font-mono"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="user-email" className="text-sm font-medium">
-                      Votre Email
-                    </label>
-                    <Input
-                      id="user-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={userEmail}
-                      onChange={(e) => setUserEmail(e.target.value)}
-                    />
-                  </div>
-                </div>
-                {hotelCode && userEmail && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                    <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-700">
-                        Configuration prête - Hôtel: <strong>{hotelCode}</strong>
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
 
         {/* Panneau de notifications global */}
         <div className="fixed top-4 right-4 z-50">

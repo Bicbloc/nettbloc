@@ -11,15 +11,36 @@ export const AccessCodeDisplay = () => {
   const { user, isAuthenticated } = useAuth();
   const { accessCode, generateNewAccessCode, hotel } = useAutoSetup();
   const { toast } = useToast();
-  const [codes, setCodes] = useState<string[]>([]);
+  const [housekeeperCodes, setHousekeeperCodes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
 
+  // Charger les codes depuis les femmes de chambre en base
   useEffect(() => {
-    if (isAuthenticated && accessCode) {
-      setCodes([accessCode]);
+    const loadHousekeeperCodes = async () => {
+      if (!hotel?.id) return;
+      
+      try {
+        // Récupérer toutes les femmes de chambre avec leurs codes
+        const { SupabaseService } = await import('@/services/supabaseService');
+        const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
+        
+        if (housekeepers) {
+          const codes: Record<string, string> = {};
+          housekeepers.forEach(hk => {
+            codes[hk.name] = hk.access_code;
+          });
+          setHousekeeperCodes(codes);
+        }
+      } catch (error) {
+        console.error('Erreur chargement codes femmes de chambre:', error);
+      }
+    };
+
+    if (isAuthenticated && hotel) {
+      loadHousekeeperCodes();
     }
-  }, [isAuthenticated, accessCode]);
+  }, [isAuthenticated, hotel]);
 
   const generateAccessCodes = async () => {
     if (!hotel) return;
@@ -28,7 +49,11 @@ export const AccessCodeDisplay = () => {
     try {
       const newCode = await generateNewAccessCode();
       if (newCode) {
-        setCodes([newCode]);
+        // Le code principal pour l'hôtel
+        toast({
+          title: "Code généré",
+          description: "Nouveau code d'accès principal généré."
+        });
       }
     } catch (error: any) {
       console.error('Erreur génération codes:', error);
@@ -105,25 +130,60 @@ export const AccessCodeDisplay = () => {
           </Button>
         </div>
 
-        {accessCode && showCodes && (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Code d'accès actuel :
-            </p>
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border">
-              <code className="font-mono text-xl font-bold text-primary">
-                {accessCode}
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(accessCode)}
-                className="flex items-center gap-1"
-              >
-                <Copy className="h-3 w-3" />
-                Copier
-              </Button>
-            </div>
+        {showCodes && (
+          <div className="space-y-4">
+            {/* Code principal de l'hôtel */}
+            {accessCode && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Code d'accès principal de l'hôtel :
+                </p>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border">
+                  <code className="font-mono text-xl font-bold text-primary">
+                    {accessCode}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(accessCode)}
+                    className="flex items-center gap-1"
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copier
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Codes individuels des femmes de chambre */}
+            {Object.keys(housekeeperCodes).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Codes d'accès des femmes de chambre :
+                </p>
+                <div className="space-y-2">
+                  {Object.entries(housekeeperCodes).map(([name, code]) => (
+                    <div key={name} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border">
+                      <div>
+                        <div className="font-medium text-sm">{name}</div>
+                        <code className="font-mono text-lg font-bold text-blue-700">
+                          {code}
+                        </code>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(code)}
+                        className="flex items-center gap-1"
+                      >
+                        <Copy className="h-3 w-3" />
+                        Copier
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             {hotel && (
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -134,7 +194,7 @@ export const AccessCodeDisplay = () => {
                   1. Code de l'hôtel : <code className="bg-blue-100 px-1 rounded">{hotel.hotel_code}</code>
                 </p>
                 <p className="text-sm text-blue-700">
-                  2. Code d'accès personnel : <code className="bg-blue-100 px-1 rounded">{accessCode}</code>
+                  2. Utilisez votre code d'accès personnel ci-dessus
                 </p>
               </div>
             )}
@@ -145,6 +205,14 @@ export const AccessCodeDisplay = () => {
           <p className="text-muted-foreground text-center py-8">
             Code d'accès en cours de génération automatique...
           </p>
+        )}
+
+        {Object.keys(housekeeperCodes).length === 0 && showCodes && accessCode && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800">
+              Aucune femme de chambre configurée. Ajoutez des femmes de chambre dans l'onglet "Équipe" pour générer leurs codes d'accès individuels.
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>

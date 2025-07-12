@@ -297,15 +297,22 @@ export class SupabaseService {
   }
 
   static async authenticateHousekeeper(accessCode: string): Promise<Housekeeper | null> {
+    console.log('🔐 Tentative d\'authentification avec code:', accessCode);
+    
     const { data, error } = await supabase
       .from('housekeepers')
       .select('*, hotels!inner(id, hotel_code)')
       .eq('access_code', accessCode)
       .eq('is_active', true)
-      .single();
+      .maybeSingle(); // Utiliser maybeSingle pour éviter les erreurs
     
     if (error) {
-      console.error('Erreur authentification femme de chambre:', error);
+      console.error('❌ Erreur authentification femme de chambre:', error);
+      return null;
+    }
+
+    if (!data) {
+      console.error('❌ Code d\'accès non trouvé ou inactif:', accessCode);
       return null;
     }
 
@@ -317,11 +324,12 @@ export class SupabaseService {
       });
 
       if (!isValidCode) {
-        console.error('Code d\'accès ne correspond pas à l\'hôtel');
+        console.error('❌ Code d\'accès ne correspond pas à l\'hôtel');
         return null;
       }
     }
-
+    
+    console.log('✅ Authentification réussie pour:', data.name);
     return data as Housekeeper;
   }
 
