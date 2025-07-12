@@ -131,35 +131,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
     
     setIsHousekeeperDialogOpen(false);
     
-    // Après configuration des femmes de chambre, procéder automatiquement à la distribution
-    if (pdfData && configuredHousekeepers.length > 0) {
-      // Distribution automatique par étages
-      const roomAssignments = autoDistributeRooms(pdfData, configuredHousekeepers);
-      
-      if (roomAssignments) {
-        // Convertir les assignations en format Record<string, string> pour la base de données
-        const assignments: Record<string, string> = {};
-        Object.entries(roomAssignments).forEach(([housekeeper, rooms]) => {
-          rooms.forEach(room => {
-            assignments[room.number] = housekeeper;
-          });
-        });
-        
-        // Sauvegarder les assignations
-        await HotelSessionService.updateHousekeeperAssignments(assignments);
-        await HotelSessionService.markAsDistributed();
-        
-        // Terminer le workflow
-        onWorkflowComplete(pdfData, configuredHousekeepers);
-        setOpen(false);
-        resetDialog();
-        
-        toast({
-          title: "Configuration terminée",
-          description: `Les ${pdfData.length} chambres ont été automatiquement distribuées entre ${configuredHousekeepers.length} femme(s) de chambre.`,
-        });
-      }
-    }
+    // Ne pas fermer le dialog, juste passer à l'étape de distribution
+    setStep('distribution');
   };
 
   const handleDistributionComplete = (housekeeperName: string, rooms: Room[]) => {
@@ -325,7 +298,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
           Retour
         </Button>
         <Button
-          onClick={() => setShowDistributionOptions(true)}
+          onClick={() => setStep('distribution')}
           disabled={housekeepers.length === 0}
         >
           Distribuer les chambres
@@ -397,7 +370,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         <Button
           type="button"
           variant="secondary"
-          onClick={() => setShowDistributionOptions(false)}
+          onClick={() => setStep('housekeepers')}
         >
           Retour
         </Button>
@@ -417,7 +390,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
           {step === 'upload' && renderUploadStep()}
           {step === 'housekeepers' && renderHousekeepersStep()}
-          {showDistributionOptions && renderDistributionOptionsStep()}
+          {step === 'distribution' && renderDistributionOptionsStep()}
         </DialogContent>
       </Dialog>
 
