@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,6 +35,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const [isDistributionDialogOpen, setIsDistributionDialogOpen] = useState(false);
   const [showDistributionOptions, setShowDistributionOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { addHousekeepers } = useHousekeeping();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -115,24 +117,28 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const handleHousekeepersConfigured = async (configuredHousekeepers: string[]) => {
     setHousekeepers(configuredHousekeepers);
     
-    // Sauvegarder les noms des femmes de chambre dans la session
     try {
-      await HotelSessionService.updateHousekeeperNames(configuredHousekeepers);
-      console.log('Noms des femmes de chambre sauvegardés:', configuredHousekeepers);
+      // Sauvegarder les noms et créer les codes d'accès via le contexte
+      await addHousekeepers(configuredHousekeepers);
+      console.log('✅ Femmes de chambre configurées avec codes d\'accès');
+      
+      setIsHousekeeperDialogOpen(false);
+      
+      // Passer à l'étape de distribution sans fermer le dialog principal
+      setStep('distribution');
+      
+      toast({
+        title: "Femmes de chambre configurées",
+        description: `${configuredHousekeepers.length} femme(s) de chambre configurée(s) avec codes d'accès. Choisissez maintenant la méthode de distribution.`,
+      });
     } catch (error) {
-      console.error('Erreur sauvegarde noms femmes de chambre:', error);
+      console.error('❌ Erreur configuration femmes de chambre:', error);
       toast({
         variant: "destructive",
-        title: "Erreur de sauvegarde",
-        description: "Impossible de sauvegarder les noms des femmes de chambre.",
+        title: "Erreur de configuration",
+        description: "Impossible de configurer les femmes de chambre et leurs codes d'accès.",
       });
-      return;
     }
-    
-    setIsHousekeeperDialogOpen(false);
-    
-    // Ne pas fermer le dialog, juste passer à l'étape de distribution
-    setStep('distribution');
   };
 
   const handleDistributionComplete = (housekeeperName: string, rooms: Room[]) => {

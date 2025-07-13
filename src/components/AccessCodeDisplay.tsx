@@ -18,29 +18,48 @@ export const AccessCodeDisplay = () => {
   // Charger les codes depuis les femmes de chambre en base
   useEffect(() => {
     const loadHousekeeperCodes = async () => {
-      if (!hotel?.id) return;
+      if (!hotel?.id || !isAuthenticated) {
+        console.log('🏨 Pas d\'hôtel ou utilisateur non connecté');
+        setHousekeeperCodes({});
+        return;
+      }
+      
+      console.log('🔄 Chargement des codes femmes de chambre pour hotel:', hotel.id);
+      setLoading(true);
       
       try {
         // Récupérer toutes les femmes de chambre avec leurs codes
         const { SupabaseService } = await import('@/services/supabaseService');
         const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
         
-        if (housekeepers) {
+        console.log('👩‍🏠 Femmes de chambre récupérées:', housekeepers);
+        
+        if (housekeepers && housekeepers.length > 0) {
           const codes: Record<string, string> = {};
           housekeepers.forEach(hk => {
             codes[hk.name] = hk.access_code;
           });
           setHousekeeperCodes(codes);
+          console.log('✅ Codes des femmes de chambre chargés:', codes);
+        } else {
+          console.log('⚠️ Aucune femme de chambre trouvée');
+          setHousekeeperCodes({});
         }
       } catch (error) {
-        console.error('Erreur chargement codes femmes de chambre:', error);
+        console.error('❌ Erreur chargement codes femmes de chambre:', error);
+        setHousekeeperCodes({});
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de charger les codes des femmes de chambre."
+        });
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (isAuthenticated && hotel) {
-      loadHousekeeperCodes();
-    }
-  }, [isAuthenticated, hotel]);
+    loadHousekeeperCodes();
+  }, [isAuthenticated, hotel?.id]);
 
   const generateAccessCodes = async () => {
     if (!hotel) return;

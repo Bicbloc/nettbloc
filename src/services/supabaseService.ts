@@ -339,60 +339,106 @@ export class SupabaseService {
   }
 
   static async authenticateHousekeeper(accessCode: string): Promise<Housekeeper | null> {
-    console.log('🔐 Tentative d\'authentification avec code:', accessCode);
-    
-    const { data, error } = await supabase
-      .from('housekeepers')
-      .select('*, hotels!inner(id, hotel_code)')
-      .eq('access_code', accessCode)
-      .eq('is_active', true)
-      .maybeSingle(); // Utiliser maybeSingle pour éviter les erreurs
-    
-    if (error) {
-      console.error('❌ Erreur authentification femme de chambre:', error);
-      return null;
-    }
-
-    if (!data) {
-      console.error('❌ Code d\'accès non trouvé ou inactif:', accessCode);
-      return null;
-    }
-
-    // Valider que le code d'accès appartient au bon hôtel
-    if (data.hotel_id) {
-      const isValidCode = await supabase.rpc('validate_access_code_for_hotel', {
-        access_code: accessCode,
-        hotel_uuid: data.hotel_id
-      });
-
-      if (!isValidCode) {
-        console.error('❌ Code d\'accès ne correspond pas à l\'hôtel');
+    try {
+      console.log('🔐 Tentative d\'authentification avec code:', accessCode);
+      
+      // Première requête : récupérer la femme de chambre avec le code
+      const { data: housekeeper, error: housekeeperError } = await supabase
+        .from('housekeepers')
+        .select('*')
+        .eq('access_code', accessCode)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (housekeeperError) {
+        console.error('❌ Erreur récupération femme de chambre:', housekeeperError);
         return null;
       }
+
+      if (!housekeeper) {
+        console.error('❌ Code d\'accès non trouvé ou inactif:', accessCode);
+        return null;
+      }
+
+      console.log('✅ Femme de chambre trouvée:', housekeeper.name);
+
+      // Deuxième requête : récupérer l'hôtel associé
+      const { data: hotel, error: hotelError } = await supabase
+        .from('hotels')
+        .select('id, hotel_code')
+        .eq('id', housekeeper.hotel_id)
+        .maybeSingle();
+      
+      if (hotelError || !hotel) {
+        console.error('❌ Erreur récupération hôtel:', hotelError);
+        return null;
+      }
+
+      console.log('✅ Hôtel trouvé:', hotel.hotel_code);
+
+      // Valider que le code d'accès appartient au bon hôtel
+      if (housekeeper.hotel_id) {
+        const { data: isValidCode, error: validationError } = await supabase.rpc('validate_access_code_for_hotel', {
+          access_code: accessCode,
+          hotel_uuid: housekeeper.hotel_id
+        });
+
+        if (validationError) {
+          console.error('❌ Erreur validation code:', validationError);
+          return null;
+        }
+
+        if (!isValidCode) {
+          console.error('❌ Code d\'accès ne correspond pas à l\'hôtel');
+          return null;
+        }
+      }
+      
+      console.log('✅ Authentification réussie pour:', housekeeper.name);
+      return housekeeper as Housekeeper;
+    } catch (err) {
+      console.error('❌ Exception authenticateHousekeeper:', err);
+      return null;
     }
-    
-    console.log('✅ Authentification réussie pour:', data.name);
-    return data as Housekeeper;
   }
 
   static async getHousekeepers(hotelId?: string): Promise<Housekeeper[]> {
-    let query = supabase
-      .from('housekeepers')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
-    
-    if (hotelId) {
-      query = query.eq('hotel_id', hotelId);
-    }
-    
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('Erreur récupération femmes de chambre:', error);
+    try {
+      console.log('🔍 getHousekeepers - hotelId:', hotelId);
+      
+      // Vérifier l'utilisateur connecté
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ Utilisateur non connecté');
+        return [];
+      }
+      
+      let query = supabase
+        .from('housekeepers')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      
+      if (hotelId) {
+        query = query.eq('hotel_id', hotelId);
+      }
+      
+      console.log('📤 Requête SQL pour femmes de chambre...');
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('❌ Erreur récupération femmes de chambre:', error);
+        return [];
+      }
+      
+      console.log('✅ Femmes de chambre récupérées:', data?.length || 0, 'éléments');
+      console.log('📋 Détail:', data);
+      
+      return (data || []) as Housekeeper[];
+    } catch (err) {
+      console.error('❌ Exception getHousekeepers:', err);
       return [];
     }
-    return (data || []) as Housekeeper[];
   }
 
   static async deactivateHousekeeper(id: string): Promise<boolean> {

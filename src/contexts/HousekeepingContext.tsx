@@ -17,6 +17,7 @@ interface HousekeepingContextType {
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read' | 'hotel_id'>) => void;
   validateHotelConnection: () => Promise<string | null>;
   refreshHousekeepers: () => Promise<void>;
+  addHousekeepers: (names: string[]) => Promise<void>;
 }
 
 const HousekeepingContext = createContext<HousekeepingContextType | undefined>(undefined);
@@ -309,6 +310,30 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   };
 
+  // Fonction pour ajouter des femmes de chambre et créer leurs codes d'accès
+  const addHousekeepers = async (names: string[]) => {
+    console.log('🔧 addHousekeepers appelé avec:', names);
+    setHousekeeperNames(names);
+    
+    try {
+      // Si on a un hôtel configuré, créer les femmes de chambre en base
+      if (hotelId) {
+        console.log('🔧 Création des femmes de chambre en base pour hotel:', hotelId);
+        const { SupabaseService } = await import('@/services/supabaseService');
+        await SupabaseService.createHousekeepers(hotelId, names);
+        console.log('✅ Femmes de chambre créées en base');
+        
+        // Attendre un peu pour que la base soit mise à jour puis recharger
+        setTimeout(() => {
+          refreshHousekeepers();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('❌ Erreur création femmes de chambre:', error);
+      throw error; // Propager l'erreur pour que l'UI puisse la gérer
+    }
+  };
+
   const value = {
     housekeeperNames,
     rooms,
@@ -323,6 +348,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     addNotification,
     validateHotelConnection,
     refreshHousekeepers,
+    addHousekeepers,
   };
 
   return (
