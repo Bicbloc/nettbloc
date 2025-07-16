@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide-react";
+import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound, AlertCircle } from "lucide-react";
 import { SupabaseService } from "@/services/supabaseService";
 import BackButton from '@/components/BackButton';
 
@@ -258,7 +258,26 @@ export default function HousekeeperLogin() {
             </>
           )}
           
-          <div className="mt-6 text-center">
+          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-amber-800">Accès restreint</h3>
+            </div>
+            <p className="text-sm text-amber-700 mb-3">
+              Cette interface est réservée aux femmes de chambre avec un compte valide. 
+              Pour tester en mode invité, utilisez l'interface de gestion principale.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate("/guest")}
+              className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+            >
+              Essayer en mode invité
+            </Button>
+          </div>
+          
+          <div className="mt-4 text-center">
             <Button 
               variant="ghost" 
               size="sm"

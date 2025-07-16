@@ -29,6 +29,7 @@ export const AccessCodeDisplay = () => {
       
       try {
         // Récupérer toutes les femmes de chambre avec leurs codes
+        console.log('🔍 Chargement codes d\'accès pour hotel:', hotel.id);
         const { SupabaseService } = await import('@/services/supabaseService');
         const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
         
@@ -42,7 +43,7 @@ export const AccessCodeDisplay = () => {
           setHousekeeperCodes(codes);
           console.log('✅ Codes des femmes de chambre chargés:', codes);
         } else {
-          console.log('⚠️ Aucune femme de chambre trouvée');
+          console.log('⚠️ Aucune femme de chambre trouvée pour hotel:', hotel.id);
           setHousekeeperCodes({});
         }
       } catch (error) {

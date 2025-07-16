@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Housekeeper from "./pages/Housekeeper";
+import GuestMode from "./pages/GuestMode";
 import HousekeeperLogin from "./pages/HousekeeperLogin";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
@@ -51,6 +52,7 @@ const App = () => (
                   <Route path="/analysis" element={<AnalysisWorkflow />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/housekeeper" element={<Housekeeper />} />
+                  <Route path="/guest" element={<GuestMode />} />
                   <Route path="/housekeeper-login" element={<HousekeeperLogin />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

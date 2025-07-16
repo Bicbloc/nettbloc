@@ -34,29 +34,26 @@ export class SupabaseService {
   // Gestion des hôtels - Version simplifiée
   static async createSimpleHotel(name: string, address: string, userEmail: string): Promise<Hotel | null> {
     try {
-      // Récupérer l'utilisateur actuel pour obtenir son ID
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('🏨 Création hôtel simple en mode invité...');
       
-      if (!user) {
-        console.error('Aucun utilisateur connecté');
-        return null;
-      }
-
+      // En mode invité, créer sans authentification
       const { data, error } = await supabase
         .from('hotels')
         .insert({ 
           name, 
           address, 
           email: userEmail,
-          user_id: user.id  // Assigner explicitement le user_id
+          user_id: null  // Mode invité - pas d'user_id
         })
         .select('id, name, email, address, hotel_code, created_at, updated_at')
         .single();
       
       if (error || !data) {
-        console.error('Erreur création hôtel simple:', error);
+        console.error('❌ Erreur création hôtel simple:', error);
         return null;
       }
+      
+      console.log('✅ Hôtel créé en mode invité:', data);
       return data as Hotel;
     } catch (err) {
       console.error('Erreur createSimpleHotel:', err);
