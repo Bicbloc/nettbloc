@@ -52,11 +52,11 @@ export function HousekeeperSetupDialog({
     const trimmedName = name.trim();
     
     if (!trimmedName) {
-      return "Veuillez saisir un nom";
+      return "Veuillez saisir un prénom";
     }
     
-    if (trimmedName.length < 3) {
-      return "Le nom doit contenir au moins 3 caractères";
+    if (trimmedName.length < 2) {
+      return "Le prénom doit contenir au moins 2 caractères";
     }
     
     // Vérifier que ce n'est pas un nom générique
@@ -68,13 +68,7 @@ export function HousekeeperSetupDialog({
     ];
     
     if (genericPatterns.some(pattern => pattern.test(trimmedName))) {
-      return "Veuillez utiliser le vrai prénom et nom de la femme de chambre";
-    }
-    
-    // Vérifier qu'il y a au moins un prénom et un nom (au moins 2 mots)
-    const words = trimmedName.split(/\s+/);
-    if (words.length < 2) {
-      return "Veuillez saisir le prénom et le nom complets";
+      return "Veuillez utiliser le vrai prénom de la femme de chambre";
     }
     
     return null;
@@ -166,11 +160,11 @@ export function HousekeeperSetupDialog({
         
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="housekeeper-name">Nom de la femme de chambre</Label>
+            <Label htmlFor="housekeeper-name">Prénom de la femme de chambre</Label>
             <div className="flex gap-2">
               <Input
                 id="housekeeper-name"
-                placeholder="Nom et prénom"
+                placeholder="Prénom"
                 value={newHousekeeper}
                 onChange={(e) => setNewHousekeeper(e.target.value)}
                 onKeyPress={handleKeyPress}
