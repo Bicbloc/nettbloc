@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +17,6 @@ import { ManualAssignmentDialog } from "./ManualAssignmentDialog";
 import { HotelSessionService } from "@/services/hotelSessionService";
 import { Badge } from "@/components/ui/badge";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
-import { PdfProgressDialog } from "./PdfProgressDialog";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -35,12 +33,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const [isHousekeeperDialogOpen, setIsHousekeeperDialogOpen] = useState(false);
   const [isDistributionDialogOpen, setIsDistributionDialogOpen] = useState(false);
   const [showDistributionOptions, setShowDistributionOptions] = useState(false);
-  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState('');
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { addHousekeepers } = useHousekeeping();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -89,13 +82,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
 
     try {
       setIsUploading(true);
-      setProgressDialogOpen(true);
-      setUploadProgress(0);
-      setUploadStatus("Initialisation...");
-      
-      // Créer un AbortController pour permettre l'annulation
-      const controller = new AbortController();
-      setAbortController(controller);
       
       // Initialiser ou récupérer la session avant tout traitement
       const sessionToken = await HotelSessionService.initializeSession();
@@ -103,82 +89,50 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         throw new Error("Impossible de créer une session");
       }
       
-      // Traiter le PDF avec progression et timeout
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Timeout: L'analyse a pris trop de temps")), 30000);
-      });
-      
-      const processingPromise = processPdf(selectedFile, (progress, status) => {
-        if (controller.signal.aborted) return;
-        setUploadProgress(progress);
-        setUploadStatus(status);
-      });
-      
-      const data = await Promise.race([processingPromise, timeoutPromise]) as Room[];
-      
-      if (controller.signal.aborted) {
-        throw new Error("Analyse annulée par l'utilisateur");
-      }
-      
+      // Traiter le PDF
+      const data = await processPdf(selectedFile);
       setPdfData(data);
       
       // Sauvegarder les données de chambre dans la session
       await HotelSessionService.updateRoomData(data);
       
-      setProgressDialogOpen(false);
       setStep('housekeepers');
       toast({
         title: "PDF analysé et sauvegardé",
         description: `${data.length} chambres détectées. Session créée avec votre adresse IP. Configurez maintenant vos femmes de chambre.`,
       });
     } catch (error) {
-      setProgressDialogOpen(false);
-      const errorMessage = error instanceof Error ? error.message : "Une erreur s'est produite lors du traitement du fichier PDF.";
       toast({
         variant: "destructive",
         title: "Échec du traitement",
-        description: errorMessage,
+        description: "Une erreur s'est produite lors du traitement du fichier PDF.",
       });
     } finally {
       setIsUploading(false);
-      setAbortController(null);
     }
-  };
-
-  const handleCancelUpload = () => {
-    if (abortController) {
-      abortController.abort();
-    }
-    setProgressDialogOpen(false);
-    setIsUploading(false);
-    setAbortController(null);
   };
 
   const handleHousekeepersConfigured = async (configuredHousekeepers: string[]) => {
     setHousekeepers(configuredHousekeepers);
     
+    // Sauvegarder les noms des femmes de chambre dans la session
     try {
-      // Sauvegarder les noms et créer les codes d'accès via le contexte
-      await addHousekeepers(configuredHousekeepers);
-      console.log('✅ Femmes de chambre configurées avec codes d\'accès');
-      
-      setIsHousekeeperDialogOpen(false);
-      
-      // Passer à l'étape de distribution sans fermer le dialog principal
-      setStep('distribution');
-      
-      toast({
-        title: "Femmes de chambre configurées",
-        description: `${configuredHousekeepers.length} femme(s) de chambre configurée(s) avec codes d'accès. Choisissez maintenant la méthode de distribution.`,
-      });
+      await HotelSessionService.updateHousekeeperNames(configuredHousekeepers);
+      console.log('Noms des femmes de chambre sauvegardés:', configuredHousekeepers);
     } catch (error) {
-      console.error('❌ Erreur configuration femmes de chambre:', error);
+      console.error('Erreur sauvegarde noms femmes de chambre:', error);
       toast({
         variant: "destructive",
-        title: "Erreur de configuration",
-        description: "Impossible de configurer les femmes de chambre et leurs codes d'accès.",
+        title: "Erreur de sauvegarde",
+        description: "Impossible de sauvegarder les noms des femmes de chambre.",
       });
+      return;
     }
+    
+    setIsHousekeeperDialogOpen(false);
+    
+    // Ne pas fermer le dialog, juste passer à l'étape de distribution
+    setStep('distribution');
   };
 
   const handleDistributionComplete = (housekeeperName: string, rooms: Room[]) => {
@@ -458,13 +412,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
           housekeeperPreferredFloors={{}}
         />
       )}
-
-      <PdfProgressDialog
-        isOpen={progressDialogOpen}
-        progress={uploadProgress}
-        status={uploadStatus}
-        onCancel={handleCancelUpload}
-      />
     </>
   );
 }

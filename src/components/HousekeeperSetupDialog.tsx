@@ -48,45 +48,17 @@ export function HousekeeperSetupDialog({
     }
   }, [isOpen, roomCount, JSON.stringify(initialHousekeepers)]);
 
-  const validateName = (name: string): string | null => {
-    const trimmedName = name.trim();
-    
-    if (!trimmedName) {
-      return "Veuillez saisir un prénom";
-    }
-    
-    if (trimmedName.length < 2) {
-      return "Le prénom doit contenir au moins 2 caractères";
-    }
-    
-    // Vérifier que ce n'est pas un nom générique
-    const genericPatterns = [
-      /^femme de chambre\s*\d*$/i,
-      /^housekeeper\s*\d*$/i,
-      /^employee\s*\d*$/i,
-      /^test\s*\d*$/i
-    ];
-    
-    if (genericPatterns.some(pattern => pattern.test(trimmedName))) {
-      return "Veuillez utiliser le vrai prénom de la femme de chambre";
-    }
-    
-    return null;
-  };
-
   const addHousekeeper = () => {
-    const validationError = validateName(newHousekeeper);
-    if (validationError) {
+    if (!newHousekeeper.trim()) {
       toast({
-        title: "Nom invalide",
-        description: validationError,
+        title: "Erreur",
+        description: "Veuillez saisir un nom",
         variant: "destructive"
       });
       return;
     }
 
-    const trimmedName = newHousekeeper.trim();
-    if (housekeepers.includes(trimmedName)) {
+    if (housekeepers.includes(newHousekeeper.trim())) {
       toast({
         title: "Erreur",
         description: "Cette femme de chambre existe déjà",
@@ -95,7 +67,7 @@ export function HousekeeperSetupDialog({
       return;
     }
 
-    setHousekeepers([...housekeepers, trimmedName]);
+    setHousekeepers([...housekeepers, newHousekeeper.trim()]);
     setNewHousekeeper('');
   };
 
@@ -105,7 +77,7 @@ export function HousekeeperSetupDialog({
 
   const updateHousekeeper = (index: number, newName: string) => {
     const updated = [...housekeepers];
-    updated[index] = newName.trim();
+    updated[index] = newName;
     setHousekeepers(updated);
   };
 
@@ -114,17 +86,6 @@ export function HousekeeperSetupDialog({
       toast({
         title: "Erreur",
         description: "Veuillez ajouter au moins une femme de chambre",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Valider tous les noms avant confirmation
-    const invalidNames = housekeepers.filter(name => validateName(name) !== null);
-    if (invalidNames.length > 0) {
-      toast({
-        title: "Noms invalides",
-        description: `Veuillez corriger les noms suivants : ${invalidNames.join(', ')}`,
         variant: "destructive"
       });
       return;
@@ -160,11 +121,11 @@ export function HousekeeperSetupDialog({
         
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="housekeeper-name">Prénom de la femme de chambre</Label>
+            <Label htmlFor="housekeeper-name">Nom de la femme de chambre</Label>
             <div className="flex gap-2">
               <Input
                 id="housekeeper-name"
-                placeholder="Prénom"
+                placeholder="Nom et prénom"
                 value={newHousekeeper}
                 onChange={(e) => setNewHousekeeper(e.target.value)}
                 onKeyPress={handleKeyPress}
