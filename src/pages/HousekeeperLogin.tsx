@@ -270,7 +270,7 @@ export default function HousekeeperLogin() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => navigate("/guest")}
+              onClick={() => navigate("/?mode=guest")}
               className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
             >
               Essayer en mode invité

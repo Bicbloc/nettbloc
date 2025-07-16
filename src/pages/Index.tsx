@@ -44,6 +44,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
+import { GuestModeAlert } from "@/components/GuestModeAlert";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -100,6 +101,12 @@ const Index = () => {
   
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
+  
+  // Guest mode restriction states
+  const [guestModeAlert, setGuestModeAlert] = useState<{ isOpen: boolean; feature: string }>({
+    isOpen: false,
+    feature: ''
+  });
   
   // État pour l'ID hôtel réel depuis la base de données
   const [realHotelId, setRealHotelId] = useState<string | null>(null);
@@ -197,6 +204,30 @@ const Index = () => {
   if (!loading && !isAuthenticated && !isGuestMode) {
     return <Navigate to="/auth" replace />;
   }
+
+  // Check if guest mode and block certain tabs
+  const isGuestModeBlocked = (tab: string) => {
+    if (!isGuestMode) return false;
+    return ['settings', 'team', 'config', 'reports'].includes(tab);
+  };
+
+  const handleTabChange = (value: string) => {
+    if (isGuestModeBlocked(value)) {
+      const featureNames: Record<string, string> = {
+        'settings': 'Paramètres et codes d\'accès',
+        'team': 'Gestion de l\'équipe',
+        'config': 'Configuration',
+        'reports': 'Rapports'
+      };
+      
+      setGuestModeAlert({
+        isOpen: true,
+        feature: featureNames[value] || value
+      });
+      return;
+    }
+    setActiveTab(value);
+  };
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
   
@@ -1073,7 +1104,7 @@ const Index = () => {
                 />
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <div className="flex items-center justify-between mb-4">
             <TabsList className="grid w-full grid-cols-6 max-w-fit">
               <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -1722,7 +1753,13 @@ const Index = () => {
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
-
+      
+      {/* Guest Mode Alert */}
+      <GuestModeAlert
+        isOpen={guestModeAlert.isOpen}
+        onClose={() => setGuestModeAlert({ isOpen: false, feature: '' })}
+        feature={guestModeAlert.feature}
+      />
     </div>
   );
 };

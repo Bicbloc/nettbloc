@@ -33,35 +33,56 @@ export const defaultCleaningConfig: CleaningConfig = {
   maxRoomsPerHousekeeper: 18
 };
 
-// Process PDF file
-export async function processPdf(file: File): Promise<Room[]> {
+// Process PDF file with progress feedback
+export async function processPdf(
+  file: File, 
+  onProgress?: (progress: number, status: string) => void
+): Promise<Room[]> {
   try {
+    onProgress?.(10, "Lecture du fichier PDF...");
+    
     // Convertir le fichier en ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
+    
+    onProgress?.(30, "Chargement du document...");
     
     // Charger le document PDF
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
-    // Extraire le texte de toutes les pages
+    onProgress?.(50, "Extraction du texte...");
+    
+    // Extraire le texte de toutes les pages avec progression
     let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
+    const totalPages = pdf.numPages;
+    
+    for (let i = 1; i <= totalPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ');
       fullText += pageText + ' ';
+      
+      // Mise à jour de la progression
+      const pageProgress = Math.round((i / totalPages) * 30);
+      onProgress?.(50 + pageProgress, `Extraction page ${i}/${totalPages}...`);
     }
+    
+    onProgress?.(85, "Analyse des données...");
     
     console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
     
     // Analyser le texte pour extraire les informations des chambres
     const rooms = parseRoomsFromText(fullText);
     
+    onProgress?.(95, "Finalisation...");
+    
     toast({
-      title: "PDF Processed",
-      description: `Successfully processed ${file.name}`,
+      title: "PDF analysé avec succès",
+      description: `${rooms.length} chambres détectées`,
     });
+    
+    onProgress?.(100, "Terminé !");
     
     // Si aucune chambre n'a été trouvée, retourner des données de test
     if (rooms.length === 0) {
@@ -72,10 +93,11 @@ export async function processPdf(file: File): Promise<Room[]> {
     return rooms;
   } catch (error) {
     console.error("Error processing PDF:", error);
+    onProgress?.(0, "Erreur lors de l'analyse");
     toast({
       variant: "destructive",
-      title: "Processing Failed",
-      description: "Failed to process the PDF file. Please try again.",
+      title: "Erreur d'analyse",
+      description: "Impossible d'analyser le fichier PDF. Veuillez réessayer.",
     });
     throw error;
   }

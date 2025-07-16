@@ -19,35 +19,50 @@ export const AccessCodeDisplay = () => {
   useEffect(() => {
     const loadHousekeeperCodes = async () => {
       if (!hotel?.id || !isAuthenticated) {
-        console.log('🏨 Pas d\'hôtel ou utilisateur non connecté');
+        console.log('🏨 AccessCodeDisplay - Pas d\'hôtel ou utilisateur non connecté', { 
+          hotelId: hotel?.id, 
+          isAuthenticated 
+        });
         setHousekeeperCodes({});
         return;
       }
       
-      console.log('🔄 Chargement des codes femmes de chambre pour hotel:', hotel.id);
+      console.log('🔄 AccessCodeDisplay - Chargement des codes femmes de chambre pour hotel:', hotel.id);
       setLoading(true);
       
       try {
         // Récupérer toutes les femmes de chambre avec leurs codes
-        console.log('🔍 Chargement codes d\'accès pour hotel:', hotel.id);
         const { SupabaseService } = await import('@/services/supabaseService');
+        console.log('🔍 AccessCodeDisplay - Appel getHousekeepers avec hotel.id:', hotel.id);
+        
         const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
         
-        console.log('👩‍🏠 Femmes de chambre récupérées:', housekeepers);
+        console.log('👩‍🏠 AccessCodeDisplay - Femmes de chambre récupérées:', {
+          count: housekeepers?.length || 0,
+          housekeepers: housekeepers?.map(hk => ({ 
+            id: hk.id, 
+            name: hk.name, 
+            access_code: hk.access_code,
+            hotel_id: hk.hotel_id,
+            is_active: hk.is_active
+          }))
+        });
         
         if (housekeepers && housekeepers.length > 0) {
           const codes: Record<string, string> = {};
           housekeepers.forEach(hk => {
-            codes[hk.name] = hk.access_code;
+            if (hk.is_active) {  // Only show active housekeepers
+              codes[hk.name] = hk.access_code;
+            }
           });
           setHousekeeperCodes(codes);
-          console.log('✅ Codes des femmes de chambre chargés:', codes);
+          console.log('✅ AccessCodeDisplay - Codes des femmes de chambre chargés:', codes);
         } else {
-          console.log('⚠️ Aucune femme de chambre trouvée pour hotel:', hotel.id);
+          console.log('⚠️ AccessCodeDisplay - Aucune femme de chambre active trouvée pour hotel:', hotel.id);
           setHousekeeperCodes({});
         }
       } catch (error) {
-        console.error('❌ Erreur chargement codes femmes de chambre:', error);
+        console.error('❌ AccessCodeDisplay - Erreur chargement codes femmes de chambre:', error);
         setHousekeeperCodes({});
         toast({
           variant: "destructive",
