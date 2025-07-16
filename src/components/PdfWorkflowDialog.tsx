@@ -18,6 +18,7 @@ import { ManualAssignmentDialog } from "./ManualAssignmentDialog";
 import { HotelSessionService } from "@/services/hotelSessionService";
 import { Badge } from "@/components/ui/badge";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
+import { PdfProgressDialog } from "./PdfProgressDialog";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -34,6 +35,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const [isHousekeeperDialogOpen, setIsHousekeeperDialogOpen] = useState(false);
   const [isDistributionDialogOpen, setIsDistributionDialogOpen] = useState(false);
   const [showDistributionOptions, setShowDistributionOptions] = useState(false);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { addHousekeepers } = useHousekeeping();
 
@@ -84,6 +89,13 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
 
     try {
       setIsUploading(true);
+      setProgressDialogOpen(true);
+      setUploadProgress(0);
+      setUploadStatus("Initialisation...");
+      
+      // Créer un AbortController pour permettre l'annulation
+      const controller = new AbortController();
+      setAbortController(controller);
       
       // Initialiser ou récupérer la session avant tout traitement
       const sessionToken = await HotelSessionService.initializeSession();
@@ -91,27 +103,55 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         throw new Error("Impossible de créer une session");
       }
       
-      // Traiter le PDF
-      const data = await processPdf(selectedFile);
+      // Traiter le PDF avec progression et timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Timeout: L'analyse a pris trop de temps")), 30000);
+      });
+      
+      const processingPromise = processPdf(selectedFile, (progress, status) => {
+        if (controller.signal.aborted) return;
+        setUploadProgress(progress);
+        setUploadStatus(status);
+      });
+      
+      const data = await Promise.race([processingPromise, timeoutPromise]) as Room[];
+      
+      if (controller.signal.aborted) {
+        throw new Error("Analyse annulée par l'utilisateur");
+      }
+      
       setPdfData(data);
       
       // Sauvegarder les données de chambre dans la session
       await HotelSessionService.updateRoomData(data);
       
+      setProgressDialogOpen(false);
       setStep('housekeepers');
       toast({
         title: "PDF analysé et sauvegardé",
         description: `${data.length} chambres détectées. Session créée avec votre adresse IP. Configurez maintenant vos femmes de chambre.`,
       });
     } catch (error) {
+      setProgressDialogOpen(false);
+      const errorMessage = error instanceof Error ? error.message : "Une erreur s'est produite lors du traitement du fichier PDF.";
       toast({
         variant: "destructive",
         title: "Échec du traitement",
-        description: "Une erreur s'est produite lors du traitement du fichier PDF.",
+        description: errorMessage,
       });
     } finally {
       setIsUploading(false);
+      setAbortController(null);
     }
+  };
+
+  const handleCancelUpload = () => {
+    if (abortController) {
+      abortController.abort();
+    }
+    setProgressDialogOpen(false);
+    setIsUploading(false);
+    setAbortController(null);
   };
 
   const handleHousekeepersConfigured = async (configuredHousekeepers: string[]) => {
@@ -418,6 +458,13 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
           housekeeperPreferredFloors={{}}
         />
       )}
+
+      <PdfProgressDialog
+        isOpen={progressDialogOpen}
+        progress={uploadProgress}
+        status={uploadStatus}
+        onCancel={handleCancelUpload}
+      />
     </>
   );
 }

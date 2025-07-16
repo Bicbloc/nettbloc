@@ -33,7 +33,7 @@ export const defaultCleaningConfig: CleaningConfig = {
   maxRoomsPerHousekeeper: 18
 };
 
-// Process PDF file with progress feedback
+// Process PDF file with progress feedback and optimized performance
 export async function processPdf(
   file: File, 
   onProgress?: (progress: number, status: string) => void
@@ -51,11 +51,20 @@ export async function processPdf(
     
     onProgress?.(50, "Extraction du texte...");
     
-    // Extraire le texte de toutes les pages avec progression
+    // Extraire le texte de toutes les pages avec progression optimisée
     let fullText = '';
     const totalPages = pdf.numPages;
     
     for (let i = 1; i <= totalPages; i++) {
+      // Utiliser requestIdleCallback pour ne pas bloquer l'UI
+      await new Promise(resolve => {
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(resolve);
+        } else {
+          setTimeout(resolve, 0);
+        }
+      });
+      
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items
@@ -70,10 +79,8 @@ export async function processPdf(
     
     onProgress?.(85, "Analyse des données...");
     
-    console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
-    
-    // Analyser le texte pour extraire les informations des chambres
-    const rooms = parseRoomsFromText(fullText);
+    // Analyser le texte pour extraire les informations des chambres (logs réduits)
+    const rooms = parseRoomsFromText(fullText, true); // true = mode production (moins de logs)
     
     onProgress?.(95, "Finalisation...");
     
@@ -104,7 +111,7 @@ export async function processPdf(
 }
 
 // Analyse le texte pour extraire les informations des chambres
-function parseRoomsFromText(text: string): Room[] {
+function parseRoomsFromText(text: string, productionMode: boolean = false): Room[] {
   const rooms: Room[] = [];
   
 // Pattern pour capturer les numéros de chambre
@@ -130,8 +137,10 @@ function parseRoomsFromText(text: string): Room[] {
     const end = Math.min(text.length, match.index + 300);
     const context = text.substring(start, end);
     
-    console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
-    console.log(`Contexte complet:`, context);
+    if (!productionMode) {
+      console.log(`=== ANALYSE CHAMBRE ${normalizedRoomNumber} ===`);
+      console.log(`Contexte complet:`, context);
+    }
     
     // Trouver la ligne spécifique de cette chambre
     const roomLinePattern = new RegExp(`\\b${normalizedRoomNumber}\\s+(\\w+)\\s+(\\w+)`, 'g');
@@ -143,14 +152,18 @@ function parseRoomsFromText(text: string): Room[] {
     if (roomLineMatch) {
       roomType = roomLineMatch[1]; // SGL, DBS, TWS, DBL
       roomStatusCode = roomLineMatch[2]; // DIR, CL, INS, OCC
-      console.log(`Ligne chambre: ${normalizedRoomNumber} ${roomType} ${roomStatusCode}`);
+      if (!productionMode) {
+        console.log(`Ligne chambre: ${normalizedRoomNumber} ${roomType} ${roomStatusCode}`);
+      }
     }
     
     // Analyser les dates dans le contexte spécifique à cette chambre
     // On cherche les dates qui suivent le numéro de chambre
     const roomIndex = context.indexOf(normalizedRoomNumber);
     if (roomIndex === -1) {
-      console.log(`❌ Chambre ${normalizedRoomNumber} non trouvée dans le contexte`);
+      if (!productionMode) {
+        console.log(`❌ Chambre ${normalizedRoomNumber} non trouvée dans le contexte`);
+      }
       continue;
     }
     
@@ -164,7 +177,9 @@ function parseRoomsFromText(text: string): Room[] {
       afterRoom.substring(0, nextRoomMatch.index) : 
       afterRoom;
     
-    console.log(`Contexte spécifique chambre:`, roomSpecificContext.substring(0, 150) + "...");
+    if (!productionMode) {
+      console.log(`Contexte spécifique chambre:`, roomSpecificContext.substring(0, 150) + "...");
+    }
     
     const dates: string[] = roomSpecificContext.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
     const hasOCC = roomStatusCode === 'OCC';
@@ -173,14 +188,16 @@ function parseRoomsFromText(text: string): Room[] {
     const hasDIR = roomStatusCode === 'DIR';
     const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext) && dates.length === 0;
     
-    // Debug pour mieux comprendre le contexte
-    console.log(`DEBUG - Dates trouvées:`, dates);
-    console.log(`DEBUG - Contient horaires:`, /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext));
-    console.log(`DEBUG - roomStatusCode:`, roomStatusCode);
-    
-    console.log(`Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
-    console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}, DIR=${hasDIR}`);
-    console.log(`Heure seule: ${hasTimeOnly}`);
+    if (!productionMode) {
+      // Debug pour mieux comprendre le contexte
+      console.log(`DEBUG - Dates trouvées:`, dates);
+      console.log(`DEBUG - Contient horaires:`, /\b\d{1,2}:\d{2}\b/.test(roomSpecificContext));
+      console.log(`DEBUG - roomStatusCode:`, roomStatusCode);
+      
+      console.log(`Dates trouvées: ${dates.length} - ${dates.join(', ')}`);
+      console.log(`Statuts: OCC=${hasOCC}, INS=${hasINS}, CL=${hasCL}, DIR=${hasDIR}`);
+      console.log(`Heure seule: ${hasTimeOnly}`);
+    }
     
     // Date d'aujourd'hui (01/05/2025 d'après le contexte du PDF)
     const today = '01/05/2025';
@@ -199,7 +216,9 @@ function parseRoomsFromText(text: string): Room[] {
     if (shouldBeFullCleaning) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
-      console.log(`→ À blanc (deux blocs séparés + INS - règle spéciale)`);
+      if (!productionMode) {
+        console.log(`→ À blanc (deux blocs séparés + INS - règle spéciale)`);
+      }
     }
     // Détecter si c'est une recouche: une seule réservation avec arrivée/départ OU pattern Night
     else {
@@ -208,49 +227,51 @@ function parseRoomsFromText(text: string): Room[] {
                         !hasTimeOnly && 
                         !/\b\d{1,2}:\d{2}\b/.test(roomSpecificContext.replace(/\d{2}\/\d{2}\/\d{4}/g, ''));
       
-      console.log(`Détection recouche: ${dates.length} dates, une seule résa=${isSingleReservationWithDates}, Night=${hasNightPattern}, isRecouche=${isRecouche}`);
+      if (!productionMode) {
+        console.log(`Détection recouche: ${dates.length} dates, une seule résa=${isSingleReservationWithDates}, Night=${hasNightPattern}, isRecouche=${isRecouche}`);
+      }
     
       // 1. Chambre occupée (OCC)
       if (hasOCC) {
         cleaningType = 'none';
         roomStatus = 'occupied';
-        console.log(`→ Chambre occupée (OCC)`);
+        if (!productionMode) console.log(`→ Chambre occupée (OCC)`);
       }
       // 2. Pas de dates + statut CL/INS → Propre
       else if (dates.length === 0 && (hasINS || hasCL)) {
         cleaningType = 'none';
         roomStatus = 'clean';
-        console.log(`→ Propre (pas de dates + CL/INS)`);
+        if (!productionMode) console.log(`→ Propre (pas de dates + CL/INS)`);
       }
       // 3. Recouche détectée → Quick cleaning
       else if (isRecouche) {
         cleaningType = 'quick';
         roomStatus = 'needs-cleaning';
-        console.log(`→ Recouche (deux dates sans horaires: ${dates.join(', ')})`);
+        if (!productionMode) console.log(`→ Recouche (deux dates sans horaires: ${dates.join(', ')})`);
       }
       // 4. DIR ou Dirty présent → À blanc
       else if (hasDIR) {
         cleaningType = 'full';
         roomStatus = 'needs-cleaning';
-        console.log(`→ À blanc (DIR/Dirty détecté)`);
+        if (!productionMode) console.log(`→ À blanc (DIR/Dirty détecté)`);
       }
       // 5. Une seule date → Regarder le statut en priorité
       else if (dates.length === 1) {
         if (hasINS || hasCL) {
           cleaningType = 'none';
           roomStatus = 'clean';
-          console.log(`→ Propre (une date + statut CL/INS)`);
+          if (!productionMode) console.log(`→ Propre (une date + statut CL/INS)`);
         } else {
           cleaningType = 'full';
           roomStatus = 'needs-cleaning';
-          console.log(`→ À blanc (une date + statut non propre)`);
+          if (!productionMode) console.log(`→ À blanc (une date + statut non propre)`);
         }
       }
       // 6. Une seule ligne horaire → À blanc
       else if (hasTimeOnly) {
         cleaningType = 'full';
         roomStatus = 'needs-cleaning';
-        console.log(`→ À blanc (heure seule)`);
+        if (!productionMode) console.log(`→ À blanc (heure seule)`);
       }
       // 6. Analyser les dates par rapport à aujourd'hui
       else if (dates.length > 0) {
@@ -267,29 +288,31 @@ function parseRoomsFromText(text: string): Room[] {
           // Départ après aujourd'hui → Recouche
           cleaningType = 'quick';
           roomStatus = 'needs-cleaning';
-          console.log(`→ Recouche (départ après aujourd'hui)`);
+          if (!productionMode) console.log(`→ Recouche (départ après aujourd'hui)`);
         } else if (hasTodayDeparture) {
           // Départ aujourd'hui → À blanc
           cleaningType = 'full';
           roomStatus = 'needs-cleaning';
-          console.log(`→ À blanc (départ aujourd'hui)`);
+          if (!productionMode) console.log(`→ À blanc (départ aujourd'hui)`);
         } else {
           // Par défaut À blanc si dates présentes
           cleaningType = 'full';
           roomStatus = 'needs-cleaning';
-          console.log(`→ À blanc (dates détectées)`);
+          if (!productionMode) console.log(`→ À blanc (dates détectées)`);
         }
       }
       // 7. Par défaut - propre
       else {
         cleaningType = 'none';
         roomStatus = 'clean';
-        console.log(`→ Propre par défaut`);
+        if (!productionMode) console.log(`→ Propre par défaut`);
       }
     }
     
-    console.log(`RÉSULTAT: ${roomStatus} / ${cleaningType}`);
-    console.log(`=== FIN ANALYSE CHAMBRE ${normalizedRoomNumber} ===\n`);
+    if (!productionMode) {
+      console.log(`RÉSULTAT: ${roomStatus} / ${cleaningType}`);
+      console.log(`=== FIN ANALYSE CHAMBRE ${normalizedRoomNumber} ===\n`);
+    }
     
     // Déterminer si c'est une chambre twin
     const isTwin = /TWN|TWS/.test(context);
