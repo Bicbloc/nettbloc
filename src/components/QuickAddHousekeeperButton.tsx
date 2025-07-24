@@ -21,10 +21,33 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
   const { setHousekeeperNames, refreshHousekeepers } = useHousekeeping();
 
   const handleAdd = async () => {
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    
+    if (!trimmedName) {
       toast({
         title: "Erreur",
         description: "Veuillez saisir un nom",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validation simplifiée : au moins 2 caractères et pas de noms génériques
+    if (trimmedName.length < 2) {
+      toast({
+        title: "Erreur",
+        description: "Le nom doit contenir au moins 2 caractères",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Empêcher les noms génériques
+    const genericNames = ['femme de chambre', 'housekeeper', 'test', 'admin'];
+    if (genericNames.some(generic => trimmedName.toLowerCase().includes(generic))) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez utiliser un prénom ou nom propre",
         variant: "destructive"
       });
       return;
@@ -46,23 +69,23 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
       }
 
       // Créer la femme de chambre dans Supabase
-      const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, name.trim());
+      const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, trimmedName);
       
       if (housekeeper) {
         // Mettre à jour le contexte local
-        setHousekeeperNames(prev => [...prev, name.trim()]);
+        setHousekeeperNames(prev => [...prev, trimmedName]);
         
         // Rafraîchir la liste depuis la base
         await refreshHousekeepers();
         
         // Appeler le callback si fourni
         if (onAddHousekeeper) {
-          onAddHousekeeper(name.trim());
+          onAddHousekeeper(trimmedName);
         }
         
         toast({
           title: "Succès",
-          description: `${name.trim()} a été créé(e) avec le code ${housekeeper.access_code}`,
+          description: `${trimmedName} a été créé(e) avec le code ${housekeeper.access_code}`,
         });
         
         setName('');

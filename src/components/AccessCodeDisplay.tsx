@@ -99,11 +99,11 @@ export const AccessCodeDisplay = () => {
       <CardHeader>
         <CardTitle>Codes d'Accès</CardTitle>
         <CardDescription>
-          Code d'accès pour permettre aux femmes de chambre d'accéder à l'interface mobile
+          <span>Code d'accès pour permettre aux femmes de chambre d'accéder à l'interface mobile</span>
           {hotel && (
-            <div className="text-sm text-muted-foreground mt-1">
+            <span className="text-sm text-muted-foreground mt-1 block">
               Hôtel: {hotel.name}
-            </div>
+            </span>
           )}
         </CardDescription>
       </CardHeader>

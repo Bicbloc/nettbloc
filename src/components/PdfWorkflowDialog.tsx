@@ -128,6 +128,45 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
       });
       return;
     }
+
+    // Créer les femmes de chambre en base avec codes d'accès
+    const savedHotelId = localStorage.getItem('selectedHotelId');
+    if (savedHotelId) {
+      try {
+        const { SupabaseService } = await import('@/services/supabaseService');
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        for (const housekeeperName of configuredHousekeepers) {
+          // Générer un code d'accès pour cette femme de chambre
+          const { data: accessCode, error: codeError } = await supabase
+            .rpc('generate_hotel_access_code', {
+              hotel_uuid: savedHotelId
+            });
+
+          if (codeError) {
+            console.error('Erreur génération code pour', housekeeperName, ':', codeError);
+            continue;
+          }
+
+          // Créer ou mettre à jour la femme de chambre
+          await SupabaseService.createOrUpdateHousekeeper(savedHotelId, housekeeperName, accessCode);
+          console.log('✅ Femme de chambre créée:', housekeeperName, 'avec code:', accessCode);
+        }
+        
+        toast({
+          title: "Femmes de chambre configurées",
+          description: `${configuredHousekeepers.length} femmes de chambre créées avec leurs codes d'accès.`
+        });
+        
+      } catch (error) {
+        console.error('Erreur création femmes de chambre en base:', error);
+        toast({
+          variant: "destructive",
+          title: "Attention",
+          description: "Femmes de chambre sauvegardées mais codes d'accès non générés."
+        });
+      }
+    }
     
     setIsHousekeeperDialogOpen(false);
     

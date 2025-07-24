@@ -49,7 +49,9 @@ export function HousekeeperSetupDialog({
   }, [isOpen, roomCount, JSON.stringify(initialHousekeepers)]);
 
   const addHousekeeper = () => {
-    if (!newHousekeeper.trim()) {
+    const trimmedName = newHousekeeper.trim();
+    
+    if (!trimmedName) {
       toast({
         title: "Erreur",
         description: "Veuillez saisir un nom",
@@ -58,7 +60,28 @@ export function HousekeeperSetupDialog({
       return;
     }
 
-    if (housekeepers.includes(newHousekeeper.trim())) {
+    // Validation simplifiée : au moins 2 caractères et pas de noms génériques
+    if (trimmedName.length < 2) {
+      toast({
+        title: "Erreur",
+        description: "Le nom doit contenir au moins 2 caractères",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Empêcher les noms génériques
+    const genericNames = ['femme de chambre', 'housekeeper', 'test', 'admin'];
+    if (genericNames.some(generic => trimmedName.toLowerCase().includes(generic))) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez utiliser un prénom ou nom propre",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (housekeepers.includes(trimmedName)) {
       toast({
         title: "Erreur",
         description: "Cette femme de chambre existe déjà",
@@ -67,7 +90,7 @@ export function HousekeeperSetupDialog({
       return;
     }
 
-    setHousekeepers([...housekeepers, newHousekeeper.trim()]);
+    setHousekeepers([...housekeepers, trimmedName]);
     setNewHousekeeper('');
   };
 

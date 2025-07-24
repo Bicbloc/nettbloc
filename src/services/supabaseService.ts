@@ -242,8 +242,16 @@ export class SupabaseService {
     try {
       console.log('🔧 Début création femme de chambre:', { hotelId, name });
       
-      // Générer un code d'accès unique (4 chiffres)
-      const accessCode = Math.floor(1000 + Math.random() * 9000).toString();
+      // Générer un code d'accès avec le préfixe de l'hôtel
+      const { data: accessCode, error: codeError } = await supabase
+        .rpc('generate_hotel_access_code', {
+          hotel_uuid: hotelId
+        });
+
+      if (codeError) {
+        console.error('❌ Erreur génération code d\'accès:', codeError);
+        return null;
+      }
 
       // Récupérer l'utilisateur actuel pour obtenir son ID
       const { data: { user } } = await supabase.auth.getUser();
