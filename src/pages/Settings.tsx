@@ -134,6 +134,45 @@ const Settings = () => {
     }
   };
 
+  const handleCreateHotel = async () => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      const { data: newHotel, error } = await supabase
+        .from('hotels')
+        .insert({
+          name: editedHotelData.name.trim(),
+          email: user.email,
+          user_id: user.id,
+          address: editedHotelData.address.trim() || null
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erreur création hôtel:', error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de créer l'hôtel"
+        });
+        return;
+      }
+
+      setSettings(prev => ({ ...prev, hotel: newHotel }));
+      
+      toast({
+        title: "Hôtel créé avec succès",
+        description: `L'établissement "${newHotel.name}" a été créé`
+      });
+
+    } catch (error) {
+      console.error('Erreur:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
   const handleSaveNotifications = () => {
     localStorage.setItem('notificationSettings', JSON.stringify(settings.notifications));
     toast({
@@ -264,12 +303,47 @@ const Settings = () => {
                     </div>
                   </>
                 ) : (
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      Aucun établissement configuré. Veuillez configurer un hôtel depuis la page principale.
-                    </AlertDescription>
-                  </Alert>
+                  <div className="space-y-6">
+                    <Alert>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Aucun établissement configuré. Créez votre hôtel ci-dessous pour commencer.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="new-hotel-name">Nom de l'établissement *</Label>
+                        <Input
+                          id="new-hotel-name"
+                          value={editedHotelData.name}
+                          onChange={(e) => setEditedHotelData(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="Nom de votre hôtel"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-hotel-address">Adresse</Label>
+                        <Input
+                          id="new-hotel-address"
+                          value={editedHotelData.address}
+                          onChange={(e) => setEditedHotelData(prev => ({ ...prev, address: e.target.value }))}
+                          placeholder="Adresse complète de l'établissement"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleCreateHotel}
+                        disabled={isSaving || !editedHotelData.name.trim()}
+                        className="flex items-center gap-2"
+                      >
+                        <Building className="h-4 w-4" />
+                        {isSaving ? 'Création...' : 'Créer l\'établissement'}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
