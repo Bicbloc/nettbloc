@@ -28,6 +28,17 @@ export const useAutoSetup = () => {
       try {
         console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
 
+        // Timeout de sécurité pour éviter un blocage infini
+        const timeoutId = setTimeout(() => {
+          console.log('⏰ Auto-setup: Timeout - arrêt forcé');
+          setLoading(false);
+          toast({
+            variant: "destructive",
+            title: "Configuration interrompue",
+            description: "La configuration automatique a pris trop de temps. Vous pouvez configurer manuellement."
+          });
+        }, 10000); // 10 secondes max
+
         // 1. Vérifier si l'utilisateur a déjà un hôtel
         const { data: existingHotel, error: hotelError } = await supabase
           .from('hotels')
@@ -96,30 +107,44 @@ export const useAutoSetup = () => {
         if (hotelData) {
           setHotel(hotelData);
 
-          // 3. Générer un code d'accès si il n'existe pas
+          // 3. Générer un code d'accès si il n'existe pas (avec timeout)
           if (!accessCode) {
             console.log('🔑 Auto-setup: Génération du code d\'accès...');
             
-            const { data: codeData, error: codeError } = await supabase
-              .rpc('generate_hotel_access_code', {
+            try {
+              // Timeout spécifique pour la génération de code
+              const codePromise = supabase.rpc('generate_hotel_access_code', {
                 hotel_uuid: hotelData.id
               });
-
-            if (codeError) {
-              console.error('Erreur génération code:', codeError);
-            } else {
-              setAccessCode(codeData);
-              console.log('🔑 Auto-setup: Code généré:', codeData);
               
-              toast({
-                title: "Configuration automatique",
-                description: `Votre hôtel "${hotelData.name}" est prêt ! Code d'accès généré.`
-              });
+              const codeTimeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Code generation timeout')), 5000)
+              );
+              
+              const result = await Promise.race([codePromise, codeTimeout]) as any;
+              const { data: codeData, error: codeError } = result;
+
+              if (codeError) {
+                console.error('Erreur génération code:', codeError);
+              } else {
+                setAccessCode(codeData);
+                console.log('🔑 Auto-setup: Code généré:', codeData);
+                
+                toast({
+                  title: "Configuration automatique",
+                  description: `Votre hôtel "${hotelData.name}" est prêt ! Code d'accès généré.`
+                });
+              }
+            } catch (error) {
+              console.error('❌ Auto-setup: Timeout génération code:', error);
+              // Continuer sans le code d'accès
             }
           }
 
           setIsSetupComplete(true);
         }
+
+        clearTimeout(timeoutId);
 
       } catch (error) {
         console.error('Erreur auto-setup:', error);
