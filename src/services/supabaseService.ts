@@ -209,8 +209,16 @@ export class SupabaseService {
     }
     
     for (const name of names) {
-      // Générer un code d'accès unique pour chaque femme de chambre (4 chiffres)
-      const accessCode = Math.floor(1000 + Math.random() * 9000).toString();
+      // Générer un code d'accès avec le préfixe de l'hôtel (format HTL001-XXXX)
+      const { data: accessCode, error: codeError } = await supabase
+        .rpc('generate_hotel_access_code', {
+          hotel_uuid: hotelId
+        });
+
+      if (codeError) {
+        console.error(`❌ Erreur génération code d'accès pour ${name}:`, codeError);
+        throw codeError;
+      }
       
       const { data, error } = await supabase
         .from('housekeepers')

@@ -28,9 +28,12 @@ export const AccessCodeDisplay = () => {
         if (housekeepers) {
           const codes: Record<string, string> = {};
           housekeepers.forEach(hk => {
-            codes[hk.name] = hk.access_code;
+            if (hk.access_code) {
+              codes[hk.name] = hk.access_code;
+            }
           });
           setHousekeeperCodes(codes);
+          console.log('✅ Codes femmes de chambre chargés:', codes);
         }
       } catch (error) {
         console.error('Erreur chargement codes femmes de chambre:', error);
@@ -41,6 +44,39 @@ export const AccessCodeDisplay = () => {
       loadHousekeeperCodes();
     }
   }, [isAuthenticated, hotel]);
+
+  // Rafraîchir les codes quand une nouvelle femme de chambre est ajoutée
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (hotel?.id && showCodes) {
+        try {
+          const { SupabaseService } = await import('@/services/supabaseService');
+          const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
+          
+          if (housekeepers) {
+            const codes: Record<string, string> = {};
+            housekeepers.forEach(hk => {
+              if (hk.access_code) {
+                codes[hk.name] = hk.access_code;
+              }
+            });
+            setHousekeeperCodes(prevCodes => {
+              // Ne mettre à jour que si les codes ont changé
+              if (JSON.stringify(prevCodes) !== JSON.stringify(codes)) {
+                console.log('🔄 Nouveaux codes détectés:', codes);
+                return codes;
+              }
+              return prevCodes;
+            });
+          }
+        } catch (error) {
+          console.error('Erreur rafraîchissement codes:', error);
+        }
+      }
+    }, 3000); // Vérifier toutes les 3 secondes
+
+    return () => clearInterval(interval);
+  }, [hotel?.id, showCodes]);
 
   const generateAccessCodes = async () => {
     if (!hotel) return;
