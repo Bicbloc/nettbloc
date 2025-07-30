@@ -28,9 +28,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔧 AuthContext: Initialisation des listeners d\'authentification');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log(`🔄 AuthContext: Auth state change - Event: ${event}, Session:`, !!session);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -47,13 +50,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // Get initial session
+    console.log('🔍 AuthContext: Vérification de la session initiale');
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('📋 AuthContext: Session initiale récupérée:', !!session);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+    }).catch((error) => {
+      console.error('❌ AuthContext: Erreur récupération session initiale:', error);
+      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('🧹 AuthContext: Nettoyage des listeners');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, companyName?: string) => {
