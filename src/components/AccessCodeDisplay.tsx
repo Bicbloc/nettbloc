@@ -166,6 +166,51 @@ export const AccessCodeDisplay = () => {
           </Button>
         </div>
 
+        {/* Bouton pour créer des femmes de chambre de test */}
+        {Object.keys(housekeeperCodes).length === 0 && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800 mb-2">
+              Aucune femme de chambre trouvée. Créez-en pour générer leurs codes d'accès.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!hotel?.id) return;
+                try {
+                  const { SupabaseService } = await import('@/services/supabaseService');
+                  await SupabaseService.createHousekeepers(hotel.id, ['Marie Dupont', 'Sophie Martin', 'Claire Bernard']);
+                  toast({
+                    title: "Femmes de chambre créées",
+                    description: "3 femmes de chambre de test ont été créées avec leurs codes d'accès."
+                  });
+                  // Forcer le rechargement des codes
+                  setTimeout(async () => {
+                    const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
+                    if (housekeepers) {
+                      const codes: Record<string, string> = {};
+                      housekeepers.forEach(hk => {
+                        if (hk.access_code) {
+                          codes[hk.name] = hk.access_code;
+                        }
+                      });
+                      setHousekeeperCodes(codes);
+                    }
+                  }, 1000);
+                } catch (error) {
+                  toast({
+                    variant: "destructive",
+                    title: "Erreur",
+                    description: "Impossible de créer les femmes de chambre de test."
+                  });
+                }
+              }}
+            >
+              Créer des femmes de chambre de test
+            </Button>
+          </div>
+        )}
+
         {showCodes && (
           <div className="space-y-4">
             {/* Code principal de l'hôtel */}
