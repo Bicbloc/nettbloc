@@ -34,6 +34,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Nettoyer les données d'hôtel obsolètes lors de l'authentification
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('🧹 Nettoyage des données d\'hôtel obsolètes après connexion');
+          localStorage.removeItem('selectedHotelCode');
+          localStorage.removeItem('selectedHotelId');
+          localStorage.removeItem('selectedHotelName');
+          localStorage.removeItem('userEmail');
+        }
       }
     );
 
