@@ -30,12 +30,6 @@ const Auth = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const forceAuth = urlParams.get('force') === 'true';
 
-  // Redirect if already authenticated (unless forced)
-  if (!loading && isAuthenticated && !forceAuth) {
-    console.log('🔄 Redirecting authenticated user to home');
-    return <Navigate to="/" replace />;
-  }
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -107,6 +101,14 @@ const Auth = () => {
   const handleHousekeeperAccess = () => {
     navigate('/housekeeper-login');
   };
+
+  // Handle authentication redirect
+  useEffect(() => {
+    if (!loading && isAuthenticated && !forceAuth) {
+      console.log('🔄 Redirecting authenticated user to home');
+      navigate('/', { replace: true });
+    }
+  }, [loading, isAuthenticated, forceAuth, navigate]);
 
   // Handle password reset from URL
   useEffect(() => {
