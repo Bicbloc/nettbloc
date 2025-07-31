@@ -30,17 +30,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     console.log('🔧 AuthContext: Initialisation des listeners d\'authentification');
     
-    // Timeout de sécurité pour éviter un loading infini
-    const timeoutId = setTimeout(() => {
-      console.log('⏰ AuthContext: Timeout - forçage du loading à false');
-      setLoading(false);
-    }, 3000); // 3 secondes max
-
-    // Set up auth state listener
+    let isMounted = true;
+    
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!isMounted) return;
+        
         console.log(`🔄 AuthContext: Auth state change - Event: ${event}, Session:`, !!session);
-        clearTimeout(timeoutId); // Annuler le timeout si on reçoit un event
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -56,26 +53,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Get initial session avec timeout
+    // THEN get initial session
     console.log('🔍 AuthContext: Vérification de la session initiale');
-    Promise.race([
-      supabase.auth.getSession(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 2000))
-    ]).then(({ data: { session } }: any) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      
       console.log('📋 AuthContext: Session initiale récupérée:', !!session);
-      clearTimeout(timeoutId);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     }).catch((error) => {
+      if (!isMounted) return;
+      
       console.error('❌ AuthContext: Erreur récupération session initiale:', error);
-      clearTimeout(timeoutId);
       setLoading(false);
     });
 
     return () => {
       console.log('🧹 AuthContext: Nettoyage des listeners');
-      clearTimeout(timeoutId);
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
