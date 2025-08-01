@@ -320,8 +320,8 @@ const Index = () => {
     }));
   };
   
-  const handlePdfProcessed = (data: Room[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
-    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune');
+  const handlePdfProcessed = async (data: Room[], housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
+    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeepers);
     
     const floors = new Set<number>();
     data.forEach(room => {
@@ -336,11 +336,41 @@ const Index = () => {
     const sortedData = [...data].sort((a, b) => 
       a.number.localeCompare(b.number, undefined, { numeric: true })
     );
+
+    // Mettre à jour les noms des femmes de chambre dans le context
+    setHousekeeperNames(housekeepers);
     
-    // Appliquer la méthode de redistribution si spécifiée et si on a des femmes de chambre
-    if (distributionMethod && housekeeperNames.length > 0) {
+    // Générer automatiquement les codes d'accès pour les femmes de chambre
+    if (housekeepers.length > 0 && hotel?.id) {
+      try {
+        console.log("🔑 Génération des codes d'accès pour:", housekeepers);
+        
+        await SupabaseService.createHousekeepers(hotel.id, housekeepers);
+        
+        // Rafraîchir la liste des femmes de chambre pour récupérer les codes
+        await refreshHousekeepers();
+        
+        console.log("✅ Codes d'accès générés avec succès");
+        
+        toast({
+          title: "Codes d'accès générés",
+          description: `${housekeepers.length} codes d'accès créés pour les femmes de chambre.`
+        });
+        
+      } catch (error) {
+        console.error("❌ Erreur génération codes d'accès:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur codes d'accès",
+          description: "Impossible de générer les codes d'accès automatiquement."
+        });
+      }
+    }
+    
+    // Appliquer la méthode de redistribution si spécifiée
+    if (distributionMethod && housekeepers.length > 0) {
       console.log("🔄 Application de la redistribution automatique:", distributionMethod);
-      const redistributedRooms = redistributeRooms(sortedData, housekeeperNames, distributionMethod);
+      const redistributedRooms = redistributeRooms(sortedData, housekeepers, distributionMethod);
       setRooms(redistributedRooms);
       setIsDistributed(true);
       
@@ -1186,8 +1216,7 @@ const Index = () => {
                 <CardContent className="space-y-4">
                   <PdfWorkflowDialog 
                     onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                      handlePdfProcessed(data, distributionMethod);
-                      setHousekeeperNames(housekeepers);
+                      handlePdfProcessed(data, housekeepers, distributionMethod);
                     }}
                     currentHousekeepers={housekeeperNames}
                   />
@@ -1281,8 +1310,7 @@ const Index = () => {
               <div className="flex gap-2">
                   <PdfWorkflowDialog 
                     onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                      handlePdfProcessed(data, distributionMethod);
-                      setHousekeeperNames(housekeepers);
+                      handlePdfProcessed(data, housekeepers, distributionMethod);
                     }}
                     currentHousekeepers={housekeeperNames}
                   />
@@ -1307,8 +1335,7 @@ const Index = () => {
                   </p>
                 <PdfWorkflowDialog 
                   onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                    handlePdfProcessed(data, distributionMethod);
-                    setHousekeeperNames(housekeepers);
+                    handlePdfProcessed(data, housekeepers, distributionMethod);
                   }}
                   currentHousekeepers={housekeeperNames}
                 />

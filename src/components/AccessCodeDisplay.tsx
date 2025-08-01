@@ -31,6 +31,7 @@ export const AccessCodeDisplay = () => {
             codes[hk.name] = hk.access_code;
           });
           setHousekeeperCodes(codes);
+          console.log("✅ Codes femmes de chambre chargés:", codes);
         }
       } catch (error) {
         console.error('Erreur chargement codes femmes de chambre:', error);
@@ -41,6 +42,46 @@ export const AccessCodeDisplay = () => {
       loadHousekeeperCodes();
     }
   }, [isAuthenticated, hotel]);
+
+  // Rafraîchir automatiquement toutes les 2 secondes pour détecter les nouveaux codes
+  useEffect(() => {
+    if (!isAuthenticated || !hotel?.id) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const { SupabaseService } = await import('@/services/supabaseService');
+        const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
+        
+        if (housekeepers) {
+          const codes: Record<string, string> = {};
+          housekeepers.forEach(hk => {
+            codes[hk.name] = hk.access_code;
+          });
+          
+          // Mettre à jour seulement si des changements sont détectés
+          const currentKeys = Object.keys(housekeeperCodes).sort().join(',');
+          const newKeys = Object.keys(codes).sort().join(',');
+          
+          if (currentKeys !== newKeys && newKeys.length > 0) {
+            console.log("🔄 Nouveaux codes détectés, mise à jour...");
+            setHousekeeperCodes(codes);
+            
+            // Notifier seulement si on avait des codes avant (pas au premier chargement)
+            if (currentKeys.length > 0) {
+              toast({
+                title: "Codes mis à jour",
+                description: "De nouveaux codes d'accès ont été générés automatiquement."
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erreur rafraîchissement codes:', error);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, hotel?.id, housekeeperCodes]);
 
   const generateAccessCodes = async () => {
     if (!hotel) return;
