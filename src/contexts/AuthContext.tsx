@@ -28,52 +28,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🔧 AuthContext: Initialisation des listeners d\'authentification');
-    
-    let isMounted = true;
-    
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (!isMounted) return;
-        
-        console.log(`🔄 AuthContext: Auth state change - Event: ${event}, Session:`, !!session);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-        
-        // Nettoyer les données d'hôtel obsolètes lors de l'authentification
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('🧹 Nettoyage des données d\'hôtel obsolètes après connexion');
-          localStorage.removeItem('selectedHotelCode');
-          localStorage.removeItem('selectedHotelId');
-          localStorage.removeItem('selectedHotelName');
-          localStorage.removeItem('userEmail');
-        }
       }
     );
 
-    // THEN get initial session
-    console.log('🔍 AuthContext: Vérification de la session initiale');
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      
-      console.log('📋 AuthContext: Session initiale récupérée:', !!session);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-    }).catch((error) => {
-      if (!isMounted) return;
-      
-      console.error('❌ AuthContext: Erreur récupération session initiale:', error);
-      setLoading(false);
     });
 
-    return () => {
-      console.log('🧹 AuthContext: Nettoyage des listeners');
-      isMounted = false;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, companyName?: string) => {

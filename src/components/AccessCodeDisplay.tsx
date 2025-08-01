@@ -28,12 +28,9 @@ export const AccessCodeDisplay = () => {
         if (housekeepers) {
           const codes: Record<string, string> = {};
           housekeepers.forEach(hk => {
-            if (hk.access_code) {
-              codes[hk.name] = hk.access_code;
-            }
+            codes[hk.name] = hk.access_code;
           });
           setHousekeeperCodes(codes);
-          console.log('✅ Codes femmes de chambre chargés:', codes);
         }
       } catch (error) {
         console.error('Erreur chargement codes femmes de chambre:', error);
@@ -44,39 +41,6 @@ export const AccessCodeDisplay = () => {
       loadHousekeeperCodes();
     }
   }, [isAuthenticated, hotel]);
-
-  // Rafraîchir les codes quand une nouvelle femme de chambre est ajoutée
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (hotel?.id && showCodes) {
-        try {
-          const { SupabaseService } = await import('@/services/supabaseService');
-          const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
-          
-          if (housekeepers) {
-            const codes: Record<string, string> = {};
-            housekeepers.forEach(hk => {
-              if (hk.access_code) {
-                codes[hk.name] = hk.access_code;
-              }
-            });
-            setHousekeeperCodes(prevCodes => {
-              // Ne mettre à jour que si les codes ont changé
-              if (JSON.stringify(prevCodes) !== JSON.stringify(codes)) {
-                console.log('🔄 Nouveaux codes détectés:', codes);
-                return codes;
-              }
-              return prevCodes;
-            });
-          }
-        } catch (error) {
-          console.error('Erreur rafraîchissement codes:', error);
-        }
-      }
-    }, 3000); // Vérifier toutes les 3 secondes
-
-    return () => clearInterval(interval);
-  }, [hotel?.id, showCodes]);
 
   const generateAccessCodes = async () => {
     if (!hotel) return;
@@ -165,51 +129,6 @@ export const AccessCodeDisplay = () => {
             {showCodes ? 'Masquer' : 'Afficher'}
           </Button>
         </div>
-
-        {/* Bouton pour créer des femmes de chambre de test */}
-        {Object.keys(housekeeperCodes).length === 0 && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800 mb-2">
-              Aucune femme de chambre trouvée. Créez-en pour générer leurs codes d'accès.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                if (!hotel?.id) return;
-                try {
-                  const { SupabaseService } = await import('@/services/supabaseService');
-                  await SupabaseService.createHousekeepers(hotel.id, ['Marie Dupont', 'Sophie Martin', 'Claire Bernard']);
-                  toast({
-                    title: "Femmes de chambre créées",
-                    description: "3 femmes de chambre de test ont été créées avec leurs codes d'accès."
-                  });
-                  // Forcer le rechargement des codes
-                  setTimeout(async () => {
-                    const housekeepers = await SupabaseService.getHousekeepers(hotel.id);
-                    if (housekeepers) {
-                      const codes: Record<string, string> = {};
-                      housekeepers.forEach(hk => {
-                        if (hk.access_code) {
-                          codes[hk.name] = hk.access_code;
-                        }
-                      });
-                      setHousekeeperCodes(codes);
-                    }
-                  }, 1000);
-                } catch (error) {
-                  toast({
-                    variant: "destructive",
-                    title: "Erreur",
-                    description: "Impossible de créer les femmes de chambre de test."
-                  });
-                }
-              }}
-            >
-              Créer des femmes de chambre de test
-            </Button>
-          </div>
-        )}
 
         {showCodes && (
           <div className="space-y-4">
