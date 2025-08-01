@@ -19,14 +19,16 @@ export const useAutoSetup = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
     const setupUserHotel = async () => {
       if (!isAuthenticated || !user) {
-        setLoading(false);
+        if (isMounted) setLoading(false);
         return;
       }
 
       try {
-        console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
 
         // 1. Vérifier si l'utilisateur a déjà un hôtel
         const { data: existingHotel, error: hotelError } = await supabase
@@ -93,13 +95,11 @@ export const useAutoSetup = () => {
           }
         }
 
-        if (hotelData) {
+        if (hotelData && isMounted) {
           setHotel(hotelData);
 
           // 3. Générer un code d'accès si il n'existe pas
           if (!accessCode) {
-            console.log('🔑 Auto-setup: Génération du code d\'accès...');
-            
             const { data: codeData, error: codeError } = await supabase
               .rpc('generate_hotel_access_code', {
                 hotel_uuid: hotelData.id
@@ -107,9 +107,8 @@ export const useAutoSetup = () => {
 
             if (codeError) {
               console.error('Erreur génération code:', codeError);
-            } else {
+            } else if (isMounted) {
               setAccessCode(codeData);
-              console.log('🔑 Auto-setup: Code généré:', codeData);
               
               toast({
                 title: "Configuration automatique",
@@ -123,18 +122,32 @@ export const useAutoSetup = () => {
 
       } catch (error) {
         console.error('Erreur auto-setup:', error);
-        toast({
-          variant: "destructive",
-          title: "Erreur configuration",
-          description: "Impossible de configurer automatiquement votre hôtel."
-        });
+        if (isMounted) {
+          toast({
+            variant: "destructive",
+            title: "Erreur configuration",
+            description: "Impossible de configurer automatiquement votre hôtel."
+          });
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
+    // Set timeout to prevent hanging
+    timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        setLoading(false);
+      }
+    }, 10000);
+
     setupUserHotel();
-  }, [isAuthenticated, user]);
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isAuthenticated, user?.id]); // Only depend on user.id to prevent loops
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;

@@ -23,8 +23,6 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Debug auth state
-  console.log('🔐 Auth State:', { isAuthenticated, loading, user: isAuthenticated ? 'Connected' : 'Not connected' });
 
   // Check for forced access parameter
   const urlParams = new URLSearchParams(window.location.search);
@@ -32,7 +30,6 @@ const Auth = () => {
 
   // Redirect if already authenticated (unless forced)
   if (!loading && isAuthenticated && !forceAuth) {
-    console.log('🔄 Redirecting authenticated user to home');
     return <Navigate to="/" replace />;
   }
 
