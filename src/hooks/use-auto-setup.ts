@@ -17,33 +17,37 @@ export const useAutoSetup = () => {
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
 
     const setupUserHotel = async () => {
-      if (!isAuthenticated || !user) {
+      // Éviter les appels multiples
+      if (hasInitialized || !isAuthenticated || !user?.id) {
         if (isMounted) setLoading(false);
         return;
       }
 
-      try {
+      console.log('🏨 Auto-setup: Démarrage UNIQUE pour user:', user.email);
+      setHasInitialized(true);
 
+      try {
         // 1. Vérifier si l'utilisateur a déjà un hôtel
         const { data: existingHotel, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (hotelError && hotelError.code !== 'PGRST116') {
+        if (hotelError) {
           throw hotelError;
         }
 
         let hotelData = existingHotel;
 
-        // 2. Si pas d'hôtel, créer un nouveau systématiquement avec le company_name du profil
+        // 2. Si pas d'hôtel, créer un nouveau
         if (!existingHotel) {
           console.log('🏨 Auto-setup: Création d\'un nouvel hôtel...');
           
@@ -52,7 +56,7 @@ export const useAutoSetup = () => {
             .from('profiles')
             .select('company_name')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
           const hotelName = profile?.company_name || `Établissement de ${user.email}`;
 
@@ -71,12 +75,14 @@ export const useAutoSetup = () => {
           
           console.log('🏨 Auto-setup: Nouvel hôtel créé:', hotelData);
         } else {
+          console.log('🏨 Auto-setup: Hôtel existant trouvé:', existingHotel);
+          
           // 2bis. Mettre à jour le nom de l'hôtel existant avec le company_name actuel
           const { data: profile } = await supabase
             .from('profiles')
             .select('company_name')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
           const updatedHotelName = profile?.company_name || existingHotel.name;
           
@@ -98,44 +104,50 @@ export const useAutoSetup = () => {
         if (hotelData && isMounted) {
           setHotel(hotelData);
 
-          // 3. Générer un code d'accès si il n'en existe pas déjà un
-          if (!accessCode && hotelData.id) {
-            const { data: codeData, error: codeError } = await supabase
-              .rpc('generate_hotel_access_code', {
-                hotel_uuid: hotelData.id
-              });
+          // 3. Générer un code d'accès UNIQUEMENT si nécessaire
+          console.log('🔑 Auto-setup: Génération du code d\'accès...');
+          
+          const { data: codeData, error: codeError } = await supabase
+            .rpc('generate_hotel_access_code', {
+              hotel_uuid: hotelData.id
+            });
 
-            if (codeError) {
-              console.error('Erreur génération code:', codeError);
-            } else if (isMounted && codeData) {
-              setAccessCode(codeData);
-              
-              toast({
-                title: "Configuration automatique",
-                description: `Votre hôtel "${hotelData.name}" est prêt ! Code d'accès généré.`
-              });
-            }
-          } else if (isMounted) {
-            // Si on a déjà un code d'accès, marquer comme configuré
+          if (codeError) {
+            console.error('Erreur génération code:', codeError);
+            throw codeError;
+          } else if (isMounted && codeData) {
+            setAccessCode(codeData);
+            console.log('🔑 Auto-setup: Code généré avec succès:', codeData);
+            
             toast({
-              title: "Configuration complète",
-              description: `Votre hôtel "${hotelData.name}" est déjà configuré.`
+              title: "Configuration automatique",
+              description: `Votre hôtel "${hotelData.name}" est prêt ! Code d'accès: ${codeData}`
             });
           }
 
           if (isMounted) {
             setIsSetupComplete(true);
+            console.log('✅ Auto-setup: Configuration terminée avec succès');
           }
         }
 
       } catch (error) {
-        console.error('Erreur auto-setup:', error);
+        console.error('❌ Erreur auto-setup:', error);
         if (isMounted) {
+          setHasInitialized(false); // Permettre un retry
           toast({
             variant: "destructive",
             title: "Erreur configuration",
-            description: "Impossible de configurer automatiquement votre hôtel."
+            description: "Impossible de configurer automatiquement votre hôtel. Tentative automatique dans 5 secondes..."
           });
+          
+          // Retry après 5 secondes
+          setTimeout(() => {
+            if (isMounted) {
+              setHasInitialized(false);
+              setupUserHotel();
+            }
+          }, 5000);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -145,9 +157,11 @@ export const useAutoSetup = () => {
     // Set timeout to prevent hanging
     timeoutId = setTimeout(() => {
       if (isMounted && loading) {
+        console.log('⏰ Auto-setup: Timeout atteint');
         setLoading(false);
+        setHasInitialized(false);
       }
-    }, 10000);
+    }, 15000);
 
     setupUserHotel();
 
@@ -155,7 +169,7 @@ export const useAutoSetup = () => {
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isAuthenticated, user?.id]); // Only depend on user.id to prevent loops
+  }, [isAuthenticated, user?.id, hasInitialized]); // Ajouter hasInitialized pour éviter les boucles
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
