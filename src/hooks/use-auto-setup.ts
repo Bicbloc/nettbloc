@@ -98,8 +98,8 @@ export const useAutoSetup = () => {
         if (hotelData && isMounted) {
           setHotel(hotelData);
 
-          // 3. Générer un code d'accès si il n'existe pas
-          if (!accessCode) {
+          // 3. Générer un code d'accès si il n'en existe pas déjà un
+          if (!accessCode && hotelData.id) {
             const { data: codeData, error: codeError } = await supabase
               .rpc('generate_hotel_access_code', {
                 hotel_uuid: hotelData.id
@@ -107,7 +107,7 @@ export const useAutoSetup = () => {
 
             if (codeError) {
               console.error('Erreur génération code:', codeError);
-            } else if (isMounted) {
+            } else if (isMounted && codeData) {
               setAccessCode(codeData);
               
               toast({
@@ -115,9 +115,17 @@ export const useAutoSetup = () => {
                 description: `Votre hôtel "${hotelData.name}" est prêt ! Code d'accès généré.`
               });
             }
+          } else if (isMounted) {
+            // Si on a déjà un code d'accès, marquer comme configuré
+            toast({
+              title: "Configuration complète",
+              description: `Votre hôtel "${hotelData.name}" est déjà configuré.`
+            });
           }
 
-          setIsSetupComplete(true);
+          if (isMounted) {
+            setIsSetupComplete(true);
+          }
         }
 
       } catch (error) {
