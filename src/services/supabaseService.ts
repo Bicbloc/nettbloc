@@ -465,6 +465,25 @@ export class SupabaseService {
     return true;
   }
 
+  static async cleanupAllHousekeepers(hotelId: string): Promise<{deleted_housekeepers: number, deleted_codes: number} | null> {
+    try {
+      const { data, error } = await supabase
+        .rpc('cleanup_all_housekeepers_for_hotel', {
+          p_hotel_id: hotelId
+        });
+
+      if (error) {
+        console.error('❌ Erreur nettoyage femmes de chambre:', error);
+        return null;
+      }
+
+      return data?.[0] || { deleted_housekeepers: 0, deleted_codes: 0 };
+    } catch (error) {
+      console.error('❌ Erreur nettoyage femmes de chambre:', error);
+      return null;
+    }
+  }
+
   // Gestion des mises à jour de statut des chambres
   static async createRoomStatusUpdate(
     hotelId: string,

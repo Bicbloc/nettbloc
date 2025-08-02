@@ -171,6 +171,41 @@ export const HousekeeperManagement = () => {
     }
   };
 
+  const handleCleanupAll = async () => {
+    if (!hotel?.id) return;
+
+    if (!confirm('Êtes-vous sûr de vouloir supprimer TOUTES les femmes de chambre et leurs codes d\'accès ? Cette action est irréversible.')) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log('🧹 Nettoyage de toutes les femmes de chambre...');
+      
+      const result = await SupabaseService.cleanupAllHousekeepers(hotel.id);
+      
+      if (result) {
+        toast({
+          title: "Nettoyage terminé",
+          description: `${result.deleted_housekeepers} femme(s) de chambre et ${result.deleted_codes} code(s) supprimé(s).`
+        });
+        await loadHousekeepers();
+        await refreshHousekeepers();
+      } else {
+        throw new Error('Nettoyage échoué');
+      }
+    } catch (error) {
+      console.error('❌ Erreur nettoyage:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de nettoyer les femmes de chambre"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const syncWithContext = async () => {
     if (!hotel?.id || housekeeperNames.length === 0) return;
 
@@ -285,6 +320,15 @@ export const HousekeeperManagement = () => {
                 >
                   <Key className="h-4 w-4" />
                   {isGeneratingCodes ? 'Génération...' : 'Forcer génération codes'}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleCleanupAll}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {isLoading ? 'Suppression...' : 'Supprimer tout'}
                 </Button>
               </div>
             </div>

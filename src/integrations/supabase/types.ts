@@ -462,6 +462,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_all_housekeepers_for_hotel: {
+        Args: { p_hotel_id: string }
+        Returns: {
+          deleted_housekeepers: number
+          deleted_codes: number
+        }[]
+      }
       cleanup_expired_hotel_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
