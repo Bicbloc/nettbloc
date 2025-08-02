@@ -207,23 +207,11 @@ export const HousekeeperManagement = () => {
   };
 
   const syncWithContext = async () => {
-    if (!hotel?.id || housekeeperNames.length === 0) return;
-
-    try {
-      console.log('🔄 Synchronisation avec le contexte (femmes assignées uniquement):', housekeeperNames);
-      
-      const results = await CodeGenerationService.ensureCodesForAssignedHousekeepers(hotel.id, housekeeperNames);
-      
-      if (results > 0) {
-        toast({
-          title: "Synchronisation terminée",
-          description: `${results} code(s) d'accès généré(s) pour les femmes assignées`
-        });
-        await loadHousekeepers();
-      }
-    } catch (error) {
-      console.error('❌ Erreur synchronisation:', error);
-    }
+    console.log('⚠️ Synchronisation désactivée - création manuelle uniquement');
+    toast({
+      title: "Synchronisation désactivée",
+      description: "Veuillez créer les femmes de chambre manuellement via le bouton 'Ajouter'."
+    });
   };
 
   useEffect(() => {

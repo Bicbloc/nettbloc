@@ -264,21 +264,21 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
         const hotelCode = hotel?.hotel_code || 'HTL';
         
-        // Utiliser le service de génération pour créer les codes
-        const { CodeGenerationService } = await import('@/services/codeGenerationService');
-        const generated = await CodeGenerationService.ensureCodesForHotel(currentHotelId, newHousekeepers);
+        // DÉSACTIVÉ: Génération automatique des codes
+        // const { CodeGenerationService } = await import('@/services/codeGenerationService');
+        // const generated = await CodeGenerationService.ensureCodesForHotel(currentHotelId, newHousekeepers);
         
-        console.log(`✅ ${generated} codes d'accès générés automatiquement`);
+        console.log('⚠️ Génération automatique désactivée - création manuelle requise');
 
-        // Rafraîchir les femmes de chambre
-        await refreshHousekeepers();
+        // DÉSACTIVÉ: Rafraîchir les femmes de chambre automatiquement
+        // await refreshHousekeepers();
 
-        // Notification de succès
-        const { toast } = await import('@/hooks/use-toast');
-        toast({
-          title: "Codes d'accès générés",
-          description: `${newHousekeepers.length} code(s) d'accès généré(s) automatiquement pour les femmes de chambre.`
-        });
+        // DÉSACTIVÉ: Notification de succès automatique
+        // const { toast } = await import('@/hooks/use-toast');
+        // toast({
+        //   title: "Codes d'accès générés",
+        //   description: `${newHousekeepers.length} code(s) d'accès généré(s) automatiquement pour les femmes de chambre.`
+        // });
       } else {
         console.log('✅ Toutes les femmes de chambre ont déjà des codes d\'accès');
       }
@@ -387,38 +387,38 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     return hotelId || savedHotelId;
   };
 
-  // Vérifier périodiquement qu'il y a des codes d'accès pour les femmes de chambre
-  useEffect(() => {
-    const generateAccessCodesForAssignedHousekeepers = async () => {
-      if (!hotelId) return;
+  // DÉSACTIVÉ: Vérification périodique automatique des codes d'accès
+  // useEffect(() => {
+  //   const generateAccessCodesForAssignedHousekeepers = async () => {
+  //     if (!hotelId) return;
       
-      try {
-        console.log('🔧 Vérification des codes d\'accès manquants...');
+  //     try {
+  //       console.log('🔧 Vérification des codes d\'accès manquants...');
         
-        // Forcer la génération de codes pour toutes les femmes de chambre manquantes
-        const { CodeGenerationService } = await import('@/services/codeGenerationService');
-        const results = await CodeGenerationService.forceGenerateAllMissingCodes();
+  //       // Forcer la génération de codes pour toutes les femmes de chambre manquantes
+  //       const { CodeGenerationService } = await import('@/services/codeGenerationService');
+  //       const results = await CodeGenerationService.forceGenerateAllMissingCodes();
         
-        if (results.generated > 0) {
-          console.log(`✅ ${results.generated} code(s) d'accès généré(s) automatiquement`);
-        }
+  //       if (results.generated > 0) {
+  //         console.log(`✅ ${results.generated} code(s) d'accès généré(s) automatiquement`);
+  //       }
         
-        if (results.errors.length > 0) {
-          console.warn('⚠️ Erreurs lors de la génération automatique:', results.errors);
-        }
-      } catch (error) {
-        console.error('❌ Erreur génération codes automatique:', error);
-      }
-    };
+  //       if (results.errors.length > 0) {
+  //         console.warn('⚠️ Erreurs lors de la génération automatique:', results.errors);
+  //       }
+  //     } catch (error) {
+  //       console.error('❌ Erreur génération codes automatique:', error);
+  //     }
+  //   };
     
-    // Vérifier immédiatement
-    generateAccessCodesForAssignedHousekeepers();
+  //   // Vérifier immédiatement
+  //   generateAccessCodesForAssignedHousekeepers();
     
-    // Puis vérifier toutes les 2 minutes
-    const interval = setInterval(generateAccessCodesForAssignedHousekeepers, 120000);
+  //   // Puis vérifier toutes les 2 minutes
+  //   const interval = setInterval(generateAccessCodesForAssignedHousekeepers, 120000);
     
-    return () => clearInterval(interval);
-  }, [hotelId]);
+  //   return () => clearInterval(interval);
+  // }, [hotelId]);
 
   // Fonction pour charger les femmes de chambre depuis la base
   const refreshHousekeepers = async () => {

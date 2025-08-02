@@ -134,8 +134,8 @@ export const DataDiagnostic: React.FC = () => {
       // 4. Clean up orphaned access codes
       await CodeGenerationService.cleanupOrphanedCodes();
 
-      // 5. Generate missing access codes for remaining housekeepers
-      await CodeGenerationService.forceGenerateAllMissingCodes();
+      // DÉSACTIVÉ: Génération automatique de codes
+      // await CodeGenerationService.forceGenerateAllMissingCodes();
 
       toast({
         title: "Réparation terminée",
