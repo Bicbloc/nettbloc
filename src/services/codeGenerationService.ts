@@ -117,13 +117,20 @@ export class CodeGenerationService {
             try {
               const accessCode = await this.generateUniqueCode(hotelCode, name);
 
+              // Récupérer l'utilisateur pour obtenir user_id
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) {
+                throw new Error('Utilisateur non connecté');
+              }
+
               // Créer la femme de chambre
               const { data: housekeeper, error: housekeeperError } = await supabase
                 .from('housekeepers')
                 .insert({
                   hotel_id: session.hotel_id as string,
                   name: name,
-                  access_code: accessCode
+                  access_code: accessCode,
+                  user_id: user.id
                 })
                 .select('id')
                 .single();
@@ -252,6 +259,12 @@ export class CodeGenerationService {
               });
 
           } else {
+            // Récupérer l'utilisateur pour obtenir user_id
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+              throw new Error('Utilisateur non connecté');
+            }
+
             // Créer une nouvelle femme de chambre
             const { data: newHousekeeper, error: createError } = await supabase
               .from('housekeepers')
@@ -259,7 +272,8 @@ export class CodeGenerationService {
                 hotel_id: hotelId,
                 name: housekeeperName,
                 access_code: accessCode,
-                is_active: true
+                is_active: true,
+                user_id: user.id
               })
               .select('id')
               .single();

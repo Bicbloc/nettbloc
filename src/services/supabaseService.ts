@@ -242,22 +242,24 @@ export class SupabaseService {
     try {
       console.log('🔧 Début création femme de chambre:', { hotelId, name });
       
-      // Générer un code d'accès avec le préfixe de l'hôtel
-      const { data: accessCode, error: codeError } = await supabase
-        .rpc('generate_hotel_access_code', {
-          hotel_uuid: hotelId
-        });
-
-      if (codeError) {
-        console.error('❌ Erreur génération code d\'accès:', codeError);
-        return null;
-      }
-
       // Récupérer l'utilisateur actuel pour obtenir son ID
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         console.error('❌ Aucun utilisateur connecté');
+        return null;
+      }
+
+      // Utiliser la nouvelle fonction qui génère le code ET l'insère avec user_id
+      const { data: accessCode, error: codeError } = await supabase
+        .rpc('generate_housekeeper_access_code_with_user', {
+          p_hotel_id: hotelId,
+          p_housekeeper_name: name,
+          p_user_id: user.id
+        });
+
+      if (codeError) {
+        console.error('❌ Erreur génération code d\'accès:', codeError);
         return null;
       }
 
@@ -325,13 +327,22 @@ export class SupabaseService {
         }
         housekeeper = data as Housekeeper;
       } else {
+        // Récupérer l'utilisateur actuel pour obtenir son ID
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          console.error('❌ Aucun utilisateur connecté');
+          return null;
+        }
+
         // Créer une nouvelle femme de chambre
         const { data, error } = await supabase
           .from('housekeepers')
           .insert({ 
             hotel_id: hotelId, 
             name, 
-            access_code: accessCode 
+            access_code: accessCode,
+            user_id: user.id 
           })
           .select()
           .single();

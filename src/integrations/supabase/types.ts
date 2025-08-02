@@ -299,7 +299,7 @@ export type Database = {
           is_active: boolean
           name: string
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           access_code: string
@@ -309,7 +309,7 @@ export type Database = {
           is_active?: boolean
           name: string
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           access_code?: string
@@ -319,7 +319,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -581,6 +581,15 @@ export type Database = {
           p_hotel_id: string
           p_housekeeper_id?: string
           p_housekeeper_name?: string
+        }
+        Returns: string
+      }
+      generate_housekeeper_access_code_with_user: {
+        Args: {
+          p_hotel_id: string
+          p_housekeeper_id?: string
+          p_housekeeper_name?: string
+          p_user_id?: string
         }
         Returns: string
       }
