@@ -48,6 +48,7 @@ import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
+import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 
@@ -1091,8 +1092,36 @@ const Index = () => {
                  <UserMenu />
                </>
              )}
-           </div>
+          </div>
         </div>
+
+        {/* Diagnostic pour les problèmes d'association hôtel */}
+        {(!hotel || !isSetupComplete || !currentHotelId) && (
+          <div className="mb-6">
+            <HotelSetupFix onForceSetup={() => window.location.reload()} />
+          </div>
+        )}
+
+        {/* Affichage du nom d'hôtel actuel */}
+        {hotel && (
+          <div className="mb-4">
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm text-muted-foreground">Hôtel connecté:</span>
+                    <p className="font-medium">{hotel.name} ({hotel.hotel_code})</p>
+                  </div>
+                  {accessCode && (
+                    <Badge variant="secondary">
+                      Code: {accessCode}
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
 
         {/* Panneau de notifications global */}

@@ -77,6 +77,17 @@ export const useAutoSetup = () => {
         if (hotelData) {
           setHotel(hotelData);
           
+          // IMPORTANT: Sauvegarder l'hôtel dans localStorage pour les autres composants
+          localStorage.setItem('selectedHotelId', hotelData.id);
+          localStorage.setItem('selectedHotelCode', hotelData.hotel_code || '');
+          localStorage.setItem('selectedHotelName', hotelData.name);
+          
+          console.log('✅ Hôtel sauvegardé dans localStorage:', {
+            id: hotelData.id,
+            code: hotelData.hotel_code,
+            name: hotelData.name
+          });
+          
           // 3. Vérifier un code d'accès existant
           const { data: existingCodes } = await supabase
             .from('housekeeper_access_codes')
@@ -91,7 +102,7 @@ export const useAutoSetup = () => {
           }
 
           setIsSetupComplete(true);
-          console.log('✅ Configuration terminée');
+          console.log('✅ Configuration terminée avec sauvegarde localStorage');
         }
 
       } catch (error) {
