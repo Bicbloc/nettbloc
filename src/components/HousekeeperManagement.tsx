@@ -210,14 +210,14 @@ export const HousekeeperManagement = () => {
     if (!hotel?.id || housekeeperNames.length === 0) return;
 
     try {
-      console.log('🔄 Synchronisation avec le contexte:', housekeeperNames);
+      console.log('🔄 Synchronisation avec le contexte (femmes assignées uniquement):', housekeeperNames);
       
-      const results = await CodeGenerationService.ensureCodesForHotel(hotel.id, housekeeperNames);
+      const results = await CodeGenerationService.ensureCodesForAssignedHousekeepers(hotel.id, housekeeperNames);
       
       if (results > 0) {
         toast({
           title: "Synchronisation terminée",
-          description: `${results} nouvelle(s) femme(s) de chambre créée(s)`
+          description: `${results} code(s) d'accès généré(s) pour les femmes assignées`
         });
         await loadHousekeepers();
       }
@@ -228,7 +228,9 @@ export const HousekeeperManagement = () => {
 
   useEffect(() => {
     // Synchroniser automatiquement quand les noms changent dans le contexte
-    syncWithContext();
+    if (hotel?.id && housekeeperNames.length > 0) {
+      syncWithContext();
+    }
   }, [housekeeperNames, hotel?.id]);
 
   if (!isSetupComplete || !hotel) {

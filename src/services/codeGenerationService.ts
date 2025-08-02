@@ -163,11 +163,16 @@ export class CodeGenerationService {
   }
 
   /**
-   * Vérifie et génère les codes manquants pour un hôtel spécifique
+   * Génère les codes UNIQUEMENT pour les femmes de chambre assignées aux chambres
    */
-  static async ensureCodesForHotel(hotelId: string, housekeeperNames: string[]): Promise<number> {
-    if (!hotelId || !housekeeperNames.length) return 0;
+  static async ensureCodesForAssignedHousekeepers(hotelId: string, assignedHousekeepers: string[]): Promise<number> {
+    if (!hotelId || !assignedHousekeepers.length) {
+      console.log('🔄 Aucune femme de chambre assignée, aucun code à générer');
+      return 0;
+    }
 
+    console.log('🔧 Génération codes pour femmes de chambre assignées:', assignedHousekeepers);
+    
     try {
       // Récupérer le code de l'hôtel
       const { data: hotel } = await supabase
@@ -177,59 +182,90 @@ export class CodeGenerationService {
         .single();
 
       const hotelCode = hotel?.hotel_code || 'HTL';
-
-      // Vérifier les femmes de chambre existantes
-      const { data: existingHousekeepers } = await supabase
-        .from('housekeepers')
-        .select('name')
-        .eq('hotel_id', hotelId)
-        .eq('is_active', true);
-
-      const existingNames = existingHousekeepers?.map(h => h.name) || [];
-      const newHousekeepers = housekeeperNames.filter(name => !existingNames.includes(name));
-
       let generated = 0;
 
-      for (const name of newHousekeepers) {
+      // Pour chaque femme de chambre assignée
+      for (const housekeeperName of assignedHousekeepers) {
+        console.log('🔍 Vérification code pour:', housekeeperName);
+        
+        // Vérifier si elle existe déjà avec un code actif
+        const { data: existingHousekeeper } = await supabase
+          .from('housekeepers')
+          .select('*')
+          .eq('hotel_id', hotelId)
+          .eq('name', housekeeperName)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (existingHousekeeper?.access_code) {
+          console.log('✅ Code déjà existant pour:', housekeeperName, existingHousekeeper.access_code);
+          continue;
+        }
+
         try {
-          const accessCode = await this.generateUniqueCode(hotelCode, name);
+          // Générer un nouveau code d'accès
+          const accessCode = await this.generateUniqueCode(hotelCode, housekeeperName);
 
-          // Créer la femme de chambre
-          const { data: housekeeper, error: housekeeperError } = await supabase
-            .from('housekeepers')
-            .insert({
-              hotel_id: hotelId,
-              name: name,
-              access_code: accessCode
-            })
-            .select('id')
-            .single();
+          if (existingHousekeeper) {
+            // Mettre à jour la femme de chambre existante avec le nouveau code
+            const { error: updateError } = await supabase
+              .from('housekeepers')
+              .update({ 
+                access_code: accessCode,
+                is_active: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingHousekeeper.id);
 
-          if (housekeeperError) throw housekeeperError;
+            if (updateError) throw updateError;
+          } else {
+            // Créer une nouvelle femme de chambre
+            const { data: newHousekeeper, error: createError } = await supabase
+              .from('housekeepers')
+              .insert({
+                hotel_id: hotelId,
+                name: housekeeperName,
+                access_code: accessCode,
+                is_active: true
+              })
+              .select('id')
+              .single();
 
-          // Créer le code d'accès
-          await supabase
-            .from('housekeeper_access_codes')
-            .insert({
-              hotel_id: hotelId,
-              housekeeper_id: housekeeper.id,
-              access_code: accessCode,
-              created_by: null
-            });
+            if (createError) throw createError;
+            
+            // Créer le code d'accès dans la table dédiée
+            await supabase
+              .from('housekeeper_access_codes')
+              .insert({
+                hotel_id: hotelId,
+                housekeeper_id: newHousekeeper.id,
+                access_code: accessCode,
+                created_by: null
+              });
+          }
 
           generated++;
-          console.log(`✅ Code généré pour ${name}: ${accessCode}`);
+          console.log(`✅ Code généré pour ${housekeeperName}: ${accessCode}`);
           
         } catch (error) {
-          console.error(`❌ Erreur génération code pour ${name}:`, error);
+          console.error(`❌ Erreur génération code pour ${housekeeperName}:`, error);
         }
       }
 
+      console.log(`🎯 Génération terminée: ${generated} codes créés pour les femmes assignées`);
       return generated;
       
     } catch (error) {
-      console.error('❌ Erreur ensureCodesForHotel:', error);
+      console.error('❌ Erreur ensureCodesForAssignedHousekeepers:', error);
       return 0;
     }
+  }
+
+  /**
+   * DEPRECATED: Utiliser ensureCodesForAssignedHousekeepers à la place
+   */
+  static async ensureCodesForHotel(hotelId: string, housekeeperNames: string[]): Promise<number> {
+    console.warn('⚠️ ensureCodesForHotel est dépréciée, utilisez ensureCodesForAssignedHousekeepers');
+    return this.ensureCodesForAssignedHousekeepers(hotelId, housekeeperNames);
   }
 }
