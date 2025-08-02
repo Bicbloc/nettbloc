@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
-  Hotel, Users, BarChart3
+  Hotel, Users, BarChart3, CreditCard, Calendar, Gift
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
@@ -30,6 +30,7 @@ interface UserWithRole {
   company_name?: string;
   is_suspended?: boolean;
   subscription_type?: string;
+  trial_end_date?: string;
   role?: 'user' | 'admin' | 'super_admin';
   created_at: string;
   last_sign_in_at?: string;
@@ -140,6 +141,7 @@ const Admin = () => {
           company_name,
           is_suspended,
           subscription_type,
+          trial_end_date,
           created_at
         `);
 
@@ -463,6 +465,76 @@ const Admin = () => {
     }
   };
 
+  // Nouvelle fonction pour changer le type d'abonnement
+  const changeSubscriptionType = async (userId: string, newType: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription_type: newType })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Log l'action
+      await supabase.rpc('log_admin_action', {
+        p_action: 'change_subscription_type',
+        p_target_user_id: userId,
+        p_details: { new_subscription_type: newType }
+      });
+
+      toast({
+        title: "Type d'abonnement modifié",
+        description: `L'utilisateur a maintenant un abonnement ${newType}.`
+      });
+
+      await loadAdminData();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: `Impossible de modifier l'abonnement: ${error.message}`
+      });
+    }
+  };
+
+  // Nouvelle fonction pour étendre la période d'essai
+  const extendTrial = async (userId: string, days: number) => {
+    try {
+      const newTrialEndDate = new Date();
+      newTrialEndDate.setDate(newTrialEndDate.getDate() + days);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ trial_end_date: newTrialEndDate.toISOString() })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Log l'action
+      await supabase.rpc('log_admin_action', {
+        p_action: 'extend_trial',
+        p_target_user_id: userId,
+        p_details: { 
+          days_extended: days,
+          new_trial_end: newTrialEndDate.toISOString()
+        }
+      });
+
+      toast({
+        title: "Période d'essai étendue",
+        description: `La période d'essai a été étendue de ${days} jours.`
+      });
+
+      await loadAdminData();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: `Impossible d'étendre la période d'essai: ${error.message}`
+      });
+    }
+  };
+
   if (loading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -644,18 +716,19 @@ const Admin = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Entreprise</TableHead>
-                    <TableHead>Rôle</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Inscription</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+               <Table>
+                 <TableHeader>
+                   <TableRow>
+                     <TableHead>Email</TableHead>
+                     <TableHead>Entreprise</TableHead>
+                     <TableHead>Rôle</TableHead>
+                     <TableHead>Statut</TableHead>
+                     <TableHead>Abonnement</TableHead>
+                     <TableHead>Essai gratuit</TableHead>
+                     <TableHead>Inscription</TableHead>
+                     <TableHead>Actions</TableHead>
+                   </TableRow>
+                 </TableHeader>
                 <TableBody>
                   {users.map((userItem) => (
                     <TableRow key={userItem.id}>
@@ -671,63 +744,181 @@ const Admin = () => {
                           {userItem.is_suspended ? 'Suspendu' : 'Actif'}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {userItem.subscription_type || 'free'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(userItem.created_at), 'dd/MM/yyyy', { locale: fr })}
-                      </TableCell>
-                      <TableCell className="space-x-2">
-                        {userItem.role !== 'super_admin' && (
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              size="sm"
-                              variant={userItem.is_suspended ? "default" : "outline"}
-                              onClick={() => suspendUser(userItem.id, !userItem.is_suspended)}
-                            >
-                              {userItem.is_suspended ? (
-                                <CheckCircle className="h-4 w-4" />
-                              ) : (
-                                <Ban className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => toggleUserRole(userItem.id, userItem.role || 'user')}
-                            >
-                              <Shield className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Supprimer l'utilisateur</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Êtes-vous sûr de vouloir supprimer {userItem.email} ? 
-                                    Cette action est irréversible et supprimera toutes les données associées.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => deleteUser(userItem.id)}
-                                    className="bg-destructive hover:bg-destructive/90"
-                                  >
-                                    Supprimer définitivement
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        )}
-                      </TableCell>
+                       <TableCell>
+                         <Badge variant="outline">
+                           {userItem.subscription_type || 'free'}
+                         </Badge>
+                       </TableCell>
+                       <TableCell>
+                         {userItem.trial_end_date ? (
+                           <div className="text-sm">
+                             <div className={`text-xs ${new Date(userItem.trial_end_date) > new Date() ? 'text-green-600' : 'text-red-600'}`}>
+                               {new Date(userItem.trial_end_date) > new Date() ? 'Actif' : 'Expiré'}
+                             </div>
+                             <div className="text-xs text-muted-foreground">
+                               {format(new Date(userItem.trial_end_date), 'dd/MM/yyyy', { locale: fr })}
+                             </div>
+                           </div>
+                         ) : (
+                           <Badge variant="secondary" className="text-xs">
+                             Aucun essai
+                           </Badge>
+                         )}
+                       </TableCell>
+                       <TableCell>
+                         {format(new Date(userItem.created_at), 'dd/MM/yyyy', { locale: fr })}
+                       </TableCell>
+                       <TableCell className="space-x-1">
+                         {userItem.role !== 'super_admin' && (
+                           <div className="flex items-center gap-1 flex-wrap">
+                             {/* Bouton Suspendre/Réactiver */}
+                             <Button
+                               size="sm"
+                               variant={userItem.is_suspended ? "default" : "outline"}
+                               onClick={() => suspendUser(userItem.id, !userItem.is_suspended)}
+                               title={userItem.is_suspended ? "Réactiver l'utilisateur" : "Suspendre l'utilisateur"}
+                             >
+                               {userItem.is_suspended ? (
+                                 <CheckCircle className="h-4 w-4" />
+                               ) : (
+                                 <Ban className="h-4 w-4" />
+                               )}
+                             </Button>
+                             
+                             {/* Bouton Changer rôle */}
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               onClick={() => toggleUserRole(userItem.id, userItem.role || 'user')}
+                               title="Changer le rôle"
+                             >
+                               <Shield className="h-4 w-4" />
+                             </Button>
+
+                             {/* Boutons Type d'abonnement */}
+                             <AlertDialog>
+                               <AlertDialogTrigger asChild>
+                                 <Button 
+                                   size="sm" 
+                                   variant="outline"
+                                   title="Changer le type d'abonnement"
+                                   className="bg-blue-50 hover:bg-blue-100"
+                                 >
+                                   <CreditCard className="h-4 w-4" />
+                                 </Button>
+                               </AlertDialogTrigger>
+                               <AlertDialogContent>
+                                 <AlertDialogHeader>
+                                   <AlertDialogTitle>Changer le type d'abonnement</AlertDialogTitle>
+                                   <AlertDialogDescription>
+                                     Utilisateur: {userItem.email}<br/>
+                                     Type actuel: {userItem.subscription_type || 'free'}
+                                   </AlertDialogDescription>
+                                 </AlertDialogHeader>
+                                 <div className="grid grid-cols-2 gap-2 my-4">
+                                   <Button
+                                     variant="outline"
+                                     onClick={() => changeSubscriptionType(userItem.id, 'free')}
+                                     className="w-full"
+                                   >
+                                     Gratuit
+                                   </Button>
+                                   <Button
+                                     variant="outline"
+                                     onClick={() => changeSubscriptionType(userItem.id, 'premium')}
+                                     className="w-full"
+                                   >
+                                     Premium
+                                   </Button>
+                                 </div>
+                                 <AlertDialogFooter>
+                                   <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                 </AlertDialogFooter>
+                               </AlertDialogContent>
+                             </AlertDialog>
+
+                             {/* Bouton Étendre période d'essai */}
+                             <AlertDialog>
+                               <AlertDialogTrigger asChild>
+                                 <Button 
+                                   size="sm" 
+                                   variant="outline"
+                                   title="Étendre la période d'essai"
+                                   className="bg-green-50 hover:bg-green-100"
+                                 >
+                                   <Calendar className="h-4 w-4" />
+                                 </Button>
+                               </AlertDialogTrigger>
+                               <AlertDialogContent>
+                                 <AlertDialogHeader>
+                                   <AlertDialogTitle>Étendre la période d'essai</AlertDialogTitle>
+                                   <AlertDialogDescription>
+                                     Utilisateur: {userItem.email}<br/>
+                                     {userItem.trial_end_date ? (
+                                       <>Fin actuelle: {format(new Date(userItem.trial_end_date), 'dd/MM/yyyy', { locale: fr })}</>
+                                     ) : (
+                                       'Aucune période d\'essai définie'
+                                     )}
+                                   </AlertDialogDescription>
+                                 </AlertDialogHeader>
+                                 <div className="grid grid-cols-3 gap-2 my-4">
+                                   <Button
+                                     variant="outline"
+                                     onClick={() => extendTrial(userItem.id, 7)}
+                                     className="w-full"
+                                   >
+                                     +7 jours
+                                   </Button>
+                                   <Button
+                                     variant="outline"
+                                     onClick={() => extendTrial(userItem.id, 30)}
+                                     className="w-full"
+                                   >
+                                     +30 jours
+                                   </Button>
+                                   <Button
+                                     variant="outline"
+                                     onClick={() => extendTrial(userItem.id, 90)}
+                                     className="w-full"
+                                   >
+                                     +90 jours
+                                   </Button>
+                                 </div>
+                                 <AlertDialogFooter>
+                                   <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                 </AlertDialogFooter>
+                               </AlertDialogContent>
+                             </AlertDialog>
+
+                             {/* Bouton Supprimer */}
+                             <AlertDialog>
+                               <AlertDialogTrigger asChild>
+                                 <Button size="sm" variant="destructive" title="Supprimer l'utilisateur">
+                                   <Trash2 className="h-4 w-4" />
+                                 </Button>
+                               </AlertDialogTrigger>
+                               <AlertDialogContent>
+                                 <AlertDialogHeader>
+                                   <AlertDialogTitle>Supprimer l'utilisateur</AlertDialogTitle>
+                                   <AlertDialogDescription>
+                                     Êtes-vous sûr de vouloir supprimer {userItem.email} ? 
+                                     Cette action est irréversible et supprimera toutes les données associées.
+                                   </AlertDialogDescription>
+                                 </AlertDialogHeader>
+                                 <AlertDialogFooter>
+                                   <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                   <AlertDialogAction
+                                     onClick={() => deleteUser(userItem.id)}
+                                     className="bg-destructive hover:bg-destructive/90"
+                                   >
+                                     Supprimer définitivement
+                                   </AlertDialogAction>
+                                 </AlertDialogFooter>
+                               </AlertDialogContent>
+                             </AlertDialog>
+                           </div>
+                         )}
+                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

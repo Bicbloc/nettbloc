@@ -346,6 +346,7 @@ export type Database = {
           id: string
           is_suspended: boolean
           subscription_type: string | null
+          trial_end_date: string | null
           updated_at: string
         }
         Insert: {
@@ -355,6 +356,7 @@ export type Database = {
           id: string
           is_suspended?: boolean
           subscription_type?: string | null
+          trial_end_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -364,6 +366,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean
           subscription_type?: string | null
+          trial_end_date?: string | null
           updated_at?: string
         }
         Relationships: []
