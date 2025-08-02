@@ -23,6 +23,21 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Handle password reset from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReset = urlParams.get('reset') === 'true';
+    
+    if (isReset) {
+      // Clear the URL parameter
+      window.history.replaceState({}, '', '/auth');
+      
+      toast({
+        title: "Réinitialisation activée",
+        description: "Vous pouvez maintenant définir un nouveau mot de passe dans l'onglet connexion."
+      });
+    }
+  }, []);
 
   // Check for forced access parameter
   const urlParams = new URLSearchParams(window.location.search);
@@ -105,21 +120,6 @@ const Auth = () => {
     navigate('/housekeeper-login');
   };
 
-  // Handle password reset from URL
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const isReset = urlParams.get('reset') === 'true';
-    
-    if (isReset) {
-      // Clear the URL parameter
-      window.history.replaceState({}, '', '/auth');
-      
-      toast({
-        title: "Réinitialisation activée",
-        description: "Vous pouvez maintenant définir un nouveau mot de passe dans l'onglet connexion."
-      });
-    }
-  }, []);
 
   const handlePasswordReset = async () => {
     if (!formData.email.trim()) {
