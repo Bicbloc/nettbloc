@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import UserMenu from "@/components/UserMenu";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
@@ -59,6 +59,7 @@ const Index = () => {
   const { isAuthenticated, loading } = useAuth();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
@@ -131,6 +132,27 @@ const Index = () => {
   useEffect(() => {
     cleanupInvalidHotelIds();
   }, []);
+  
+  // Traiter les données de l'AnalysisWorkflow
+  useEffect(() => {
+    if (location.state) {
+      const { rooms: analyzedRooms, housekeepers: analyzedHousekeepers, distributionMethod } = location.state as any;
+      
+      if (analyzedRooms && analyzedHousekeepers) {
+        console.log('📊 Données reçues de l\'AnalysisWorkflow:', {
+          rooms: analyzedRooms.length,
+          housekeepers: analyzedHousekeepers.length,
+          method: distributionMethod
+        });
+        
+        // Appliquer les données analysées
+        handlePdfProcessed(analyzedRooms, analyzedHousekeepers, distributionMethod);
+        
+        // Nettoyer l'état de navigation pour éviter les répétitions
+        navigate('/', { replace: true });
+      }
+    }
+  }, [location.state]);
   
   useEffect(() => {
     const initialPreferences: Record<string, number[]> = {};

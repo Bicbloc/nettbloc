@@ -118,13 +118,14 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Exécuter seulement si pas encore initialisé
-    if (!isSetupComplete && !hotel) {
+    // Exécuter seulement si authentifié et pas encore initialisé
+    if (isAuthenticated && user?.id && !isSetupComplete && !hotel) {
       setupHotel();
-    } else {
+    } else if (isAuthenticated && !loading) {
       setLoading(false);
+      setIsSetupComplete(true);
     }
-  }, [isAuthenticated, user?.id, isSetupComplete, hotel]);
+  }, [isAuthenticated, user?.id, isSetupComplete, hotel, loading]);
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;

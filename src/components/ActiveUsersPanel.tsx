@@ -64,7 +64,10 @@ export function ActiveUsersPanel() {
   }, [housekeeperNames, housekeepers]);
 
   const updateHousekeeperConnections = () => {
-    const connections: HousekeeperConnection[] = housekeeperNames.map(name => {
+    // Éliminer les doublons dans les noms de femmes de chambre
+    const uniqueHousekeeperNames = [...new Set(housekeeperNames)].filter(name => name && name.trim());
+    
+    const connections: HousekeeperConnection[] = uniqueHousekeeperNames.map((name, index) => {
       const housekeeper = housekeepers.find(h => h.name === name);
       const accessCode = housekeeper?.access_code || '';
       const rooms = getHousekeeperRooms(name).map(room => room.number);
@@ -203,9 +206,9 @@ export function ActiveUsersPanel() {
                 Aucune femme de chambre configurée
               </p>
             ) : (
-              housekeeperConnections.map((connection) => (
+              housekeeperConnections.map((connection, index) => (
                 <div
-                  key={connection.name}
+                  key={`${connection.name}-${index}`}
                   className="p-3 bg-secondary/50 rounded-lg hover:bg-secondary/70 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
