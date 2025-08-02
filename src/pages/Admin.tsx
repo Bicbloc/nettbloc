@@ -283,13 +283,14 @@ const Admin = () => {
     }
 
     try {
-      // Créer l'utilisateur avec Supabase Auth Admin
-      const { data, error } = await supabase.auth.admin.createUser({
+      // Créer l'utilisateur avec signUp (approche alternative)
+      const { data, error } = await supabase.auth.signUp({
         email: newUserEmail,
         password: newUserPassword,
-        email_confirm: true,
-        user_metadata: {
-          company_name: newUserCompany || 'Mon Établissement'
+        options: {
+          data: {
+            company_name: newUserCompany || 'Mon Établissement'
+          }
         }
       });
 
@@ -398,20 +399,23 @@ const Admin = () => {
 
   const deleteUser = async (userId: string) => {
     try {
-      // Supprimer l'utilisateur via l'API Supabase Admin
-      const { error } = await supabase.auth.admin.deleteUser(userId);
+      // Marquer l'utilisateur comme supprimé dans le profil
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_suspended: true })
+        .eq('id', userId);
       
       if (error) throw error;
 
       // Log l'action
       await supabase.rpc('log_admin_action', {
-        p_action: 'delete_user',
+        p_action: 'suspend_user',
         p_target_user_id: userId
       });
 
       toast({
-        title: "Utilisateur supprimé",
-        description: "L'utilisateur a été supprimé avec succès."
+        title: "Utilisateur suspendu",
+        description: "L'utilisateur a été marqué comme suspendu."
       });
 
       await loadAdminData();
@@ -419,7 +423,7 @@ const Admin = () => {
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: `Impossible de supprimer l'utilisateur: ${error.message}`
+        description: `Impossible de suspendre l'utilisateur: ${error.message}`
       });
     }
   };

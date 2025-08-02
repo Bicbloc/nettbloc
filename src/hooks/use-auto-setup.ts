@@ -118,12 +118,12 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Exécuter seulement si authentifié et pas encore initialisé
-    if (isAuthenticated && user?.id && !isSetupComplete && !hotel) {
+    // Exécuter seulement si authentifié et pas encore chargé
+    if (isAuthenticated && user?.id && loading) {
       setupHotel();
-    } else if (isAuthenticated && !loading) {
+    } else if (!isAuthenticated || !user?.id) {
       setLoading(false);
-      setIsSetupComplete(true);
+      setIsSetupComplete(false);
     }
   }, [isAuthenticated, user?.id, isSetupComplete, hotel, loading]);
 
