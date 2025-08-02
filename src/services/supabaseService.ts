@@ -308,6 +308,8 @@ export class SupabaseService {
         .eq('name', name)
         .maybeSingle();
 
+      let housekeeper: Housekeeper;
+
       if (existingHousekeeper) {
         // Mettre à jour le code d'accès
         const { data, error } = await supabase
@@ -321,7 +323,7 @@ export class SupabaseService {
           console.error('Erreur mise à jour femme de chambre:', error);
           return null;
         }
-        return data as Housekeeper;
+        housekeeper = data as Housekeeper;
       } else {
         // Créer une nouvelle femme de chambre
         const { data, error } = await supabase
@@ -338,8 +340,29 @@ export class SupabaseService {
           console.error('Erreur création femme de chambre:', error);
           return null;
         }
-        return data as Housekeeper;
+        housekeeper = data as Housekeeper;
       }
+
+      // Créer ou mettre à jour le code d'accès dans la table dédiée avec le bon housekeeper_id
+      const { error: codeError } = await supabase
+        .from('housekeeper_access_codes')
+        .upsert({
+          hotel_id: hotelId,
+          housekeeper_id: housekeeper.id,
+          access_code: accessCode,
+          is_active: true,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        }, {
+          onConflict: 'hotel_id,housekeeper_id'
+        });
+
+      if (codeError) {
+        console.error('Erreur création/mise à jour code d\'accès:', codeError);
+        // Ne pas retourner null car la femme de chambre est créée
+      }
+
+      return housekeeper;
+      
     } catch (err) {
       console.error('Erreur createOrUpdateHousekeeper:', err);
       return null;

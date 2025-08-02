@@ -237,6 +237,20 @@ export class CodeGenerationService {
               .eq('id', existingHousekeeper.id);
 
             if (updateError) throw updateError;
+
+            // Créer ou mettre à jour le code d'accès dans la table dédiée
+            await supabase
+              .from('housekeeper_access_codes')
+              .upsert({
+                hotel_id: hotelId,
+                housekeeper_id: existingHousekeeper.id,
+                access_code: accessCode,
+                is_active: true,
+                created_by: (await supabase.auth.getUser()).data.user?.id
+              }, {
+                onConflict: 'hotel_id,housekeeper_id'
+              });
+
           } else {
             // Créer une nouvelle femme de chambre
             const { data: newHousekeeper, error: createError } = await supabase
@@ -251,6 +265,17 @@ export class CodeGenerationService {
               .single();
 
             if (createError) throw createError;
+
+            // Créer le code d'accès dans la table dédiée
+            await supabase
+              .from('housekeeper_access_codes')
+              .insert({
+                hotel_id: hotelId,
+                housekeeper_id: newHousekeeper.id,
+                access_code: accessCode,
+                is_active: true,
+                created_by: (await supabase.auth.getUser()).data.user?.id
+              });
           }
 
           generated++;
