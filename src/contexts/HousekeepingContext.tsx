@@ -183,10 +183,98 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     if (isInitialized) {
       if (isDistributed) {
         HotelSessionService.markAsDistributed();
+        // Générer automatiquement les codes d'accès pour les femmes de chambre
+        generateAccessCodesForAssignedHousekeepers();
       }
       console.log("Session - isDistributed sauvegardé:", isDistributed);
     }
   }, [isDistributed, isInitialized]);
+
+  // Fonction pour générer automatiquement les codes d'accès après distribution
+  const generateAccessCodesForAssignedHousekeepers = async () => {
+    const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
+    if (!currentHotelId || !isDistributed || housekeeperNames.length === 0) return;
+
+    console.log('🔑 Génération automatique des codes d\'accès pour les femmes de chambre...');
+
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Vérifier les femmes de chambre existantes dans la base
+      const { data: existingHousekeepers } = await supabase
+        .from('housekeepers')
+        .select('name, access_code')
+        .eq('hotel_id', currentHotelId)
+        .eq('is_active', true);
+
+      const existingNames = existingHousekeepers?.map(h => h.name) || [];
+      const newHousekeepers = housekeeperNames.filter(name => !existingNames.includes(name));
+
+      if (newHousekeepers.length > 0) {
+        console.log('📝 Création de nouvelles femmes de chambre:', newHousekeepers);
+        
+        // Créer les nouvelles femmes de chambre avec codes d'accès
+        for (const name of newHousekeepers) {
+          try {
+            // Génération manuelle du code d'accès
+            const { data: hotel } = await supabase
+              .from('hotels')
+              .select('hotel_code')
+              .eq('id', currentHotelId)
+              .single();
+
+            const hotelCode = hotel?.hotel_code || 'HTL';
+            const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+            const accessCode = `${hotelCode}-${randomSuffix}`;
+
+            // Créer la femme de chambre
+            const { data: housekeeper, error: housekeeperError } = await supabase
+              .from('housekeepers')
+              .insert({
+                hotel_id: currentHotelId,
+                name: name,
+                access_code: accessCode
+              })
+              .select('id')
+              .single();
+
+            if (housekeeperError) {
+              console.error('❌ Erreur création femme de chambre:', housekeeperError);
+              continue;
+            }
+
+            // Créer le code d'accès dans la table housekeeper_access_codes
+            await supabase
+              .from('housekeeper_access_codes')
+              .insert({
+                hotel_id: currentHotelId,
+                housekeeper_id: housekeeper.id,
+                access_code: accessCode,
+                created_by: null // Généré automatiquement
+              });
+
+            console.log(`✅ Code d'accès généré pour ${name}: ${accessCode}`);
+          } catch (error) {
+            console.error(`❌ Erreur génération code pour ${name}:`, error);
+          }
+        }
+
+        // Rafraîchir les femmes de chambre
+        await refreshHousekeepers();
+
+        // Notification de succès
+        const { toast } = await import('@/hooks/use-toast');
+        toast({
+          title: "Codes d'accès générés",
+          description: `${newHousekeepers.length} code(s) d'accès généré(s) automatiquement pour les femmes de chambre.`
+        });
+      } else {
+        console.log('✅ Toutes les femmes de chambre ont déjà des codes d\'accès');
+      }
+    } catch (error) {
+      console.error('❌ Erreur génération automatique des codes:', error);
+    }
+  };
 
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
