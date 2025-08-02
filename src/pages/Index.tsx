@@ -334,82 +334,68 @@ const Index = () => {
   const handlePdfProcessed = async (data: Room[], housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
     console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeepers);
     
-    // NOUVEAU: Vider automatiquement les femmes de chambre de la session précédente
-    console.log("🧹 Nettoyage des femmes de chambre de la session précédente...");
-    if (hotel?.id) {
-      try {
+    try {
+      // NOUVEAU: Vider automatiquement les femmes de chambre de la session précédente
+      console.log("🧹 Nettoyage des femmes de chambre de la session précédente...");
+      if (hotel?.id) {
         await SupabaseService.cleanupAllHousekeepers(hotel.id);
-        console.log("✅ Nettoyage terminé, création des nouvelles femmes de chambre...");
-      } catch (error) {
-        console.error("❌ Erreur nettoyage:", error);
+        console.log("✅ Nettoyage terminé");
       }
-    }
-    
-    const floors = new Set<number>();
-    data.forEach(room => {
-      const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
-      floors.add(floor);
-      room.floor = floor;
-      room.isTwin = false; 
-    });
-    const floorArray = Array.from(floors).sort((a, b) => a - b);
-    setAvailableFloors(floorArray);
-    
-    const sortedData = [...data].sort((a, b) => 
-      a.number.localeCompare(b.number, undefined, { numeric: true })
-    );
-
-    // Mettre à jour les noms des femmes de chambre dans le context
-    setHousekeeperNames(housekeepers);
-    
-    // Générer automatiquement les codes d'accès UNIQUEMENT pour les femmes de chambre assignées
-    if (housekeepers.length > 0 && hotel?.id) {
-      try {
-        console.log("🔑 Génération des codes d'accès pour les femmes assignées:", housekeepers);
-        
-        // Utiliser la nouvelle méthode qui génère les codes seulement pour les assignées
-        await CodeGenerationService.ensureCodesForAssignedHousekeepers(hotel.id, housekeepers);
-        
-        // Rafraîchir la liste des femmes de chambre pour récupérer les codes
-        await refreshHousekeepers();
-        
-        console.log("✅ Codes d'accès générés avec succès");
-        
-        toast({
-          title: "Codes d'accès générés",
-          description: `${housekeepers.length} codes d'accès créés pour les femmes de chambre.`
-        });
-        
-      } catch (error) {
-        console.error("❌ Erreur génération codes d'accès:", error);
-        toast({
-          variant: "destructive",
-          title: "Erreur codes d'accès",
-          description: "Impossible de générer les codes d'accès automatiquement."
-        });
-      }
-    }
-    
-    // Appliquer la méthode de redistribution si spécifiée
-    if (distributionMethod && housekeepers.length > 0) {
-      console.log("🔄 Application de la redistribution automatique:", distributionMethod);
-      const redistributedRooms = redistributeRooms(sortedData, housekeepers, distributionMethod);
-      setRooms(redistributedRooms);
-      setIsDistributed(true);
       
-      const methodName = distributionMethod === 'random' ? 'aléatoire' : 
-                        distributionMethod === 'floor' ? 'par étage' : 'par type de nettoyage';
+      const floors = new Set<number>();
+      data.forEach(room => {
+        const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
+        floors.add(floor);
+        room.floor = floor;
+        room.isTwin = false; 
+      });
+      const floorArray = Array.from(floors).sort((a, b) => a - b);
+      setAvailableFloors(floorArray);
+      
+      const sortedData = [...data].sort((a, b) => 
+        a.number.localeCompare(b.number, undefined, { numeric: true })
+      );
+
+      // Mettre à jour les noms des femmes de chambre dans le context
+      setHousekeeperNames(housekeepers);
+      
+      // Auto-distribute if method specified
+      if (distributionMethod && distributionMethod !== 'random') {
+        console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
+        const distributedRooms = autoDistributeRooms(sortedData, housekeepers, false);
+        if (distributedRooms) {
+          // Mettre à jour les chambres avec les assignations
+          const updatedRooms = sortedData.map(room => {
+            for (const [housekeeper, rooms] of Object.entries(distributedRooms)) {
+              if (rooms.some(r => r.number === room.number)) {
+                return { ...room, assignedTo: housekeeper };
+              }
+            }
+            return room;
+          });
+          setRooms(updatedRooms);
+        } else {
+          setRooms(sortedData);
+        }
+        setIsDistributed(true);
+      } else {
+        setRooms(sortedData);
+        setIsDistributed(false);
+      }
       
       toast({
-        title: "Import et redistribution terminés",
-        description: `${sortedData.length} chambres importées et redistribuées (méthode: ${methodName})`
+        title: "PDF traité avec succès",
+        description: `${data.length} chambres importées${distributionMethod ? ` et distribuées (${distributionMethod})` : ''}`
       });
-    } else {
-      setRooms(sortedData);
-      setIsDistributed(false);
+      
+    } catch (error) {
+      console.error("❌ Erreur traitement PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Erreur lors du traitement du PDF"
+      });
     }
-    
-    setActiveTab("rooms");
   };
 
   const distributeRooms = (
