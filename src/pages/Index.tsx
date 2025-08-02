@@ -48,6 +48,7 @@ import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
 import { SupabaseService } from "@/services/supabaseService";
 import { CodeGenerationService } from "@/services/codeGenerationService";
+import { AddRoomDialog } from "@/components/AddRoomDialog";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
@@ -352,6 +353,11 @@ const Index = () => {
       ...prev,
       [housekeeperName]: maxRooms
     }));
+  };
+
+  const handleAddRoom = (newRoom: Room) => {
+    setRooms(prevRooms => [...prevRooms, newRoom]);
+    console.log('✅ Chambre ajoutée manuellement:', newRoom.number);
   };
   
   const handlePdfProcessed = async (data: Room[], housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
@@ -1428,12 +1434,16 @@ const Index = () => {
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Gestion des chambres</h2>
               <div className="flex gap-2">
-                  <PdfWorkflowDialog 
-                    onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                      handlePdfProcessed(data, housekeepers, distributionMethod);
-                    }}
-                    currentHousekeepers={housekeeperNames}
-                  />
+                <AddRoomDialog 
+                  onAddRoom={handleAddRoom} 
+                  existingRooms={rooms} 
+                />
+                <PdfWorkflowDialog 
+                  onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                    handlePdfProcessed(data, housekeepers, distributionMethod);
+                  }}
+                  currentHousekeepers={housekeeperNames}
+                />
                 <Button
                   onClick={() => openManualAssignment()}
                   variant="outline"
@@ -1451,14 +1461,20 @@ const Index = () => {
                   <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Aucune chambre importée</h3>
                   <p className="text-muted-foreground text-center mb-4">
-                    Importez un fichier PDF pour commencer à gérer vos chambres
+                    Importez un fichier PDF pour commencer à gérer vos chambres ou ajoutez des chambres manuellement
                   </p>
-                <PdfWorkflowDialog 
-                  onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                    handlePdfProcessed(data, housekeepers, distributionMethod);
-                  }}
-                  currentHousekeepers={housekeeperNames}
-                />
+                  <div className="flex gap-2 justify-center">
+                    <AddRoomDialog 
+                      onAddRoom={handleAddRoom} 
+                      existingRooms={rooms} 
+                    />
+                    <PdfWorkflowDialog 
+                      onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                        handlePdfProcessed(data, housekeepers, distributionMethod);
+                      }}
+                      currentHousekeepers={housekeeperNames}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             ) : (
