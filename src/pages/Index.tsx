@@ -18,6 +18,7 @@ import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
 import { generateReport, generateCombinedReport } from "@/services/reportService";
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
+import { supabase } from "@/integrations/supabase/client";
 import { EmailDialog } from "@/components/EmailDialog";
 import { useReportEmail } from "@/hooks/use-report-email";
 import { Input } from "@/components/ui/input";
@@ -721,6 +722,59 @@ const Index = () => {
         return <Badge variant="outline">{type}</Badge>;
     }
   };
+
+  // Auto-générer les codes d'accès pour la distribution
+  const generateAccessCodesForDistribution = async () => {
+    const hotelId = selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId");
+    if (!hotelId) return;
+    
+    try {
+      console.log('🔑 Génération automatique des codes pour:', housekeeperNames);
+      
+      for (const housekeeperName of housekeeperNames) {
+        // Vérifier si la femme de chambre a déjà un code
+        const { data: existingHousekeeper } = await supabase
+          .from('housekeepers')
+          .select('id, access_code')
+          .eq('hotel_id', hotelId)
+          .eq('name', housekeeperName)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (!existingHousekeeper?.access_code) {
+          // Générer un nouveau code
+          const { data: newCodeData, error: codeError } = await supabase
+            .rpc('generate_housekeeper_access_code', {
+              p_hotel_id: hotelId,
+              p_housekeeper_id: existingHousekeeper?.id || null
+            });
+          
+          if (codeError) {
+            console.error('❌ Erreur génération code pour', housekeeperName, ':', codeError);
+            continue;
+          }
+          
+          console.log('✅ Code généré pour', housekeeperName, ':', newCodeData);
+          
+          // Mettre à jour la femme de chambre avec le nouveau code
+          if (existingHousekeeper) {
+            await supabase
+              .from('housekeepers')
+              .update({ access_code: newCodeData })
+              .eq('id', existingHousekeeper.id);
+          }
+        }
+      }
+      
+      // Rafraîchir les données
+      if (refreshHousekeepers) {
+        await refreshHousekeepers();
+      }
+      
+    } catch (error) {
+      console.error('❌ Erreur génération automatique codes:', error);
+    }
+  };
   
   // Nouvelle fonction de redistribution avec méthode
   const handleRedistributeWithMethod = async (method: RedistributionMethod) => {
@@ -729,6 +783,9 @@ const Index = () => {
     const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
     setRooms(redistributedRooms);
     setIsDistributed(true);
+    
+    // Auto-générer les codes d'accès lors de la distribution
+    await generateAccessCodesForDistribution();
     
     // Statistiques de distribution
     const stats = getDistributionStats(redistributedRooms, housekeeperNames);
@@ -1688,10 +1745,11 @@ const Index = () => {
                 {/* Affichage des femmes de chambre avec leurs assignations */}
                 {housekeeperNames.length > 0 && (
                   <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-4">Assignations des femmes de chambre</h3>
+                    <h3 className="text-lg font-semibold mb-4">Accès femmes de chambre</h3>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {housekeeperNames.map((name) => {
                         const housekeeperRooms = getHousekeeperRooms(name);
+                        const housekeeper = housekeepers.find(h => h.name === name);
                         
                         return (
                           <Card key={name}>
@@ -1705,17 +1763,30 @@ const Index = () => {
                             </CardHeader>
                             <CardContent>
                               <div className="space-y-4">
+                                {/* Code d'accès affiché en premier */}
+                                {housekeeper?.access_code && (
+                                  <div className="text-center">
+                                    <div className="bg-primary/10 px-3 py-2 rounded-lg border">
+                                      <div className="text-xs text-muted-foreground mb-1">Code d'accès</div>
+                                      <div className="font-mono font-bold text-lg text-primary">
+                                        {housekeeper.access_code}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 <div className="text-sm text-muted-foreground">
                                   Chambres assignées: {housekeeperRooms.map(r => r.number).join(', ')}
                                 </div>
+                                
                                 <div className="text-center">
                                   <Button
                                     onClick={() => window.open(`/housekeeper-login`, '_blank')}
-                                    className="w-full hover-scale"
+                                    className="w-full"
                                     size="sm"
                                   >
                                     <Smartphone className="mr-2 h-4 w-4" />
-                                    Ouvrir interface mobile
+                                    Ouvrir interface femme de chambre
                                   </Button>
                                 </div>
                               </div>
