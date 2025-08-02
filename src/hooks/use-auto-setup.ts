@@ -8,6 +8,18 @@ interface HotelData {
   name: string;
   hotel_code: string;
   access_code?: string;
+  user_id?: string;
+  email?: string;
+  address?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface HotelWithCodes extends HotelData {
+  housekeeper_access_codes: {
+    access_code: string;
+    is_active: boolean;
+  }[];
 }
 
 export const useAutoSetup = () => {
@@ -31,13 +43,7 @@ export const useAutoSetup = () => {
         console.log('🚫 Non authentifié, arrêt du setup');
         setLoading(false);
         setIsSetupComplete(false);
-        return;
-      }
-
-      // Si hotel déjà chargé, pas besoin de refaire le setup
-      if (hotel && isSetupComplete) {
-        console.log('✅ Hôtel déjà chargé, setup terminé');
-        setLoading(false);
+        hasAttemptedSetup.current = false;
         return;
       }
 
@@ -45,8 +51,9 @@ export const useAutoSetup = () => {
       hasAttemptedSetup.current = true;
       
       try {
-        console.log('🔍 Recherche hôtel existant...');
-        // 1. Vérifier si l'utilisateur a déjà un hôtel
+        console.log('🔍 Recherche combinée hôtel + codes d\'accès...');
+        
+        // 1. Rechercher l'hôtel existant
         const { data: existingHotel, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
@@ -58,10 +65,28 @@ export const useAutoSetup = () => {
           throw hotelError;
         }
 
-        let hotelData = existingHotel;
+        let hotelData: HotelData | null = existingHotel;
+        let activeCode: string | null = null;
 
-        // 2. Si pas d'hôtel, créer un nouveau
-        if (!existingHotel) {
+        // 2. Si hôtel trouvé, chercher les codes d'accès actifs
+        if (existingHotel) {
+          console.log('✅ Hôtel existant trouvé:', existingHotel);
+          
+          const { data: accessCodes } = await supabase
+            .from('housekeeper_access_codes')
+            .select('access_code')
+            .eq('hotel_id', existingHotel.id)
+            .eq('is_active', true)
+            .limit(1);
+
+          if (accessCodes && accessCodes.length > 0) {
+            activeCode = accessCodes[0].access_code;
+            console.log('✅ Code actif trouvé:', activeCode);
+          }
+        }
+
+        // Si pas d'hôtel du tout, en créer un
+        if (!hotelData) {
           console.log('📝 Création nouvel hôtel...');
           const { data: profile } = await supabase
             .from('profiles')
@@ -88,43 +113,32 @@ export const useAutoSetup = () => {
           hotelData = newHotel;
           console.log('✅ Hôtel créé:', hotelData);
         } else {
-          console.log('✅ Hôtel existant trouvé:', existingHotel);
+          console.log('✅ Hôtel existant trouvé:', hotelData);
         }
 
+        // Finaliser le setup avec les données trouvées/créées
         if (hotelData) {
+          // Mise à jour immédiate des états
           setHotel(hotelData);
+          setAccessCode(activeCode);
+          setIsSetupComplete(true);
           
-          // IMPORTANT: Sauvegarder l'hôtel dans localStorage pour les autres composants
+          // Sauvegarde localStorage pour les autres composants
           localStorage.setItem('selectedHotelId', hotelData.id);
           localStorage.setItem('selectedHotelCode', hotelData.hotel_code || '');
           localStorage.setItem('selectedHotelName', hotelData.name);
           
-          console.log('✅ Hôtel sauvegardé dans localStorage:', {
-            id: hotelData.id,
-            code: hotelData.hotel_code,
-            name: hotelData.name
+          console.log('✅ Setup terminé avec succès:', {
+            hotelId: hotelData.id,
+            hotelCode: hotelData.hotel_code,
+            hotelName: hotelData.name,
+            hasAccessCode: !!activeCode
           });
-          
-          // 3. Vérifier un code d'accès existant
-          const { data: existingCodes } = await supabase
-            .from('housekeeper_access_codes')
-            .select('access_code')
-            .eq('hotel_id', hotelData.id)
-            .eq('is_active', true)
-            .limit(1);
-
-          if (existingCodes && existingCodes.length > 0) {
-            console.log('✅ Code existant trouvé:', existingCodes[0].access_code);
-            setAccessCode(existingCodes[0].access_code);
-          }
-
-          setIsSetupComplete(true);
-          console.log('✅ Configuration terminée avec sauvegarde localStorage');
         }
 
       } catch (error) {
         console.error('❌ Erreur auto-setup:', error);
-        hasAttemptedSetup.current = false; // Permettre un retry en cas d'erreur
+        hasAttemptedSetup.current = false; // Permettre un retry
         toast({
           variant: "destructive",
           title: "Erreur configuration",
@@ -136,6 +150,15 @@ export const useAutoSetup = () => {
       }
     };
 
+    // Timeout de sécurité pour éviter les blocages
+    const setupTimeout = setTimeout(() => {
+      if (loading && hasAttemptedSetup.current) {
+        console.warn('⚠️ Timeout setup, forçage completion...');
+        setLoading(false);
+        setIsSetupComplete(true);
+      }
+    }, 10000); // 10 secondes max
+
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {
       setupHotel();
@@ -144,6 +167,8 @@ export const useAutoSetup = () => {
       setIsSetupComplete(false);
       hasAttemptedSetup.current = false;
     }
+
+    return () => clearTimeout(setupTimeout);
   }, [isAuthenticated, user?.id]);
 
   const generateNewAccessCode = async () => {
