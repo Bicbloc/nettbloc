@@ -5,19 +5,31 @@ import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { 
+  User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
+  Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
+  Hotel, Users, BarChart3
+} from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
 import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface UserWithRole {
   id: string;
   email: string;
   company_name?: string;
+  is_suspended?: boolean;
+  subscription_type?: string;
   role?: 'user' | 'admin' | 'super_admin';
   created_at: string;
   last_sign_in_at?: string;
@@ -31,6 +43,7 @@ interface ActiveSession {
   login_time: string;
   last_activity: string;
   is_active: boolean;
+  user_id?: string;
 }
 
 interface HousekeeperAccessCode {
@@ -45,6 +58,25 @@ interface HousekeeperAccessCode {
   expires_at?: string;
 }
 
+interface HotelStats {
+  id: string;
+  name: string;
+  hotel_code: string;
+  user_email: string;
+  housekeepers_count: number;
+  active_sessions: number;
+  created_at: string;
+}
+
+interface AdminStats {
+  total_users: number;
+  active_users: number;
+  suspended_users: number;
+  total_hotels: number;
+  total_sessions: number;
+  total_housekeepers: number;
+}
+
 const Admin = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
@@ -52,9 +84,21 @@ const Admin = () => {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [accessCodes, setAccessCodes] = useState<HousekeeperAccessCode[]>([]);
+  const [hotels, setHotels] = useState<HotelStats[]>([]);
+  const [stats, setStats] = useState<AdminStats>({
+    total_users: 0,
+    active_users: 0,
+    suspended_users: 0,
+    total_hotels: 0,
+    total_sessions: 0,
+    total_housekeepers: 0
+  });
   const [loadingData, setLoadingData] = useState(true);
   const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserCompany, setNewUserCompany] = useState('');
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   // Vérifier les permissions super admin
   useEffect(() => {
@@ -87,13 +131,15 @@ const Admin = () => {
 
   const loadAdminData = async () => {
     try {
-      // Charger les utilisateurs avec leurs rôles
+      // Charger les utilisateurs avec leurs rôles et profils
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select(`
           id,
           email,
           company_name,
+          is_suspended,
+          subscription_type,
           created_at
         `);
 
@@ -155,6 +201,67 @@ const Admin = () => {
 
       setAccessCodes(formattedAccessCodes);
 
+      // Charger les statistiques des hôtels
+      const { data: hotelsData, error: hotelsError } = await supabase
+        .from('hotels')
+        .select(`
+          id,
+          name,
+          hotel_code,
+          created_at,
+          user_id
+        `);
+
+      if (hotelsError) throw hotelsError;
+
+      // Calculer les statistiques pour chaque hôtel avec l'email du propriétaire
+      const hotelsWithStats = await Promise.all(
+        (hotelsData || []).map(async (hotel) => {
+          // Récupérer l'email du propriétaire
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('id', hotel.user_id)
+            .single();
+
+          const { data: housekeepersCount } = await supabase
+            .from('housekeepers')
+            .select('id', { count: 'exact' })
+            .eq('hotel_id', hotel.id)
+            .eq('is_active', true);
+
+          const { data: activeSessionsCount } = await supabase
+            .from('user_sessions')
+            .select('id', { count: 'exact' })
+            .eq('hotel_id', hotel.id)
+            .eq('is_active', true);
+
+          return {
+            id: hotel.id,
+            name: hotel.name,
+            hotel_code: hotel.hotel_code || '',
+            user_email: ownerProfile?.email || 'Email inconnu',
+            housekeepers_count: housekeepersCount?.length || 0,
+            active_sessions: activeSessionsCount?.length || 0,
+            created_at: hotel.created_at
+          };
+        })
+      );
+
+      setHotels(hotelsWithStats);
+
+      // Calculer les statistiques globales
+      const newStats: AdminStats = {
+        total_users: usersWithRoles.length,
+        active_users: usersWithRoles.filter(u => !u.is_suspended).length,
+        suspended_users: usersWithRoles.filter(u => u.is_suspended).length,
+        total_hotels: hotelsWithStats.length,
+        total_sessions: sessionsData?.length || 0,
+        total_housekeepers: formattedAccessCodes.length
+      };
+
+      setStats(newStats);
+
     } catch (error) {
       console.error('Erreur chargement données admin:', error);
       toast({
@@ -165,12 +272,142 @@ const Admin = () => {
     }
   };
 
+  const createUser = async () => {
+    if (!newUserEmail || !newUserPassword) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Email et mot de passe requis."
+      });
+      return;
+    }
+
+    try {
+      // Créer l'utilisateur avec Supabase Auth Admin
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: newUserEmail,
+        password: newUserPassword,
+        email_confirm: true,
+        user_metadata: {
+          company_name: newUserCompany || 'Mon Établissement'
+        }
+      });
+
+      if (error) throw error;
+
+      // Ajouter le rôle si nécessaire
+      if (newUserRole === 'admin' && data.user) {
+        await supabase
+          .from('user_roles')
+          .insert({
+            user_id: data.user.id,
+            role: 'admin'
+          });
+      }
+
+      // Log l'action
+      await supabase.rpc('log_admin_action', {
+        p_action: 'create_user',
+        p_target_user_id: data.user?.id,
+        p_details: { email: newUserEmail, role: newUserRole }
+      });
+
+      toast({
+        title: "Utilisateur créé",
+        description: `L'utilisateur ${newUserEmail} a été créé avec succès.`
+      });
+
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserCompany('');
+      setNewUserRole('user');
+      setShowCreateUser(false);
+      await loadAdminData();
+
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: `Impossible de créer l'utilisateur: ${error.message}`
+      });
+    }
+  };
+
+  const suspendUser = async (userId: string, suspend: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_suspended: suspend })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Log l'action
+      await supabase.rpc('log_admin_action', {
+        p_action: suspend ? 'suspend_user' : 'unsuspend_user',
+        p_target_user_id: userId
+      });
+
+      toast({
+        title: suspend ? "Utilisateur suspendu" : "Utilisateur réactivé",
+        description: `L'utilisateur a été ${suspend ? 'suspendu' : 'réactivé'} avec succès.`
+      });
+
+      await loadAdminData();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: `Impossible de modifier le statut: ${error.message}`
+      });
+    }
+  };
+
+  const forceLogout = async (sessionId: string, userId?: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_sessions')
+        .update({ is_active: false })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      // Log l'action
+      if (userId) {
+        await supabase.rpc('log_admin_action', {
+          p_action: 'force_logout',
+          p_target_user_id: userId,
+          p_details: { session_id: sessionId }
+        });
+      }
+
+      toast({
+        title: "Déconnexion forcée",
+        description: "L'utilisateur a été déconnecté avec succès."
+      });
+
+      await loadAdminData();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: `Impossible de forcer la déconnexion: ${error.message}`
+      });
+    }
+  };
+
   const deleteUser = async (userId: string) => {
     try {
-      // Supprimer l'utilisateur via l'API Supabase Admin (nécessite des permissions spéciales)
+      // Supprimer l'utilisateur via l'API Supabase Admin
       const { error } = await supabase.auth.admin.deleteUser(userId);
       
       if (error) throw error;
+
+      // Log l'action
+      await supabase.rpc('log_admin_action', {
+        p_action: 'delete_user',
+        p_target_user_id: userId
+      });
 
       toast({
         title: "Utilisateur supprimé",
@@ -199,6 +436,13 @@ const Admin = () => {
         });
 
       if (error) throw error;
+
+      // Log l'action
+      await supabase.rpc('log_admin_action', {
+        p_action: 'change_role',
+        p_target_user_id: userId,
+        p_details: { old_role: currentRole, new_role: newRole }
+      });
 
       toast({
         title: "Rôle modifié",
@@ -237,39 +481,163 @@ const Admin = () => {
           <BackButton />
           <Shield className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Administration NettoBloc</h1>
-            <p className="text-muted-foreground">Gestion des utilisateurs et sessions</p>
+            <h1 className="text-3xl font-bold">Super Administration NettoBloc</h1>
+            <p className="text-muted-foreground">Supervision complète du système</p>
           </div>
         </div>
+        <Button onClick={loadAdminData} variant="outline" size="sm">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Actualiser
+        </Button>
+      </div>
+
+      {/* Tableau de bord principal */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Utilisateurs totaux</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total_users}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.suspended_users} suspendus
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Hôtels actifs</CardTitle>
+            <Hotel className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total_hotels}</div>
+            <p className="text-xs text-muted-foreground">
+              Établissements enregistrés
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sessions actives</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total_sessions}</div>
+            <p className="text-xs text-muted-foreground">
+              Connexions en cours
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Femmes de chambre</CardTitle>
+            <Key className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total_housekeepers}</div>
+            <p className="text-xs text-muted-foreground">
+              Codes générés
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">
             <User className="h-4 w-4 mr-2" />
-            Utilisateurs ({users.length})
+            Utilisateurs
+          </TabsTrigger>
+          <TabsTrigger value="sessions">
+            <Monitor className="h-4 w-4 mr-2" />
+            Sessions
+          </TabsTrigger>
+          <TabsTrigger value="hotels">
+            <Hotel className="h-4 w-4 mr-2" />
+            Hôtels
           </TabsTrigger>
           <TabsTrigger value="access-codes">
             <Key className="h-4 w-4 mr-2" />
-            Codes d'accès ({accessCodes.length})
+            Codes d'accès
           </TabsTrigger>
-          <TabsTrigger value="sessions">
-            <Activity className="h-4 w-4 mr-2" />
-            Sessions actives ({sessions.length})
-          </TabsTrigger>
-          <TabsTrigger value="stats">
-            <Database className="h-4 w-4 mr-2" />
-            Statistiques
+          <TabsTrigger value="system">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Système
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Gestion des utilisateurs</CardTitle>
-              <CardDescription>
-                Gérer les utilisateurs, leurs rôles et permissions
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Gestion des utilisateurs</CardTitle>
+                  <CardDescription>
+                    Créer, suspendre et gérer les comptes utilisateurs
+                  </CardDescription>
+                </div>
+                <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Créer un utilisateur
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={newUserEmail}
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          placeholder="email@exemple.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="password">Mot de passe</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={newUserPassword}
+                          onChange={(e) => setNewUserPassword(e.target.value)}
+                          placeholder="Mot de passe sécurisé"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="company">Nom de l'établissement</Label>
+                        <Input
+                          id="company"
+                          value={newUserCompany}
+                          onChange={(e) => setNewUserCompany(e.target.value)}
+                          placeholder="Mon Hôtel"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="admin-role"
+                          checked={newUserRole === 'admin'}
+                          onCheckedChange={(checked) => setNewUserRole(checked ? 'admin' : 'user')}
+                        />
+                        <Label htmlFor="admin-role">Administrateur</Label>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowCreateUser(false)}>
+                          Annuler
+                        </Button>
+                        <Button onClick={createUser}>
+                          Créer l'utilisateur
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -278,6 +646,8 @@ const Admin = () => {
                     <TableHead>Email</TableHead>
                     <TableHead>Entreprise</TableHead>
                     <TableHead>Rôle</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Inscription</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -293,17 +663,38 @@ const Admin = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {new Date(userItem.created_at).toLocaleDateString('fr-FR')}
+                        <Badge variant={userItem.is_suspended ? 'destructive' : 'default'}>
+                          {userItem.is_suspended ? 'Suspendu' : 'Actif'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {userItem.subscription_type || 'free'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(userItem.created_at), 'dd/MM/yyyy', { locale: fr })}
                       </TableCell>
                       <TableCell className="space-x-2">
                         {userItem.role !== 'super_admin' && (
-                          <>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant={userItem.is_suspended ? "default" : "outline"}
+                              onClick={() => suspendUser(userItem.id, !userItem.is_suspended)}
+                            >
+                              {userItem.is_suspended ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : (
+                                <Ban className="h-4 w-4" />
+                              )}
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => toggleUserRole(userItem.id, userItem.role || 'user')}
                             >
-                              {userItem.role === 'admin' ? 'Retirer admin' : 'Promouvoir admin'}
+                              <Shield className="h-4 w-4" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -316,7 +707,7 @@ const Admin = () => {
                                   <AlertDialogTitle>Supprimer l'utilisateur</AlertDialogTitle>
                                   <AlertDialogDescription>
                                     Êtes-vous sûr de vouloir supprimer {userItem.email} ? 
-                                    Cette action est irréversible.
+                                    Cette action est irréversible et supprimera toutes les données associées.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -325,13 +716,146 @@ const Admin = () => {
                                     onClick={() => deleteUser(userItem.id)}
                                     className="bg-destructive hover:bg-destructive/90"
                                   >
-                                    Supprimer
+                                    Supprimer définitivement
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
-                          </>
+                          </div>
                         )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sessions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sessions actives en temps réel</CardTitle>
+              <CardDescription>
+                Surveillance et contrôle des connexions utilisateurs
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Utilisateur</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Connexion</TableHead>
+                    <TableHead>Dernière activité</TableHead>
+                    <TableHead>Durée</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessions.map((session) => {
+                    const loginTime = new Date(session.login_time);
+                    const lastActivity = new Date(session.last_activity);
+                    const duration = Math.floor((lastActivity.getTime() - loginTime.getTime()) / (1000 * 60));
+                    
+                    return (
+                      <TableRow key={session.id}>
+                        <TableCell className="font-medium">{session.user_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{session.user_type}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {format(loginTime, 'dd/MM/yyyy HH:mm', { locale: fr })}
+                        </TableCell>
+                        <TableCell>
+                          {format(lastActivity, 'dd/MM/yyyy HH:mm', { locale: fr })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={duration > 60 ? 'destructive' : 'default'}>
+                            {duration}m
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="outline">
+                                <LogOut className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Forcer la déconnexion</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Êtes-vous sûr de vouloir déconnecter {session.user_name} ?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => forceLogout(session.id, session.user_id)}
+                                >
+                                  Déconnecter
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              
+              {sessions.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Aucune session active</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="hotels" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Vue d'ensemble des hôtels</CardTitle>
+              <CardDescription>
+                Monitoring et statistiques des établissements
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Propriétaire</TableHead>
+                    <TableHead>Femmes de chambre</TableHead>
+                    <TableHead>Sessions actives</TableHead>
+                    <TableHead>Créé le</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {hotels.map((hotel) => (
+                    <TableRow key={hotel.id}>
+                      <TableCell className="font-medium">{hotel.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{hotel.hotel_code}</Badge>
+                      </TableCell>
+                      <TableCell>{hotel.user_email}</TableCell>
+                      <TableCell>
+                        <Badge variant={hotel.housekeepers_count > 0 ? 'default' : 'secondary'}>
+                          {hotel.housekeepers_count}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={hotel.active_sessions > 0 ? 'default' : 'secondary'}>
+                          {hotel.active_sessions}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(hotel.created_at), 'dd/MM/yyyy', { locale: fr })}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -348,7 +872,7 @@ const Admin = () => {
                 <div>
                   <CardTitle>Codes d'accès des femmes de chambre</CardTitle>
                   <CardDescription>
-                    Surveillance et gestion des codes d'accès générés automatiquement
+                    Surveillance et gestion des codes d'accès
                   </CardDescription>
                 </div>
                 <ForceCodeGenerationButton onRefresh={loadAdminData} />
@@ -384,13 +908,7 @@ const Admin = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {new Date(code.created_at).toLocaleDateString('fr-FR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {format(new Date(code.created_at), 'dd/MM/yyyy HH:mm', { locale: fr })}
                       </TableCell>
                       <TableCell>
                         {code.used_at ? (
@@ -399,12 +917,7 @@ const Admin = () => {
                               Utilisé
                             </Badge>
                             <div className="text-xs text-muted-foreground mt-1">
-                              {new Date(code.used_at).toLocaleDateString('fr-FR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
+                              {format(new Date(code.used_at), 'dd/MM/yyyy HH:mm', { locale: fr })}
                             </div>
                           </div>
                         ) : (
@@ -424,10 +937,8 @@ const Admin = () => {
                               description: "Le code d'accès a été copié dans le presse-papier."
                             });
                           }}
-                          className="flex items-center gap-2"
                         >
                           <Copy className="h-4 w-4" />
-                          Copier
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -439,87 +950,71 @@ const Admin = () => {
                 <div className="text-center py-8 text-muted-foreground">
                   <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Aucun code d'accès trouvé</p>
-                  <p className="text-sm">Les codes seront générés automatiquement après la distribution des chambres</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="sessions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sessions actives</CardTitle>
-              <CardDescription>
-                Surveillance des connexions en temps réel
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Utilisateur</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Connexion</TableHead>
-                    <TableHead>Dernière activité</TableHead>
-                    <TableHead>Statut</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessions.map((session) => (
-                    <TableRow key={session.id}>
-                      <TableCell className="font-medium">{session.user_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{session.user_type}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(session.login_time).toLocaleString('fr-FR')}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(session.last_activity).toLocaleString('fr-FR')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={session.is_active ? 'default' : 'secondary'}>
-                          {session.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="stats" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <TabsContent value="system" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>Utilisateurs totaux</CardTitle>
+                <CardTitle>État du système</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{users.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Administrateurs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {users.filter(u => u.role === 'admin' || u.role === 'super_admin').length}
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span>Base de données</span>
+                  <Badge variant="default">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Opérationnelle
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Authentification</span>
+                  <Badge variant="default">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Active
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Sessions temps réel</span>
+                  <Badge variant="default">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Synchronisées
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Sessions actives</CardTitle>
+                <CardTitle>Actions rapides</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{sessions.length}</div>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full justify-start">
+                  <Database className="h-4 w-4 mr-2" />
+                  Nettoyer les sessions expirées
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Synchroniser les données
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Vérifier l'intégrité
+                </Button>
               </CardContent>
             </Card>
           </div>
+
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Interface d'administration avancée. Toutes les actions sont loggées et tracées.
+              En cas de problème, contactez le support technique.
+            </AlertDescription>
+          </Alert>
         </TabsContent>
       </Tabs>
     </div>

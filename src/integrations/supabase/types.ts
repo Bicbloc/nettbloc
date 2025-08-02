@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       daily_reports: {
         Row: {
           action_log: Json
@@ -317,6 +344,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          is_suspended: boolean
           subscription_type: string | null
           updated_at: string
         }
@@ -325,6 +353,7 @@ export type Database = {
           created_at?: string
           email: string
           id: string
+          is_suspended?: boolean
           subscription_type?: string | null
           updated_at?: string
         }
@@ -333,6 +362,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          is_suspended?: boolean
           subscription_type?: string | null
           updated_at?: string
         }
@@ -503,6 +533,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: { p_action: string; p_target_user_id?: string; p_details?: Json }
+        Returns: undefined
       }
       request_password_reset: {
         Args: { user_email: string }
