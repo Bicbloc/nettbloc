@@ -21,22 +21,32 @@ export const useAutoSetup = () => {
 
   useEffect(() => {
     const setupHotel = async () => {
-      if (!isAuthenticated || !user?.id || isSetupComplete) return;
+      if (!isAuthenticated || !user?.id || isSetupComplete) {
+        setLoading(false);
+        return;
+      }
 
       console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
       
       try {
+        console.log('🔍 Recherche hôtel existant...');
         // 1. Vérifier si l'utilisateur a déjà un hôtel
-        const { data: existingHotel } = await supabase
+        const { data: existingHotel, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
           .eq('user_id', user.id)
           .maybeSingle();
 
+        if (hotelError) {
+          console.error('❌ Erreur recherche hôtel:', hotelError);
+          throw hotelError;
+        }
+
         let hotelData = existingHotel;
 
         // 2. Si pas d'hôtel, créer un nouveau
         if (!existingHotel) {
+          console.log('📝 Création nouvel hôtel...');
           const { data: profile } = await supabase
             .from('profiles')
             .select('company_name')
@@ -55,37 +65,63 @@ export const useAutoSetup = () => {
             .select()
             .single();
 
-          if (createError) throw createError;
+          if (createError) {
+            console.error('❌ Erreur création hôtel:', createError);
+            throw createError;
+          }
           hotelData = newHotel;
+          console.log('✅ Hôtel créé:', hotelData);
+        } else {
+          console.log('✅ Hôtel existant trouvé:', existingHotel);
         }
 
         if (hotelData) {
           setHotel(hotelData);
+          console.log('🔍 Vérification codes d\'accès...');
 
           // 3. Vérifier les codes d'accès existants
-          const { data: existingCodes } = await supabase
+          const { data: existingCodes, error: codeError } = await supabase
             .from('housekeeper_access_codes')
             .select('access_code')
             .eq('hotel_id', hotelData.id)
             .eq('is_active', true)
             .limit(1);
 
+          if (codeError) {
+            console.error('❌ Erreur vérification codes:', codeError);
+          }
+
           if (existingCodes && existingCodes.length > 0) {
+            console.log('✅ Code existant trouvé:', existingCodes[0].access_code);
             setAccessCode(existingCodes[0].access_code);
           } else {
-            // Générer un nouveau code
-            const { data: codeData } = await supabase
-              .rpc('generate_housekeeper_access_code', {
-                p_hotel_id: hotelData.id,
-                p_housekeeper_id: null
-              });
+            console.log('🔑 Génération nouveau code...');
+            // Au lieu d'utiliser la fonction RPC, créons le code directement
+            const hotelCode = hotelData.hotel_code || 'HTL';
+            const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+            const newAccessCode = `${hotelCode}-${randomSuffix}`;
 
-            if (codeData) {
-              setAccessCode(codeData);
+            const { data: insertedCode, error: insertError } = await supabase
+              .from('housekeeper_access_codes')
+              .insert({
+                hotel_id: hotelData.id,
+                access_code: newAccessCode,
+                created_by: user.id
+              })
+              .select('access_code')
+              .single();
+
+            if (insertError) {
+              console.error('❌ Erreur insertion code:', insertError);
+            } else {
+              console.log('✅ Code généré:', insertedCode.access_code);
+              setAccessCode(insertedCode.access_code);
             }
           }
 
           setIsSetupComplete(true);
+          console.log('✅ Configuration terminée');
+          
           toast({
             title: "Configuration terminée",
             description: `Votre hôtel "${hotelData.name}" est prêt !`
@@ -101,6 +137,7 @@ export const useAutoSetup = () => {
         });
       } finally {
         setLoading(false);
+        console.log('🏁 Auto-setup terminé');
       }
     };
 
