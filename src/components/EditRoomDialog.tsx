@@ -6,7 +6,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -27,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -52,32 +50,36 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-interface AddRoomDialogProps {
-  onAddRoom: (room: Room) => void;
+interface EditRoomDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  room: Room;
+  onEditRoom: (updatedRoom: Room) => void;
   existingRooms: Room[];
 }
 
-export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) {
-  const [open, setOpen] = useState(false);
-  
+export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingRooms }: EditRoomDialogProps) {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      number: '',
-      status: '',
-      cleaningType: 'full',
-      priority: 'medium',
-      floor: '',
-      isTwin: false,
-      isUrgent: false,
-      notUrgent: false,
-      notes: '',
+      number: room.number || '',
+      status: room.status || '',
+      cleaningType: room.cleaningType || 'full',
+      priority: room.priority || 'medium',
+      floor: room.floor?.toString() || '',
+      isTwin: room.isTwin || false,
+      isUrgent: room.isUrgent || false,
+      notUrgent: room.notUrgent || false,
+      notes: room.notes || '',
     },
   });
 
   const onSubmit = (data: FormData) => {
-    // Vérifier si la chambre existe déjà
-    const roomExists = existingRooms.some(room => room.number === data.number);
+    // Vérifier si le nouveau numéro existe déjà (sauf pour la chambre actuelle)
+    const roomExists = existingRooms.some(existingRoom => 
+      existingRoom.number === data.number && existingRoom.number !== room.number
+    );
+    
     if (roomExists) {
       toast({
         title: "Erreur",
@@ -87,7 +89,8 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
       return;
     }
 
-    const newRoom: Room = {
+    const updatedRoom: Room = {
+      ...room,
       number: data.number,
       status: data.status,
       cleaningType: data.cleaningType,
@@ -99,15 +102,14 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
       notes: data.notes,
     };
 
-    onAddRoom(newRoom);
+    onEditRoom(updatedRoom);
     
     toast({
       title: "Succès",
-      description: `Chambre ${data.number} ajoutée avec succès. Elle apparaît maintenant dans l'interface et sera incluse dans tous les rapports.`,
+      description: `Chambre ${data.number} modifiée avec succès`,
     });
 
-    form.reset();
-    setOpen(false);
+    onOpenChange(false);
   };
 
   const statusOptions = [
@@ -122,18 +124,12 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
   ];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          Ajouter une chambre
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Ajouter une chambre manuellement</DialogTitle>
+          <DialogTitle>Modifier la chambre {room.number}</DialogTitle>
           <DialogDescription>
-            Créez une nouvelle chambre si les données PDF ne sont pas correctement récupérées.
+            Modifiez les détails de cette chambre.
           </DialogDescription>
         </DialogHeader>
         
@@ -176,7 +172,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Statut *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionnez le statut" />
@@ -201,7 +197,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type de nettoyage *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Type de nettoyage" />
@@ -225,7 +221,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Priorité *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionnez la priorité" />
@@ -316,11 +312,11 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Annuler
               </Button>
               <Button type="submit">
-                Ajouter la chambre
+                Sauvegarder les modifications
               </Button>
             </DialogFooter>
           </form>

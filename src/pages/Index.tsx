@@ -355,9 +355,18 @@ const Index = () => {
     }));
   };
 
-  const handleAddRoom = (newRoom: Room) => {
-    setRooms(prevRooms => [...prevRooms, newRoom]);
-    console.log('✅ Chambre ajoutée manuellement:', newRoom.number);
+  const handleAddRoom = async (newRoom: Room) => {
+    const updatedRooms = [...rooms, newRoom];
+    setRooms(updatedRooms);
+    
+    // Sauvegarder dans la session pour persistance
+    try {
+      const { HotelSessionService } = await import('@/services/hotelSessionService');
+      await HotelSessionService.updateRoomData(updatedRooms);
+      console.log('✅ Chambre ajoutée et sauvegardée:', newRoom.number);
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde chambre:', error);
+    }
   };
   
   const handlePdfProcessed = async (data: Room[], housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
