@@ -46,6 +46,7 @@ import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
 import { SupabaseService } from "@/services/supabaseService";
+import { CodeGenerationService } from "@/services/codeGenerationService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
@@ -63,6 +64,14 @@ const Index = () => {
   useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState("overview");
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
+  
+  // Vérifier que le contexte est disponible
+  const housekeepingContext = useHousekeeping();
+  
+  if (!housekeepingContext) {
+    return <div>Erreur de contexte HousekeepingProvider</div>;
+  }
+  
   const { 
     housekeeperNames, 
     setHousekeeperNames,
@@ -325,6 +334,17 @@ const Index = () => {
   const handlePdfProcessed = async (data: Room[], housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
     console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeepers);
     
+    // NOUVEAU: Vider automatiquement les femmes de chambre de la session précédente
+    console.log("🧹 Nettoyage des femmes de chambre de la session précédente...");
+    if (hotel?.id) {
+      try {
+        await SupabaseService.cleanupAllHousekeepers(hotel.id);
+        console.log("✅ Nettoyage terminé, création des nouvelles femmes de chambre...");
+      } catch (error) {
+        console.error("❌ Erreur nettoyage:", error);
+      }
+    }
+    
     const floors = new Set<number>();
     data.forEach(room => {
       const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
@@ -342,12 +362,13 @@ const Index = () => {
     // Mettre à jour les noms des femmes de chambre dans le context
     setHousekeeperNames(housekeepers);
     
-    // Générer automatiquement les codes d'accès pour les femmes de chambre
+    // Générer automatiquement les codes d'accès UNIQUEMENT pour les femmes de chambre assignées
     if (housekeepers.length > 0 && hotel?.id) {
       try {
-        console.log("🔑 Génération des codes d'accès pour:", housekeepers);
+        console.log("🔑 Génération des codes d'accès pour les femmes assignées:", housekeepers);
         
-        await SupabaseService.createHousekeepers(hotel.id, housekeepers);
+        // Utiliser la nouvelle méthode qui génère les codes seulement pour les assignées
+        await CodeGenerationService.ensureCodesForAssignedHousekeepers(hotel.id, housekeepers);
         
         // Rafraîchir la liste des femmes de chambre pour récupérer les codes
         await refreshHousekeepers();
