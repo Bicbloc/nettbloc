@@ -172,7 +172,7 @@ const Admin = () => {
       if (sessionsError) throw sessionsError;
       setSessions(sessionsData || []);
 
-      // Charger les codes d'accès des femmes de chambre
+      // Charger les codes d'accès des femmes de chambre (sans jointures problématiques)
       const { data: accessCodesData, error: accessCodesError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
@@ -182,26 +182,52 @@ const Admin = () => {
           created_at,
           used_at,
           expires_at,
-          housekeepers!inner(name),
-          hotels!inner(name, hotel_code)
+          hotel_id,
+          housekeeper_id
         `)
         .order('created_at', { ascending: false });
 
       if (accessCodesError) throw accessCodesError;
-      
-      const formattedAccessCodes = accessCodesData?.map(code => ({
-        id: code.id,
-        access_code: code.access_code,
-        housekeeper_name: code.housekeepers?.name || 'Non assigné',
-        hotel_name: code.hotels?.name || 'Inconnu',
-        hotel_code: code.hotels?.hotel_code || '',
-        is_active: code.is_active,
-        created_at: code.created_at,
-        used_at: code.used_at,
-        expires_at: code.expires_at
-      })) || [];
 
-      setAccessCodes(formattedAccessCodes);
+      // Enrichir les codes d'accès avec les noms (requêtes séparées pour éviter les problèmes de jointures)
+      const enrichedAccessCodes = await Promise.all(
+        (accessCodesData || []).map(async (code) => {
+          // Récupérer le nom de l'hôtel
+          const { data: hotelData } = await supabase
+            .from('hotels')
+            .select('name, hotel_code')
+            .eq('id', code.hotel_id)
+            .single();
+
+          // Récupérer le nom de la femme de chambre si assignée
+          let housekeeperName = 'Non assigné';
+          if (code.housekeeper_id) {
+            const { data: housekeeperData } = await supabase
+              .from('housekeepers')
+              .select('name')
+              .eq('id', code.housekeeper_id)
+              .single();
+            
+            if (housekeeperData) {
+              housekeeperName = housekeeperData.name;
+            }
+          }
+
+          return {
+            id: code.id,
+            access_code: code.access_code,
+            housekeeper_name: housekeeperName,
+            hotel_name: hotelData?.name || 'Inconnu',
+            hotel_code: hotelData?.hotel_code || '',
+            is_active: code.is_active,
+            created_at: code.created_at,
+            used_at: code.used_at,
+            expires_at: code.expires_at
+          };
+        })
+      );
+
+      setAccessCodes(enrichedAccessCodes);
 
       // Charger les statistiques des hôtels
       const { data: hotelsData, error: hotelsError } = await supabase
@@ -259,7 +285,7 @@ const Admin = () => {
         suspended_users: usersWithRoles.filter(u => u.is_suspended).length,
         total_hotels: hotelsWithStats.length,
         total_sessions: sessionsData?.length || 0,
-        total_housekeepers: formattedAccessCodes.length
+        total_housekeepers: enrichedAccessCodes.length
       };
 
       setStats(newStats);
