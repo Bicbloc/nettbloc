@@ -23,6 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import BackButton from '@/components/BackButton';
 import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
 import { SuspensionDialog } from '@/components/SuspensionDialog';
+import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -34,6 +35,8 @@ interface UserWithRole {
   suspension_reason?: string;
   subscription_type?: string;
   trial_end_date?: string;
+  trial_extension_days?: number;
+  trial_extension_reason?: string;
   role?: 'user' | 'admin' | 'super_admin';
   created_at: string;
   last_sign_in_at?: string;
@@ -401,7 +404,7 @@ const Admin = () => {
 
       // Envoyer l'email d'activation
       try {
-        const activationLink = `${window.location.origin}/auth`;
+        const activationLink = `${window.location.origin}/auth?type=signup&email=${encodeURIComponent(newUserEmail)}`;
         
         await supabase.functions.invoke('send-activation-email', {
           body: {

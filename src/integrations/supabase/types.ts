@@ -383,6 +383,10 @@ export type Database = {
           subscription_type: string | null
           suspension_reason: string | null
           trial_end_date: string | null
+          trial_extension_days: number | null
+          trial_extension_granted_at: string | null
+          trial_extension_granted_by: string | null
+          trial_extension_reason: string | null
           updated_at: string
         }
         Insert: {
@@ -394,6 +398,10 @@ export type Database = {
           subscription_type?: string | null
           suspension_reason?: string | null
           trial_end_date?: string | null
+          trial_extension_days?: number | null
+          trial_extension_granted_at?: string | null
+          trial_extension_granted_by?: string | null
+          trial_extension_reason?: string | null
           updated_at?: string
         }
         Update: {
@@ -405,6 +413,10 @@ export type Database = {
           subscription_type?: string | null
           suspension_reason?: string | null
           trial_end_date?: string | null
+          trial_extension_days?: number | null
+          trial_extension_granted_at?: string | null
+          trial_extension_granted_by?: string | null
+          trial_extension_reason?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -533,6 +545,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      change_subscription_status: {
+        Args: { p_user_id: string; p_new_status: string; p_reason?: string }
+        Returns: boolean
+      }
       cleanup_all_housekeepers_for_hotel: {
         Args: { p_hotel_id: string }
         Returns: {
@@ -547,6 +563,10 @@ export type Database = {
       cleanup_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      extend_trial_period: {
+        Args: { p_user_id: string; p_extension_days: number; p_reason?: string }
+        Returns: boolean
       }
       generate_hotel_access_code: {
         Args: { hotel_uuid: string }
