@@ -1619,47 +1619,51 @@ const Index = () => {
                 <div className="flex items-center justify-between mb-4">
                   <NotificationBell hotelId={currentHotelId} />
                 </div>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {housekeeperNames.map((name) => {
-                    const housekeeperRooms = getHousekeeperRooms(name);
-                    const accessCode = housekeepers.find(h => h.name === name)?.access_code || '';
-                    
-                    return (
-                      <Card key={name}>
-                        <CardHeader>
-                          <CardTitle className="flex items-center justify-between">
-                            <span>{name}</span>
-                            <Badge variant="secondary">
-                              {housekeeperRooms.length} chambres
-                            </Badge>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4 flex-1">
-                            <div className="text-center">
-                              <div className="text-sm text-muted-foreground mb-2">
-                                Code d'accès mobile
+                
+                {/* Utiliser le composant AccessCodeDisplay pour la version mobile */}
+                <AccessCodeDisplay key={`mobile-access-codes-${currentHotelId}`} />
+                
+                {/* Affichage des femmes de chambre avec leurs assignations */}
+                {housekeeperNames.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-4">Assignations des femmes de chambre</h3>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {housekeeperNames.map((name) => {
+                        const housekeeperRooms = getHousekeeperRooms(name);
+                        
+                        return (
+                          <Card key={name}>
+                            <CardHeader>
+                              <CardTitle className="flex items-center justify-between">
+                                <span>{name}</span>
+                                <Badge variant="secondary">
+                                  {housekeeperRooms.length} chambres
+                                </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-4">
+                                <div className="text-sm text-muted-foreground">
+                                  Chambres assignées: {housekeeperRooms.map(r => r.number).join(', ')}
+                                </div>
+                                <div className="text-center">
+                                  <Button
+                                    onClick={() => window.open(`/housekeeper-login`, '_blank')}
+                                    className="w-full hover-scale"
+                                    size="sm"
+                                  >
+                                    <Smartphone className="mr-2 h-4 w-4" />
+                                    Ouvrir interface mobile
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="text-2xl font-mono font-bold bg-slate-100 rounded-lg py-3 px-4 min-h-[60px] flex items-center justify-center">
-                                {accessCode}
-                              </div>
-                            </div>
-                            <div className="text-center mt-auto">
-                              <Button
-                                onClick={() => window.open(`/housekeeper?code=${accessCode}`, '_blank')}
-                                className="w-full hover-scale"
-                                size="sm"
-                              >
-                                <Smartphone className="mr-2 h-4 w-4" />
-                                Ouvrir interface mobile
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </TabsContent>
