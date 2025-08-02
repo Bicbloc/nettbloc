@@ -132,6 +132,27 @@ const Admin = () => {
 
   const loadAdminData = async () => {
     try {
+      console.log('🔄 Début du chargement des données admin...');
+      
+      // Vérifier d'abord si l'utilisateur a vraiment les permissions super_admin
+      const { data: currentUserRoles, error: roleCheckError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id);
+
+      if (roleCheckError) {
+        console.error('❌ Erreur vérification permissions:', roleCheckError);
+        throw new Error('Impossible de vérifier les permissions');
+      }
+
+      const hasSupeAdminRole = currentUserRoles?.some(r => r.role === 'super_admin');
+      if (!hasSupeAdminRole) {
+        console.error('❌ Utilisateur sans permissions super_admin');
+        throw new Error('Permissions insuffisantes');
+      }
+
+      console.log('✅ Permissions super_admin confirmées');
+
       // Charger les utilisateurs avec leurs rôles et profils
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
@@ -145,7 +166,10 @@ const Admin = () => {
           created_at
         `);
 
-      if (usersError) throw usersError;
+      if (usersError) {
+        console.error('❌ Erreur chargement profils:', usersError);
+        throw usersError;
+      }
 
       // Charger les rôles des utilisateurs
       const { data: rolesData, error: rolesError } = await supabase
