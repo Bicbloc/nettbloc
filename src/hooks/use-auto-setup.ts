@@ -21,11 +21,18 @@ export const useAutoSetup = () => {
 
   useEffect(() => {
     const setupHotel = async () => {
-      if (!isAuthenticated || !user?.id || isSetupComplete) {
+      if (!isAuthenticated || !user?.id) {
         setLoading(false);
         return;
       }
 
+      // Éviter les boucles infinies
+      if (hasInitialized) {
+        setLoading(false);
+        return;
+      }
+
+      setHasInitialized(true);
       console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
       
       try {
@@ -77,48 +84,6 @@ export const useAutoSetup = () => {
 
         if (hotelData) {
           setHotel(hotelData);
-          console.log('🔍 Vérification codes d\'accès...');
-
-          // 3. Vérifier les codes d'accès existants
-          const { data: existingCodes, error: codeError } = await supabase
-            .from('housekeeper_access_codes')
-            .select('access_code')
-            .eq('hotel_id', hotelData.id)
-            .eq('is_active', true)
-            .limit(1);
-
-          if (codeError) {
-            console.error('❌ Erreur vérification codes:', codeError);
-          }
-
-          if (existingCodes && existingCodes.length > 0) {
-            console.log('✅ Code existant trouvé:', existingCodes[0].access_code);
-            setAccessCode(existingCodes[0].access_code);
-          } else {
-            console.log('🔑 Génération nouveau code...');
-            // Au lieu d'utiliser la fonction RPC, créons le code directement
-            const hotelCode = hotelData.hotel_code || 'HTL';
-            const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-            const newAccessCode = `${hotelCode}-${randomSuffix}`;
-
-            const { data: insertedCode, error: insertError } = await supabase
-              .from('housekeeper_access_codes')
-              .insert({
-                hotel_id: hotelData.id,
-                access_code: newAccessCode,
-                created_by: user.id
-              })
-              .select('access_code')
-              .single();
-
-            if (insertError) {
-              console.error('❌ Erreur insertion code:', insertError);
-            } else {
-              console.log('✅ Code généré:', insertedCode.access_code);
-              setAccessCode(insertedCode.access_code);
-            }
-          }
-
           setIsSetupComplete(true);
           console.log('✅ Configuration terminée');
           
@@ -141,8 +106,10 @@ export const useAutoSetup = () => {
       }
     };
 
-    setupHotel();
-  }, [isAuthenticated, user?.id, isSetupComplete]);
+    if (!hasInitialized) {
+      setupHotel();
+    }
+  }, [isAuthenticated, user?.id, hasInitialized]);
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
