@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -17,15 +17,32 @@ export const useAutoSetup = () => {
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(true);
+  const hasAttemptedSetup = useRef(false);
 
   useEffect(() => {
     const setupHotel = async () => {
+      // Éviter les exécutions multiples
+      if (hasAttemptedSetup.current) {
+        console.log('🚫 Setup déjà tenté, ignore...');
+        return;
+      }
+
       if (!isAuthenticated || !user?.id) {
+        console.log('🚫 Non authentifié, arrêt du setup');
+        setLoading(false);
+        setIsSetupComplete(false);
+        return;
+      }
+
+      // Si hotel déjà chargé, pas besoin de refaire le setup
+      if (hotel && isSetupComplete) {
+        console.log('✅ Hôtel déjà chargé, setup terminé');
         setLoading(false);
         return;
       }
 
       console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
+      hasAttemptedSetup.current = true;
       
       try {
         console.log('🔍 Recherche hôtel existant...');
@@ -107,6 +124,7 @@ export const useAutoSetup = () => {
 
       } catch (error) {
         console.error('❌ Erreur auto-setup:', error);
+        hasAttemptedSetup.current = false; // Permettre un retry en cas d'erreur
         toast({
           variant: "destructive",
           title: "Erreur configuration",
@@ -118,14 +136,15 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Exécuter seulement si authentifié et pas encore chargé
-    if (isAuthenticated && user?.id && loading) {
+    // Lancer le setup si nécessaire
+    if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {
       setupHotel();
     } else if (!isAuthenticated || !user?.id) {
       setLoading(false);
       setIsSetupComplete(false);
+      hasAttemptedSetup.current = false;
     }
-  }, [isAuthenticated, user?.id, isSetupComplete, hotel, loading]);
+  }, [isAuthenticated, user?.id]);
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
