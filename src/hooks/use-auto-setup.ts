@@ -24,13 +24,19 @@ export const useAutoSetup = () => {
     let timeoutId: NodeJS.Timeout;
 
     const setupUserHotel = async () => {
-      // Éviter les appels multiples
-      if (hasInitialized || !isAuthenticated || !user?.id) {
+      // Éviter les appels multiples seulement si déjà en cours
+      if (!isAuthenticated || !user?.id) {
         if (isMounted) setLoading(false);
         return;
       }
 
-      console.log('🏨 Auto-setup: Démarrage UNIQUE pour user:', user.email);
+      // Permettre une nouvelle tentative si pas encore complété
+      if (hasInitialized && isSetupComplete) {
+        if (isMounted) setLoading(false);
+        return;
+      }
+
+      console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
       setHasInitialized(true);
 
       try {
@@ -104,26 +110,63 @@ export const useAutoSetup = () => {
         if (hotelData && isMounted) {
           setHotel(hotelData);
 
-          // 3. Générer un code d'accès UNIQUEMENT si nécessaire
-          console.log('🔑 Auto-setup: Génération du code d\'accès...');
-          
-          const { data: codeData, error: codeError } = await supabase
-            .rpc('generate_housekeeper_access_code', {
-              p_hotel_id: hotelData.id,
-              p_housekeeper_id: null
-            });
+          // 3. Vérifier s'il y a déjà un code d'accès actif
+          const { data: existingCodes, error: codeCheckError } = await supabase
+            .from('housekeeper_access_codes')
+            .select('access_code')
+            .eq('hotel_id', hotelData.id)
+            .eq('is_active', true)
+            .limit(1);
 
-          if (codeError) {
-            console.error('Erreur génération code:', codeError);
-            throw codeError;
-          } else if (isMounted && codeData) {
-            setAccessCode(codeData);
-            console.log('🔑 Auto-setup: Code généré avec succès:', codeData);
+          if (codeCheckError) {
+            console.error('Erreur vérification codes:', codeCheckError);
+          }
+
+          if (existingCodes && existingCodes.length > 0) {
+            // Il y a déjà un code d'accès actif
+            const existingCode = existingCodes[0].access_code;
+            setAccessCode(existingCode);
+            console.log('🔑 Auto-setup: Code existant trouvé:', existingCode);
             
             toast({
-              title: "Configuration automatique",
-              description: `Votre hôtel "${hotelData.name}" est prêt ! Code d'accès: ${codeData}`
+              title: "Hôtel configuré",
+              description: `Votre hôtel "${hotelData.name}" est prêt !`
             });
+          } else {
+            // Générer un nouveau code d'accès
+            console.log('🔑 Auto-setup: Génération d\'un nouveau code d\'accès...');
+            
+            try {
+              const { data: codeData, error: codeError } = await supabase
+                .rpc('generate_housekeeper_access_code', {
+                  p_hotel_id: hotelData.id,
+                  p_housekeeper_id: null
+                });
+
+              if (codeError) {
+                console.error('Erreur génération code:', codeError);
+                // Ne pas faire échouer tout le processus pour un code
+                toast({
+                  title: "Hôtel configuré",
+                  description: `Votre hôtel "${hotelData.name}" est prêt ! Vous pourrez générer des codes d'accès manuellement.`
+                });
+              } else if (isMounted && codeData) {
+                setAccessCode(codeData);
+                console.log('🔑 Auto-setup: Code généré avec succès:', codeData);
+                
+                toast({
+                  title: "Configuration automatique",
+                  description: `Votre hôtel "${hotelData.name}" est prêt ! Code d'accès: ${codeData}`
+                });
+              }
+            } catch (codeGenError) {
+              console.error('Erreur génération code:', codeGenError);
+              // Continuer sans code d'accès
+              toast({
+                title: "Hôtel configuré",
+                description: `Votre hôtel "${hotelData.name}" est prêt ! Vous pourrez générer des codes d'accès manuellement.`
+              });
+            }
           }
 
           if (isMounted) {
@@ -160,7 +203,10 @@ export const useAutoSetup = () => {
       if (isMounted && loading) {
         console.log('⏰ Auto-setup: Timeout atteint');
         setLoading(false);
-        setHasInitialized(false);
+        // Ne pas réinitialiser hasInitialized si on a déjà trouvé un hôtel
+        if (!hotel) {
+          setHasInitialized(false);
+        }
       }
     }, 15000);
 
@@ -170,7 +216,7 @@ export const useAutoSetup = () => {
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isAuthenticated, user?.id, hasInitialized]); // Ajouter hasInitialized pour éviter les boucles
+  }, [isAuthenticated, user?.id]); // Supprimer hasInitialized des dépendances
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;

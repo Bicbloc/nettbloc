@@ -128,10 +128,16 @@ export const AccessCodeDisplay = () => {
   if (!hotel) {
     return (
       <Card>
-        <CardContent className="text-center py-8">
-          <p className="text-muted-foreground">
-            Configuration de l'hôtel en cours...
-          </p>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="text-center space-y-4">
+            <RefreshCw className="h-8 w-8 mx-auto animate-spin text-primary" />
+            <div>
+              <p className="text-muted-foreground">Configuration de l'hôtel en cours...</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Chargement des informations de l'établissement
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
