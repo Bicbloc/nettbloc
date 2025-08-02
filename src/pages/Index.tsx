@@ -49,6 +49,8 @@ import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
 import { SupabaseService } from "@/services/supabaseService";
 import { CodeGenerationService } from "@/services/codeGenerationService";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
+import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
+import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
@@ -366,6 +368,82 @@ const Index = () => {
       console.log('✅ Chambre ajoutée et sauvegardée:', newRoom.number);
     } catch (error) {
       console.error('❌ Erreur sauvegarde chambre:', error);
+    }
+  };
+
+  const handleDeleteRoom = async (roomNumber: string) => {
+    const roomToDelete = rooms.find(r => r.number === roomNumber);
+    if (!roomToDelete) return;
+
+    // Supprimer les liaisons bidirectionnelles
+    const updatedRooms = rooms
+      .filter(r => r.number !== roomNumber) // Supprimer la chambre
+      .map(room => ({
+        ...room,
+        linkedRooms: room.linkedRooms?.filter(linkedRoom => linkedRoom !== roomNumber) || []
+      }));
+
+    setRooms(updatedRooms);
+    
+    // Sauvegarder dans la session
+    try {
+      const { HotelSessionService } = await import('@/services/hotelSessionService');
+      await HotelSessionService.updateRoomData(updatedRooms);
+      console.log('✅ Chambre supprimée et sauvegardée:', roomNumber);
+      
+      toast({
+        title: "Chambre supprimée",
+        description: `La chambre ${roomNumber} a été supprimée avec succès`,
+      });
+    } catch (error) {
+      console.error('❌ Erreur suppression chambre:', error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la suppression de la chambre",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLinkRooms = async (roomNumber: string, linkedRoomNumbers: string[]) => {
+    const updatedRooms = rooms.map(room => {
+      if (room.number === roomNumber) {
+        return {
+          ...room,
+          linkedRooms: linkedRoomNumbers
+        };
+      }
+      
+      // Mettre à jour les liaisons bidirectionnelles
+      const shouldBeLinked = linkedRoomNumbers.includes(room.number);
+      const currentlyLinked = room.linkedRooms?.includes(roomNumber) || false;
+      
+      if (shouldBeLinked && !currentlyLinked) {
+        // Ajouter la liaison
+        return {
+          ...room,
+          linkedRooms: [...(room.linkedRooms || []), roomNumber]
+        };
+      } else if (!shouldBeLinked && currentlyLinked) {
+        // Supprimer la liaison
+        return {
+          ...room,
+          linkedRooms: room.linkedRooms?.filter(linked => linked !== roomNumber) || []
+        };
+      }
+      
+      return room;
+    });
+
+    setRooms(updatedRooms);
+    
+    // Sauvegarder dans la session
+    try {
+      const { HotelSessionService } = await import('@/services/hotelSessionService');
+      await HotelSessionService.updateRoomData(updatedRooms);
+      console.log('✅ Liaisons de chambres sauvegardées:', roomNumber, linkedRoomNumbers);
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde liaisons:', error);
     }
   };
   
@@ -1546,6 +1624,9 @@ const Index = () => {
                               room={room}
                               onUpdate={handleRoomUpdate}
                               onUnassign={handleRoomUnassign}
+                              onDelete={handleDeleteRoom}
+                              onLinkRooms={handleLinkRooms}
+                              allRooms={rooms}
                               compact={true}
                               showActions={true}
                             />

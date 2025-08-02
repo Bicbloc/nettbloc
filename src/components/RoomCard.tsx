@@ -1,13 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
+import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 
 interface RoomCardProps {
   room: Room;
@@ -15,7 +17,10 @@ interface RoomCardProps {
   onAssign?: (room: Room, housekeeperName: string) => void;
   onUnassign?: (room: Room) => void;
   onReassign?: (room: Room, newHousekeeper: string | null) => void;
+  onDelete?: (roomNumber: string) => void;
+  onLinkRooms?: (roomNumber: string, linkedRoomNumbers: string[]) => void;
   housekeeperNames?: string[];
+  allRooms?: Room[];
   draggable?: boolean;
   compact?: boolean;
   selectable?: boolean;
@@ -30,7 +35,10 @@ export function RoomCard({
   onAssign, 
   onUnassign,
   onReassign,
+  onDelete,
+  onLinkRooms,
   housekeeperNames = [],
+  allRooms = [],
   draggable = false, 
   compact = false, 
   selectable = false,
@@ -39,6 +47,8 @@ export function RoomCard({
   showActions = false
 }: RoomCardProps) {
   const [dragging, setDragging] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Add animation effect when dragging
@@ -415,6 +425,76 @@ export function RoomCard({
           </label>
         </div>
       </div>
+
+      {/* Boutons de gestion des chambres */}
+      <div className="flex gap-2 mt-4 pt-3 border-t border-gray-200">
+        {room.linkedRooms && room.linkedRooms.length > 0 && (
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground mb-1">Chambres liées:</p>
+            <div className="flex flex-wrap gap-1">
+              {room.linkedRooms.map(linkedRoom => (
+                <Badge key={linkedRoom} variant="secondary" className="text-xs">
+                  {linkedRoom}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        <div className="flex gap-1">
+          {onLinkRooms && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLinkDialog(true);
+              }}
+              className="flex items-center gap-1"
+              title="Lier avec d'autres chambres"
+            >
+              <Link className="h-3 w-3" />
+              Lier
+            </Button>
+          )}
+          
+          {onDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteDialog(true);
+              }}
+              className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+              title="Supprimer la chambre"
+            >
+              <Trash2 className="h-3 w-3" />
+              Supprimer
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      {showDeleteDialog && onDelete && (
+        <DeleteRoomDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          room={room}
+          onDeleteRoom={onDelete}
+        />
+      )}
+
+      {showLinkDialog && onLinkRooms && (
+        <LinkRoomsDialog
+          open={showLinkDialog}
+          onOpenChange={setShowLinkDialog}
+          room={room}
+          allRooms={allRooms}
+          onLinkRooms={onLinkRooms}
+        />
+      )}
     </div>
   );
 }

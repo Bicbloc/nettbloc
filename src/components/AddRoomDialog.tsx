@@ -48,6 +48,7 @@ const formSchema = z.object({
   isUrgent: z.boolean().default(false),
   notUrgent: z.boolean().default(false),
   notes: z.string().optional(),
+  linkedRooms: z.array(z.string()).default([]),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -72,6 +73,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
       isUrgent: false,
       notUrgent: false,
       notes: '',
+      linkedRooms: [],
     },
   });
 
@@ -97,6 +99,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
       isUrgent: data.isUrgent,
       notUrgent: data.notUrgent,
       notes: data.notes,
+      linkedRooms: data.linkedRooms || [],
     };
 
     onAddRoom(newRoom);

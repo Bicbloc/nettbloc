@@ -16,6 +16,7 @@ export interface Room {
   floor?: number;
   notes?: string; // Added notes property
   remark?: string; // Added remark property for housekeeper remarks
+  linkedRooms?: string[]; // Array of room numbers that are connected to this room
 }
 
 export interface CleaningConfig {
