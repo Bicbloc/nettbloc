@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -116,6 +116,11 @@ const Index = () => {
   
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
+  
+  // États pour les dialogs de gestion des chambres
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
   
   // État pour l'ID hôtel réel depuis la base de données
   const [realHotelId, setRealHotelId] = useState<string | null>(null);
@@ -366,8 +371,19 @@ const Index = () => {
       const { HotelSessionService } = await import('@/services/hotelSessionService');
       await HotelSessionService.updateRoomData(updatedRooms);
       console.log('✅ Chambre ajoutée et sauvegardée:', newRoom.number);
+      
+      // Afficher un toast de confirmation
+      toast({
+        title: "Chambre ajoutée",
+        description: `La chambre ${newRoom.number} a été ajoutée avec succès`,
+      });
     } catch (error) {
       console.error('❌ Erreur sauvegarde chambre:', error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de l'ajout de la chambre",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1588,7 +1604,9 @@ const Index = () => {
                         <TableHead>Priorité</TableHead>
                         <TableHead>Assignée à</TableHead>
                         <TableHead>Jumelle</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>Chambres liées</TableHead>
+                        <TableHead>Actions rapides</TableHead>
+                        <TableHead>Gestion</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1620,16 +1638,59 @@ const Index = () => {
                             />
                           </TableCell>
                           <TableCell>
+                            {room.linkedRooms && room.linkedRooms.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {room.linkedRooms.map(linkedRoom => (
+                                  <Badge key={linkedRoom} variant="secondary" className="text-xs">
+                                    {linkedRoom}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">Aucune</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <RoomCard
                               room={room}
                               onUpdate={handleRoomUpdate}
                               onUnassign={handleRoomUnassign}
-                              onDelete={handleDeleteRoom}
-                              onLinkRooms={handleLinkRooms}
+                              onReassign={handleRoomReassign}
                               allRooms={rooms}
+                              housekeeperNames={housekeeperNames}
                               compact={true}
                               showActions={true}
                             />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedRoom(room);
+                                  setShowLinkDialog(true);
+                                }}
+                                className="flex items-center gap-1"
+                                title="Lier avec d'autres chambres"
+                              >
+                                <Link className="h-3 w-3" />
+                                Lier
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedRoom(room);
+                                  setShowDeleteDialog(true);
+                                }}
+                                className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Supprimer la chambre"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Supprimer
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1933,6 +1994,26 @@ const Index = () => {
         housekeeperName={reportAction === "single" ? reportHousekeeper : undefined}
         allHousekeepers={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
       />
+      
+      {/* Dialogs de gestion des chambres */}
+      {showDeleteDialog && selectedRoom && (
+        <DeleteRoomDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          room={selectedRoom}
+          onDeleteRoom={handleDeleteRoom}
+        />
+      )}
+
+      {showLinkDialog && selectedRoom && (
+        <LinkRoomsDialog
+          open={showLinkDialog}
+          onOpenChange={setShowLinkDialog}
+          room={selectedRoom}
+          allRooms={rooms}
+          onLinkRooms={handleLinkRooms}
+        />
+      )}
       
       {/* Dialogue de sélection d'hôtel */}
       <Dialog open={isHotelSelectionOpen} onOpenChange={setIsHotelSelectionOpen}>

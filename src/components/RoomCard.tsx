@@ -255,6 +255,33 @@ export function RoomCard({
               🚪
             </button>
             
+            {/* Boutons de gestion des chambres en mode compact */}
+            {onLinkRooms && (
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLinkDialog(true);
+                }}
+                title="Lier avec d'autres chambres"
+              >
+                <Link className="h-3 w-3" />
+              </button>
+            )}
+            
+            {onDelete && (
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-red-700 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteDialog(true);
+                }}
+                title="Supprimer la chambre"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
+            
             {/* Menu de réassignation si la chambre est assignée */}
             {room.assignedTo && onReassign && housekeeperNames.length > 0 && (
               <DropdownMenu>
@@ -300,6 +327,26 @@ export function RoomCard({
               </DropdownMenu>
             )}
           </div>
+        )}
+        
+        {/* Dialogs aussi en mode compact */}
+        {showDeleteDialog && onDelete && (
+          <DeleteRoomDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            room={room}
+            onDeleteRoom={onDelete}
+          />
+        )}
+
+        {showLinkDialog && onLinkRooms && (
+          <LinkRoomsDialog
+            open={showLinkDialog}
+            onOpenChange={setShowLinkDialog}
+            room={room}
+            allRooms={allRooms}
+            onLinkRooms={onLinkRooms}
+          />
         )}
       </div>
     );
