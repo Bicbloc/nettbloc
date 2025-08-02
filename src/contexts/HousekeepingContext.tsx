@@ -190,10 +190,52 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   }, [isDistributed, isInitialized]);
 
+  // Vérification périodique pour s'assurer que tous les housekeepers ont des codes
+  useEffect(() => {
+    if (!isInitialized || !hotelId || housekeeperNames.length === 0) return;
+
+    const checkMissingCodes = async () => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        const { data: existingHousekeepers } = await supabase
+          .from('housekeepers')
+          .select('name')
+          .eq('hotel_id', hotelId)
+          .eq('is_active', true);
+
+        const existingNames = existingHousekeepers?.map(h => h.name) || [];
+        const missingHousekeepers = housekeeperNames.filter(name => !existingNames.includes(name));
+        
+        if (missingHousekeepers.length > 0) {
+          console.log('🔍 Femmes de chambre sans codes détectées:', missingHousekeepers);
+          generateAccessCodesForAssignedHousekeepers(true); // Force la génération
+        }
+      } catch (error) {
+        console.error('❌ Erreur vérification codes manquants:', error);
+      }
+    };
+
+    // Vérifier immédiatement puis toutes les 30 secondes
+    checkMissingCodes();
+    const interval = setInterval(checkMissingCodes, 30000);
+    
+    return () => clearInterval(interval);
+  }, [isInitialized, hotelId, housekeeperNames]);
+
   // Fonction pour générer automatiquement les codes d'accès après distribution
-  const generateAccessCodesForAssignedHousekeepers = async () => {
+  const generateAccessCodesForAssignedHousekeepers = async (force = false) => {
     const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
-    if (!currentHotelId || !isDistributed || housekeeperNames.length === 0) return;
+    if (!currentHotelId || housekeeperNames.length === 0) {
+      console.log('⚠️ Génération codes: Conditions non remplies', { currentHotelId, housekeeperCount: housekeeperNames.length });
+      return;
+    }
+
+    // Forcer la génération ou attendre que la distribution soit faite
+    if (!force && !isDistributed) {
+      console.log('⚠️ Génération codes: Distribution pas encore faite, attente...');
+      return;
+    }
 
     console.log('🔑 Génération automatique des codes d\'accès pour les femmes de chambre...');
 
@@ -222,45 +264,11 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
         const hotelCode = hotel?.hotel_code || 'HTL';
         
-        // Créer les nouvelles femmes de chambre avec codes d'accès personnalisés
-        for (const name of newHousekeepers) {
-          try {
-            // Générer un code personnalisé avec le nom: HTL002-MARIE-1234
-            const namePart = name.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 6);
-            const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-            const accessCode = `${hotelCode}-${namePart}-${randomSuffix}`;
-
-            // Créer la femme de chambre
-            const { data: housekeeper, error: housekeeperError } = await supabase
-              .from('housekeepers')
-              .insert({
-                hotel_id: currentHotelId,
-                name: name,
-                access_code: accessCode
-              })
-              .select('id')
-              .single();
-
-            if (housekeeperError) {
-              console.error('❌ Erreur création femme de chambre:', housekeeperError);
-              continue;
-            }
-
-            // Créer le code d'accès dans la table housekeeper_access_codes
-            await supabase
-              .from('housekeeper_access_codes')
-              .insert({
-                hotel_id: currentHotelId,
-                housekeeper_id: housekeeper.id,
-                access_code: accessCode,
-                created_by: null // Généré automatiquement
-              });
-
-            console.log(`✅ Code d'accès généré pour ${name}: ${accessCode}`);
-          } catch (error) {
-            console.error(`❌ Erreur génération code pour ${name}:`, error);
-          }
-        }
+        // Utiliser le service de génération pour créer les codes
+        const { CodeGenerationService } = await import('@/services/codeGenerationService');
+        const generated = await CodeGenerationService.ensureCodesForHotel(currentHotelId, newHousekeepers);
+        
+        console.log(`✅ ${generated} codes d'accès générés automatiquement`);
 
         // Rafraîchir les femmes de chambre
         await refreshHousekeepers();

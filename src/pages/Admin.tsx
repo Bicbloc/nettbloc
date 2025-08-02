@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
+import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
 
 interface UserWithRole {
   id: string;
@@ -343,10 +344,15 @@ const Admin = () => {
         <TabsContent value="access-codes" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Codes d'accès des femmes de chambre</CardTitle>
-              <CardDescription>
-                Surveillance et gestion des codes d'accès générés automatiquement
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Codes d'accès des femmes de chambre</CardTitle>
+                  <CardDescription>
+                    Surveillance et gestion des codes d'accès générés automatiquement
+                  </CardDescription>
+                </div>
+                <ForceCodeGenerationButton onRefresh={loadAdminData} />
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
