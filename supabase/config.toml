@@ -19,3 +19,6 @@ enable_signup = true
 
 [functions.send-activation-email]
 verify_jwt = false
+
+[functions.archive-daily-data]
+verify_jwt = false

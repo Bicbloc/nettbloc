@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useNotifications } from '@/hooks/use-notifications-improved';
 import { TestTube } from 'lucide-react';
 import { isValidUUID } from '@/lib/utils';
 
