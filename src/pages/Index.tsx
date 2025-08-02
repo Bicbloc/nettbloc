@@ -335,12 +335,12 @@ const Index = () => {
     console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeepers);
     
     try {
-      // NOUVEAU: Vider automatiquement les femmes de chambre de la session précédente
-      console.log("🧹 Nettoyage des femmes de chambre de la session précédente...");
-      if (hotel?.id) {
-        await SupabaseService.cleanupAllHousekeepers(hotel.id);
-        console.log("✅ Nettoyage terminé");
-      }
+      // DÉSACTIVÉ: Nettoyage automatique des femmes de chambre
+      // console.log("🧹 Nettoyage des femmes de chambre de la session précédente...");
+      // if (hotel?.id) {
+      //   await SupabaseService.cleanupAllHousekeepers(hotel.id);
+      //   console.log("✅ Nettoyage terminé");
+      // }
       
       const floors = new Set<number>();
       data.forEach(room => {
