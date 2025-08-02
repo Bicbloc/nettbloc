@@ -5,11 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Building, Bell, Shield, Save, AlertTriangle } from 'lucide-react';
+import { Settings as SettingsIcon, Building, Bell, Shield, Save, AlertTriangle, Key } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import HousekeeperAccessCodes from '@/components/HousekeeperAccessCodes';
+import BackButton from '@/components/BackButton';
 
 interface HotelData {
   id: string;
@@ -167,18 +169,25 @@ const Settings = () => {
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Paramètres</h1>
-          <p className="text-muted-foreground">
-            Configurez votre établissement et vos préférences
-          </p>
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-3xl font-bold">Paramètres</h1>
+            <p className="text-muted-foreground">
+              Configurez votre établissement et vos préférences
+            </p>
+          </div>
         </div>
 
         <Tabs defaultValue="hotel" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="hotel" className="flex items-center gap-2">
               <Building className="h-4 w-4" />
               Établissement
+            </TabsTrigger>
+            <TabsTrigger value="access-codes" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              Codes d'accès
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
@@ -273,6 +282,20 @@ const Settings = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Onglet Codes d'accès */}
+          <TabsContent value="access-codes" className="space-y-6">
+            {settings.hotel ? (
+              <HousekeeperAccessCodes hotelId={settings.hotel.id} />
+            ) : (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Vous devez d'abord configurer votre établissement avant de générer des codes d'accès.
+                </AlertDescription>
+              </Alert>
+            )}
           </TabsContent>
 
           {/* Onglet Notifications */}

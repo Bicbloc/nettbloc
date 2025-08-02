@@ -139,6 +139,57 @@ export type Database = {
         }
         Relationships: []
       }
+      housekeeper_access_codes: {
+        Row: {
+          access_code: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          hotel_id: string
+          housekeeper_id: string | null
+          id: string
+          is_active: boolean
+          used_at: string | null
+        }
+        Insert: {
+          access_code: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          hotel_id: string
+          housekeeper_id?: string | null
+          id?: string
+          is_active?: boolean
+          used_at?: string | null
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          hotel_id?: string
+          housekeeper_id?: string | null
+          id?: string
+          is_active?: boolean
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "housekeeper_access_codes_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "housekeeper_access_codes_housekeeper_id_fkey"
+            columns: ["housekeeper_id"]
+            isOneToOne: false
+            referencedRelation: "housekeepers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       housekeeper_tokens: {
         Row: {
           created_at: string
@@ -423,6 +474,10 @@ export type Database = {
         Args: { hotel_uuid: string }
         Returns: string
       }
+      generate_housekeeper_access_code: {
+        Args: { p_hotel_id: string; p_housekeeper_id?: string }
+        Returns: string
+      }
       generate_short_hotel_id: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -440,6 +495,10 @@ export type Database = {
       }
       validate_access_code_for_hotel: {
         Args: { access_code: string; hotel_uuid: string }
+        Returns: boolean
+      }
+      validate_housekeeper_access_code: {
+        Args: { p_access_code: string; p_hotel_id: string }
         Returns: boolean
       }
     }

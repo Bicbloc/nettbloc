@@ -108,8 +108,9 @@ export const useAutoSetup = () => {
           console.log('🔑 Auto-setup: Génération du code d\'accès...');
           
           const { data: codeData, error: codeError } = await supabase
-            .rpc('generate_hotel_access_code', {
-              hotel_uuid: hotelData.id
+            .rpc('generate_housekeeper_access_code', {
+              p_hotel_id: hotelData.id,
+              p_housekeeper_id: null
             });
 
           if (codeError) {
@@ -176,8 +177,9 @@ export const useAutoSetup = () => {
 
     try {
       const { data: codeData, error } = await supabase
-        .rpc('generate_hotel_access_code', {
-          hotel_uuid: hotel.id
+        .rpc('generate_housekeeper_access_code', {
+          p_hotel_id: hotel.id,
+          p_housekeeper_id: null
         });
 
       if (error) throw error;
