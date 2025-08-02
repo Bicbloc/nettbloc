@@ -102,7 +102,7 @@ const Admin = () => {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserCompany, setNewUserCompany] = useState('');
-  const [selectedHotelId, setSelectedHotelId] = useState('');
+  const [selectedHotelId, setSelectedHotelId] = useState('new');
   const [suspensionDialog, setSuspensionDialog] = useState<{
     open: boolean;
     userId: string;
@@ -387,7 +387,7 @@ const Admin = () => {
       }
 
       // Assigner à un établissement existant ou créer un nouveau
-      if (selectedHotelId) {
+      if (selectedHotelId && selectedHotelId !== 'new') {
         // Assigner à un établissement existant
         await supabase
           .from('hotel_users')
@@ -407,7 +407,7 @@ const Admin = () => {
           body: {
             email: newUserEmail,
             companyName: newUserCompany || 'Mon Établissement',
-            hotelName: selectedHotelId ? hotels.find(h => h.id === selectedHotelId)?.name : undefined,
+            hotelName: selectedHotelId !== 'new' ? hotels.find(h => h.id === selectedHotelId)?.name : undefined,
             activationLink
           }
         });
@@ -423,7 +423,7 @@ const Admin = () => {
         p_details: { 
           email: newUserEmail, 
           role: newUserRole,
-          hotel_assigned: selectedHotelId || null
+          hotel_assigned: selectedHotelId !== 'new' ? selectedHotelId : null
         }
       });
 
@@ -435,7 +435,7 @@ const Admin = () => {
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserCompany('');
-      setSelectedHotelId('');
+      setSelectedHotelId('new');
       setNewUserRole('user');
       setShowCreateUser(false);
       await loadAdminData();
@@ -821,7 +821,7 @@ const Admin = () => {
                              <SelectValue placeholder="Choisir un établissement existant..." />
                            </SelectTrigger>
                            <SelectContent>
-                             <SelectItem value="">Créer un nouvel établissement</SelectItem>
+                             <SelectItem value="new">Créer un nouvel établissement</SelectItem>
                              {hotels.map((hotel) => (
                                <SelectItem key={hotel.id} value={hotel.id}>
                                  {hotel.name} ({hotel.hotel_code})
