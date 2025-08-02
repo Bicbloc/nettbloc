@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import HousekeeperAccessCodes from '@/components/HousekeeperAccessCodes';
 import BackButton from '@/components/BackButton';
+import { DataDiagnostic } from '@/components/DataDiagnostic';
 
 interface HotelData {
   id: string;
@@ -180,7 +181,7 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue="hotel" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="hotel" className="flex items-center gap-2">
               <Building className="h-4 w-4" />
               Établissement
@@ -188,6 +189,10 @@ const Settings = () => {
             <TabsTrigger value="access-codes" className="flex items-center gap-2">
               <Key className="h-4 w-4" />
               Codes d'accès
+            </TabsTrigger>
+            <TabsTrigger value="diagnostic" className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Diagnostic
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
@@ -382,6 +387,11 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Onglet Diagnostic */}
+          <TabsContent value="diagnostic" className="space-y-4">
+            <DataDiagnostic />
           </TabsContent>
 
           {/* Onglet Sécurité */}
