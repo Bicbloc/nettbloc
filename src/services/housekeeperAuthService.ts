@@ -63,16 +63,17 @@ export class HousekeeperAuthService {
         .eq('is_active', true)
         .maybeSingle();
 
-      // If not found and access code has the format HTL002-4480, try to find the housekeeper by the access_code field
       if (!accessCodeData && accessCode.match(/^[A-Z]+\d+-\d+$/)) {
-        console.log('🔄 Tentative de correspondance avec le champ access_code de housekeepers');
-        const { data: housekeeper } = await supabase
+        console.log('🔄 Code non trouvé dans housekeeper_access_codes, recherche dans housekeepers...');
+        const { data: housekeeper, error: housekeeperError } = await supabase
           .from('housekeepers')
           .select('*')
           .eq('access_code', accessCode)
           .eq('hotel_id', hotel.id)
           .eq('is_active', true)
           .maybeSingle();
+
+        console.log('🔍 Résultat recherche housekeeper:', { housekeeper, housekeeperError });
 
         if (housekeeper) {
           // Create a mock accessCodeData structure
@@ -94,21 +95,28 @@ export class HousekeeperAuthService {
       }
 
       if (codeError || !accessCodeData) {
-        console.error('❌ Code d\'accès non trouvé:', { accessCode, error: codeError });
+        console.error('❌ Code d\'accès non trouvé dans les deux tables:', { accessCode, error: codeError });
         
         // Try to find any code with this pattern for debugging
         const { data: allCodes } = await supabase
           .from('housekeeper_access_codes')
-          .select('access_code, hotel_id, is_active')
+          .select('access_code, hotel_id, is_active, housekeeper_id')
+          .eq('hotel_id', hotel.id);
+          
+        const { data: allHousekeepers } = await supabase
+          .from('housekeepers')
+          .select('name, access_code, hotel_id, is_active')
           .eq('hotel_id', hotel.id);
         
         return {
           success: false,
-          error: `Code d'accès "${accessCode}" non trouvé pour cet hôtel`,
+          error: `Code d'accès "${accessCode}" non trouvé`,
           debugInfo: { 
             accessCode, 
             hotelId: hotel.id,
             availableCodes: allCodes,
+            availableHousekeepers: allHousekeepers,
+            searchedInBothTables: true,
             codeError 
           }
         };
