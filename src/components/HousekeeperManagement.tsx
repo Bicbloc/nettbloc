@@ -210,7 +210,10 @@ export const HousekeeperManagement = () => {
     );
   }
 
-  const activeHousekeepers = housekeepers.filter(h => h.is_active);
+  // Filtrer uniquement les femmes de chambre assignées à des chambres
+  const assignedHousekeepers = housekeepers.filter(h => 
+    h.is_active && housekeeperNames.includes(h.name)
+  );
   const inactiveHousekeepers = housekeepers.filter(h => !h.is_active);
   const hasHousekeepers = housekeepers.length > 0;
 
@@ -248,12 +251,12 @@ export const HousekeeperManagement = () => {
             </div>
           </div>
           
-          {!hasHousekeepers && (
+          {assignedHousekeepers.length === 0 && (
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Aucune femme de chambre n'est créée pour votre établissement. 
-                Ajoutez des femmes de chambre pour pouvoir générer leurs codes d'accès.
+                Aucune femme de chambre n'est assignée à des chambres dans ce rapport. 
+                Allez dans l'onglet "Distribution" pour assigner des chambres aux femmes de chambre.
               </AlertDescription>
             </Alert>
           )}
@@ -261,7 +264,7 @@ export const HousekeeperManagement = () => {
       </Card>
 
       {/* Actions de gestion */}
-      {hasHousekeepers && (
+      {assignedHousekeepers.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -289,15 +292,15 @@ export const HousekeeperManagement = () => {
         </Card>
       )}
 
-      {/* Femmes de chambre actives */}
-      {activeHousekeepers.length > 0 && (
+      {/* Femmes de chambre assignées aux chambres */}
+      {assignedHousekeepers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Femmes de chambre actives ({activeHousekeepers.length})</CardTitle>
+            <CardTitle>Femmes de chambre assignées ({assignedHousekeepers.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {activeHousekeepers.map((housekeeper) => (
+              {assignedHousekeepers.map((housekeeper) => (
                 <div key={housekeeper.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">
                     <UserIcon className="h-5 w-5 text-muted-foreground" />
