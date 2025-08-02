@@ -133,6 +133,41 @@ export type Database = {
           },
         ]
       }
+      hotel_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          hotel_id: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          hotel_id?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_users_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotels: {
         Row: {
           address: string | null
@@ -346,6 +381,7 @@ export type Database = {
           id: string
           is_suspended: boolean
           subscription_type: string | null
+          suspension_reason: string | null
           trial_end_date: string | null
           updated_at: string
         }
@@ -356,6 +392,7 @@ export type Database = {
           id: string
           is_suspended?: boolean
           subscription_type?: string | null
+          suspension_reason?: string | null
           trial_end_date?: string | null
           updated_at?: string
         }
@@ -366,6 +403,7 @@ export type Database = {
           id?: string
           is_suspended?: boolean
           subscription_type?: string | null
+          suspension_reason?: string | null
           trial_end_date?: string | null
           updated_at?: string
         }
