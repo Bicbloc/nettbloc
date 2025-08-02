@@ -742,11 +742,12 @@ const Index = () => {
           .maybeSingle();
         
         if (!existingHousekeeper?.access_code) {
-          // Générer un nouveau code
+          // Générer un nouveau code avec le nom
           const { data: newCodeData, error: codeError } = await supabase
-            .rpc('generate_housekeeper_access_code', {
+            .rpc('generate_housekeeper_access_code_with_name', {
               p_hotel_id: hotelId,
-              p_housekeeper_id: existingHousekeeper?.id || null
+              p_housekeeper_id: existingHousekeeper?.id || null,
+              p_housekeeper_name: housekeeperName
             });
           
           if (codeError) {
