@@ -90,14 +90,10 @@ export function useSessionTracking() {
       }
     }, 120000); // 2 minutes
 
-    // Handle page unload
+    // Handle page unload - Remove sendBeacon as it causes issues
     const handleBeforeUnload = () => {
-      if (sessionId) {
-        navigator.sendBeacon(
-          '/api/end-session',
-          JSON.stringify({ sessionId })
-        );
-      }
+      // Just end session normally, no beacon needed
+      endSession();
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
