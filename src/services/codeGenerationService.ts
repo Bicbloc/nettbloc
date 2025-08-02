@@ -43,15 +43,22 @@ export class CodeGenerationService {
       const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
       const accessCode = `${hotelCode}-${namePart}-${randomSuffix}`;
 
-      // Vérifier l'unicité
-      const { data: existing } = await supabase
+      // Vérifier l'unicité dans TOUTES les tables
+      const { data: existingInCodes } = await supabase
         .from('housekeeper_access_codes')
         .select('id')
         .eq('access_code', accessCode)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (!existing) {
+      const { data: existingInHousekeepers } = await supabase
+        .from('housekeepers')
+        .select('id')
+        .eq('access_code', accessCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!existingInCodes && !existingInHousekeepers) {
         return accessCode;
       }
 
@@ -184,18 +191,30 @@ export class CodeGenerationService {
       const hotelCode = hotel?.hotel_code || 'HTL';
       let generated = 0;
 
-      // Pour chaque femme de chambre assignée
+      // Traiter chaque femme de chambre UNE SEULE FOIS
+      const processedNames = new Set<string>();
+
       for (const housekeeperName of assignedHousekeepers) {
+        // Éviter les doublons dans la même boucle
+        if (processedNames.has(housekeeperName)) {
+          console.log('⚠️ Nom déjà traité, ignoré:', housekeeperName);
+          continue;
+        }
+        processedNames.add(housekeeperName);
+
         console.log('🔍 Vérification code pour:', housekeeperName);
         
-        // Vérifier si elle existe déjà avec un code actif
-        const { data: existingHousekeeper } = await supabase
+        // Vérifier si elle existe déjà avec un code actif (chercher le PREMIER seulement)
+        const { data: existingHousekeepers } = await supabase
           .from('housekeepers')
           .select('*')
           .eq('hotel_id', hotelId)
           .eq('name', housekeeperName)
           .eq('is_active', true)
-          .maybeSingle();
+          .order('created_at', { ascending: true })
+          .limit(1);
+
+        const existingHousekeeper = existingHousekeepers?.[0];
 
         if (existingHousekeeper?.access_code) {
           console.log('✅ Code déjà existant pour:', housekeeperName, existingHousekeeper.access_code);
@@ -207,7 +226,7 @@ export class CodeGenerationService {
           const accessCode = await this.generateUniqueCode(hotelCode, housekeeperName);
 
           if (existingHousekeeper) {
-            // Mettre à jour la femme de chambre existante avec le nouveau code
+            // Mettre à jour SEULEMENT le premier
             const { error: updateError } = await supabase
               .from('housekeepers')
               .update({ 
@@ -232,16 +251,6 @@ export class CodeGenerationService {
               .single();
 
             if (createError) throw createError;
-            
-            // Créer le code d'accès dans la table dédiée
-            await supabase
-              .from('housekeeper_access_codes')
-              .insert({
-                hotel_id: hotelId,
-                housekeeper_id: newHousekeeper.id,
-                access_code: accessCode,
-                created_by: null
-              });
           }
 
           generated++;
