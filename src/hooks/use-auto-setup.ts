@@ -24,14 +24,12 @@ export const useAutoSetup = () => {
     let timeoutId: NodeJS.Timeout;
 
     const setupUserHotel = async () => {
-      // Éviter les appels multiples seulement si déjà en cours
       if (!isAuthenticated || !user?.id) {
         if (isMounted) setLoading(false);
         return;
       }
 
-      // Permettre une nouvelle tentative si pas encore complété
-      if (hasInitialized && isSetupComplete) {
+      if (isSetupComplete) {
         if (isMounted) setLoading(false);
         return;
       }
