@@ -10,9 +10,10 @@ import { SupabaseService } from "@/services/supabaseService";
 import BackButton from '@/components/BackButton';
 
 export default function HousekeeperLogin() {
-  const [step, setStep] = useState<"hotel" | "housekeeper">("hotel");
+  const [step, setStep] = useState<"direct" | "hotel" | "housekeeper">("direct");
   const [hotelCode, setHotelCode] = useState("");
   const [housekeeperCode, setHousekeeperCode] = useState("");
+  const [fullAccessCode, setFullAccessCode] = useState("");
   const [selectedHotel, setSelectedHotel] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -119,6 +120,71 @@ export default function HousekeeperLogin() {
     }
   };
 
+  // Nouvelle fonction pour l'authentification directe avec code complet
+  const handleDirectLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!fullAccessCode.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Code d'accès requis",
+        description: "Veuillez saisir votre code d'accès complet."
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // Authentifier directement avec le code complet
+      const authenticatedHousekeeper = await SupabaseService.authenticateHousekeeper(fullAccessCode);
+
+      if (authenticatedHousekeeper) {
+        // Récupérer les informations de l'hôtel
+        const hotel = await SupabaseService.getHotels();
+        const userHotel = hotel.find(h => h.id === authenticatedHousekeeper.hotel_id);
+        
+        if (userHotel) {
+          // Sauvegarder les données utilisateur dans localStorage
+          localStorage.setItem('housekeeper', JSON.stringify({
+            id: authenticatedHousekeeper.id,
+            name: authenticatedHousekeeper.name,
+            accessCode: authenticatedHousekeeper.access_code
+          }));
+          
+          // Sauvegarder l'hôtel
+          localStorage.setItem('selectedHotelId', userHotel.id);
+          localStorage.setItem('selectedHotelName', userHotel.name);
+          localStorage.setItem('selectedHotelCode', userHotel.hotel_code || '');
+          
+          console.log('✅ Connexion directe réussie:', authenticatedHousekeeper.name, 'pour l\'hôtel:', userHotel.name);
+          navigate('/housekeeper');
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Impossible de récupérer les informations de l'hôtel."
+          });
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Code d'accès invalide",
+          description: "Le code d'accès n'est pas reconnu. Vérifiez votre saisie."
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de la connexion directe:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de connexion",
+        description: "Une erreur est survenue lors de la connexion."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleBackToHotel = () => {
     setStep("hotel");
     setHousekeeperCode("");
@@ -144,7 +210,69 @@ export default function HousekeeperLogin() {
         </CardHeader>
         
         <CardContent>
-          {step === "hotel" ? (
+          {step === "direct" ? (
+            <>
+              <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <KeyRound className="h-5 w-5 text-emerald-600" />
+                  <h3 className="font-semibold text-emerald-800">Connexion rapide</h3>
+                </div>
+                <p className="text-sm text-emerald-700">
+                  Saisissez votre code d'accès complet pour vous connecter directement
+                </p>
+                <p className="text-xs text-emerald-600 mt-1">
+                  Format: HTL002-MARIE-1234
+                </p>
+              </div>
+              
+              <form onSubmit={handleDirectLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fullAccessCode" className="flex items-center gap-2 font-medium">
+                    <KeyRound className="h-4 w-4" />
+                    Code d'accès complet
+                  </Label>
+                  <Input
+                    id="fullAccessCode"
+                    type="text"
+                    placeholder="HTL002-MARIE-1234"
+                    value={fullAccessCode}
+                    onChange={(e) => setFullAccessCode(e.target.value.toUpperCase())}
+                    className="text-center text-lg font-mono h-12"
+                    autoFocus
+                  />
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 text-lg bg-emerald-600 hover:bg-emerald-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Connexion...
+                    </>
+                  ) : (
+                    "Se connecter"
+                  )}
+                </Button>
+
+                <div className="text-center pt-4 border-t">
+                  <p className="text-sm text-gray-600 mb-3">ou connectez-vous en deux étapes</p>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStep("hotel")}
+                    className="flex items-center gap-2"
+                  >
+                    <Building className="h-4 w-4" />
+                    Mode classique
+                  </Button>
+                </div>
+              </form>
+            </>
+          ) : step === "hotel" ? (
             <>
               <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
@@ -165,7 +293,7 @@ export default function HousekeeperLogin() {
                   <Input
                     id="hotelCode"
                     type="text"
-                    placeholder="Ex: HTL-1234"
+                    placeholder="Ex: HTL002"
                     value={hotelCode}
                     onChange={(e) => setHotelCode(e.target.value.toUpperCase())}
                     className="text-center text-lg font-mono h-12"
@@ -187,6 +315,17 @@ export default function HousekeeperLogin() {
                     "Continuer"
                   )}
                 </Button>
+
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setStep("direct")}
+                  className="w-full flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Retour à la connexion rapide
+                </Button>
               </form>
             </>
           ) : (
@@ -207,7 +346,10 @@ export default function HousekeeperLogin() {
                   <h3 className="font-semibold text-blue-800">Étape 2: Votre code d'accès</h3>
                 </div>
                 <p className="text-sm text-blue-700">
-                  Saisissez votre code d'accès personnel (4 chiffres)
+                  Saisissez votre code d'accès personnel complet
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Format: {selectedHotel?.hotel_code}-VOTRENOM-1234
                 </p>
               </div>
               
@@ -215,17 +357,16 @@ export default function HousekeeperLogin() {
                 <div className="space-y-2">
                   <Label htmlFor="housekeeperCode" className="flex items-center gap-2 font-medium">
                     <User className="h-4 w-4" />
-                    Code d'accès personnel
+                    Code d'accès complet
                   </Label>
                   <Input
                     id="housekeeperCode"
                     type="text"
-                    placeholder="Ex: 1234"
+                    placeholder={`${selectedHotel?.hotel_code || 'HTL002'}-MARIE-1234`}
                     value={housekeeperCode}
-                    onChange={(e) => setHousekeeperCode(e.target.value)}
+                    onChange={(e) => setHousekeeperCode(e.target.value.toUpperCase())}
                     className="text-center text-lg font-mono h-12"
                     autoFocus
-                    maxLength={4}
                   />
                 </div>
                 

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { User, Shield, Database, Activity, Trash2, UserPlus } from 'lucide-react';
+import { User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
 
@@ -32,12 +32,25 @@ interface ActiveSession {
   is_active: boolean;
 }
 
+interface HousekeeperAccessCode {
+  id: string;
+  access_code: string;
+  housekeeper_name: string;
+  hotel_name: string;
+  hotel_code: string;
+  is_active: boolean;
+  created_at: string;
+  used_at?: string;
+  expires_at?: string;
+}
+
 const Admin = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [accessCodes, setAccessCodes] = useState<HousekeeperAccessCode[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
@@ -109,6 +122,37 @@ const Admin = () => {
 
       if (sessionsError) throw sessionsError;
       setSessions(sessionsData || []);
+
+      // Charger les codes d'accès des femmes de chambre
+      const { data: accessCodesData, error: accessCodesError } = await supabase
+        .from('housekeeper_access_codes')
+        .select(`
+          id,
+          access_code,
+          is_active,
+          created_at,
+          used_at,
+          expires_at,
+          housekeepers!inner(name),
+          hotels!inner(name, hotel_code)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (accessCodesError) throw accessCodesError;
+      
+      const formattedAccessCodes = accessCodesData?.map(code => ({
+        id: code.id,
+        access_code: code.access_code,
+        housekeeper_name: code.housekeepers?.name || 'Non assigné',
+        hotel_name: code.hotels?.name || 'Inconnu',
+        hotel_code: code.hotels?.hotel_code || '',
+        is_active: code.is_active,
+        created_at: code.created_at,
+        used_at: code.used_at,
+        expires_at: code.expires_at
+      })) || [];
+
+      setAccessCodes(formattedAccessCodes);
 
     } catch (error) {
       console.error('Erreur chargement données admin:', error);
@@ -204,6 +248,10 @@ const Admin = () => {
             <User className="h-4 w-4 mr-2" />
             Utilisateurs ({users.length})
           </TabsTrigger>
+          <TabsTrigger value="access-codes">
+            <Key className="h-4 w-4 mr-2" />
+            Codes d'accès ({accessCodes.length})
+          </TabsTrigger>
           <TabsTrigger value="sessions">
             <Activity className="h-4 w-4 mr-2" />
             Sessions actives ({sessions.length})
@@ -288,6 +336,106 @@ const Admin = () => {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="access-codes" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Codes d'accès des femmes de chambre</CardTitle>
+              <CardDescription>
+                Surveillance et gestion des codes d'accès générés automatiquement
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code d'accès</TableHead>
+                    <TableHead>Femme de chambre</TableHead>
+                    <TableHead>Hôtel</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Créé le</TableHead>
+                    <TableHead>Utilisé le</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accessCodes.map((code) => (
+                    <TableRow key={code.id}>
+                      <TableCell className="font-mono font-bold">{code.access_code}</TableCell>
+                      <TableCell>{code.housekeeper_name}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{code.hotel_name}</div>
+                          <div className="text-sm text-muted-foreground">({code.hotel_code})</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={code.is_active ? 'default' : 'secondary'}>
+                          {code.is_active ? 'Actif' : 'Inactif'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(code.created_at).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        {code.used_at ? (
+                          <div className="text-sm">
+                            <Badge variant="outline" className="bg-green-50 text-green-700">
+                              Utilisé
+                            </Badge>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {new Date(code.used_at).toLocaleDateString('fr-FR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="bg-gray-50 text-gray-600">
+                            Non utilisé
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(code.access_code);
+                            toast({
+                              title: "Code copié",
+                              description: "Le code d'accès a été copié dans le presse-papier."
+                            });
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copier
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {accessCodes.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Aucun code d'accès trouvé</p>
+                  <p className="text-sm">Les codes seront générés automatiquement après la distribution des chambres</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

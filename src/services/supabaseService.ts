@@ -349,38 +349,74 @@ export class SupabaseService {
   static async authenticateHousekeeper(accessCode: string): Promise<Housekeeper | null> {
     console.log('🔐 Tentative d\'authentification avec code:', accessCode);
     
-    const { data, error } = await supabase
-      .from('housekeepers')
-      .select('*, hotels!inner(id, hotel_code)')
-      .eq('access_code', accessCode)
-      .eq('is_active', true)
-      .maybeSingle(); // Utiliser maybeSingle pour éviter les erreurs
-    
-    if (error) {
-      console.error('❌ Erreur authentification femme de chambre:', error);
-      return null;
-    }
+    try {
+      // Nouvelle méthode: chercher dans housekeeper_access_codes d'abord
+      const { data: accessCodeData, error: accessError } = await supabase
+        .from('housekeeper_access_codes')
+        .select(`
+          *,
+          housekeepers!inner(*, hotels!inner(id, hotel_code))
+        `)
+        .eq('access_code', accessCode)
+        .eq('is_active', true)
+        .maybeSingle();
 
-    if (!data) {
-      console.error('❌ Code d\'accès non trouvé ou inactif:', accessCode);
-      return null;
-    }
+      if (accessError) {
+        console.error('❌ Erreur recherche code d\'accès:', accessError);
+      }
 
-    // Valider que le code d'accès appartient au bon hôtel
-    if (data.hotel_id) {
-      const isValidCode = await supabase.rpc('validate_access_code_for_hotel', {
-        access_code: accessCode,
-        hotel_uuid: data.hotel_id
-      });
+      if (accessCodeData?.housekeepers) {
+        console.log('✅ Code trouvé dans housekeeper_access_codes');
+        
+        // Marquer le code comme utilisé
+        await supabase
+          .from('housekeeper_access_codes')
+          .update({ used_at: new Date().toISOString() })
+          .eq('id', accessCodeData.id);
+          
+        console.log('✅ Authentification réussie pour:', accessCodeData.housekeepers.name);
+        return accessCodeData.housekeepers as Housekeeper;
+      }
 
-      if (!isValidCode) {
-        console.error('❌ Code d\'accès ne correspond pas à l\'hôtel');
+      // Fallback: chercher directement dans la table housekeepers (ancien système)
+      console.log('🔄 Fallback: recherche dans table housekeepers...');
+      const { data: housekeeperData, error: housekeeperError } = await supabase
+        .from('housekeepers')
+        .select('*, hotels!inner(id, hotel_code)')
+        .eq('access_code', accessCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (housekeeperError) {
+        console.error('❌ Erreur authentification femme de chambre (fallback):', housekeeperError);
         return null;
       }
+
+      if (!housekeeperData) {
+        console.error('❌ Code d\'accès non trouvé ou inactif:', accessCode);
+        return null;
+      }
+
+      // Valider que le code d'accès appartient au bon hôtel
+      if (housekeeperData.hotel_id) {
+        const isValidCode = await supabase.rpc('validate_access_code_for_hotel', {
+          access_code: accessCode,
+          hotel_uuid: housekeeperData.hotel_id
+        });
+
+        if (!isValidCode) {
+          console.error('❌ Code d\'accès ne correspond pas à l\'hôtel');
+          return null;
+        }
+      }
+      
+      console.log('✅ Authentification réussie pour:', housekeeperData.name);
+      return housekeeperData as Housekeeper;
+      
+    } catch (error) {
+      console.error('❌ Erreur dans authenticateHousekeeper:', error);
+      return null;
     }
-    
-    console.log('✅ Authentification réussie pour:', data.name);
-    return data as Housekeeper;
   }
 
   static async getHousekeepers(hotelId?: string): Promise<Housekeeper[]> {

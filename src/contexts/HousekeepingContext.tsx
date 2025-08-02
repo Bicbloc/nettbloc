@@ -213,19 +213,22 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       if (newHousekeepers.length > 0) {
         console.log('📝 Création de nouvelles femmes de chambre:', newHousekeepers);
         
-        // Créer les nouvelles femmes de chambre avec codes d'accès
+        // Récupérer le code hôtel
+        const { data: hotel } = await supabase
+          .from('hotels')
+          .select('hotel_code')
+          .eq('id', currentHotelId)
+          .single();
+
+        const hotelCode = hotel?.hotel_code || 'HTL';
+        
+        // Créer les nouvelles femmes de chambre avec codes d'accès personnalisés
         for (const name of newHousekeepers) {
           try {
-            // Génération manuelle du code d'accès
-            const { data: hotel } = await supabase
-              .from('hotels')
-              .select('hotel_code')
-              .eq('id', currentHotelId)
-              .single();
-
-            const hotelCode = hotel?.hotel_code || 'HTL';
+            // Générer un code personnalisé avec le nom: HTL002-MARIE-1234
+            const namePart = name.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 6);
             const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-            const accessCode = `${hotelCode}-${randomSuffix}`;
+            const accessCode = `${hotelCode}-${namePart}-${randomSuffix}`;
 
             // Créer la femme de chambre
             const { data: housekeeper, error: housekeeperError } = await supabase
