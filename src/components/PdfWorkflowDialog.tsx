@@ -444,6 +444,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         onClose={() => setIsHousekeeperDialogOpen(false)}
         onHousekeepersConfirmed={handleHousekeepersConfigured}
         initialHousekeepers={housekeepers}
+        existingHousekeepers={currentHousekeepers}
         roomCount={pdfData?.length || 0}
       />
 
