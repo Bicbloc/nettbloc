@@ -15,6 +15,7 @@ import BackButton from '@/components/BackButton';
 import { DataDiagnostic } from '@/components/DataDiagnostic';
 import { AccessCodeTester } from '@/components/AccessCodeTester';
 import { CodeAssignmentTest } from '@/components/CodeAssignmentTest';
+import { HousekeeperAuthTester } from '@/components/HousekeeperAuthTester';
 
 interface HotelData {
   id: string;
@@ -393,6 +394,7 @@ const Settings = () => {
 
           {/* Onglet Diagnostic */}
           <TabsContent value="diagnostic" className="space-y-6">
+            <HousekeeperAuthTester />
             <CodeAssignmentTest />
             <AccessCodeTester />
             <DataDiagnostic />
