@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
@@ -21,6 +22,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
 import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
+import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -29,11 +31,13 @@ interface UserWithRole {
   email: string;
   company_name?: string;
   is_suspended?: boolean;
+  suspension_reason?: string;
   subscription_type?: string;
   trial_end_date?: string;
   role?: 'user' | 'admin' | 'super_admin';
   created_at: string;
   last_sign_in_at?: string;
+  hotel_name?: string;
 }
 
 interface ActiveSession {
@@ -98,6 +102,13 @@ const Admin = () => {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserCompany, setNewUserCompany] = useState('');
+  const [selectedHotelId, setSelectedHotelId] = useState('');
+  const [suspensionDialog, setSuspensionDialog] = useState<{
+    open: boolean;
+    userId: string;
+    userEmail: string;
+    isSuspended: boolean;
+  }>({ open: false, userId: '', userEmail: '', isSuspended: false });
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
   const [showCreateUser, setShowCreateUser] = useState(false);
 
@@ -161,6 +172,7 @@ const Admin = () => {
           email,
           company_name,
           is_suspended,
+          suspension_reason,
           subscription_type,
           trial_end_date,
           created_at
@@ -178,10 +190,22 @@ const Admin = () => {
 
       if (rolesError) throw rolesError;
 
+      // Charger les hôtels assignés aux utilisateurs
+      const { data: hotelUsersData, error: hotelUsersError } = await supabase
+        .from('hotel_users')
+        .select(`
+          user_id,
+          role,
+          hotels!inner(name)
+        `);
+
+      if (hotelUsersError) throw hotelUsersError;
+
       // Combiner les données
       const usersWithRoles = usersData?.map(user => ({
         ...user,
-        role: rolesData?.find(role => role.user_id === user.id)?.role || 'user'
+        role: rolesData?.find(role => role.user_id === user.id)?.role || 'user',
+        hotel_name: hotelUsersData?.find(hu => hu.user_id === user.id)?.hotels?.name || 'Aucun'
       })) || [];
 
       setUsers(usersWithRoles);
@@ -348,8 +372,12 @@ const Admin = () => {
 
       if (error) throw error;
 
+      if (!data.user) {
+        throw new Error('Utilisateur non créé');
+      }
+
       // Ajouter le rôle si nécessaire
-      if (newUserRole === 'admin' && data.user) {
+      if (newUserRole === 'admin') {
         await supabase
           .from('user_roles')
           .insert({
@@ -358,21 +386,56 @@ const Admin = () => {
           });
       }
 
+      // Assigner à un établissement existant ou créer un nouveau
+      if (selectedHotelId) {
+        // Assigner à un établissement existant
+        await supabase
+          .from('hotel_users')
+          .insert({
+            hotel_id: selectedHotelId,
+            user_id: data.user.id,
+            role: 'user',
+            created_by: user?.id
+          });
+      }
+
+      // Envoyer l'email d'activation
+      try {
+        const activationLink = `${window.location.origin}/auth`;
+        
+        await supabase.functions.invoke('send-activation-email', {
+          body: {
+            email: newUserEmail,
+            companyName: newUserCompany || 'Mon Établissement',
+            hotelName: selectedHotelId ? hotels.find(h => h.id === selectedHotelId)?.name : undefined,
+            activationLink
+          }
+        });
+      } catch (emailError) {
+        console.error('Erreur envoi email:', emailError);
+        // Ne pas bloquer la création d'utilisateur pour un problème d'email
+      }
+
       // Log l'action
       await supabase.rpc('log_admin_action', {
         p_action: 'create_user',
-        p_target_user_id: data.user?.id,
-        p_details: { email: newUserEmail, role: newUserRole }
+        p_target_user_id: data.user.id,
+        p_details: { 
+          email: newUserEmail, 
+          role: newUserRole,
+          hotel_assigned: selectedHotelId || null
+        }
       });
 
       toast({
         title: "Utilisateur créé",
-        description: `L'utilisateur ${newUserEmail} a été créé avec succès.`
+        description: `L'utilisateur ${newUserEmail} a été créé avec succès. Un email d'activation a été envoyé.`
       });
 
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserCompany('');
+      setSelectedHotelId('');
       setNewUserRole('user');
       setShowCreateUser(false);
       await loadAdminData();
@@ -386,11 +449,17 @@ const Admin = () => {
     }
   };
 
-  const suspendUser = async (userId: string, suspend: boolean) => {
+  // Nouvelle fonction pour suspendre un utilisateur avec motif
+  const suspendUser = async (userId: string, suspend: boolean, reason?: string) => {
     try {
+      const updateData = { 
+        is_suspended: suspend,
+        suspension_reason: suspend ? reason : null
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .update({ is_suspended: suspend })
+        .update(updateData)
         .eq('id', userId);
 
       if (error) throw error;
@@ -398,7 +467,8 @@ const Admin = () => {
       // Log l'action
       await supabase.rpc('log_admin_action', {
         p_action: suspend ? 'suspend_user' : 'unsuspend_user',
-        p_target_user_id: userId
+        p_target_user_id: userId,
+        p_details: suspend ? { reason } : {}
       });
 
       toast({
@@ -411,7 +481,7 @@ const Admin = () => {
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: `Impossible de modifier le statut: ${error.message}`
+        description: `Impossible de ${suspend ? 'suspendre' : 'réactiver'} l'utilisateur: ${error.message}`
       });
     }
   };
@@ -735,15 +805,31 @@ const Admin = () => {
                           placeholder="Mot de passe sécurisé"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="company">Nom de l'établissement</Label>
-                        <Input
-                          id="company"
-                          value={newUserCompany}
-                          onChange={(e) => setNewUserCompany(e.target.value)}
-                          placeholder="Mon Hôtel"
-                        />
-                      </div>
+                       <div>
+                         <Label htmlFor="company">Nom de l'établissement</Label>
+                         <Input
+                           id="company"
+                           value={newUserCompany}
+                           onChange={(e) => setNewUserCompany(e.target.value)}
+                           placeholder="Mon Hôtel"
+                         />
+                       </div>
+                       <div>
+                         <Label htmlFor="hotel-select">Assigner à un établissement existant (optionnel)</Label>
+                         <Select value={selectedHotelId} onValueChange={setSelectedHotelId}>
+                           <SelectTrigger>
+                             <SelectValue placeholder="Choisir un établissement existant..." />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="">Créer un nouvel établissement</SelectItem>
+                             {hotels.map((hotel) => (
+                               <SelectItem key={hotel.id} value={hotel.id}>
+                                 {hotel.name} ({hotel.hotel_code})
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
                           id="admin-role"
@@ -769,31 +855,42 @@ const Admin = () => {
                <Table>
                  <TableHeader>
                    <TableRow>
-                     <TableHead>Email</TableHead>
-                     <TableHead>Entreprise</TableHead>
-                     <TableHead>Rôle</TableHead>
-                     <TableHead>Statut</TableHead>
-                     <TableHead>Abonnement</TableHead>
-                     <TableHead>Essai gratuit</TableHead>
-                     <TableHead>Inscription</TableHead>
-                     <TableHead>Actions</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Entreprise</TableHead>
+                      <TableHead>Établissement</TableHead>
+                      <TableHead>Rôle</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Abonnement</TableHead>
+                      <TableHead>Essai gratuit</TableHead>
+                      <TableHead>Inscription</TableHead>
+                      <TableHead>Actions</TableHead>
                    </TableRow>
                  </TableHeader>
                 <TableBody>
                   {users.map((userItem) => (
                     <TableRow key={userItem.id}>
-                      <TableCell className="font-medium">{userItem.email}</TableCell>
-                      <TableCell>{userItem.company_name || 'Non définie'}</TableCell>
-                      <TableCell>
-                        <Badge variant={userItem.role === 'admin' ? 'default' : 'secondary'}>
-                          {userItem.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={userItem.is_suspended ? 'destructive' : 'default'}>
-                          {userItem.is_suspended ? 'Suspendu' : 'Actif'}
-                        </Badge>
-                      </TableCell>
+                       <TableCell className="font-medium">{userItem.email}</TableCell>
+                       <TableCell>{userItem.company_name || 'Non définie'}</TableCell>
+                       <TableCell>
+                         <Badge variant="outline">{userItem.hotel_name}</Badge>
+                       </TableCell>
+                       <TableCell>
+                         <Badge variant={userItem.role === 'admin' ? 'default' : 'secondary'}>
+                           {userItem.role}
+                         </Badge>
+                       </TableCell>
+                       <TableCell>
+                         <div className="space-y-1">
+                           <Badge variant={userItem.is_suspended ? 'destructive' : 'default'}>
+                             {userItem.is_suspended ? 'Suspendu' : 'Actif'}
+                           </Badge>
+                           {userItem.is_suspended && userItem.suspension_reason && (
+                             <div className="text-xs text-muted-foreground max-w-[150px] truncate" title={userItem.suspension_reason}>
+                               {userItem.suspension_reason}
+                             </div>
+                           )}
+                         </div>
+                       </TableCell>
                        <TableCell>
                          <Badge variant="outline">
                            {userItem.subscription_type || 'free'}
@@ -821,19 +918,24 @@ const Admin = () => {
                        <TableCell className="space-x-1">
                          {userItem.role !== 'super_admin' && (
                            <div className="flex items-center gap-1 flex-wrap">
-                             {/* Bouton Suspendre/Réactiver */}
-                             <Button
-                               size="sm"
-                               variant={userItem.is_suspended ? "default" : "outline"}
-                               onClick={() => suspendUser(userItem.id, !userItem.is_suspended)}
-                               title={userItem.is_suspended ? "Réactiver l'utilisateur" : "Suspendre l'utilisateur"}
-                             >
-                               {userItem.is_suspended ? (
-                                 <CheckCircle className="h-4 w-4" />
-                               ) : (
-                                 <Ban className="h-4 w-4" />
-                               )}
-                             </Button>
+                              {/* Bouton Suspendre/Réactiver avec motif */}
+                              <Button
+                                size="sm"
+                                variant={userItem.is_suspended ? "default" : "outline"}
+                                onClick={() => setSuspensionDialog({
+                                  open: true,
+                                  userId: userItem.id,
+                                  userEmail: userItem.email,
+                                  isSuspended: userItem.is_suspended || false
+                                })}
+                                title={userItem.is_suspended ? "Réactiver l'utilisateur" : "Suspendre l'utilisateur"}
+                              >
+                                {userItem.is_suspended ? (
+                                  <CheckCircle className="h-4 w-4" />
+                                ) : (
+                                  <Ban className="h-4 w-4" />
+                                )}
+                              </Button>
                              
                              {/* Bouton Changer rôle */}
                              <Button
@@ -1262,6 +1364,15 @@ const Admin = () => {
           </Alert>
         </TabsContent>
       </Tabs>
+      
+      {/* Dialogue de suspension avec motif */}
+      <SuspensionDialog
+        open={suspensionDialog.open}
+        onClose={() => setSuspensionDialog({ open: false, userId: '', userEmail: '', isSuspended: false })}
+        onConfirm={(reason) => suspendUser(suspensionDialog.userId, !suspensionDialog.isSuspended, reason)}
+        userEmail={suspensionDialog.userEmail}
+        isSuspended={suspensionDialog.isSuspended}
+      />
     </div>
   );
 };
