@@ -17,7 +17,6 @@ export const useAutoSetup = () => {
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
     const setupHotel = async () => {
@@ -26,13 +25,6 @@ export const useAutoSetup = () => {
         return;
       }
 
-      // Éviter les boucles infinies
-      if (hasInitialized) {
-        setLoading(false);
-        return;
-      }
-
-      setHasInitialized(true);
       console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
       
       try {
@@ -84,13 +76,22 @@ export const useAutoSetup = () => {
 
         if (hotelData) {
           setHotel(hotelData);
+          
+          // 3. Vérifier un code d'accès existant
+          const { data: existingCodes } = await supabase
+            .from('housekeeper_access_codes')
+            .select('access_code')
+            .eq('hotel_id', hotelData.id)
+            .eq('is_active', true)
+            .limit(1);
+
+          if (existingCodes && existingCodes.length > 0) {
+            console.log('✅ Code existant trouvé:', existingCodes[0].access_code);
+            setAccessCode(existingCodes[0].access_code);
+          }
+
           setIsSetupComplete(true);
           console.log('✅ Configuration terminée');
-          
-          toast({
-            title: "Configuration terminée",
-            description: `Votre hôtel "${hotelData.name}" est prêt !`
-          });
         }
 
       } catch (error) {
@@ -106,10 +107,13 @@ export const useAutoSetup = () => {
       }
     };
 
-    if (!hasInitialized) {
+    // Exécuter seulement si pas encore initialisé
+    if (!isSetupComplete && !hotel) {
       setupHotel();
+    } else {
+      setLoading(false);
     }
-  }, [isAuthenticated, user?.id, hasInitialized]);
+  }, [isAuthenticated, user?.id, isSetupComplete, hotel]);
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
