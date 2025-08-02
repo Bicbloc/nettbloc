@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,6 +34,12 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
   const [isDistributionDialogOpen, setIsDistributionDialogOpen] = useState(false);
   const [showDistributionOptions, setShowDistributionOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Synchroniser avec les femmes de chambre existantes
+  useEffect(() => {
+    console.log('🔄 PdfWorkflow - Synchronisation housekeepers:', { currentHousekeepers, housekeepers });
+    setHousekeepers(currentHousekeepers);
+  }, [currentHousekeepers]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
