@@ -109,26 +109,28 @@ export const HousekeeperManagement = () => {
     }
   };
 
-  const handleDeactivateHousekeeper = async (id: string, name: string) => {
+  const handleToggleHousekeeper = async (id: string, name: string, currentStatus: boolean) => {
     try {
-      const success = await SupabaseService.deactivateHousekeeper(id);
+      const success = currentStatus 
+        ? await SupabaseService.deactivateHousekeeper(id)
+        : await SupabaseService.activateHousekeeper(id);
       
       if (success) {
         toast({
-          title: "Femme de chambre désactivée",
-          description: `"${name}" a été désactivée`
+          title: currentStatus ? "Femme de chambre désactivée" : "Femme de chambre réactivée",
+          description: `"${name}" a été ${currentStatus ? 'désactivée' : 'réactivée'}`
         });
         await loadHousekeepers();
         await refreshHousekeepers();
       } else {
-        throw new Error('Désactivation échouée');
+        throw new Error('Changement de statut échoué');
       }
     } catch (error) {
-      console.error('❌ Erreur désactivation:', error);
+      console.error('❌ Erreur changement statut:', error);
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de désactiver la femme de chambre"
+        description: "Impossible de modifier le statut"
       });
     }
   };
@@ -209,7 +211,8 @@ export const HousekeeperManagement = () => {
   }
 
   const activeHousekeepers = housekeepers.filter(h => h.is_active);
-  const hasHousekeepers = activeHousekeepers.length > 0;
+  const inactiveHousekeepers = housekeepers.filter(h => !h.is_active);
+  const hasHousekeepers = housekeepers.length > 0;
 
   return (
     <div className="space-y-6">
@@ -286,13 +289,11 @@ export const HousekeeperManagement = () => {
         </Card>
       )}
 
-      {/* Liste des femmes de chambre */}
-      {hasHousekeepers && (
+      {/* Femmes de chambre actives */}
+      {activeHousekeepers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>
-              Femmes de chambre actives ({activeHousekeepers.length})
-            </CardTitle>
+            <CardTitle>Femmes de chambre actives ({activeHousekeepers.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -317,10 +318,53 @@ export const HousekeeperManagement = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDeactivateHousekeeper(housekeeper.id, housekeeper.name)}
+                      onClick={() => handleToggleHousekeeper(housekeeper.id, housekeeper.name, true)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-3 w-3" />
+                      Désactiver
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Femmes de chambre inactives */}
+      {inactiveHousekeepers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Femmes de chambre désactivées ({inactiveHousekeepers.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {inactiveHousekeepers.map((housekeeper) => (
+                <div key={housekeeper.id} className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    <UserIcon className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium text-muted-foreground">{housekeeper.name}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Key className="h-3 w-3" />
+                        <span className="font-mono">{housekeeper.access_code}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Inactif
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleHousekeeper(housekeeper.id, housekeeper.name, false)}
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      <CheckCircle className="h-3 w-3" />
+                      Réactiver
                     </Button>
                   </div>
                 </div>

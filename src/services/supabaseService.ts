@@ -452,6 +452,19 @@ export class SupabaseService {
     return true;
   }
 
+  static async activateHousekeeper(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('housekeepers')
+      .update({ is_active: true })
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Erreur réactivation femme de chambre:', error);
+      return false;
+    }
+    return true;
+  }
+
   // Gestion des mises à jour de statut des chambres
   static async createRoomStatusUpdate(
     hotelId: string,
