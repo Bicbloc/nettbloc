@@ -287,7 +287,16 @@ const Settings = () => {
           {/* Onglet Codes d'accès */}
           <TabsContent value="access-codes" className="space-y-6">
             {settings.hotel ? (
-              <HousekeeperAccessCodes hotelId={settings.hotel.id} />
+              <div className="space-y-6">
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Pour gérer les femmes de chambre et générer leurs codes d'accès, rendez-vous sur la page principale dans l'onglet "Vue d'ensemble".
+                    Cette section affiche uniquement les codes d'accès existants.
+                  </AlertDescription>
+                </Alert>
+                <HousekeeperAccessCodes hotelId={settings.hotel.id} />
+              </div>
             ) : (
               <Alert>
                 <AlertTriangle className="h-4 w-4" />

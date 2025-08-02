@@ -43,6 +43,7 @@ import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
+import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
 import { SupabaseService } from "@/services/supabaseService";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
@@ -1331,6 +1332,9 @@ const Index = () => {
               
               <ActiveUsersPanel />
             </div>
+            
+            {/* Section Gestion des femmes de chambre */}
+            <HousekeeperManagement />
           </TabsContent>
 
           <TabsContent value="rooms" className="space-y-6">

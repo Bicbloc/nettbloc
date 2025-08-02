@@ -387,6 +387,39 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     return hotelId || savedHotelId;
   };
 
+  // Vérifier périodiquement qu'il y a des codes d'accès pour les femmes de chambre
+  useEffect(() => {
+    const generateAccessCodesForAssignedHousekeepers = async () => {
+      if (!hotelId) return;
+      
+      try {
+        console.log('🔧 Vérification des codes d\'accès manquants...');
+        
+        // Forcer la génération de codes pour toutes les femmes de chambre manquantes
+        const { CodeGenerationService } = await import('@/services/codeGenerationService');
+        const results = await CodeGenerationService.forceGenerateAllMissingCodes();
+        
+        if (results.generated > 0) {
+          console.log(`✅ ${results.generated} code(s) d'accès généré(s) automatiquement`);
+        }
+        
+        if (results.errors.length > 0) {
+          console.warn('⚠️ Erreurs lors de la génération automatique:', results.errors);
+        }
+      } catch (error) {
+        console.error('❌ Erreur génération codes automatique:', error);
+      }
+    };
+    
+    // Vérifier immédiatement
+    generateAccessCodesForAssignedHousekeepers();
+    
+    // Puis vérifier toutes les 2 minutes
+    const interval = setInterval(generateAccessCodesForAssignedHousekeepers, 120000);
+    
+    return () => clearInterval(interval);
+  }, [hotelId]);
+
   // Fonction pour charger les femmes de chambre depuis la base
   const refreshHousekeepers = async () => {
     const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
