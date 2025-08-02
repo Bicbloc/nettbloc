@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import HousekeeperAccessCodes from '@/components/HousekeeperAccessCodes';
 import BackButton from '@/components/BackButton';
 import { DataDiagnostic } from '@/components/DataDiagnostic';
+import { AccessCodeTester } from '@/components/AccessCodeTester';
 
 interface HotelData {
   id: string;
@@ -390,7 +391,8 @@ const Settings = () => {
           </TabsContent>
 
           {/* Onglet Diagnostic */}
-          <TabsContent value="diagnostic" className="space-y-4">
+          <TabsContent value="diagnostic" className="space-y-6">
+            <AccessCodeTester />
             <DataDiagnostic />
           </TabsContent>
 

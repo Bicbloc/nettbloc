@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide-react";
 import { SupabaseService } from "@/services/supabaseService";
+import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import BackButton from '@/components/BackButton';
 
 export default function HousekeeperLogin() {
@@ -34,19 +35,23 @@ export default function HousekeeperLogin() {
     setIsLoading(true);
     
     try {
-      const hotel = await SupabaseService.getHotelByCode(hotelCode);
+      console.log('🏨 Recherche hôtel avec code:', hotelCode);
       
-      if (hotel) {
-        setSelectedHotel(hotel);
-        setStep("housekeeper");
-        console.log('✅ Hôtel trouvé:', hotel.name);
-      } else {
+      const result = await HousekeeperAuthService.findHotelByCode(hotelCode);
+      
+      if (!result.success) {
+        console.error('❌ Hôtel non trouvé:', result.error);
         toast({
           variant: "destructive",
-          title: "Hôtel introuvable",
-          description: "Le code hôtel que vous avez saisi n'existe pas."
+          title: "Hôtel non trouvé",
+          description: result.error || `Aucun hôtel trouvé avec le code "${hotelCode}"`
         });
+        return;
       }
+
+      console.log('✅ Hôtel trouvé:', result.hotel);
+      setSelectedHotel(result.hotel);
+      setStep("housekeeper");
     } catch (error) {
       console.error("Erreur lors de la vérification de l'hôtel:", error);
       toast({
@@ -136,49 +141,48 @@ export default function HousekeeperLogin() {
     setIsLoading(true);
     
     try {
-      // Authentifier directement avec le code complet
-      const authenticatedHousekeeper = await SupabaseService.authenticateHousekeeper(fullAccessCode);
-
-      if (authenticatedHousekeeper) {
-        // Récupérer les informations de l'hôtel
-        const hotel = await SupabaseService.getHotels();
-        const userHotel = hotel.find(h => h.id === authenticatedHousekeeper.hotel_id);
-        
-        if (userHotel) {
-          // Sauvegarder les données utilisateur dans localStorage
-          localStorage.setItem('housekeeper', JSON.stringify({
-            id: authenticatedHousekeeper.id,
-            name: authenticatedHousekeeper.name,
-            accessCode: authenticatedHousekeeper.access_code
-          }));
-          
-          // Sauvegarder l'hôtel
-          localStorage.setItem('selectedHotelId', userHotel.id);
-          localStorage.setItem('selectedHotelName', userHotel.name);
-          localStorage.setItem('selectedHotelCode', userHotel.hotel_code || '');
-          
-          console.log('✅ Connexion directe réussie:', authenticatedHousekeeper.name, 'pour l\'hôtel:', userHotel.name);
-          navigate('/housekeeper');
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Erreur",
-            description: "Impossible de récupérer les informations de l'hôtel."
-          });
-        }
-      } else {
+      console.log('🔐 Tentative connexion directe avec code:', fullAccessCode);
+      
+      const result = await HousekeeperAuthService.authenticateWithFullCode(fullAccessCode);
+      
+      if (!result.success) {
+        console.error('❌ Échec authentification:', result.error);
         toast({
           variant: "destructive",
           title: "Code d'accès invalide",
-          description: "Le code d'accès n'est pas reconnu. Vérifiez votre saisie."
+          description: result.error || "Le code d'accès saisi n'existe pas ou a expiré"
         });
+        return;
       }
+
+      const { user: housekeeper, hotel } = result;
+
+      console.log('✅ Authentification réussie:', { hotel, housekeeper });
+
+      // Store user and hotel data
+      localStorage.setItem('housekeeper', JSON.stringify({
+        id: housekeeper.id,
+        name: housekeeper.name,
+        accessCode: fullAccessCode
+      }));
+      
+      localStorage.setItem('selectedHotelId', hotel.id);
+      localStorage.setItem('selectedHotelName', hotel.name);
+      localStorage.setItem('selectedHotelCode', hotel.hotel_code || '');
+
+      toast({
+        title: "Connexion réussie",
+        description: `Bienvenue ${housekeeper.name} !`
+      });
+
+      navigate('/housekeeper');
+
     } catch (error) {
-      console.error("Erreur lors de la connexion directe:", error);
+      console.error('💥 Erreur connexion directe:', error);
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
-        description: "Une erreur est survenue lors de la connexion."
+        description: "Une erreur est survenue lors de la connexion"
       });
     } finally {
       setIsLoading(false);
