@@ -250,18 +250,19 @@ export class SupabaseService {
         return null;
       }
 
-      // Utiliser la nouvelle fonction qui génère le code ET l'insère avec user_id
+      // Générer un code d'accès unique avec la nouvelle fonction simplifiée
       const { data: accessCode, error: codeError } = await supabase
-        .rpc('generate_housekeeper_access_code_with_user', {
+        .rpc('generate_housekeeper_access_code_simple', {
           p_hotel_id: hotelId,
-          p_housekeeper_name: name,
-          p_user_id: user.id
+          p_housekeeper_name: name
         });
 
       if (codeError) {
         console.error('❌ Erreur génération code d\'accès:', codeError);
         return null;
       }
+
+      console.log('✅ Code d\'accès généré:', accessCode);
 
       const { data, error } = await supabase
         .from('housekeepers')

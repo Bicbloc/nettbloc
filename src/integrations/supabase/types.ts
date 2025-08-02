@@ -576,20 +576,15 @@ export type Database = {
         Args: { p_hotel_id: string; p_housekeeper_id?: string }
         Returns: string
       }
+      generate_housekeeper_access_code_simple: {
+        Args: { p_hotel_id: string; p_housekeeper_name?: string }
+        Returns: string
+      }
       generate_housekeeper_access_code_with_name: {
         Args: {
           p_hotel_id: string
           p_housekeeper_id?: string
           p_housekeeper_name?: string
-        }
-        Returns: string
-      }
-      generate_housekeeper_access_code_with_user: {
-        Args: {
-          p_hotel_id: string
-          p_housekeeper_id?: string
-          p_housekeeper_name?: string
-          p_user_id?: string
         }
         Returns: string
       }
