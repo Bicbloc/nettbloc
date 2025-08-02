@@ -46,7 +46,7 @@ export class HousekeeperAuthService {
       console.log('✅ Hôtel trouvé:', hotel);
 
       // Find housekeeper access code
-      const { data: accessCodeData, error: codeError } = await supabase
+      let { data: accessCodeData, error: codeError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
           *,
@@ -61,7 +61,37 @@ export class HousekeeperAuthService {
         .eq('access_code', accessCode)
         .eq('hotel_id', hotel.id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
+
+      // If not found and access code has the format HTL002-4480, try to find the housekeeper by the access_code field
+      if (!accessCodeData && accessCode.match(/^[A-Z]+\d+-\d+$/)) {
+        console.log('🔄 Tentative de correspondance avec le champ access_code de housekeepers');
+        const { data: housekeeper } = await supabase
+          .from('housekeepers')
+          .select('*')
+          .eq('access_code', accessCode)
+          .eq('hotel_id', hotel.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (housekeeper) {
+          // Create a mock accessCodeData structure
+          accessCodeData = {
+            id: 'mock-' + housekeeper.id,
+            access_code: accessCode,
+            hotel_id: hotel.id,
+            housekeeper_id: housekeeper.id,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            created_by: null,
+            expires_at: null,
+            used_at: null,
+            housekeepers: housekeeper
+          } as any;
+          codeError = null;
+          console.log('✅ Femme de chambre trouvée via access_code:', housekeeper);
+        }
+      }
 
       if (codeError || !accessCodeData) {
         console.error('❌ Code d\'accès non trouvé:', { accessCode, error: codeError });
