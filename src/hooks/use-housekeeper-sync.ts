@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SupabaseService } from '@/services/supabaseService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useToast } from '@/hooks/use-toast';
@@ -89,33 +89,38 @@ export function useHousekeeperSync() {
     return result;
   };
 
-  // Synchronisation automatique au chargement si nécessaire
-  useEffect(() => {
-    const autoSync = async () => {
-      const selectedHotelId = localStorage.getItem('selectedHotelId');
-      if (!selectedHotelId || housekeeperNames.length === 0) return;
+  // Synchronisation basée sur les événements (plus de polling automatique)
+  const checkForSyncNeeded = useCallback(async () => {
+    const selectedHotelId = localStorage.getItem('selectedHotelId');
+    if (!selectedHotelId || housekeeperNames.length === 0) return false;
 
-      // Vérifier s'il y a des femmes de chambre à synchroniser
+    try {
       const existingHousekeepers = await SupabaseService.getHousekeepers(selectedHotelId);
       const existingNames = existingHousekeepers.map(h => h.name.toLowerCase());
       
-      const needsSync = housekeeperNames.some(name => 
+      return housekeeperNames.some(name => 
         !existingNames.includes(name.toLowerCase())
       );
+    } catch (error) {
+      console.error('Error checking sync status:', error);
+      return false;
+    }
+  }, [housekeeperNames]);
 
-      if (needsSync) {
-        console.log('🔄 Synchronisation automatique requise');
-        await syncHousekeepers();
-      }
-    };
-
-    // Délai pour laisser le contexte se charger
-    const timeout = setTimeout(autoSync, 2000);
-    return () => clearTimeout(timeout);
-  }, [housekeeperNames.length]);
+  // Exposer la vérification pour déclenchement manuel
+  const triggerSyncIfNeeded = useCallback(async () => {
+    const needsSync = await checkForSyncNeeded();
+    if (needsSync) {
+      console.log('🔄 Synchronisation déclenchée par événement');
+      return await syncHousekeepers();
+    }
+    return { success: true, synchronized: 0, errors: [] };
+  }, [checkForSyncNeeded, syncHousekeepers]);
 
   return {
     syncHousekeepers,
-    isSyncing
+    isSyncing,
+    triggerSyncIfNeeded,
+    checkForSyncNeeded
   };
 }

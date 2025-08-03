@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bell, BellOff } from 'lucide-react';
-import { useNotifications } from '@/hooks/use-notifications-improved';
+import { useNotifications } from '@/hooks/use-notifications';
 import { ActionLogPanel } from './ActionLogPanel';
 
 interface NotificationBellProps {

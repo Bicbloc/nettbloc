@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Room } from '@/services/pdfService';
-import { useNotifications, Notification } from '@/hooks/use-notifications';
+import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { HotelSessionService } from '@/services/hotelSessionService';
 
 interface HousekeepingContextType {

@@ -76,7 +76,7 @@ export function useSessionTracking() {
       }
     });
 
-    // Update activity every 2 minutes
+    // Update activity every 5 minutes (reduced frequency)
     const activityInterval = setInterval(async () => {
       if (sessionId) {
         try {
@@ -88,7 +88,7 @@ export function useSessionTracking() {
           console.error('Error updating activity:', error);
         }
       }
-    }, 120000); // 2 minutes
+    }, 300000); // 5 minutes
 
     // Handle page unload - Remove sendBeacon as it causes issues
     const handleBeforeUnload = () => {

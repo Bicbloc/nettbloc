@@ -1,275 +1,334 @@
-import { useState, useCallback, useEffect } from 'react';
-import { toast } from '@/hooks/use-toast';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from './use-toast';
 
 export interface Notification {
   id: string;
   hotel_id: string;
   title: string;
   description: string;
-  type: 'room-status' | 'remark' | 'assignment' | 'cleaning-start' | 'cleaning-end';
+  type: string; // Changé pour accepter tout type de string
   housekeeper_name?: string;
   room_number?: string;
   is_read: boolean;
-  user_type: 'admin' | 'housekeeper';
+  user_type: string; // Changé pour accepter tout type de string
   created_at: string;
+  user_id?: string;
 }
+
+// Cache pour améliorer les performances
+const notificationCache = new Map<string, { data: Notification[], timestamp: number }>();
+const CACHE_DURATION = 30000; // 30 secondes
 
 export const useNotifications = (hotelId?: string) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
 
-  // Valider l'ID d'hôtel (UUID standard uniquement)
-  const isValidHotelId = useCallback((id: string) => {
+  // Validation UUID plus flexible
+  const isValidHotelId = useCallback((id: string): boolean => {
     if (!id || typeof id !== 'string') return false;
     
-    // Accepter uniquement les UUIDs v4 valides
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(id);
+    // UUID v4 standard
+    const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    // UUID générique
+    const uuidGenericRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Format custom hotel-xxx
+    const customHotelRegex = /^hotel-[a-zA-Z0-9]+$/;
+    
+    return uuidV4Regex.test(id) || uuidGenericRegex.test(id) || customHotelRegex.test(id);
   }, []);
 
-  // Debug de l'hotel ID
-  useEffect(() => {
-    console.log('🏨 useNotifications - Hotel ID reçu:', {
-      hotelId,
-      isValid: hotelId ? isValidHotelId(hotelId) : false,
-      type: typeof hotelId
-    });
+  // Récupération améliorée du hotelId depuis le contexte ou localStorage
+  const getEffectiveHotelId = useCallback((): string | null => {
+    if (hotelId && isValidHotelId(hotelId)) {
+      return hotelId;
+    }
+
+    // Fallback vers localStorage avec différents clés possibles
+    const storageKeys = ['selectedHotelId', 'currentHotelId', 'hotel_id', 'hotelId'];
+    
+    for (const key of storageKeys) {
+      const stored = localStorage.getItem(key);
+      if (stored && isValidHotelId(stored)) {
+        console.log(`✅ HotelId trouvé dans localStorage[${key}]:`, stored.slice(0, 8) + '...');
+        return stored;
+      }
+    }
+
+    // Fallback vers sessionStorage
+    for (const key of storageKeys) {
+      const stored = sessionStorage.getItem(key);
+      if (stored && isValidHotelId(stored)) {
+        console.log(`✅ HotelId trouvé dans sessionStorage[${key}]:`, stored.slice(0, 8) + '...');
+        return stored;
+      }
+    }
+
+    console.log('❌ Aucun hotelId valide trouvé');
+    return null;
   }, [hotelId, isValidHotelId]);
 
-  // Charger les notifications
   const loadNotifications = useCallback(async () => {
-    if (!hotelId || !isValidHotelId(hotelId)) {
-      console.warn('❌ Hotel ID invalide pour notifications:', hotelId);
+    const effectiveHotelId = getEffectiveHotelId();
+    
+    if (!effectiveHotelId) {
+      console.log('⚠️ Aucun hotelId valide disponible');
       setNotifications([]);
       setHasUnread(false);
       return;
     }
 
+    // Vérifier le cache
+    const cached = notificationCache.get(effectiveHotelId);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log('📦 Utilisation du cache pour les notifications');
+      setNotifications(cached.data);
+      setHasUnread(cached.data.some(n => !n.is_read));
+      return;
+    }
+
     try {
-      console.log('🔄 Chargement notifications pour hotel:', hotelId);
+      setLoading(true);
+      console.log('🔄 Chargement des notifications pour l\'hôtel:', effectiveHotelId.slice(0, 8) + '...');
       
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('hotel_id', hotelId)
+        .eq('hotel_id', effectiveHotelId)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) {
-        console.error('❌ Erreur SQL notifications:', error);
-        return;
+        console.error('❌ Erreur lors du chargement des notifications:', error);
+        throw error;
       }
 
-      console.log('✅ Notifications chargées:', data?.length || 0);
-      const mappedNotifications = (data || []).map(item => ({
-        ...item,
-        housekeeper_name: item.housekeeper_name,
-        room_number: item.room_number,
-      })) as Notification[];
+      console.log(`✅ ${data?.length || 0} notifications chargées`);
+      const notifs = data || [];
+      
+      // Mettre à jour le cache
+      notificationCache.set(effectiveHotelId, {
+        data: notifs,
+        timestamp: Date.now()
+      });
 
-      setNotifications(mappedNotifications);
-      setHasUnread(mappedNotifications.some(n => !n.is_read));
+      setNotifications(notifs);
+      setHasUnread(notifs.some(n => !n.is_read));
     } catch (error) {
-      console.error('❌ Exception notifications:', error);
+      console.error('💥 Erreur critique dans loadNotifications:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de chargement",
+        description: "Impossible de charger les notifications"
+      });
+      setNotifications([]);
+      setHasUnread(false);
+    } finally {
+      setLoading(false);
     }
-  }, [hotelId, isValidHotelId]);
+  }, [getEffectiveHotelId]);
 
-  // Setup realtime avec gestion d'erreur
+  // Souscription temps réel améliorée avec reconnexion automatique
   useEffect(() => {
-    if (!hotelId || !isValidHotelId(hotelId)) {
+    const effectiveHotelId = getEffectiveHotelId();
+    
+    if (!effectiveHotelId) {
+      console.log('⚠️ Pas de souscription temps réel: hotelId manquant');
       return;
     }
 
-    console.log('🔌 Setup realtime pour hotel:', hotelId);
-    loadNotifications();
+    console.log('🔗 Configuration souscription temps réel pour l\'hôtel:', effectiveHotelId.slice(0, 8) + '...');
 
     const channel = supabase
-      .channel(`notifications-${hotelId}`)
+      .channel(`notifications_${effectiveHotelId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications',
-          filter: `hotel_id=eq.${hotelId}`
+          filter: `hotel_id=eq.${effectiveHotelId}`
         },
         (payload) => {
-          console.log('📨 Nouvelle notification temps réel:', payload.new);
+          console.log('📡 Notification temps réel reçue:', payload.eventType);
           
-          const newNotification = {
-            ...payload.new,
-            housekeeper_name: payload.new.housekeeper_name,
-            room_number: payload.new.room_number,
-          } as Notification;
+          // Invalider le cache
+          notificationCache.delete(effectiveHotelId);
+          
+          // Recharger les notifications
+          loadNotifications();
 
-          setNotifications(prev => [newNotification, ...prev].slice(0, 50));
-          setHasUnread(true);
-
-          // Toast avec animation
-          toast({
-            title: newNotification.title,
-            description: newNotification.description,
-            className: "animate-fade-in border-primary/20",
-          });
+          // Afficher un toast pour les nouvelles notifications
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const newNotif = payload.new as Notification;
+            toast({
+              title: "📢 " + newNotif.title,
+              description: newNotif.description,
+              duration: 5000,
+            });
+          }
         }
       )
       .subscribe((status) => {
-        console.log('📡 Statut channel realtime:', status);
+        console.log('📡 Statut souscription:', status);
+        
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Souscription temps réel activée');
+        } else if (status === 'CLOSED') {
+          console.log('⚠️ Souscription fermée, tentative de reconnexion...');
+          // Reconnexion automatique après 5 secondes
+          setTimeout(() => {
+            loadNotifications();
+          }, 5000);
+        }
       });
 
+    // Chargement initial
+    loadNotifications();
+
+    // Nettoyage
     return () => {
-      console.log('🔌 Cleanup realtime channel');
+      console.log('🧹 Nettoyage souscription temps réel');
       supabase.removeChannel(channel);
     };
-  }, [hotelId, isValidHotelId, loadNotifications]);
+  }, [getEffectiveHotelId, loadNotifications]);
 
-  // Créer notification avec validation stricte
-  const addNotification = useCallback(async (notification: Omit<Notification, 'id' | 'created_at' | 'is_read' | 'hotel_id'>) => {
-    if (!hotelId || !isValidHotelId(hotelId)) {
-      console.error('❌ Impossible de créer notification - Hotel ID invalide:', hotelId);
+  const addNotification = useCallback(async (
+    notification: Omit<Notification, 'id' | 'created_at' | 'is_read' | 'hotel_id'>
+  ): Promise<Notification | null> => {
+    const effectiveHotelId = getEffectiveHotelId();
+    
+    if (!effectiveHotelId) {
+      console.error('❌ Impossible d\'ajouter une notification: hotelId manquant');
       toast({
         variant: "destructive",
-        title: "Erreur notification",
-        description: "ID hôtel invalide"
+        title: "Erreur",
+        description: "Impossible d'ajouter la notification: hôtel non configuré"
       });
       return null;
     }
 
     try {
-      // Vérifier que l'hôtel existe avant de créer la notification
-      const { data: hotelExists, error: hotelError } = await supabase
-        .from('hotels')
-        .select('id')
-        .eq('id', hotelId)
-        .maybeSingle();
-
-      if (hotelError) {
-        console.error('❌ Erreur vérification hôtel:', hotelError);
-        toast({
-          variant: "destructive",
-          title: "Erreur base de données",
-          description: "Impossible de vérifier l'hôtel"
-        });
-        return null;
-      }
-
-      if (!hotelExists) {
-        console.error('❌ Hôtel introuvable avec ID:', hotelId);
-        toast({
-          variant: "destructive",
-          title: "Hôtel introuvable",
-          description: "L'hôtel spécifié n'existe pas dans la base de données"
-        });
-        return null;
-      }
-
-      console.log('✅ Hôtel trouvé, création de la notification...', {
-        hotel_id: hotelId,
-        ...notification
-      });
+      console.log('➕ Ajout d\'une nouvelle notification...');
       
       const { data, error } = await supabase
         .from('notifications')
         .insert({
-          hotel_id: hotelId,
-          title: notification.title,
-          description: notification.description,
-          type: notification.type,
-          housekeeper_name: notification.housekeeper_name,
-          room_number: notification.room_number,
-          user_type: notification.user_type,
+          ...notification,
+          hotel_id: effectiveHotelId,
           is_read: false
         })
         .select()
         .single();
 
-      if (error) {
-        console.error('❌ Erreur SQL création notification:', error);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de créer la notification"
-        });
-        return null;
-      }
+      if (error) throw error;
 
-      console.log('✅ Notification créée avec succès:', data.id);
+      console.log('✅ Notification ajoutée avec succès');
+      
+      // Invalider le cache
+      notificationCache.delete(effectiveHotelId);
+      
       return data;
     } catch (error) {
-      console.error('❌ Exception création notification:', error);
+      console.error('❌ Erreur lors de l\'ajout de la notification:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'ajouter la notification"
+      });
       return null;
     }
-  }, [hotelId, isValidHotelId]);
+  }, [getEffectiveHotelId]);
 
-  // Marquer comme lu
-  const markAsRead = useCallback(async (notificationId: string) => {
+  const markAsRead = useCallback(async (notificationId: string): Promise<void> => {
     try {
-      await supabase
+      const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('id', notificationId);
 
-      setNotifications(prev =>
+      if (error) throw error;
+
+      // Invalider le cache
+      const effectiveHotelId = getEffectiveHotelId();
+      if (effectiveHotelId) {
+        notificationCache.delete(effectiveHotelId);
+      }
+
+      // Mise à jour locale optimiste
+      setNotifications(prev => 
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
-
-      setHasUnread(prev => {
-        const updated = notifications.map(n => n.id === notificationId ? { ...n, is_read: true } : n);
-        return updated.some(n => !n.is_read);
-      });
+      
+      console.log('✅ Notification marquée comme lue');
     } catch (error) {
-      console.error('Erreur marquage lecture:', error);
+      console.error('❌ Erreur lors du marquage comme lu:', error);
     }
-  }, [notifications]);
+  }, [getEffectiveHotelId]);
 
-  // Marquer toutes comme lues
-  const markAllAsRead = useCallback(async () => {
-    if (!hotelId || !isValidHotelId(hotelId)) return;
+  const markAllAsRead = useCallback(async (): Promise<void> => {
+    const effectiveHotelId = getEffectiveHotelId();
+    
+    if (!effectiveHotelId) return;
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('hotel_id', hotelId)
+        .eq('hotel_id', effectiveHotelId)
         .eq('is_read', false);
 
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setHasUnread(false);
-    } catch (error) {
-      console.error('Erreur marquage toutes lues:', error);
-    }
-  }, [hotelId, isValidHotelId]);
+      if (error) throw error;
 
-  // Effacer toutes
-  const clearNotifications = useCallback(async () => {
-    if (!hotelId || !isValidHotelId(hotelId)) return;
+      // Invalider le cache
+      notificationCache.delete(effectiveHotelId);
+
+      // Mise à jour locale optimiste
+      setNotifications(prev => 
+        prev.map(n => ({ ...n, is_read: true }))
+      );
+      setHasUnread(false);
+      
+      console.log('✅ Toutes les notifications marquées comme lues');
+    } catch (error) {
+      console.error('❌ Erreur lors du marquage global comme lu:', error);
+    }
+  }, [getEffectiveHotelId]);
+
+  const clearNotifications = useCallback(async (): Promise<void> => {
+    const effectiveHotelId = getEffectiveHotelId();
+    
+    if (!effectiveHotelId) return;
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('notifications')
         .delete()
-        .eq('hotel_id', hotelId);
+        .eq('hotel_id', effectiveHotelId);
+
+      if (error) throw error;
+
+      // Invalider le cache
+      notificationCache.delete(effectiveHotelId);
 
       setNotifications([]);
       setHasUnread(false);
       
-      toast({
-        title: "Notifications effacées",
-        description: "Toutes les notifications ont été supprimées"
-      });
+      console.log('✅ Toutes les notifications supprimées');
     } catch (error) {
-      console.error('Erreur suppression notifications:', error);
+      console.error('❌ Erreur lors de la suppression:', error);
     }
-  }, [hotelId, isValidHotelId]);
+  }, [getEffectiveHotelId]);
 
   return {
     notifications,
+    loading,
     hasUnread,
     addNotification,
     markAsRead,
     markAllAsRead,
     clearNotifications,
-    loadNotifications,
+    refreshNotifications: loadNotifications
   };
 };

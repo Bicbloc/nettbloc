@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bell, BellOff, Trash2, Check, Clock, AlertCircle, User, Bed, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useNotifications, Notification } from '@/hooks/use-notifications';
+import { useNotifications, type Notification } from '@/hooks/use-notifications';
 
 interface ActionLogPanelProps {
   hotelId?: string;
