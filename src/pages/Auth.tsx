@@ -8,33 +8,66 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Building, Users, Shield, UserCheck } from 'lucide-react';
+import { Loader2, Building, Users, Shield, UserCheck, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const Auth = () => {
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     confirmPassword: '',
-    companyName: ''
+    companyName: '',
+    newPassword: '',
+    confirmNewPassword: ''
   });
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Handle password reset from URL
+  // Handle password reset from URL and hash
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const isReset = urlParams.get('reset') === 'true';
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
     
-    if (isReset) {
-      // Clear the URL parameter
+    // Check for recovery tokens in the URL hash (from email link)
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    const type = hashParams.get('type');
+    
+    if (accessToken && refreshToken && type === 'recovery') {
+      // Set the session with the recovery tokens
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      }).then(({ error }) => {
+        if (error) {
+          console.error('Error setting session:', error);
+          toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Lien de récupération invalide ou expiré."
+          });
+        } else {
+          setIsPasswordReset(true);
+          // Clear the hash to clean the URL
+          window.history.replaceState({}, '', '/auth');
+          toast({
+            title: "Récupération activée",
+            description: "Vous pouvez maintenant définir un nouveau mot de passe."
+          });
+        }
+      });
+    }
+    
+    // Handle the old reset parameter for backward compatibility
+    const isReset = urlParams.get('reset') === 'true';
+    if (isReset && !accessToken) {
       window.history.replaceState({}, '', '/auth');
-      
       toast({
-        title: "Réinitialisation activée",
-        description: "Vous pouvez maintenant définir un nouveau mot de passe dans l'onglet connexion."
+        title: "Email envoyé",
+        description: "Vérifiez votre email et cliquez sur le lien de récupération."
       });
     }
   }, []);
@@ -133,7 +166,7 @@ const Auth = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth?reset=true`
+        redirectTo: `${window.location.origin}/auth`
       });
 
       if (error) {
@@ -151,6 +184,57 @@ const Auth = () => {
         description: error.message || "Impossible d'envoyer l'email de réinitialisation."
       });
     }
+  };
+
+  const handleNewPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (formData.newPassword !== formData.confirmNewPassword) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Les mots de passe ne correspondent pas."
+      });
+      return;
+    }
+
+    if (formData.newPassword.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Le mot de passe doit contenir au moins 6 caractères."
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: formData.newPassword
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Mot de passe mis à jour",
+        description: "Votre mot de passe a été changé avec succès."
+      });
+
+      setIsPasswordReset(false);
+      setFormData(prev => ({ ...prev, newPassword: '', confirmNewPassword: '' }));
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de mettre à jour le mot de passe."
+      });
+    }
+
+    setIsLoading(false);
   };
 
   if (loading) {
@@ -176,34 +260,92 @@ const Auth = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Bienvenue</CardTitle>
+            <CardTitle>
+              {isPasswordReset ? (
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5" />
+                  Nouveau mot de passe
+                </div>
+              ) : (
+                "Bienvenue"
+              )}
+            </CardTitle>
             <CardDescription>
-              {isAuthenticated && forceAuth ? 
-                "Vous êtes déjà connecté. Vous pouvez vous déconnecter ou changer de compte." :
-                "Connectez-vous ou créez un compte pour gérer vos hôtels"
+              {isPasswordReset ? 
+                "Définissez votre nouveau mot de passe" :
+                isAuthenticated && forceAuth ? 
+                  "Vous êtes déjà connecté. Vous pouvez vous déconnecter ou changer de compte." :
+                  "Connectez-vous ou créez un compte pour gérer vos hôtels"
               }
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isAuthenticated && forceAuth && (
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 mb-2">Vous êtes déjà connecté.</p>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    toast({
-                      title: "Déconnexion réussie",
-                      description: "Vous pouvez maintenant vous reconnecter."
-                    });
-                  }}
-                >
-                  Se déconnecter
+            {isPasswordReset ? (
+              // Interface de changement de mot de passe
+              <form onSubmit={handleNewPasswordSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Nouveau mot de passe</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Minimum 6 caractères"
+                    value={formData.newPassword}
+                    onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-new-password">Confirmer le nouveau mot de passe</Label>
+                  <Input
+                    id="confirm-new-password"
+                    type="password"
+                    placeholder="Répétez le nouveau mot de passe"
+                    value={formData.confirmNewPassword}
+                    onChange={(e) => setFormData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Mettre à jour le mot de passe
                 </Button>
-              </div>
-            )}
-            <Tabs defaultValue="signin" className="space-y-4">
+                <div className="text-center">
+                  <Button 
+                    variant="link" 
+                    type="button"
+                    onClick={() => {
+                      setIsPasswordReset(false);
+                      setFormData(prev => ({ ...prev, newPassword: '', confirmNewPassword: '' }));
+                    }}
+                    className="text-sm text-muted-foreground"
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {isAuthenticated && forceAuth && (
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 mb-2">Vous êtes déjà connecté.</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={async () => {
+                        await supabase.auth.signOut();
+                        toast({
+                          title: "Déconnexion réussie",
+                          description: "Vous pouvez maintenant vous reconnecter."
+                        });
+                      }}
+                    >
+                      Se déconnecter
+                    </Button>
+                  </div>
+                )}
+                <Tabs defaultValue="signin" className="space-y-4">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Connexion</TabsTrigger>
                 <TabsTrigger value="signup">Inscription</TabsTrigger>
@@ -342,6 +484,8 @@ const Auth = () => {
                 </p>
               </div>
             </div>
+            </>
+            )}
           </CardContent>
         </Card>
       </div>
