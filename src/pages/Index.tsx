@@ -45,7 +45,8 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
-import { AccessCodeDisplay } from "@/components/AccessCodeDisplay";
+import { GeneralAccessCodes } from "@/components/GeneralAccessCodes";
+import { SetupStatusSimple } from "@/components/SetupStatusSimple";
 import { SupabaseService } from "@/services/supabaseService";
 import { CodeGenerationService } from "@/services/codeGenerationService";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
@@ -1270,22 +1271,8 @@ const Index = () => {
     );
   }
 
-  // Affichage pendant la configuration automatique
-  if (setupLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center py-8">
-            <div className="h-8 w-8 animate-spin mx-auto mb-4 border-2 border-primary border-t-transparent rounded-full" />
-            <h3 className="text-lg font-semibold mb-2">Configuration automatique</h3>
-            <p className="text-muted-foreground">
-              Initialisation de votre hôtel et génération des codes d'accès...
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Si setup en cours, afficher directement le dashboard avec un indicateur discret
+  // Plus de blocage complet de l'interface
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -1340,31 +1327,13 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Diagnostic pour les problèmes d'association hôtel */}
+        {/* Statut de setup discret */}
+        <SetupStatusSimple onRetry={() => window.location.reload()} />
+
+        {/* Diagnostic pour les problèmes d'association hôtel uniquement si problème */}
         {(!hotel || !isSetupComplete || !currentHotelId) && (
           <div className="mb-6">
             <HotelSetupFix onForceSetup={() => window.location.reload()} />
-          </div>
-        )}
-
-        {/* Affichage du nom d'hôtel actuel */}
-        {hotel && (
-          <div className="mb-4">
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm text-muted-foreground">Hôtel connecté:</span>
-                    <p className="font-medium">{hotel.name} ({hotel.hotel_code})</p>
-                  </div>
-                  {accessCode && (
-                    <Badge variant="secondary">
-                      Code: {accessCode}
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
 
@@ -1934,7 +1903,8 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="access-codes" className="space-y-6">
-            <AccessCodeDisplay key={`access-codes-${currentHotelId}`} />
+            <SetupStatusSimple />
+            <GeneralAccessCodes key={`general-access-codes-${currentHotelId}`} />
           </TabsContent>
 
           <TabsContent value="mobile" className="space-y-6">
@@ -1956,8 +1926,8 @@ const Index = () => {
                   <NotificationBell hotelId={currentHotelId} />
                 </div>
                 
-                {/* Utiliser le composant AccessCodeDisplay pour la version mobile */}
-                <AccessCodeDisplay key={`mobile-access-codes-${currentHotelId}`} />
+                {/* Codes d'accès généraux pour l'interface mobile */}
+                <GeneralAccessCodes key={`mobile-access-codes-${currentHotelId}`} />
                 
                 {/* Affichage des femmes de chambre avec leurs assignations */}
                 {housekeeperNames.length > 0 && (

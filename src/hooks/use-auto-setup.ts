@@ -164,22 +164,6 @@ export const useAutoSetup = () => {
           }
           hotelData = newHotel;
           console.log('✅ Hôtel créé automatiquement:', hotelData);
-          
-          // Générer automatiquement un code d'accès pour le nouvel hôtel
-          try {
-            const { data: codeData, error: codeError } = await supabase
-              .rpc('generate_housekeeper_access_code', {
-                p_hotel_id: newHotel.id,
-                p_housekeeper_id: null
-              });
-
-            if (!codeError && codeData) {
-              activeCode = codeData;
-              console.log('✅ Code d\'accès généré automatiquement:', activeCode);
-            }
-          } catch (codeError) {
-            console.warn('⚠️ Erreur génération code automatique (non bloquant):', codeError);
-          }
         }
 
         // Phase 5: Finaliser le setup avec les données trouvées/créées
@@ -203,11 +187,13 @@ export const useAutoSetup = () => {
             profileCompanyName: profileData.company_name
           });
 
-          // Afficher un message de succès pour l'établissement configuré
-          toast({
-            title: "✅ Établissement connecté",
-            description: `Connexion rapide à ${profileData.company_name || hotelData.name} réussie !`
-          });
+          // Ne pas afficher de toast si l'hôtel existait déjà (évite le spam)
+          if (!existingHotel) {
+            toast({
+              title: "✅ Établissement configuré",
+              description: `${profileData.company_name || hotelData.name} prêt à l'emploi !`
+            });
+          }
         }
 
       } catch (error) {
@@ -224,14 +210,14 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Réduire le timeout pour une connexion plus rapide
+    // Timeout très réduit pour une connexion ultra-rapide
     const setupTimeout = setTimeout(() => {
       if (loading && hasAttemptedSetup.current) {
         console.warn('⚠️ Timeout setup, forçage completion...');
         setLoading(false);
         setIsSetupComplete(true);
       }
-    }, 3000); // Réduit de 10s à 3s
+    }, 1000); // Réduit de 3s à 1s pour une connexion immédiate
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {
