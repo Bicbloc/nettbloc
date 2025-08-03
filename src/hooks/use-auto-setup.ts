@@ -65,19 +65,35 @@ export const useAutoSetup = () => {
           throw profileError;
         }
 
-        // Si le profil n'existe pas, afficher un message d'erreur clair
+        // Si le profil n'existe pas, le créer automatiquement
+        let profileData = profile;
         if (!profile) {
-          console.error('❌ Profil utilisateur manquant dans la base de données');
-          toast({
-            variant: "destructive",
-            title: "Erreur de configuration",
-            description: "Votre profil utilisateur n'a pas été créé correctement. Veuillez contacter le support."
-          });
-          setLoading(false);
-          return;
+          console.log('📝 Création automatique du profil utilisateur...');
+          const { data: newProfile, error: createProfileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email || '',
+              company_name: null
+            })
+            .select()
+            .single();
+
+          if (createProfileError) {
+            console.error('❌ Erreur création profil:', createProfileError);
+            toast({
+              variant: "destructive",
+              title: "Erreur de configuration",
+              description: "Impossible de créer votre profil. Veuillez réessayer."
+            });
+            setLoading(false);
+            return;
+          }
+          profileData = newProfile;
+          console.log('✅ Profil créé automatiquement:', profileData);
         }
 
-        console.log('✅ Profil utilisateur trouvé:', profile);
+        console.log('✅ Profil utilisateur disponible:', profileData);
 
         // Phase 2: Rechercher l'hôtel existant
         const { data: existingHotel, error: hotelError } = await supabase
@@ -99,18 +115,18 @@ export const useAutoSetup = () => {
           console.log('✅ Hôtel existant trouvé:', existingHotel);
           
           // Vérifier que le nom de l'hôtel correspond au company_name du profil
-          if (existingHotel.name !== profile.company_name && profile.company_name) {
+          if (existingHotel.name !== profileData.company_name && profileData.company_name) {
             console.log('🔄 Mise à jour nom hôtel pour correspondre au profil...');
             const { data: updatedHotel, error: updateError } = await supabase
               .from('hotels')
-              .update({ name: profile.company_name })
+              .update({ name: profileData.company_name })
               .eq('id', existingHotel.id)
               .select()
               .single();
 
             if (!updateError && updatedHotel) {
               hotelData = updatedHotel;
-              console.log('✅ Nom hôtel mis à jour:', profile.company_name);
+              console.log('✅ Nom hôtel mis à jour:', profileData.company_name);
             }
           }
           
@@ -127,10 +143,10 @@ export const useAutoSetup = () => {
           }
         }
 
-        // Phase 4: Si pas d'hôtel du tout, en créer un
+        // Phase 4: Si pas d'hôtel du tout, en créer un automatiquement
         if (!hotelData) {
-          console.log('📝 Création nouvel hôtel...');
-          const hotelName = profile.company_name || `Établissement de ${user.email}`;
+          console.log('📝 Création automatique nouvel hôtel...');
+          const hotelName = profileData.company_name || `Établissement de ${user.email}`;
 
           const { data: newHotel, error: createError } = await supabase
             .from('hotels')
@@ -147,7 +163,23 @@ export const useAutoSetup = () => {
             throw createError;
           }
           hotelData = newHotel;
-          console.log('✅ Hôtel créé:', hotelData);
+          console.log('✅ Hôtel créé automatiquement:', hotelData);
+          
+          // Générer automatiquement un code d'accès pour le nouvel hôtel
+          try {
+            const { data: codeData, error: codeError } = await supabase
+              .rpc('generate_housekeeper_access_code', {
+                p_hotel_id: newHotel.id,
+                p_housekeeper_id: null
+              });
+
+            if (!codeError && codeData) {
+              activeCode = codeData;
+              console.log('✅ Code d\'accès généré automatiquement:', activeCode);
+            }
+          } catch (codeError) {
+            console.warn('⚠️ Erreur génération code automatique (non bloquant):', codeError);
+          }
         }
 
         // Phase 5: Finaliser le setup avec les données trouvées/créées
@@ -167,16 +199,14 @@ export const useAutoSetup = () => {
             hotelCode: hotelData.hotel_code,
             hotelName: hotelData.name,
             hasAccessCode: !!activeCode,
-            profileCompanyName: profile.company_name
+            profileCompanyName: profileData.company_name
           });
 
-          // Afficher un message de succès si c'était la première connexion
-          if (!activeCode) {
-            toast({
-              title: "Configuration terminée",
-              description: `Bienvenue ${profile.company_name || hotelData.name} ! Votre établissement est configuré.`
-            });
-          }
+          // Afficher un message de succès pour l'établissement configuré
+          toast({
+            title: "✅ Établissement connecté",
+            description: `Bienvenue dans ${profileData.company_name || hotelData.name} ! Votre système est prêt.`
+          });
         }
 
       } catch (error) {
