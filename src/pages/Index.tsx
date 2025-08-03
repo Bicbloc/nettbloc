@@ -347,6 +347,54 @@ const Index = () => {
       description: `"${oldName}" a été renommé en "${newName}".`
     });
   };
+
+  // Nouvelle fonction pour générer un code d'accès pour une femme de chambre
+  const handleGenerateAccessCode = async (housekeeperName: string) => {
+    if (!hotel?.id) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Aucun hôtel sélectionné pour générer le code d'accès."
+      });
+      return;
+    }
+
+    try {
+      const { data: codeData, error } = await supabase
+        .rpc('generate_housekeeper_access_code_simple', {
+          p_hotel_id: hotel.id,
+          p_housekeeper_name: housekeeperName
+        });
+
+      if (error) throw error;
+
+      // Mettre à jour la femme de chambre avec le nouveau code
+      const housekeeper = housekeepers.find(h => h.name === housekeeperName);
+      if (housekeeper) {
+        await supabase
+          .from('housekeepers')
+          .update({ access_code: codeData })
+          .eq('id', housekeeper.id);
+
+        // Rafraîchir la liste des femmes de chambre
+        refreshHousekeepers();
+      }
+
+      toast({
+        title: "Code généré",
+        description: `Code d'accès généré pour ${housekeeperName}: ${codeData}`
+      });
+
+      return codeData;
+    } catch (error) {
+      console.error('Erreur génération code:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de générer le code d'accès."
+      });
+    }
+  };
   
   const handleFloorPreferenceChange = (housekeeperName: string, floors: number[]) => {
     setHousekeeperFloorPreferences(prev => ({
@@ -1807,6 +1855,7 @@ const Index = () => {
                             onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
                             accessCode={housekeepers.find(h => h.name === name)?.access_code || ''}
                             housekeeperNames={housekeeperNames}
+                            onGenerateAccessCode={handleGenerateAccessCode}
                           />
                         </div>
                       );

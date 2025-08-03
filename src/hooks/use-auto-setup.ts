@@ -188,6 +188,7 @@ export const useAutoSetup = () => {
           setHotel(hotelData);
           setAccessCode(activeCode);
           setIsSetupComplete(true);
+          setLoading(false); // Arrêter le loading immédiatement
           
           // Sauvegarde localStorage pour les autres composants
           localStorage.setItem('selectedHotelId', hotelData.id);
@@ -205,7 +206,7 @@ export const useAutoSetup = () => {
           // Afficher un message de succès pour l'établissement configuré
           toast({
             title: "✅ Établissement connecté",
-            description: `Bienvenue dans ${profileData.company_name || hotelData.name} ! Votre système est prêt.`
+            description: `Connexion rapide à ${profileData.company_name || hotelData.name} réussie !`
           });
         }
 
@@ -223,14 +224,14 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Timeout de sécurité pour éviter les blocages
+    // Réduire le timeout pour une connexion plus rapide
     const setupTimeout = setTimeout(() => {
       if (loading && hasAttemptedSetup.current) {
         console.warn('⚠️ Timeout setup, forçage completion...');
         setLoading(false);
         setIsSetupComplete(true);
       }
-    }, 10000); // 10 secondes max
+    }, 3000); // Réduit de 10s à 3s
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {

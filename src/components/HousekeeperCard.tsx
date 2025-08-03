@@ -3,7 +3,7 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings, FileText, Download } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings, FileText, Download, Key } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -44,6 +44,7 @@ interface HousekeeperCardProps {
   onRename?: (newName: string) => void;
   accessCode?: string;
   housekeeperNames?: string[];
+  onGenerateAccessCode?: (housekeeperName: string) => void;
 }
 
 export function HousekeeperCard({ 
@@ -67,7 +68,8 @@ export function HousekeeperCard({
   onMaxRoomsOverrideChange,
   onRename,
   accessCode,
-  housekeeperNames = []
+  housekeeperNames = [],
+  onGenerateAccessCode
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -430,10 +432,21 @@ export function HousekeeperCard({
                   >
                     ✏️
                   </Button>
-                  {accessCode && (
+                  {accessCode ? (
                     <div className="bg-primary/10 px-2 py-1 rounded text-sm font-mono font-bold text-primary">
                       {accessCode}
                     </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onGenerateAccessCode?.(name)}
+                      className="h-6 px-2 text-xs"
+                      title="Générer un code d'accès"
+                    >
+                      <Key className="h-3 w-3 mr-1" />
+                      Code
+                    </Button>
                   )}
                 </div>
               )}
