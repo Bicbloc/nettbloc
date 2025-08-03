@@ -45,7 +45,7 @@ export class HousekeeperAuthService {
 
       console.log('✅ Hôtel trouvé:', hotel);
 
-      // Find housekeeper access code
+      // Find housekeeper access code - chercher dans les deux tables
       let { data: accessCodeData, error: codeError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
@@ -63,7 +63,10 @@ export class HousekeeperAuthService {
         .eq('is_active', true)
         .maybeSingle();
 
-      if (!accessCodeData && accessCode.match(/^[A-Z]+\d+-\d+$/)) {
+      console.log('🔍 Recherche dans housekeeper_access_codes:', { accessCodeData, codeError });
+
+      // Si pas trouvé dans housekeeper_access_codes, chercher directement dans housekeepers
+      if (!accessCodeData) {
         console.log('🔄 Code non trouvé dans housekeeper_access_codes, recherche dans housekeepers...');
         const { data: housekeeper, error: housekeeperError } = await supabase
           .from('housekeepers')

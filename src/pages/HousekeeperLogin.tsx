@@ -9,6 +9,7 @@ import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide
 import { SupabaseService } from "@/services/supabaseService";
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import BackButton from '@/components/BackButton';
+import { HousekeeperAuthTester } from '@/components/HousekeeperAuthTester';
 
 export default function HousekeeperLogin() {
   const [step, setStep] = useState<"direct" | "hotel" | "housekeeper">("direct");
@@ -88,31 +89,59 @@ export default function HousekeeperLogin() {
     setIsLoading(true);
     
     try {
-      // Authentifier avec la base de données en vérifiant que le code appartient à cet hôtel
-      const authenticatedHousekeeper = await SupabaseService.authenticateHousekeeper(housekeeperCode);
-
-      if (authenticatedHousekeeper && authenticatedHousekeeper.hotel_id === selectedHotel.id) {
-        // Sauvegarder les données utilisateur dans localStorage
-        localStorage.setItem('housekeeper', JSON.stringify({
-          id: authenticatedHousekeeper.id,
-          name: authenticatedHousekeeper.name,
-          accessCode: authenticatedHousekeeper.access_code
-        }));
-        
-        // Sauvegarder l'hôtel sélectionné
-        localStorage.setItem('selectedHotelId', selectedHotel.id);
-        localStorage.setItem('selectedHotelName', selectedHotel.name);
-        localStorage.setItem('selectedHotelCode', selectedHotel.hotel_code || '');
-        
-        console.log('✅ Connexion femme de chambre réussie:', authenticatedHousekeeper.name, 'pour l\'hôtel:', selectedHotel.name);
-        navigate('/housekeeper');
-      } else {
+      console.log('🔐 Tentative connexion avec code:', housekeeperCode, 'pour hôtel:', selectedHotel.hotel_code);
+      
+      // Utiliser le service d'authentification unifié
+      const result = await HousekeeperAuthService.authenticateWithFullCode(housekeeperCode);
+      
+      if (!result.success) {
+        console.error('❌ Échec authentification:', result.error);
         toast({
           variant: "destructive",
           title: "Code d'accès invalide",
-          description: "Le code d'accès ne correspond pas à cet hôtel ou n'est pas reconnu."
+          description: result.error || "Le code d'accès saisi n'existe pas ou a expiré"
         });
+        
+        // Afficher des informations de debug pour aider
+        if (result.debugInfo?.availableHousekeepers?.length > 0) {
+          console.log('🔍 Codes disponibles pour cet hôtel:', result.debugInfo.availableHousekeepers.map((h: any) => h.access_code).filter(Boolean));
+        }
+        return;
       }
+
+      const { user: housekeeper, hotel } = result;
+
+      // Vérifier que l'hôtel correspond
+      if (hotel.id !== selectedHotel.id) {
+        toast({
+          variant: "destructive",
+          title: "Hôtel incorrect",
+          description: `Ce code d'accès appartient à ${hotel.name}, pas à ${selectedHotel.name}`
+        });
+        return;
+      }
+
+      console.log('✅ Connexion réussie:', housekeeper.name, 'pour l\'hôtel:', hotel.name);
+
+      // Sauvegarder les données utilisateur dans localStorage
+      localStorage.setItem('housekeeper', JSON.stringify({
+        id: housekeeper.id,
+        name: housekeeper.name,
+        accessCode: housekeeperCode
+      }));
+      
+      // Sauvegarder l'hôtel sélectionné
+      localStorage.setItem('selectedHotelId', selectedHotel.id);
+      localStorage.setItem('selectedHotelName', selectedHotel.name);
+      localStorage.setItem('selectedHotelCode', selectedHotel.hotel_code || '');
+      
+      toast({
+        title: "Connexion réussie",
+        description: `Bienvenue ${housekeeper.name} !`
+      });
+
+      navigate('/housekeeper');
+      
     } catch (error) {
       console.error("Erreur lors de la connexion:", error);
       toast({
@@ -196,10 +225,14 @@ export default function HousekeeperLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex flex-col items-center justify-center p-4 relative gap-6">
       <div className="absolute top-4 left-4">
         <BackButton to="/" />
       </div>
+      
+      {/* Composant de test pour diagnostiquer les problèmes */}
+      <HousekeeperAuthTester />
+      
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
