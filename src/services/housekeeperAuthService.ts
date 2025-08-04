@@ -27,12 +27,12 @@ export class HousekeeperAuthService {
       const hotelCode = accessCode.split('-')[0];
       console.log('🏨 Code hôtel extrait:', hotelCode);
 
-      // Find hotel by code
+      // Find hotel by code (case-insensitive search)
       const { data: hotel, error: hotelError } = await supabase
         .from('hotels')
         .select('*')
-        .eq('hotel_code', hotelCode)
-        .single();
+        .ilike('hotel_code', hotelCode)
+        .maybeSingle();
 
       if (hotelError || !hotel) {
         console.error('❌ Hôtel non trouvé:', { hotelCode, error: hotelError });
@@ -167,8 +167,8 @@ export class HousekeeperAuthService {
       const { data: hotel, error } = await supabase
         .from('hotels')
         .select('*')
-        .eq('hotel_code', hotelCode)
-        .single();
+        .ilike('hotel_code', hotelCode)
+        .maybeSingle();
 
       if (error || !hotel) {
         console.error('❌ Hôtel non trouvé:', { hotelCode, error });
