@@ -77,6 +77,66 @@ export type Database = {
         }
         Relationships: []
       }
+      hotel_access_sessions: {
+        Row: {
+          access_code: string
+          created_at: string
+          ended_at: string | null
+          expires_at: string
+          hotel_id: string
+          housekeeper_profile_id: string
+          id: string
+          is_active: boolean
+          rooms_cleaned_today: number
+          session_token: string
+          started_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_code: string
+          created_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          hotel_id: string
+          housekeeper_profile_id: string
+          id?: string
+          is_active?: boolean
+          rooms_cleaned_today?: number
+          session_token: string
+          started_at?: string
+          updated_at?: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          hotel_id?: string
+          housekeeper_profile_id?: string
+          id?: string
+          is_active?: boolean
+          rooms_cleaned_today?: number
+          session_token?: string
+          started_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_access_sessions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_access_sessions_housekeeper_profile_id_fkey"
+            columns: ["housekeeper_profile_id"]
+            isOneToOne: false
+            referencedRelation: "housekeeper_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_sessions: {
         Row: {
           created_at: string
@@ -251,6 +311,108 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      housekeeper_hotel_history: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          hotel_id: string
+          housekeeper_profile_id: string
+          id: string
+          is_favorite: boolean
+          notes: string | null
+          rating: number | null
+          rooms_cleaned: number
+          started_at: string
+          total_work_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          hotel_id: string
+          housekeeper_profile_id: string
+          id?: string
+          is_favorite?: boolean
+          notes?: string | null
+          rating?: number | null
+          rooms_cleaned?: number
+          started_at?: string
+          total_work_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          hotel_id?: string
+          housekeeper_profile_id?: string
+          id?: string
+          is_favorite?: boolean
+          notes?: string | null
+          rating?: number | null
+          rooms_cleaned?: number
+          started_at?: string
+          total_work_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "housekeeper_hotel_history_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "housekeeper_hotel_history_housekeeper_profile_id_fkey"
+            columns: ["housekeeper_profile_id"]
+            isOneToOne: false
+            referencedRelation: "housekeeper_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      housekeeper_profiles: {
+        Row: {
+          average_rating: number | null
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          profile_picture_url: string | null
+          total_hotels_worked: number
+          total_rooms_cleaned: number
+          updated_at: string
+        }
+        Insert: {
+          average_rating?: number | null
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          profile_picture_url?: string | null
+          total_hotels_worked?: number
+          total_rooms_cleaned?: number
+          updated_at?: string
+        }
+        Update: {
+          average_rating?: number | null
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          profile_picture_url?: string | null
+          total_hotels_worked?: number
+          total_rooms_cleaned?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       housekeeper_tokens: {
         Row: {
