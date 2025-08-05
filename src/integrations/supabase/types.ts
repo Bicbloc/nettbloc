@@ -762,6 +762,10 @@ export type Database = {
         }
         Returns: string
       }
+      get_housekeeper_profile_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       has_role: {
         Args: {
           _user_id: string

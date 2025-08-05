@@ -1299,12 +1299,18 @@ const Index = () => {
            <div className="flex items-center space-x-4">
              {!isAuthenticated && !isGuestMode && (
                <>
-                 <Button asChild variant="outline">
-                   <a href="/housekeeper-login">
-                     <Smartphone className="mr-2 h-4 w-4" />
-                     Accès Femme de Chambre
-                   </a>
-                 </Button>
+                  <Button asChild variant="outline">
+                    <a href="/housekeeper-login">
+                      <Smartphone className="mr-2 h-4 w-4" />
+                      Accès Femme de Chambre (Code Hôtel)
+                    </a>
+                  </Button>
+                  <Button asChild>
+                    <a href="/housekeeper/auth">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      Espace Personnel Femme de Chambre
+                    </a>
+                  </Button>
                  <Button asChild>
                    <a href="/auth">
                      <LogIn className="mr-2 h-4 w-4" />
@@ -1315,12 +1321,18 @@ const Index = () => {
              )}
              {isAuthenticated && (
                <>
-                 <Button asChild variant="outline">
-                   <a href="/housekeeper-login">
-                     <Smartphone className="mr-2 h-4 w-4" />
-                     Accès Femme de Chambre
-                   </a>
-                 </Button>
+                  <Button asChild variant="outline">
+                    <a href="/housekeeper-login">
+                      <Smartphone className="mr-2 h-4 w-4" />
+                      Accès Femme de Chambre (Code Hôtel)
+                    </a>
+                  </Button>
+                  <Button asChild>
+                    <a href="/housekeeper/auth">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      Espace Personnel Femme de Chambre
+                    </a>
+                  </Button>
                  <UserMenu />
                </>
              )}
