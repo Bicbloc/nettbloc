@@ -754,6 +754,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_temporary_hotel_access_code: {
+        Args: {
+          p_housekeeper_profile_id: string
+          p_hotel_id: string
+          p_duration_hours?: number
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _user_id: string
