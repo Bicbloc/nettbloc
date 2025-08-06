@@ -43,6 +43,7 @@ interface HousekeeperAuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   connectToHotel: (accessCode: string) => Promise<{ success: boolean; error?: string; session?: HotelSession }>;
+  requestHotelAccess: (hotelCode: string) => Promise<{ success: boolean; error?: string }>;
   disconnectFromHotel: () => Promise<void>;
   updateProfile: (updates: Partial<HousekeeperProfile>) => Promise<{ error: any }>;
   isAuthenticated: boolean;
@@ -295,6 +296,57 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     }
   };
 
+  const requestHotelAccess = async (hotelCode: string): Promise<{ success: boolean; error?: string }> => {
+    if (!profile) {
+      return { success: false, error: "Profil femme de chambre non trouvé" };
+    }
+
+    try {
+      // Find hotel by hotel code
+      const { data: hotel, error: hotelError } = await supabase
+        .from('hotels')
+        .select('id, name, hotel_code')
+        .eq('hotel_code', hotelCode)
+        .maybeSingle();
+
+      if (hotelError || !hotel) {
+        return { success: false, error: "Code d'hôtel invalide" };
+      }
+
+      // Check if request already exists
+      const { data: existingRequest, error: requestError } = await supabase
+        .from('housekeeper_access_requests')
+        .select('id, status')
+        .eq('housekeeper_profile_id', profile.id)
+        .eq('hotel_id', hotel.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (existingRequest) {
+        return { success: false, error: "Une demande d'accès est déjà en cours pour cet hôtel" };
+      }
+
+      // Create access request
+      const { error: insertError } = await supabase
+        .from('housekeeper_access_requests')
+        .insert({
+          housekeeper_profile_id: profile.id,
+          hotel_id: hotel.id,
+          hotel_code: hotelCode
+        });
+
+      if (insertError) {
+        console.error('Error creating access request:', insertError);
+        return { success: false, error: "Erreur lors de la création de la demande" };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error requesting hotel access:', error);
+      return { success: false, error: "Erreur lors de la demande d'accès" };
+    }
+  };
+
   const disconnectFromHotel = async () => {
     if (!currentHotelSession || !profile) return;
 
@@ -360,6 +412,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     signIn,
     signOut,
     connectToHotel,
+    requestHotelAccess,
     disconnectFromHotel,
     updateProfile,
     isAuthenticated: !!user && !!profile,

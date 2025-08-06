@@ -24,6 +24,7 @@ import BackButton from '@/components/BackButton';
 import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
 import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
+import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -760,6 +761,10 @@ const Admin = () => {
             <Key className="h-4 w-4 mr-2" />
             Codes d'accès
           </TabsTrigger>
+          <TabsTrigger value="housekeeper-requests">
+            <Users className="h-4 w-4 mr-2" />
+            Demandes femmes de chambre
+          </TabsTrigger>
           <TabsTrigger value="system">
             <BarChart3 className="h-4 w-4 mr-2" />
             Système
@@ -1304,6 +1309,10 @@ const Admin = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="housekeeper-requests" className="space-y-4">
+          <HousekeeperAccessRequests />
         </TabsContent>
 
         <TabsContent value="system" className="space-y-4">

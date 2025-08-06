@@ -80,6 +80,9 @@ export type Database = {
       hotel_access_sessions: {
         Row: {
           access_code: string
+          access_request_id: string | null
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           ended_at: string | null
           expires_at: string
@@ -94,6 +97,9 @@ export type Database = {
         }
         Insert: {
           access_code: string
+          access_request_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           ended_at?: string | null
           expires_at?: string
@@ -108,6 +114,9 @@ export type Database = {
         }
         Update: {
           access_code?: string
+          access_request_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           ended_at?: string | null
           expires_at?: string
@@ -311,6 +320,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      housekeeper_access_requests: {
+        Row: {
+          created_at: string
+          hotel_code: string
+          hotel_id: string
+          housekeeper_profile_id: string
+          id: string
+          notes: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hotel_code: string
+          hotel_id: string
+          housekeeper_profile_id: string
+          id?: string
+          notes?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hotel_code?: string
+          hotel_id?: string
+          housekeeper_profile_id?: string
+          id?: string
+          notes?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       housekeeper_hotel_history: {
         Row: {
@@ -707,6 +758,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_housekeeper_access_request: {
+        Args: { request_id: string; admin_user_id: string }
+        Returns: string
+      }
       change_subscription_status: {
         Args: { p_user_id: string; p_new_status: string; p_reason?: string }
         Returns: boolean

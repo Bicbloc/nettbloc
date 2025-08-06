@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useHousekeeperAuth } from "@/contexts/HousekeeperAuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { HousekeeperAccessRequest } from "@/components/HousekeeperAccessRequest";
 
 interface HotelHistory {
   id: string;
@@ -272,6 +273,11 @@ export default function HousekeeperDashboard() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Hotel Access Request */}
+      <div className="mb-6">
+        <HousekeeperAccessRequest />
+      </div>
 
       {/* Recent Hotels */}
       <Card>
