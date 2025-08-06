@@ -46,6 +46,9 @@ import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { GeneralAccessCodes } from "@/components/GeneralAccessCodes";
+import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
+import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
+import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
 import { SetupStatusSimple } from "@/components/SetupStatusSimple";
 import { SupabaseService } from "@/services/supabaseService";
 import { CodeGenerationService } from "@/services/codeGenerationService";
@@ -70,6 +73,7 @@ const Index = () => {
   useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState("overview");
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
+  const [showHousekeeperManagement, setShowHousekeeperManagement] = useState(false);
   
   // Vérifier que le contexte est disponible
   const housekeepingContext = useHousekeeping();

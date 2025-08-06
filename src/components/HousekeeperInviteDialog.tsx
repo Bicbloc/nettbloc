@@ -83,8 +83,9 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
           await supabase.functions.invoke('send-activation-email', {
             body: {
               email,
+              type: 'activation',
               companyName: name,
-              hotelName: 'Votre hôtel',
+              accessCode: generatedCode,
               activationLink: `${window.location.origin}/housekeeper/auth?code=${generatedCode}`
             }
           });
