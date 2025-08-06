@@ -28,6 +28,7 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
   const { toast } = useToast();
 
   const generateAccessCode = async () => {
+    console.log('Generating access code for hotel:', hotelId, 'and name:', name);
     setIsLoading(true);
     try {
       // Generate access code with name

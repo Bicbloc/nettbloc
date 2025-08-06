@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { HousekeeperTeamManager } from '@/components/HousekeeperTeamManager';
-import { supabase } from '@/integrations/supabase/client';
+import { HotelAdminPanel } from '@/components/HotelAdminPanel';
 import { Navigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -671,8 +672,13 @@ const Admin = () => {
     );
   }
 
-  if (!user || !isSuperAdmin) {
+  // Si l'utilisateur n'est pas super admin, afficher l'interface hôtel normale
+  if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  if (!isSuperAdmin) {
+    return <HotelAdminPanel />;
   }
 
   return (
@@ -1314,7 +1320,7 @@ const Admin = () => {
 
         <TabsContent value="housekeeper-requests" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HousekeeperTeamManager hotelId={user?.id ? hotels.find(h => h.user_id === user.id)?.id || '' : ''} />
+            <HousekeeperTeamManager hotelId={user?.id || ''} />
             <HousekeeperAccessRequests />
           </div>
         </TabsContent>

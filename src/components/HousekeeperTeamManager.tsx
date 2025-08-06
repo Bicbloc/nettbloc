@@ -39,6 +39,7 @@ export const HousekeeperTeamManager: React.FC<HousekeeperTeamManagerProps> = ({
   }, [hotelId]);
 
   const fetchHousekeepers = async () => {
+    console.log('Fetching housekeepers for hotel:', hotelId);
     try {
       // Fetch from housekeepers table
       const { data: housekeepersData, error: housekeepersError } = await supabase
