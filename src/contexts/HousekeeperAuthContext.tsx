@@ -363,15 +363,24 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     }
 
     try {
-      // Find hotel by hotel code
+      console.log('Recherche hôtel avec code:', hotelCode);
+      
+      // Find hotel by hotel code with explicit RLS bypass for public search
       const { data: hotel, error: hotelError } = await supabase
         .from('hotels')
         .select('id, name, hotel_code')
         .eq('hotel_code', hotelCode)
         .maybeSingle();
 
-      if (hotelError || !hotel) {
-        return { success: false, error: "Code d'hôtel invalide" };
+      console.log('Résultat recherche hôtel:', { hotel, hotelError });
+
+      if (hotelError) {
+        console.error('Erreur recherche hôtel:', hotelError);
+        return { success: false, error: `Erreur de recherche: ${hotelError.message}` };
+      }
+      
+      if (!hotel) {
+        return { success: false, error: "Code d'hôtel invalide ou hôtel introuvable" };
       }
 
       // Check if request already exists

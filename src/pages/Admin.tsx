@@ -1314,7 +1314,7 @@ const Admin = () => {
 
         <TabsContent value="housekeeper-requests" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HousekeeperTeamManager hotelId={hotels[0]?.id || ''} />
+            <HousekeeperTeamManager hotelId={user?.id ? hotels.find(h => h.user_id === user.id)?.id || '' : ''} />
             <HousekeeperAccessRequests />
           </div>
         </TabsContent>
