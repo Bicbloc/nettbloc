@@ -279,6 +279,9 @@ export type Database = {
           hotel_id: string
           housekeeper_id: string | null
           id: string
+          invitation_sent_at: string | null
+          invited_email: string | null
+          invited_name: string | null
           is_active: boolean
           used_at: string | null
         }
@@ -290,6 +293,9 @@ export type Database = {
           hotel_id: string
           housekeeper_id?: string | null
           id?: string
+          invitation_sent_at?: string | null
+          invited_email?: string | null
+          invited_name?: string | null
           is_active?: boolean
           used_at?: string | null
         }
@@ -301,6 +307,9 @@ export type Database = {
           hotel_id?: string
           housekeeper_id?: string | null
           id?: string
+          invitation_sent_at?: string | null
+          invited_email?: string | null
+          invited_name?: string | null
           is_active?: boolean
           used_at?: string | null
         }
@@ -423,6 +432,48 @@ export type Database = {
           },
         ]
       }
+      housekeeper_invitations: {
+        Row: {
+          access_code: string
+          created_at: string
+          email: string
+          expires_at: string
+          hotel_id: string
+          id: string
+          invited_by: string
+          name: string
+          sent_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          access_code: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          hotel_id: string
+          id?: string
+          invited_by: string
+          name: string
+          sent_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          hotel_id?: string
+          id?: string
+          invited_by?: string
+          name?: string
+          sent_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       housekeeper_profiles: {
         Row: {
           average_rating: number | null
@@ -510,6 +561,7 @@ export type Database = {
           hotel_id: string
           id: string
           is_active: boolean
+          is_temporary: boolean
           name: string
           updated_at: string
           user_id: string
@@ -520,6 +572,7 @@ export type Database = {
           hotel_id: string
           id?: string
           is_active?: boolean
+          is_temporary?: boolean
           name: string
           updated_at?: string
           user_id: string
@@ -530,6 +583,7 @@ export type Database = {
           hotel_id?: string
           id?: string
           is_active?: boolean
+          is_temporary?: boolean
           name?: string
           updated_at?: string
           user_id?: string

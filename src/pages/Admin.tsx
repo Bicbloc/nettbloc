@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { HousekeeperTeamManager } from '@/components/HousekeeperTeamManager';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1312,7 +1313,10 @@ const Admin = () => {
         </TabsContent>
 
         <TabsContent value="housekeeper-requests" className="space-y-4">
-          <HousekeeperAccessRequests />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <HousekeeperTeamManager hotelId={hotels[0]?.id || ''} />
+            <HousekeeperAccessRequests />
+          </div>
         </TabsContent>
 
         <TabsContent value="system" className="space-y-4">
