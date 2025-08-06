@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { HousekeeperTeamManager } from './HousekeeperTeamManager';
+import { HousekeeperStatusDashboard } from './HousekeeperStatusDashboard';
 import { HousekeeperAccessRequests } from './HousekeeperAccessRequests';
 import { Hotel, Users } from 'lucide-react';
 
@@ -87,6 +88,10 @@ export const HotelAdminPanel: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <HousekeeperTeamManager hotelId={hotel.id} />
+        <HousekeeperStatusDashboard hotelId={hotel.id} />
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6">
         <HousekeeperAccessRequests />
       </div>
     </div>

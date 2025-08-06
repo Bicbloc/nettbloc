@@ -410,6 +410,26 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         return { success: false, error: "Erreur lors de la création de la demande" };
       }
 
+      // Create notification for hotel admin
+      const { data: hotelOwner } = await supabase
+        .from('hotels')
+        .select('user_id')
+        .eq('id', hotel.id)
+        .single();
+
+      if (hotelOwner) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: hotelOwner.user_id,
+            hotel_id: hotel.id,
+            title: 'Nouvelle demande d\'accès',
+            description: `${profile.name} demande l'accès à votre hôtel (${hotelCode})`,
+            type: 'housekeeper_access_request',
+            user_type: 'admin'
+          });
+      }
+
       return { success: true };
     } catch (error) {
       console.error('Error requesting hotel access:', error);

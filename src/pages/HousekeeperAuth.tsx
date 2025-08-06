@@ -1,351 +1,288 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, User, Mail, Lock, Phone, UserPlus, LogIn } from "lucide-react";
-import { useHousekeeperAuth } from "@/contexts/HousekeeperAuthContext";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { HousekeeperGuestMode } from '@/components/HousekeeperGuestMode';
+import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
+import { Hotel, User, Key } from 'lucide-react';
 
-export default function HousekeeperAuth() {
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [registerForm, setRegisterForm] = useState({ 
-    email: "", 
-    password: "", 
-    confirmPassword: "",
-    name: "", 
-    phone: "" 
-  });
+const HousekeeperAuth: React.FC = () => {
+  const [mode, setMode] = useState<'auth' | 'guest'>('auth');
+  const [authType, setAuthType] = useState<'login' | 'signup'>('login');
+  const [guestCode, setGuestCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [hotelCode, setHotelCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const { signIn, signUp } = useHousekeeperAuth();
+  const navigate = useNavigate();
+  const { signUp, signIn, connectToHotel, isAuthenticated, isConnectedToHotel } = useHousekeeperAuth();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!loginForm.email || !loginForm.password) {
+  // Redirect if already authenticated and connected
+  if (isAuthenticated && isConnectedToHotel) {
+    navigate('/housekeeper/work');
+    return null;
+  }
+
+  if (isAuthenticated && !isConnectedToHotel) {
+    navigate('/housekeeper/dashboard');
+    return null;
+  }
+
+  const handleGuestAccess = () => {
+    if (!guestCode.trim()) {
       toast({
-        variant: "destructive",
-        title: "Champs requis",
-        description: "Veuillez saisir votre email et mot de passe."
+        title: "Erreur",
+        description: "Veuillez saisir un code d'accès",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if it's a full access code (like HTL002-AMI-1234)
+    if (guestCode.includes('-') && guestCode.split('-').length >= 3) {
+      setMode('guest');
+    } else {
+      toast({
+        title: "Code invalide",
+        description: "Le code d'accès invité doit contenir des tirets (ex: HTL002-AMI-1234)",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      let result;
+      if (authType === 'signup') {
+        result = await signUp(email, password, name, phone);
+      } else {
+        result = await signIn(email, password);
+      }
+
+      if (result.error) {
+        toast({
+          title: "Erreur d'authentification",
+          description: result.error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (authType === 'signup') {
+        toast({
+          title: "Compte créé",
+          description: "Vérifiez votre email pour confirmer votre compte"
+        });
+      } else {
+        toast({
+          title: "Connexion réussie",
+          description: "Redirection vers votre tableau de bord..."
+        });
+        navigate('/housekeeper/dashboard');
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleHotelConnect = async () => {
+    if (!hotelCode.trim()) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez saisir un code",
+        variant: "destructive"
       });
       return;
     }
 
     setIsLoading(true);
-    
     try {
-      const { error } = await signIn(loginForm.email, loginForm.password);
+      const result = await connectToHotel(hotelCode);
       
-      if (error) {
-        console.error('Login error:', error);
+      if (result.success) {
         toast({
-          variant: "destructive",
+          title: "Connexion réussie",
+          description: "Vous êtes maintenant connectée à l'hôtel"
+        });
+        navigate('/housekeeper/work');
+      } else {
+        toast({
           title: "Erreur de connexion",
-          description: error.message === "Invalid login credentials" 
-            ? "Email ou mot de passe incorrect"
-            : "Une erreur est survenue lors de la connexion"
+          description: result.error,
+          variant: "destructive"
         });
-        return;
       }
-
-      toast({
-        title: "Connexion réussie",
-        description: "Bienvenue dans votre espace personnel !"
-      });
-
-      navigate('/housekeeper/dashboard');
-      
     } catch (error) {
-      console.error("Login error:", error);
+      console.error('Hotel connect error:', error);
       toast({
-        variant: "destructive",
         title: "Erreur",
-        description: "Une erreur inattendue est survenue"
+        description: "Une erreur s'est produite",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!registerForm.email || !registerForm.password || !registerForm.name) {
-      toast({
-        variant: "destructive",
-        title: "Champs requis",
-        description: "Veuillez remplir tous les champs obligatoires."
-      });
-      return;
-    }
-
-    if (registerForm.password !== registerForm.confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Mots de passe différents",
-        description: "Les mots de passe ne correspondent pas."
-      });
-      return;
-    }
-
-    if (registerForm.password.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Mot de passe trop court",
-        description: "Le mot de passe doit contenir au moins 6 caractères."
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      const { error } = await signUp(
-        registerForm.email, 
-        registerForm.password, 
-        registerForm.name,
-        registerForm.phone || undefined
-      );
-      
-      if (error) {
-        console.error('Register error:', error);
-        
-        let errorMessage = "Une erreur est survenue lors de l'inscription";
-        if (error.message?.includes("already registered")) {
-          errorMessage = "Cette adresse email est déjà utilisée";
-        } else if (error.message?.includes("password")) {
-          errorMessage = "Le mot de passe ne respecte pas les critères requis";
-        } else if (error.message?.includes("email")) {
-          errorMessage = "L'adresse email n'est pas valide";
-        }
-        
-        toast({
-          variant: "destructive",
-          title: "Erreur d'inscription",
-          description: errorMessage
-        });
-        return;
-      }
-
-      toast({
-        title: "Inscription réussie !",
-        description: "Vérifiez votre email pour confirmer votre compte, puis connectez-vous."
-      });
-
-      // Clear form and switch to login tab
-      setRegisterForm({ email: "", password: "", confirmPassword: "", name: "", phone: "" });
-      
-    } catch (error) {
-      console.error("Register error:", error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Une erreur inattendue est survenue"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (mode === 'guest' && guestCode) {
+    return <HousekeeperGuestMode accessCode={guestCode} />;
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4">
-      <div className="absolute top-4 left-4">
-        <Link to="/">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Accueil
-          </Button>
-        </Link>
-      </div>
-      
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-blue-600/10 p-3 rounded-full">
-              <User className="h-8 w-8 text-blue-600" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center">
+          <Hotel className="h-12 w-12 mx-auto text-blue-600 mb-4" />
+          <h1 className="text-2xl font-bold">Espace Femme de chambre</h1>
+          <p className="text-muted-foreground">Connectez-vous à votre hôtel</p>
+        </div>
+
+        {/* Guest Mode Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Accès invité
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="guest-code">Code d'accès temporaire</Label>
+              <Input
+                id="guest-code"
+                value={guestCode}
+                onChange={(e) => setGuestCode(e.target.value)}
+                placeholder="HTL002-AMI-1234"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Utilisez le code fourni par l'admin
+              </p>
             </div>
-          </div>
-          <CardTitle className="text-2xl font-bold text-gray-800">
-            Espace Femme de Chambre
-          </CardTitle>
-          <CardDescription>
-            Connectez-vous à votre compte personnel
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login" className="flex items-center gap-2">
-                <LogIn className="h-4 w-4" />
+            <Button 
+              onClick={handleGuestAccess}
+              className="w-full"
+              disabled={isLoading}
+            >
+              Accéder en mode invité
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Authentication Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Compte personnel
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex mb-4">
+              <Button
+                variant={authType === 'login' ? 'default' : 'outline'}
+                onClick={() => setAuthType('login')}
+                className="flex-1 mr-1"
+              >
                 Connexion
-              </TabsTrigger>
-              <TabsTrigger value="register" className="flex items-center gap-2">
-                <UserPlus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={authType === 'signup' ? 'default' : 'outline'}
+                onClick={() => setAuthType('signup')}
+                className="flex-1 ml-1"
+              >
                 Inscription
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </Label>
+              </Button>
+            </div>
+
+            <form onSubmit={handleAuth} className="space-y-4">
+              {authType === 'signup' && (
+                <>
+                  <div>
+                    <Label htmlFor="name">Nom complet</Label>
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Téléphone (optionnel)</Label>
+                    <Input
+                      id="phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="password">Mot de passe</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Chargement...' : authType === 'login' ? 'Se connecter' : 'S\'inscrire'}
+              </Button>
+            </form>
+
+            {/* Hotel connection for authenticated users */}
+            {isAuthenticated && (
+              <div className="mt-6 pt-4 border-t">
+                <Label htmlFor="hotel-code">Code d'hôtel ou code d'accès</Label>
+                <div className="flex gap-2 mt-2">
                   <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="votre.email@exemple.com"
-                    value={loginForm.email}
-                    onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                    autoFocus
+                    id="hotel-code"
+                    value={hotelCode}
+                    onChange={(e) => setHotelCode(e.target.value)}
+                    placeholder="HTL002 ou HTL002-AMI-1234"
                   />
+                  <Button onClick={handleHotelConnect} disabled={isLoading}>
+                    Connecter
+                  </Button>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="login-password" className="flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Mot de passe
-                  </Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="Votre mot de passe"
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Connexion...
-                    </>
-                  ) : (
-                    <>
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Se connecter
-                    </>
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="register">
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="register-name" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Nom complet *
-                  </Label>
-                  <Input
-                    id="register-name"
-                    type="text"
-                    placeholder="Marie Dupont"
-                    value={registerForm.name}
-                    onChange={(e) => setRegisterForm(prev => ({ ...prev, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="register-email" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Email *
-                  </Label>
-                  <Input
-                    id="register-email"
-                    type="email"
-                    placeholder="votre.email@exemple.com"
-                    value={registerForm.email}
-                    onChange={(e) => setRegisterForm(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="register-phone" className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Téléphone
-                  </Label>
-                  <Input
-                    id="register-phone"
-                    type="tel"
-                    placeholder="06 12 34 56 78"
-                    value={registerForm.phone}
-                    onChange={(e) => setRegisterForm(prev => ({ ...prev, phone: e.target.value }))}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="register-password" className="flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Mot de passe *
-                  </Label>
-                  <Input
-                    id="register-password"
-                    type="password"
-                    placeholder="Au moins 6 caractères"
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm(prev => ({ ...prev, password: e.target.value }))}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="register-confirm-password" className="flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Confirmer le mot de passe *
-                  </Label>
-                  <Input
-                    id="register-confirm-password"
-                    type="password"
-                    placeholder="Répétez votre mot de passe"
-                    value={registerForm.confirmPassword}
-                    onChange={(e) => setRegisterForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Inscription...
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      S'inscrire
-                    </>
-                  )}
-                </Button>
-                
-                <p className="text-xs text-gray-600 text-center">
-                  * Champs obligatoires
-                </p>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
-}
+};
+
+export default HousekeeperAuth;
