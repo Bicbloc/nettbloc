@@ -77,6 +77,22 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
         })
         .eq('access_code', generatedCode);
 
+      // Send email invitation if email provided
+      if (email) {
+        try {
+          await supabase.functions.invoke('send-activation-email', {
+            body: {
+              email,
+              companyName: name,
+              hotelName: 'Votre hôtel',
+              activationLink: `${window.location.origin}/housekeeper/auth?code=${generatedCode}`
+            }
+          });
+        } catch (emailError) {
+          console.error('Error sending invitation email:', emailError);
+        }
+      }
+
       setStep('code');
       toast({
         title: "Code généré",
