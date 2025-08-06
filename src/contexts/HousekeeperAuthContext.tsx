@@ -238,7 +238,89 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     }
 
     try {
-      // Find the hotel session by access code
+      // Check if it's a simple hotel code (like HTL002) - make access request
+      if (accessCode.length <= 6 && !accessCode.includes('-')) {
+        const requestResult = await requestHotelAccess(accessCode);
+        if (requestResult.success) {
+          return { success: false, error: "Demande d'accès envoyée. En attente d'approbation de l'admin." };
+        } else {
+          return { success: false, error: requestResult.error };
+        }
+      }
+
+      // First, check if it's a generated access code in housekeeper_access_codes
+      const { data: accessCodeData, error: codeError } = await supabase
+        .from('housekeeper_access_codes')
+        .select(`
+          *,
+          hotels:hotel_id (
+            id,
+            name,
+            hotel_code,
+            address
+          )
+        `)
+        .eq('access_code', accessCode)
+        .eq('is_active', true)
+        .is('used_at', null)
+        .maybeSingle();
+
+      if (accessCodeData && !codeError) {
+        // Mark the code as used
+        await supabase
+          .from('housekeeper_access_codes')
+          .update({ used_at: new Date().toISOString() })
+          .eq('id', accessCodeData.id);
+
+        // Create a new hotel access session
+        const sessionToken = Math.random().toString(36).substring(2, 15);
+        const { data: newSession, error: sessionError } = await supabase
+          .from('hotel_access_sessions')
+          .insert({
+            housekeeper_profile_id: profile.id,
+            hotel_id: accessCodeData.hotel_id,
+            access_code: accessCode,
+            session_token: sessionToken,
+            started_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), // 48 hours
+            is_active: true
+          })
+          .select(`
+            *,
+            hotels:hotel_id (
+              id,
+              name,
+              hotel_code,
+              address
+            )
+          `)
+          .single();
+
+        if (sessionError || !newSession) {
+          return { success: false, error: "Erreur lors de la création de la session" };
+        }
+
+        const hotelSession: HotelSession = {
+          ...newSession,
+          hotel: Array.isArray(newSession.hotels) ? newSession.hotels[0] : newSession.hotels
+        };
+
+        setCurrentHotelSession(hotelSession);
+        
+        // Create hotel history entry
+        await supabase
+          .from('housekeeper_hotel_history')
+          .insert({
+            housekeeper_profile_id: profile.id,
+            hotel_id: hotelSession.hotel_id,
+            started_at: new Date().toISOString(),
+            rooms_cleaned: 0
+          });
+
+        return { success: true, session: hotelSession };
+      }
+
+      // Then check in hotel_access_sessions for existing approved sessions
       const { data: sessionData, error } = await supabase
         .from('hotel_access_sessions')
         .select(`
@@ -259,17 +341,19 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         return { success: false, error: "Code d'accès invalide ou expiré" };
       }
 
-      // Update the session to link it to this housekeeper
-      const { error: updateError } = await supabase
-        .from('hotel_access_sessions')
-        .update({
-          housekeeper_profile_id: profile.id,
-          started_at: new Date().toISOString()
-        })
-        .eq('id', sessionData.id);
+      // Update the session to link it to this housekeeper if not already linked
+      if (!sessionData.housekeeper_profile_id) {
+        const { error: updateError } = await supabase
+          .from('hotel_access_sessions')
+          .update({
+            housekeeper_profile_id: profile.id,
+            started_at: new Date().toISOString()
+          })
+          .eq('id', sessionData.id);
 
-      if (updateError) {
-        return { success: false, error: "Erreur lors de la connexion à l'hôtel" };
+        if (updateError) {
+          return { success: false, error: "Erreur lors de la connexion à l'hôtel" };
+        }
       }
 
       const hotelSession: HotelSession = {
@@ -279,15 +363,25 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
 
       setCurrentHotelSession(hotelSession);
       
-      // Create hotel history entry
-      await supabase
+      // Create hotel history entry if not exists
+      const { data: existingHistory } = await supabase
         .from('housekeeper_hotel_history')
-        .insert({
-          housekeeper_profile_id: profile.id,
-          hotel_id: hotelSession.hotel_id,
-          started_at: new Date().toISOString(),
-          rooms_cleaned: 0
-        });
+        .select('id')
+        .eq('housekeeper_profile_id', profile.id)
+        .eq('hotel_id', hotelSession.hotel_id)
+        .is('ended_at', null)
+        .maybeSingle();
+
+      if (!existingHistory) {
+        await supabase
+          .from('housekeeper_hotel_history')
+          .insert({
+            housekeeper_profile_id: profile.id,
+            hotel_id: hotelSession.hotel_id,
+            started_at: new Date().toISOString(),
+            rooms_cleaned: 0
+          });
+      }
 
       return { success: true, session: hotelSession };
     } catch (error) {

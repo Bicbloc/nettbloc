@@ -6,8 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import Housekeeper from "./pages/Housekeeper";
-import HousekeeperLogin from "./pages/HousekeeperLogin";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -55,9 +53,7 @@ const App = () => (
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/analysis" element={<AnalysisWorkflow />} />
-                  <Route path="/admin" element={<Admin />} />
-                   <Route path="/housekeeper" element={<Housekeeper />} />
-                   <Route path="/housekeeper-login" element={<HousekeeperLogin />} />
+                   <Route path="/admin" element={<Admin />} />
             <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
             <Route path="/housekeeper/dashboard" element={<HousekeeperDashboard />} />
             <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
