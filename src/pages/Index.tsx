@@ -61,6 +61,7 @@ import { useAutoSetup } from "@/hooks/use-auto-setup";
 import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
+import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -107,10 +108,11 @@ const Index = () => {
   const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
   const { email, setEmail, isValid } = useReportEmail();
   const [recommendedHousekeepers, setRecommendedHousekeepers] = useState<number>(0);
-  const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ 
+const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ 
     toDoItems: [], 
     toKnowItems: [] 
   });
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   // États pour la gestion des hôtels
   const [availableHotels, setAvailableHotels] = useState<any[]>([]);
@@ -202,12 +204,8 @@ const Index = () => {
           // Code authentifié pour le mode invité
           console.log('✅ Code hôtel vérifié pour le mode invité');
         } else {
-          console.error('❌ Aucun hôtel trouvé pour le code:', savedHotelCode);
-          toast({
-            variant: "destructive",
-            title: "Hôtel introuvable",
-            description: `Aucun hôtel trouvé avec le code ${savedHotelCode}. Veuillez configurer un hôtel.`
-          });
+          console.warn('❌ Aucun hôtel trouvé pour le code:', savedHotelCode);
+          // Suppression du popup intrusif; l'auto-setup et la configuration guidée gèreront le cas automatiquement.
         }
       }
     };
@@ -1805,6 +1803,32 @@ const Index = () => {
             ) : (
               <div className="space-y-6">
                 <div className="space-y-6">
+                  {/* Disponibilités du jour et recommandations */}
+                  {(recommendedHousekeepers > housekeeperNames.length || getUnassignedRooms().length > 0) && (
+                    <Card>
+                      <CardContent className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold">Disponibilités du jour</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {recommendedHousekeepers > housekeeperNames.length
+                                ? `Recommandation: ${recommendedHousekeepers} femmes de chambre pour aujourd'hui.`
+                                : `${getUnassignedRooms().length} chambre(s) restent non assignées.`}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button onClick={() => setShowInviteDialog(true)}>
+                              Inviter / Ajouter
+                            </Button>
+                            <Button variant="outline" onClick={() => navigate('/reports')}>
+                              Gérer l'équipe
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* Chambres non assignées en haut - toujours visible */}
                   <div className="w-full">
                     <UnassignedRoomsColumn
@@ -1815,6 +1839,13 @@ const Index = () => {
                       housekeeperNames={housekeeperNames}
                       onDirectAssign={handleDirectRoomAssignment}
                     />
+
+                    <HousekeeperInviteDialog
+                      open={showInviteDialog}
+                      onOpenChange={setShowInviteDialog}
+                      hotelId={(hotel?.id as string) || (currentHotelId as string) || ''}
+                    />
+                  </div>
                   </div>
                   
                   {/* Grid responsive pour 2 sections en largeur */}
