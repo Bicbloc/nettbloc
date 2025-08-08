@@ -1878,11 +1878,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       );
                     })}
                   </div>
-                  </div>
                 </div>
-              </div>
-            )}
-          </TabsContent>
+              )}
+            </TabsContent>
 
           <TabsContent value="reports" className="space-y-6">
             <div className="flex justify-between items-center">
@@ -2142,7 +2140,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
-    </div>
+      </div>
     </>
   );
 };
