@@ -91,20 +91,30 @@ export function ActiveUsersPanel() {
 
   const fetchActiveSessions = async () => {
     try {
+      // Récupérer seulement les sessions de l'hôtel actuel
+      const hotelId = localStorage.getItem('selectedHotelId');
+      if (!hotelId) {
+        setSessions([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('user_sessions')
         .select('*')
         .eq('is_active', true)
+        .eq('hotel_id', hotelId)
         .order('last_activity', { ascending: false });
 
       if (error) {
         console.error('Error fetching sessions:', error);
+        setSessions([]);
         return;
       }
 
       setSessions(data || []);
     } catch (error) {
       console.error('Error in fetchActiveSessions:', error);
+      setSessions([]);
     } finally {
       setLoading(false);
     }

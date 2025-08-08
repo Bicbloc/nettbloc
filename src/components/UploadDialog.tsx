@@ -13,17 +13,22 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
 import { FileUp } from "lucide-react";
+import { HousekeeperSetupDialog } from './HousekeeperSetupDialog';
 
 interface UploadDialogProps {
   onPdfProcessed: (data: any, distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
+  existingHousekeepers?: string[];
+  hotelId?: string;
 }
 
-export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
+export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelId }: UploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
   const [showDistributionOptions, setShowDistributionOptions] = useState(false);
   const [processedData, setProcessedData] = useState<any>(null);
+  const [showHousekeeperSetup, setShowHousekeeperSetup] = useState(false);
+  const [selectedHousekeepers, setSelectedHousekeepers] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,7 +85,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
       console.log("Données traitées:", data.length, "chambres");
       
       setProcessedData(data);
-      setShowDistributionOptions(true);
+      setShowHousekeeperSetup(true);
       
       toast({
         title: "Téléversement réussi",
@@ -98,13 +103,21 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
     }
   };
 
+  const handleHousekeepersConfirmed = (housekeepers: string[]) => {
+    setSelectedHousekeepers(housekeepers);
+    setShowHousekeeperSetup(false);
+    setShowDistributionOptions(true);
+  };
+
   const handleDistributionSelect = (method: 'random' | 'floor' | 'cleaning-type') => {
     if (processedData) {
       onPdfProcessed(processedData, method);
       setOpen(false);
       setShowDistributionOptions(false);
+      setShowHousekeeperSetup(false);
       setProcessedData(null);
       setSelectedFile(null);
+      setSelectedHousekeepers([]);
     }
   };
 
@@ -124,7 +137,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        {!showDistributionOptions ? (
+        {!showHousekeeperSetup && !showDistributionOptions ? (
           <>
             <DialogHeader>
               <DialogTitle>Importer un Rapport Mews</DialogTitle>
@@ -192,6 +205,25 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
               </Button>
             </DialogFooter>
           </>
+        ) : showHousekeeperSetup ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Configuration des femmes de chambre</DialogTitle>
+              <DialogDescription>
+                Sélectionnez les femmes de chambre existantes ou ajoutez-en de nouvelles avant la distribution.
+              </DialogDescription>
+            </DialogHeader>
+            <HousekeeperSetupDialog
+              isOpen={true}
+              onClose={() => {
+                setShowHousekeeperSetup(false);
+                setProcessedData(null);
+              }}
+              onHousekeepersConfirmed={handleHousekeepersConfirmed}
+              existingHousekeepers={existingHousekeepers}
+              roomCount={processedData?.length || 0}
+            />
+          </>
         ) : (
           <>
             <DialogHeader>
@@ -234,7 +266,7 @@ export function UploadDialog({ onPdfProcessed }: UploadDialogProps) {
                 variant="secondary"
                 onClick={() => {
                   setShowDistributionOptions(false);
-                  setProcessedData(null);
+                  setShowHousekeeperSetup(true);
                 }}
               >
                 Retour

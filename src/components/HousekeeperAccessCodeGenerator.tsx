@@ -43,6 +43,22 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
 
       if (error) throw error;
 
+      // Créer également une entrée dans la table housekeepers
+      const { error: housekeeperError } = await supabase
+        .from('housekeepers')
+        .insert({
+          hotel_id: hotelId,
+          name: housekeeperName,
+          access_code: accessCode,
+          is_temporary: true,
+          is_active: true,
+          user_id: (await supabase.auth.getUser()).data.user?.id
+        });
+
+      if (housekeeperError) {
+        console.warn('Erreur création housekeeper:', housekeeperError);
+      }
+
       // Créer l'entrée dans housekeeper_access_codes avec l'email si fourni
       const { error: insertError } = await supabase
         .from('housekeeper_access_codes')
@@ -51,7 +67,8 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
           access_code: accessCode,
           invited_name: housekeeperName,
           invited_email: email || null,
-          is_active: true
+          is_active: true,
+          created_by: (await supabase.auth.getUser()).data.user?.id
         });
 
       if (insertError) throw insertError;

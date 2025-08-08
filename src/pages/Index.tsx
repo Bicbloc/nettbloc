@@ -1821,7 +1821,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                             <Button onClick={() => setShowInviteDialog(true)}>
                               Inviter / Ajouter
                             </Button>
-                            <Button variant="outline" onClick={() => navigate('/reports')}>
+                            <Button variant="outline" onClick={() => setActiveTab('access-codes')}>
                               Gérer l'équipe
                             </Button>
                           </div>
