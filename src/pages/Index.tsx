@@ -1277,7 +1277,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   // Plus de blocage complet de l'interface
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <>
+      <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container mx-auto py-6">
         {/* Header avec navigation et authentification */}
         <div className="flex justify-between items-center mb-6">
@@ -1877,6 +1878,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       );
                     })}
                   </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -2140,8 +2142,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
-
     </div>
+    </>
   );
 };
 
