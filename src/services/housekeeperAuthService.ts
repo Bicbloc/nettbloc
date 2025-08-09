@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { generateHotelId } from '@/lib/utils';
 
 export interface HousekeeperAuthResult {
   success: boolean;
@@ -23,23 +24,36 @@ export class HousekeeperAuthService {
         };
       }
 
-      // Extract hotel code (part before first dash)
-      const hotelCode = accessCode.split('-')[0];
+      // Extraire et normaliser le code hôtel
+      const rawHotelPart = accessCode.split('-')[0]?.trim().toUpperCase();
+      const hotelCode = rawHotelPart || '';
       console.log('🏨 Code hôtel extrait:', hotelCode);
 
-      // Find hotel by code (case-insensitive search)
-      const { data: hotel, error: hotelError } = await supabase
+      // Rechercher l'hôtel par code exact (insensible à la casse)
+      let { data: hotel, error: hotelError } = await supabase
         .from('hotels')
         .select('*')
-        .ilike('hotel_code', hotelCode)
+        .eq('hotel_code', hotelCode)
         .maybeSingle();
+
+      // Fallback: tenter via l'ID déterministe si non trouvé
+      if (!hotel) {
+        const deterministicId = generateHotelId(hotelCode);
+        const { data: byId, error: byIdError } = await supabase
+          .from('hotels')
+          .select('*')
+          .eq('id', deterministicId)
+          .maybeSingle();
+        hotel = byId as any;
+        hotelError = byIdError as any;
+      }
 
       if (hotelError || !hotel) {
         console.error('❌ Hôtel non trouvé:', { hotelCode, error: hotelError });
         return {
           success: false,
-          error: `Hôtel avec le code "${hotelCode}" non trouvé`,
-          debugInfo: { hotelCode, hotelError }
+          error: `Hôtel avec le code "${hotelCode}" introuvable`,
+          debugInfo: { hotelCode, hotelError, triedDeterministicId: true }
         };
       }
 
@@ -160,45 +174,50 @@ export class HousekeeperAuthService {
   }
 
   // Find hotel by code only (for two-step authentication)
-  static async findHotelByCode(hotelCode: string): Promise<HousekeeperAuthResult> {
-    console.log('🔍 Recherche hôtel avec code:', hotelCode);
+  static async findHotelByCode(hotelCodeInput: string): Promise<HousekeeperAuthResult> {
+    console.log('🔍 Recherche hôtel avec code:', hotelCodeInput);
     
     try {
-      const { data: hotel, error } = await supabase
+      const normalized = (hotelCodeInput || '').trim().toUpperCase();
+      const codeOnly = normalized.split('-')[0];
+
+      // Tentative 1: par hotel_code exact
+      let { data: hotel, error } = await supabase
         .from('hotels')
         .select('*')
-        .ilike('hotel_code', hotelCode)
+        .eq('hotel_code', codeOnly)
         .maybeSingle();
 
+      // Tentative 2: par ID déterministe
+      if (!hotel) {
+        const deterministicId = generateHotelId(codeOnly);
+        const { data: byId, error: byIdError } = await supabase
+          .from('hotels')
+          .select('*')
+          .eq('id', deterministicId)
+          .maybeSingle();
+        hotel = byId as any;
+        error = byIdError as any;
+      }
+
       if (error || !hotel) {
-        console.error('❌ Hôtel non trouvé:', { hotelCode, error });
-        
-        // Get all hotels for debugging
+        console.error('❌ Hôtel non trouvé:', { codeOnly, error });
         const { data: allHotels } = await supabase
           .from('hotels')
           .select('hotel_code, name, id');
-        
         return {
           success: false,
-          error: `Hôtel avec le code "${hotelCode}" non trouvé`,
-          debugInfo: { hotelCode, availableHotels: allHotels, error }
+          error: `Hôtel avec le code "${codeOnly}" non trouvé`,
+          debugInfo: { input: hotelCodeInput, codeOnly, availableHotels: allHotels, error }
         };
       }
 
       console.log('✅ Hôtel trouvé:', hotel);
-      return {
-        success: true,
-        hotel: hotel,
-        debugInfo: { hotel }
-      };
+      return { success: true, hotel, debugInfo: { hotel } };
 
     } catch (error) {
       console.error('💥 Erreur recherche hôtel:', error);
-      return {
-        success: false,
-        error: 'Erreur lors de la recherche de l\'hôtel',
-        debugInfo: { error }
-      };
+      return { success: false, error: 'Erreur lors de la recherche de l\'hôtel', debugInfo: { error } };
     }
   }
 

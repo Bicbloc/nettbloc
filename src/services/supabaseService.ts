@@ -42,13 +42,27 @@ export class SupabaseService {
         return null;
       }
 
+      // Générer un code hôtel si absent via RPC, avec repli local
+      let generatedCode: string | null = null;
+      try {
+        const { data: rpcCode, error: rpcErr } = await supabase.rpc('generate_short_hotel_id');
+        if (!rpcErr && rpcCode) generatedCode = rpcCode as string;
+      } catch (e) {
+        console.warn('⚠️ RPC generate_short_hotel_id indisponible, fallback local');
+      }
+      if (!generatedCode) {
+        const rand = Math.floor(1 + Math.random() * 999);
+        generatedCode = `HTL${String(rand).padStart(3, '0')}`;
+      }
+
       const { data, error } = await supabase
         .from('hotels')
         .insert({ 
           name, 
           address, 
           email: userEmail,
-          user_id: user.id  // Assigner explicitement le user_id
+          user_id: user.id,  // Assigner explicitement le user_id
+          hotel_code: generatedCode
         })
         .select('id, name, email, address, hotel_code, created_at, updated_at')
         .single();

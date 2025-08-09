@@ -46,9 +46,10 @@ export function HousekeeperSetupDialog({
   // Réinitialiser les données quand le dialog s'ouvre
   useEffect(() => {
     if (isOpen) {
-      // Si on a des femmes de chambre existantes, commencer par les proposer
+      // Si on a des femmes de chambre existantes, proposer et présélectionner les dernières (limitées au recommandé)
       if (existingHousekeepers.length > 0 && initialHousekeepers.length === 0) {
-        setSelectedExisting(existingHousekeepers);
+        const preselected = existingHousekeepers.slice(0, recommendedCount);
+        setSelectedExisting(preselected);
         setHousekeepers([]);
       } else {
         const defaultHousekeepers = initialHousekeepers.length > 0 

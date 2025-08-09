@@ -158,20 +158,45 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       try {
         console.log("🔍 Chargement des femmes de chambre existantes pour l'hôtel:", currentHotelId);
         
-        const { data: housekeepers, error } = await supabase
+        const { data: hkList, error: hkError } = await supabase
           .from('housekeepers')
-          .select('name')
+          .select('id, name, is_active')
           .eq('hotel_id', currentHotelId)
           .eq('is_active', true);
 
-        if (error) {
-          console.error('Erreur lors du chargement des femmes de chambre:', error);
+        if (hkError) {
+          console.error('Erreur lors du chargement des femmes de chambre:', hkError);
           return;
         }
 
-        const names = housekeepers?.map(h => h.name) || [];
-        console.log("✅ Femmes de chambre chargées:", names);
-        setExistingHousekeepers(names);
+        const hkById = new Map<string, string>();
+        (hkList || []).forEach((h: any) => hkById.set(h.id, h.name));
+
+        const { data: sessions, error: sessError } = await supabase
+          .from('user_sessions')
+          .select('housekeeper_id, user_name, last_activity')
+          .eq('hotel_id', currentHotelId)
+          .eq('user_type', 'housekeeper')
+          .order('last_activity', { ascending: false });
+
+        if (sessError) {
+          console.warn('⚠️ Chargement sessions impossible, fallback ordre alphabétique');
+        }
+
+        const ordered: string[] = [];
+        const seen = new Set<string>();
+
+        (sessions || []).forEach((s: any) => {
+          const name = (s.housekeeper_id && hkById.get(s.housekeeper_id)) || s.user_name;
+          if (name && !seen.has(name)) { seen.add(name); ordered.push(name); }
+        });
+
+        (hkList || []).forEach((h: any) => {
+          if (!seen.has(h.name)) { seen.add(h.name); ordered.push(h.name); }
+        });
+
+        console.log("✅ Femmes de chambre (priorisées):", ordered);
+        setExistingHousekeepers(ordered);
       } catch (error) {
         console.error('Erreur lors du chargement des femmes de chambre:', error);
       }
