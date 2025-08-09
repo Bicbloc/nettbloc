@@ -131,6 +131,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   
   // État pour l'ID hôtel réel depuis la base de données
   const [realHotelId, setRealHotelId] = useState<string | null>(null);
+  const [existingHousekeepers, setExistingHousekeepers] = useState<string[]>([]);
   
   // ID d'hôtel - utilise l'ID réel de la base ou le localStorage
   const currentHotelId = realHotelId || selectedHotel?.id || localStorage.getItem("selectedHotelId");
@@ -148,6 +149,36 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   useEffect(() => {
     cleanupInvalidHotelIds();
   }, []);
+  
+  // Charger les femmes de chambre existantes
+  useEffect(() => {
+    const loadExistingHousekeepers = async () => {
+      if (!currentHotelId) return;
+      
+      try {
+        console.log("🔍 Chargement des femmes de chambre existantes pour l'hôtel:", currentHotelId);
+        
+        const { data: housekeepers, error } = await supabase
+          .from('housekeepers')
+          .select('name')
+          .eq('hotel_id', currentHotelId)
+          .eq('is_active', true);
+
+        if (error) {
+          console.error('Erreur lors du chargement des femmes de chambre:', error);
+          return;
+        }
+
+        const names = housekeepers?.map(h => h.name) || [];
+        console.log("✅ Femmes de chambre chargées:", names);
+        setExistingHousekeepers(names);
+      } catch (error) {
+        console.error('Erreur lors du chargement des femmes de chambre:', error);
+      }
+    };
+
+    loadExistingHousekeepers();
+  }, [currentHotelId]);
   
   // Traiter les données de l'AnalysisWorkflow
   useEffect(() => {
@@ -1477,6 +1508,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       handlePdfProcessed(data, housekeepers, distributionMethod);
                     }}
                     currentHousekeepers={housekeeperNames}
+                    existingHousekeepers={existingHousekeepers}
+                    hotelId={currentHotelId}
                   />
                   <ConfigDialog 
                     config={cleaningConfig} 
@@ -1578,6 +1611,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                     handlePdfProcessed(data, housekeepers, distributionMethod);
                   }}
                   currentHousekeepers={housekeeperNames}
+                  existingHousekeepers={existingHousekeepers}
+                  hotelId={currentHotelId}
                 />
                 <Button
                   onClick={() => openManualAssignment()}
@@ -1608,6 +1643,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                         handlePdfProcessed(data, housekeepers, distributionMethod);
                       }}
                       currentHousekeepers={housekeeperNames}
+                      existingHousekeepers={existingHousekeepers}
+                      hotelId={currentHotelId}
                     />
                   </div>
                 </CardContent>
@@ -2015,7 +2052,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                                 
                                 <div className="text-center">
                                   <Button
-                                    onClick={() => window.open(`/housekeeper-login`, '_blank')}
+                                    onClick={() => window.open(`/housekeeper/login`, '_blank')}
                                     className="w-full"
                                     size="sm"
                                   >

@@ -21,9 +21,11 @@ import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
   currentHousekeepers?: string[];
+  existingHousekeepers?: string[];
+  hotelId?: string;
 }
 
-export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = [] }: PdfWorkflowDialogProps) {
+export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = [], existingHousekeepers = [], hotelId }: PdfWorkflowDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -444,8 +446,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
         onClose={() => setIsHousekeeperDialogOpen(false)}
         onHousekeepersConfirmed={handleHousekeepersConfigured}
         initialHousekeepers={housekeepers}
-        existingHousekeepers={currentHousekeepers}
+        existingHousekeepers={existingHousekeepers}
         roomCount={pdfData?.length || 0}
+        hotelId={hotelId}
       />
 
       {pdfData && (

@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Users } from 'lucide-react';
+import { Trash2, Plus, Users, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { HousekeeperInviteDialog } from './HousekeeperInviteDialog';
 
 interface HousekeeperSetupDialogProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface HousekeeperSetupDialogProps {
   initialHousekeepers?: string[];
   existingHousekeepers?: string[]; // Femmes de chambre déjà créées
   roomCount?: number; // Nombre de chambres pour calculer le nombre recommandé
+  hotelId?: string; // Pour les invitations
 }
 
 export function HousekeeperSetupDialog({
@@ -23,7 +25,8 @@ export function HousekeeperSetupDialog({
   onHousekeepersConfirmed,
   initialHousekeepers = [],
   existingHousekeepers = [],
-  roomCount = 0
+  roomCount = 0,
+  hotelId
 }: HousekeeperSetupDialogProps) {
   // Calculer le nombre recommandé de femmes de chambre (approximativement 1 pour 10-12 chambres)
   const recommendedCount = Math.max(1, Math.ceil(roomCount / 10));
@@ -37,6 +40,7 @@ export function HousekeeperSetupDialog({
   const [housekeepers, setHousekeepers] = useState<string[]>(getDefaultHousekeepers());
   const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
   const [newHousekeeper, setNewHousekeeper] = useState('');
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const { toast } = useToast();
 
   // Réinitialiser les données quand le dialog s'ouvre
@@ -222,11 +226,28 @@ export function HousekeeperSetupDialog({
                 value={newHousekeeper}
                 onChange={(e) => setNewHousekeeper(e.target.value)}
                 onKeyPress={handleKeyPress}
+                className="flex-1"
               />
               <Button onClick={addHousekeeper} size="icon">
                 <Plus className="h-4 w-4" />
               </Button>
+              {hotelId && (
+                <Button 
+                  onClick={() => setShowInviteDialog(true)}
+                  variant="outline"
+                  size="icon"
+                  title="Inviter une femme de chambre"
+                >
+                  <Mail className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+            {hotelId && (
+              <p className="text-xs text-muted-foreground">
+                <Mail className="inline h-3 w-3 mr-1" />
+                Utilisez le bouton email pour inviter directement
+              </p>
+            )}
           </div>
 
           {/* Liste des nouvelles femmes de chambre ajoutées */}
@@ -282,6 +303,15 @@ export function HousekeeperSetupDialog({
           </div>
         </div>
       </DialogContent>
+      
+      {/* Dialog d'invitation */}
+      {hotelId && (
+        <HousekeeperInviteDialog
+          open={showInviteDialog}
+          onOpenChange={setShowInviteDialog}
+          hotelId={hotelId}
+        />
+      )}
     </Dialog>
   );
 }

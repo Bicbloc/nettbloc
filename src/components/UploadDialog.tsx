@@ -222,6 +222,7 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
               onHousekeepersConfirmed={handleHousekeepersConfirmed}
               existingHousekeepers={existingHousekeepers}
               roomCount={processedData?.length || 0}
+              hotelId={hotelId}
             />
           </>
         ) : (
