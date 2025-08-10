@@ -59,7 +59,16 @@ export class HousekeeperAuthService {
 
       console.log('✅ Hôtel trouvé:', hotel);
 
-      // Find housekeeper access code - chercher dans les deux tables
+      // Normalize code to support both short (HTL002-1234) and long (HTL002-NAME-1234) formats
+      const normalized = (accessCode || '').trim().toUpperCase();
+      const parts = normalized.split('-').filter(Boolean);
+      const codeHotelPart = parts[0] || hotelCode;
+      const suffix = parts.length >= 3 ? parts[2] : (parts[1] || '');
+      const isShort = parts.length === 2;
+      const isLong = parts.length >= 3;
+      const shortVariant = codeHotelPart && suffix ? `${codeHotelPart}-${suffix}` : normalized;
+
+      // 1) Try exact match in housekeeper_access_codes
       let { data: accessCodeData, error: codeError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
@@ -72,42 +81,140 @@ export class HousekeeperAuthService {
             is_active
           )
         `)
-        .eq('access_code', accessCode)
+        .eq('access_code', normalized)
         .eq('hotel_id', hotel.id)
         .eq('is_active', true)
         .maybeSingle();
 
-      console.log('🔍 Recherche dans housekeeper_access_codes:', { accessCodeData, codeError });
+      console.log('🔍 Recherche (exact) dans housekeeper_access_codes:', { accessCodeData, codeError });
 
-      // Si pas trouvé dans housekeeper_access_codes, chercher directement dans housekeepers
+      // 2) If not found and short format, try pattern HTLXXX-%-SUFFIX
+      if (!accessCodeData && isShort && codeHotelPart && suffix) {
+        console.log('🔄 Recherche (pattern court) dans housekeeper_access_codes');
+        const { data: patternCodes, error: patternErr } = await supabase
+          .from('housekeeper_access_codes')
+          .select(`
+            *,
+            housekeepers (
+              id,
+              name,
+              hotel_id,
+              user_id,
+              is_active
+            )
+          `)
+          .eq('hotel_id', hotel.id)
+          .eq('is_active', true)
+          .ilike('access_code', `${codeHotelPart}-%-${suffix}`)
+          .limit(1);
+        if (!patternErr && patternCodes && patternCodes.length > 0) {
+          accessCodeData = patternCodes[0] as any;
+          codeError = null as any;
+        }
+      }
+
+      // 3) If not found and long format, try short variant HTLXXX-SUFFIX
+      if (!accessCodeData && isLong && shortVariant) {
+        console.log('🔄 Recherche (variante courte) dans housekeeper_access_codes');
+        const { data: shortCodes, error: shortErr } = await supabase
+          .from('housekeeper_access_codes')
+          .select(`
+            *,
+            housekeepers (
+              id,
+              name,
+              hotel_id,
+              user_id,
+              is_active
+            )
+          `)
+          .eq('hotel_id', hotel.id)
+          .eq('is_active', true)
+          .eq('access_code', shortVariant)
+          .limit(1);
+        if (!shortErr && shortCodes && shortCodes.length > 0) {
+          accessCodeData = shortCodes[0] as any;
+          codeError = null as any;
+        }
+      }
+
+      // 4) If still not found, search directly in housekeepers table
       if (!accessCodeData) {
-        console.log('🔄 Code non trouvé dans housekeeper_access_codes, recherche dans housekeepers...');
-        const { data: housekeeper, error: housekeeperError } = await supabase
+        console.log('🔄 Recherche dans housekeepers...');
+        // 4a) Exact
+        const { data: hkExact, error: hkExactErr } = await supabase
           .from('housekeepers')
           .select('*')
-          .eq('access_code', accessCode)
+          .eq('access_code', normalized)
           .eq('hotel_id', hotel.id)
           .eq('is_active', true)
           .maybeSingle();
 
-        console.log('🔍 Résultat recherche housekeeper:', { housekeeper, housekeeperError });
-
-        if (housekeeper) {
-          // Create a mock accessCodeData structure
+        if (hkExact && !hkExactErr) {
           accessCodeData = {
-            id: 'mock-' + housekeeper.id,
-            access_code: accessCode,
+            id: 'mock-' + hkExact.id,
+            access_code: normalized,
             hotel_id: hotel.id,
-            housekeeper_id: housekeeper.id,
-            is_active: true,
+            housekeeper_id: hkExact.id,
+            is_active: hkExact.is_active,
             created_at: new Date().toISOString(),
             created_by: null,
             expires_at: null,
             used_at: null,
-            housekeepers: housekeeper
+            housekeepers: hkExact
           } as any;
-          codeError = null;
-          console.log('✅ Femme de chambre trouvée via access_code:', housekeeper);
+        }
+
+        // 4b) Short pattern
+        if (!accessCodeData && isShort && codeHotelPart && suffix) {
+          const { data: hkList, error: hkListErr } = await supabase
+            .from('housekeepers')
+            .select('*')
+            .eq('hotel_id', hotel.id)
+            .eq('is_active', true)
+            .ilike('access_code', `${codeHotelPart}-%-${suffix}`)
+            .limit(1);
+          if (!hkListErr && hkList && hkList.length > 0) {
+            const hk = hkList[0];
+            accessCodeData = {
+              id: 'mock-' + hk.id,
+              access_code: hk.access_code,
+              hotel_id: hotel.id,
+              housekeeper_id: hk.id,
+              is_active: hk.is_active,
+              created_at: new Date().toISOString(),
+              created_by: null,
+              expires_at: null,
+              used_at: null,
+              housekeepers: hk
+            } as any;
+          }
+        }
+
+        // 4c) Long provided, try short variant
+        if (!accessCodeData && isLong && shortVariant) {
+          const { data: hkShort, error: hkShortErr } = await supabase
+            .from('housekeepers')
+            .select('*')
+            .eq('hotel_id', hotel.id)
+            .eq('is_active', true)
+            .eq('access_code', shortVariant)
+            .limit(1);
+          if (!hkShortErr && hkShort && hkShort.length > 0) {
+            const hk = hkShort[0];
+            accessCodeData = {
+              id: 'mock-' + hk.id,
+              access_code: hk.access_code,
+              hotel_id: hotel.id,
+              housekeeper_id: hk.id,
+              is_active: hk.is_active,
+              created_at: new Date().toISOString(),
+              created_by: null,
+              expires_at: null,
+              used_at: null,
+              housekeepers: hk
+            } as any;
+          }
         }
       }
 

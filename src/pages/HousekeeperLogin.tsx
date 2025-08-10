@@ -258,7 +258,7 @@ export default function HousekeeperLogin() {
                   Saisissez votre code d'accès complet pour vous connecter directement
                 </p>
                 <p className="text-xs text-emerald-600 mt-1">
-                  Format: HTL002-MARIE-1234
+                  Formats acceptés: HTL002-1234 ou HTL002-MARIE-1234
                 </p>
               </div>
               
@@ -383,10 +383,10 @@ export default function HousekeeperLogin() {
                   <h3 className="font-semibold text-blue-800">Étape 2: Votre code d'accès</h3>
                 </div>
                 <p className="text-sm text-blue-700">
-                  Saisissez votre code d'accès personnel complet
+                  Saisissez votre code d'accès (court ou complet)
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
-                  Format: {selectedHotel?.hotel_code}-VOTRENOM-1234
+                  Formats acceptés: {selectedHotel?.hotel_code}-1234 ou {selectedHotel?.hotel_code}-VOTRENOM-1234
                 </p>
               </div>
               

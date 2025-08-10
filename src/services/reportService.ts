@@ -26,6 +26,51 @@ export async function storeEmailAddress(email: string): Promise<void> {
   }
 }
 
+// Archive a daily report in Supabase so it appears in the Reports page
+export async function saveDailyReport(params: {
+  roomData: any[];
+  assignments: Record<string, any[]>;
+  housekeeperNames: string[];
+}) {
+  try {
+    const { data: userData } = await supabaseClient.auth.getUser();
+    const user = userData?.user;
+    if (!user) {
+      console.log("Skipping report archive: no authenticated user");
+      return { success: false };
+    }
+
+    const hotelId = typeof window !== 'undefined' ? localStorage.getItem('selectedHotelId') : null;
+    if (!hotelId) {
+      console.log("Skipping report archive: no selectedHotelId in localStorage");
+      return { success: false };
+    }
+
+    const { error } = await supabaseClient
+      .from('daily_reports')
+      .insert({
+        user_id: user.id,
+        hotel_id: hotelId,
+        report_date: new Date().toISOString().slice(0, 10),
+        room_data: params.roomData || [],
+        housekeeper_assignments: params.assignments || {},
+        housekeeper_names: params.housekeeperNames || [],
+        action_log: [],
+      });
+
+    if (error) {
+      console.error('Error archiving daily report:', error);
+      return { success: false, error };
+    }
+
+    console.log('✅ Daily report archived successfully');
+    return { success: true };
+  } catch (e) {
+    console.error('Unexpected error archiving daily report:', e);
+    return { success: false, error: e };
+  }
+}
+
 // Generate a PDF report
 export async function generateReport(
   housekeeper: string,
@@ -108,6 +153,13 @@ export async function generateReport(
     toast({
       title: "Rapport généré",
       description: `Le rapport pour ${housekeeper} a été téléchargé.`
+    });
+    
+    // Archive the report for the Reports page (best-effort)
+    await saveDailyReport({
+      roomData: sortedRooms,
+      assignments: { [housekeeper]: sortedRooms },
+      housekeeperNames: [housekeeper],
     });
     
     return true;
@@ -705,6 +757,13 @@ export async function generateCombinedReport(
     toast({
       title: "Rapports générés",
       description: `Un fichier PDF combinant les rapports de ${validHousekeepers.length} femmes de chambre a été téléchargé.`
+    });
+    
+    // Archive the combined report (best-effort)
+    await saveDailyReport({
+      roomData: validHousekeepers.flatMap(h => h.rooms),
+      assignments: Object.fromEntries(validHousekeepers.map(h => [h.name, h.rooms])),
+      housekeeperNames: validHousekeepers.map(h => h.name),
     });
     
     return true;
