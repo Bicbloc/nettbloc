@@ -1697,7 +1697,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                         <TableHead>Type de nettoyage</TableHead>
                         <TableHead>Priorité</TableHead>
                         <TableHead>Assignée à</TableHead>
-                        <TableHead>Jumelle</TableHead>
+                        <TableHead>Twin</TableHead>
                         <TableHead>Chambres liées</TableHead>
                         <TableHead>Actions rapides</TableHead>
                         <TableHead>Gestion</TableHead>
