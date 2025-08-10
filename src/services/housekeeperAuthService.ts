@@ -33,11 +33,12 @@ export class HousekeeperAuthService {
       let { data: hotel, error: hotelError } = await supabase
         .from('hotels')
         .select('*')
-        .eq('hotel_code', hotelCode)
+        .ilike('hotel_code', hotelCode)
         .maybeSingle();
 
       // Fallback: tenter via l'ID déterministe si non trouvé
       if (!hotel) {
+        console.log('🔄 Tentative avec ID déterministe pour:', hotelCode);
         const deterministicId = generateHotelId(hotelCode);
         const { data: byId, error: byIdError } = await supabase
           .from('hotels')
@@ -48,18 +49,42 @@ export class HousekeeperAuthService {
         hotelError = byIdError as any;
       }
 
+      // Fallback: recherche générale par nom si toujours pas trouvé
+      if (!hotel) {
+        console.log('🔄 Recherche générale par nom pour:', hotelCode);
+        const { data: byName, error: byNameError } = await supabase
+          .from('hotels')
+          .select('*')
+          .ilike('name', `%${hotelCode}%`)
+          .maybeSingle();
+        hotel = byName as any;
+        hotelError = byNameError as any;
+      }
+
       if (hotelError || !hotel) {
         console.error('❌ Hôtel non trouvé:', { hotelCode, error: hotelError });
+        
+        // Debug: montrer tous les hôtels disponibles
+        const { data: allHotels } = await supabase
+          .from('hotels')
+          .select('id, name, hotel_code, email')
+          .limit(10);
+        
         return {
           success: false,
           error: `Hôtel avec le code "${hotelCode}" introuvable`,
-          debugInfo: { hotelCode, hotelError, triedDeterministicId: true }
+          debugInfo: { 
+            hotelCode, 
+            hotelError, 
+            availableHotels: allHotels,
+            triedDeterministicId: true 
+          }
         };
       }
 
       console.log('✅ Hôtel trouvé:', hotel);
 
-      // Find housekeeper access code - chercher dans les deux tables
+      // Rechercher dans housekeeper_access_codes d'abord
       let { data: accessCodeData, error: codeError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
@@ -114,7 +139,7 @@ export class HousekeeperAuthService {
       if (codeError || !accessCodeData) {
         console.error('❌ Code d\'accès non trouvé dans les deux tables:', { accessCode, error: codeError });
         
-        // Try to find any code with this pattern for debugging
+        // Debug: montrer tous les codes disponibles pour cet hôtel
         const { data: allCodes } = await supabase
           .from('housekeeper_access_codes')
           .select('access_code, hotel_id, is_active, housekeeper_id')
@@ -127,10 +152,11 @@ export class HousekeeperAuthService {
         
         return {
           success: false,
-          error: `Code d'accès "${accessCode}" non trouvé`,
+          error: `Code d'accès "${accessCode}" non trouvé ou inactif`,
           debugInfo: { 
             accessCode, 
             hotelId: hotel.id,
+            hotelName: hotel.name,
             availableCodes: allCodes,
             availableHousekeepers: allHousekeepers,
             searchedInBothTables: true,
@@ -150,11 +176,13 @@ export class HousekeeperAuthService {
 
       console.log('✅ Authentification réussie:', housekeeper);
 
-      // Mark code as used
-      await supabase
-        .from('housekeeper_access_codes')
-        .update({ used_at: new Date().toISOString() })
-        .eq('id', accessCodeData.id);
+      // Mark code as used only if it's a real access code (not mock)
+      if (!accessCodeData.id.startsWith('mock-')) {
+        await supabase
+          .from('housekeeper_access_codes')
+          .update({ used_at: new Date().toISOString() })
+          .eq('id', accessCodeData.id);
+      }
 
       return {
         success: true,
@@ -181,11 +209,11 @@ export class HousekeeperAuthService {
       const normalized = (hotelCodeInput || '').trim().toUpperCase();
       const codeOnly = normalized.split('-')[0];
 
-      // Tentative 1: par hotel_code exact
+      // Tentative 1: par hotel_code exact (insensible à la casse)
       let { data: hotel, error } = await supabase
         .from('hotels')
         .select('*')
-        .eq('hotel_code', codeOnly)
+        .ilike('hotel_code', codeOnly)
         .maybeSingle();
 
       // Tentative 2: par ID déterministe
@@ -200,11 +228,23 @@ export class HousekeeperAuthService {
         error = byIdError as any;
       }
 
+      // Tentative 3: recherche par nom
+      if (!hotel) {
+        const { data: byName, error: byNameError } = await supabase
+          .from('hotels')
+          .select('*')
+          .ilike('name', `%${codeOnly}%`)
+          .maybeSingle();
+        hotel = byName as any;
+        error = byNameError as any;
+      }
+
       if (error || !hotel) {
         console.error('❌ Hôtel non trouvé:', { codeOnly, error });
         const { data: allHotels } = await supabase
           .from('hotels')
-          .select('hotel_code, name, id');
+          .select('hotel_code, name, id')
+          .limit(10);
         return {
           success: false,
           error: `Hôtel avec le code "${codeOnly}" non trouvé`,
@@ -253,10 +293,44 @@ export class HousekeeperAuthService {
       }
 
       if (!codes || codes.length === 0) {
+        // Chercher aussi dans housekeepers
+        const { data: housekeepers, error: hkError } = await supabase
+          .from('housekeepers')
+          .select(`
+            *,
+            hotels!inner (
+              id,
+              name,
+              hotel_code
+            )
+          `)
+          .eq('access_code', accessCode);
+
+        if (hkError || !housekeepers || housekeepers.length === 0) {
+          return {
+            success: false,
+            error: 'Code d\'accès non trouvé dans la base de données',
+            debugInfo: { accessCode, searchResult: codes, housekeeperResult: housekeepers }
+          };
+        }
+
+        const activeHousekeeper = housekeepers.find(h => h.is_active);
+        if (!activeHousekeeper) {
+          return {
+            success: false,
+            error: 'Code d\'accès trouvé mais femme de chambre inactive',
+            debugInfo: { accessCode, housekeepers }
+          };
+        }
+
         return {
-          success: false,
-          error: 'Code d\'accès non trouvé dans la base de données',
-          debugInfo: { accessCode, searchResult: codes }
+          success: true,
+          debugInfo: { 
+            accessCode, 
+            housekeeper: activeHousekeeper,
+            hotel: activeHousekeeper.hotels,
+            foundInHousekeepers: true
+          }
         };
       }
 
