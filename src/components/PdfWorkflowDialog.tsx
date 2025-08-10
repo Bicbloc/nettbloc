@@ -223,10 +223,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">Étape 1/3</Badge>
-          Importer un Rapport Mews
+          Importer un Rapport Housekeeping
         </DialogTitle>
         <DialogDescription>
-          Téléversez un rapport PDF exporté depuis Mews. Les données seront associées à votre session IP pour permettre la synchronisation en temps réel entre l'admin et les interfaces des femmes de chambre.
+          Téléversez un rapport PDF exporté depuis votre PMS. Les données seront associées à votre session IP pour permettre la synchronisation en temps réel entre l'admin et les interfaces des femmes de chambre.
         </DialogDescription>
       </DialogHeader>
       
