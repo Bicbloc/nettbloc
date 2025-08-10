@@ -18,7 +18,7 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { addHousekeeper, refreshHousekeepers } = useHousekeeping();
+  const { setHousekeeperNames, refreshHousekeepers } = useHousekeeping();
 
   const handleAdd = async () => {
     const trimmedName = name.trim();
@@ -73,7 +73,7 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
       
       if (housekeeper) {
         // Mettre à jour le contexte local
-        addHousekeeper(trimmedName);
+        setHousekeeperNames(prev => [...prev, trimmedName]);
         
         // Rafraîchir la liste depuis la base
         await refreshHousekeepers();
