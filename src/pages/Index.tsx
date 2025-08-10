@@ -8,39 +8,20 @@ import { useToast } from "@/hooks/use-toast";
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { Users, ListChecks, FileText, Settings, Trash2, Plus } from "lucide-react";
 
-
 export default function Index() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'rooms' | 'reports' | 'settings' | 'access-codes'>('rooms');
   const [hotelName, setHotelName] = useState(localStorage.getItem('selectedHotelName') || 'Hôtel non sélectionné');
   const [hotelCode, setHotelCode] = useState(localStorage.getItem('selectedHotelCode') || '');
   const [isInitialized, setIsInitialized] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [reportSavedEvent, setReportSavedEvent] = useState<Event | null>(null);
-  const [reportSaveErrorEvent, setReportSaveErrorEvent] = useState<Event | null>(null);
-  const [isAutoSaving, setIsAutoSaving] = useState(true);
-  const debouncedSave = useDebounce(saveToSupabase, 2000);
 
   const {
     roomData,
-    setRoomData,
-    addRoom,
-    updateRoom,
-    deleteRoom,
     housekeeperNames,
     addHousekeeper,
-    deleteHousekeeper,
-    housekeeperAssignments,
-    assignHousekeeper,
-    unassignHousekeeper,
-    actionLog,
-    logAction,
-    clearActionLog,
-    saveToSupabase
+    removeHousekeeper,
+    housekeeperAssignments
   } = useHousekeeping();
   
   useEffect(() => {
@@ -50,43 +31,19 @@ export default function Index() {
     if (storedHotelCode) setHotelCode(storedHotelCode);
     setIsInitialized(true);
   }, []);
-
-  useEffect(() => {
-    if (isInitialized && isAutoSaving) {
-      debouncedSave();
-    }
-  }, [roomData, housekeeperAssignments, housekeeperNames, actionLog, isInitialized, isAutoSaving, debouncedSave]);
-
-  useEffect(() => {
-    const handleReportSaved = (event: Event) => {
-      setReportSavedEvent(event);
-      toast({
-        title: "Rapport Sauvegardé",
-        description: `Votre rapport a été sauvegardé avec succès.`,
-      });
-    };
-
-    const handleReportSaveError = (event: Event) => {
-      setReportSaveErrorEvent(event);
-      const detail = (event as CustomEvent).detail;
-      toast({
-        title: "Erreur de Sauvegarde",
-        description: `Erreur lors de la sauvegarde du rapport: ${detail?.error || 'Erreur inconnue'}`,
-        variant: "destructive",
-      });
-    };
-
-    window.addEventListener('report-saved', handleReportSaved);
-    window.addEventListener('report-save-error', handleReportSaveError);
-
-    return () => {
-      window.removeEventListener('report-saved', handleReportSaved);
-      window.removeEventListener('report-save-error', handleReportSaveError);
-    };
-  }, [toast]);
   
   const handleManageTeam = () => {
     setActiveTab('access-codes');
+  };
+
+  const handleConfirmDelete = (name: string) => {
+    if (window.confirm(`Voulez-vous supprimer ${name} de la liste?`)) {
+      removeHousekeeper(name);
+      toast({
+        title: "Femme de chambre supprimée",
+        description: `${name} a été supprimée de la liste`,
+      });
+    }
   };
 
   return (
@@ -101,9 +58,6 @@ export default function Index() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/housekeeper-login")}>
-              Changer d'hôtel
-            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               Déconnexion
             </Button>
@@ -146,7 +100,20 @@ export default function Index() {
       <main className="container mx-auto px-4 py-8">
         {activeTab === 'rooms' && (
           <div className="space-y-6">
-            <RoomList />
+            <Card>
+              <CardHeader>
+                <CardTitle>Chambres</CardTitle>
+                <CardDescription>
+                  Gestion des chambres de l'hôtel
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center text-muted-foreground">
+                  <p>Liste des chambres ({roomData.length} chambres)</p>
+                  <p className="mt-2">Utilisez l'interface de gestion pour configurer les chambres</p>
+                </div>
+              </CardContent>
+            </Card>
             
             <div className="text-center space-y-4">
               <Button 
@@ -166,7 +133,20 @@ export default function Index() {
 
         {activeTab === 'reports' && (
           <div className="space-y-6">
-            <ReportList />
+            <Card>
+              <CardHeader>
+                <CardTitle>Rapports</CardTitle>
+                <CardDescription>
+                  Historique des rapports de nettoyage
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center text-muted-foreground">
+                  <p>Aucun rapport disponible pour le moment</p>
+                  <p className="mt-2">Les rapports apparaîtront ici une fois générés</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -180,18 +160,9 @@ export default function Index() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="auto-save">Sauvegarde automatique</Label>
-                  <Switch
-                    id="auto-save"
-                    checked={isAutoSaving}
-                    onCheckedChange={(checked) => {
-                      setIsAutoSaving(checked);
-                      if (!checked) {
-                        debouncedSave.cancel();
-                      }
-                    }}
-                  />
+                <div className="text-center text-muted-foreground">
+                  <p>Configuration de l'application</p>
+                  <p className="mt-2">Les paramètres avancés seront disponibles prochainement</p>
                 </div>
               </CardContent>
             </Card>
@@ -210,34 +181,46 @@ export default function Index() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4">
                   {housekeeperNames.map((name, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <p className="font-medium">{name}</p>
+                    <div key={index} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{name}</p>
+                        <div className="text-xs text-muted-foreground">
+                          {housekeeperAssignments[name]?.length || 0} chambres assignées
+                        </div>
+                      </div>
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => {
-                          confirm({
-                            title: 'Supprimer?',
-                            description: `Voulez-vous supprimer ${name} de la liste?`,
-                            onConfirm: () => deleteHousekeeper(name),
-                          });
-                        }}
+                        onClick={() => handleConfirmDelete(name)}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Supprimer
                       </Button>
                     </div>
                   ))}
+                  
+                  {housekeeperNames.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8">
+                      <p>Aucune femme de chambre configurée</p>
+                      <p className="text-sm mt-1">Ajoutez votre première femme de chambre ci-dessous</p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex">
+                
+                <div className="flex gap-2">
                   <Input
                     placeholder="Nom de la femme de chambre"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (e.currentTarget.value) {
-                          addHousekeeper(e.currentTarget.value);
+                        const value = e.currentTarget.value.trim();
+                        if (value) {
+                          addHousekeeper(value);
                           e.currentTarget.value = '';
+                          toast({
+                            title: "Femme de chambre ajoutée",
+                            description: `${value} a été ajoutée à l'équipe`,
+                          });
                         }
                       }
                     }}
@@ -245,12 +228,17 @@ export default function Index() {
                   <Button
                     onClick={(e) => {
                       const input = (e.target as HTMLButtonElement)?.previousElementSibling as HTMLInputElement;
-                      if (input?.value) {
-                        addHousekeeper(input.value);
+                      const value = input?.value?.trim();
+                      if (value) {
+                        addHousekeeper(value);
                         input.value = '';
+                        toast({
+                          title: "Femme de chambre ajoutée",
+                          description: `${value} a été ajoutée à l'équipe`,
+                        });
                       }
                     }}
-                    className="ml-2"
+                    className="shrink-0"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter
