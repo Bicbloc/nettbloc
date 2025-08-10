@@ -1,25 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
-import { Room, Hotel, ReportData } from '@/types';
-import { CheckCircle, Copy, Plus, Trash2, Users, ListChecks, FileText, Settings, AlertTriangle, Save, Loader2 } from "lucide-react";
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { ReportService } from '@/services/reportService';
-import ReportList from '@/components/ReportList';
-import RoomList from '@/components/RoomList';
-import { useConfirm } from '@/components/ConfirmDialog';
-import { useDebounce } from '@/hooks/use-debounce';
+import { Users, ListChecks, FileText, Settings, Trash2, Plus } from "lucide-react";
+
 
 export default function Index() {
   const navigate = useNavigate();

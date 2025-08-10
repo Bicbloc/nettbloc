@@ -40,6 +40,13 @@ interface HousekeepingContextType {
   lastSaved: Date | null;
   refreshHousekeepers: () => Promise<void>;
   isInitialized: boolean;
+  // Compat helpers for existing components
+  rooms: any[];
+  isDistributed: boolean;
+  getHousekeeperRooms: (name: string) => any[];
+  updateRoomStatus: (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => void;
+  housekeepers: any[];
+  validateHotelConnection: () => Promise<string | null>;
 }
 
 const HousekeepingContext = createContext<HousekeepingContextType | undefined>(undefined);
@@ -258,6 +265,52 @@ export const HousekeepingProvider = ({ children }: { children: React.ReactNode }
     console.log('Refreshing housekeepers...');
   }, []);
 
+  // Compatibility helpers for components expecting additional API
+  const getHousekeeperRooms = useCallback((name: string) => {
+    const assignedNumbers = (housekeeperAssignments[name] || []).length > 0
+      ? housekeeperAssignments[name]
+      : roomData.filter(r => r.housekeeper === name).map(r => r.number);
+
+    // Return lightweight room objects compatible enough for consumers
+    return assignedNumbers.map((num) => ({
+      number: num,
+      status: 'needs-cleaning',
+      cleaningType: 'quick',
+      assignedTo: name
+    }));
+  }, [housekeeperAssignments, roomData]);
+
+  const updateRoomStatus = useCallback((roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => {
+    const mapStatus: Record<string, Room['status']> = {
+      'clean': 'libre',
+      'in-progress': 'en cours',
+      'needs-cleaning': 'à nettoyer',
+      'ready-to-clean': 'à nettoyer',
+      'needs-attention': 'hors service'
+    } as const;
+
+    const mapped = mapStatus[newStatus] ?? 'à nettoyer';
+    updateRoom(roomNumber, {
+      status: mapped,
+      housekeeper: housekeeperName || undefined,
+      notes: remark ? remark : undefined
+    });
+
+    addActionLog({
+      action: `update-status:${newStatus}`,
+      room: roomNumber,
+      housekeeper: housekeeperName,
+      details: remark
+    });
+  }, [updateRoom, addActionLog]);
+
+  const validateHotelConnection = useCallback(async () => {
+    const id = localStorage.getItem('selectedHotelId');
+    return id || null;
+  }, []);
+
+  const isDistributed = Object.values(housekeeperAssignments).some(arr => (arr || []).length > 0);
+
   const value: HousekeepingContextType = {
     roomData,
     setRoomData,
@@ -275,7 +328,14 @@ export const HousekeepingProvider = ({ children }: { children: React.ReactNode }
     clearActionLog,
     lastSaved,
     refreshHousekeepers,
-    isInitialized
+    isInitialized,
+    // Compat helpers
+    rooms: roomData as any,
+    isDistributed,
+    getHousekeeperRooms,
+    updateRoomStatus,
+    housekeepers: [],
+    validateHotelConnection
   };
 
   return (

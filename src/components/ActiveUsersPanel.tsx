@@ -29,7 +29,7 @@ export function ActiveUsersPanel() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [housekeeperConnections, setHousekeeperConnections] = useState<HousekeeperConnection[]>([]);
   const [loading, setLoading] = useState(true);
-  const { housekeeperNames, housekeepers, getHousekeeperRooms } = useHousekeeping();
+  const { housekeeperNames, housekeeperAssignments, roomData } = useHousekeeping();
 
   useEffect(() => {
     fetchActiveSessions();
@@ -61,16 +61,16 @@ export function ActiveUsersPanel() {
       supabase.removeChannel(channel);
       clearInterval(activityInterval);
     };
-  }, [housekeeperNames, housekeepers]);
+  }, [housekeeperNames, housekeeperAssignments, roomData]);
 
   const updateHousekeeperConnections = () => {
     // Éliminer les doublons dans les noms de femmes de chambre
     const uniqueHousekeeperNames = [...new Set(housekeeperNames)].filter(name => name && name.trim());
     
-    const connections: HousekeeperConnection[] = uniqueHousekeeperNames.map((name, index) => {
-      const housekeeper = housekeepers.find(h => h.name === name);
-      const accessCode = housekeeper?.access_code || '';
-      const rooms = getHousekeeperRooms(name).map(room => room.number);
+    const connections: HousekeeperConnection[] = uniqueHousekeeperNames.map((name) => {
+      // Récupérer les chambres assignées à cette femme de chambre
+      const assignedRoomNumbers = housekeeperAssignments[name] ||
+        roomData.filter(r => r.housekeeper === name).map(r => r.number);
       
       // Vérifier s'il y a une session active pour cette femme de chambre
       const activeSession = sessions.find(s => 
@@ -79,9 +79,9 @@ export function ActiveUsersPanel() {
       
       return {
         name,
-        accessCode,
+        accessCode: '', // Non disponible dans le contexte local
         loginTime: activeSession ? new Date(activeSession.login_time) : new Date(),
-        rooms,
+        rooms: assignedRoomNumbers,
         isOnline: !!activeSession
       };
     });
