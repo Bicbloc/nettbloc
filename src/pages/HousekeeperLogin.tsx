@@ -127,8 +127,11 @@ export default function HousekeeperLogin() {
       localStorage.setItem('housekeeper', JSON.stringify({
         id: housekeeper.id,
         name: housekeeper.name,
-        accessCode: housekeeperCode
+        accessCode: housekeeper.access_code || housekeeperCode
       }));
+      // Clés utilisées par l'interface mobile
+      localStorage.setItem('currentHousekeeper', housekeeper.name);
+      localStorage.setItem('currentAccessCode', housekeeper.access_code || housekeeperCode);
       
       // Sauvegarder l'hôtel sélectionné
       localStorage.setItem('selectedHotelId', selectedHotel.id);
@@ -192,8 +195,11 @@ export default function HousekeeperLogin() {
       localStorage.setItem('housekeeper', JSON.stringify({
         id: housekeeper.id,
         name: housekeeper.name,
-        accessCode: fullAccessCode
+        accessCode: housekeeper.access_code || fullAccessCode
       }));
+      // Clés utilisées par l'interface mobile
+      localStorage.setItem('currentHousekeeper', housekeeper.name);
+      localStorage.setItem('currentAccessCode', housekeeper.access_code || fullAccessCode);
       
       localStorage.setItem('selectedHotelId', hotel.id);
       localStorage.setItem('selectedHotelName', hotel.name);

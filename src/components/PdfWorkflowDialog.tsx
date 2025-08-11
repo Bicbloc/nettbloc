@@ -427,7 +427,17 @@ export function PdfWorkflowDialog({ onWorkflowComplete, currentHousekeepers = []
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(next) => {
+        if (!next && step !== 'upload') {
+          toast({
+            variant: 'destructive',
+            title: 'Terminez le workflow',
+            description: 'Vous devez terminer les étapes avant de fermer.'
+          });
+          return; // Empêcher la fermeture en cours de workflow
+        }
+        setOpen(next);
+      }}>
         <DialogTrigger asChild>
           <Button>
             <FileUp className="mr-2 h-4 w-4" />
