@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,8 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { processPdf, Room } from '@/services/pdfService';
 import { useNavigate } from 'react-router-dom';
+import { HousekeeperSetupDialog } from '@/components/HousekeeperSetupDialog';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
 
 type DistributionMethod = 'random' | 'floor' | 'cleaning-type';
 
@@ -35,6 +37,7 @@ interface AnalysisStep {
 const AnalysisWorkflow = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { housekeeperNames: existingHousekeepers } = useHousekeeping();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +46,7 @@ const AnalysisWorkflow = () => {
   const [recommendedHousekeepers, setRecommendedHousekeepers] = useState(0);
   const [housekeeperNames, setHousekeeperNames] = useState<string[]>([]);
   const [distributionMethod, setDistributionMethod] = useState<DistributionMethod>('random');
+  const [showHousekeeperDialog, setShowHousekeeperDialog] = useState(false);
   
   const steps: AnalysisStep[] = [
     {
@@ -133,6 +137,16 @@ const AnalysisWorkflow = () => {
     const updated = [...housekeeperNames];
     updated[index] = newName;
     setHousekeeperNames(updated);
+  };
+
+  const handleOpenHousekeeperDialog = () => {
+    setShowHousekeeperDialog(true);
+  };
+
+  const handleHousekeepersConfirmed = (confirmedHousekeepers: string[]) => {
+    setHousekeeperNames(confirmedHousekeepers);
+    setShowHousekeeperDialog(false);
+    setCurrentStep(4); // Aller directement à l'étape suivante
   };
 
   const handleApplyDistribution = () => {
@@ -278,30 +292,49 @@ const AnalysisWorkflow = () => {
             <strong>Nombre recommandé :</strong> {recommendedHousekeepers} femmes de chambre
           </AlertDescription>
         </Alert>
+
+        {existingHousekeepers.length > 0 && (
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>{existingHousekeepers.length} femmes de chambre existantes détectées.</strong>
+              <br />
+              Vous pouvez les utiliser ou en ajouter de nouvelles.
+            </AlertDescription>
+          </Alert>
+        )}
         
-        <div className="space-y-2">
-          <Label>Noms des femmes de chambre ({housekeeperNames.length}/{recommendedHousekeepers})</Label>
-          {housekeeperNames.map((name, index) => (
-            <div key={index} className="flex gap-2">
-              <Input
-                value={name}
-                onChange={(e) => handleHousekeeperNameChange(index, e.target.value)}
-                placeholder={`Femme de chambre ${index + 1}`}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRemoveHousekeeper(index)}
-              >
-                Supprimer
-              </Button>
+        <div className="space-y-4">
+          <Button 
+            onClick={handleOpenHousekeeperDialog}
+            className="w-full"
+            size="lg"
+          >
+            <Users className="mr-2 h-4 w-4" />
+            Configurer les femmes de chambre
+          </Button>
+
+          {housekeeperNames.length > 0 && (
+            <div className="space-y-2">
+              <Label>Femmes de chambre sélectionnées ({housekeeperNames.length})</Label>
+              <div className="flex flex-wrap gap-2">
+                {housekeeperNames.map((name, index) => (
+                  <Badge key={index} variant="secondary" className="px-3 py-1">
+                    {name}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleAddHousekeeper} className="flex-1">
-            Ajouter une femme de chambre
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentStep(2)}
+            className="flex-1"
+          >
+            Retour
           </Button>
           <Button 
             onClick={() => setCurrentStep(4)}
@@ -409,6 +442,16 @@ const AnalysisWorkflow = () => {
           Retour à l'accueil
         </Button>
       </div>
+
+      {/* Dialog de configuration des femmes de chambre */}
+      <HousekeeperSetupDialog
+        isOpen={showHousekeeperDialog}
+        onClose={() => setShowHousekeeperDialog(false)}
+        onHousekeepersConfirmed={handleHousekeepersConfirmed}
+        initialHousekeepers={housekeeperNames}
+        existingHousekeepers={existingHousekeepers}
+        roomCount={analyzedRooms.length}
+      />
     </div>
   );
 };

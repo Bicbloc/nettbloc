@@ -151,7 +151,17 @@ export function HousekeeperSetupDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(next) => {
+      if (!next && (selectedExisting.length > 0 || housekeepers.length > 0)) {
+        toast({
+          variant: 'destructive',
+          title: 'Terminez la configuration',
+          description: 'Cliquez sur "Confirmer" pour valider votre sélection.'
+        });
+        return; // Empêcher la fermeture si des selections sont faites
+      }
+      onClose();
+    }}>
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

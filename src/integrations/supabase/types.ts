@@ -816,6 +816,19 @@ export type Database = {
         Args: { request_id: string; admin_user_id: string }
         Returns: string
       }
+      authenticate_housekeeper_by_code: {
+        Args: { p_access_code: string }
+        Returns: {
+          success: boolean
+          hotel_id: string
+          hotel_name: string
+          hotel_code: string
+          housekeeper_id: string
+          housekeeper_name: string
+          resolved_access_code: string
+          code_source: string
+        }[]
+      }
       change_subscription_status: {
         Args: { p_user_id: string; p_new_status: string; p_reason?: string }
         Returns: boolean
