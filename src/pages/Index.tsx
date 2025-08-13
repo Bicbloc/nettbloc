@@ -1404,7 +1404,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         <SetupStatusSimple onRetry={() => window.location.reload()} />
 
         {/* Diagnostic pour les problèmes d'association hôtel uniquement si problème */}
-        {(!hotel || !isSetupComplete || !currentHotelId) && (
+        {!setupLoading && !hotel && (
           <div className="mb-6">
             <HotelSetupFix onForceSetup={() => window.location.reload()} />
           </div>
