@@ -899,6 +899,18 @@ export type Database = {
         Args: { p_action: string; p_target_user_id?: string; p_details?: Json }
         Returns: undefined
       }
+      log_housekeeper_action: {
+        Args: {
+          p_hotel_id: string
+          p_type: string
+          p_title?: string
+          p_description?: string
+          p_housekeeper_name?: string
+          p_room_number?: string
+          p_target_user_id?: string
+        }
+        Returns: number
+      }
       request_password_reset: {
         Args: { user_email: string }
         Returns: boolean

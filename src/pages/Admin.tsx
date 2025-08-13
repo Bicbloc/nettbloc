@@ -27,6 +27,7 @@ import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButto
 import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
+import { HousekeeperAccessRequestNotification } from '@/components/HousekeeperAccessRequestNotification';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -683,6 +684,9 @@ const Admin = () => {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Access Request Notifications */}
+      <HousekeeperAccessRequestNotification />
+      
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <BackButton />

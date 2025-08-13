@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Clock, Home, LogOut } from 'lucide-react';
+import { useRoomCleaningActions } from '@/hooks/use-room-cleaning-actions';
 
 interface Room {
   number: string;
@@ -24,6 +25,11 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
   const [housekeeperName, setHousekeeperName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  
+  const { startCleaning, finishCleaning, isLoading: cleaningActionLoading } = useRoomCleaningActions({
+    hotelId: hotel?.id || '',
+    housekeeperName
+  });
 
   useEffect(() => {
     loadGuestModeData();
@@ -82,6 +88,13 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
   };
 
   const updateRoomStatus = async (roomNumber: string, newStatus: Room['status']) => {
+    // Log the cleaning action before updating UI
+    if (newStatus === 'in_progress') {
+      await startCleaning(roomNumber);
+    } else if (newStatus === 'completed') {
+      await finishCleaning(roomNumber);
+    }
+
     setRooms(prev => prev.map(room => 
       room.number === roomNumber 
         ? { ...room, status: newStatus }
@@ -200,6 +213,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
                       <Button 
                         onClick={() => updateRoomStatus(room.number, 'in_progress')}
                         variant="outline"
+                        disabled={cleaningActionLoading}
                       >
                         Commencer
                       </Button>
@@ -208,6 +222,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
                       <Button 
                         onClick={() => updateRoomStatus(room.number, 'completed')}
                         className="bg-green-600 hover:bg-green-700"
+                        disabled={cleaningActionLoading}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Terminer
