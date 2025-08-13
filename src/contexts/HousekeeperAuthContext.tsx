@@ -333,13 +333,17 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
             rooms_cleaned: 0
           });
 
-        // Log housekeeper connection using secure RPC
-        const { HousekeeperActionLogger } = await import('@/services/housekeeperActionLogger');
-        await HousekeeperActionLogger.logHousekeeperConnection(
-          accessCodeData.hotel_id,
-          profile.name,
-          accessCode
-        );
+        // Create notification for admin
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: accessCodeData.created_by,
+            hotel_id: accessCodeData.hotel_id,
+            title: 'Nouvelle connexion femme de chambre',
+            description: `${profile.name} s'est connectée avec le code ${accessCode}`,
+            type: 'housekeeper_connected',
+            user_type: 'admin'
+          });
 
         return { success: true, session: hotelSession };
       }
@@ -406,13 +410,25 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         return { success: false, error: "Erreur lors de la création de la demande" };
       }
 
-      // Log access request using secure RPC
-      const { HousekeeperActionLogger } = await import('@/services/housekeeperActionLogger');
-      await HousekeeperActionLogger.logAccessRequest(
-        hotel.id,
-        profile.name,
-        hotelCode
-      );
+      // Create notification for hotel admin
+      const { data: hotelOwner } = await supabase
+        .from('hotels')
+        .select('user_id')
+        .eq('id', hotel.id)
+        .single();
+
+      if (hotelOwner) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: hotelOwner.user_id,
+            hotel_id: hotel.id,
+            title: 'Nouvelle demande d\'accès',
+            description: `${profile.name} demande l'accès à votre hôtel (${hotelCode})`,
+            type: 'housekeeper_access_request',
+            user_type: 'admin'
+          });
+      }
 
       return { success: true };
     } catch (error) {

@@ -1213,17 +1213,15 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       selectedHotel: selectedHotel?.id
     });
     
-    // Log room assignment using secure RPC
     if (notificationHotelId) {
       console.log('✅ Création notification assignation pour hotel:', notificationHotelId);
-      
-      // Use the action logger instead of direct notification
-      import('@/services/housekeeperActionLogger').then(({ HousekeeperActionLogger }) => {
-        HousekeeperActionLogger.logRoomAssignment(
-          notificationHotelId,
-          roomNumber,
-          housekeeperName
-        );
+      addNotification({
+        title: `Assignation chambre ${roomNumber}`,
+        description: `Admin - CH ${roomNumber} assignée à ${housekeeperName}`,
+        type: 'assignment',
+        housekeeper_name: housekeeperName,
+        room_number: roomNumber,
+        user_type: 'admin'
       });
     } else {
       console.warn('❌ Hotel ID invalide pour notification:', currentHotelId);
@@ -1404,7 +1402,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         <SetupStatusSimple onRetry={() => window.location.reload()} />
 
         {/* Diagnostic pour les problèmes d'association hôtel uniquement si problème */}
-        {!setupLoading && !hotel && (
+        {(!hotel || !isSetupComplete || !currentHotelId) && (
           <div className="mb-6">
             <HotelSetupFix onForceSetup={() => window.location.reload()} />
           </div>
