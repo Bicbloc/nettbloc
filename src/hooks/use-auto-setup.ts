@@ -47,6 +47,12 @@ export const useAutoSetup = () => {
         return;
       }
 
+      // Éviter les exécutions multiples
+      if (hasAttemptedSetup.current) {
+        console.log('🚫 Setup déjà en cours, ignore...');
+        return;
+      }
+
       console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
       hasAttemptedSetup.current = true;
       
@@ -281,20 +287,16 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Timeout plus raisonnable pour permettre aux requêtes de se terminer
+    // Timeout de sécurité pour éviter un loading infini
     const setupTimeout = setTimeout(() => {
       if (loading && hasAttemptedSetup.current) {
-        console.warn('⚠️ Timeout setup après 3s, retry avec fallback...');
-        // Au lieu de forcer le completion, on relance un setup simple
-        hasAttemptedSetup.current = false;
-        setupHotel().catch(() => {
-          // En cas d'échec final, on marque comme complété avec un message d'erreur
-          setLoading(false);
-          setIsSetupComplete(true);
-          console.error('❌ Setup échoué définitivement');
-        });
+        console.warn('⚠️ Timeout setup après 5s, arrêt du loading...');
+        // Arrêter le loading mais ne pas relancer de setup
+        setLoading(false);
+        // Garder isSetupComplete à false pour montrer l'erreur
+        console.error('❌ Setup échoué après timeout');
       }
-    }, 3000); // Augmenté à 3000ms pour laisser le temps aux requêtes
+    }, 5000); // Timeout plus long pour laisser le temps aux requêtes lentes
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {
