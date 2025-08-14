@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useHousekeeperAuthStability } from '@/hooks/use-housekeeper-auth-stability';
 
 interface HousekeeperProfile {
   id: string;
@@ -67,6 +68,9 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   const [currentHotelSession, setCurrentHotelSession] = useState<HotelSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(true);
+  
+  // Utiliser le hook de stabilité
+  const { connectionQuality, authenticateCode } = useHousekeeperAuthStability();
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -251,27 +255,36 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         }
       }
 
-      // First, check if it's a generated access code in housekeeper_access_codes
-      console.log('Recherche du code dans housekeeper_access_codes');
-      const { data: accessCodeData, error: codeError } = await supabase
-        .from('housekeeper_access_codes')
-        .select(`
-          *,
-          hotels:hotel_id (
-            id,
-            name,
-            hotel_code,
-            address
-          )
-        `)
-        .eq('access_code', accessCode)
-        .eq('is_active', true)
-        .is('used_at', null)
-        .maybeSingle();
+      // Utiliser la fonction d'authentification stable
+      try {
+        const authResult = await authenticateCode(accessCode);
+        
+        if (!authResult || !authResult.success) {
+          return { success: false, error: "Code d'accès invalide ou expiré" };
+        }
 
-      console.log('Résultat de la recherche:', { accessCodeData, codeError });
+        console.log('✅ Code authentifié:', authResult);
 
-      if (accessCodeData && !codeError) {
+        // Rechercher le code dans la table housekeeper_access_codes
+        const { data: accessCodeData, error: codeError } = await supabase
+          .from('housekeeper_access_codes')
+          .select(`
+            *,
+            hotels:hotel_id (
+              id,
+              name,
+              hotel_code,
+              address
+            )
+          `)
+          .eq('access_code', accessCode)
+          .eq('is_active', true)
+          .is('used_at', null)
+          .maybeSingle();
+
+        console.log('Résultat de la recherche:', { accessCodeData, codeError });
+
+        if (accessCodeData && !codeError) {
         console.log('Code trouvé, création de session');
         
         // Mark the code as used
@@ -345,12 +358,16 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
             user_type: 'admin'
           });
 
-        return { success: true, session: hotelSession };
+          return { success: true, session: hotelSession };
+        }
+
+        console.log('Code non trouvé dans housekeeper_access_codes');
+        return { success: false, error: "Code d'accès invalide ou déjà utilisé" };
+
+      } catch (error) {
+        console.error('Error connecting to hotel:', error);
+        return { success: false, error: "Erreur lors de la connexion" };
       }
-
-      console.log('Code non trouvé dans housekeeper_access_codes');
-      return { success: false, error: "Code d'accès invalide ou déjà utilisé" };
-
     } catch (error) {
       console.error('Error connecting to hotel:', error);
       return { success: false, error: "Erreur lors de la connexion" };

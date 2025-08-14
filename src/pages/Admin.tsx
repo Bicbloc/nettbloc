@@ -31,6 +31,7 @@ import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequest
 import AdminDashboard from '@/components/AdminDashboard';
 import PasswordResetManager from '@/components/PasswordResetManager';
 import { NotificationButton } from '@/components/NotificationButton';
+import { AdminRealtimeStatus } from '@/components/AdminRealtimeStatus';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -96,22 +97,15 @@ const Admin = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [users, setUsers] = useState<UserWithRole[]>([]);
-  const [sessions, setSessions] = useState<ActiveSession[]>([]);
-  const [accessCodes, setAccessCodes] = useState<HousekeeperAccessCode[]>([]);
-  const [hotels, setHotels] = useState<HotelStats[]>([]);
-  const [stats, setStats] = useState<AdminStats>({
-    total_users: 0,
-    active_users: 0,
-    suspended_users: 0,
-    total_hotels: 0,
-    total_sessions: 0,
-    total_housekeepers: 0
-  });
-  const [loadingData, setLoadingData] = useState(true);
-  
-  // Utilisation du hook temps réel
+  // Utilisation du hook temps réel exclusivement
   const realtimeData = useRealtimeAdmin(isSuperAdmin);
+  
+  // Alias pour compatibilité avec le code existant
+  const users = realtimeData.users;
+  const sessions = realtimeData.sessions;
+  const hotels = realtimeData.hotels;
+  const stats = realtimeData.stats;
+  const loadingData = realtimeData.loading;
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserCompany, setNewUserCompany] = useState('');
@@ -140,12 +134,10 @@ const Admin = () => {
 
       if (!error && data) {
           setIsSuperAdmin(true);
-          console.log('✅ Super admin confirmé, pas de chargement manuel (temps réel actif)');
+          console.log('✅ Super admin confirmé, données temps réel activées');
         }
       } catch (error) {
         console.error('Erreur vérification role:', error);
-      } finally {
-        setLoadingData(false);
       }
     };
 
@@ -153,213 +145,6 @@ const Admin = () => {
       checkSuperAdminRole();
     }
   }, [user, loading]);
-
-  const loadAdminData = async () => {
-    try {
-      console.log('🔄 Début du chargement des données admin...');
-      
-      // Vérifier d'abord si l'utilisateur a vraiment les permissions super_admin
-      const { data: currentUserRoles, error: roleCheckError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user?.id);
-
-      if (roleCheckError) {
-        console.error('❌ Erreur vérification permissions:', roleCheckError);
-        throw new Error('Impossible de vérifier les permissions');
-      }
-
-      const hasSupeAdminRole = currentUserRoles?.some(r => r.role === 'super_admin');
-      if (!hasSupeAdminRole) {
-        console.error('❌ Utilisateur sans permissions super_admin');
-        throw new Error('Permissions insuffisantes');
-      }
-
-      console.log('✅ Permissions super_admin confirmées');
-
-      // Charger les utilisateurs avec leurs rôles et profils
-      const { data: usersData, error: usersError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          email,
-          company_name,
-          is_suspended,
-          suspension_reason,
-          subscription_type,
-          trial_end_date,
-          created_at
-        `);
-
-      if (usersError) {
-        console.error('❌ Erreur chargement profils:', usersError);
-        throw usersError;
-      }
-
-      // Charger les rôles des utilisateurs
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-
-      if (rolesError) throw rolesError;
-
-      // Charger les hôtels assignés aux utilisateurs
-      const { data: hotelUsersData, error: hotelUsersError } = await supabase
-        .from('hotel_users')
-        .select(`
-          user_id,
-          role,
-          hotels!inner(name)
-        `);
-
-      if (hotelUsersError) throw hotelUsersError;
-
-      // Combiner les données
-      const usersWithRoles = usersData?.map(user => ({
-        ...user,
-        role: rolesData?.find(role => role.user_id === user.id)?.role || 'user',
-        hotel_name: hotelUsersData?.find(hu => hu.user_id === user.id)?.hotels?.name || 'Aucun'
-      })) || [];
-
-      setUsers(usersWithRoles);
-
-      // Charger les sessions actives
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('user_sessions')
-        .select('*')
-        .eq('is_active', true)
-        .order('last_activity', { ascending: false });
-
-      if (sessionsError) throw sessionsError;
-      setSessions(sessionsData || []);
-
-      // Charger les codes d'accès des femmes de chambre (sans jointures problématiques)
-      const { data: accessCodesData, error: accessCodesError } = await supabase
-        .from('housekeeper_access_codes')
-        .select(`
-          id,
-          access_code,
-          is_active,
-          created_at,
-          used_at,
-          expires_at,
-          hotel_id,
-          housekeeper_id
-        `)
-        .order('created_at', { ascending: false });
-
-      if (accessCodesError) throw accessCodesError;
-
-      // Enrichir les codes d'accès avec les noms (requêtes séparées pour éviter les problèmes de jointures)
-      const enrichedAccessCodes = await Promise.all(
-        (accessCodesData || []).map(async (code) => {
-          // Récupérer le nom de l'hôtel
-          const { data: hotelData } = await supabase
-            .from('hotels')
-            .select('name, hotel_code')
-            .eq('id', code.hotel_id)
-            .single();
-
-          // Récupérer le nom de la femme de chambre si assignée
-          let housekeeperName = 'Non assigné';
-          if (code.housekeeper_id) {
-            const { data: housekeeperData } = await supabase
-              .from('housekeepers')
-              .select('name')
-              .eq('id', code.housekeeper_id)
-              .single();
-            
-            if (housekeeperData) {
-              housekeeperName = housekeeperData.name;
-            }
-          }
-
-          return {
-            id: code.id,
-            access_code: code.access_code,
-            housekeeper_name: housekeeperName,
-            hotel_name: hotelData?.name || 'Inconnu',
-            hotel_code: hotelData?.hotel_code || '',
-            is_active: code.is_active,
-            created_at: code.created_at,
-            used_at: code.used_at,
-            expires_at: code.expires_at
-          };
-        })
-      );
-
-      setAccessCodes(enrichedAccessCodes);
-
-      // Charger les statistiques des hôtels
-      const { data: hotelsData, error: hotelsError } = await supabase
-        .from('hotels')
-        .select(`
-          id,
-          name,
-          hotel_code,
-          created_at,
-          user_id
-        `);
-
-      if (hotelsError) throw hotelsError;
-
-      // Calculer les statistiques pour chaque hôtel avec l'email du propriétaire
-      const hotelsWithStats = await Promise.all(
-        (hotelsData || []).map(async (hotel) => {
-          // Récupérer l'email du propriétaire
-          const { data: ownerProfile } = await supabase
-            .from('profiles')
-            .select('email')
-            .eq('id', hotel.user_id)
-            .single();
-
-          const { data: housekeepersCount } = await supabase
-            .from('housekeepers')
-            .select('id', { count: 'exact' })
-            .eq('hotel_id', hotel.id)
-            .eq('is_active', true);
-
-          const { data: activeSessionsCount } = await supabase
-            .from('user_sessions')
-            .select('id', { count: 'exact' })
-            .eq('hotel_id', hotel.id)
-            .eq('is_active', true);
-
-          return {
-            id: hotel.id,
-            name: hotel.name,
-            hotel_code: hotel.hotel_code || '',
-            user_email: ownerProfile?.email || 'Email inconnu',
-            housekeepers_count: housekeepersCount?.length || 0,
-            active_sessions: activeSessionsCount?.length || 0,
-            created_at: hotel.created_at
-          };
-        })
-      );
-
-      setHotels(hotelsWithStats);
-
-      // Calculer les statistiques globales
-      const newStats: AdminStats = {
-        total_users: usersWithRoles.length,
-        active_users: usersWithRoles.filter(u => !u.is_suspended).length,
-        suspended_users: usersWithRoles.filter(u => u.is_suspended).length,
-        total_hotels: hotelsWithStats.length,
-        total_sessions: sessionsData?.length || 0,
-        total_housekeepers: enrichedAccessCodes.length
-      };
-
-      setStats(newStats);
-
-    } catch (error) {
-      console.error('Erreur chargement données admin:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de charger les données d'administration."
-      });
-    }
-  };
 
   const createUser = async () => {
     if (!newUserEmail || !newUserPassword) {
@@ -451,7 +236,8 @@ const Admin = () => {
       setSelectedHotelId('new');
       setNewUserRole('user');
       setShowCreateUser(false);
-      await loadAdminData();
+      // Pas besoin de loadAdminData, les données temps réel se mettront à jour automatiquement
+      realtimeData.refresh();
 
     } catch (error: any) {
       toast({
@@ -489,7 +275,7 @@ const Admin = () => {
         description: `L'utilisateur a été ${suspend ? 'suspendu' : 'réactivé'} avec succès.`
       });
 
-      await loadAdminData();
+      realtimeData.refresh();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -522,7 +308,7 @@ const Admin = () => {
         description: "L'utilisateur a été déconnecté avec succès."
       });
 
-      await loadAdminData();
+      realtimeData.refresh();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -553,7 +339,7 @@ const Admin = () => {
         description: "L'utilisateur a été marqué comme suspendu."
       });
 
-      await loadAdminData();
+      realtimeData.refresh();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -588,7 +374,7 @@ const Admin = () => {
         description: `L'utilisateur est maintenant ${newRole}.`
       });
 
-      await loadAdminData();
+      realtimeData.refresh();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -620,7 +406,7 @@ const Admin = () => {
         description: `L'utilisateur a maintenant un abonnement ${newType}.`
       });
 
-      await loadAdminData();
+      realtimeData.refresh();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -658,7 +444,7 @@ const Admin = () => {
         description: `La période d'essai a été étendue de ${days} jours.`
       });
 
-      await loadAdminData();
+      realtimeData.refresh();
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -728,7 +514,7 @@ const Admin = () => {
           <CardContent>
             <div className="text-2xl font-bold">{realtimeData.stats.total_users || stats.total_users}</div>
             <p className="text-xs text-muted-foreground">
-              {realtimeData.stats.active_users || stats.active_users} actifs, {stats.suspended_users} suspendus
+              {realtimeData.stats.active_users || stats.active_users} actifs, {(stats as any).suspended_users || 0} suspendus
             </p>
           </CardContent>
         </Card>
@@ -766,7 +552,7 @@ const Admin = () => {
             <Key className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total_housekeepers}</div>
+            <div className="text-2xl font-bold">{(stats as any).total_housekeepers || 0}</div>
             <p className="text-xs text-muted-foreground">
               Codes générés
             </p>
@@ -1269,7 +1055,7 @@ const Admin = () => {
                     Surveillance et gestion des codes d'accès
                   </CardDescription>
                 </div>
-                <ForceCodeGenerationButton onRefresh={loadAdminData} />
+                <ForceCodeGenerationButton onRefresh={realtimeData.refresh} />
               </div>
             </CardHeader>
             <CardContent>
@@ -1286,7 +1072,7 @@ const Admin = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accessCodes.map((code) => (
+                  {((realtimeData as any).accessCodes || []).map((code: any) => (
                     <TableRow key={code.id}>
                       <TableCell className="font-mono font-bold">{code.access_code}</TableCell>
                       <TableCell>{code.housekeeper_name}</TableCell>
@@ -1340,7 +1126,7 @@ const Admin = () => {
                 </TableBody>
               </Table>
               
-              {accessCodes.length === 0 && (
+              {((realtimeData as any).accessCodes || []).length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Aucun code d'accès trouvé</p>

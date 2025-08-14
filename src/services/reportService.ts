@@ -33,24 +33,12 @@ export async function saveDailyReport(params: {
   housekeeperNames: string[];
 }) {
   try {
-    // Stabilize authentication - check session with retry
-    let session = null;
-    let attempts = 0;
-    const maxAttempts = 3;
-
-    while (!session && attempts < maxAttempts) {
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      session = sessionData?.session;
-      
-      if (!session && attempts < maxAttempts - 1) {
-        console.log(`Tentative ${attempts + 1}: Session non trouvée, retry...`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      attempts++;
-    }
+    // Utiliser la session courante sans retry agressif
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const session = sessionData?.session;
 
     if (!session?.user) {
-      console.log("❌ Aucune session valide après retry - ignorer sauvegarde");
+      console.log("❌ Aucune session active - ignorer sauvegarde silencieusement");
       return { success: false, skipped: true };
     }
 

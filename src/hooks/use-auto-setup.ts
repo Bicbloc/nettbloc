@@ -61,26 +61,20 @@ export const useAutoSetup = () => {
 
   useEffect(() => {
     const setupHotel = async () => {
-      // Vérifier si setup déjà réussi pour cet utilisateur
-      if (lastSuccessfulSetup.current === user?.id && isSetupComplete && hotel) {
-        console.log('✅ Setup déjà validé pour cet utilisateur, aucune action requise');
+      // Vérifier localStorage pour setup précédent
+      const savedHotelData = localStorage.getItem('lastValidHotelSetup');
+      const savedUserId = localStorage.getItem('lastValidUserId');
+      
+      if (savedHotelData && savedUserId === user?.id && isSetupComplete && hotel) {
+        console.log('✅ Setup validé depuis localStorage, skip re-verification');
         setLoading(false);
         setHasConfigurationIssues(false);
         return;
       }
 
-      // Phase 0: Vérification intelligente localStorage
-      const diagnostic = LocalStorageManager.getDiagnosticReport();
-      const { cleaned } = LocalStorageManager.cleanCorruptedValues();
-      
-      if (cleaned.length > 0) {
-        console.log('🧹 Valeurs localStorage corrompues nettoyées:', cleaned);
-        hasAttemptedSetup.current = 0;
-      }
-
-      // Éviter les exécutions multiples
-      if (hasAttemptedSetup.current && Date.now() - hasAttemptedSetup.current < 5000) {
-        console.log('🚫 Setup récent déjà tenté, ignore pour éviter spam');
+      // Éviter les exécutions multiples avec timing plus large
+      if (hasAttemptedSetup.current && Date.now() - hasAttemptedSetup.current < 15000) {
+        console.log('🚫 Setup récent (< 15s), ignore pour éviter boucles');
         return;
       }
 
@@ -309,7 +303,15 @@ export const useAutoSetup = () => {
           // Marquer le succès pour cet utilisateur
           lastSuccessfulSetup.current = user.id;
           
-          // Sauvegarde localStorage avec validation
+          // Sauvegarde optimisée localStorage
+          localStorage.setItem('lastValidHotelSetup', JSON.stringify({
+            id: hotelData.id,
+            code: hotelData.hotel_code,
+            name: hotelData.name,
+            timestamp: Date.now()
+          }));
+          localStorage.setItem('lastValidUserId', user.id);
+          
           const saveSuccess = LocalStorageManager.saveHotelData({
             id: hotelData.id,
             code: hotelData.hotel_code,
@@ -401,21 +403,15 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Timeout de sécurité intelligent
+    // Timeout de sécurité plus long pour éviter interruptions
     const setupTimeout = setTimeout(() => {
       if (loading && isAuthenticated && user?.id) {
-        console.warn('⚠️ Timeout setup après 10s');
+        console.warn('⚠️ Timeout setup après 20s');
         setLoading(false);
-        setHasConfigurationIssues(true);
+        setHasConfigurationIssues(false); // Ne pas marquer comme problème immédiatement
         hasAttemptedSetup.current = 0; // Reset pour permettre retry
-        
-        toast({
-          title: "Chargement lent",
-          description: "La configuration prend plus de temps que prévu.",
-          duration: 3000
-        });
       }
-    }, 10000);
+    }, 20000);
 
     // Lancer le setup intelligemment
     if (isAuthenticated && user?.id) {

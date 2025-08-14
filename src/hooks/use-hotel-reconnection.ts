@@ -75,50 +75,59 @@ export const useHotelReconnection = (): HotelReconnectionResult => {
     }
   };
 
-  // Auto-reconnexion périodique
+  // Auto-reconnexion optimisée
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
+    let reconnectTimeout: NodeJS.Timeout;
+    let isMounted = true;
+    let lastReconnectAttempt = 0;
+
+    const attemptReconnect = () => {
+      const now = Date.now();
+      if (now - lastReconnectAttempt < 30000) { // 30 secondes minimum entre tentatives
+        console.log('🚫 Reconnexion ignorée (< 30s depuis dernière tentative)');
+        return;
+      }
+      
+      // Vérifier si on a vraiment besoin de reconnecter
+      const hotelId = localStorage.getItem('selectedHotelId');
+      const lastValidSetup = localStorage.getItem('lastValidHotelSetup');
+      
+      if (!hotelId && !lastValidSetup) {
+        console.log('🔄 Aucun hôtel actif détecté, tentative reconnexion...');
+        lastReconnectAttempt = now;
+        if (isMounted) forceReconnect();
+      }
+    };
+
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'hotel-reconnection-needed') {
-        console.log('🔄 Reconnexion demandée via storage');
-        forceReconnect();
+      if (e.key === 'hotel-data-reset') {
+        console.log('🔄 Reset détecté, attente avant reconnexion...');
+        setTimeout(attemptReconnect, 5000);
       }
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const lastReconnection = localStorage.getItem('lastReconnection');
-        const now = Date.now();
-        
-    // Reconnexion si pas de reconnexion récente (< 30 min) ET pas de hotel en cours
-        const currentHotelId = localStorage.getItem('selectedHotelId');
-        if ((!lastReconnection || (now - parseInt(lastReconnection)) > 1800000) && !currentHotelId) {
-          console.log('🔄 Auto-reconnexion par visibilité (pas d\'hôtel actif)');
-          forceReconnect();
-        }
+        setTimeout(attemptReconnect, 3000);
       }
     };
 
-    // Écouter les événements
+    // Tentative initiale moins agressive
+    reconnectTimeout = setTimeout(attemptReconnect, 10000);
+
     window.addEventListener('storage', handleStorageChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('hotel-reconnected', () => setHasReconnected(true));
 
-    // Reconnexion initiale après authentification
-    const initialReconnectTimeout = setTimeout(() => {
-      if (!hasReconnected) {
-        console.log('🔄 Reconnexion initiale différée');
-        forceReconnect();
-      }
-    }, 1000);
-
     return () => {
+      isMounted = false;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
       window.removeEventListener('storage', handleStorageChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearTimeout(initialReconnectTimeout);
     };
-  }, [isAuthenticated, user?.id, hasReconnected]);
+  }, [isAuthenticated, user?.id, forceReconnect]);
 
   return {
     isReconnecting,
