@@ -862,6 +862,10 @@ export type Database = {
           success: boolean
         }[]
       }
+      can_manage_hotel_data: {
+        Args: { target_hotel_id: string }
+        Returns: boolean
+      }
       change_subscription_status: {
         Args: { p_new_status: string; p_reason?: string; p_user_id: string }
         Returns: boolean

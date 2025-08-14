@@ -13,13 +13,29 @@ export const QuickHotelFix: React.FC = () => {
   const [isFixed, setIsFixed] = useState(false);
 
   const handleQuickFix = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      toast({
+        variant: "destructive",
+        title: "Erreur d'authentification",
+        description: "Utilisateur non connecté. Veuillez vous reconnecter.",
+        duration: 5000
+      });
+      return;
+    }
 
     setIsFixing(true);
     try {
       console.log('🔧 Quick fix pour utilisateur:', user.email);
 
-      // Phase 0: Diagnostic et nettoyage localStorage
+      // Phase 0: Vérification de la connectivité Supabase
+      try {
+        const { data: healthCheck } = await supabase.from('profiles').select('count').limit(1);
+        console.log('✅ Connexion Supabase OK');
+      } catch (connectError) {
+        throw new Error(`Problème de connexion Supabase: ${connectError.message}`);
+      }
+
+      // Phase 1: Diagnostic et nettoyage localStorage
       const diagnostic = LocalStorageManager.getDiagnosticReport();
       console.log('📊 Diagnostic localStorage:', diagnostic);
       
@@ -28,109 +44,152 @@ export const QuickHotelFix: React.FC = () => {
         LocalStorageManager.cleanCorruptedValues();
       }
 
-      // 1. Vérifier/créer le profil
-      let { data: profile } = await supabase
+      // Phase 2: Vérifier/créer le profil avec gestion d'erreurs détaillée
+      console.log('🔍 Vérification du profil utilisateur...');
+      let { data: profile, error: profileSelectError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (profileSelectError) {
+        console.error('❌ Erreur lecture profil:', profileSelectError);
+        throw new Error(`Impossible de lire le profil: ${profileSelectError.message}`);
+      }
 
       if (!profile) {
+        console.log('📝 Création du profil...');
         const { data: newProfile, error: profileError } = await supabase
           .from('profiles')
           .insert({
             id: user.id,
             email: user.email || '',
-            company_name: 'Mon Établissement'
+            company_name: 'Mon Établissement',
+            subscription_type: 'trial'
           })
           .select()
-          .single();
+          .maybeSingle();
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('❌ Erreur création profil:', profileError);
+          throw new Error(`Impossible de créer le profil: ${profileError.message}`);
+        }
         profile = newProfile;
         console.log('✅ Profil créé:', profile);
+      } else {
+        console.log('✅ Profil existant trouvé:', profile);
       }
 
-      // 2. Chercher son hôtel
-      let { data: hotel } = await supabase
+      // Phase 3: Chercher/créer l'hôtel avec gestion d'erreurs améliorée
+      console.log('🏨 Vérification de l\'hôtel...');
+      let { data: hotel, error: hotelSelectError } = await supabase
         .from('hotels')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (hotelSelectError) {
+        console.error('❌ Erreur lecture hôtel:', hotelSelectError);
+        throw new Error(`Impossible de lire l'hôtel: ${hotelSelectError.message}`);
+      }
 
       if (!hotel) {
+        console.log('🔍 Recherche hôtel par email...');
         // Chercher par email
-        const { data: hotelByEmail } = await supabase
+        const { data: hotelByEmail, error: emailSearchError } = await supabase
           .from('hotels')
           .select('*')
           .eq('email', user.email)
-          .single();
+          .maybeSingle();
 
-        if (hotelByEmail) {
+        if (emailSearchError) {
+          console.error('❌ Erreur recherche par email:', emailSearchError);
+        }
+
+        if (hotelByEmail && !emailSearchError) {
+          console.log('🔗 Récupération de l\'hôtel existant...');
           // Récupérer l'hôtel
           const { data: updatedHotel, error: updateError } = await supabase
             .from('hotels')
             .update({ user_id: user.id })
             .eq('id', hotelByEmail.id)
             .select()
-            .single();
+            .maybeSingle();
 
-          if (updateError) throw updateError;
+          if (updateError) {
+            console.error('❌ Erreur mise à jour hôtel:', updateError);
+            throw new Error(`Impossible de récupérer l'hôtel: ${updateError.message}`);
+          }
           hotel = updatedHotel;
           console.log('✅ Hôtel récupéré:', hotel);
         } else {
+          console.log('🏗️ Création d\'un nouvel hôtel...');
           // Créer un nouvel hôtel
           const { data: newHotel, error: createError } = await supabase
             .from('hotels')
             .insert({
-              name: profile.company_name || `Établissement de ${user.email}`,
-              email: user.email,
+              name: profile?.company_name || `Établissement de ${user.email}`,
+              email: user.email || '',
               user_id: user.id
             })
             .select()
-            .single();
+            .maybeSingle();
 
-          if (createError) throw createError;
+          if (createError) {
+            console.error('❌ Erreur création hôtel:', createError);
+            throw new Error(`Impossible de créer l'hôtel: ${createError.message}`);
+          }
           hotel = newHotel;
           console.log('✅ Hôtel créé:', hotel);
         }
+      } else {
+        console.log('✅ Hôtel existant trouvé:', hotel);
       }
 
-      // 3. Sauvegarder avec validation dans localStorage
-      if (hotel) {
-        const saveSuccess = LocalStorageManager.saveHotelData({
-          id: hotel.id,
-          code: hotel.hotel_code,
-          name: hotel.name
-        });
-        
-        if (!saveSuccess) {
-          throw new Error('Impossible de sauvegarder les données dans localStorage');
-        }
-        
-        // Forcer la réinitialisation de useAutoSetup
-        window.dispatchEvent(new Event('hotel-reconnected'));
+      // Phase 4: Validation et sauvegarde
+      if (!hotel) {
+        throw new Error('Aucun hôtel n\'a pu être trouvé ou créé');
       }
+
+      console.log('💾 Sauvegarde dans localStorage...');
+      const saveSuccess = LocalStorageManager.saveHotelData({
+        id: hotel.id,
+        code: hotel.hotel_code || '',
+        name: hotel.name
+      });
+      
+      if (!saveSuccess) {
+        console.warn('⚠️ Échec sauvegarde localStorage, mais on continue...');
+      }
+      
+      // Forcer la réinitialisation de useAutoSetup
+      console.log('🔄 Déclenchement de la reconnexion...');
+      window.dispatchEvent(new Event('hotel-reconnected'));
+      
+      // Attendre un peu pour la propagation de l'événement
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       setIsFixed(true);
       toast({
         title: "✅ Problème résolu !",
-        description: `Hôtel ${hotel.name} configuré avec succès.`,
+        description: `Hôtel "${hotel.name}" configuré avec succès.`,
         duration: 3000
       });
 
-      // Recharger la page après 1 seconde
+      // Recharger la page après 2 secondes
       setTimeout(() => {
         window.location.reload();
-      }, 1000);
+      }, 2000);
 
     } catch (error) {
       console.error('❌ Erreur quick fix:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de corriger automatiquement. Contactez le support.",
-        duration: 5000
+        title: "Correction automatique échouée",
+        description: `Détails: ${errorMessage}`,
+        duration: 7000
       });
     } finally {
       setIsFixing(false);

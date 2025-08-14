@@ -24,14 +24,81 @@ export const FullResetButton: React.FC<FullResetButtonProps> = ({ onResetComplet
     try {
       console.log('🔄 Début reset complet application...');
       
-      // Obtenir le diagnostic avant reset
+      // Phase 1: Diagnostic et sauvegarde état initial
       const beforeDiagnostic = LocalStorageManager.getDiagnosticReport();
       console.log('📊 État avant reset:', beforeDiagnostic);
       
-      // Appeler le reset depuis useAutoSetup pour coordination complète
-      forceCompleteReset();
+      // Phase 2: Reset indépendant et robuste
+      try {
+        console.log('🧹 Nettoyage localStorage...');
+        // Reset complet du localStorage
+        LocalStorageManager.resetHotelData();
+        LocalStorageManager.cleanCorruptedValues();
+        
+        // Nettoyer toutes les données liées à l'application
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.startsWith('hotel') || 
+            key.startsWith('housekeeper') || 
+            key.startsWith('user') ||
+            key.startsWith('session') ||
+            key.startsWith('auth') ||
+            key.startsWith('supabase')
+          )) {
+            keysToRemove.push(key);
+          }
+        }
+        
+        keysToRemove.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+            console.log(`🗑️ Supprimé: ${key}`);
+          } catch (err) {
+            console.warn(`⚠️ Impossible de supprimer ${key}:`, err);
+          }
+        });
+        
+        console.log('✅ Nettoyage localStorage terminé');
+      } catch (localStorageError) {
+        console.error('❌ Erreur nettoyage localStorage:', localStorageError);
+        // Continuer même en cas d'erreur localStorage
+      }
       
-      // Vérifier le nettoyage
+      // Phase 3: Nettoyage session et cache
+      try {
+        console.log('🧹 Nettoyage sessionStorage...');
+        sessionStorage.clear();
+        console.log('✅ SessionStorage vidé');
+      } catch (sessionError) {
+        console.warn('⚠️ Erreur sessionStorage:', sessionError);
+      }
+      
+      // Phase 4: Tentative de reset useAutoSetup si disponible
+      try {
+        if (forceCompleteReset && typeof forceCompleteReset === 'function') {
+          console.log('🔄 Appel forceCompleteReset...');
+          forceCompleteReset();
+          console.log('✅ forceCompleteReset appelé');
+        }
+      } catch (autoSetupError) {
+        console.warn('⚠️ Erreur forceCompleteReset (continuant sans):', autoSetupError);
+        // Ne pas échouer si useAutoSetup a des problèmes
+      }
+      
+      // Phase 5: Événements de reset global
+      try {
+        console.log('📡 Déclenchement événements reset...');
+        window.dispatchEvent(new Event('hotel-disconnected'));
+        window.dispatchEvent(new Event('app-reset'));
+        window.dispatchEvent(new Event('storage'));
+        console.log('✅ Événements déclenchés');
+      } catch (eventError) {
+        console.warn('⚠️ Erreur événements:', eventError);
+      }
+      
+      // Phase 6: Diagnostic final
       const afterDiagnostic = LocalStorageManager.getDiagnosticReport();
       console.log('📊 État après reset:', afterDiagnostic);
       
@@ -39,8 +106,8 @@ export const FullResetButton: React.FC<FullResetButtonProps> = ({ onResetComplet
       
       toast({
         title: "✅ Reset terminé",
-        description: "Application réinitialisée. Rechargement automatique...",
-        duration: 2000
+        description: "Application réinitialisée. Rechargement dans 3 secondes...",
+        duration: 3000
       });
       
       // Notification au parent
@@ -48,16 +115,19 @@ export const FullResetButton: React.FC<FullResetButtonProps> = ({ onResetComplet
       
       // Recharger après un délai
       setTimeout(() => {
+        console.log('🔄 Rechargement de la page...');
         window.location.reload();
-      }, 2000);
+      }, 3000);
       
     } catch (error) {
-      console.error('❌ Erreur pendant le reset:', error);
+      console.error('❌ Erreur critique pendant le reset:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      
       toast({
         variant: "destructive",
         title: "Erreur de reset",
-        description: "Impossible de réinitialiser complètement. Rechargez manuellement la page.",
-        duration: 5000
+        description: `Détails: ${errorMessage}. Rechargez manuellement la page.`,
+        duration: 8000
       });
     } finally {
       setIsResetting(false);
