@@ -47,24 +47,38 @@ export const useAutoSetup = () => {
         return;
       }
 
-      // Éviter les exécutions multiples
+      // Éviter les exécutions multiples avec log détaillé
       if (hasAttemptedSetup.current) {
-        console.log('🚫 Setup déjà en cours, ignore...');
+        console.log('🚫 Setup déjà en cours, ignore...', {
+          hasAttemptedSetup: hasAttemptedSetup.current,
+          isSetupComplete,
+          loading,
+          userId: user.id,
+          userEmail: user.email
+        });
         return;
       }
 
-      console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
+      console.log('🏨 Auto-setup: Démarrage pour user:', user.email, {
+        userId: user.id,
+        isAuthenticated,
+        hasAttemptedSetup: hasAttemptedSetup.current,
+        isSetupComplete,
+        loading
+      });
       hasAttemptedSetup.current = true;
       
       try {
         // Phase 1: Vérification de cohérence des données
-        console.log('🔍 Vérification cohérence profil + hôtel...');
+        console.log('🔍 Phase 1: Vérification cohérence profil + hôtel...');
         
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .maybeSingle();
+
+        console.log('📊 Résultat requête profil:', { profile, profileError });
 
         if (profileError) {
           console.error('❌ Erreur recherche profil:', profileError);
@@ -102,13 +116,14 @@ export const useAutoSetup = () => {
         console.log('✅ Profil utilisateur disponible:', profileData);
 
         // Phase 2: Recherche hôtel optimisée avec priorisation intelligente
-        console.log('🔍 Recherche hôtel avec priorisation...', { 
+        console.log('🔍 Phase 2: Recherche hôtel avec priorisation...', { 
           user_id: user.id, 
           email: user.email, 
           company: profileData.company_name 
         });
 
         // D'abord chercher par user_id (priorité absolue)
+        console.log('🔍 Recherche par user_id:', user.id);
         let { data: hotelResults, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
@@ -116,15 +131,19 @@ export const useAutoSetup = () => {
           .order('created_at', { ascending: false })
           .limit(1);
 
+        console.log('📊 Résultat recherche par user_id:', { hotelResults, hotelError });
+
         // Si pas trouvé par user_id, chercher par email avec possibilité de récupération
         if ((!hotelResults || hotelResults.length === 0) && user.email) {
-          console.log('🔍 Recherche par email en fallback...');
+          console.log('🔍 Recherche par email en fallback...', user.email);
           const { data: emailResults, error: emailError } = await supabase
             .from('hotels')
             .select('*')
             .eq('email', user.email)
             .order('created_at', { ascending: false })
             .limit(1);
+          
+          console.log('📊 Résultat recherche par email:', { emailResults, emailError });
           
           if (!emailError && emailResults && emailResults.length > 0) {
             hotelResults = emailResults;

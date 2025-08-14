@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { useAutoSetup } from '@/hooks/use-auto-setup';
 import { useAuth } from '@/contexts/AuthContext';
+import { QuickHotelFix } from '@/components/QuickHotelFix';
 
 interface SetupStatusReloadProps {
   onManualReload?: () => void;
@@ -16,6 +17,15 @@ export const SetupStatusReload: React.FC<SetupStatusReloadProps> = ({ onManualRe
   // Si tout va bien, ne rien afficher
   if (isAuthenticated && isSetupComplete && hotel) {
     return null;
+  }
+
+  // Si échec de setup complet, afficher la correction automatique
+  if (isAuthenticated && !loading && (!isSetupComplete || !hotel)) {
+    return (
+      <div className="mb-6">
+        <QuickHotelFix />
+      </div>
+    );
   }
 
   // Si pas authentifié
