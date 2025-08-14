@@ -101,27 +101,36 @@ export const useAutoSetup = () => {
 
         console.log('✅ Profil utilisateur disponible:', profileData);
 
-        // Phase 2: Recherche hôtel optimisée avec requête unique multi-critères
-        console.log('🔍 Recherche hôtel multi-critères...', { 
+        // Phase 2: Recherche hôtel optimisée avec priorisation intelligente
+        console.log('🔍 Recherche hôtel avec priorisation...', { 
           user_id: user.id, 
           email: user.email, 
           company: profileData.company_name 
         });
 
-        // Requête optimisée combinant tous les critères
-        const searchConditions = [`user_id.eq.${user.id}`];
-        if (user.email) {
-          searchConditions.push(`email.eq.${user.email}`);
-        }
-        if (profileData.company_name) {
-          searchConditions.push(`name.eq.${profileData.company_name}`);
-        }
-
-        const { data: hotelResults, error: hotelError } = await supabase
+        // D'abord chercher par user_id (priorité absolue)
+        let { data: hotelResults, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
-          .or(searchConditions.join(','))
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
           .limit(1);
+
+        // Si pas trouvé par user_id, chercher par email avec possibilité de récupération
+        if ((!hotelResults || hotelResults.length === 0) && user.email) {
+          console.log('🔍 Recherche par email en fallback...');
+          const { data: emailResults, error: emailError } = await supabase
+            .from('hotels')
+            .select('*')
+            .eq('email', user.email)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          if (!emailError && emailResults && emailResults.length > 0) {
+            hotelResults = emailResults;
+            console.log('✅ Hôtel trouvé par email, sera récupéré');
+          }
+        }
 
         if (hotelError) {
           console.error('❌ Erreur recherche hôtel:', hotelError);
@@ -130,22 +139,26 @@ export const useAutoSetup = () => {
 
         let existingHotel = hotelResults && hotelResults.length > 0 ? hotelResults[0] : null;
 
-        // Si trouvé mais pas avec le bon user_id, le mettre à jour
+        // Si trouvé mais pas avec le bon user_id, le récupérer et le synchroniser
         if (existingHotel && existingHotel.user_id !== user.id) {
-          console.log('✅ Hôtel trouvé, synchronisation user_id...');
-          const { data: updatedHotel } = await supabase
+          console.log('🔄 Récupération hôtel orphelin, synchronisation user_id...');
+          const { data: updatedHotel, error: updateError } = await supabase
             .from('hotels')
             .update({ 
               user_id: user.id,
-              email: user.email 
+              email: user.email,
+              name: profileData.company_name || existingHotel.name
             })
             .eq('id', existingHotel.id)
             .select()
             .single();
           
-          if (updatedHotel) {
+          if (updateError) {
+            console.error('❌ Erreur synchronisation hôtel:', updateError);
+            // Continuer avec l'hôtel existant même si la sync échoue
+          } else if (updatedHotel) {
             existingHotel = updatedHotel;
-            console.log('✅ Hotel synchronisé avec user_id');
+            console.log('✅ Hôtel récupéré et synchronisé avec user_id');
           }
         }
 
@@ -264,39 +277,67 @@ export const useAutoSetup = () => {
 
       } catch (error) {
         console.error('❌ Erreur auto-setup:', error);
-        hasAttemptedSetup.current = false; // Permettre un retry
         
-        // Uniquement pour les erreurs critiques, proposer un retry manuel
-        toast({
-          variant: "destructive",
-          title: "Problème de connexion",
-          description: "Impossible de charger les données. Un retry automatique va être effectué.",
-          duration: 3000
-        });
+        // Reset pour permettre un retry uniquement en cas d'erreur réseau/temporaire
+        const isNetworkError = error?.message?.includes('fetch') || 
+                              error?.message?.includes('network') ||
+                              error?.code === 'PGRST301';
         
-        // Auto-retry après 2 secondes en cas d'erreur
-        setTimeout(() => {
-          if (!isSetupComplete && isAuthenticated && user?.id) {
-            console.log('🔄 Auto-retry après erreur...');
-            setupHotel();
-          }
-        }, 2000);
+        if (isNetworkError) {
+          hasAttemptedSetup.current = false; // Permettre retry pour erreurs réseau
+          console.log('🔄 Erreur réseau détectée, retry autorisé');
+          
+          toast({
+            variant: "destructive",
+            title: "Problème de connexion",
+            description: "Erreur réseau détectée. Retry automatique...",
+            duration: 2000
+          });
+          
+          // Auto-retry immédiat pour erreurs réseau
+          setTimeout(() => {
+            if (!isSetupComplete && isAuthenticated && user?.id && !hasAttemptedSetup.current) {
+              console.log('🔄 Auto-retry réseau...');
+              setupHotel();
+            }
+          }, 1000);
+        } else {
+          // Pour autres erreurs, afficher message mais ne pas retry automatiquement
+          toast({
+            variant: "destructive",
+            title: "Erreur de configuration",
+            description: "Impossible de charger les données de votre établissement. Utilisez le bouton de rechargement.",
+            duration: 5000
+          });
+          console.log('❌ Erreur non-réseau, pas de retry automatique');
+        }
       } finally {
-        setLoading(false);
+        // Ne pas forcer setLoading(false) ici si on va retry
+        const shouldRetry = !isSetupComplete && isAuthenticated && user?.id && !hasAttemptedSetup.current;
+        if (!shouldRetry) {
+          setLoading(false);
+        }
         console.log('🏁 Auto-setup terminé');
       }
     };
 
-    // Timeout de sécurité pour éviter un loading infini
+    // Timeout de sécurité pour éviter un loading infini mais plus généreux
     const setupTimeout = setTimeout(() => {
       if (loading && hasAttemptedSetup.current) {
-        console.warn('⚠️ Timeout setup après 5s, arrêt du loading...');
-        // Arrêter le loading mais ne pas relancer de setup
+        console.warn('⚠️ Timeout setup après 8s, arrêt forcé...');
+        hasAttemptedSetup.current = false; // Reset pour permettre retry manuel
         setLoading(false);
-        // Garder isSetupComplete à false pour montrer l'erreur
-        console.error('❌ Setup échoué après timeout');
+        setIsSetupComplete(false);
+        
+        toast({
+          variant: "destructive",
+          title: "Timeout de connexion",
+          description: "Le chargement prend trop de temps. Utilisez le bouton de rechargement.",
+          duration: 5000
+        });
+        console.error('❌ Setup échoué après timeout - retry manuel disponible');
       }
-    }, 5000); // Timeout plus long pour laisser le temps aux requêtes lentes
+    }, 8000); // Timeout plus généreux
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {

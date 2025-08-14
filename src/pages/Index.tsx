@@ -64,6 +64,7 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
 import { useHotelReconnection } from "@/hooks/use-hotel-reconnection";
 import { HotelSetupFix } from "@/components/HotelSetupFix";
+import { AutoSetupDiagnostic } from "@/components/AutoSetupDiagnostic";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
@@ -104,9 +105,23 @@ const Index = () => {
   const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
   const { forceReconnect } = useHotelReconnection();
 
-  // Handler pour le reload manuel
+  // Mode debug activé si dans localStorage ou URL contient debug
+  const isDebugMode = localStorage.getItem('debug-mode') === 'true' || 
+                      window.location.search.includes('debug=true');
+
+  // Handler pour le reload manuel complet
   const handleManualReload = () => {
-    forceReconnect();
+    // Nettoyer localStorage et forcer un reload complet
+    const keys = [
+      'selectedHotelId',
+      'selectedHotelCode', 
+      'selectedHotelName',
+      'autoSetupComplete',
+      'lastHotelCheck'
+    ];
+    
+    keys.forEach(key => localStorage.removeItem(key));
+    window.location.reload();
   };
   
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
@@ -1415,6 +1430,17 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
              )}
           </div>
         </div>
+
+        {/* Debug en mode développement */}
+        {isDebugMode && (
+          <AutoSetupDiagnostic 
+            hotel={hotel}
+            accessCode={accessCode}
+            isSetupComplete={isSetupComplete}
+            loading={setupLoading}
+            onForceReload={handleManualReload}
+          />
+        )}
 
         {/* Statut de setup avec gestion d'erreur améliorée */}
         <SetupStatusReload onManualReload={handleManualReload} />
