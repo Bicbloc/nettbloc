@@ -61,7 +61,7 @@ import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
-import { useAutoSetup } from "@/hooks/use-auto-setup";
+import { useHotelState } from "@/hooks/use-hotel-state";
 import { useHotelReconnection } from "@/hooks/use-hotel-reconnection";
 import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { AutoSetupDiagnostic } from "@/components/AutoSetupDiagnostic";
@@ -102,7 +102,7 @@ const Index = () => {
   } = useHousekeeping();
   
   // Auto-setup automatique de l'hôtel et génération des codes
-  const { hotel, accessCode, isSetupComplete, loading: setupLoading, hasConfigurationIssues } = useAutoSetup();
+  const { hotel, accessCode, isSetupComplete, loading: setupLoading, hasConfigurationIssues } = useHotelState();
   const { forceReconnect } = useHotelReconnection();
 
   // Mode debug activé si dans localStorage ou URL contient debug

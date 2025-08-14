@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RotateCcw, AlertTriangle, CheckCircle } from 'lucide-react';
 import { LocalStorageManager } from '@/utils/localStorageManager';
-import { useAutoSetup } from '@/hooks/use-auto-setup';
+import { HotelStateManager } from '@/services/HotelStateManager';
 import { toast } from '@/hooks/use-toast';
 
 interface FullResetButtonProps {
@@ -15,7 +15,7 @@ export const FullResetButton: React.FC<FullResetButtonProps> = ({ onResetComplet
   const [isResetting, setIsResetting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
-  const { forceCompleteReset } = useAutoSetup();
+  const manager = HotelStateManager.getInstance();
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -75,16 +75,13 @@ export const FullResetButton: React.FC<FullResetButtonProps> = ({ onResetComplet
         console.warn('⚠️ Erreur sessionStorage:', sessionError);
       }
       
-      // Phase 4: Tentative de reset useAutoSetup si disponible
+      // Phase 4: Reset du gestionnaire d'état unifié
       try {
-        if (forceCompleteReset && typeof forceCompleteReset === 'function') {
-          console.log('🔄 Appel forceCompleteReset...');
-          forceCompleteReset();
-          console.log('✅ forceCompleteReset appelé');
-        }
-      } catch (autoSetupError) {
-        console.warn('⚠️ Erreur forceCompleteReset (continuant sans):', autoSetupError);
-        // Ne pas échouer si useAutoSetup a des problèmes
+        console.log('🔄 Reset HotelStateManager...');
+        manager.forceReset();
+        console.log('✅ HotelStateManager reset');
+      } catch (stateManagerError) {
+        console.warn('⚠️ Erreur HotelStateManager (continuant sans):', stateManagerError);
       }
       
       // Phase 5: Événements de reset global

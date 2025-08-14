@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Room } from '@/services/pdfService';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
-import { HotelSessionService } from '@/services/hotelSessionService';
-import { useDistributionPersistence } from '@/hooks/use-distribution-persistence';
+import { HotelStateManager } from '@/services/HotelStateManager';
+import { supabase } from '@/integrations/supabase/client';
 
 interface HousekeepingContextType {
   housekeeperNames: string[];
@@ -35,294 +35,56 @@ interface HousekeepingProviderProps {
 }
 
 export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ children }) => {
-  const [housekeeperNames, setHousekeeperNames] = useState<string[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
-  
-  // Utiliser le hook de persistance pour la distribution
-  const { isDistributed, saveDistribution } = useDistributionPersistence();
-  
-  const [hotelId, setHotelId] = useState<string | null>(null);
-  const { notifications, addNotification } = useNotifications(hotelId || undefined);
+  const manager = HotelStateManager.getInstance();
+  const [hotelState, setHotelState] = useState(manager.getState());
+  const { notifications, addNotification } = useNotifications(hotelState.hotel?.id);
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
 
-  // Initialiser la session au chargement
+  // Subscribe to hotel state changes
   useEffect(() => {
-    const initializeSession = async () => {
-      try {
-        const token = await HotelSessionService.initializeSession();
-        if (token) {
-          console.log('Session initialisée:', token);
-          await loadSessionData();
-        }
-      } catch (error) {
-        console.error('Erreur initialisation session:', error);
-        setIsInitialized(true);
-      }
-    };
+    const unsubscribe = manager.subscribe(setHotelState);
+    return unsubscribe;
+  }, [manager]);
 
-    initializeSession();
-  }, []);
-
-  // Synchronisation en temps réel - vérifier les changements toutes les 10 secondes
+  // Refresh housekeepers when hotel changes
   useEffect(() => {
-    if (!isInitialized) return;
+    if (hotelState.hotel?.id) {
+      refreshHousekeepers();
+    }
+  }, [hotelState.hotel?.id]);
 
-    const interval = setInterval(async () => {
-      try {
-        const session = await HotelSessionService.getSession();
-        if (session) {
-          // Mettre à jour les données si elles ont changé, mais préserver la distribution locale
-          setHousekeeperNames(prev => {
-            const newNames = session.housekeeper_names || [];
-            return JSON.stringify(prev) !== JSON.stringify(newNames) ? newNames : prev;
-          });
-          
-          setRooms(prev => {
-            const newRooms = session.room_data || [];
-            const hasLocalAssignments = prev.some(room => room.assignedTo);
-            // Si on a des assignations locales, ne pas les écraser
-            if (hasLocalAssignments && newRooms.length > 0) {
-              return prev; // Garder les données locales
-            }
-            return JSON.stringify(prev) !== JSON.stringify(newRooms) ? newRooms : prev;
-          });
-          
-          // Vérifier l'état de distribution depuis le localStorage d'abord
-          const localDistributed = localStorage.getItem('rooms-distributed') === 'true';
-          if (localDistributed && !isDistributed) {
-            saveDistribution(true); // Synchroniser avec le hook de persistance
-          } else if (!localDistributed && session.is_distributed) {
-            saveDistribution(session.is_distributed);
-          }
+  // Sync data every 30 seconds (reduced frequency)
+  useEffect(() => {
+    if (!hotelState.hotel?.id) return;
 
-          // Charger les vraies femmes de chambre depuis la base si on a un hotelId
-          refreshHousekeepers();
-        }
-      } catch (error) {
-        console.error('Erreur synchronisation:', error);
-      }
-    }, 10000); // Réduire la fréquence pour éviter les conflits
+    const interval = setInterval(() => {
+      // Only refresh housekeepers to avoid state conflicts
+      refreshHousekeepers();
+    }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
-  }, [isInitialized]);
+  }, [hotelState.hotel?.id]);
 
-  // Charger les données de la session
-  const loadSessionData = async () => {
-    try {
-      const session = await HotelSessionService.getSession();
-      if (session) {
-        setHousekeeperNames(session.housekeeper_names || []);
-        setRooms(session.room_data || []);
-        saveDistribution(session.is_distributed || false);
-        
-        // Récupérer l'ID réel de l'hôtel depuis la base de données
-        let sessionHotelId = session.hotel_id;
-        const savedHotelCode = localStorage.getItem('selectedHotelCode');
-        const savedHotelId = localStorage.getItem('selectedHotelId');
-        
-        // Valider l'UUID
-        const isValidUUID = (uuid: string) => {
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-          return uuidRegex.test(uuid);
+  const getHousekeeperRooms = (name: string): Room[] => {
+    return hotelState.rooms.filter(room => room.assignedTo === name);
+  };
+
+  const updateRoomStatus = (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => {
+    const updatedRooms = hotelState.rooms.map(room => {
+      if (room.number === roomNumber) {
+        return { 
+          ...room, 
+          status: newStatus,
+          remark: remark || room.remark
         };
-        
-        // Priorité au hotelId sauvegardé s'il est valide
-        if (savedHotelId && isValidUUID(savedHotelId)) {
-          sessionHotelId = savedHotelId;
-          console.log('✅ Context - Hotel ID valide récupéré depuis localStorage:', sessionHotelId);
-        } else if (savedHotelCode) {
-          // Récupérer l'hôtel réel depuis la base de données par son code
-          try {
-            const { SupabaseService } = await import('@/services/supabaseService');
-            const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
-            
-            if (hotel) {
-              sessionHotelId = hotel.id;
-              localStorage.setItem('selectedHotelId', hotel.id);
-              localStorage.setItem('selectedHotelName', hotel.name);
-              console.log('✅ Context - Hotel ID réel récupéré depuis la base:', sessionHotelId);
-            } else {
-              console.error('❌ Context - Hôtel non trouvé pour le code:', savedHotelCode);
-            }
-          } catch (error) {
-            console.error('❌ Context - Erreur récupération hôtel:', error);
-          }
-        }
-        
-        // Assurer qu'on a un hotelId valide
-        if (sessionHotelId && isValidUUID(sessionHotelId)) {
-          setHotelId(sessionHotelId);
-          console.log('✅ Context - Hotel ID valide défini pour les notifications:', sessionHotelId);
-        } else {
-          console.warn('⚠️ Context - Aucun hotelId valide trouvé - notifications désactivées');
-        }
-        
-        // Charger les vraies femmes de chambre depuis la base
-        if (sessionHotelId) {
-          await refreshHousekeepers();
-        }
-        
-        setIsInitialized(true);
-        console.log('Données de session chargées:', {
-          housekeepers: session.housekeeper_names?.length || 0,
-          rooms: session.room_data?.length || 0,
-          distributed: session.is_distributed,
-          hotelId: sessionHotelId
-        });
       }
-    } catch (error) {
-      console.error('Erreur chargement session:', error);
-      setIsInitialized(true);
-    }
-  };
-
-  // Sauvegarder les changements en base de données
-  useEffect(() => {
-    if (isInitialized && housekeeperNames.length > 0) {
-      HotelSessionService.updateHousekeeperNames(housekeeperNames);
-    }
-  }, [housekeeperNames, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized && rooms.length > 0) {
-      HotelSessionService.updateRoomData(rooms);
-    }
-  }, [rooms, isInitialized]);
-
-  useEffect(() => {
-    if (isInitialized) {
-      if (isDistributed) {
-        HotelSessionService.markAsDistributed();
-        // DÉSACTIVÉ: Génération automatique des codes d'accès
-        // generateAccessCodesForAssignedHousekeepers();
-      }
-      console.log("Session - isDistributed sauvegardé:", isDistributed);
-    }
-  }, [isDistributed, isInitialized]);
-
-  // DÉSACTIVÉ: Vérification périodique automatique des codes manquants
-  // useEffect(() => {
-  //   if (!isInitialized || !hotelId || housekeeperNames.length === 0) return;
-
-  //   const checkMissingCodes = async () => {
-  //     try {
-  //       const { supabase } = await import('@/integrations/supabase/client');
-        
-  //       const { data: existingHousekeepers } = await supabase
-  //         .from('housekeepers')
-  //         .select('name')
-  //         .eq('hotel_id', hotelId)
-  //         .eq('is_active', true);
-
-  //       const existingNames = existingHousekeepers?.map(h => h.name) || [];
-  //       const missingHousekeepers = housekeeperNames.filter(name => !existingNames.includes(name));
-        
-  //       if (missingHousekeepers.length > 0) {
-  //         console.log('🔍 Femmes de chambre sans codes détectées:', missingHousekeepers);
-  //         generateAccessCodesForAssignedHousekeepers(true); // Force la génération
-  //       }
-  //     } catch (error) {
-  //       console.error('❌ Erreur vérification codes manquants:', error);
-  //     }
-  //   };
-
-  //   // Vérifier immédiatement puis toutes les 30 secondes
-  //   checkMissingCodes();
-  //   const interval = setInterval(checkMissingCodes, 30000);
+      return room;
+    });
     
-  //   return () => clearInterval(interval);
-  // }, [isInitialized, hotelId, housekeeperNames]);
+    manager.setRooms(updatedRooms);
 
-  // Fonction pour générer automatiquement les codes d'accès après distribution
-  const generateAccessCodesForAssignedHousekeepers = async (force = false) => {
-    const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
-    if (!currentHotelId || housekeeperNames.length === 0) {
-      console.log('⚠️ Génération codes: Conditions non remplies', { currentHotelId, housekeeperCount: housekeeperNames.length });
-      return;
-    }
-
-    // Forcer la génération ou attendre que la distribution soit faite
-    if (!force && !isDistributed) {
-      console.log('⚠️ Génération codes: Distribution pas encore faite, attente...');
-      return;
-    }
-
-    console.log('🔑 Génération automatique des codes d\'accès pour les femmes de chambre...');
-
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
-      // Vérifier les femmes de chambre existantes dans la base
-      const { data: existingHousekeepers } = await supabase
-        .from('housekeepers')
-        .select('name, access_code')
-        .eq('hotel_id', currentHotelId)
-        .eq('is_active', true);
-
-      const existingNames = existingHousekeepers?.map(h => h.name) || [];
-      const newHousekeepers = housekeeperNames.filter(name => !existingNames.includes(name));
-
-      if (newHousekeepers.length > 0) {
-        console.log('📝 Création de nouvelles femmes de chambre:', newHousekeepers);
-        
-        // Récupérer le code hôtel
-        const { data: hotel } = await supabase
-          .from('hotels')
-          .select('hotel_code')
-          .eq('id', currentHotelId)
-          .single();
-
-        const hotelCode = hotel?.hotel_code || 'HTL';
-        
-        // DÉSACTIVÉ: Génération automatique des codes
-        // const { CodeGenerationService } = await import('@/services/codeGenerationService');
-        // const generated = await CodeGenerationService.ensureCodesForHotel(currentHotelId, newHousekeepers);
-        
-        console.log('⚠️ Génération automatique désactivée - création manuelle requise');
-
-        // DÉSACTIVÉ: Rafraîchir les femmes de chambre automatiquement
-        // await refreshHousekeepers();
-
-        // DÉSACTIVÉ: Notification de succès automatique
-        // const { toast } = await import('@/hooks/use-toast');
-        // toast({
-        //   title: "Codes d'accès générés",
-        //   description: `${newHousekeepers.length} code(s) d'accès généré(s) automatiquement pour les femmes de chambre.`
-        // });
-      } else {
-        console.log('✅ Toutes les femmes de chambre ont déjà des codes d\'accès');
-      }
-    } catch (error) {
-      console.error('❌ Erreur génération automatique des codes:', error);
-    }
-  };
-
-  const getHousekeeperRooms = (name: string) => {
-    return rooms.filter(room => room.assignedTo === name);
-  };
-
-  const updateRoomStatus = async (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => {
-    console.log('🔄 updateRoomStatus appelé:', { roomNumber, newStatus, housekeeperName, remark, hotelId });
-    
-    // Mettre à jour localement
-    setRooms(prev => prev.map(room => 
-      room.number === roomNumber 
-        ? { ...room, status: newStatus, remark: remark || room.remark }
-        : room
-    ));
-
-    // Mettre à jour en base de données
-    try {
-      await HotelSessionService.updateRoomStatus(roomNumber, newStatus);
-    } catch (error) {
-      console.error('Erreur mise à jour statut chambre:', error);
-    }
-
-    // Ajouter notification pour l'admin - FORMAT AMÉLIORÉ
-    if (housekeeperName && hotelId) {
-      console.log('🔔 Création notification avec hotelId:', hotelId);
-      
+    // Add notification for admin
+    if (housekeeperName && hotelState.hotel?.id) {
       let notification;
       
       if (newStatus === 'clean') {
@@ -363,113 +125,87 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         };
       }
 
-      console.log('📝 Envoi notification:', notification);
       addNotification(notification);
-    } else {
-      console.warn('⚠️ Notification non créée - manque housekeeperName ou hotelId:', { housekeeperName, hotelId });
     }
   };
 
-  // Fonction pour valider la connexion hôtel
   const validateHotelConnection = async (): Promise<string | null> => {
-    const savedHotelCode = localStorage.getItem('selectedHotelCode');
-    const savedHotelId = localStorage.getItem('selectedHotelId');
-    
-    if (savedHotelCode && (!savedHotelId || !hotelId)) {
-      console.log('⚙️ Context - Validation de la connexion hôtel...');
-      try {
-        const { SupabaseService } = await import('@/services/supabaseService');
-        const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
-        
-        if (hotel) {
-          localStorage.setItem('selectedHotelId', hotel.id);
-          localStorage.setItem('selectedHotelName', hotel.name);
-          setHotelId(hotel.id);
-          console.log('✅ Context - Connexion hôtel validée:', hotel.id);
-          return hotel.id;
-        } else {
-          console.error('❌ Context - Hôtel non trouvé pour le code:', savedHotelCode);
-        }
-      } catch (error) {
-        console.error('❌ Context - Erreur validation hôtel:', error);
-      }
-    }
-    
-    return hotelId || savedHotelId;
-  };
-
-  // DÉSACTIVÉ: Vérification périodique automatique des codes d'accès
-  // useEffect(() => {
-  //   const generateAccessCodesForAssignedHousekeepers = async () => {
-  //     if (!hotelId) return;
-      
-  //     try {
-  //       console.log('🔧 Vérification des codes d\'accès manquants...');
-        
-  //       // Forcer la génération de codes pour toutes les femmes de chambre manquantes
-  //       const { CodeGenerationService } = await import('@/services/codeGenerationService');
-  //       const results = await CodeGenerationService.forceGenerateAllMissingCodes();
-        
-  //       if (results.generated > 0) {
-  //         console.log(`✅ ${results.generated} code(s) d'accès généré(s) automatiquement`);
-  //       }
-        
-  //       if (results.errors.length > 0) {
-  //         console.warn('⚠️ Erreurs lors de la génération automatique:', results.errors);
-  //       }
-  //     } catch (error) {
-  //       console.error('❌ Erreur génération codes automatique:', error);
-  //     }
-  //   };
-    
-  //   // Vérifier immédiatement
-  //   generateAccessCodesForAssignedHousekeepers();
-    
-  //   // Puis vérifier toutes les 2 minutes
-  //   const interval = setInterval(generateAccessCodesForAssignedHousekeepers, 120000);
-    
-  //   return () => clearInterval(interval);
-  // }, [hotelId]);
-
-  // Fonction pour charger les femmes de chambre depuis la base
-  const refreshHousekeepers = async () => {
-    const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
-    if (!currentHotelId) return;
-    
     try {
-      const { SupabaseService } = await import('@/services/supabaseService');
-      const dbHousekeepers = await SupabaseService.getHousekeepers(currentHotelId);
-      
-      setHousekeepers(dbHousekeepers.map(h => ({
-        id: h.id,
-        name: h.name,
-        access_code: h.access_code
-      })));
-      
-      console.log('✅ Femmes de chambre chargées depuis la base:', dbHousekeepers.length);
+      if (!hotelState.hotel?.id) {
+        return "Aucun hôtel configuré";
+      }
+
+      const { data: hotel, error } = await supabase
+        .from('hotels')
+        .select('id, name, hotel_code')
+        .eq('id', hotelState.hotel.id)
+        .single();
+
+      if (error || !hotel) {
+        return "Impossible de valider la connexion à l'hôtel";
+      }
+
+      console.log('✅ Connexion hôtel validée:', hotel);
+      return null;
     } catch (error) {
-      console.error('❌ Erreur chargement femmes de chambre:', error);
+      console.error('Erreur validation connexion hôtel:', error);
+      return "Erreur de connexion à la base de données";
     }
   };
 
-  const value = {
-    housekeeperNames,
-    rooms,
-    isDistributed,
-    notifications,
-    housekeepers,
-    setHousekeeperNames,
-    setRooms,
-    setIsDistributed: saveDistribution,
-    getHousekeeperRooms,
-    updateRoomStatus,
-    addNotification,
-    validateHotelConnection,
-    refreshHousekeepers,
+  const refreshHousekeepers = async () => {
+    try {
+      if (!hotelState.hotel?.id) {
+        console.log('Pas de hotelId, skip refresh housekeepers');
+        return;
+      }
+
+      const { data: housekeepersData, error } = await supabase
+        .from('housekeepers')
+        .select('id, name, access_code')
+        .eq('hotel_id', hotelState.hotel.id)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Erreur récupération housekeepers:', error);
+        return;
+      }
+
+      const validHousekeepers = (housekeepersData || []).filter(h => h.name && h.access_code);
+      setHousekeepers(validHousekeepers);
+      
+      // Update names in the unified state
+      const names = validHousekeepers.map(h => h.name);
+      if (names.length > 0) {
+        manager.setHousekeeperNames(names);
+      }
+
+      console.log('✅ Femmes de chambre mises à jour:', validHousekeepers.length);
+    } catch (error) {
+      console.error('Erreur refresh housekeepers:', error);
+    }
+  };
+
+  const setIsDistributed = (distributed: boolean) => {
+    manager.setDistributed(distributed);
   };
 
   return (
-    <HousekeepingContext.Provider value={value}>
+    <HousekeepingContext.Provider value={{
+      housekeeperNames: hotelState.housekeeperNames,
+      rooms: hotelState.rooms,
+      isDistributed: hotelState.isDistributed,
+      notifications,
+      housekeepers,
+      setHousekeeperNames: manager.setHousekeeperNames.bind(manager),
+      setRooms: manager.setRooms.bind(manager),
+      setIsDistributed,
+      getHousekeeperRooms,
+      updateRoomStatus,
+      addNotification,
+      validateHotelConnection,
+      refreshHousekeepers
+    }}>
       {children}
     </HousekeepingContext.Provider>
   );

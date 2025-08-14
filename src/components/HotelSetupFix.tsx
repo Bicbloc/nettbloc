@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useAutoSetup } from '@/hooks/use-auto-setup';
+import { useHotelState } from '@/hooks/use-hotel-state';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -10,7 +10,7 @@ interface HotelSetupFixProps {
 }
 
 export const HotelSetupFix: React.FC<HotelSetupFixProps> = ({ onForceSetup }) => {
-  const { hotel, accessCode, isSetupComplete, loading, generateNewAccessCode } = useAutoSetup();
+  const { hotel, accessCode, isSetupComplete, loading, generateAccessCode } = useHotelState();
   
   const forceHotelAssociation = async () => {
     try {
@@ -109,7 +109,7 @@ export const HotelSetupFix: React.FC<HotelSetupFixProps> = ({ onForceSetup }) =>
         ) : (
           <div className="space-y-2">
             <Badge variant="outline">Aucun code d'accès</Badge>
-            <Button onClick={generateNewAccessCode} size="sm" variant="outline">
+            <Button onClick={generateAccessCode} size="sm" variant="outline">
               Générer un code d'accès
             </Button>
           </div>
