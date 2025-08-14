@@ -61,6 +61,7 @@ import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
+import { useHotelReconnection } from "@/hooks/use-hotel-reconnection";
 import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
@@ -100,6 +101,7 @@ const Index = () => {
   
   // Auto-setup automatique de l'hôtel et génération des codes
   const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
+  const { forceReconnect } = useHotelReconnection();
   
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
@@ -141,6 +143,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showNotificationPopup, setShowNotificationPopup] = useState(false);
   const [showUnassignedAlert, setShowUnassignedAlert] = useState(true);
+  const [dismissedUnassignedAlert, setDismissedUnassignedAlert] = useState(false);
   
   // ID d'hôtel - utilise l'ID réel de la base ou le localStorage
   const currentHotelId = realHotelId || selectedHotel?.id || localStorage.getItem("selectedHotelId");
@@ -1899,6 +1902,40 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                         </div>
                       </CardContent>
                     </Card>
+                  )}
+
+                  {/* Alerte chambres non-assignées */}
+                  {getUnassignedRooms().length > 0 && !dismissedUnassignedAlert && (
+                    <UnassignedRoomsAlert
+                      unassignedRooms={getUnassignedRooms()}
+                      housekeeperNames={housekeeperNames}
+                      onAddHousekeepers={(newNames) => {
+                        setHousekeeperNames(prev => [...prev, ...newNames]);
+                        toast({
+                          title: "Femmes de chambre ajoutées",
+                          description: `${newNames.length} nouvelle(s) femme(s) de chambre ajoutée(s)`
+                        });
+                      }}
+                      onForceAssignment={(assignments) => {
+                        console.log('🔧 Attribution forcée:', assignments);
+                        // Réinitialiser toutes les assignations existantes
+                        const resetRooms = rooms.map(room => ({ ...room, assignedTo: undefined }));
+                        
+                        // Redistribuer équitablement TOUTES les chambres 
+                        const redistributedRooms = redistributeRooms(resetRooms, housekeeperNames, 'random');
+                        setRooms(redistributedRooms);
+                        setIsDistributed(true);
+                        
+                        const totalAssigned = redistributedRooms.filter(r => r.assignedTo).length;
+                        toast({
+                          title: "Attribution forcée terminée",
+                          description: `${totalAssigned} chambres redistribuées équitablement entre ${housekeeperNames.length} femme(s) de chambre`
+                        });
+                        
+                        setDismissedUnassignedAlert(true);
+                      }}
+                      onDismiss={() => setDismissedUnassignedAlert(true)}
+                    />
                   )}
 
                   {/* Chambres non assignées en haut - toujours visible */}

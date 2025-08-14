@@ -33,9 +33,9 @@ export const useAutoSetup = () => {
 
   useEffect(() => {
     const setupHotel = async () => {
-      // Éviter les exécutions multiples
-      if (hasAttemptedSetup.current) {
-        console.log('🚫 Setup déjà tenté, ignore...');
+      // Éviter les exécutions multiples mais permettre retry si échec
+      if (hasAttemptedSetup.current && isSetupComplete) {
+        console.log('🚫 Setup déjà réussi, ignore...');
         return;
       }
 
@@ -95,12 +95,53 @@ export const useAutoSetup = () => {
 
         console.log('✅ Profil utilisateur disponible:', profileData);
 
-        // Phase 2: Rechercher l'hôtel existant
-        const { data: existingHotel, error: hotelError } = await supabase
+        // Phase 2: Rechercher l'hôtel existant (multiple méthodes)
+        console.log('🔍 Recherche hôtel par user_id...', user.id);
+        let { data: existingHotel, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
           .eq('user_id', user.id)
           .maybeSingle();
+
+        // Si pas trouvé par user_id, essayer par email exact
+        if (!existingHotel && !hotelError && user.email) {
+          console.log('🔍 Recherche hôtel par email...', user.email);
+          const { data: hotelByEmail, error: emailError } = await supabase
+            .from('hotels')
+            .select('*')
+            .eq('email', user.email)
+            .maybeSingle();
+          
+          if (hotelByEmail && !emailError) {
+            existingHotel = hotelByEmail;
+            console.log('✅ Hôtel trouvé par email, mise à jour user_id...');
+            // Mettre à jour le user_id pour correspondre
+            await supabase
+              .from('hotels')
+              .update({ user_id: user.id })
+              .eq('id', hotelByEmail.id);
+          }
+        }
+
+        // Si toujours pas trouvé et qu'on a un company_name, essayer par nom
+        if (!existingHotel && !hotelError && profileData.company_name) {
+          console.log('🔍 Recherche hôtel par company_name...', profileData.company_name);
+          const { data: hotelByName, error: nameError } = await supabase
+            .from('hotels')
+            .select('*')
+            .eq('name', profileData.company_name)
+            .maybeSingle();
+          
+          if (hotelByName && !nameError) {
+            existingHotel = hotelByName;
+            console.log('✅ Hôtel trouvé par nom, mise à jour user_id...');
+            // Mettre à jour le user_id pour correspondre
+            await supabase
+              .from('hotels')
+              .update({ user_id: user.id, email: user.email })
+              .eq('id', hotelByName.id);
+          }
+        }
 
         if (hotelError) {
           console.error('❌ Erreur recherche hôtel:', hotelError);
@@ -192,23 +233,24 @@ export const useAutoSetup = () => {
             profileCompanyName: profileData.company_name
           });
 
-          // Ne pas afficher de toast si l'hôtel existait déjà (évite le spam)
+          // Toast discret uniquement pour les nouveaux hôtels
           if (!existingHotel) {
             toast({
               title: "✅ Établissement configuré",
-              description: `${profileData.company_name || hotelData.name} prêt à l'emploi !`
+              description: `${profileData.company_name || hotelData.name} prêt !`,
+              duration: 2000
             });
+          } else {
+            // Log silencieux pour hôtel existant
+            console.log('✅ Reconnexion silencieuse réussie:', hotelData.name);
           }
         }
 
       } catch (error) {
         console.error('❌ Erreur auto-setup:', error);
         hasAttemptedSetup.current = false; // Permettre un retry
-        toast({
-          variant: "destructive",
-          title: "Erreur configuration",
-          description: "Erreur lors de la configuration de l'hôtel. Veuillez réessayer ou contacter le support."
-        });
+        // Pas de toast intrusif - les erreurs seront gérées par la reconnexion automatique
+        console.warn('⚠️ Auto-setup échoué, la reconnexion automatique prendra le relais');
       } finally {
         setLoading(false);
         console.log('🏁 Auto-setup terminé');
@@ -221,8 +263,10 @@ export const useAutoSetup = () => {
         console.warn('⚠️ Timeout setup, forçage completion...');
         setLoading(false);
         setIsSetupComplete(true);
+        // Force un retry si la configuration échoue
+        hasAttemptedSetup.current = false;
       }
-    }, 1000); // Réduit de 3s à 1s pour une connexion immédiate
+    }, 500); // Réduit à 500ms pour une connexion immédiate
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {

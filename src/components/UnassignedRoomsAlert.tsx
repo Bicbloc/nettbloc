@@ -31,15 +31,16 @@ export function UnassignedRoomsAlert({
       return; // Cannot force assignment without housekeepers
     }
 
-    // Use random distribution for equitable assignment
+    // Utiliser la redistribution aléatoire équitable pour TOUTES les chambres non-assignées
     const redistributedRooms = redistributeRooms(unassignedRooms, housekeeperNames, 'random');
     
-    // Group rooms by assigned housekeeper
+    // Grouper par femme de chambre assignée
     const assignments = housekeeperNames.map(housekeeper => ({
       housekeeper,
       rooms: redistributedRooms.filter(room => room.assignedTo === housekeeper)
     })).filter(assignment => assignment.rooms.length > 0);
 
+    console.log('🔧 Attribution forcée générant:', assignments);
     onForceAssignment(assignments);
   };
 
@@ -134,6 +135,7 @@ export function UnassignedRoomsAlert({
                 rooms: redistributedRooms.filter(room => room.assignedTo === housekeeper)
               })).filter(assignment => assignment.rooms.length > 0);
               
+              console.log('🎯 Auto-attribution après ajout:', assignments);
               onForceAssignment(assignments);
             }, 100); // Délai pour laisser le temps aux états de se mettre à jour
           }

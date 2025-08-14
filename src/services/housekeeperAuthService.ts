@@ -55,12 +55,14 @@ export class HousekeeperAuthService {
         console.error('❌ Authentification échouée:', result);
         
         // Message d'erreur plus clair selon le contexte
-        let errorMessage = 'Code d\'accès invalide';
+        let errorMessage = 'Code d\'accès invalide ou expiré';
         if (result.hotel_id && result.hotel_name) {
-          errorMessage = `Code d'accès non trouvé pour l'hôtel "${result.hotel_name}"`;
+          errorMessage = `Code d'accès non trouvé pour l'hôtel "${result.hotel_name}". Vérifiez que le code est correct et actif.`;
         } else if (accessCode.includes('-')) {
           const hotelCode = accessCode.split('-')[0];
-          errorMessage = `Hôtel non trouvé avec le code "${hotelCode}"`;
+          errorMessage = `Hôtel non trouvé avec le code "${hotelCode}". Vérifiez le code auprès de votre administration.`;
+        } else {
+          errorMessage = 'Format de code d\'accès invalide. Le code doit contenir le code hôtel suivi d\'un tiret.';
         }
         
         return {

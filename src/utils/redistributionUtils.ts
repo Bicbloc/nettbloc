@@ -12,20 +12,24 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-// Distribution aléatoire équitable
+// Distribution aléatoire équitable - forcée pour attribuer TOUTES les chambres
 function distributeRandomly(rooms: Room[], housekeeperNames: string[]): Room[] {
   if (housekeeperNames.length === 0) return rooms;
   
-  const shuffledRooms = shuffleArray(rooms);
-  const result = [...shuffledRooms];
+  const roomsToAssign = rooms.filter(room => 
+    room.cleaningType !== 'none' && room.status !== 'maintenance'
+  );
   
+  // Mélanger pour éviter les biais d'ordre
+  const shuffledRooms = shuffleArray(roomsToAssign);
+  const result = [...rooms]; // Garder toutes les chambres originales
+  
+  // Attribution équitable forcée - peut dépasser la limite habituelle si nécessaire
   shuffledRooms.forEach((room, index) => {
-    if (room.cleaningType !== 'none' && room.status !== 'maintenance') {
-      const housekeeperIndex = index % housekeeperNames.length;
-      const assignedRoom = result.find(r => r.number === room.number);
-      if (assignedRoom) {
-        assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
-      }
+    const housekeeperIndex = index % housekeeperNames.length;
+    const assignedRoom = result.find(r => r.number === room.number);
+    if (assignedRoom) {
+      assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
     }
   });
   
