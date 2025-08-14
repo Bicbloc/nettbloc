@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -813,31 +813,31 @@ export type Database = {
     }
     Functions: {
       approve_housekeeper_access_request: {
-        Args: { request_id: string; admin_user_id: string }
+        Args: { admin_user_id: string; request_id: string }
         Returns: string
       }
       authenticate_housekeeper_by_code: {
         Args: { p_access_code: string }
         Returns: {
-          success: boolean
+          code_source: string
+          hotel_code: string
           hotel_id: string
           hotel_name: string
-          hotel_code: string
           housekeeper_id: string
           housekeeper_name: string
           resolved_access_code: string
-          code_source: string
+          success: boolean
         }[]
       }
       change_subscription_status: {
-        Args: { p_user_id: string; p_new_status: string; p_reason?: string }
+        Args: { p_new_status: string; p_reason?: string; p_user_id: string }
         Returns: boolean
       }
       cleanup_all_housekeepers_for_hotel: {
         Args: { p_hotel_id: string }
         Returns: {
-          deleted_housekeepers: number
           deleted_codes: number
+          deleted_housekeepers: number
         }[]
       }
       cleanup_expired_hotel_sessions: {
@@ -849,7 +849,7 @@ export type Database = {
         Returns: undefined
       }
       extend_trial_period: {
-        Args: { p_user_id: string; p_extension_days: number; p_reason?: string }
+        Args: { p_extension_days: number; p_reason?: string; p_user_id: string }
         Returns: boolean
       }
       generate_hotel_access_code: {
@@ -878,9 +878,9 @@ export type Database = {
       }
       generate_temporary_hotel_access_code: {
         Args: {
-          p_housekeeper_profile_id: string
-          p_hotel_id: string
           p_duration_hours?: number
+          p_hotel_id: string
+          p_housekeeper_profile_id: string
         }
         Returns: string
       }
@@ -890,14 +890,26 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
       log_admin_action: {
-        Args: { p_action: string; p_target_user_id?: string; p_details?: Json }
+        Args: { p_action: string; p_details?: Json; p_target_user_id?: string }
         Returns: undefined
+      }
+      log_housekeeper_action: {
+        Args: {
+          p_description?: string
+          p_hotel_id: string
+          p_housekeeper_name?: string
+          p_room_number?: string
+          p_target_user_id?: string
+          p_title?: string
+          p_type: string
+        }
+        Returns: number
       }
       request_password_reset: {
         Args: { user_email: string }
