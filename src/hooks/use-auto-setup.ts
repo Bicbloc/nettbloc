@@ -30,7 +30,9 @@ export const useAutoSetup = () => {
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(true);
-  const hasAttemptedSetup = useRef(false);
+  const [hasConfigurationIssues, setHasConfigurationIssues] = useState(false);
+  const hasAttemptedSetup = useRef<number>(0);
+  const lastSuccessfulSetup = useRef<string | null>(null);
 
   // Force un reset complet et redémarrage
   const forceCompleteReset = () => {
@@ -41,10 +43,15 @@ export const useAutoSetup = () => {
     setAccessCode(null);
     setIsSetupComplete(false);
     setLoading(true);
-    hasAttemptedSetup.current = false;
+    setHasConfigurationIssues(false);
+    hasAttemptedSetup.current = 0;
+    lastSuccessfulSetup.current = null;
     
     // Reset localStorage
     LocalStorageManager.resetHotelData();
+    
+    // Cleanup retry counters
+    localStorage.removeItem('setup_retry_count');
     
     // Dispatch event pour forcer les autres composants à se réinitialiser
     window.dispatchEvent(new Event('hotel-reset-complete'));
@@ -54,37 +61,36 @@ export const useAutoSetup = () => {
 
   useEffect(() => {
     const setupHotel = async () => {
-      // Phase 0: Nettoyage localStorage au démarrage
-      const { cleaned } = LocalStorageManager.cleanCorruptedValues();
-      if (cleaned.length > 0) {
-        console.log('🧹 Valeurs localStorage corrompues nettoyées:', cleaned);
-        // Si localStorage était corrompu, on force un redémarrage propre
-        hasAttemptedSetup.current = false;
+      // Vérifier si setup déjà réussi pour cet utilisateur
+      if (lastSuccessfulSetup.current === user?.id && isSetupComplete && hotel) {
+        console.log('✅ Setup déjà validé pour cet utilisateur, aucune action requise');
+        setLoading(false);
+        setHasConfigurationIssues(false);
+        return;
       }
 
-      // Éviter les exécutions multiples mais permettre retry si échec
-      if (hasAttemptedSetup.current && isSetupComplete) {
-        console.log('🚫 Setup déjà réussi, ignore...');
+      // Phase 0: Vérification intelligente localStorage
+      const diagnostic = LocalStorageManager.getDiagnosticReport();
+      const { cleaned } = LocalStorageManager.cleanCorruptedValues();
+      
+      if (cleaned.length > 0) {
+        console.log('🧹 Valeurs localStorage corrompues nettoyées:', cleaned);
+        hasAttemptedSetup.current = 0;
+      }
+
+      // Éviter les exécutions multiples
+      if (hasAttemptedSetup.current && Date.now() - hasAttemptedSetup.current < 5000) {
+        console.log('🚫 Setup récent déjà tenté, ignore pour éviter spam');
         return;
       }
 
       if (!isAuthenticated || !user?.id) {
-        console.log('🚫 Non authentifié, arrêt du setup');
+        console.log('🚫 Non authentifié, reset état');
         setLoading(false);
         setIsSetupComplete(false);
-        hasAttemptedSetup.current = false;
-        return;
-      }
-
-      // Éviter les exécutions multiples avec log détaillé
-      if (hasAttemptedSetup.current) {
-        console.log('🚫 Setup déjà en cours, ignore...', {
-          hasAttemptedSetup: hasAttemptedSetup.current,
-          isSetupComplete,
-          loading,
-          userId: user.id,
-          userEmail: user.email
-        });
+        setHasConfigurationIssues(false);
+        hasAttemptedSetup.current = 0;
+        lastSuccessfulSetup.current = null;
         return;
       }
 
@@ -95,7 +101,7 @@ export const useAutoSetup = () => {
         isSetupComplete,
         loading
       });
-      hasAttemptedSetup.current = true;
+      hasAttemptedSetup.current = Date.now();
       
       try {
         // Phase 1: Vérification de cohérence des données
@@ -210,7 +216,6 @@ export const useAutoSetup = () => {
           }
         }
 
-
         let hotelData: HotelData | null = existingHotel;
         let activeCode: string | null = null;
 
@@ -284,15 +289,27 @@ export const useAutoSetup = () => {
           console.log('✅ Hôtel créé automatiquement:', hotelData);
         }
 
-        // Phase 5: Finaliser le setup avec les données trouvées/créées
+        // Phase 5: Finaliser le setup avec validation rigoureuse
         if (hotelData) {
-          // Mise à jour immédiate des états
+          // Vérification finale de cohérence
+          const isValidSetup = hotelData.id && hotelData.name && hotelData.user_id === user.id;
+          
+          if (!isValidSetup) {
+            console.error('❌ Données hôtel incohérentes:', hotelData);
+            throw new Error('Configuration hôtel invalide');
+          }
+
+          // Mise à jour atomique des états
           setHotel(hotelData);
           setAccessCode(activeCode);
           setIsSetupComplete(true);
-          setLoading(false); // Arrêter le loading immédiatement
+          setHasConfigurationIssues(false);
+          setLoading(false);
           
-          // Sauvegarde localStorage sécurisée
+          // Marquer le succès pour cet utilisateur
+          lastSuccessfulSetup.current = user.id;
+          
+          // Sauvegarde localStorage avec validation
           const saveSuccess = LocalStorageManager.saveHotelData({
             id: hotelData.id,
             code: hotelData.hotel_code,
@@ -300,105 +317,122 @@ export const useAutoSetup = () => {
           });
           
           if (!saveSuccess) {
-            console.error('❌ Échec sauvegarde localStorage');
-            throw new Error('Impossible de sauvegarder les données hôtel');
+            console.warn('⚠️ Échec sauvegarde localStorage, continue quand même');
           }
-          
-          // Force la reconnexion automatique
-          window.dispatchEvent(new Event('hotel-reconnected'));
           
           console.log('✅ Setup terminé avec succès:', {
             hotelId: hotelData.id,
             hotelCode: hotelData.hotel_code,
             hotelName: hotelData.name,
             hasAccessCode: !!activeCode,
-            profileCompanyName: profileData.company_name
+            userId: user.id,
+            configurationIssues: false
           });
 
-          // Toast discret uniquement pour les nouveaux hôtels
-          if (!existingHotel) {
+          // Toast uniquement pour nouveaux hôtels ou après problème résolu
+          if (!existingHotel || hasConfigurationIssues) {
             toast({
-              title: "✅ Établissement configuré",
-              description: `${profileData.company_name || hotelData.name} prêt !`,
+              title: "✅ Configuration réussie",
+              description: `${hotelData.name} est prêt !`,
               duration: 2000
             });
-          } else {
-            // Log silencieux pour hôtel existant
-            console.log('✅ Reconnexion silencieuse réussie:', hotelData.name);
           }
         }
 
       } catch (error) {
         console.error('❌ Erreur auto-setup:', error);
         
-        // Reset pour permettre un retry uniquement en cas d'erreur réseau/temporaire
+        // Diagnostic de l'erreur plus précis
         const isNetworkError = error?.message?.includes('fetch') || 
                               error?.message?.includes('network') ||
-                              error?.code === 'PGRST301';
+                              error?.code === 'PGRST301' ||
+                              error?.name === 'NetworkError';
+        
+        const isAuthError = error?.message?.includes('JWT') || 
+                          error?.message?.includes('auth') ||
+                          error?.code === 'PGRST302';
         
         if (isNetworkError) {
-          hasAttemptedSetup.current = false; // Permettre retry pour erreurs réseau
-          console.log('🔄 Erreur réseau détectée, retry autorisé');
+          console.log('🔄 Erreur réseau, retry autorisé');
+          setHasConfigurationIssues(false);
+          hasAttemptedSetup.current = 0;
+          
+          // Retry silencieux sans toast si moins de 3 tentatives
+          const retryCount = Number(localStorage.getItem('setup_retry_count') || '0');
+          if (retryCount < 3) {
+            localStorage.setItem('setup_retry_count', String(retryCount + 1));
+            setTimeout(() => setupHotel(), 2000);
+            return;
+          }
           
           toast({
             variant: "destructive",
             title: "Problème de connexion",
-            description: "Erreur réseau détectée. Retry automatique...",
-            duration: 2000
+            description: "Vérifiez votre connexion internet.",
+            duration: 3000
           });
-          
-          // Auto-retry immédiat pour erreurs réseau
-          setTimeout(() => {
-            if (!isSetupComplete && isAuthenticated && user?.id && !hasAttemptedSetup.current) {
-              console.log('🔄 Auto-retry réseau...');
-              setupHotel();
-            }
-          }, 1000);
+        } else if (isAuthError) {
+          console.log('🔐 Erreur authentification, reset complet');
+          setHasConfigurationIssues(true);
+          lastSuccessfulSetup.current = null;
         } else {
-          // Pour autres erreurs, afficher message mais ne pas retry automatiquement
+          // Erreur de données ou configuration
+          console.log('⚠️ Erreur configuration détectée');
+          setHasConfigurationIssues(true);
+          
+          // Toast discret, pas d'alarme excessive
           toast({
-            variant: "destructive",
-            title: "Erreur de configuration",
-            description: "Impossible de charger les données de votre établissement. Utilisez le bouton de rechargement.",
-            duration: 5000
+            title: "Configuration requise",
+            description: "Votre compte nécessite une mise à jour.",
+            duration: 3000
           });
-          console.log('❌ Erreur non-réseau, pas de retry automatique');
         }
+        
+        // Reset pour cleanup
+        localStorage.removeItem('setup_retry_count');
       } finally {
-        // Ne pas forcer setLoading(false) ici si on va retry
-        const shouldRetry = !isSetupComplete && isAuthenticated && user?.id && !hasAttemptedSetup.current;
-        if (!shouldRetry) {
-          setLoading(false);
+        // Cleanup et finalisation état
+        if (isAuthenticated && user?.id) {
+          hasAttemptedSetup.current = Date.now();
         }
+        
+        setLoading(false);
         console.log('🏁 Auto-setup terminé');
       }
     };
 
-    // Timeout de sécurité pour éviter un loading infini mais plus généreux
+    // Timeout de sécurité intelligent
     const setupTimeout = setTimeout(() => {
-      if (loading && hasAttemptedSetup.current) {
-        console.warn('⚠️ Timeout setup après 8s, arrêt forcé...');
-        hasAttemptedSetup.current = false; // Reset pour permettre retry manuel
+      if (loading && isAuthenticated && user?.id) {
+        console.warn('⚠️ Timeout setup après 10s');
         setLoading(false);
-        setIsSetupComplete(false);
+        setHasConfigurationIssues(true);
+        hasAttemptedSetup.current = 0; // Reset pour permettre retry
         
         toast({
-          variant: "destructive",
-          title: "Timeout de connexion",
-          description: "Le chargement prend trop de temps. Utilisez le bouton de rechargement.",
-          duration: 5000
+          title: "Chargement lent",
+          description: "La configuration prend plus de temps que prévu.",
+          duration: 3000
         });
-        console.error('❌ Setup échoué après timeout - retry manuel disponible');
       }
-    }, 8000); // Timeout plus généreux
+    }, 10000);
 
-    // Lancer le setup si nécessaire
-    if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {
-      setupHotel();
-    } else if (!isAuthenticated || !user?.id) {
+    // Lancer le setup intelligemment
+    if (isAuthenticated && user?.id) {
+      const lastAttempt = hasAttemptedSetup.current;
+      const shouldAttempt = !lastAttempt || (Date.now() - lastAttempt > 10000);
+      
+      if (shouldAttempt) {
+        setupHotel();
+      } else {
+        setLoading(false);
+      }
+    } else {
       setLoading(false);
       setIsSetupComplete(false);
-      hasAttemptedSetup.current = false;
+      setHasConfigurationIssues(false);
+      hasAttemptedSetup.current = 0;
+      lastSuccessfulSetup.current = null;
     }
 
     return () => clearTimeout(setupTimeout);
@@ -438,6 +472,7 @@ export const useAutoSetup = () => {
     accessCode,
     isSetupComplete,
     loading,
+    hasConfigurationIssues,
     generateNewAccessCode,
     forceCompleteReset
   };

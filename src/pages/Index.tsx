@@ -102,7 +102,7 @@ const Index = () => {
   } = useHousekeeping();
   
   // Auto-setup automatique de l'hôtel et génération des codes
-  const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
+  const { hotel, accessCode, isSetupComplete, loading: setupLoading, hasConfigurationIssues } = useAutoSetup();
   const { forceReconnect } = useHotelReconnection();
 
   // Mode debug activé si dans localStorage ou URL contient debug
@@ -1438,6 +1438,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             accessCode={accessCode}
             isSetupComplete={isSetupComplete}
             loading={setupLoading}
+            hasConfigurationIssues={hasConfigurationIssues}
             onForceReload={handleManualReload}
           />
         )}

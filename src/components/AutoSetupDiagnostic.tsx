@@ -11,6 +11,7 @@ interface AutoSetupDiagnosticProps {
   accessCode: string | null;
   isSetupComplete: boolean;
   loading: boolean;
+  hasConfigurationIssues: boolean;
   onForceReload?: () => void;
 }
 
@@ -19,6 +20,7 @@ export const AutoSetupDiagnostic: React.FC<AutoSetupDiagnosticProps> = ({
   accessCode,
   isSetupComplete,
   loading,
+  hasConfigurationIssues,
   onForceReload
 }) => {
   const { user, isAuthenticated } = useAuth();
@@ -26,6 +28,7 @@ export const AutoSetupDiagnostic: React.FC<AutoSetupDiagnosticProps> = ({
   const getDiagnosticStatus = () => {
     if (!isAuthenticated) return { status: 'error', message: 'Non authentifié' };
     if (loading) return { status: 'loading', message: 'Chargement en cours...' };
+    if (hasConfigurationIssues) return { status: 'warning', message: 'Configuration requise' };
     if (!hotel) return { status: 'error', message: 'Aucun hôtel trouvé' };
     if (!isSetupComplete) return { status: 'warning', message: 'Setup incomplet' };
     return { status: 'success', message: 'Configuration réussie' };
