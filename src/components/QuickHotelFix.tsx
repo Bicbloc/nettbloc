@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { LocalStorageManager } from '@/utils/localStorageManager';
 
@@ -11,124 +11,130 @@ export const QuickHotelFix: React.FC = () => {
   const { user } = useAuth();
   const [isFixing, setIsFixing] = useState(false);
   const [isFixed, setIsFixed] = useState(false);
+  const [fixDetails, setFixDetails] = useState<string[]>([]);
 
   const handleQuickFix = async () => {
     if (!user?.id) {
       toast({
         variant: "destructive",
-        title: "Erreur d'authentification",
-        description: "Utilisateur non connecté. Veuillez vous reconnecter.",
-        duration: 5000
+        title: "Erreur",
+        description: "Utilisateur non authentifié"
       });
       return;
     }
 
     setIsFixing(true);
+    setFixDetails([]);
+    const details: string[] = [];
+    
     try {
       console.log('🔧 Quick fix pour utilisateur:', user.email);
+      details.push(`Correction pour ${user.email}`);
 
-      // Phase 0: Vérification de la connectivité Supabase
-      try {
-        const { data: healthCheck } = await supabase.from('profiles').select('count').limit(1);
-        console.log('✅ Connexion Supabase OK');
-      } catch (connectError) {
-        throw new Error(`Problème de connexion Supabase: ${connectError.message}`);
-      }
-
-      // Phase 1: Diagnostic et nettoyage localStorage
+      // Phase 0: Diagnostic et nettoyage localStorage
       const diagnostic = LocalStorageManager.getDiagnosticReport();
       console.log('📊 Diagnostic localStorage:', diagnostic);
       
       if (diagnostic.corrupted.length > 0) {
         console.log('🧹 Nettoyage localStorage corrompu...');
         LocalStorageManager.cleanCorruptedValues();
+        details.push('localStorage nettoyé');
       }
 
-      // Phase 2: Vérifier/créer le profil avec gestion d'erreurs détaillée
-      console.log('🔍 Vérification du profil utilisateur...');
-      let { data: profile, error: profileSelectError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileSelectError) {
-        console.error('❌ Erreur lecture profil:', profileSelectError);
-        throw new Error(`Impossible de lire le profil: ${profileSelectError.message}`);
-      }
-
-      if (!profile) {
-        console.log('📝 Création du profil...');
-        const { data: newProfile, error: profileError } = await supabase
+      // 1. Vérifier/créer le profil avec gestion d'erreur améliorée
+      let profile;
+      try {
+        const { data: existingProfile, error: profileSelectError } = await supabase
           .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email || '',
-            company_name: 'Mon Établissement',
-            subscription_type: 'trial'
-          })
-          .select()
-          .maybeSingle();
-
-        if (profileError) {
-          console.error('❌ Erreur création profil:', profileError);
-          throw new Error(`Impossible de créer le profil: ${profileError.message}`);
-        }
-        profile = newProfile;
-        console.log('✅ Profil créé:', profile);
-      } else {
-        console.log('✅ Profil existant trouvé:', profile);
-      }
-
-      // Phase 3: Chercher/créer l'hôtel avec gestion d'erreurs améliorée
-      console.log('🏨 Vérification de l\'hôtel...');
-      let { data: hotel, error: hotelSelectError } = await supabase
-        .from('hotels')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (hotelSelectError) {
-        console.error('❌ Erreur lecture hôtel:', hotelSelectError);
-        throw new Error(`Impossible de lire l'hôtel: ${hotelSelectError.message}`);
-      }
-
-      if (!hotel) {
-        console.log('🔍 Recherche hôtel par email...');
-        // Chercher par email
-        const { data: hotelByEmail, error: emailSearchError } = await supabase
-          .from('hotels')
           .select('*')
-          .eq('email', user.email)
+          .eq('id', user.id)
           .maybeSingle();
 
-        if (emailSearchError) {
-          console.error('❌ Erreur recherche par email:', emailSearchError);
+        if (profileSelectError) {
+          console.warn('Erreur lecture profil:', profileSelectError);
+          details.push('Erreur lecture profil existant');
         }
 
-        if (hotelByEmail && !emailSearchError) {
-          console.log('🔗 Récupération de l\'hôtel existant...');
-          // Récupérer l'hôtel
-          const { data: updatedHotel, error: updateError } = await supabase
-            .from('hotels')
-            .update({ user_id: user.id })
-            .eq('id', hotelByEmail.id)
+        profile = existingProfile;
+
+        if (!profile) {
+          console.log('📝 Création du profil...');
+          const { data: newProfile, error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email || '',
+              company_name: 'Mon Établissement',
+              subscription_type: 'trial'
+            })
             .select()
             .maybeSingle();
 
-          if (updateError) {
-            console.error('❌ Erreur mise à jour hôtel:', updateError);
-            throw new Error(`Impossible de récupérer l'hôtel: ${updateError.message}`);
+          if (profileError) {
+            console.error('Erreur création profil:', profileError);
+            details.push(`Erreur profil: ${profileError.message}`);
+            throw new Error(`Profil: ${profileError.message}`);
           }
-          hotel = updatedHotel;
-          console.log('✅ Hôtel récupéré:', hotel);
+          profile = newProfile;
+          details.push('Profil créé');
+          console.log('✅ Profil créé:', profile);
         } else {
-          console.log('🏗️ Création d\'un nouvel hôtel...');
+          details.push('Profil trouvé');
+        }
+      } catch (profileError) {
+        console.error('Erreur profil globale:', profileError);
+        details.push('Échec gestion profil');
+      }
+
+      // 2. Chercher/créer son hôtel avec gestion d'erreur robuste
+      let hotel;
+      try {
+        // Chercher par user_id d'abord
+        const { data: hotelByUserId } = await supabase
+          .from('hotels')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        hotel = hotelByUserId;
+
+        if (!hotel && user.email) {
+          // Chercher par email
+          const { data: hotelByEmail } = await supabase
+            .from('hotels')
+            .select('*')
+            .eq('email', user.email)
+            .maybeSingle();
+
+          if (hotelByEmail) {
+            // Associer l'hôtel existant
+            const { data: updatedHotel, error: updateError } = await supabase
+              .from('hotels')
+              .update({ user_id: user.id })
+              .eq('id', hotelByEmail.id)
+              .select()
+              .maybeSingle();
+
+            if (updateError) {
+              console.error('Erreur association hôtel:', updateError);
+              details.push(`Erreur association: ${updateError.message}`);
+            } else {
+              hotel = updatedHotel;
+              details.push('Hôtel récupéré par email');
+              console.log('✅ Hôtel associé:', hotel);
+            }
+          }
+        }
+
+        if (!hotel) {
           // Créer un nouvel hôtel
+          console.log('🏨 Création nouvel hôtel...');
+          const hotelName = profile?.company_name || `Établissement de ${user.email?.split('@')[0] || 'Utilisateur'}`;
+          
           const { data: newHotel, error: createError } = await supabase
             .from('hotels')
             .insert({
-              name: profile?.company_name || `Établissement de ${user.email}`,
+              name: hotelName,
               email: user.email || '',
               user_id: user.id
             })
@@ -136,44 +142,53 @@ export const QuickHotelFix: React.FC = () => {
             .maybeSingle();
 
           if (createError) {
-            console.error('❌ Erreur création hôtel:', createError);
-            throw new Error(`Impossible de créer l'hôtel: ${createError.message}`);
+            console.error('Erreur création hôtel:', createError);
+            details.push(`Erreur création hôtel: ${createError.message}`);
+            throw new Error(`Hôtel: ${createError.message}`);
           }
           hotel = newHotel;
+          details.push('Nouvel hôtel créé');
           console.log('✅ Hôtel créé:', hotel);
+        } else {
+          details.push('Hôtel trouvé');
         }
-      } else {
-        console.log('✅ Hôtel existant trouvé:', hotel);
+      } catch (hotelError) {
+        console.error('Erreur hôtel globale:', hotelError);
+        details.push('Échec gestion hôtel');
+        throw hotelError;
       }
 
-      // Phase 4: Validation et sauvegarde
-      if (!hotel) {
-        throw new Error('Aucun hôtel n\'a pu être trouvé ou créé');
+      // 3. Sauvegarder dans localStorage avec validation
+      if (hotel) {
+        try {
+          const saveSuccess = LocalStorageManager.saveHotelData({
+            id: hotel.id,
+            code: hotel.hotel_code || 'HTL001',
+            name: hotel.name
+          });
+          
+          if (!saveSuccess) {
+            throw new Error('Échec sauvegarde localStorage');
+          }
+          
+          details.push('Données sauvegardées localement');
+          
+          // Forcer la réinitialisation de useAutoSetup
+          window.dispatchEvent(new Event('hotel-reconnected'));
+          details.push('Reconnexion déclenchée');
+        } catch (storageError) {
+          console.error('Erreur localStorage:', storageError);
+          details.push('Erreur sauvegarde locale');
+        }
       }
 
-      console.log('💾 Sauvegarde dans localStorage...');
-      const saveSuccess = LocalStorageManager.saveHotelData({
-        id: hotel.id,
-        code: hotel.hotel_code || '',
-        name: hotel.name
-      });
-      
-      if (!saveSuccess) {
-        console.warn('⚠️ Échec sauvegarde localStorage, mais on continue...');
-      }
-      
-      // Forcer la réinitialisation de useAutoSetup
-      console.log('🔄 Déclenchement de la reconnexion...');
-      window.dispatchEvent(new Event('hotel-reconnected'));
-      
-      // Attendre un peu pour la propagation de l'événement
-      await new Promise(resolve => setTimeout(resolve, 500));
-
+      setFixDetails(details);
       setIsFixed(true);
+      
       toast({
-        title: "✅ Problème résolu !",
-        description: `Hôtel "${hotel.name}" configuré avec succès.`,
-        duration: 3000
+        title: "✅ Correction réussie !",
+        description: `Hôtel "${hotel?.name}" configuré. Rechargement...`,
+        duration: 2000
       });
 
       // Recharger la page après 2 secondes
@@ -181,15 +196,16 @@ export const QuickHotelFix: React.FC = () => {
         window.location.reload();
       }, 2000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erreur quick fix:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      details.push(`Erreur finale: ${error.message || 'Inconnue'}`);
+      setFixDetails(details);
       
       toast({
         variant: "destructive",
-        title: "Correction automatique échouée",
-        description: `Détails: ${errorMessage}`,
-        duration: 7000
+        title: "Correction échouée",
+        description: error.message || "Erreur inconnue lors de la correction",
+        duration: 5000
       });
     } finally {
       setIsFixing(false);
@@ -199,11 +215,24 @@ export const QuickHotelFix: React.FC = () => {
   if (isFixed) {
     return (
       <Card className="border-green-200 bg-green-50">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2 text-green-700">
             <CheckCircle className="h-5 w-5" />
-            <span>Problème résolu ! Rechargement...</span>
+            <span className="font-medium">Correction réussie ! Rechargement...</span>
           </div>
+          {fixDetails.length > 0 && (
+            <div className="text-sm text-green-600 bg-green-100 p-2 rounded">
+              <div className="flex items-center gap-1 mb-1">
+                <Info className="h-4 w-4" />
+                <span className="font-medium">Détails:</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1">
+                {fixDetails.map((detail, index) => (
+                  <li key={index}>{detail}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -217,8 +246,22 @@ export const QuickHotelFix: React.FC = () => {
       <CardContent className="space-y-4">
         <p className="text-orange-700">
           Votre compte semble avoir un problème de configuration. 
-          Cliquez ci-dessous pour une correction automatique.
+          Cette correction va vérifier et réparer votre profil et hôtel.
         </p>
+        
+        {fixDetails.length > 0 && !isFixed && (
+          <div className="text-sm text-orange-600 bg-orange-100 p-2 rounded">
+            <div className="flex items-center gap-1 mb-1">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">Progression:</span>
+            </div>
+            <ul className="list-disc list-inside space-y-1">
+              {fixDetails.map((detail, index) => (
+                <li key={index}>{detail}</li>
+              ))}
+            </ul>
+            </div>
+        )}
         
         <Button 
           onClick={handleQuickFix}
@@ -231,7 +274,10 @@ export const QuickHotelFix: React.FC = () => {
               Correction en cours...
             </>
           ) : (
-            'Corriger automatiquement'
+            <>
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              Corriger automatiquement
+            </>
           )}
         </Button>
       </CardContent>
