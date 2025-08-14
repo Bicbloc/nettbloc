@@ -14,9 +14,12 @@ export interface Room {
   isUrgent?: boolean;
   notUrgent?: boolean;
   floor?: number;
-  notes?: string; // Added notes property
-  remark?: string; // Added remark property for housekeeper remarks
+  notes?: string; // Admin notes that appear on PDF reports
+  remark?: string; // Housekeeper remarks that alert the client
   linkedRooms?: string[]; // Array of room numbers that are connected to this room
+  dndReason?: string; // Do Not Disturb reason
+  dndImageUrl?: string; // Do Not Disturb image URL
+  dndSetAt?: string; // When DND was set
 }
 
 export interface CleaningConfig {

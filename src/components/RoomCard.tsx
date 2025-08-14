@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, MessageSquare, Ban } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -10,6 +10,8 @@ import { toast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
+import { RoomRemarksDialog } from "@/components/RoomRemarksDialog";
+import { DNDDialog } from "@/components/DNDDialog";
 
 interface RoomCardProps {
   room: Room;
@@ -49,6 +51,8 @@ export function RoomCard({
   const [dragging, setDragging] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showRemarksDialog, setShowRemarksDialog] = useState(false);
+  const [showDNDDialog, setShowDNDDialog] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Add animation effect when dragging
@@ -91,6 +95,10 @@ export function RoomCard({
         return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Occupé</Badge>;
       case 'maintenance':
         return <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">Maintenance</Badge>;
+      case 'do-not-disturb':
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-100">DND</Badge>;
+      case 'needs-attention':
+        return <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">Attention</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -191,6 +199,16 @@ export function RoomCard({
               <AlertCircle className="h-2 w-2" /> Remarque
             </span>
           )}
+          {room.status === 'do-not-disturb' && (
+            <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
+              <Ban className="h-2 w-2" /> DND
+            </span>
+          )}
+          {(room.notes || room.remark) && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
+              <MessageSquare className="h-2 w-2" /> Note
+            </span>
+          )}
           {room.status === 'ready-to-clean' && (
             <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
               🚪
@@ -253,6 +271,30 @@ export function RoomCard({
               title="Client sorti - Prêt à nettoyer"
             >
               🚪
+            </button>
+
+            {/* Bouton remarques */}
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRemarksDialog(true);
+              }}
+              title="Ajouter/modifier remarques"
+            >
+              <MessageSquare className="h-3 w-3" />
+            </button>
+
+            {/* Bouton DND */}
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-red-700 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDNDDialog(true);
+              }}
+              title="Do Not Disturb"
+            >
+              <Ban className="h-3 w-3" />
             </button>
             
             {/* Boutons de gestion des chambres en mode compact */}
@@ -346,6 +388,28 @@ export function RoomCard({
             room={room}
             allRooms={allRooms}
             onLinkRooms={onLinkRooms}
+          />
+        )}
+
+        {showRemarksDialog && (
+          <RoomRemarksDialog
+            open={showRemarksDialog}
+            onOpenChange={setShowRemarksDialog}
+            room={room}
+            onUpdateRoom={onUpdate}
+          />
+        )}
+
+        {showDNDDialog && (
+          <DNDDialog
+            open={showDNDDialog}
+            onOpenChange={setShowDNDDialog}
+            room={room}
+            onUpdateRoom={onUpdate}
+            onNotifyAdmin={(message, imageUrl) => {
+              // Ici vous pourriez ajouter une notification à l'admin
+              console.log('Admin notification:', message, imageUrl);
+            }}
           />
         )}
       </div>

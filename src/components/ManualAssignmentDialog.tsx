@@ -192,13 +192,23 @@ export function ManualAssignmentDialog({
       }
     }
     
+    // Check for remaining unassigned rooms
+    const unassignedRooms = rooms.filter(room => !room.assignedTo);
+    
+    if (unassignedRooms.length > 0) {
+      toast({
+        title: "Distribution incomplète",
+        description: `${totalAssigned} chambres distribuées. ${unassignedRooms.length} chambres restent non-assignées. Continuez l'attribution ou ajoutez des femmes de chambre.`,
+        variant: "destructive"
+      });
+      return; // Don't close dialog, let user continue
+    }
+    
     // Success message
     toast({
       title: "Distribution réussie",
       description: `${totalAssigned} chambres ont été distribuées en respectant l'ordre des étages.`,
     });
-    
-    onClose();
   };
   
   const handleAssign = () => {
@@ -228,7 +238,10 @@ export function ManualAssignmentDialog({
       title: "Chambres assignées",
       description: `${selectedRooms.length} chambre(s) assignée(s) à ${selectedHousekeeper}`,
     });
-    onClose();
+    
+    // Reset selections but don't close dialog - allow continued assignment
+    setSelectedRooms([]);
+    setSelectedFloors([]);
   };
   
   const selectAll = () => {
@@ -241,12 +254,12 @@ export function ManualAssignmentDialog({
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="max-w-[98vw] max-h-[95vh] overflow-hidden w-[98vw] mx-auto">
         <DialogHeader className="pb-2">
           <DialogTitle>Assigner manuellement des chambres</DialogTitle>
           <DialogDescription>
-            Sélectionnez les chambres et assignez-les à une femme de chambre
+            Sélectionnez les chambres et assignez-les à une femme de chambre. La dialog ne se fermera qu'après attribution complète.
           </DialogDescription>
         </DialogHeader>
         

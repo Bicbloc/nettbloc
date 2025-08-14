@@ -42,6 +42,8 @@ import { RedistributionDialog, RedistributionMethod } from "@/components/Redistr
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { NotificationSoundManager } from "@/components/NotificationSoundManager";
+import { NotificationPopup } from "@/components/NotificationPopup";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
@@ -62,6 +64,7 @@ import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
+import { UnassignedRoomsAlert } from "@/components/UnassignedRoomsAlert";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -133,6 +136,11 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const [realHotelId, setRealHotelId] = useState<string | null>(null);
   const [existingHousekeepers, setExistingHousekeepers] = useState<string[]>([]);
   
+  // États pour les notifications avec son
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showNotificationPopup, setShowNotificationPopup] = useState(false);
+  const [showUnassignedAlert, setShowUnassignedAlert] = useState(true);
+  
   // ID d'hôtel - utilise l'ID réel de la base ou le localStorage
   const currentHotelId = realHotelId || selectedHotel?.id || localStorage.getItem("selectedHotelId");
   
@@ -143,7 +151,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     selectedHotelId: selectedHotel?.id
   });
   
-  const { addNotification } = useNotifications(currentHotelId);
+  const { notifications, addNotification, markAsRead, markAllAsRead, hasUnread } = useNotifications(currentHotelId);
 
   // ALL useEffect hooks must be here too - before any conditional returns
   useEffect(() => {
@@ -2202,6 +2210,26 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
+      
+      {/* Alerte pour les chambres non-assignées */}
+      {showUnassignedAlert && (
+        <UnassignedRoomsAlert
+          unassignedRooms={rooms.filter(room => !room.assignedTo)}
+          housekeeperNames={housekeeperNames}
+          onAddHousekeepers={(newHousekeepers) => {
+            setHousekeeperNames(prev => [...new Set([...prev, ...newHousekeepers])]);
+          }}
+          onForceAssignment={(assignments) => {
+            assignments.forEach(({ housekeeper, rooms: assignedRooms }) => {
+              assignedRooms.forEach(room => {
+                handleRoomReassign(room, housekeeper);
+              });
+            });
+            setShowUnassignedAlert(false);
+          }}
+          onDismiss={() => setShowUnassignedAlert(false)}
+        />
+      )}
       </div>
     </>
   );
