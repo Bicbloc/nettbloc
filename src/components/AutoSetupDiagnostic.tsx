@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { LocalStorageManager } from '@/utils/localStorageManager';
 
 interface AutoSetupDiagnosticProps {
   hotel: any;
@@ -43,15 +44,8 @@ export const AutoSetupDiagnostic: React.FC<AutoSetupDiagnosticProps> = ({
   };
 
   const handleClearCache = () => {
-    const keys = [
-      'selectedHotelId',
-      'selectedHotelCode', 
-      'selectedHotelName',
-      'autoSetupComplete',
-      'lastHotelCheck'
-    ];
-    
-    keys.forEach(key => localStorage.removeItem(key));
+    // Utiliser le gestionnaire centralisé
+    LocalStorageManager.resetHotelData();
     
     if (onForceReload) {
       onForceReload();
@@ -112,6 +106,27 @@ export const AutoSetupDiagnostic: React.FC<AutoSetupDiagnosticProps> = ({
           <div>
             <span className="font-medium">Code d'accès:</span>
             <span className="ml-2">{accessCode || 'Aucun'}</span>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="font-medium">État localStorage:</h4>
+          <div className="text-sm text-muted-foreground">
+            {(() => {
+              const diagnostic = LocalStorageManager.getDiagnosticReport();
+              return (
+                <div className="space-y-1">
+                  <div>✅ Valides: {Object.keys(diagnostic.valid).length}</div>
+                  <div>❌ Corrompues: {diagnostic.corrupted.length}</div>
+                  <div>⚠️ Manquantes: {diagnostic.missing.length}</div>
+                  {diagnostic.corrupted.length > 0 && (
+                    <div className="text-red-600 text-xs">
+                      Corrompues: {diagnostic.corrupted.join(', ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
         

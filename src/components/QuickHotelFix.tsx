@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { RefreshCw, CheckCircle } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { LocalStorageManager } from '@/utils/localStorageManager';
 
 export const QuickHotelFix: React.FC = () => {
   const { user } = useAuth();
@@ -17,6 +18,15 @@ export const QuickHotelFix: React.FC = () => {
     setIsFixing(true);
     try {
       console.log('🔧 Quick fix pour utilisateur:', user.email);
+
+      // Phase 0: Diagnostic et nettoyage localStorage
+      const diagnostic = LocalStorageManager.getDiagnosticReport();
+      console.log('📊 Diagnostic localStorage:', diagnostic);
+      
+      if (diagnostic.corrupted.length > 0) {
+        console.log('🧹 Nettoyage localStorage corrompu...');
+        LocalStorageManager.cleanCorruptedValues();
+      }
 
       // 1. Vérifier/créer le profil
       let { data: profile } = await supabase
@@ -86,12 +96,20 @@ export const QuickHotelFix: React.FC = () => {
         }
       }
 
-      // 3. Mettre à jour localStorage
+      // 3. Sauvegarder avec validation dans localStorage
       if (hotel) {
-        localStorage.setItem('selectedHotelId', hotel.id);
-        localStorage.setItem('selectedHotelCode', hotel.hotel_code || '');
-        localStorage.setItem('selectedHotelName', hotel.name);
-        localStorage.setItem('autoSetupComplete', 'true');
+        const saveSuccess = LocalStorageManager.saveHotelData({
+          id: hotel.id,
+          code: hotel.hotel_code,
+          name: hotel.name
+        });
+        
+        if (!saveSuccess) {
+          throw new Error('Impossible de sauvegarder les données dans localStorage');
+        }
+        
+        // Forcer la réinitialisation de useAutoSetup
+        window.dispatchEvent(new Event('hotel-reconnected'));
       }
 
       setIsFixed(true);

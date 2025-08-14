@@ -5,6 +5,8 @@ import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { useAutoSetup } from '@/hooks/use-auto-setup';
 import { useAuth } from '@/contexts/AuthContext';
 import { QuickHotelFix } from '@/components/QuickHotelFix';
+import { FullResetButton } from '@/components/FullResetButton';
+import { LocalStorageManager } from '@/utils/localStorageManager';
 
 interface SetupStatusReloadProps {
   onManualReload?: () => void;
@@ -19,11 +21,12 @@ export const SetupStatusReload: React.FC<SetupStatusReloadProps> = ({ onManualRe
     return null;
   }
 
-  // Si échec de setup complet, afficher la correction automatique
+  // Si échec de setup complet, afficher la correction automatique ET le reset
   if (isAuthenticated && !loading && (!isSetupComplete || !hotel)) {
     return (
-      <div className="mb-6">
+      <div className="mb-6 space-y-4">
         <QuickHotelFix />
+        <FullResetButton />
       </div>
     );
   }
@@ -63,9 +66,14 @@ export const SetupStatusReload: React.FC<SetupStatusReloadProps> = ({ onManualRe
             variant="outline" 
             size="sm" 
             onClick={() => {
-              // Forcer un reload complet
+              // Nettoyage intelligent du localStorage
+              const { cleaned } = LocalStorageManager.cleanCorruptedValues();
+              console.log('🧹 Nettoyage reload manuel:', cleaned);
+              
+              // Reset partiel pour forcer useAutoSetup
               localStorage.removeItem('autoSetupComplete');
               localStorage.removeItem('lastHotelCheck');
+              
               if (onManualReload) {
                 onManualReload();
               } else {

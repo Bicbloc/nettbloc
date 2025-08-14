@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { LocalStorageManager } from '@/utils/localStorageManager';
 
 interface HotelData {
   id: string;
@@ -31,8 +32,36 @@ export const useAutoSetup = () => {
   const [loading, setLoading] = useState(true);
   const hasAttemptedSetup = useRef(false);
 
+  // Force un reset complet et redémarrage
+  const forceCompleteReset = () => {
+    console.log('🔄 Force reset complet demandé...');
+    
+    // Reset des états
+    setHotel(null);
+    setAccessCode(null);
+    setIsSetupComplete(false);
+    setLoading(true);
+    hasAttemptedSetup.current = false;
+    
+    // Reset localStorage
+    LocalStorageManager.resetHotelData();
+    
+    // Dispatch event pour forcer les autres composants à se réinitialiser
+    window.dispatchEvent(new Event('hotel-reset-complete'));
+    
+    console.log('✅ Reset complet terminé');
+  };
+
   useEffect(() => {
     const setupHotel = async () => {
+      // Phase 0: Nettoyage localStorage au démarrage
+      const { cleaned } = LocalStorageManager.cleanCorruptedValues();
+      if (cleaned.length > 0) {
+        console.log('🧹 Valeurs localStorage corrompues nettoyées:', cleaned);
+        // Si localStorage était corrompu, on force un redémarrage propre
+        hasAttemptedSetup.current = false;
+      }
+
       // Éviter les exécutions multiples mais permettre retry si échec
       if (hasAttemptedSetup.current && isSetupComplete) {
         console.log('🚫 Setup déjà réussi, ignore...');
@@ -263,12 +292,17 @@ export const useAutoSetup = () => {
           setIsSetupComplete(true);
           setLoading(false); // Arrêter le loading immédiatement
           
-          // Sauvegarde localStorage pour les autres composants avec force refresh
-          localStorage.setItem('selectedHotelId', hotelData.id);
-          localStorage.setItem('selectedHotelCode', hotelData.hotel_code || '');
-          localStorage.setItem('selectedHotelName', hotelData.name);
-          localStorage.setItem('autoSetupComplete', 'true');
-          localStorage.setItem('lastHotelCheck', Date.now().toString());
+          // Sauvegarde localStorage sécurisée
+          const saveSuccess = LocalStorageManager.saveHotelData({
+            id: hotelData.id,
+            code: hotelData.hotel_code,
+            name: hotelData.name
+          });
+          
+          if (!saveSuccess) {
+            console.error('❌ Échec sauvegarde localStorage');
+            throw new Error('Impossible de sauvegarder les données hôtel');
+          }
           
           // Force la reconnexion automatique
           window.dispatchEvent(new Event('hotel-reconnected'));
@@ -404,6 +438,7 @@ export const useAutoSetup = () => {
     accessCode,
     isSetupComplete,
     loading,
-    generateNewAccessCode
+    generateNewAccessCode,
+    forceCompleteReset
   };
 };
