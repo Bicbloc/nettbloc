@@ -326,6 +326,43 @@ const AnalysisWorkflow = () => {
               </div>
             </div>
           )}
+
+          {/* Alert pour chambres non assignées lors de la planification */}
+          {analyzedRooms.length > 0 && housekeeperNames.length > 0 && (
+            (() => {
+              const roomsToClean = analyzedRooms.filter(room => 
+                room.cleaningType !== 'none' && room.status !== 'maintenance'
+              );
+              const maxRoomsPerHousekeeper = Math.ceil(roomsToClean.length / housekeeperNames.length);
+              const unassignedCount = Math.max(0, roomsToClean.length - (housekeeperNames.length * 15)); // 15 chambres max par personne
+              
+              if (unassignedCount > 0) {
+                return (
+                  <Alert className="border-orange-500 bg-orange-50">
+                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-700">
+                      <div className="space-y-2">
+                        <p><strong>⚠️ Attention :</strong> {unassignedCount} chambres risquent de rester non-assignées</p>
+                        <p className="text-sm">
+                          Avec {housekeeperNames.length} femmes de chambre, chacune aura environ {maxRoomsPerHousekeeper} chambres à nettoyer.
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleOpenHousekeeperDialog}
+                          className="mt-2"
+                        >
+                          <Users className="h-3 w-3 mr-1" />
+                          Ajouter plus de femmes de chambre
+                        </Button>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+              return null;
+            })()
+          )}
         </div>
         
         <div className="flex gap-2">

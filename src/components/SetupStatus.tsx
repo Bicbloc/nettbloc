@@ -38,20 +38,29 @@ export const SetupStatus: React.FC<SetupStatusProps> = ({ onRetry }) => {
     );
   }
 
-  if (!hotel) {
+  if (!hotel || !isSetupComplete) {
     return (
       <Card>
         <CardContent className="text-center py-8">
           <AlertTriangle className="h-8 w-8 mx-auto text-destructive mb-4" />
-          <p className="text-muted-foreground mb-4">
-            Impossible de charger la configuration de l'hôtel
-          </p>
-          {onRetry && (
-            <Button onClick={onRetry} variant="outline">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Réessayer
-            </Button>
-          )}
+          <div className="space-y-3">
+            <p className="text-muted-foreground">
+              Configuration de l'hôtel incomplète
+            </p>
+            <p className="text-sm text-muted-foreground">
+              La reconnexion automatique à votre hôtel est en cours...
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-sm text-primary">Reconnexion en cours</span>
+            </div>
+            {onRetry && (
+              <Button onClick={onRetry} variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Forcer la reconnexion
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     );

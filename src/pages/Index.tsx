@@ -44,6 +44,7 @@ import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { NotificationSoundManager } from "@/components/NotificationSoundManager";
 import { NotificationPopup } from "@/components/NotificationPopup";
+import { NotificationPermissionHandler } from "@/components/NotificationPermissionHandler";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
@@ -2230,6 +2231,21 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           onDismiss={() => setShowUnassignedAlert(false)}
         />
       )}
+      
+      {/* Gestionnaires de notifications */}
+      <NotificationSoundManager 
+        notificationCount={notifications.filter(n => !n.is_read).length}
+        onToggleSound={setSoundEnabled}
+        soundEnabled={soundEnabled}
+      />
+      <NotificationPopup 
+        notifications={notifications}
+        isOpen={showNotificationPopup}
+        onClose={() => setShowNotificationPopup(false)}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
+      />
+      <NotificationPermissionHandler />
       </div>
     </>
   );

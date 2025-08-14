@@ -53,15 +53,24 @@ export class HousekeeperAuthService {
 
       if (!result.success) {
         console.error('❌ Authentification échouée:', result);
+        
+        // Message d'erreur plus clair selon le contexte
+        let errorMessage = 'Code d\'accès invalide';
+        if (result.hotel_id && result.hotel_name) {
+          errorMessage = `Code d'accès non trouvé pour l'hôtel "${result.hotel_name}"`;
+        } else if (accessCode.includes('-')) {
+          const hotelCode = accessCode.split('-')[0];
+          errorMessage = `Hôtel non trouvé avec le code "${hotelCode}"`;
+        }
+        
         return {
           success: false,
-          error: result.hotel_id ? 
-            `Code d'accès "${accessCode}" non trouvé pour l'hôtel ${result.hotel_name}` :
-            `Hôtel non trouvé pour le code "${accessCode.split('-')[0]}"`,
+          error: errorMessage,
           debugInfo: { 
             accessCode,
             rpcResult: result,
-            hotelFound: !!result.hotel_id
+            hotelFound: !!result.hotel_id,
+            hotelCode: accessCode.split('-')[0]
           }
         };
       }
