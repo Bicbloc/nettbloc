@@ -653,13 +653,13 @@ const Admin = () => {
                            <SelectTrigger>
                              <SelectValue placeholder="Choisir un établissement existant..." />
                            </SelectTrigger>
-                           <SelectContent>
-                             <SelectItem value="new">Créer un nouvel établissement</SelectItem>
-                             {hotels.map((hotel) => (
-                               <SelectItem key={hotel.id} value={hotel.id}>
-                                 {hotel.name} ({hotel.hotel_code})
-                               </SelectItem>
-                             ))}
+                            <SelectContent>
+                              <SelectItem value="new">Créer un nouvel établissement</SelectItem>
+                              {(hotels || []).map((hotel) => (
+                                <SelectItem key={hotel.id} value={hotel.id}>
+                                  {hotel.name} ({hotel.hotel_code})
+                                </SelectItem>
+                              ))}
                            </SelectContent>
                          </Select>
                        </div>
@@ -699,8 +699,8 @@ const Admin = () => {
                       <TableHead>Actions</TableHead>
                    </TableRow>
                  </TableHeader>
-                <TableBody>
-                  {users.map((userItem) => (
+                 <TableBody>
+                   {(users || []).map((userItem) => (
                     <TableRow key={userItem.id}>
                        <TableCell className="font-medium">{userItem.email}</TableCell>
                        <TableCell>{userItem.company_name || 'Non définie'}</TableCell>
@@ -932,8 +932,8 @@ const Admin = () => {
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {sessions.map((session) => {
+                 <TableBody>
+                   {(sessions || []).map((session) => {
                     const loginTime = new Date(session.login_time);
                     const lastActivity = new Date(session.last_activity);
                     const duration = Math.floor((lastActivity.getTime() - loginTime.getTime()) / (1000 * 60));
@@ -986,7 +986,7 @@ const Admin = () => {
                 </TableBody>
               </Table>
               
-              {sessions.length === 0 && (
+              {(sessions || []).length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Aucune session active</p>
@@ -1016,8 +1016,8 @@ const Admin = () => {
                     <TableHead>Créé le</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {hotels.map((hotel) => (
+                 <TableBody>
+                   {(hotels || []).map((hotel) => (
                     <TableRow key={hotel.id}>
                       <TableCell className="font-medium">{hotel.name}</TableCell>
                       <TableCell>
