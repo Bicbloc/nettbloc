@@ -87,8 +87,13 @@ export const NotificationPermissionHandler = () => {
     }
   }, []);
 
-  // Ne pas afficher si les notifications sont déjà accordées ou refusées définitivement
-  if (!showRequest || permission !== 'default' || !('Notification' in window)) {
+  // Ne pas afficher si les notifications sont déjà accordées ou le navigateur ne les supporte pas
+  if (!('Notification' in window) || permission === 'granted') {
+    return null;
+  }
+
+  // Afficher seulement si pas encore demandé ou si c'est par défaut ET qu'on doit montrer la demande
+  if (!showRequest && permission !== 'default') {
     return null;
   }
 

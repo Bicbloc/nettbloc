@@ -91,9 +91,10 @@ export const useHotelReconnection = (): HotelReconnectionResult => {
         const lastReconnection = localStorage.getItem('lastReconnection');
         const now = Date.now();
         
-        // Reconnexion si pas de reconnexion récente (< 5 min)
-        if (!lastReconnection || (now - parseInt(lastReconnection)) > 300000) {
-          console.log('🔄 Auto-reconnexion par visibilité');
+    // Reconnexion si pas de reconnexion récente (< 30 min) ET pas de hotel en cours
+        const currentHotelId = localStorage.getItem('selectedHotelId');
+        if ((!lastReconnection || (now - parseInt(lastReconnection)) > 1800000) && !currentHotelId) {
+          console.log('🔄 Auto-reconnexion par visibilité (pas d\'hôtel actif)');
           forceReconnect();
         }
       }

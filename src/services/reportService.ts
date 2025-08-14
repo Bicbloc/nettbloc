@@ -33,23 +33,37 @@ export async function saveDailyReport(params: {
   housekeeperNames: string[];
 }) {
   try {
-    const { data: userData } = await supabaseClient.auth.getUser();
-    const user = userData?.user;
-    if (!user) {
-      console.log("Skipping report archive: no authenticated user");
-      return { success: false };
+    // Stabilize authentication - check session with retry
+    let session = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (!session && attempts < maxAttempts) {
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      session = sessionData?.session;
+      
+      if (!session && attempts < maxAttempts - 1) {
+        console.log(`Tentative ${attempts + 1}: Session non trouvée, retry...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      attempts++;
+    }
+
+    if (!session?.user) {
+      console.log("❌ Aucune session valide après retry - ignorer sauvegarde");
+      return { success: false, skipped: true };
     }
 
     const hotelId = typeof window !== 'undefined' ? localStorage.getItem('selectedHotelId') : null;
     if (!hotelId) {
-      console.log("Skipping report archive: no selectedHotelId in localStorage");
-      return { success: false };
+      console.log("⚠️ Pas d'hôtel sélectionné - ignorer sauvegarde");
+      return { success: false, skipped: true };
     }
 
     const { error } = await supabaseClient
       .from('daily_reports')
       .insert({
-        user_id: user.id,
+        user_id: session.user.id,
         hotel_id: hotelId,
         report_date: new Date().toISOString().slice(0, 10),
         room_data: params.roomData || [],

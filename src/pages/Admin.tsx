@@ -21,6 +21,7 @@ import {
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
   Hotel, Users, BarChart3, CreditCard, Calendar, Gift
 } from 'lucide-react';
+import { useRealtimeAdmin } from '@/hooks/use-real-time-admin';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { BackButton } from '@/components/BackButton';
 import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
@@ -29,6 +30,7 @@ import { SubscriptionManagementDialog } from '@/components/SubscriptionManagemen
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
 import AdminDashboard from '@/components/AdminDashboard';
 import PasswordResetManager from '@/components/PasswordResetManager';
+import { NotificationButton } from '@/components/NotificationButton';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -107,6 +109,9 @@ const Admin = () => {
     total_housekeepers: 0
   });
   const [loadingData, setLoadingData] = useState(true);
+  
+  // Utilisation du hook temps réel
+  const realtimeData = useRealtimeAdmin(isSuperAdmin);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserCompany, setNewUserCompany] = useState('');
@@ -133,9 +138,9 @@ const Admin = () => {
           .eq('role', 'super_admin')
           .single();
 
-        if (!error && data) {
+      if (!error && data) {
           setIsSuperAdmin(true);
-          await loadAdminData();
+          console.log('✅ Super admin confirmé, pas de chargement manuel (temps réel actif)');
         }
       } catch (error) {
         console.error('Erreur vérification role:', error);
@@ -694,33 +699,48 @@ const Admin = () => {
             <p className="text-muted-foreground">Supervision complète du système</p>
           </div>
         </div>
-        <Button onClick={loadAdminData} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-4">
+          <NotificationButton />
+          <div className="text-sm text-muted-foreground">
+            Dernière MAJ: {realtimeData.lastUpdate || 'En cours...'}
+          </div>
+          <Button
+            onClick={realtimeData.refresh}
+            variant="outline"
+            size="sm"
+            disabled={realtimeData.loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${realtimeData.loading ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Tableau de bord principal */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Utilisateurs totaux</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Utilisateurs {realtimeData.loading ? '🔄' : '📊'}
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total_users}</div>
+            <div className="text-2xl font-bold">{realtimeData.stats.total_users || stats.total_users}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.suspended_users} suspendus
+              {realtimeData.stats.active_users || stats.active_users} actifs, {stats.suspended_users} suspendus
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hôtels actifs</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Hôtels {realtimeData.loading ? '🔄' : '🏨'}
+            </CardTitle>
             <Hotel className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total_hotels}</div>
+            <div className="text-2xl font-bold">{realtimeData.stats.total_hotels || stats.total_hotels}</div>
             <p className="text-xs text-muted-foreground">
               Établissements enregistrés
             </p>
@@ -728,11 +748,13 @@ const Admin = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sessions actives</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Sessions actives {realtimeData.loading ? '🔄' : '💚'}
+            </CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total_sessions}</div>
+            <div className="text-2xl font-bold">{realtimeData.stats.total_sessions || stats.total_sessions}</div>
             <p className="text-xs text-muted-foreground">
               Connexions en cours
             </p>
