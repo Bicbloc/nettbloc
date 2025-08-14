@@ -27,6 +27,8 @@ import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButto
 import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
+import AdminDashboard from '@/components/AdminDashboard';
+import PasswordResetManager from '@/components/PasswordResetManager';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -750,8 +752,12 @@ const Admin = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="dashboard" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4 md:grid-cols-7">
+          <TabsTrigger value="dashboard">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Dashboard
+          </TabsTrigger>
           <TabsTrigger value="users">
             <User className="h-4 w-4 mr-2" />
             Utilisateurs
@@ -768,15 +774,19 @@ const Admin = () => {
             <Key className="h-4 w-4 mr-2" />
             Codes d'accès
           </TabsTrigger>
+          <TabsTrigger value="password-resets">
+            <Shield className="h-4 w-4 mr-2" />
+            Mots de passe
+          </TabsTrigger>
           <TabsTrigger value="housekeeper-requests">
             <Users className="h-4 w-4 mr-2" />
-            Demandes femmes de chambre
-          </TabsTrigger>
-          <TabsTrigger value="system">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Système
+            Demandes
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-4">
+          <AdminDashboard />
+        </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
           <Card>
@@ -1316,6 +1326,10 @@ const Admin = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="password-resets" className="space-y-4">
+          <PasswordResetManager />
         </TabsContent>
 
         <TabsContent value="housekeeper-requests" className="space-y-4">

@@ -640,6 +640,39 @@ export type Database = {
         }
         Relationships: []
       }
+      password_reset_logs: {
+        Row: {
+          completed_at: string | null
+          email: string
+          id: string
+          request_ip: unknown | null
+          requested_at: string | null
+          status: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          email: string
+          id?: string
+          request_ip?: unknown | null
+          requested_at?: string | null
+          status?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          email?: string
+          id?: string
+          request_ip?: unknown | null
+          requested_at?: string | null
+          status?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -910,6 +943,10 @@ export type Database = {
           p_type: string
         }
         Returns: number
+      }
+      log_password_reset_request: {
+        Args: { p_email: string; p_request_ip?: unknown; p_user_agent?: string }
+        Returns: string
       }
       request_password_reset: {
         Args: { user_email: string }

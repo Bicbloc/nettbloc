@@ -165,8 +165,13 @@ const Auth = () => {
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth`
+      // Call our enhanced password reset function
+      const { error } = await supabase.functions.invoke('send-password-reset', {
+        body: {
+          email: formData.email,
+          userAgent: navigator.userAgent,
+          ipAddress: 'unknown' // IP will be captured server-side if needed
+        }
       });
 
       if (error) {
@@ -178,11 +183,29 @@ const Auth = () => {
         description: "Un email de réinitialisation a été envoyé à votre adresse."
       });
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message || "Impossible d'envoyer l'email de réinitialisation."
-      });
+      console.error('Password reset error:', error);
+      
+      // Fallback to direct Supabase call if edge function fails
+      try {
+        const { error: fallbackError } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: `${window.location.origin}/auth`
+        });
+
+        if (fallbackError) {
+          throw fallbackError;
+        }
+
+        toast({
+          title: "Email envoyé",
+          description: "Un email de réinitialisation a été envoyé à votre adresse."
+        });
+      } catch (fallbackError: any) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: fallbackError.message || "Impossible d'envoyer l'email de réinitialisation."
+        });
+      }
     }
   };
 
