@@ -114,7 +114,7 @@ export class HousekeeperAuthService {
     }
   }
 
-  // Find hotel by code only (for two-step authentication)
+  // Find hotel by code only (for two-step authentication) - IMPROVED SEARCH
   static async findHotelByCode(hotelCodeInput: string): Promise<HousekeeperAuthResult> {
     console.log('🔍 Recherche hôtel avec code:', hotelCodeInput);
     
@@ -122,15 +122,15 @@ export class HousekeeperAuthService {
       const normalized = (hotelCodeInput || '').trim().toUpperCase();
       const codeOnly = normalized.split('-')[0];
 
-      // Tentative 1: par hotel_code exact
+      // Tentative 1: par hotel_code exact (case insensitive)
       let { data: hotel, error } = await supabase
         .from('hotels')
         .select('*')
-        .eq('hotel_code', codeOnly)
+        .ilike('hotel_code', codeOnly)
         .maybeSingle();
 
-      // Tentative 2: par ID déterministe
-      if (!hotel) {
+      // Tentative 2: par ID déterministe si pas trouvé
+      if (!hotel && !error) {
         const deterministicId = generateHotelId(codeOnly);
         const { data: byId, error: byIdError } = await supabase
           .from('hotels')
@@ -141,15 +141,45 @@ export class HousekeeperAuthService {
         error = byIdError as any;
       }
 
+      // Tentative 3: recherche partielle si toujours pas trouvé
+      if (!hotel && !error) {
+        console.log('🔍 Recherche partielle par code partiel...');
+        const { data: partialMatch, error: partialError } = await supabase
+          .from('hotels')
+          .select('*')
+          .ilike('hotel_code', `%${codeOnly}%`)
+          .limit(1)
+          .maybeSingle();
+        
+        if (partialMatch && !partialError) {
+          hotel = partialMatch;
+          console.log('✅ Hôtel trouvé par recherche partielle:', hotel);
+        }
+      }
+
       if (error || !hotel) {
         console.error('❌ Hôtel non trouvé:', { codeOnly, error });
+        
+        // Diagnostic amélioré avec suggestions
         const { data: allHotels } = await supabase
           .from('hotels')
-          .select('hotel_code, name, id');
+          .select('hotel_code, name, id')
+          .limit(10);
+          
+        const suggestions = allHotels?.filter(h => 
+          h.hotel_code?.toLowerCase().includes(codeOnly.toLowerCase())
+        ) || [];
+        
         return {
           success: false,
-          error: `Hôtel avec le code "${codeOnly}" non trouvé`,
-          debugInfo: { input: hotelCodeInput, codeOnly, availableHotels: allHotels, error }
+          error: `Hôtel avec le code "${codeOnly}" non trouvé. ${suggestions.length > 0 ? `Codes similaires disponibles: ${suggestions.map(s => s.hotel_code).join(', ')}` : 'Vérifiez le code auprès de votre administration.'}`,
+          debugInfo: { 
+            input: hotelCodeInput, 
+            codeOnly, 
+            availableHotels: allHotels?.slice(0,5), 
+            suggestions,
+            error 
+          }
         };
       }
 

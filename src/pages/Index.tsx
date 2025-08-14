@@ -1910,25 +1910,40 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       unassignedRooms={getUnassignedRooms()}
                       housekeeperNames={housekeeperNames}
                       onAddHousekeepers={(newNames) => {
+                        console.log('➕ Ajout de femmes de chambre:', newNames);
                         setHousekeeperNames(prev => [...prev, ...newNames]);
+                        setIsDistributed(false); // Reset distribution status to allow new distribution
                         toast({
-                          title: "Femmes de chambre ajoutées",
-                          description: `${newNames.length} nouvelle(s) femme(s) de chambre ajoutée(s)`
+                          title: "✅ Femmes de chambre ajoutées",
+                          description: `${newNames.length} nouvelle(s) femme(s) de chambre ajoutée(s). Attribution automatique en cours...`
                         });
                       }}
                       onForceAssignment={(assignments) => {
-                        console.log('🔧 Attribution forcée:', assignments);
-                        // Réinitialiser toutes les assignations existantes
-                        const resetRooms = rooms.map(room => ({ ...room, assignedTo: undefined }));
+                        console.log('🔧 Attribution forcée complète:', assignments);
                         
-                        // Redistribuer équitablement TOUTES les chambres 
+                        // Forcer la redistribution de TOUTES les chambres (pas seulement les non-assignées)
+                        const allRoomsToRedistribute = rooms.filter(room => 
+                          room.cleaningType !== 'none' && room.status !== 'maintenance'
+                        );
+                        
+                        // Réinitialiser toutes les assignations
+                        const resetRooms = allRoomsToRedistribute.map(room => ({ ...room, assignedTo: undefined }));
+                        
+                        // Redistribuer équitablement entre toutes les femmes de chambre
                         const redistributedRooms = redistributeRooms(resetRooms, housekeeperNames, 'random');
-                        setRooms(redistributedRooms);
+                        
+                        // Mettre à jour toutes les chambres de l'état
+                        const updatedRooms = rooms.map(room => {
+                          const redistributedRoom = redistributedRooms.find(r => r.number === room.number);
+                          return redistributedRoom || room;
+                        });
+                        
+                        setRooms(updatedRooms);
                         setIsDistributed(true);
                         
                         const totalAssigned = redistributedRooms.filter(r => r.assignedTo).length;
                         toast({
-                          title: "Attribution forcée terminée",
+                          title: "✅ Attribution forcée terminée",
                           description: `${totalAssigned} chambres redistribuées équitablement entre ${housekeeperNames.length} femme(s) de chambre`
                         });
                         
@@ -2067,12 +2082,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <h2 className="text-2xl font-bold">Accès mobile</h2>
             </div>
 
-            {!isDistributed ? (
+            {(!isDistributed && housekeeperNames.length === 0) ? (
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Distribution requise</AlertTitle>
+                <AlertTitle>Personnel requis</AlertTitle>
                 <AlertDescription>
-                  Vous devez d'abord distribuer les chambres pour générer les codes d'accès mobile.
+                  Vous devez d'abord ajouter des femmes de chambre dans l'onglet "Affectation".
                 </AlertDescription>
               </Alert>
             ) : (

@@ -121,24 +121,26 @@ export function UnassignedRoomsAlert({
         isOpen={showHousekeeperDialog}
         onClose={() => setShowHousekeeperDialog(false)}
         onHousekeepersConfirmed={(newHousekeepers) => {
-          // Ajouter les nouvelles femmes de chambre
+          // Ajouter les nouvelles femmes de chambre immédiatement
           onAddHousekeepers(newHousekeepers);
           
-          // Déclencher automatiquement l'attribution forcée après ajout
-          if (newHousekeepers.length > 0) {
-            setTimeout(() => {
-              const allHousekeepers = [...housekeeperNames, ...newHousekeepers];
-              const redistributedRooms = redistributeRooms(unassignedRooms, allHousekeepers, 'random');
-              
-              const assignments = allHousekeepers.map(housekeeper => ({
-                housekeeper,
-                rooms: redistributedRooms.filter(room => room.assignedTo === housekeeper)
-              })).filter(assignment => assignment.rooms.length > 0);
-              
-              console.log('🎯 Auto-attribution après ajout:', assignments);
-              onForceAssignment(assignments);
-            }, 100); // Délai pour laisser le temps aux états de se mettre à jour
-          }
+          // Attribution automatique complète après ajout
+          setTimeout(() => {
+            const allHousekeepers = [...housekeeperNames, ...newHousekeepers];
+            console.log('🎯 Attribution automatique avec:', allHousekeepers);
+            
+            // Utiliser toutes les chambres non-assignées pour redistribution
+            const redistributedRooms = redistributeRooms(unassignedRooms, allHousekeepers, 'random');
+            
+            // Créer les assignations pour le callback
+            const assignments = allHousekeepers.map(housekeeper => ({
+              housekeeper,
+              rooms: redistributedRooms.filter(room => room.assignedTo === housekeeper)
+            })).filter(assignment => assignment.rooms.length > 0);
+            
+            console.log('✅ Auto-attribution prête:', assignments);
+            onForceAssignment(assignments);
+          }, 200); // Délai légèrement plus long pour stabilité
           
           setShowHousekeeperDialog(false);
         }}
