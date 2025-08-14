@@ -174,10 +174,15 @@ export const useAutoSetup = () => {
           setIsSetupComplete(true);
           setLoading(false); // Arrêter le loading immédiatement
           
-          // Sauvegarde localStorage pour les autres composants
+          // Sauvegarde localStorage pour les autres composants avec force refresh
           localStorage.setItem('selectedHotelId', hotelData.id);
           localStorage.setItem('selectedHotelCode', hotelData.hotel_code || '');
           localStorage.setItem('selectedHotelName', hotelData.name);
+          localStorage.setItem('autoSetupComplete', 'true');
+          localStorage.setItem('lastHotelCheck', Date.now().toString());
+          
+          // Force la reconnexion automatique
+          window.dispatchEvent(new Event('hotel-reconnected'));
           
           console.log('✅ Setup terminé avec succès:', {
             hotelId: hotelData.id,

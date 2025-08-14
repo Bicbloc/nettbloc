@@ -12,7 +12,7 @@ import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import AnalysisWorkflow from "./pages/AnalysisWorkflow";
 import Admin from "./pages/Admin";
-import { BicblocFooter } from "./components/BicblocBranding";
+
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { HousekeeperAuthProvider } from "./contexts/HousekeeperAuthContext";
@@ -42,10 +42,6 @@ const App = () => (
           <Sonner />
           <div className="flex flex-col min-h-screen">
             <HeaderSpace />
-            {/* Footer positioned at the top, before the main content, with increased width and less padding */}
-            <div className="container mx-auto mb-2 px-0">
-              <BicblocFooter />
-            </div>
             <div className="flex-grow">
               <BrowserRouter>
                 <Routes>

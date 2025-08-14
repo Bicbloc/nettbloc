@@ -120,7 +120,24 @@ export function UnassignedRoomsAlert({
         isOpen={showHousekeeperDialog}
         onClose={() => setShowHousekeeperDialog(false)}
         onHousekeepersConfirmed={(newHousekeepers) => {
+          // Ajouter les nouvelles femmes de chambre
           onAddHousekeepers(newHousekeepers);
+          
+          // Déclencher automatiquement l'attribution forcée après ajout
+          if (newHousekeepers.length > 0) {
+            setTimeout(() => {
+              const allHousekeepers = [...housekeeperNames, ...newHousekeepers];
+              const redistributedRooms = redistributeRooms(unassignedRooms, allHousekeepers, 'random');
+              
+              const assignments = allHousekeepers.map(housekeeper => ({
+                housekeeper,
+                rooms: redistributedRooms.filter(room => room.assignedTo === housekeeper)
+              })).filter(assignment => assignment.rooms.length > 0);
+              
+              onForceAssignment(assignments);
+            }, 100); // Délai pour laisser le temps aux états de se mettre à jour
+          }
+          
           setShowHousekeeperDialog(false);
         }}
         roomCount={unassignedRooms.length}

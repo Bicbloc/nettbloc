@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide-react";
 import { SupabaseService } from "@/services/supabaseService";
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
-import BackButton from '@/components/BackButton';
+import { BackButton } from '@/components/BackButton';
 import { HousekeeperAuthTester } from '@/components/HousekeeperAuthTester';
 
 export default function HousekeeperLogin() {
@@ -233,7 +233,7 @@ export default function HousekeeperLogin() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex flex-col items-center justify-center p-4 relative gap-6">
       <div className="absolute top-4 left-4">
-        <BackButton to="/" />
+        <BackButton />
       </div>
       
       {/* Composant de test pour diagnostiquer les problèmes */}

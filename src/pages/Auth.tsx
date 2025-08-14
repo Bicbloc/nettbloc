@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import BackButton from '@/components/BackButton';
+import { BackButton } from '@/components/BackButton';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Building, Users, Shield, UserCheck, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -249,7 +249,7 @@ const Auth = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4 relative">
       <div className="absolute top-4 left-4">
-        <BackButton to="/" />
+        <BackButton />
       </div>
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">

@@ -22,7 +22,7 @@ import {
   Hotel, Users, BarChart3, CreditCard, Calendar, Gift
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import BackButton from '@/components/BackButton';
+import { BackButton } from '@/components/BackButton';
 import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
 import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';

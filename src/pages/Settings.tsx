@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import HousekeeperAccessCodes from '@/components/HousekeeperAccessCodes';
-import BackButton from '@/components/BackButton';
+import { BackButton } from '@/components/BackButton';
 import { DataDiagnostic } from '@/components/DataDiagnostic';
 import { AccessCodeTester } from '@/components/AccessCodeTester';
 import { CodeAssignmentTest } from '@/components/CodeAssignmentTest';
