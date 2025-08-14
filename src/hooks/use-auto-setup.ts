@@ -95,93 +95,103 @@ export const useAutoSetup = () => {
 
         console.log('✅ Profil utilisateur disponible:', profileData);
 
-        // Phase 2: Rechercher l'hôtel existant (multiple méthodes)
-        console.log('🔍 Recherche hôtel par user_id...', user.id);
-        let { data: existingHotel, error: hotelError } = await supabase
+        // Phase 2: Recherche hôtel optimisée avec requête unique multi-critères
+        console.log('🔍 Recherche hôtel multi-critères...', { 
+          user_id: user.id, 
+          email: user.email, 
+          company: profileData.company_name 
+        });
+
+        // Requête optimisée combinant tous les critères
+        const searchConditions = [`user_id.eq.${user.id}`];
+        if (user.email) {
+          searchConditions.push(`email.eq.${user.email}`);
+        }
+        if (profileData.company_name) {
+          searchConditions.push(`name.eq.${profileData.company_name}`);
+        }
+
+        const { data: hotelResults, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        // Si pas trouvé par user_id, essayer par email exact
-        if (!existingHotel && !hotelError && user.email) {
-          console.log('🔍 Recherche hôtel par email...', user.email);
-          const { data: hotelByEmail, error: emailError } = await supabase
-            .from('hotels')
-            .select('*')
-            .eq('email', user.email)
-            .maybeSingle();
-          
-          if (hotelByEmail && !emailError) {
-            existingHotel = hotelByEmail;
-            console.log('✅ Hôtel trouvé par email, mise à jour user_id...');
-            // Mettre à jour le user_id pour correspondre
-            await supabase
-              .from('hotels')
-              .update({ user_id: user.id })
-              .eq('id', hotelByEmail.id);
-          }
-        }
-
-        // Si toujours pas trouvé et qu'on a un company_name, essayer par nom
-        if (!existingHotel && !hotelError && profileData.company_name) {
-          console.log('🔍 Recherche hôtel par company_name...', profileData.company_name);
-          const { data: hotelByName, error: nameError } = await supabase
-            .from('hotels')
-            .select('*')
-            .eq('name', profileData.company_name)
-            .maybeSingle();
-          
-          if (hotelByName && !nameError) {
-            existingHotel = hotelByName;
-            console.log('✅ Hôtel trouvé par nom, mise à jour user_id...');
-            // Mettre à jour le user_id pour correspondre
-            await supabase
-              .from('hotels')
-              .update({ user_id: user.id, email: user.email })
-              .eq('id', hotelByName.id);
-          }
-        }
+          .or(searchConditions.join(','))
+          .limit(1);
 
         if (hotelError) {
           console.error('❌ Erreur recherche hôtel:', hotelError);
           throw hotelError;
         }
 
+        let existingHotel = hotelResults && hotelResults.length > 0 ? hotelResults[0] : null;
+
+        // Si trouvé mais pas avec le bon user_id, le mettre à jour
+        if (existingHotel && existingHotel.user_id !== user.id) {
+          console.log('✅ Hôtel trouvé, synchronisation user_id...');
+          const { data: updatedHotel } = await supabase
+            .from('hotels')
+            .update({ 
+              user_id: user.id,
+              email: user.email 
+            })
+            .eq('id', existingHotel.id)
+            .select()
+            .single();
+          
+          if (updatedHotel) {
+            existingHotel = updatedHotel;
+            console.log('✅ Hotel synchronisé avec user_id');
+          }
+        }
+
+
         let hotelData: HotelData | null = existingHotel;
         let activeCode: string | null = null;
 
-        // Phase 3: Si hôtel trouvé, chercher les codes d'accès actifs
+        // Phase 3: Si hôtel trouvé, optimiser la récupération des données
         if (existingHotel) {
           console.log('✅ Hôtel existant trouvé:', existingHotel);
+          hotelData = existingHotel;
           
-          // Vérifier que le nom de l'hôtel correspond au company_name du profil
+          // Synchroniser le nom si nécessaire et récupérer les codes en parallèle
+          const promises = [];
+          
+          // Mise à jour nom si nécessaire
           if (existingHotel.name !== profileData.company_name && profileData.company_name) {
-            console.log('🔄 Mise à jour nom hôtel pour correspondre au profil...');
-            const { data: updatedHotel, error: updateError } = await supabase
-              .from('hotels')
-              .update({ name: profileData.company_name })
-              .eq('id', existingHotel.id)
-              .select()
-              .single();
-
-            if (!updateError && updatedHotel) {
-              hotelData = updatedHotel;
-              console.log('✅ Nom hôtel mis à jour:', profileData.company_name);
-            }
+            console.log('🔄 Mise à jour nom hôtel...');
+            promises.push(
+              supabase
+                .from('hotels')
+                .update({ name: profileData.company_name })
+                .eq('id', existingHotel.id)
+                .select()
+                .single()
+                .then(({ data }) => {
+                  if (data) {
+                    hotelData = data;
+                    console.log('✅ Nom hôtel mis à jour');
+                  }
+                })
+            );
           }
           
-          const { data: accessCodes } = await supabase
-            .from('housekeeper_access_codes')
-            .select('access_code')
-            .eq('hotel_id', existingHotel.id)
-            .eq('is_active', true)
-            .limit(1);
-
-          if (accessCodes && accessCodes.length > 0) {
-            activeCode = accessCodes[0].access_code;
-            console.log('✅ Code actif trouvé:', activeCode);
-          }
+          // Récupération codes d'accès
+          promises.push(
+            supabase
+              .from('housekeeper_access_codes')
+              .select('access_code')
+              .eq('hotel_id', existingHotel.id)
+              .eq('is_active', true)
+              .limit(1)
+              .then(({ data }) => {
+                if (data && data.length > 0) {
+                  activeCode = data[0].access_code;
+                  console.log('✅ Code actif trouvé:', activeCode);
+                }
+              })
+          );
+          
+          // Exécuter en parallèle pour optimiser les performances
+          await Promise.allSettled(promises);
         }
 
         // Phase 4: Si pas d'hôtel du tout, en créer un automatiquement
@@ -249,24 +259,42 @@ export const useAutoSetup = () => {
       } catch (error) {
         console.error('❌ Erreur auto-setup:', error);
         hasAttemptedSetup.current = false; // Permettre un retry
-        // Pas de toast intrusif - les erreurs seront gérées par la reconnexion automatique
-        console.warn('⚠️ Auto-setup échoué, la reconnexion automatique prendra le relais');
+        
+        // Uniquement pour les erreurs critiques, proposer un retry manuel
+        toast({
+          variant: "destructive",
+          title: "Problème de connexion",
+          description: "Impossible de charger les données. Un retry automatique va être effectué.",
+          duration: 3000
+        });
+        
+        // Auto-retry après 2 secondes en cas d'erreur
+        setTimeout(() => {
+          if (!isSetupComplete && isAuthenticated && user?.id) {
+            console.log('🔄 Auto-retry après erreur...');
+            setupHotel();
+          }
+        }, 2000);
       } finally {
         setLoading(false);
         console.log('🏁 Auto-setup terminé');
       }
     };
 
-    // Timeout très réduit pour une connexion ultra-rapide
+    // Timeout plus raisonnable pour permettre aux requêtes de se terminer
     const setupTimeout = setTimeout(() => {
       if (loading && hasAttemptedSetup.current) {
-        console.warn('⚠️ Timeout setup, forçage completion...');
-        setLoading(false);
-        setIsSetupComplete(true);
-        // Force un retry si la configuration échoue
+        console.warn('⚠️ Timeout setup après 3s, retry avec fallback...');
+        // Au lieu de forcer le completion, on relance un setup simple
         hasAttemptedSetup.current = false;
+        setupHotel().catch(() => {
+          // En cas d'échec final, on marque comme complété avec un message d'erreur
+          setLoading(false);
+          setIsSetupComplete(true);
+          console.error('❌ Setup échoué définitivement');
+        });
       }
-    }, 500); // Réduit à 500ms pour une connexion immédiate
+    }, 3000); // Augmenté à 3000ms pour laisser le temps aux requêtes
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {

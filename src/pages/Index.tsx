@@ -53,6 +53,7 @@ import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
 import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
 import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
 import { SetupStatusSimple } from "@/components/SetupStatusSimple";
+import { SetupStatusReload } from "@/components/SetupStatusReload";
 import { SupabaseService } from "@/services/supabaseService";
 import { CodeGenerationService } from "@/services/codeGenerationService";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
@@ -102,6 +103,11 @@ const Index = () => {
   // Auto-setup automatique de l'hôtel et génération des codes
   const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
   const { forceReconnect } = useHotelReconnection();
+
+  // Handler pour le reload manuel
+  const handleManualReload = () => {
+    forceReconnect();
+  };
   
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
@@ -1410,8 +1416,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           </div>
         </div>
 
-        {/* Statut de setup discret */}
-        <SetupStatusSimple onRetry={() => window.location.reload()} />
+        {/* Statut de setup avec gestion d'erreur améliorée */}
+        <SetupStatusReload onManualReload={handleManualReload} />
 
         {/* Diagnostic pour les problèmes d'association hôtel uniquement si problème */}
         {(!hotel || !isSetupComplete || !currentHotelId) && (
@@ -2073,7 +2079,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           </TabsContent>
 
           <TabsContent value="access-codes" className="space-y-6">
-            <SetupStatusSimple />
+            <SetupStatusReload onManualReload={handleManualReload} />
             <GeneralAccessCodes key={`general-access-codes-${currentHotelId}`} />
           </TabsContent>
 
