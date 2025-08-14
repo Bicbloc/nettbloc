@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Room } from '@/services/pdfService';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { HotelSessionService } from '@/services/hotelSessionService';
+import { useDistributionPersistence } from '@/hooks/use-distribution-persistence';
 
 interface HousekeepingContextType {
   housekeeperNames: string[];
@@ -36,8 +37,10 @@ interface HousekeepingProviderProps {
 export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ children }) => {
   const [housekeeperNames, setHousekeeperNames] = useState<string[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [isDistributed, setIsDistributed] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  
+  // Utiliser le hook de persistance pour la distribution
+  const { isDistributed, saveDistribution } = useDistributionPersistence();
   
   const [hotelId, setHotelId] = useState<string | null>(null);
   const { notifications, addNotification } = useNotifications(hotelId || undefined);
@@ -61,7 +64,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     initializeSession();
   }, []);
 
-  // Synchronisation en temps réel - vérifier les changements toutes les 5 secondes
+  // Synchronisation en temps réel - vérifier les changements toutes les 10 secondes
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -69,7 +72,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       try {
         const session = await HotelSessionService.getSession();
         if (session) {
-          // Mettre à jour les données si elles ont changé
+          // Mettre à jour les données si elles ont changé, mais préserver la distribution locale
           setHousekeeperNames(prev => {
             const newNames = session.housekeeper_names || [];
             return JSON.stringify(prev) !== JSON.stringify(newNames) ? newNames : prev;
@@ -77,13 +80,21 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           
           setRooms(prev => {
             const newRooms = session.room_data || [];
+            const hasLocalAssignments = prev.some(room => room.assignedTo);
+            // Si on a des assignations locales, ne pas les écraser
+            if (hasLocalAssignments && newRooms.length > 0) {
+              return prev; // Garder les données locales
+            }
             return JSON.stringify(prev) !== JSON.stringify(newRooms) ? newRooms : prev;
           });
           
-          setIsDistributed(prev => {
-            const newDistributed = session.is_distributed || false;
-            return prev !== newDistributed ? newDistributed : prev;
-          });
+          // Vérifier l'état de distribution depuis le localStorage d'abord
+          const localDistributed = localStorage.getItem('rooms-distributed') === 'true';
+          if (localDistributed && !isDistributed) {
+            saveDistribution(true); // Synchroniser avec le hook de persistance
+          } else if (!localDistributed && session.is_distributed) {
+            saveDistribution(session.is_distributed);
+          }
 
           // Charger les vraies femmes de chambre depuis la base si on a un hotelId
           refreshHousekeepers();
@@ -91,7 +102,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       } catch (error) {
         console.error('Erreur synchronisation:', error);
       }
-    }, 5000); // Vérifier toutes les 5 secondes
+    }, 10000); // Réduire la fréquence pour éviter les conflits
 
     return () => clearInterval(interval);
   }, [isInitialized]);
@@ -103,7 +114,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       if (session) {
         setHousekeeperNames(session.housekeeper_names || []);
         setRooms(session.room_data || []);
-        setIsDistributed(session.is_distributed || false);
+        saveDistribution(session.is_distributed || false);
         
         // Récupérer l'ID réel de l'hôtel depuis la base de données
         let sessionHotelId = session.hotel_id;
@@ -449,7 +460,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     housekeepers,
     setHousekeeperNames,
     setRooms,
-    setIsDistributed,
+    setIsDistributed: saveDistribution,
     getHousekeeperRooms,
     updateRoomStatus,
     addNotification,
