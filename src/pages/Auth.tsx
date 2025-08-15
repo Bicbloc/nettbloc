@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { BackButton } from '@/components/BackButton';
+import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Building, Users, Shield, UserCheck, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -165,13 +165,8 @@ const Auth = () => {
     }
 
     try {
-      // Call our enhanced password reset function
-      const { error } = await supabase.functions.invoke('send-password-reset', {
-        body: {
-          email: formData.email,
-          userAgent: navigator.userAgent,
-          ipAddress: 'unknown' // IP will be captured server-side if needed
-        }
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/auth`
       });
 
       if (error) {
@@ -183,29 +178,11 @@ const Auth = () => {
         description: "Un email de réinitialisation a été envoyé à votre adresse."
       });
     } catch (error: any) {
-      console.error('Password reset error:', error);
-      
-      // Fallback to direct Supabase call if edge function fails
-      try {
-        const { error: fallbackError } = await supabase.auth.resetPasswordForEmail(formData.email, {
-          redirectTo: `${window.location.origin}/auth`
-        });
-
-        if (fallbackError) {
-          throw fallbackError;
-        }
-
-        toast({
-          title: "Email envoyé",
-          description: "Un email de réinitialisation a été envoyé à votre adresse."
-        });
-      } catch (fallbackError: any) {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: fallbackError.message || "Impossible d'envoyer l'email de réinitialisation."
-        });
-      }
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible d'envoyer l'email de réinitialisation."
+      });
     }
   };
 
@@ -272,7 +249,7 @@ const Auth = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4 relative">
       <div className="absolute top-4 left-4">
-        <BackButton />
+        <BackButton to="/" />
       </div>
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">

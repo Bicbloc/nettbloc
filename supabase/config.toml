@@ -22,6 +22,3 @@ verify_jwt = false
 
 [functions.archive-daily-data]
 verify_jwt = false
-
-[functions.send-password-reset]
-verify_jwt = false

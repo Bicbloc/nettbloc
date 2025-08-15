@@ -26,34 +26,57 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
-    console.log('🔐 AuthContext: Initialisation...');
-
-    // Set up auth state listener FIRST
+    let timeoutId: NodeJS.Timeout;
+    
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('🔐 Auth event:', event, session ? 'avec session' : 'sans session');
+        if (!isMounted) return;
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+        // Use setTimeout to prevent blocking the auth callback
+        setTimeout(() => {
+          if (isMounted) {
+            setSession(session);
+            setUser(session?.user ?? null);
+            setLoading(false);
+          }
+        }, 0);
       }
     );
 
-    // THEN get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('✅ Session initiale récupérée:', session ? 'authentifié' : 'non authentifié');
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    }).catch((error) => {
-      console.error('❌ Erreur récupération session:', error);
-      setLoading(false);
-    });
+    // Get initial session with timeout
+    const initializeSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Failed to get session:', error);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeSession();
+
+    // Set timeout fallback
+    timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        setLoading(false);
+      }
+    }, 5000);
 
     return () => {
+      setIsMounted(false);
       subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
 

@@ -1,35 +1,40 @@
-import { ArrowLeft } from 'lucide-react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-export function BackButton() {
+interface BackButtonProps {
+  to?: string;
+  label?: string;
+  className?: string;
+}
+
+export const BackButton: React.FC<BackButtonProps> = ({ 
+  to = '/', 
+  label = 'Retour',
+  className = '' 
+}) => {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  // Ne pas afficher le bouton sur la page d'accueil
-  if (location.pathname === '/') {
-    return null;
-  }
 
   const handleBack = () => {
-    // Si on peut revenir en arrière dans l'historique, on le fait
-    if (window.history.length > 1) {
-      navigate(-1);
+    if (to) {
+      navigate(to);
     } else {
-      // Sinon, on va vers la page d'accueil
-      navigate('/');
+      navigate(-1);
     }
   };
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="sm"
       onClick={handleBack}
-      className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+      className={`flex items-center gap-2 ${className}`}
     >
       <ArrowLeft className="h-4 w-4" />
-      Retour
+      {label}
     </Button>
   );
-}
+};
+
+export default BackButton;
