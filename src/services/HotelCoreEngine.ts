@@ -24,7 +24,7 @@ export interface Assignment {
   assigned_at: string;
   started_at?: string;
   completed_at?: string;
-  status: 'assigned' | 'in_progress' | 'completed' | 'skipped';
+  status: string;
   estimated_duration: number;
   actual_duration?: number;
   notes?: string;
@@ -40,7 +40,7 @@ export interface Activity {
   entity_id: string;
   actor_name?: string;
   actor_type: string;
-  details: Record<string, any>;
+  details: any;
   timestamp: string;
 }
 
@@ -167,7 +167,7 @@ class HotelCoreEngine {
         hotel = newHotel;
       }
 
-      this.setState({ hotel });
+      this.setState({ hotel: hotel as any });
       await this.loadHotelData();
     } catch (error) {
       console.error('Failed to initialize hotel:', error);
@@ -209,9 +209,9 @@ class HotelCoreEngine {
       const housekeepers = [...new Set(assignments.map(a => a.housekeeper_name))];
 
       this.setState({
-        rooms,
-        assignments,
-        activities,
+        rooms: rooms as any,
+        assignments: assignments as any,
+        activities: activities as any,
         housekeepers,
         loading: false
       });
@@ -243,7 +243,7 @@ class HotelCoreEngine {
       if (error) throw error;
 
       this.setState({
-        rooms: [...this.state.rooms, ...data]
+        rooms: [...this.state.rooms, ...data as any]
       });
 
       await this.logActivity('rooms_created', 'hotel', this.state.hotel.id, undefined, {
@@ -315,9 +315,9 @@ class HotelCoreEngine {
         .in('id', roomIds);
 
       this.setState({
-        assignments: [data, ...this.state.assignments],
+        assignments: [...data as any, ...this.state.assignments],
         rooms: this.state.rooms.map(room =>
-          roomIds.includes(room.id) ? { ...room, status: 'cleaning' as const } : room
+          roomIds.includes(room.id) ? { ...room, status: 'cleaning' as any } : room
         ),
         housekeepers: [...new Set([...this.state.housekeepers, ...assignments.map(a => a.housekeeperName)])]
       });

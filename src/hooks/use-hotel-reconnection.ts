@@ -43,7 +43,6 @@ export const useHotelReconnection = (): HotelReconnectionResult => {
 
         // Mise à jour localStorage immédiate
         localStorage.setItem('selectedHotelId', hotel.id);
-        localStorage.setItem('selectedHotelCode', hotel.hotel_code || '');
         localStorage.setItem('selectedHotelName', hotel.name);
         localStorage.setItem('lastReconnection', Date.now().toString());
 

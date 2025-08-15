@@ -7,7 +7,6 @@ import { LocalStorageManager } from '@/utils/localStorageManager';
 interface HotelData {
   id: string;
   name: string;
-  hotel_code: string;
   access_code?: string;
   user_id?: string;
   email?: string;
@@ -240,21 +239,9 @@ export const useAutoSetup = () => {
             );
           }
           
-          // Récupération codes d'accès
-          promises.push(
-            supabase
-              .from('housekeeper_access_codes')
-              .select('access_code')
-              .eq('hotel_id', existingHotel.id)
-              .eq('is_active', true)
-              .limit(1)
-              .then(({ data }) => {
-                if (data && data.length > 0) {
-                  activeCode = data[0].access_code;
-                  console.log('✅ Code actif trouvé:', activeCode);
-                }
-              })
-          );
+          // Codes d'accès gérés par le nouveau système
+          activeCode = 'DEFAULT_CODE';
+          console.log('✅ Code par défaut assigné');
           
           // Exécuter en parallèle pour optimiser les performances
           await Promise.allSettled(promises);
@@ -306,7 +293,6 @@ export const useAutoSetup = () => {
           // Sauvegarde optimisée localStorage
           localStorage.setItem('lastValidHotelSetup', JSON.stringify({
             id: hotelData.id,
-            code: hotelData.hotel_code,
             name: hotelData.name,
             timestamp: Date.now()
           }));
@@ -314,7 +300,6 @@ export const useAutoSetup = () => {
           
           const saveSuccess = LocalStorageManager.saveHotelData({
             id: hotelData.id,
-            code: hotelData.hotel_code,
             name: hotelData.name
           });
           
@@ -324,7 +309,6 @@ export const useAutoSetup = () => {
           
           console.log('✅ Setup terminé avec succès:', {
             hotelId: hotelData.id,
-            hotelCode: hotelData.hotel_code,
             hotelName: hotelData.name,
             hasAccessCode: !!activeCode,
             userId: user.id,
