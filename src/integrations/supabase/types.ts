@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          activity_type: string
+          actor_name: string | null
+          actor_type: string | null
+          created_at: string
+          details: Json | null
+          entity_id: string
+          entity_type: string
+          hotel_id: string
+          id: string
+          metadata: Json | null
+          timestamp: string
+        }
+        Insert: {
+          activity_type: string
+          actor_name?: string | null
+          actor_type?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id: string
+          entity_type: string
+          hotel_id: string
+          id?: string
+          metadata?: Json | null
+          timestamp?: string
+        }
+        Update: {
+          activity_type?: string
+          actor_name?: string | null
+          actor_type?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id?: string
+          entity_type?: string
+          hotel_id?: string
+          id?: string
+          metadata?: Json | null
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -41,198 +91,71 @@ export type Database = {
         }
         Relationships: []
       }
-      daily_reports: {
+      assignments: {
         Row: {
-          action_log: Json
+          actual_duration: number | null
+          assigned_at: string
+          assigned_by: string | null
+          completed_at: string | null
           created_at: string
+          estimated_duration: number | null
           hotel_id: string
-          housekeeper_assignments: Json
-          housekeeper_names: Json
+          housekeeper_id: string | null
+          housekeeper_name: string
           id: string
-          report_date: string
-          room_data: Json
-          user_id: string
-        }
-        Insert: {
-          action_log?: Json
-          created_at?: string
-          hotel_id: string
-          housekeeper_assignments?: Json
-          housekeeper_names?: Json
-          id?: string
-          report_date?: string
-          room_data?: Json
-          user_id: string
-        }
-        Update: {
-          action_log?: Json
-          created_at?: string
-          hotel_id?: string
-          housekeeper_assignments?: Json
-          housekeeper_names?: Json
-          id?: string
-          report_date?: string
-          room_data?: Json
-          user_id?: string
-        }
-        Relationships: []
-      }
-      hotel_access_sessions: {
-        Row: {
-          access_code: string
-          access_request_id: string | null
-          approved_at: string | null
-          approved_by: string | null
-          created_at: string
-          ended_at: string | null
-          expires_at: string
-          hotel_id: string
-          housekeeper_profile_id: string
-          id: string
-          is_active: boolean
-          rooms_cleaned_today: number
-          session_token: string
-          started_at: string
+          notes: string | null
+          room_id: string
+          started_at: string | null
+          status: string
           updated_at: string
         }
         Insert: {
-          access_code: string
-          access_request_id?: string | null
-          approved_at?: string | null
-          approved_by?: string | null
+          actual_duration?: number | null
+          assigned_at?: string
+          assigned_by?: string | null
+          completed_at?: string | null
           created_at?: string
-          ended_at?: string | null
-          expires_at?: string
+          estimated_duration?: number | null
           hotel_id: string
-          housekeeper_profile_id: string
+          housekeeper_id?: string | null
+          housekeeper_name: string
           id?: string
-          is_active?: boolean
-          rooms_cleaned_today?: number
-          session_token: string
-          started_at?: string
+          notes?: string | null
+          room_id: string
+          started_at?: string | null
+          status?: string
           updated_at?: string
         }
         Update: {
-          access_code?: string
-          access_request_id?: string | null
-          approved_at?: string | null
-          approved_by?: string | null
+          actual_duration?: number | null
+          assigned_at?: string
+          assigned_by?: string | null
+          completed_at?: string | null
           created_at?: string
-          ended_at?: string | null
-          expires_at?: string
+          estimated_duration?: number | null
           hotel_id?: string
-          housekeeper_profile_id?: string
+          housekeeper_id?: string | null
+          housekeeper_name?: string
           id?: string
-          is_active?: boolean
-          rooms_cleaned_today?: number
-          session_token?: string
-          started_at?: string
+          notes?: string | null
+          room_id?: string
+          started_at?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "hotel_access_sessions_hotel_id_fkey"
+            foreignKeyName: "assignments_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "hotel_access_sessions_housekeeper_profile_id_fkey"
-            columns: ["housekeeper_profile_id"]
+            foreignKeyName: "assignments_room_id_fkey"
+            columns: ["room_id"]
             isOneToOne: false
-            referencedRelation: "housekeeper_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hotel_sessions: {
-        Row: {
-          created_at: string
-          expires_at: string
-          hotel_id: string | null
-          housekeeper_assignments: Json
-          housekeeper_names: Json
-          id: string
-          ip_address: unknown | null
-          is_active: boolean
-          is_distributed: boolean
-          room_data: Json
-          session_token: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          expires_at?: string
-          hotel_id?: string | null
-          housekeeper_assignments?: Json
-          housekeeper_names?: Json
-          id?: string
-          ip_address?: unknown | null
-          is_active?: boolean
-          is_distributed?: boolean
-          room_data?: Json
-          session_token: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          expires_at?: string
-          hotel_id?: string | null
-          housekeeper_assignments?: Json
-          housekeeper_names?: Json
-          id?: string
-          ip_address?: unknown | null
-          is_active?: boolean
-          is_distributed?: boolean
-          room_data?: Json
-          session_token?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hotel_sessions_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hotel_users: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          hotel_id: string
-          id: string
-          role: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          hotel_id: string
-          id?: string
-          role?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          hotel_id?: string
-          id?: string
-          role?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hotel_users_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels"
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -242,9 +165,10 @@ export type Database = {
           address: string | null
           created_at: string
           email: string
-          hotel_code: string | null
           id: string
           name: string
+          settings: Json | null
+          status: string | null
           updated_at: string
           user_id: string | null
         }
@@ -252,9 +176,10 @@ export type Database = {
           address?: string | null
           created_at?: string
           email: string
-          hotel_code?: string | null
           id?: string
           name: string
+          settings?: Json | null
+          status?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -262,113 +187,12 @@ export type Database = {
           address?: string | null
           created_at?: string
           email?: string
-          hotel_code?: string | null
           id?: string
           name?: string
+          settings?: Json | null
+          status?: string | null
           updated_at?: string
           user_id?: string | null
-        }
-        Relationships: []
-      }
-      housekeeper_access_codes: {
-        Row: {
-          access_code: string
-          created_at: string
-          created_by: string | null
-          expires_at: string | null
-          hotel_id: string
-          housekeeper_id: string | null
-          id: string
-          invitation_sent_at: string | null
-          invited_email: string | null
-          invited_name: string | null
-          is_active: boolean
-          used_at: string | null
-        }
-        Insert: {
-          access_code: string
-          created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
-          hotel_id: string
-          housekeeper_id?: string | null
-          id?: string
-          invitation_sent_at?: string | null
-          invited_email?: string | null
-          invited_name?: string | null
-          is_active?: boolean
-          used_at?: string | null
-        }
-        Update: {
-          access_code?: string
-          created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
-          hotel_id?: string
-          housekeeper_id?: string | null
-          id?: string
-          invitation_sent_at?: string | null
-          invited_email?: string | null
-          invited_name?: string | null
-          is_active?: boolean
-          used_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "housekeeper_access_codes_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "housekeeper_access_codes_housekeeper_id_fkey"
-            columns: ["housekeeper_id"]
-            isOneToOne: false
-            referencedRelation: "housekeepers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      housekeeper_access_requests: {
-        Row: {
-          created_at: string
-          hotel_code: string
-          hotel_id: string
-          housekeeper_profile_id: string
-          id: string
-          notes: string | null
-          requested_at: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          hotel_code: string
-          hotel_id: string
-          housekeeper_profile_id: string
-          id?: string
-          notes?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          hotel_code?: string
-          hotel_id?: string
-          housekeeper_profile_id?: string
-          id?: string
-          notes?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -432,48 +256,6 @@ export type Database = {
           },
         ]
       }
-      housekeeper_invitations: {
-        Row: {
-          access_code: string
-          created_at: string
-          email: string
-          expires_at: string
-          hotel_id: string
-          id: string
-          invited_by: string
-          name: string
-          sent_at: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          access_code: string
-          created_at?: string
-          email: string
-          expires_at?: string
-          hotel_id: string
-          id?: string
-          invited_by: string
-          name: string
-          sent_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          access_code?: string
-          created_at?: string
-          email?: string
-          expires_at?: string
-          hotel_id?: string
-          id?: string
-          invited_by?: string
-          name?: string
-          sent_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       housekeeper_profiles: {
         Row: {
           average_rating: number | null
@@ -515,44 +297,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      housekeeper_tokens: {
-        Row: {
-          created_at: string
-          expires_at: string
-          housekeeper_id: string
-          id: string
-          is_active: boolean
-          token: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          expires_at?: string
-          housekeeper_id: string
-          id?: string
-          is_active?: boolean
-          token: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          expires_at?: string
-          housekeeper_id?: string
-          id?: string
-          is_active?: boolean
-          token?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "housekeeper_tokens_housekeeper_id_fkey"
-            columns: ["housekeeper_id"]
-            isOneToOne: false
-            referencedRelation: "housekeepers"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       housekeepers: {
         Row: {
@@ -721,50 +465,55 @@ export type Database = {
         }
         Relationships: []
       }
-      room_status_updates: {
+      rooms: {
         Row: {
+          cleaning_priority: number | null
           created_at: string
+          estimated_time: number | null
+          floor: number | null
           hotel_id: string
-          housekeeper_id: string
           id: string
-          message: string | null
+          last_cleaned_at: string | null
+          notes: string | null
           room_number: string
+          room_type: string | null
           status: string
-          user_id: string | null
+          updated_at: string
         }
         Insert: {
+          cleaning_priority?: number | null
           created_at?: string
+          estimated_time?: number | null
+          floor?: number | null
           hotel_id: string
-          housekeeper_id: string
           id?: string
-          message?: string | null
+          last_cleaned_at?: string | null
+          notes?: string | null
           room_number: string
-          status: string
-          user_id?: string | null
+          room_type?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
+          cleaning_priority?: number | null
           created_at?: string
+          estimated_time?: number | null
+          floor?: number | null
           hotel_id?: string
-          housekeeper_id?: string
           id?: string
-          message?: string | null
+          last_cleaned_at?: string | null
+          notes?: string | null
           room_number?: string
+          room_type?: string | null
           status?: string
-          user_id?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "room_status_updates_hotel_id_fkey"
+            foreignKeyName: "rooms_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "room_status_updates_housekeeper_id_fkey"
-            columns: ["housekeeper_id"]
-            isOneToOne: false
-            referencedRelation: "housekeepers"
             referencedColumns: ["id"]
           },
         ]
@@ -931,6 +680,18 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      log_activity: {
+        Args: {
+          p_activity_type: string
+          p_actor_name?: string
+          p_actor_type?: string
+          p_details?: Json
+          p_entity_id: string
+          p_entity_type: string
+          p_hotel_id: string
+        }
+        Returns: string
       }
       log_admin_action: {
         Args: { p_action: string; p_details?: Json; p_target_user_id?: string }
