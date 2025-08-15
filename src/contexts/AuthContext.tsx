@@ -30,48 +30,83 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    let initializationPromise: Promise<void> | null = null;
     
+    console.log('🔐 AuthContext: Initialisation...');
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!isMounted) return;
         
-        // Use setTimeout to prevent blocking the auth callback
-        setTimeout(() => {
-          if (isMounted) {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-          }
-        }, 0);
-      }
-    );
-
-    // Get initial session with timeout
-    const initializeSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔐 Auth event:', event, session ? 'avec session' : 'sans session');
+        
+        // Wait for initialization to complete first
+        if (initializationPromise) {
+          await initializationPromise;
+        }
+        
+        // Update state immediately without setTimeout
         if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
         }
-      } catch (error) {
-        console.error('Failed to get session:', error);
-        if (isMounted) {
-          setLoading(false);
+      }
+    );
+
+    // Get initial session with retry
+    const initializeSession = async () => {
+      let retries = 3;
+      
+      while (retries > 0 && isMounted) {
+        try {
+          console.log(`🔐 Récupération session initiale (${4 - retries}/3)...`);
+          
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.warn('❌ Erreur récupération session:', error);
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+          }
+          
+          if (isMounted) {
+            console.log('✅ Session récupérée:', session ? 'authentifié' : 'non authentifié');
+            setSession(session);
+            setUser(session?.user ?? null);
+            setLoading(false);
+          }
+          return;
+          
+        } catch (error) {
+          console.error('❌ Erreur fatale récupération session:', error);
+          retries--;
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         }
+      }
+      
+      // Final fallback
+      if (isMounted) {
+        console.log('⚠️ Impossible de récupérer la session, on continue sans');
+        setLoading(false);
       }
     };
 
-    initializeSession();
+    initializationPromise = initializeSession();
 
-    // Set timeout fallback
+    // Reduced timeout fallback
     timeoutId = setTimeout(() => {
       if (isMounted && loading) {
+        console.log('⏰ Timeout auth, on continue sans session');
         setLoading(false);
       }
-    }, 5000);
+    }, 3000);
 
     return () => {
       setIsMounted(false);
