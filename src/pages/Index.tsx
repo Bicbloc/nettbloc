@@ -218,7 +218,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         });
         
         // Appliquer les données analysées
-        handlePdfProcessed(analyzedRooms, analyzedHousekeepers, distributionMethod);
+        handlePdfProcessed(analyzedRooms);
         
         // Nettoyer l'état de navigation pour éviter les répétitions
         navigate('/', { replace: true });
@@ -570,17 +570,10 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     }
   };
   
-  const handlePdfProcessed = async (data: Room[], housekeepers: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
-    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeepers);
+  const handlePdfProcessed = async (data: Room[]) => {
+    console.log("📋 Traitement PDF avec données:", data.length, "chambres");
     
     try {
-      // DÉSACTIVÉ: Nettoyage automatique des femmes de chambre
-      // console.log("🧹 Nettoyage des femmes de chambre de la session précédente...");
-      // if (hotel?.id) {
-      //   await SupabaseService.cleanupAllHousekeepers(hotel.id);
-      //   console.log("✅ Nettoyage terminé");
-      // }
-      
       const floors = new Set<number>();
       data.forEach(room => {
         const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
@@ -595,36 +588,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         a.number.localeCompare(b.number, undefined, { numeric: true })
       );
 
-      // Mettre à jour les noms des femmes de chambre dans le context
-      setHousekeeperNames(housekeepers);
-      
-      // Auto-distribute if method specified
-      if (distributionMethod && distributionMethod !== 'random') {
-        console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
-        const distributedRooms = autoDistributeRooms(sortedData, housekeepers, false);
-        if (distributedRooms) {
-          // Mettre à jour les chambres avec les assignations
-          const updatedRooms = sortedData.map(room => {
-            for (const [housekeeper, rooms] of Object.entries(distributedRooms)) {
-              if (rooms.some(r => r.number === room.number)) {
-                return { ...room, assignedTo: housekeeper };
-              }
-            }
-            return room;
-          });
-          setRooms(updatedRooms);
-        } else {
-          setRooms(sortedData);
-        }
-        setIsDistributed(true);
-      } else {
-        setRooms(sortedData);
-        setIsDistributed(false);
-      }
+      setRooms(sortedData);
+      setIsDistributed(false);
       
       toast({
         title: "PDF traité avec succès",
-        description: `${data.length} chambres importées${distributionMethod ? ` et distribuées (${distributionMethod})` : ''}`
+        description: `${data.length} chambres importées`
       });
       
     } catch (error) {
@@ -1529,12 +1498,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <PdfWorkflowDialog 
-                    onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                      handlePdfProcessed(data, housekeepers, distributionMethod);
+                    onWorkflowComplete={(data) => {
+                      handlePdfProcessed(data);
                     }}
-                    currentHousekeepers={housekeeperNames}
-                    existingHousekeepers={existingHousekeepers}
-                    hotelId={currentHotelId}
                   />
                   <ConfigDialog 
                     config={cleaningConfig} 
@@ -1632,12 +1598,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   existingRooms={rooms} 
                 />
                 <PdfWorkflowDialog 
-                  onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                    handlePdfProcessed(data, housekeepers, distributionMethod);
+                  onWorkflowComplete={(data) => {
+                    handlePdfProcessed(data);
                   }}
-                  currentHousekeepers={housekeeperNames}
-                  existingHousekeepers={existingHousekeepers}
-                  hotelId={currentHotelId}
                 />
                 <Button
                   onClick={() => openManualAssignment()}
@@ -1664,12 +1627,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       existingRooms={rooms} 
                     />
                     <PdfWorkflowDialog 
-                      onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                        handlePdfProcessed(data, housekeepers, distributionMethod);
+                      onWorkflowComplete={(data) => {
+                        handlePdfProcessed(data);
                       }}
-                      currentHousekeepers={housekeeperNames}
-                      existingHousekeepers={existingHousekeepers}
-                      hotelId={currentHotelId}
                     />
                   </div>
                 </CardContent>
