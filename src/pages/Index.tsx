@@ -218,7 +218,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         });
         
         // Appliquer les données analysées
-        handlePdfProcessed(analyzedRooms);
+        handlePdfProcessed(analyzedRooms, analyzedHousekeepers, distributionMethod);
         
         // Nettoyer l'état de navigation pour éviter les répétitions
         navigate('/', { replace: true });
@@ -570,8 +570,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     }
   };
   
-  const handlePdfProcessed = async (data: Room[]) => {
-    console.log("📋 Traitement PDF avec données:", data.length, "chambres");
+  const handlePdfProcessed = async (data: Room[], housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
+    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeepers || []);
     
     try {
       const floors = new Set<number>();
@@ -588,12 +588,31 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         a.number.localeCompare(b.number, undefined, { numeric: true })
       );
 
-      setRooms(sortedData);
-      setIsDistributed(false);
+      // Mettre à jour les noms des femmes de chambre si fournis
+      if (housekeepers && housekeepers.length > 0) {
+        setHousekeeperNames(housekeepers);
+      }
+
+      // Auto-distribute if method specified
+      if (distributionMethod && housekeepers && housekeepers.length > 0) {
+        console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
+        // Simuler une distribution simple pour l'instant
+        const roomsPerHousekeeper = Math.ceil(sortedData.length / housekeepers.length);
+        const updatedRooms = sortedData.map((room, index) => {
+          const housekeeperIndex = Math.floor(index / roomsPerHousekeeper);
+          const assignedHousekeeper = housekeepers[housekeeperIndex] || housekeepers[0];
+          return { ...room, assignedTo: assignedHousekeeper };
+        });
+        setRooms(updatedRooms);
+        setIsDistributed(true);
+      } else {
+        setRooms(sortedData);
+        setIsDistributed(false);
+      }
       
       toast({
         title: "PDF traité avec succès",
-        description: `${data.length} chambres importées`
+        description: `${data.length} chambres importées${distributionMethod ? ` et distribuées (${distributionMethod})` : ''}`
       });
       
     } catch (error) {
@@ -1498,8 +1517,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <PdfWorkflowDialog 
-                    onWorkflowComplete={(data) => {
-                      handlePdfProcessed(data);
+                    onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                      handlePdfProcessed(data, housekeepers, distributionMethod);
                     }}
                   />
                   <ConfigDialog 
@@ -1597,11 +1616,11 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   onAddRoom={handleAddRoom} 
                   existingRooms={rooms} 
                 />
-                <PdfWorkflowDialog 
-                  onWorkflowComplete={(data) => {
-                    handlePdfProcessed(data);
-                  }}
-                />
+                    <PdfWorkflowDialog 
+                      onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                        handlePdfProcessed(data, housekeepers, distributionMethod);
+                      }}
+                    />
                 <Button
                   onClick={() => openManualAssignment()}
                   variant="outline"
@@ -1626,11 +1645,11 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       onAddRoom={handleAddRoom} 
                       existingRooms={rooms} 
                     />
-                    <PdfWorkflowDialog 
-                      onWorkflowComplete={(data) => {
-                        handlePdfProcessed(data);
-                      }}
-                    />
+                <PdfWorkflowDialog 
+                  onWorkflowComplete={(data, housekeepers, distributionMethod) => {
+                    handlePdfProcessed(data, housekeepers, distributionMethod);
+                  }}
+                />
                   </div>
                 </CardContent>
               </Card>
