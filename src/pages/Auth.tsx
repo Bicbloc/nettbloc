@@ -99,33 +99,8 @@ const Auth = () => {
         description: "Vous êtes maintenant connecté."
       });
       
-      // Vérifier si l'utilisateur a besoin de sélectionner un plan
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('plan')
-          .eq('id', user.id)
-          .single();
-        
-        // Si pas de plan ou plan non défini, rediriger vers la sélection
-        if (!profile?.plan || profile.plan === 'free') {
-          const { data: hotel } = await supabase
-            .from('hotels')
-            .select('id')
-            .eq('user_id', user.id)
-            .single();
-          
-          // Si pas d'hôtel créé, passer par la sélection de plans
-          if (!hotel) {
-            navigate('/plan-selection');
-            setIsLoading(false);
-            return;
-          }
-        }
-      }
-      
-      navigate('/');
+      // Toujours rediriger vers la sélection de plan après connexion
+      navigate('/plan-selection');
     }
     
     setIsLoading(false);
@@ -164,13 +139,12 @@ const Auth = () => {
       });
     } else {
       toast({
-        title: "Inscription réussie",
-        description: "Connexion automatique en cours..."
+        title: "Compte créé avec succès",
+        description: "Vous êtes maintenant connecté."
       });
-      // Connexion automatique après inscription
-      setTimeout(() => {
-        navigate('/plan-selection');
-      }, 1000);
+      
+      // Rediriger vers la sélection de plan après inscription
+      navigate('/plan-selection');
     }
     
     setIsLoading(false);
