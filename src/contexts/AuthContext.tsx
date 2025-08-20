@@ -94,6 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
     
+    // Si pas d'erreur, connexion automatique (Supabase gère ça automatiquement maintenant)
     return { error };
   };
 

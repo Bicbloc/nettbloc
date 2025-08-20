@@ -138,8 +138,12 @@ const Auth = () => {
     } else {
       toast({
         title: "Inscription réussie",
-        description: "Vérifiez votre email pour confirmer votre compte."
+        description: "Connexion automatique en cours..."
       });
+      // Connexion automatique après inscription
+      setTimeout(() => {
+        navigate('/plan-selection');
+      }, 1000);
     }
     
     setIsLoading(false);

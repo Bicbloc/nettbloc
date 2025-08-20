@@ -12,7 +12,8 @@ import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import AnalysisWorkflow from "./pages/AnalysisWorkflow";
 import Admin from "./pages/Admin";
-import { BicblocFooter } from "./components/BicblocBranding";
+import PlanSelection from "./pages/PlanSelection";
+import Success from "./pages/Success";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { HousekeeperAuthProvider } from "./contexts/HousekeeperAuthContext";
@@ -23,13 +24,7 @@ import HousekeeperWork from "./pages/HousekeeperWork";
 import Housekeeper from "./pages/Housekeeper";
 import HousekeeperLogin from "./pages/HousekeeperLogin";
 
-// Minimal header space with no title
-const HeaderSpace = () => (
-  <div className="container mx-auto pt-1">
-    {/* Empty space - no title */}
-  </div>
-);
-
+// Components supprimés - plus de header space
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -41,16 +36,13 @@ const App = () => (
           <Toaster />
           <Sonner />
           <div className="flex flex-col min-h-screen">
-            <HeaderSpace />
-            {/* Footer positioned at the top, before the main content, with increased width and less padding */}
-            <div className="container mx-auto mb-2 px-0">
-              <BicblocFooter />
-            </div>
             <div className="flex-grow">
               <BrowserRouter>
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/plan-selection" element={<PlanSelection />} />
+                  <Route path="/success" element={<Success />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<Reports />} />

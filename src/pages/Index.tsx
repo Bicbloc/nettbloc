@@ -62,6 +62,8 @@ import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
+import { UpgradeButton } from "@/components/UpgradeButton";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -69,6 +71,9 @@ const Index = () => {
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Hook pour la gestion de l'abonnement
+  const { plan, isPremium, isFree, canAccessFeature, loading: subscriptionLoading } = useSubscription();
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
