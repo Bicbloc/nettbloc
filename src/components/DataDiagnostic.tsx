@@ -45,7 +45,7 @@ export const DataDiagnostic: React.FC = () => {
       const [hotelsResult, housekeepersResult, sessionsResult, accessCodesResult] = await Promise.all([
         supabase.from('hotels').select('*').eq('user_id', user.id),
         supabase.from('housekeepers').select('*').eq('user_id', user.id),
-        supabase.from('hotel_sessions').select('*').eq('user_id', user.id),
+        supabase.from('user_sessions').select('*').eq('user_id', user.id),
         supabase.from('housekeeper_access_codes').select('*')
       ]);
 
@@ -124,7 +124,7 @@ export const DataDiagnostic: React.FC = () => {
         
         for (const session of orphanedSessions) {
           await supabase
-            .from('hotel_sessions')
+            .from('user_sessions')
             .update({ hotel_id: mainHotel.id })
             .eq('id', session.id);
           orphanedSessionsFixed++;

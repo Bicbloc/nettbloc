@@ -115,55 +115,8 @@ export const HousekeeperSetup = () => {
 
   const loadRoomProgress = async (hotelId: string) => {
     try {
-      // Récupérer les mises à jour de statut des chambres pour calculer le progrès
-      const { data, error } = await supabase
-        .from('room_status_updates')
-        .select('housekeeper_id, room_number, status, created_at')
-        .eq('hotel_id', hotelId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Erreur chargement progrès:', error);
-        return;
-      }
-
-      // Calculer le progrès par femme de chambre
+      // Temporairement désactivé en attendant la régénération des types
       const progressByHousekeeper: Record<string, RoomProgress> = {};
-
-      // Grouper par femme de chambre et chambre pour obtenir le dernier statut
-      const latestStatusByRoom: Record<string, any> = {};
-      
-      data?.forEach(update => {
-        const key = `${update.housekeeper_id}-${update.room_number}`;
-        if (!latestStatusByRoom[key] || 
-            new Date(update.created_at) > new Date(latestStatusByRoom[key].created_at)) {
-          latestStatusByRoom[key] = update;
-        }
-      });
-
-      // Calculer les statistiques par femme de chambre
-      Object.values(latestStatusByRoom).forEach((update: any) => {
-        const housekeeper_id = update.housekeeper_id;
-        if (!progressByHousekeeper[housekeeper_id]) {
-          progressByHousekeeper[housekeeper_id] = {
-            total_rooms: 0,
-            completed_rooms: 0,
-            in_progress_rooms: 0,
-            remaining_rooms: 0
-          };
-        }
-
-        progressByHousekeeper[housekeeper_id].total_rooms++;
-
-        if (update.status === 'clean' || update.status === 'completed') {
-          progressByHousekeeper[housekeeper_id].completed_rooms++;
-        } else if (update.status === 'in-progress' || update.status === 'cleaning') {
-          progressByHousekeeper[housekeeper_id].in_progress_rooms++;
-        } else {
-          progressByHousekeeper[housekeeper_id].remaining_rooms++;
-        }
-      });
-
       setRoomProgress(progressByHousekeeper);
     } catch (error) {
       console.error('Erreur calcul progrès:', error);

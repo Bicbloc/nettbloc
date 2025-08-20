@@ -57,7 +57,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       }
 
       setHotel(codeData.hotels);
-      setHousekeeperName(codeData.invited_name || 'Invité');
+      setHousekeeperName((codeData as any).invited_name || 'Invité');
 
       // Get room assignments (mock data for now - replace with real room assignment logic)
       const mockRooms: Room[] = [

@@ -52,16 +52,16 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
       const generatedCode = data as string;
       setAccessCode(generatedCode);
 
-      // Save invitation
+      // Save invitation to access codes table temporarily
       const { error: inviteError } = await supabase
-        .from('housekeeper_invitations')
+        .from('housekeeper_access_codes')
         .insert({
           hotel_id: hotelId,
-          email,
-          name,
           access_code: generatedCode,
-          invited_by: (await supabase.auth.getUser()).data.user?.id || ''
-        });
+          invited_email: email,
+          invited_name: name,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        } as any);
 
       if (inviteError) {
         console.error('Error saving invitation:', inviteError);
@@ -72,9 +72,8 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
         .from('housekeeper_access_codes')
         .update({
           invited_email: email,
-          invited_name: name,
-          invitation_sent_at: new Date().toISOString()
-        })
+          invited_name: name
+        } as any)
         .eq('access_code', generatedCode);
 
       // Send email invitation if email provided
