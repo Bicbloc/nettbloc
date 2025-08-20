@@ -65,16 +65,20 @@ export const useAutoSetup = () => {
           throw profileError;
         }
 
-        // Si le profil n'existe pas, le créer automatiquement
+        // Si le profil n'existe pas, le créer automatiquement avec les métadonnées utilisateur
         let profileData = profile;
         if (!profile) {
           console.log('📝 Création automatique du profil utilisateur...');
+          
+          // Récupérer les métadonnées de l'utilisateur Supabase
+          const companyFromMetadata = user.user_metadata?.company_name;
+          
           const { data: newProfile, error: createProfileError } = await supabase
             .from('profiles')
             .insert({
               id: user.id,
               email: user.email || '',
-              company_name: null
+              company_name: companyFromMetadata || null
             })
             .select()
             .single();

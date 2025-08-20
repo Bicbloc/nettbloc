@@ -98,6 +98,33 @@ const Auth = () => {
         title: "Connexion réussie",
         description: "Vous êtes maintenant connecté."
       });
+      
+      // Vérifier si l'utilisateur a besoin de sélectionner un plan
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', user.id)
+          .single();
+        
+        // Si pas de plan ou plan non défini, rediriger vers la sélection
+        if (!profile?.plan || profile.plan === 'free') {
+          const { data: hotel } = await supabase
+            .from('hotels')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+          
+          // Si pas d'hôtel créé, passer par la sélection de plans
+          if (!hotel) {
+            navigate('/plan-selection');
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+      
       navigate('/');
     }
     

@@ -32,18 +32,46 @@ export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSel
           window.open(data.url, '_blank');
         }
       } else {
-        // Free plan - update profile directly
+        // Free plan - update profile and create hotel if needed
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          // Update profile
           await supabase
             .from('profiles')
             .update({ plan: 'free' })
             .eq('id', user.id);
+          
+          // Check if profile has company_name to create hotel
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_name, email')
+            .eq('id', user.id)
+            .single();
+          
+          // Create hotel if it doesn't exist
+          const { data: existingHotel } = await supabase
+            .from('hotels')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (!existingHotel && profile) {
+            const hotelName = profile.company_name || `Établissement de ${profile.email}`;
+            await supabase
+              .from('hotels')
+              .insert({
+                name: hotelName,
+                email: profile.email || user.email,
+                user_id: user.id
+              });
+            
+            console.log('✅ Hôtel créé automatiquement:', hotelName);
+          }
         }
         
         toast({
           title: "Plan gratuit activé",
-          description: "Vous pouvez maintenant utiliser les fonctionnalités de base."
+          description: "Votre établissement est maintenant configuré !"
         });
         
         onPlanSelected(plan);
