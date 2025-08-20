@@ -26,13 +26,16 @@ export interface CleaningConfig {
   maxRoomsPerHousekeeper: number;
 }
 
-// Default configuration
-export const defaultCleaningConfig: CleaningConfig = {
+// Default configuration - dynamically adjusted based on subscription
+export const getDefaultCleaningConfig = (isPremium: boolean = false): CleaningConfig => ({
   fullCleaningTime: 30,
   quickCleaningTime: 15,
-  minRoomsPerHousekeeper: 10,
-  maxRoomsPerHousekeeper: 18
-};
+  minRoomsPerHousekeeper: isPremium ? 15 : 10,
+  maxRoomsPerHousekeeper: isPremium ? 50 : 18
+});
+
+// Legacy export for backward compatibility
+export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(false);
 
 // Process PDF file
 export async function processPdf(file: File): Promise<Room[]> {
