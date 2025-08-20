@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminRole } from '@/hooks/use-admin-role';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,12 +13,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Shield } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { SubscriptionBadge } from './SubscriptionBadge';
 
 const UserMenu = () => {
   const { user, signOut, isAuthenticated } = useAuth();
   const { isSuperAdmin } = useAdminRole();
+  const { plan, subscribed, isPremium } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -39,18 +42,30 @@ const UserMenu = () => {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>{userInitials}</AvatarFallback>
+          <Avatar className={`h-8 w-8 ${isPremium ? 'ring-2 ring-premium/50' : ''}`}>
+            <AvatarFallback className={isPremium ? 'bg-gradient-premium text-premium-foreground' : ''}>
+              {userInitials}
+            </AvatarFallback>
           </Avatar>
+          {isPremium && (
+            <Crown className="absolute -top-1 -right-1 h-3 w-3 text-premium" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">Mon compte</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
-            </p>
+          <div className="flex flex-col space-y-2">
+            <div>
+              <p className="text-sm font-medium leading-none">Mon compte</p>
+              <p className="text-xs leading-none text-muted-foreground">
+                {user.email}
+              </p>
+            </div>
+            <SubscriptionBadge 
+              plan={plan}
+              subscribed={subscribed}
+              size="sm"
+            />
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

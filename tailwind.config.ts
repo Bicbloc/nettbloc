@@ -67,11 +67,22 @@ const config = {
           },
           border: "hsl(var(--sidebar-border))",
         },
+        premium: {
+          DEFAULT: "hsl(var(--premium))",
+          foreground: "hsl(var(--premium-foreground))",
+          light: "hsl(var(--premium-light))",
+        },
+        freemium: {
+          DEFAULT: "hsl(var(--freemium))",
+          foreground: "hsl(var(--freemium-foreground))",
+        },
       },
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',
         'gradient-secondary': 'var(--gradient-secondary)',
         'gradient-accent': 'var(--gradient-accent)',
+        'gradient-premium': 'var(--gradient-premium)',
+        'gradient-freemium': 'var(--gradient-freemium)',
       },
       boxShadow: {
         'modern-sm': 'var(--shadow-sm)',

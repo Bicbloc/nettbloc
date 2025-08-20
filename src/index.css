@@ -41,6 +41,17 @@
     --gradient-secondary: linear-gradient(135deg, hsl(240, 4.8%, 95.9%) 0%, hsl(0, 0%, 100%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(142, 76%, 73%) 0%, hsl(47, 96%, 89%) 100%);
     
+    /* Premium/Freemium colors */
+    --premium: 45 93% 47%; /* Gold */
+    --premium-foreground: 0 0% 0%;
+    --premium-light: 48 96% 89%;
+    --freemium: 240 4.8% 95.9%; /* Muted */
+    --freemium-foreground: 240 5.9% 10%;
+    
+    /* Premium gradients */
+    --gradient-premium: linear-gradient(135deg, hsl(45, 93%, 47%) 0%, hsl(43, 89%, 38%) 100%);
+    --gradient-freemium: linear-gradient(135deg, hsl(240, 4.8%, 95.9%) 0%, hsl(240, 5.9%, 90%) 100%);
+    
     /* Modern shadows */
     --shadow-sm: 0 1px 2px 0 hsl(240 5.9% 10% / 0.05);
     --shadow: 0 1px 3px 0 hsl(240 5.9% 10% / 0.1), 0 1px 2px -1px hsl(240 5.9% 10% / 0.1);
@@ -86,6 +97,17 @@
     --gradient-primary: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(197, 71%, 73%) 100%);
     --gradient-secondary: linear-gradient(135deg, hsl(240, 3.7%, 15.9%) 0%, hsl(240, 10%, 3.9%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(142, 76%, 73%) 0%, hsl(47, 96%, 89%) 100%);
+    
+    /* Premium/Freemium colors for dark mode */
+    --premium: 45 93% 47%; /* Gold - same in dark mode */
+    --premium-foreground: 240 10% 3.9%;
+    --premium-light: 48 96% 89%;
+    --freemium: 240 3.7% 15.9%; /* Dark muted */
+    --freemium-foreground: 0 0% 98%;
+    
+    /* Premium gradients for dark mode */
+    --gradient-premium: linear-gradient(135deg, hsl(45, 93%, 47%) 0%, hsl(43, 89%, 38%) 100%);
+    --gradient-freemium: linear-gradient(135deg, hsl(240, 3.7%, 15.9%) 0%, hsl(240, 10%, 3.9%) 100%);
     
     /* Dark mode shadows */
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
