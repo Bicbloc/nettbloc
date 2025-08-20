@@ -167,8 +167,10 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         if (sessionData && !sessionError) {
           setCurrentHotelSession({
             ...sessionData,
-            hotel: Array.isArray(sessionData.hotels) ? sessionData.hotels[0] : sessionData.hotels
-          });
+            hotel: Array.isArray(sessionData.hotels) ? sessionData.hotels[0] : sessionData.hotels,
+            started_at: sessionData.started_at || sessionData.created_at,
+            rooms_cleaned_today: sessionData.rooms_cleaned_today || 0
+          } as HotelSession);
         }
       }
     } catch (error) {
@@ -318,8 +320,10 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
 
         const hotelSession: HotelSession = {
           ...newSession,
-          hotel: Array.isArray(newSession.hotels) ? newSession.hotels[0] : newSession.hotels
-        };
+          hotel: Array.isArray(newSession.hotels) ? newSession.hotels[0] : newSession.hotels,
+          started_at: newSession.started_at || newSession.created_at,
+          rooms_cleaned_today: newSession.rooms_cleaned_today || 0
+        } as HotelSession;
 
         setCurrentHotelSession(hotelSession);
         

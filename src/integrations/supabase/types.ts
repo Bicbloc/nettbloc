@@ -160,6 +160,56 @@ export type Database = {
           },
         ]
       }
+      daily_reports: {
+        Row: {
+          created_at: string | null
+          hotel_id: string | null
+          housekeeper_id: string | null
+          id: string
+          notes: string | null
+          report_date: string
+          room_data: Json | null
+          summary: Json | null
+          total_hours_worked: number | null
+          total_rooms_cleaned: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hotel_id?: string | null
+          housekeeper_id?: string | null
+          id?: string
+          notes?: string | null
+          report_date?: string
+          room_data?: Json | null
+          summary?: Json | null
+          total_hours_worked?: number | null
+          total_rooms_cleaned?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hotel_id?: string | null
+          housekeeper_id?: string | null
+          id?: string
+          notes?: string | null
+          report_date?: string
+          room_data?: Json | null
+          summary?: Json | null
+          total_hours_worked?: number | null
+          total_rooms_cleaned?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_access_sessions: {
         Row: {
           access_code: string
@@ -173,7 +223,9 @@ export type Database = {
           housekeeper_profile_id: string | null
           id: string
           is_active: boolean | null
+          rooms_cleaned_today: number | null
           session_token: string | null
+          started_at: string | null
         }
         Insert: {
           access_code: string
@@ -187,7 +239,9 @@ export type Database = {
           housekeeper_profile_id?: string | null
           id?: string
           is_active?: boolean | null
+          rooms_cleaned_today?: number | null
           session_token?: string | null
+          started_at?: string | null
         }
         Update: {
           access_code?: string
@@ -201,7 +255,9 @@ export type Database = {
           housekeeper_profile_id?: string | null
           id?: string
           is_active?: boolean | null
+          rooms_cleaned_today?: number | null
           session_token?: string | null
+          started_at?: string | null
         }
         Relationships: [
           {
@@ -264,6 +320,50 @@ export type Database = {
           },
         ]
       }
+      hotel_users: {
+        Row: {
+          created_at: string | null
+          hotel_id: string | null
+          id: string
+          invited_by: string | null
+          joined_at: string | null
+          permissions: Json | null
+          role: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hotel_id?: string | null
+          id?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          permissions?: Json | null
+          role?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hotel_id?: string | null
+          id?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          permissions?: Json | null
+          role?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_users_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotels: {
         Row: {
           address: string | null
@@ -312,6 +412,7 @@ export type Database = {
           hotel_id: string | null
           housekeeper_id: string | null
           id: string
+          invitation_sent_at: string | null
           invited_email: string | null
           invited_name: string | null
           is_active: boolean | null
@@ -326,6 +427,7 @@ export type Database = {
           hotel_id?: string | null
           housekeeper_id?: string | null
           id?: string
+          invitation_sent_at?: string | null
           invited_email?: string | null
           invited_name?: string | null
           is_active?: boolean | null
@@ -340,6 +442,7 @@ export type Database = {
           hotel_id?: string | null
           housekeeper_id?: string | null
           id?: string
+          invitation_sent_at?: string | null
           invited_email?: string | null
           invited_name?: string | null
           is_active?: boolean | null

@@ -166,7 +166,7 @@ export class HotelSessionService {
         return null;
       }
 
-      return this.transformSession(data as HotelSessionRaw);
+      return this.transformSession(data as unknown as HotelSessionRaw);
     } catch (err) {
       console.error('Erreur getSession:', err);
       return null;
@@ -339,7 +339,7 @@ export class HotelSessionService {
         return [];
       }
 
-      return data?.map(session => this.transformSession(session as HotelSessionRaw)) || [];
+      return data?.map(session => this.transformSession(session as unknown as HotelSessionRaw)) || [];
     } catch (err) {
       console.error('Erreur getActiveSessions:', err);
       return [];

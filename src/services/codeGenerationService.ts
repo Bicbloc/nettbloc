@@ -95,22 +95,23 @@ export class CodeGenerationService {
       if (sessionsError) throw sessionsError;
 
       for (const session of sessions || []) {
+        const sessionAny = session as any;
         try {
-          if (!Array.isArray(session.housekeeper_names) || session.housekeeper_names.length === 0) {
+          if (!Array.isArray(sessionAny.housekeeper_names) || sessionAny.housekeeper_names.length === 0) {
             continue;
           }
 
-          const hotelCode = (session.hotels as any)?.hotel_code || 'HTL';
+          const hotelCode = sessionAny.hotels?.hotel_code || 'HTL';
           
           // Vérifier les femmes de chambre existantes pour cet hôtel
           const { data: existingHousekeepers } = await supabase
             .from('housekeepers')
             .select('name')
-            .eq('hotel_id', session.hotel_id)
+            .eq('hotel_id', sessionAny.hotel_id)
             .eq('is_active', true);
 
           const existingNames = existingHousekeepers?.map(h => h.name) || [];
-          const newHousekeepers = (session.housekeeper_names as string[]).filter(name => !existingNames.includes(name));
+          const newHousekeepers = (sessionAny.housekeeper_names as string[]).filter(name => !existingNames.includes(name));
 
           // Créer les nouvelles femmes de chambre
           for (const name of newHousekeepers) {
@@ -127,7 +128,7 @@ export class CodeGenerationService {
               const { data: housekeeper, error: housekeeperError } = await supabase
                 .from('housekeepers')
                 .insert({
-                  hotel_id: session.hotel_id as string,
+                  hotel_id: sessionAny.hotel_id,
                   name: name,
                   access_code: accessCode,
                   user_id: user.id
@@ -141,7 +142,7 @@ export class CodeGenerationService {
               const { error: codeError } = await supabase
                 .from('housekeeper_access_codes')
                 .insert({
-                  hotel_id: session.hotel_id as string,
+                  hotel_id: sessionAny.hotel_id,
                   housekeeper_id: housekeeper.id,
                   access_code: accessCode,
                   created_by: null
@@ -159,8 +160,8 @@ export class CodeGenerationService {
             }
           }
           
-        } catch (error) {
-          const errorMsg = `Erreur session ${session.id}: ${error.message}`;
+        } catch (error: any) {
+          const errorMsg = `Erreur session ${sessionAny.id}: ${error.message}`;
           results.errors.push(errorMsg);
           console.error('❌', errorMsg);
         }

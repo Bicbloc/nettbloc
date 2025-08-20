@@ -7,11 +7,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface UpgradeButtonProps {
   variant?: 'default' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'default' | 'lg';
   className?: string;
 }
 
-export function UpgradeButton({ variant = 'default', size = 'md', className }: UpgradeButtonProps) {
+export function UpgradeButton({ variant = 'default', size = 'default', className }: UpgradeButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
