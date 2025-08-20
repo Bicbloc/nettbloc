@@ -27,19 +27,31 @@ export function useSubscription() {
       // First check local profile data
       const { data: profile } = await supabase
         .from('profiles')
-        .select('plan')
+        .select('plan, subscription_type')
         .eq('id', user.id)
         .single();
 
-      if (profile?.plan === 'premium') {
+      // Check both plan and subscription_type fields for premium status
+      const isPremiumInProfile = profile?.plan === 'premium' || profile?.subscription_type === 'premium';
+
+      if (isPremiumInProfile) {
         // If premium in profile, check with Stripe to make sure it's still active
         const { data, error } = await supabase.functions.invoke('check-subscription');
         
-        if (error) throw error;
+        if (error) {
+          console.warn('Stripe check failed, using profile data:', error);
+          // Fallback to profile data if Stripe check fails
+          setSubscription({
+            plan: 'premium',
+            subscribed: true,
+            loading: false
+          });
+          return;
+        }
 
         setSubscription({
-          plan: data.plan || 'free',
-          subscribed: data.subscribed || false,
+          plan: data.plan || 'premium',
+          subscribed: data.subscribed !== false, // Default to true if not explicitly false
           subscription_end: data.subscription_end,
           loading: false
         });
