@@ -33,6 +33,41 @@ export const HousekeeperManagement = () => {
   const { housekeeperNames, setHousekeeperNames, refreshHousekeepers } = useHousekeeping();
   const { generateAccessCodesBatch, isProcessing } = useOptimizedSync();
 
+  // Filtrage et recherche optimisés - DOIT être avant le return conditionnel
+  const filteredHousekeepers = useMemo(() => {
+    if (!searchTerm.trim()) return housekeepers;
+    
+    const term = searchTerm.toLowerCase();
+    return housekeepers.filter(h => 
+      h.name.toLowerCase().includes(term) ||
+      h.access_code.toLowerCase().includes(term)
+    );
+  }, [housekeepers, searchTerm]);
+
+  const assignedHousekeepers = useMemo(() => 
+    filteredHousekeepers.filter(h => 
+      h.is_active && housekeeperNames.includes(h.name)
+    ), [filteredHousekeepers, housekeeperNames]
+  );
+
+  const inactiveHousekeepers = useMemo(() => 
+    filteredHousekeepers.filter(h => !h.is_active), 
+    [filteredHousekeepers]
+  );
+
+  const hasHousekeepers = housekeepers.length > 0;
+
+  // Suggestions pour éviter les doublons
+  const existingNames = housekeepers.map(h => h.name.toLowerCase());
+  const suggestedNames = useMemo(() => {
+    if (!newHousekeeperName.trim()) return [];
+    
+    const input = newHousekeeperName.toLowerCase();
+    return existingNames
+      .filter(name => name.includes(input) && name !== input)
+      .slice(0, 3);
+  }, [newHousekeeperName, existingNames]);
+
   useEffect(() => {
     if (hotel?.id) {
       loadHousekeepers();
@@ -250,34 +285,6 @@ export const HousekeeperManagement = () => {
       </Card>
     );
   }
-
-  // Filtrage et recherche optimisés
-  const filteredHousekeepers = useMemo(() => {
-    if (!searchTerm.trim()) return housekeepers;
-    
-    const term = searchTerm.toLowerCase();
-    return housekeepers.filter(h => 
-      h.name.toLowerCase().includes(term) ||
-      h.access_code.toLowerCase().includes(term)
-    );
-  }, [housekeepers, searchTerm]);
-
-  const assignedHousekeepers = filteredHousekeepers.filter(h => 
-    h.is_active && housekeeperNames.includes(h.name)
-  );
-  const inactiveHousekeepers = filteredHousekeepers.filter(h => !h.is_active);
-  const hasHousekeepers = housekeepers.length > 0;
-
-  // Suggestions pour éviter les doublons
-  const existingNames = housekeepers.map(h => h.name.toLowerCase());
-  const suggestedNames = useMemo(() => {
-    if (!newHousekeeperName.trim()) return [];
-    
-    const input = newHousekeeperName.toLowerCase();
-    return existingNames
-      .filter(name => name.includes(input) && name !== input)
-      .slice(0, 3);
-  }, [newHousekeeperName, existingNames]);
 
   return (
     <div className="space-y-6">
