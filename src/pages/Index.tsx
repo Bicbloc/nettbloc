@@ -1329,24 +1329,51 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     <>
       <div className="flex min-h-screen flex-col bg-slate-50">
       <div className="container mx-auto py-6">
-        {/* Header avec navigation et authentification */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Building className="h-8 w-8 text-primary" />
-              NettoBloc
-              {isGuestMode && (
-                <Badge variant="outline" className="ml-2">
-                  Mode Invité
-                </Badge>
-              )}
-            </h1>
-            {hotel && (
-              <div className="text-sm text-muted-foreground mt-1">
-                <strong>Hôtel:</strong> {hotel.name} | <strong>ID:</strong> <code className="bg-muted px-1 rounded">{hotel.hotel_code}</code>
-              </div>
-            )}
-          </div>
+         {/* Header avec navigation et authentification */}
+         <div className="flex justify-between items-center mb-6">
+           <div>
+             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+               <Building className="h-8 w-8 text-primary" />
+               NettoBloc
+               {isGuestMode && (
+                 <Badge variant="outline" className="ml-2">
+                   Mode Invité
+                 </Badge>
+               )}
+               {/* Badge de plan avec boutons d'upgrade/downgrade */}
+               {!subscriptionLoading && isAuthenticated && (
+                 <div className="flex items-center gap-2 ml-4">
+                   <Badge 
+                     variant={isPremium ? "default" : "secondary"}
+                     className={isPremium 
+                       ? "bg-gradient-premium text-premium-foreground border-premium/20" 
+                       : "bg-gradient-freemium text-freemium-foreground border-freemium/20"
+                     }
+                   >
+                     {isPremium ? "Premium" : "Freemium"}
+                   </Badge>
+                   {isFree && (
+                     <UpgradeButton 
+                       variant="outline" 
+                       size="sm"
+                       className="h-7 px-3 text-xs border-premium/30 hover:bg-premium/5" 
+                     />
+                   )}
+                 </div>
+               )}
+             </h1>
+             {hotel && (
+               <div className="text-sm text-muted-foreground mt-1">
+                 <strong>Hôtel:</strong> {hotel.name} | <strong>ID:</strong> <code className="bg-muted px-1 rounded">{hotel.hotel_code}</code>
+                 {/* Affichage des limites pour les comptes freemium */}
+                 {isFree && (
+                   <span className="ml-2 text-amber-600 font-medium">
+                     • Limité à 5 femmes de chambre
+                   </span>
+                 )}
+               </div>
+             )}
+           </div>
           
            <div className="flex items-center space-x-4">
              {!isAuthenticated && !isGuestMode && (

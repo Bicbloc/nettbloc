@@ -157,7 +157,8 @@ export const useAutoSetup = () => {
             .insert({
               name: hotelName,
               email: user.email,
-              user_id: user.id
+              user_id: user.id,
+              hotel_code: null // Le trigger auto_generate_hotel_code() va générer automatiquement
             })
             .select()
             .single();
@@ -168,6 +169,39 @@ export const useAutoSetup = () => {
           }
           hotelData = newHotel;
           console.log('✅ Hôtel créé automatiquement:', hotelData);
+          
+          // Vérifier que le hotel_code a été généré par le trigger
+          if (!hotelData.hotel_code) {
+            console.warn('⚠️ hotel_code manquant après création, tentative de récupération...');
+            // Attendre un peu pour le trigger
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const { data: refreshedHotel } = await supabase
+              .from('hotels')
+              .select('*')
+              .eq('id', hotelData.id)
+              .single();
+            
+            if (refreshedHotel?.hotel_code) {
+              hotelData = refreshedHotel;
+              console.log('✅ Hotel code récupéré après refresh:', refreshedHotel.hotel_code);
+            } else {
+              console.error('❌ Hotel code toujours manquant, génération manuelle...');
+              // Fallback: génération manuelle du code si le trigger a échoué
+              const manualCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+              const { data: updatedHotel } = await supabase
+                .from('hotels')
+                .update({ hotel_code: manualCode })
+                .eq('id', hotelData.id)
+                .select()
+                .single();
+              
+              if (updatedHotel) {
+                hotelData = updatedHotel;
+                console.log('✅ Hotel code généré manuellement:', manualCode);
+              }
+            }
+          }
         }
 
         // Phase 5: Finaliser le setup avec les données trouvées/créées
