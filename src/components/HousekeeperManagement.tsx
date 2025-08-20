@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { UserIcon, Plus, Key, Trash2, RefreshCw, AlertTriangle, CheckCircle, Users } from 'lucide-react';
+import { UserIcon, Plus, Key, Trash2, RefreshCw, AlertTriangle, CheckCircle, Users, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
 import { CodeGenerationService } from '@/services/codeGenerationService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useAutoSetup } from '@/hooks/use-auto-setup';
+import { useOptimizedSync } from '@/hooks/use-optimized-sync';
 
 interface Housekeeper {
   id: string;
@@ -24,11 +25,13 @@ interface Housekeeper {
 export const HousekeeperManagement = () => {
   const [housekeepers, setHousekeepers] = useState<Housekeeper[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingCodes, setIsGeneratingCodes] = useState(false);
   const { toast } = useToast();
   const { hotel, isSetupComplete } = useAutoSetup();
   const { housekeeperNames, setHousekeeperNames, refreshHousekeepers } = useHousekeeping();
+  const { generateAccessCodesBatch, isProcessing } = useOptimizedSync();
 
   useEffect(() => {
     if (hotel?.id) {
@@ -140,15 +143,28 @@ export const HousekeeperManagement = () => {
 
     setIsGeneratingCodes(true);
     try {
-      console.log('🔄 Génération forcée des codes pour toutes les femmes de chambre...');
+      console.log('🔄 Génération optimisée des codes...');
       
-      const results = await CodeGenerationService.forceGenerateAllMissingCodes();
+      // Utiliser la génération par batch optimisée
+      const missingHousekeepers = housekeepers
+        .filter(h => h.is_active && (!h.access_code || h.access_code.trim() === ''))
+        .map(h => h.name);
+
+      if (missingHousekeepers.length === 0) {
+        toast({
+          title: "Aucune action nécessaire",
+          description: "Tous les codes d'accès sont déjà générés."
+        });
+        return;
+      }
+
+      const results = await generateAccessCodesBatch(hotel.id, missingHousekeepers);
       
       if (results.errors.length > 0) {
         toast({
           variant: "destructive",
           title: "Génération avec erreurs",
-          description: `${results.generated} codes générés, ${results.errors.length} erreurs rencontrées.`
+          description: `${results.generated} codes générés, ${results.errors.length} erreurs.`
         });
       } else {
         toast({
@@ -235,12 +251,33 @@ export const HousekeeperManagement = () => {
     );
   }
 
-  // Filtrer uniquement les femmes de chambre assignées à des chambres
-  const assignedHousekeepers = housekeepers.filter(h => 
+  // Filtrage et recherche optimisés
+  const filteredHousekeepers = useMemo(() => {
+    if (!searchTerm.trim()) return housekeepers;
+    
+    const term = searchTerm.toLowerCase();
+    return housekeepers.filter(h => 
+      h.name.toLowerCase().includes(term) ||
+      h.access_code.toLowerCase().includes(term)
+    );
+  }, [housekeepers, searchTerm]);
+
+  const assignedHousekeepers = filteredHousekeepers.filter(h => 
     h.is_active && housekeeperNames.includes(h.name)
   );
-  const inactiveHousekeepers = housekeepers.filter(h => !h.is_active);
+  const inactiveHousekeepers = filteredHousekeepers.filter(h => !h.is_active);
   const hasHousekeepers = housekeepers.length > 0;
+
+  // Suggestions pour éviter les doublons
+  const existingNames = housekeepers.map(h => h.name.toLowerCase());
+  const suggestedNames = useMemo(() => {
+    if (!newHousekeeperName.trim()) return [];
+    
+    const input = newHousekeeperName.toLowerCase();
+    return existingNames
+      .filter(name => name.includes(input) && name !== input)
+      .slice(0, 3);
+  }, [newHousekeeperName, existingNames]);
 
   return (
     <div className="space-y-6">
@@ -253,8 +290,24 @@ export const HousekeeperManagement = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Barre de recherche */}
+          <div className="space-y-2">
+            <Label htmlFor="search">Rechercher une femme de chambre</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search"
+                placeholder="Rechercher par nom ou code d'accès..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          {/* Formulaire d'ajout */}
           <div className="flex gap-2">
-            <div className="flex-1">
+            <div className="flex-1 space-y-2">
               <Label htmlFor="housekeeper-name">Nom de la femme de chambre</Label>
               <Input
                 id="housekeeper-name"
@@ -263,11 +316,30 @@ export const HousekeeperManagement = () => {
                 onChange={(e) => setNewHousekeeperName(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleCreateHousekeeper()}
               />
+              
+              {/* Suggestions pour éviter les doublons */}
+              {suggestedNames.length > 0 && (
+                <div className="text-sm text-amber-600">
+                  <span>⚠️ Noms similaires existants: </span>
+                  {suggestedNames.map((name, i) => (
+                    <span key={name}>
+                      {i > 0 && ', '}
+                      <button
+                        type="button"
+                        className="underline hover:no-underline"
+                        onClick={() => setNewHousekeeperName(name)}
+                      >
+                        {name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex items-end">
               <Button 
                 onClick={handleCreateHousekeeper}
-                disabled={isLoading || !newHousekeeperName.trim()}
+                disabled={isLoading || isProcessing || !newHousekeeperName.trim()}
                 className="flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
@@ -305,11 +377,11 @@ export const HousekeeperManagement = () => {
                 </Button>
                 <Button
                   onClick={handleGenerateAllCodes}
-                  disabled={isGeneratingCodes}
+                  disabled={isGeneratingCodes || isProcessing}
                   className="flex items-center gap-2"
                 >
                   <Key className="h-4 w-4" />
-                  {isGeneratingCodes ? 'Génération...' : 'Forcer génération codes'}
+                  {isGeneratingCodes || isProcessing ? 'Génération optimisée...' : 'Générer codes manquants'}
                 </Button>
                 <Button
                   variant="destructive"

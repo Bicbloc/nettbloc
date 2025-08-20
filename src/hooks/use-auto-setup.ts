@@ -210,14 +210,14 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Timeout très réduit pour une connexion ultra-rapide
+    // Timeout optimisé pour éviter les déconnexions
     const setupTimeout = setTimeout(() => {
       if (loading && hasAttemptedSetup.current) {
         console.warn('⚠️ Timeout setup, forçage completion...');
         setLoading(false);
         setIsSetupComplete(true);
       }
-    }, 1000); // Réduit de 3s à 1s pour une connexion immédiate
+    }, 5000); // Augmenté à 5s pour éviter les timeouts prématurés
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {
