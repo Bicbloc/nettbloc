@@ -10,7 +10,7 @@ import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { ActiveUsersPanel } from "@/components/ActiveUsersPanel";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { ConfigDialog } from "@/components/ConfigDialog";
-import { Room, CleaningConfig, defaultCleaningConfig } from "@/services/pdfService";
+import { Room, CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
 import { Badge } from "@/components/ui/badge";
 import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
@@ -78,7 +78,7 @@ const Index = () => {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState("overview");
-  const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(defaultCleaningConfig);
+  const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   const [showHousekeeperManagement, setShowHousekeeperManagement] = useState(false);
   
   // Vérifier que le contexte est disponible
@@ -123,6 +123,18 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const [availableHotels, setAvailableHotels] = useState<any[]>([]);
   const [selectedHotel, setSelectedHotel] = useState<any | null>(null);
   const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
+
+  // Mettre à jour la configuration selon le statut premium
+  useEffect(() => {
+    if (!subscriptionLoading) {
+      setCleaningConfig(prevConfig => ({
+        ...getDefaultCleaningConfig(isPremium),
+        // Conserver les customisations utilisateur pour les temps si elles existent
+        fullCleaningTime: prevConfig.fullCleaningTime,
+        quickCleaningTime: prevConfig.quickCleaningTime
+      }));
+    }
+  }, [isPremium, subscriptionLoading]);
   const [hotelCode, setHotelCode] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   
@@ -1558,6 +1570,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                     onConfigChange={handleConfigChange}
                     housekeeperNames={housekeeperNames}
                     onHousekeeperNamesChange={handleHousekeeperNamesChange}
+                    isPremium={isPremium}
                   />
                   <Button 
                     onClick={() => {

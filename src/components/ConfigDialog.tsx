@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Settings, MinusSquare, PlusSquare, Edit, Save, X } from "lucide-react";
-import { CleaningConfig, defaultCleaningConfig } from "@/services/pdfService";
+import { CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
 
@@ -28,13 +28,15 @@ interface ConfigDialogProps {
   onConfigChange: (config: CleaningConfig) => void;
   onHousekeeperNamesChange: (names: string[]) => void;
   housekeeperNames: string[];
+  isPremium?: boolean;
 }
 
 export function ConfigDialog({ 
   config, 
   onConfigChange, 
   onHousekeeperNamesChange, 
-  housekeeperNames 
+  housekeeperNames,
+  isPremium = false
 }: ConfigDialogProps) {
   const [open, setOpen] = useState(false);
   const [names, setNames] = useState<string[]>(housekeeperNames);
@@ -50,6 +52,16 @@ export function ConfigDialog({
   const form = useForm<CleaningConfig>({
     defaultValues: config
   });
+
+  // Fonction pour réinitialiser aux valeurs par défaut (tenant compte du statut premium)
+  const resetToDefaults = () => {
+    const defaults = getDefaultCleaningConfig(isPremium);
+    form.reset(defaults);
+    onConfigChange(defaults);
+    toast({
+      description: isPremium ? "Configuration réinitialisée aux valeurs Premium par défaut" : "Configuration réinitialisée aux valeurs par défaut"
+    });
+  };
 
   const handleSubmit = (data: CleaningConfig) => {
     onConfigChange(data);
@@ -218,7 +230,7 @@ export function ConfigDialog({
               name="minRoomsPerHousekeeper"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Minimum de chambres par femme de chambre</FormLabel>
+                  <FormLabel>Minimum de chambres par femme de chambre {isPremium && <span className="text-xs text-premium-foreground bg-premium px-2 py-1 rounded">Premium: jusqu'à 15</span>}</FormLabel>
                   <FormControl>
                     <div className="flex items-center">
                       <Button 
@@ -256,7 +268,7 @@ export function ConfigDialog({
               name="maxRoomsPerHousekeeper"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Maximum de chambres par femme de chambre</FormLabel>
+                  <FormLabel>Maximum de chambres par femme de chambre {isPremium && <span className="text-xs text-premium-foreground bg-premium px-2 py-1 rounded">Premium: jusqu'à 50</span>}</FormLabel>
                   <FormControl>
                     <div className="flex items-center">
                       <Button 
@@ -362,6 +374,9 @@ export function ConfigDialog({
             </div>
             
             <DialogFooter>
+              <Button type="button" variant="outline" onClick={resetToDefaults}>
+                Réinitialiser
+              </Button>
               <Button type="submit">Sauvegarder</Button>
             </DialogFooter>
           </form>
