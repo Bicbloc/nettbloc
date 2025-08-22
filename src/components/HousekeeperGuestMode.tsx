@@ -22,7 +22,7 @@ interface GuestModeProps {
 export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) => {
   const [hotel, setHotel] = useState<any>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [housekeeperName, setHousekeeperName] = useState('');
+  const [managerName, setManagerName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -58,7 +58,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       }
 
       setHotel(codeData.hotels);
-      setHousekeeperName('Mode Invité - Personnel d\'entretien');
+      setManagerName('Client - Mode Distribution');
 
       // Get all rooms from hotel (guest mode = access to all rooms, no assignment needed)
       const { data: roomsData, error: roomsError } = await supabase
@@ -145,8 +145,8 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
           entity_type: 'room',
           entity_id: hotel.id, // Using hotel id as fallback
           activity_type: 'room_status_update',
-          actor_name: housekeeperName,
-          actor_type: 'housekeeper',
+          actor_name: managerName,
+          actor_type: 'manager',
           details: {
             room_number: roomNumber,
             old_status: rooms.find(r => r.number === roomNumber)?.status,
@@ -239,7 +239,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
             {hotel.name}
           </h1>
           <p className="text-muted-foreground">
-            Bonjour {housekeeperName} • Mode Invité • {hotel.address}
+            Bonjour {managerName} • Mode Gestion • {hotel.address}
           </p>
         </div>
         <Button variant="outline" onClick={() => window.location.href = '/housekeeper/auth'}>
@@ -275,7 +275,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         <MobileOptimizedInterface 
           hotelId={hotel.id}
           rooms={rooms}
-          housekeeperName={housekeeperName}
+          housekeeperName={managerName}
           onRoomStatusUpdate={updateRoomStatus}
         />
       </div>
@@ -283,7 +283,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       <div className="hidden sm:block">
         <Card>
           <CardHeader>
-            <CardTitle>Toutes les chambres (Mode invité)</CardTitle>
+            <CardTitle>Gestion des chambres - Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">

@@ -49,37 +49,40 @@ export const AccessCodeRedirect: React.FC = () => {
       console.log('📊 Résultat authentification:', result);
       setAuthResult(result);
 
-      if (result.success && result.hotel && result.user) {
+      if (result.success && result.hotel && result.user && !result.user.is_temporary) {
         toast({
           title: "✅ Code valide",
           description: `Accès autorisé pour ${result.user.name} à ${result.hotel.name}`
         });
 
-        // Redirection vers la page de travail appropriée
-        console.log('🔄 Redirection vers /housekeeper/work...');
+        // Redirection vers la page de travail simplifiée pour femmes de chambre
+        console.log('🔄 Redirection vers /housekeeper/work-simple...');
         
         // Préparer les paramètres de redirection
         const params = new URLSearchParams({
           hotel: result.hotel.id,
           access_code: testCode,
-          name: result.user.name || 'Invité'
+          name: result.user.name || 'Femme de chambre'
         });
 
-        // Rediriger vers la page de travail
-        const workUrl = `/housekeeper/work?${params.toString()}`;
+        // Rediriger vers la page de travail simplifiée
+        const workUrl = `/housekeeper/work-simple?${params.toString()}`;
         console.log('🔗 URL de redirection:', workUrl);
         
         // Utiliser window.location.assign pour forcer la redirection
         window.location.assign(workUrl);
         
-      } else if (result.success && result.hotel && !result.user) {
-        // Code général valide - afficher directement le mode invité
+      } else if (result.success && result.hotel && (!result.user || result.user.is_temporary)) {
+        // Code général valide - rediriger vers le mode client/manager
         toast({
           title: "✅ Code général valide",
-          description: `Accès en mode invité à ${result.hotel.name}`
+          description: `Accès en mode gestion à ${result.hotel.name}`
         });
         
-        setShowGuestMode(true);
+        // Rediriger vers la page de gestion des chambres
+        const guestUrl = `/hotel/guest?code=${testCode}`;
+        console.log('🔗 Redirection vers mode client:', guestUrl);
+        window.location.assign(guestUrl);
         
       } else {
         toast({

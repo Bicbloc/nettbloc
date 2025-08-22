@@ -25,6 +25,8 @@ import Housekeeper from "./pages/Housekeeper";
 import HousekeeperLogin from "./pages/HousekeeperLogin";
 import GuestMode from "./pages/GuestMode";
 import { AccessCodeRedirect } from "./components/AccessCodeRedirect";
+import { HousekeeperGuestMode } from "./components/HousekeeperGuestMode";
+import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
 
 // Components supprimés - plus de header space
 const queryClient = new QueryClient();
@@ -44,7 +46,7 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/guest-mode" element={<GuestMode />} />
-                  <Route path="/hotel/guest" element={<AccessCodeRedirect />} />
+                  <Route path="/hotel/guest" element={<HousekeeperGuestMode accessCode={new URLSearchParams(window.location.search).get('code') || ''} />} />
                   <Route path="/access-test" element={<AccessCodeRedirect />} />
                   <Route path="/plan-selection" element={<PlanSelection />} />
                   <Route path="/success" element={<Success />} />
@@ -59,6 +61,7 @@ const App = () => (
             <Route path="/housekeeper/dashboard" element={<HousekeeperDashboard />} />
             <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
             <Route path="/housekeeper/work" element={<HousekeeperWork />} />
+            <Route path="/housekeeper/work-simple" element={<HousekeeperWorkSimple />} />
                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
