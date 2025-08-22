@@ -7,12 +7,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { HousekeeperTeamManager } from './HousekeeperTeamManager';
 import { HousekeeperStatusDashboard } from './HousekeeperStatusDashboard';
 import { HousekeeperAccessRequests } from './HousekeeperAccessRequests';
+import { AccessCodeQRDisplay } from './AccessCodeQRDisplay';
+import { GeneralAccessCodes } from './GeneralAccessCodes';
+import { NotificationBell } from './NotificationBell';
 import { Hotel, Users } from 'lucide-react';
 
 export const HotelAdminPanel: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [hotel, setHotel] = useState<any>(null);
+  const [accessCodes, setAccessCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,6 +44,17 @@ export const HotelAdminPanel: React.FC = () => {
       }
 
       setHotel(hotelData);
+
+      // Load access codes for QR display
+      if (hotelData) {
+        const { data: codesData } = await supabase
+          .from('housekeeper_access_codes')
+          .select('*')
+          .eq('hotel_id', hotelData.id)
+          .eq('is_active', true);
+        
+        setAccessCodes(codesData || []);
+      }
     } catch (error) {
       console.error('Error in loadHotelData:', error);
     } finally {
@@ -84,9 +99,20 @@ export const HotelAdminPanel: React.FC = () => {
             {hotel.name} ({hotel.hotel_code})
           </p>
         </div>
+        <NotificationBell hotelId={hotel.id} />
       </div>
 
       <div className="grid grid-cols-1 gap-6">
+        {/* Access Codes Display */}
+        <AccessCodeQRDisplay 
+          hotelCode={hotel.hotel_code || ''}
+          accessCodes={accessCodes}
+          hotelName={hotel.name}
+        />
+        
+        {/* General Access Codes */}
+        <GeneralAccessCodes />
+        
         <HousekeeperTeamManager hotelId={hotel.id} />
         <HousekeeperStatusDashboard hotelId={hotel.id} />
         <HousekeeperAccessRequests />

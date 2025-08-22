@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
+import { NotificationBell } from '@/components/NotificationBell';
 import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButton';
 import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
@@ -692,10 +693,13 @@ const Admin = () => {
             <p className="text-muted-foreground">Supervision complète du système</p>
           </div>
         </div>
-        <Button onClick={loadAdminData} variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <Button onClick={loadAdminData} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Tableau de bord principal */}

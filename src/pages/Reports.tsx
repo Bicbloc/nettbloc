@@ -30,6 +30,8 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { NotificationBell } from '@/components/NotificationBell';
+import { EmailDialogWithLimit } from '@/components/EmailDialogWithLimit';
 
 interface DailyReport {
   id: string;
@@ -52,6 +54,8 @@ const Reports = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [selectedReportForDownload, setSelectedReportForDownload] = useState<DailyReport | null>(null);
 
   useEffect(() => {
     loadReports();
@@ -111,15 +115,24 @@ const Reports = () => {
   };
 
   const handleDownloadReport = async (report: DailyReport) => {
+    const roomCount = getTotalRooms(report.room_data);
+    setSelectedReportForDownload(report);
+    setEmailDialogOpen(true);
+  };
+
+  const performDownload = async (email: string) => {
+    if (!selectedReportForDownload) return;
+    
     try {
       // Générer un PDF du rapport (fonctionnalité simplifiée)
       const reportContent = {
-        date: format(parseISO(report.report_date), 'PPP', { locale: fr }),
-        hotel: report.hotel_id,
-        housekeepers: report.housekeeper_names,
-        rooms: report.room_data,
-        assignments: report.housekeeper_assignments,
-        actions: report.action_log
+        date: format(parseISO(selectedReportForDownload.report_date), 'PPP', { locale: fr }),
+        hotel: selectedReportForDownload.hotel_id,
+        housekeepers: selectedReportForDownload.housekeeper_names,
+        rooms: selectedReportForDownload.room_data,
+        assignments: selectedReportForDownload.housekeeper_assignments,
+        actions: selectedReportForDownload.action_log,
+        downloaded_by: email
       };
 
       const jsonContent = JSON.stringify(reportContent, null, 2);
@@ -128,7 +141,7 @@ const Reports = () => {
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `rapport-${report.report_date}.json`;
+      link.download = `rapport-${selectedReportForDownload.report_date}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -137,7 +150,7 @@ const Reports = () => {
 
       toast({
         title: "Rapport téléchargé",
-        description: "Le rapport a été téléchargé au format JSON"
+        description: `Le rapport a été téléchargé au format JSON et envoyé à ${email}`
       });
     } catch (error) {
       console.error('Erreur téléchargement:', error);
@@ -206,14 +219,17 @@ const Reports = () => {
               Consultez et téléchargez vos rapports quotidiens
             </p>
           </div>
-          <Button
-            onClick={loadReports}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Actualiser
-          </Button>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <Button
+              onClick={loadReports}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Actualiser
+            </Button>
+          </div>
         </div>
 
         {/* Filtres et recherche */}
@@ -458,6 +474,20 @@ const Reports = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Email Dialog with Premium Limits */}
+        <EmailDialogWithLimit
+          isOpen={emailDialogOpen}
+          onClose={() => {
+            setEmailDialogOpen(false);
+            setSelectedReportForDownload(null);
+          }}
+          onSubmit={performDownload}
+          title="Téléchargement de rapport"
+          description="Entrez votre email pour recevoir le rapport."
+          roomCount={selectedReportForDownload ? getTotalRooms(selectedReportForDownload.room_data) : 0}
+          maxFreeRooms={50}
+        />
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import { DataDiagnostic } from '@/components/DataDiagnostic';
 import { AccessCodeTester } from '@/components/AccessCodeTester';
 import { CodeAssignmentTest } from '@/components/CodeAssignmentTest';
 import { HousekeeperAuthTester } from '@/components/HousekeeperAuthTester';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface HotelData {
   id: string;
@@ -173,14 +174,17 @@ const Settings = () => {
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <BackButton />
-          <div>
-            <h1 className="text-3xl font-bold">Paramètres</h1>
-            <p className="text-muted-foreground">
-              Configurez votre établissement et vos préférences
-            </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <BackButton />
+            <div>
+              <h1 className="text-3xl font-bold">Paramètres</h1>
+              <p className="text-muted-foreground">
+                Configurez votre établissement et vos préférences
+              </p>
+            </div>
           </div>
+          <NotificationBell hotelId={settings.hotel?.id} />
         </div>
 
         <Tabs defaultValue="hotel" className="space-y-6">

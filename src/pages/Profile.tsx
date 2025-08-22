@@ -13,6 +13,8 @@ import BackButton from '@/components/BackButton';
 import { SubscriptionCard } from '@/components/SubscriptionCard';
 import { SubscriptionBadge } from '@/components/SubscriptionBadge';
 import { useSubscription } from '@/hooks/useSubscription';
+import { NotificationBell } from '@/components/NotificationBell';
+import { PremiumLimitGuard } from '@/components/PremiumLimitGuard';
 
 interface UserProfile {
   id: string;
@@ -153,11 +155,14 @@ const Profile = () => {
               </p>
             </div>
           </div>
-          <SubscriptionBadge 
-            plan={plan}
-            subscribed={subscribed}
-            size="lg"
-          />
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <SubscriptionBadge 
+              plan={plan}
+              subscribed={subscribed}
+              size="lg"
+            />
+          </div>
         </div>
 
         {/* Grid layout pour organiser les sections */}

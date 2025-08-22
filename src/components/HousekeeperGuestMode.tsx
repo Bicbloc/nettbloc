@@ -59,16 +59,35 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       setHotel(codeData.hotels);
       setHousekeeperName((codeData as any).invited_name || 'Invité');
 
-      // Get room assignments (mock data for now - replace with real room assignment logic)
-      const mockRooms: Room[] = [
-        { number: '101', status: 'to_clean', priority: 'normal' },
-        { number: '102', status: 'to_clean', priority: 'high', notes: 'Départ tardif client VIP' },
-        { number: '103', status: 'in_progress', priority: 'normal' },
-        { number: '201', status: 'to_clean', priority: 'urgent', notes: 'Arrivée immédiate' },
-        { number: '202', status: 'completed', priority: 'normal' },
-      ];
+      // Get real room assignments from hotel rooms
+      const { data: roomsData, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('hotel_id', codeData.hotels.id)
+        .order('room_number');
 
-      setRooms(mockRooms);
+      if (roomsError) {
+        console.error('Error loading rooms:', roomsError);
+        // Fallback to mock data if real rooms not available
+        const fallbackRooms: Room[] = [
+          { number: '101', status: 'to_clean', priority: 'normal' },
+          { number: '102', status: 'to_clean', priority: 'high', notes: 'Départ tardif client VIP' }
+        ];
+        setRooms(fallbackRooms);
+      } else {
+        // Convert database rooms to interface format
+        const formattedRooms: Room[] = (roomsData || []).map(room => ({
+          number: room.room_number,
+          status: room.status === 'dirty' ? 'to_clean' : 
+                  room.status === 'in_progress' ? 'in_progress' : 
+                  room.status === 'clean' ? 'completed' : 'to_clean',
+          priority: room.cleaning_priority === 3 ? 'urgent' : 
+                   room.cleaning_priority === 2 ? 'high' : 'normal',
+          notes: room.notes || undefined
+        }));
+        
+        setRooms(formattedRooms);
+      }
     } catch (error) {
       console.error('Error loading guest mode data:', error);
       toast({
@@ -82,16 +101,67 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
   };
 
   const updateRoomStatus = async (roomNumber: string, newStatus: Room['status']) => {
-    setRooms(prev => prev.map(room => 
-      room.number === roomNumber 
-        ? { ...room, status: newStatus }
-        : room
-    ));
+    try {
+      // Update room status in database
+      const dbStatus = newStatus === 'completed' ? 'clean' : 
+                      newStatus === 'in_progress' ? 'in_progress' : 'dirty';
+      
+      const { error } = await supabase
+        .from('rooms')
+        .update({ 
+          status: dbStatus,
+          last_cleaned_at: newStatus === 'completed' ? new Date().toISOString() : null
+        })
+        .eq('hotel_id', hotel.id)
+        .eq('room_number', roomNumber);
 
-    toast({
-      title: "Statut mis à jour",
-      description: `Chambre ${roomNumber} : ${newStatus === 'completed' ? 'terminée' : newStatus === 'in_progress' ? 'en cours' : 'à nettoyer'}`
-    });
+      if (error) {
+        console.error('Error updating room status:', error);
+        toast({
+          title: "Erreur",
+          description: "Impossible de mettre à jour le statut de la chambre",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update local state
+      setRooms(prev => prev.map(room => 
+        room.number === roomNumber 
+          ? { ...room, status: newStatus }
+          : room
+      ));
+
+      // Create activity log
+      await supabase
+        .from('activities')
+        .insert({
+          hotel_id: hotel.id,
+          entity_type: 'room',
+          entity_id: hotel.id, // Using hotel id as fallback
+          activity_type: 'room_status_update',
+          actor_name: housekeeperName,
+          actor_type: 'housekeeper',
+          details: {
+            room_number: roomNumber,
+            old_status: rooms.find(r => r.number === roomNumber)?.status,
+            new_status: newStatus
+          }
+        });
+
+      toast({
+        title: "Statut mis à jour",
+        description: `Chambre ${roomNumber} : ${newStatus === 'completed' ? 'terminée' : newStatus === 'in_progress' ? 'en cours' : 'à nettoyer'}`
+      });
+
+    } catch (error) {
+      console.error('Error updating room status:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la mise à jour",
+        variant: "destructive"
+      });
+    }
   };
 
   const getRoomStatusColor = (status: Room['status']) => {
