@@ -1703,7 +1703,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             </div>
             
             {/* Section Gestion des femmes de chambre */}
-            <HousekeeperManagementEnhanced />
+            <HousekeeperManagementEnhanced 
+              hotelId={(hotel?.id as string) || (currentHotelId as string) || ''}
+            />
           </TabsContent>
 
           <TabsContent value="rooms" className="space-y-6">
