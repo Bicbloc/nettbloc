@@ -314,14 +314,23 @@ export const HousekeeperWorkSimple: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xl font-bold">Chambre {room.room_number}</span>
-                        <Badge className={
-                          room.cleaning_priority === 3 ? 'bg-red-100 text-red-800' :
-                          room.cleaning_priority === 2 ? 'bg-orange-100 text-orange-800' :
-                          'bg-gray-100 text-gray-800'
-                        }>
-                          {room.cleaning_priority === 3 ? 'Urgent' : 
-                           room.cleaning_priority === 2 ? 'Prioritaire' : 'Normal'}
-                        </Badge>
+                         <Badge className={
+                           room.cleaning_priority === 3 ? 'bg-red-100 text-red-800' :
+                           room.cleaning_priority === 2 ? 'bg-orange-100 text-orange-800' :
+                           'bg-gray-100 text-gray-800'
+                         }>
+                           {room.cleaning_priority === 3 ? 'Urgent' : 
+                            room.cleaning_priority === 2 ? 'Prioritaire' : 'Normal'}
+                         </Badge>
+                         <Badge variant="outline" className={
+                           room.status === 'to_clean' || room.status === 'dirty' 
+                             ? 'bg-blue-100 text-blue-800 border-blue-300' 
+                             : 'bg-gray-100 text-gray-800'
+                         }>
+                           {room.status === 'to_clean' || room.status === 'dirty' 
+                             ? '🧹 À blanc' 
+                             : '🛏️ Recouche'}
+                         </Badge>
                       </div>
                       {room.notes && (
                         <p className="text-sm text-muted-foreground mt-1">

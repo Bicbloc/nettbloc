@@ -67,7 +67,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     initializeSession();
   }, []);
 
-  // Synchronisation en temps réel - vérifier les changements toutes les 5 secondes
+  // Synchronisation en temps réel avec persistance - vérifier les changements toutes les 2 secondes
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -75,6 +75,16 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       try {
         const session = await HotelSessionService.getSession();
         if (session) {
+          // Sauvegarder automatiquement les données de session
+          const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
+          SessionPersistenceService.updateSessionData({
+            sessionToken: HotelSessionService.getSessionToken() || '',
+            hotelId: session.hotel_id || '',
+            lastActiveDate: new Date().toISOString(),
+            room_data: session.room_data,
+            housekeeper_assignments: session.housekeeper_assignments
+          });
+
           // Mettre à jour les données si elles ont changé
           setHousekeeperNames(prev => {
             const newNames = session.housekeeper_names || [];
@@ -97,7 +107,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       } catch (error) {
         console.error('Erreur synchronisation:', error);
       }
-    }, 5000); // Vérifier toutes les 5 secondes
+    }, 2000); // Vérifier toutes les 2 secondes pour une meilleure réactivité
 
     return () => clearInterval(interval);
   }, [isInitialized]);
