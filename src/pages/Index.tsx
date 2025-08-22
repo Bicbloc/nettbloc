@@ -1898,6 +1898,34 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 </Button>
               </div>
             </div>
+
+            {/* Message informatif si pas de femmes de chambre */}
+            {housekeeperNames.length === 0 ? (
+              <Card className="border-orange-200 bg-orange-50">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <UserIcon className="h-16 w-16 text-orange-500 mb-4" />
+                  <h3 className="text-xl font-semibold text-orange-800 mb-2">
+                    Aucune femme de chambre configurée
+                  </h3>
+                  <p className="text-orange-700 text-center mb-6 max-w-md">
+                    Pour voir les colonnes de distribution avec les codes d'accès mobile, 
+                    vous devez d'abord créer des femmes de chambre.
+                  </p>
+                  <div className="flex flex-col gap-3 items-center">
+                    <Button 
+                      onClick={() => setActiveTab('access-codes')}
+                      className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2"
+                    >
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      Créer des femmes de chambre
+                    </Button>
+                    <p className="text-sm text-orange-600">
+                      Les codes d'accès mobile s'afficheront ici une fois créées
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="assignment" className="space-y-6">
@@ -1988,10 +2016,23 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   </div>
                   </div>
                   
-                  {/* Grid responsive pour 2 sections en largeur */}
+                  {/* Grid responsive pour 2 sections en largeur avec codes d'accès */}
+                  {housekeeperNames.length > 0 && (
+                    <div className="mb-4">
+                      <Alert className="bg-blue-50 border-blue-200">
+                        <Key className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-blue-800">
+                          <strong>Codes d'accès mobile :</strong> Chaque colonne affiche le code d'accès 
+                          spécifique à chaque femme de chambre pour l'interface mobile.
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
+                  
                   <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-2">
                     {housekeeperNames.map((name) => {
                       const housekeeperRooms = getHousekeeperRooms(name);
+                      const housekeeper = housekeepers.find(h => h.name === name);
                       return (
                         <div key={name} className="min-w-0 w-full">
                           <HousekeeperCard
@@ -2009,7 +2050,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                             maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
                             onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
                             onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
-                            accessCode={housekeepers.find(h => h.name === name)?.access_code || ''}
+                            accessCode={housekeeper?.access_code || ''}
                             housekeeperNames={housekeeperNames}
                             onGenerateAccessCode={handleGenerateAccessCode}
                           />
