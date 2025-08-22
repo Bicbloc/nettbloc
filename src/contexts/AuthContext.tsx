@@ -33,15 +33,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!isMounted) return;
         
+        console.log('🔐 Auth state changed:', { event, session_exists: !!session, user_id: session?.user?.id });
+        
         // Use setTimeout to prevent blocking the auth callback
-        setTimeout(() => {
+        setTimeout(async () => {
           if (isMounted) {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
+            
+            // Test server-side auth immediately after state change
+            if (session?.user) {
+              try {
+                const { data, error } = await supabase.rpc('test_auth_connection');
+                console.log('🔗 Server auth test:', { data, error, user_id: session.user.id });
+              } catch (err) {
+                console.error('❌ Server auth test failed:', err);
+              }
+            }
           }
         }, 0);
       }
@@ -51,10 +63,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const initializeSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('🚀 Initial session:', { session_exists: !!session, user_id: session?.user?.id });
+        
         if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+          
+          // Test server-side auth on initialization
+          if (session?.user) {
+            try {
+              const { data, error } = await supabase.rpc('test_auth_connection');
+              console.log('🔗 Initial server auth test:', { data, error, user_id: session.user.id });
+            } catch (err) {
+              console.error('❌ Initial server auth test failed:', err);
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to get session:', error);
@@ -69,6 +93,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set timeout fallback
     timeoutId = setTimeout(() => {
       if (isMounted && loading) {
+        console.log('⏰ Auth timeout reached, setting loading to false');
         setLoading(false);
       }
     }, 5000);
