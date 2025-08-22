@@ -1,21 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Crown, Zap, Check, ArrowRight } from 'lucide-react';
 import { UpgradeButton } from '@/components/UpgradeButton';
-import { useSubscription } from '@/hooks/useSubscription';
 import { SubscriptionCard } from '@/components/SubscriptionCard';
 
 const PlanSelection = () => {
   const { isAuthenticated, loading } = useAuth();
   const { plan, isPremium, isFree, loading: subscriptionLoading } = useSubscription();
 
-  // Redirect to auth if not authenticated
+  // Si l'utilisateur n'est pas connecté, rediriger vers auth
   if (!loading && !isAuthenticated) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Si l'utilisateur est déjà premium, rediriger vers l'accueil
+  if (isPremium) {
+    return <Navigate to="/" replace />;
   }
 
   const handleContinueToDashboard = () => {

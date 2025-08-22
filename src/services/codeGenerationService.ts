@@ -113,7 +113,7 @@ export class CodeGenerationService {
   }
 
   /**
-   * Force la génération de codes pour toutes les sessions actives
+   * Force la génération de codes pour toutes les femmes de chambre sans codes
    */
   static async forceGenerateAllMissingCodes(): Promise<{generated: number, errors: string[]}> {
     const results = { generated: 0, errors: [] as string[] };
@@ -124,88 +124,60 @@ export class CodeGenerationService {
       // Nettoyer d'abord les codes orphelins
       await this.cleanupOrphanedCodes();
 
-      // Récupérer toutes les sessions actives avec données de femmes de chambre
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('hotel_sessions')
+      // Récupérer toutes les femmes de chambre actives sans codes d'accès
+      const { data: housekeepersWithoutCodes, error: housekeepersError } = await supabase
+        .from('housekeepers')
         .select(`
           id,
+          name,
           hotel_id,
-          housekeeper_names,
+          access_code,
           hotels!inner(name, hotel_code)
         `)
         .eq('is_active', true)
-        .not('housekeeper_names', 'eq', '[]');
+        .or('access_code.is.null,access_code.eq.');
 
-      if (sessionsError) throw sessionsError;
+      if (housekeepersError) throw housekeepersError;
 
-      for (const session of sessions || []) {
-        const sessionAny = session as any;
+      for (const housekeeper of housekeepersWithoutCodes || []) {
+        const housekeeperAny = housekeeper as any;
         try {
-          if (!Array.isArray(sessionAny.housekeeper_names) || sessionAny.housekeeper_names.length === 0) {
-            continue;
-          }
-
-          const hotelCode = sessionAny.hotels?.hotel_code || 'HTL';
+          const hotelCode = housekeeperAny.hotels?.hotel_code || 'HTL';
           
-          // Vérifier les femmes de chambre existantes pour cet hôtel
-          const { data: existingHousekeepers } = await supabase
+          // Générer un nouveau code d'accès
+          const accessCode = await this.generateUniqueCode(hotelCode, housekeeperAny.name);
+
+          // Mettre à jour la femme de chambre avec le nouveau code
+          const { error: updateError } = await supabase
             .from('housekeepers')
-            .select('name')
-            .eq('hotel_id', sessionAny.hotel_id)
-            .eq('is_active', true);
+            .update({ 
+              access_code: accessCode,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', housekeeperAny.id);
 
-          const existingNames = existingHousekeepers?.map(h => h.name) || [];
-          const newHousekeepers = (sessionAny.housekeeper_names as string[]).filter(name => !existingNames.includes(name));
+          if (updateError) throw updateError;
 
-          // Créer les nouvelles femmes de chambre
-          for (const name of newHousekeepers) {
-            try {
-              const accessCode = await this.generateUniqueCode(hotelCode, name);
+          // Créer ou mettre à jour le code d'accès dans la table dédiée
+          const { error: codeError } = await supabase
+            .from('housekeeper_access_codes')
+            .upsert({
+              hotel_id: housekeeperAny.hotel_id,
+              housekeeper_id: housekeeperAny.id,
+              access_code: accessCode,
+              is_active: true,
+              created_by: (await supabase.auth.getUser()).data.user?.id
+            }, {
+              onConflict: 'hotel_id,housekeeper_id'
+            });
 
-              // Récupérer l'utilisateur pour obtenir user_id
-              const { data: { user } } = await supabase.auth.getUser();
-              if (!user) {
-                throw new Error('Utilisateur non connecté');
-              }
+          if (codeError) throw codeError;
 
-              // Créer la femme de chambre
-              const { data: housekeeper, error: housekeeperError } = await supabase
-                .from('housekeepers')
-                .insert({
-                  hotel_id: sessionAny.hotel_id,
-                  name: name,
-                  access_code: accessCode,
-                  user_id: user.id
-                })
-                .select('id')
-                .single();
-
-              if (housekeeperError) throw housekeeperError;
-
-              // Créer le code d'accès
-              const { error: codeError } = await supabase
-                .from('housekeeper_access_codes')
-                .insert({
-                  hotel_id: sessionAny.hotel_id,
-                  housekeeper_id: housekeeper.id,
-                  access_code: accessCode,
-                  created_by: null
-                });
-
-              if (codeError) throw codeError;
-
-              results.generated++;
-              console.log(`✅ Code généré: ${name} -> ${accessCode}`);
-              
-            } catch (error) {
-              const errorMsg = `Erreur pour ${name}: ${error.message}`;
-              results.errors.push(errorMsg);
-              console.error('❌', errorMsg);
-            }
-          }
+          results.generated++;
+          console.log(`✅ Code généré: ${housekeeperAny.name} -> ${accessCode}`);
           
         } catch (error: any) {
-          const errorMsg = `Erreur session ${sessionAny.id}: ${error.message}`;
+          const errorMsg = `Erreur pour ${housekeeperAny.name}: ${error.message}`;
           results.errors.push(errorMsg);
           console.error('❌', errorMsg);
         }
@@ -213,7 +185,7 @@ export class CodeGenerationService {
 
       console.log(`✅ Génération forcée terminée: ${results.generated} codes générés, ${results.errors.length} erreurs`);
       
-    } catch (error) {
+    } catch (error: any) {
       results.errors.push(`Erreur globale: ${error.message}`);
       console.error('❌ Erreur génération forcée globale:', error);
     }

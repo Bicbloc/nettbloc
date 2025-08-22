@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Room } from '@/services/pdfService';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { HotelSessionService } from '@/services/hotelSessionService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface HousekeepingContextType {
   housekeeperNames: string[];
@@ -166,12 +167,58 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   };
 
-  // Sauvegarder les changements en base de données
+  // Sauvegarder les changements en base de données et créer les femmes de chambre
   useEffect(() => {
     if (isInitialized && housekeeperNames.length > 0) {
       HotelSessionService.updateHousekeeperNames(housekeeperNames);
+      // Créer automatiquement les femmes de chambre dans la base de données
+      syncHousekeepersToDatabase();
     }
   }, [housekeeperNames, isInitialized]);
+
+  // Fonction pour synchroniser les femmes de chambre avec la base de données
+  const syncHousekeepersToDatabase = async () => {
+    if (!hotelId || housekeeperNames.length === 0) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Récupérer les femmes de chambre existantes
+      const { data: existingHousekeepers } = await supabase
+        .from('housekeepers')
+        .select('name')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true);
+
+      const existingNames = existingHousekeepers?.map(h => h.name) || [];
+      const newNames = housekeeperNames.filter(name => !existingNames.includes(name));
+
+      // Créer les nouvelles femmes de chambre avec des codes d'accès temporaires
+      for (const name of newNames) {
+        // Générer un code d'accès temporaire basique
+        const tempCode = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        
+        await supabase
+          .from('housekeepers')
+          .insert({
+            hotel_id: hotelId,
+            name: name,
+            user_id: user.id,
+            is_active: true,
+            access_code: tempCode
+          });
+      }
+
+      if (newNames.length > 0) {
+        console.log(`✅ ${newNames.length} nouvelles femmes de chambre créées dans la base`);
+        // Rafraîchir la liste après création
+        await refreshHousekeepers();
+      }
+    } catch (error) {
+      console.error('❌ Erreur synchronisation femmes de chambre:', error);
+    }
+  };
 
   useEffect(() => {
     if (isInitialized && rooms.length > 0) {
