@@ -3,6 +3,50 @@ import { supabase } from '@/integrations/supabase/client';
 export class CodeGenerationService {
   
   /**
+   * S'assurer que tous les hôtels ont un hotel_code
+   */
+  static async ensureHotelCodesExist(): Promise<number> {
+    try {
+      console.log('🏨 Vérification des codes d\'hôtel...');
+      
+      // Récupérer tous les hôtels sans hotel_code
+      const { data: hotelsWithoutCode, error } = await supabase
+        .from('hotels')
+        .select('id, name')
+        .or('hotel_code.is.null,hotel_code.eq.');
+
+      if (error) throw error;
+
+      let fixed = 0;
+      for (const hotel of hotelsWithoutCode || []) {
+        try {
+          // Générer un nouveau code d'hôtel
+          const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+          
+          const { error: updateError } = await supabase
+            .from('hotels')
+            .update({ hotel_code: hotelCode })
+            .eq('id', hotel.id);
+
+          if (updateError) throw updateError;
+
+          console.log(`✅ Code d'hôtel assigné: ${hotel.name} -> ${hotelCode}`);
+          fixed++;
+        } catch (error) {
+          console.error(`❌ Erreur assignation code pour ${hotel.name}:`, error);
+        }
+      }
+
+      console.log(`✅ ${fixed} codes d'hôtel assignés`);
+      return fixed;
+      
+    } catch (error) {
+      console.error('❌ Erreur ensureHotelCodesExist:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Nettoie les codes d'accès orphelins et les doublons
    */
   static async cleanupOrphanedCodes(): Promise<number> {
