@@ -5,16 +5,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Users, Mail } from 'lucide-react';
+import { Trash2, Plus, Users, Mail, Key, Copy, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { HousekeeperInviteDialog } from './HousekeeperInviteDialog';
+import { AccessCodeManagementService } from '@/services/accessCodeManagementService';
+import { supabase } from '@/integrations/supabase/client';
+
+interface HousekeeperWithCode {
+  id: string;
+  name: string;
+  access_code?: string;
+  is_active: boolean;
+  created_at: string;
+}
 
 interface HousekeeperSetupDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onHousekeepersConfirmed: (housekeepers: string[]) => void;
   initialHousekeepers?: string[];
-  existingHousekeepers?: string[]; // Femmes de chambre déjà créées
+  existingHousekeepers?: string[]; // Femmes de chambre déjà créées (legacy)
   roomCount?: number; // Nombre de chambres pour calculer le nombre recommandé
   hotelId?: string; // Pour les invitations
 }
@@ -39,13 +49,41 @@ export function HousekeeperSetupDialog({
 
   const [housekeepers, setHousekeepers] = useState<string[]>(getDefaultHousekeepers());
   const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
+  const [existingWithCodes, setExistingWithCodes] = useState<HousekeeperWithCode[]>([]);
   const [newHousekeeper, setNewHousekeeper] = useState('');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [visibleCodes, setVisibleCodes] = useState<Set<string>>(new Set());
+  const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
   const { toast } = useToast();
+
+  // Load existing housekeepers with their access codes from database
+  const loadExistingHousekeepers = async () => {
+    if (!hotelId) return;
+    
+    setIsLoadingHousekeepers(true);
+    try {
+      const housekeepersWithCodes = await AccessCodeManagementService.getHousekeepersWithCodes(hotelId);
+      setExistingWithCodes(housekeepersWithCodes);
+    } catch (error) {
+      console.error('Erreur chargement femmes de chambre:', error);
+      // Fallback to legacy existingHousekeepers prop
+      const legacy = existingHousekeepers.map((name, index) => ({
+        id: `legacy-${index}`,
+        name,
+        is_active: true,
+        created_at: new Date().toISOString()
+      }));
+      setExistingWithCodes(legacy);
+    } finally {
+      setIsLoadingHousekeepers(false);
+    }
+  };
 
   // Réinitialiser les données quand le dialog s'ouvre
   useEffect(() => {
     if (isOpen) {
+      loadExistingHousekeepers();
+      
       // Si on a des femmes de chambre existantes, proposer et présélectionner les dernières (limitées au recommandé)
       if (existingHousekeepers.length > 0 && initialHousekeepers.length === 0) {
         const preselected = existingHousekeepers.slice(0, recommendedCount);
@@ -60,8 +98,9 @@ export function HousekeeperSetupDialog({
         setSelectedExisting([]);
       }
       setNewHousekeeper('');
+      setVisibleCodes(new Set());
     }
-  }, [isOpen, roomCount, JSON.stringify(initialHousekeepers), JSON.stringify(existingHousekeepers)]);
+  }, [isOpen, roomCount, JSON.stringify(initialHousekeepers), JSON.stringify(existingHousekeepers), hotelId]);
 
   const toggleExistingHousekeeper = (name: string) => {
     setSelectedExisting(prev => 
@@ -69,6 +108,20 @@ export function HousekeeperSetupDialog({
         ? prev.filter(n => n !== name)
         : [...prev, name]
     );
+  };
+
+  const toggleCodeVisibility = (housekeeperId: string) => {
+    const newVisible = new Set(visibleCodes);
+    if (newVisible.has(housekeeperId)) {
+      newVisible.delete(housekeeperId);
+    } else {
+      newVisible.add(housekeeperId);
+    }
+    setVisibleCodes(newVisible);
+  };
+
+  const formatCode = (code: string, housekeeperId: string) => {
+    return visibleCodes.has(housekeeperId) ? code : '•'.repeat(code.length);
   };
 
   const addHousekeeper = () => {
@@ -168,35 +221,87 @@ export function HousekeeperSetupDialog({
         </DialogHeader>
         
         <div className="space-y-4">
-          {/* Section pour les femmes de chambre existantes */}
-          {existingHousekeepers.length > 0 && (
+          {/* Section pour les femmes de chambre existantes avec codes */}
+          {(existingWithCodes.length > 0 || isLoadingHousekeepers) && (
             <div className="space-y-3">
               <div className="text-sm font-medium text-green-700">
-                ✅ Femmes de chambre existantes disponibles
+                ✅ Femmes de chambre existantes avec codes d'accès
               </div>
-              <div className="space-y-2">
-                {existingHousekeepers.map((name) => (
-                  <div
-                    key={name}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedExisting.includes(name) 
-                        ? 'bg-primary/10 border-primary' 
-                        : 'bg-muted/50 hover:bg-muted'
-                    }`}
-                    onClick={() => toggleExistingHousekeeper(name)}
-                  >
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                      selectedExisting.includes(name) ? 'bg-primary border-primary' : 'border-muted-foreground'
-                    }`}>
-                      {selectedExisting.includes(name) && (
-                        <div className="w-2 h-2 bg-white rounded-full" />
-                      )}
+              
+              {isLoadingHousekeepers ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  Chargement des femmes de chambre...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {existingWithCodes.map((housekeeper) => (
+                    <div
+                      key={housekeeper.id}
+                      className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                        selectedExisting.includes(housekeeper.name) 
+                          ? 'bg-primary/10 border-primary' 
+                          : 'bg-muted/50 hover:bg-muted'
+                      }`}
+                      onClick={() => toggleExistingHousekeeper(housekeeper.name)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                          selectedExisting.includes(housekeeper.name) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                        }`}>
+                          {selectedExisting.includes(housekeeper.name) && (
+                            <div className="w-2 h-2 bg-white rounded-full" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{housekeeper.name}</span>
+                            <Badge variant={housekeeper.is_active ? "default" : "secondary"}>
+                              {housekeeper.is_active ? "Actif" : "Inactif"}
+                            </Badge>
+                          </div>
+                          {housekeeper.access_code && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Key className="h-3 w-3 text-muted-foreground" />
+                              <span className="font-mono text-sm">
+                                {formatCode(housekeeper.access_code, housekeeper.id)}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCodeVisibility(housekeeper.id);
+                                }}
+                                className="p-1 h-6 w-6"
+                              >
+                                {visibleCodes.has(housekeeper.id) ? (
+                                  <EyeOff className="h-3 w-3" />
+                                ) : (
+                                  <Eye className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  AccessCodeManagementService.copyToClipboard(housekeeper.access_code!);
+                                }}
+                                className="p-1 h-6 w-6"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Créé le: {new Date(housekeeper.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <span className="font-medium">{name}</span>
-                    <Badge variant="outline" className="ml-auto">Existante</Badge>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               
               {selectedExisting.length > 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
@@ -209,7 +314,7 @@ export function HousekeeperSetupDialog({
           )}
 
           {/* Séparateur si on a des existantes ET qu'on permet d'ajouter */}
-          {existingHousekeepers.length > 0 && (
+          {existingWithCodes.length > 0 && (
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-border"></div>
               <span className="text-sm text-muted-foreground">ou ajouter nouvelles</span>

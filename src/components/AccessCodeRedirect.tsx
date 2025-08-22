@@ -43,8 +43,13 @@ export const AccessCodeRedirect: React.FC = () => {
     try {
       console.log('🔍 Test du code d\'accès:', testCode);
       
-      // Tester l'authentification avec le code
-      const result = await HousekeeperAuthService.authenticateWithFullCode(testCode);
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      );
+      
+      const authPromise = HousekeeperAuthService.authenticateWithFullCode(testCode);
+      const result = await Promise.race([authPromise, timeoutPromise]) as any;
       
       console.log('📊 Résultat authentification:', result);
       setAuthResult(result);
@@ -55,34 +60,27 @@ export const AccessCodeRedirect: React.FC = () => {
           description: `Accès autorisé pour ${result.user.name} à ${result.hotel.name}`
         });
 
-        // Redirection vers la page de travail simplifiée pour femmes de chambre
-        console.log('🔄 Redirection vers /housekeeper/work-simple...');
-        
-        // Préparer les paramètres de redirection
-        const params = new URLSearchParams({
-          hotel: result.hotel.id,
-          access_code: testCode,
-          name: result.user.name || 'Femme de chambre'
-        });
+        // Small delay to show success message before redirect
+        setTimeout(() => {
+          const params = new URLSearchParams({
+            hotel: result.hotel.id,
+            access_code: testCode,
+            name: result.user.name || 'Femme de chambre'
+          });
 
-        // Rediriger vers la page de travail simplifiée
-        const workUrl = `/housekeeper/work-simple?${params.toString()}`;
-        console.log('🔗 URL de redirection:', workUrl);
-        
-        // Utiliser window.location.assign pour forcer la redirection
-        window.location.assign(workUrl);
+          const workUrl = `/housekeeper/work-simple?${params.toString()}`;
+          console.log('🔗 Redirection vers:', workUrl);
+          window.location.href = workUrl;
+        }, 1000);
         
       } else if (result.success && result.hotel && (!result.user || result.user.is_temporary)) {
-        // Code général valide - rediriger vers le mode client/manager
         toast({
           title: "✅ Code général valide",
           description: `Accès en mode gestion à ${result.hotel.name}`
         });
         
-        // Rediriger vers la page de gestion des chambres
-        const guestUrl = `/hotel/guest?code=${testCode}`;
-        console.log('🔗 Redirection vers mode client:', guestUrl);
-        window.location.assign(guestUrl);
+        // Show guest mode directly instead of redirecting
+        setShowGuestMode(true);
         
       } else {
         toast({
@@ -94,11 +92,19 @@ export const AccessCodeRedirect: React.FC = () => {
 
     } catch (error) {
       console.error('❌ Erreur lors du test:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Erreur lors de la vérification du code"
-      });
+      if (error.message === 'Timeout') {
+        toast({
+          variant: "destructive",
+          title: "Délai d'attente dépassé",
+          description: "La vérification du code prend trop de temps"
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Erreur lors de la vérification du code"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
