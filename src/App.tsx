@@ -23,6 +23,7 @@ import HousekeeperProfile from "./pages/HousekeeperProfile";
 import HousekeeperWork from "./pages/HousekeeperWork";
 import Housekeeper from "./pages/Housekeeper";
 import HousekeeperLogin from "./pages/HousekeeperLogin";
+import GuestMode from "./pages/GuestMode";
 
 // Components supprimés - plus de header space
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/guest-mode" element={<GuestMode />} />
                   <Route path="/plan-selection" element={<PlanSelection />} />
                   <Route path="/success" element={<Success />} />
                   <Route path="/profile" element={<Profile />} />
