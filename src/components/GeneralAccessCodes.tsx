@@ -324,50 +324,55 @@ export const GeneralAccessCodes = () => {
             {showCodes && (
               <div className="space-y-3">
                 {accessCodes.map((codeData) => (
-                  <div key={codeData.id} className="p-4 border rounded-lg bg-primary/5 border-primary/20">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <code className="text-lg font-mono font-bold text-primary bg-background px-3 py-2 rounded border-2 border-primary/20">
-                          {codeData.access_code}
-                        </code>
-                        <div className="text-sm text-muted-foreground">
-                          <Badge variant="secondary" className="mr-2">
-                            Code général
-                          </Badge>
-                          Non assigné - utilisable par toutes les femmes de chambre
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(codeData.access_code)}
-                        className="flex items-center gap-1"
-                      >
-                        <Copy className="h-3 w-3" />
-                        Copier
-                      </Button>
-                    </div>
-                  </div>
+                   <div key={codeData.id} className="p-4 border rounded-lg bg-primary/5 border-primary/20">
+                     <div className="flex items-center justify-between">
+                       <div className="space-y-1">
+                         <code className="text-lg font-mono font-bold text-primary bg-background px-3 py-2 rounded border-2 border-primary/20">
+                           {codeData.access_code}
+                         </code>
+                         <div className="text-sm text-muted-foreground">
+                           <Badge variant="secondary" className="mr-2">
+                             Code général
+                           </Badge>
+                           <Badge variant="outline" className="mr-2 text-green-600">
+                             Mode invité
+                           </Badge>
+                           Utilisable sans assignation spécifique • Créé le {new Date(codeData.created_at).toLocaleDateString('fr-FR')}
+                         </div>
+                       </div>
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => copyToClipboard(codeData.access_code)}
+                         className="flex items-center gap-1"
+                       >
+                         <Copy className="h-3 w-3" />
+                         Copier
+                       </Button>
+                     </div>
+                   </div>
                 ))}
               </div>
             )}
 
             {showCodes && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 font-medium mb-2">
-                  📱 Instructions pour les femmes de chambre :
-                </p>
-                <div className="text-sm text-blue-700 space-y-1">
-                  <p>1. Aller sur l'interface mobile housekepper</p>
-                  <p>2. Choisir "Connexion rapide"</p>
-                  <p>3. Utiliser un des codes ci-dessus</p>
-                  <p className="mt-2">
-                    <strong>OU</strong> connexion en 2 étapes :
-                  </p>
-                  <p>1. Code hôtel: <code className="bg-blue-100 px-2 py-1 rounded font-mono">{currentHotel.hotel_code}</code></p>
-                  <p>2. Puis utiliser un code ci-dessus</p>
-                </div>
-              </div>
+               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                 <p className="text-sm text-blue-800 font-medium mb-2">
+                   📱 Instructions pour les femmes de chambre :
+                 </p>
+                 <div className="text-sm text-blue-700 space-y-1">
+                   <p>1. Rendez-vous sur l'interface de connexion mobile</p>
+                   <p>2. Saisissez le code d'accès général affiché ci-dessus</p>
+                   <p>3. Accédez en mode "invité" sans assignation personnelle</p>
+                   <p>4. Consultez et mettez à jour le statut des chambres</p>
+                   <p>5. Toutes les actions sont enregistrées automatiquement</p>
+                   <div className="mt-3 p-2 bg-green-100 rounded border-l-4 border-green-400">
+                     <p className="text-green-800 text-xs">
+                       <strong>✓ Codes généraux :</strong> Permettent un accès rapide sans configuration préalable d'une femme de chambre spécifique.
+                     </p>
+                   </div>
+                 </div>
+               </div>
             )}
           </>
         )}

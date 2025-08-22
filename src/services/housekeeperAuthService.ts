@@ -247,6 +247,35 @@ export class HousekeeperAuthService {
       }
 
       const housekeeper = accessCodeData.housekeepers;
+      
+      // Handle general access codes (no specific housekeeper assigned)
+      if (!accessCodeData.housekeeper_id) {
+        console.log('✅ Code d\'accès général détecté, création d\'un profil invité');
+        const guestHousekeeper = {
+          id: 'guest-' + accessCodeData.id,
+          name: accessCodeData.invited_name || 'Femme de chambre invitée',
+          hotel_id: hotel.id,
+          user_id: 'guest',
+          is_active: true,
+          access_code: accessCodeData.access_code,
+          is_temporary: true
+        };
+        
+        // Mark code as used
+        await supabase
+          .from('housekeeper_access_codes')
+          .update({ used_at: new Date().toISOString() })
+          .eq('id', accessCodeData.id);
+
+        return {
+          success: true,
+          user: guestHousekeeper,
+          hotel: hotel,
+          debugInfo: { accessCodeData, guestHousekeeper, hotel, isGeneralCode: true }
+        };
+      }
+      
+      // Handle specific housekeeper codes
       if (!housekeeper || !housekeeper.is_active) {
         return {
           success: false,

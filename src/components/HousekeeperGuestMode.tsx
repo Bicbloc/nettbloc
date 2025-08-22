@@ -46,7 +46,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         `)
         .eq('access_code', accessCode)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (!codeData) {
         toast({
@@ -58,7 +58,10 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       }
 
       setHotel(codeData.hotels);
-      setHousekeeperName((codeData as any).invited_name || 'Invité');
+      // Handle general codes vs specific codes
+      const displayName = codeData.invited_name || 
+                          (codeData.housekeeper_id ? 'Femme de chambre' : 'Femme de chambre invitée');
+      setHousekeeperName(displayName);
 
       // Get real room assignments from hotel rooms
       const { data: roomsData, error: roomsError } = await supabase
