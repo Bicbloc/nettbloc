@@ -24,7 +24,7 @@ export const AccessCodeManagement: React.FC<AccessCodeManagementProps> = ({
   const [housekeepers, setHousekeepers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [visibleCodes, setVisibleCodes] = useState<Set<string>>(new Set());
+  const [visibleCodes, setVisibleCodes] = useState<Set<string>>(new Set()); // Start with all codes visible
   const { toast } = useToast();
 
   useEffect(() => {
@@ -95,7 +95,8 @@ export const AccessCodeManagement: React.FC<AccessCodeManagementProps> = ({
   };
 
   const formatCode = (code: string, codeId: string) => {
-    return visibleCodes.has(codeId) ? code : '•'.repeat(code.length);
+    // Show codes by default, hide only if explicitly hidden
+    return visibleCodes.has(codeId) ? '•'.repeat(code.length) : code;
   };
 
   const deactivateCode = async (codeId: string) => {
@@ -214,9 +215,9 @@ export const AccessCodeManagement: React.FC<AccessCodeManagementProps> = ({
                         className="p-1"
                       >
                         {visibleCodes.has(code.id) ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
                           <Eye className="h-4 w-4" />
+                        ) : (
+                          <EyeOff className="h-4 w-4" />
                         )}
                       </Button>
                     </div>

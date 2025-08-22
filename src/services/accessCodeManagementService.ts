@@ -170,11 +170,12 @@ export class AccessCodeManagementService {
   // Get housekeepers with their access codes
   static async getHousekeepersWithCodes(hotelId: string): Promise<any[]> {
     try {
+      // Get all active housekeepers first
       const { data: housekeepers, error } = await supabase
         .from('housekeepers')
         .select(`
           *,
-          housekeeper_access_codes!inner (
+          housekeeper_access_codes (
             access_code,
             is_active,
             created_at,

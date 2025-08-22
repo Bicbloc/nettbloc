@@ -1092,6 +1092,14 @@ export type Database = {
         Args: { p_extension_days: number; p_reason?: string; p_user_id: string }
         Returns: boolean
       }
+      fix_access_code_inconsistencies: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          fixed_housekeepers: number
+          hotel_code: string
+          hotel_name: string
+        }[]
+      }
       generate_hotel_access_code: {
         Args: { hotel_uuid: string }
         Returns: string

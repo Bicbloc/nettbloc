@@ -52,7 +52,7 @@ export function HousekeeperSetupDialog({
   const [existingWithCodes, setExistingWithCodes] = useState<HousekeeperWithCode[]>([]);
   const [newHousekeeper, setNewHousekeeper] = useState('');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [visibleCodes, setVisibleCodes] = useState<Set<string>>(new Set());
+  const [visibleCodes, setVisibleCodes] = useState<Set<string>>(new Set()); // Codes visible by default
   const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
   const { toast } = useToast();
 
@@ -121,7 +121,8 @@ export function HousekeeperSetupDialog({
   };
 
   const formatCode = (code: string, housekeeperId: string) => {
-    return visibleCodes.has(housekeeperId) ? code : '•'.repeat(code.length);
+    // Show codes by default, hide only if explicitly hidden
+    return visibleCodes.has(housekeeperId) ? '•'.repeat(code.length) : code;
   };
 
   const addHousekeeper = () => {
@@ -275,9 +276,9 @@ export function HousekeeperSetupDialog({
                                 className="p-1 h-6 w-6"
                               >
                                 {visibleCodes.has(housekeeper.id) ? (
-                                  <EyeOff className="h-3 w-3" />
-                                ) : (
                                   <Eye className="h-3 w-3" />
+                                ) : (
+                                  <EyeOff className="h-3 w-3" />
                                 )}
                               </Button>
                               <Button
