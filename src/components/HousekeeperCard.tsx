@@ -433,19 +433,28 @@ export function HousekeeperCard({
                     ✏️
                   </Button>
                   {accessCode ? (
-                    <div className="bg-primary/10 px-2 py-1 rounded text-sm font-mono font-bold text-primary">
-                      {accessCode}
+                    <div className="bg-primary/10 px-3 py-2 rounded-lg border border-primary/20">
+                      <div className="flex items-center gap-2">
+                        <Key className="h-4 w-4 text-primary" />
+                        <span className="font-mono font-bold text-primary text-base md:text-sm">
+                          {accessCode}
+                        </span>
+                      </div>
+                      <div className="text-xs text-primary/70 mt-1 md:hidden">
+                        Code d'accès mobile
+                      </div>
                     </div>
                   ) : (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onGenerateAccessCode?.(name)}
-                      className="h-6 px-2 text-xs"
+                      className="h-8 px-3 text-sm md:h-6 md:px-2 md:text-xs"
                       title="Générer un code d'accès"
                     >
-                      <Key className="h-3 w-3 mr-1" />
-                      Code
+                      <Key className="h-4 w-4 mr-1 md:h-3 md:w-3" />
+                      <span className="md:hidden">Générer Code</span>
+                      <span className="hidden md:inline">Code</span>
                     </Button>
                   )}
                 </div>

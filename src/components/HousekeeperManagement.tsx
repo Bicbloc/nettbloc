@@ -419,9 +419,16 @@ export const HousekeeperManagement = () => {
                     <UserIcon className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium">{housekeeper.name}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Key className="h-3 w-3" />
-                        <span className="font-mono">{housekeeper.access_code}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="bg-primary/10 px-2 py-1 rounded border border-primary/20 flex items-center gap-2">
+                          <Key className="h-4 w-4 text-primary" />
+                          <span className="font-mono font-bold text-primary text-base md:text-sm">
+                            {housekeeper.access_code}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground md:hidden">
+                          Mobile
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -462,9 +469,16 @@ export const HousekeeperManagement = () => {
                     <UserIcon className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium text-muted-foreground">{housekeeper.name}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Key className="h-3 w-3" />
-                        <span className="font-mono">{housekeeper.access_code}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="bg-muted px-2 py-1 rounded border flex items-center gap-2">
+                          <Key className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-mono text-muted-foreground text-base md:text-sm">
+                            {housekeeper.access_code}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground md:hidden">
+                          Mobile
+                        </span>
                       </div>
                     </div>
                   </div>
