@@ -73,7 +73,7 @@ export const AccessCodeRedirect: React.FC = () => {
         window.location.assign(workUrl);
         
       } else if (result.success && result.hotel && !result.user) {
-        // Code général valide mais sans utilisateur spécifique
+        // Code général valide - afficher directement le mode invité
         toast({
           title: "✅ Code général valide",
           description: `Accès en mode invité à ${result.hotel.name}`

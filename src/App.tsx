@@ -44,6 +44,7 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/guest-mode" element={<GuestMode />} />
+                  <Route path="/hotel/guest" element={<AccessCodeRedirect />} />
                   <Route path="/access-test" element={<AccessCodeRedirect />} />
                   <Route path="/plan-selection" element={<PlanSelection />} />
                   <Route path="/success" element={<Success />} />

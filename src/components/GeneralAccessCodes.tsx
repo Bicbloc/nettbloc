@@ -21,7 +21,7 @@ export const GeneralAccessCodes = () => {
   const { toast } = useToast();
   const [accessCodes, setAccessCodes] = useState<GeneralAccessCode[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showCodes, setShowCodes] = useState(false);
+  const [showCodes, setShowCodes] = useState(true);
   const [hotelData, setHotelData] = useState<any>(null);
   const [hotelLoading, setHotelLoading] = useState(false); // Pas de chargement visible
 
@@ -200,6 +200,22 @@ export const GeneralAccessCodes = () => {
     });
   };
 
+  const copyDirectLink = (accessCode: string) => {
+    const directLink = `${window.location.origin}/hotel/guest?code=${accessCode}`;
+    navigator.clipboard.writeText(directLink).then(() => {
+      toast({
+        title: "Lien copié !",
+        description: "Lien direct copié dans le presse-papiers"
+      });
+    }).catch(() => {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de copier le lien"
+      });
+    });
+  };
+
   if (!isAuthenticated) {
     return (
       <Card>
@@ -324,15 +340,26 @@ export const GeneralAccessCodes = () => {
                            Utilisable sans assignation spécifique • Créé le {new Date(codeData.created_at).toLocaleDateString('fr-FR')}
                          </div>
                        </div>
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => copyToClipboard(codeData.access_code)}
-                         className="flex items-center gap-1"
-                       >
-                         <Copy className="h-3 w-3" />
-                         Copier
-                       </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(codeData.access_code)}
+                            className="flex items-center gap-1"
+                          >
+                            <Copy className="h-3 w-3" />
+                            Code
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => copyDirectLink(codeData.access_code)}
+                            className="flex items-center gap-1"
+                          >
+                            <Copy className="h-3 w-3" />
+                            Lien
+                          </Button>
+                        </div>
                      </div>
                    </div>
                 ))}

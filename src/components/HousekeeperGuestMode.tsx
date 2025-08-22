@@ -58,12 +58,9 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       }
 
       setHotel(codeData.hotels);
-      // Handle general codes vs specific codes
-      const displayName = codeData.invited_name || 
-                          (codeData.housekeeper_id ? 'Femme de chambre' : 'Femme de chambre invitée');
-      setHousekeeperName(displayName);
+      setHousekeeperName('Mode Invité - Personnel d\'entretien');
 
-      // Get real room assignments from hotel rooms
+      // Get all rooms from hotel (guest mode = access to all rooms, no assignment needed)
       const { data: roomsData, error: roomsError } = await supabase
         .from('rooms')
         .select('*')
@@ -74,8 +71,11 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         console.error('Error loading rooms:', roomsError);
         // Fallback to mock data if real rooms not available
         const fallbackRooms: Room[] = [
-          { number: '101', status: 'to_clean', priority: 'normal' },
-          { number: '102', status: 'to_clean', priority: 'high', notes: 'Départ tardif client VIP' }
+          { number: '101', status: 'to_clean', priority: 'normal', notes: 'Mode invité - données de démonstration' },
+          { number: '102', status: 'to_clean', priority: 'high', notes: 'Départ tardif client VIP' },
+          { number: '103', status: 'to_clean', priority: 'normal' },
+          { number: '201', status: 'to_clean', priority: 'urgent', notes: 'Priorité absolue' },
+          { number: '202', status: 'to_clean', priority: 'normal' }
         ];
         setRooms(fallbackRooms);
       } else {
@@ -90,6 +90,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
           notes: room.notes || undefined
         }));
         
+        console.log('✅ Chambres chargées en mode invité:', formattedRooms.length);
         setRooms(formattedRooms);
       }
     } catch (error) {
@@ -282,7 +283,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       <div className="hidden sm:block">
         <Card>
           <CardHeader>
-            <CardTitle>Chambres assignées</CardTitle>
+            <CardTitle>Toutes les chambres (Mode invité)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
