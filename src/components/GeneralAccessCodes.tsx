@@ -23,7 +23,7 @@ export const GeneralAccessCodes = () => {
   const [loading, setLoading] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
   const [hotelData, setHotelData] = useState<any>(null);
-  const [hotelLoading, setHotelLoading] = useState(true);
+  const [hotelLoading, setHotelLoading] = useState(false); // Pas de chargement visible
 
   // Charger directement les données de l'hôtel pour éviter les dépendances
   useEffect(() => {
@@ -35,7 +35,7 @@ export const GeneralAccessCodes = () => {
   const loadHotelDirectly = async () => {
     if (!user?.id) return;
     
-    setHotelLoading(true);
+    setHotelLoading(false); // Pas de loading visible
     try {
       const { data: hotelResult, error } = await supabase
         .from('hotels')
@@ -212,23 +212,7 @@ export const GeneralAccessCodes = () => {
     );
   }
 
-  if (hotelLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <div className="text-center space-y-4">
-            <RefreshCw className="h-8 w-8 mx-auto animate-spin text-primary" />
-            <div>
-              <p className="text-muted-foreground">Vérification de votre établissement...</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Chargement des informations
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Pas d'écran de chargement - connexion directe
 
   const currentHotel = hotelData || hotel;
   

@@ -28,7 +28,7 @@ export const useAutoSetup = () => {
   const [hotel, setHotel] = useState<HotelData | null>(null);
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Connexion directe sans loading
   const hasAttemptedSetup = useRef(false);
 
   useEffect(() => {
@@ -192,11 +192,11 @@ export const useAutoSetup = () => {
 
         // Phase 5: Finaliser le setup avec les données trouvées/créées
         if (hotelData) {
-          // Mise à jour immédiate des états
+          // Mise à jour immédiate des états - pas de loading visible
           setHotel(hotelData);
           setAccessCode(activeCode);
           setIsSetupComplete(true);
-          setLoading(false); // Arrêter le loading immédiatement
+          setLoading(false);
           
           // Sauvegarde localStorage pour les autres composants
           localStorage.setItem('selectedHotelId', hotelData.id);
@@ -246,14 +246,14 @@ export const useAutoSetup = () => {
       }
     };
 
-    // Timeout optimisé pour éviter les déconnexions
+    // Timeout très court pour éviter les écrans de chargement
     const setupTimeout = setTimeout(() => {
       if (loading && hasAttemptedSetup.current) {
-        console.warn('⚠️ Timeout setup, forçage completion...');
+        console.warn('⚠️ Forçage completion immédiate...');
         setLoading(false);
         setIsSetupComplete(true);
       }
-    }, 5000); // Augmenté à 5s pour éviter les timeouts prématurés
+    }, 100); // 100ms seulement
 
     // Lancer le setup si nécessaire
     if (isAuthenticated && user?.id && !hasAttemptedSetup.current) {

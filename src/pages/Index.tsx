@@ -1489,18 +1489,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           </div>
         </div>
 
-        {/* Statut de setup discret */}
-        <SetupStatusSimple onRetry={() => window.location.reload()} />
-        
         {/* Notification Sound Component - silent background component */}
         <NotificationSound hotelId={hotel?.id} />
-
-        {/* Diagnostic pour les problèmes d'association hôtel uniquement si problème */}
-        {(!hotel || !isSetupComplete || !currentHotelId) && (
-          <div className="mb-6">
-            <HotelSetupFix onForceSetup={() => window.location.reload()} />
-          </div>
-        )}
 
 
         {/* Panneau de notifications global */}
@@ -2098,7 +2088,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           </TabsContent>
 
           <TabsContent value="access-codes" className="space-y-6">
-            <SetupStatusSimple />
             <GeneralAccessCodes key={`general-access-codes-${currentHotelId}`} />
           </TabsContent>
 
