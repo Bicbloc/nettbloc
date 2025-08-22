@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Clock, Home, LogOut } from 'lucide-react';
+import { MobileOptimizedInterface } from './MobileOptimizedInterface';
 
 interface Room {
   number: string;
@@ -149,10 +150,37 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
           }
         });
 
+      // Success notification with sound
+      const successMessage = `Chambre ${roomNumber} : ${newStatus === 'completed' ? 'terminée' : newStatus === 'in_progress' ? 'en cours' : 'à nettoyer'}`;
+      
       toast({
         title: "Statut mis à jour",
-        description: `Chambre ${roomNumber} : ${newStatus === 'completed' ? 'terminée' : newStatus === 'in_progress' ? 'en cours' : 'à nettoyer'}`
+        description: successMessage
       });
+
+      // Play success sound for completed rooms
+      if (newStatus === 'completed') {
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+          oscillator.type = 'sine';
+          
+          gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (audioError) {
+          // Silent fail for audio
+        }
+      }
 
     } catch (error) {
       console.error('Error updating room status:', error);
@@ -238,64 +266,76 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
       </Card>
 
       {/* Room List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Chambres assignées</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
-            {rooms.map(room => (
-              <div
-                key={room.number}
-                className={`p-4 rounded-lg border-2 ${getRoomStatusColor(room.status)}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl font-bold">Chambre {room.number}</span>
-                      <Badge className={getPriorityColor(room.priority)}>
-                        {room.priority === 'urgent' ? 'Urgent' : 
-                         room.priority === 'high' ? 'Prioritaire' : 'Normal'}
-                      </Badge>
-                    </div>
-                    {room.notes && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        📝 {room.notes}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {room.status === 'to_clean' && (
-                      <Button 
-                        onClick={() => updateRoomStatus(room.number, 'in_progress')}
-                        variant="outline"
-                      >
-                        Commencer
-                      </Button>
-                    )}
-                    {room.status === 'in_progress' && (
-                      <Button 
-                        onClick={() => updateRoomStatus(room.number, 'completed')}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Terminer
-                      </Button>
-                    )}
-                    {room.status === 'completed' && (
-                      <div className="flex items-center text-green-600">
-                        <CheckCircle className="h-5 w-5 mr-2" />
-                        Terminée
+      <div className="sm:hidden">
+        {/* Mobile optimized view */}
+        <MobileOptimizedInterface 
+          hotelId={hotel.id}
+          rooms={rooms}
+          housekeeperName={housekeeperName}
+          onRoomStatusUpdate={updateRoomStatus}
+        />
+      </div>
+      
+      <div className="hidden sm:block">
+        <Card>
+          <CardHeader>
+            <CardTitle>Chambres assignées</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              {rooms.map(room => (
+                <div
+                  key={room.number}
+                  className={`p-4 rounded-lg border-2 ${getRoomStatusColor(room.status)}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold">Chambre {room.number}</span>
+                        <Badge className={getPriorityColor(room.priority)}>
+                          {room.priority === 'urgent' ? 'Urgent' : 
+                           room.priority === 'high' ? 'Prioritaire' : 'Normal'}
+                        </Badge>
                       </div>
-                    )}
+                      {room.notes && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          📝 {room.notes}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {room.status === 'to_clean' && (
+                        <Button 
+                          onClick={() => updateRoomStatus(room.number, 'in_progress')}
+                          variant="outline"
+                        >
+                          Commencer
+                        </Button>
+                      )}
+                      {room.status === 'in_progress' && (
+                        <Button 
+                          onClick={() => updateRoomStatus(room.number, 'completed')}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Terminer
+                        </Button>
+                      )}
+                      {room.status === 'completed' && (
+                        <div className="flex items-center text-green-600">
+                          <CheckCircle className="h-5 w-5 mr-2" />
+                          Terminée
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

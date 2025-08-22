@@ -42,6 +42,7 @@ import { RedistributionDialog, RedistributionMethod } from "@/components/Redistr
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
@@ -1481,6 +1482,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       Espace Personnel Femme de Chambre
                     </a>
                   </Button>
+                  <NotificationBell hotelId={hotel?.id} />
                  <UserMenu />
                </>
              )}
@@ -1489,6 +1491,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
 
         {/* Statut de setup discret */}
         <SetupStatusSimple onRetry={() => window.location.reload()} />
+        
+        {/* Notification Sound Component - silent background component */}
+        <NotificationSound hotelId={hotel?.id} />
 
         {/* Diagnostic pour les problèmes d'association hôtel uniquement si problème */}
         {(!hotel || !isSetupComplete || !currentHotelId) && (
