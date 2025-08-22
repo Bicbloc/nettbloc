@@ -22,20 +22,104 @@ export const GeneralAccessCodes = () => {
   const [accessCodes, setAccessCodes] = useState<GeneralAccessCode[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
+  const [hotelData, setHotelData] = useState<any>(null);
+  const [hotelLoading, setHotelLoading] = useState(true);
+
+  // Charger directement les données de l'hôtel pour éviter les dépendances
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      loadHotelDirectly();
+    }
+  }, [isAuthenticated, user?.id]);
+
+  const loadHotelDirectly = async () => {
+    if (!user?.id) return;
+    
+    setHotelLoading(true);
+    try {
+      const { data: hotelResult, error } = await supabase
+        .from('hotels')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Erreur chargement hôtel direct:', error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de charger votre établissement. Vérifiez votre configuration."
+        });
+        return;
+      }
+
+      if (!hotelResult) {
+        console.log('Aucun hôtel trouvé pour cet utilisateur');
+        toast({
+          variant: "destructive", 
+          title: "Établissement manquant",
+          description: "Aucun établissement configuré. Retournez à la page principale pour créer votre hôtel."
+        });
+        return;
+      }
+
+      // Vérifier que l'hôtel a un hotel_code
+      if (!hotelResult.hotel_code) {
+        console.log('Hotel_code manquant, génération automatique...');
+        const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+        
+        const { data: updatedHotel, error: updateError } = await supabase
+          .from('hotels')
+          .update({ hotel_code: hotelCode })
+          .eq('id', hotelResult.id)
+          .select()
+          .single();
+          
+        if (updateError) {
+          console.error('Erreur mise à jour hotel_code:', updateError);
+        } else {
+          hotelResult.hotel_code = hotelCode;
+          console.log('✅ Hotel code généré:', hotelCode);
+        }
+      }
+
+      setHotelData(hotelResult);
+      console.log('✅ Hôtel chargé directement:', hotelResult);
+    } catch (error) {
+      console.error('Erreur loadHotelDirectly:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger votre établissement."
+      });
+    } finally {
+      setHotelLoading(false);
+    }
+  };
 
   useEffect(() => {
-    loadGeneralAccessCodes();
-  }, [hotel?.id]);
+    // Utiliser les données directes ou celles du hook
+    const currentHotel = hotelData || hotel;
+    if (currentHotel?.id) {
+      loadGeneralAccessCodes(currentHotel.id);
+    }
+  }, [hotelData, hotel]);
 
-  const loadGeneralAccessCodes = async () => {
-    if (!hotel?.id) return;
+  const loadGeneralAccessCodes = async (hotelId?: string) => {
+    const targetHotelId = hotelId || hotelData?.id || hotel?.id;
+    if (!targetHotelId) {
+      console.log('Pas d\'ID hôtel disponible pour charger les codes');
+      return;
+    }
     
     try {
+      console.log('🔄 Chargement codes généraux pour hôtel:', targetHotelId);
+      
       // Récupérer uniquement les codes NON assignés à une femme de chambre spécifique
       const { data, error } = await supabase
         .from('housekeeper_access_codes')
         .select('*')
-        .eq('hotel_id', hotel.id)
+        .eq('hotel_id', targetHotelId)
         .eq('is_active', true)
         .is('housekeeper_id', null) // Codes généraux uniquement
         .order('created_at', { ascending: false });
@@ -46,19 +130,29 @@ export const GeneralAccessCodes = () => {
       }
 
       setAccessCodes(data || []);
-      console.log("✅ Codes d'accès généraux chargés:", data);
+      console.log("✅ Codes d'accès généraux chargés:", data?.length, 'codes');
     } catch (error) {
       console.error('Erreur:', error);
     }
   };
 
   const generateNewGeneralCode = async () => {
-    if (!hotel) return;
+    const currentHotel = hotelData || hotel;
+    if (!currentHotel) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Hôtel non configuré. Retournez à la page principale."
+      });
+      return;
+    }
     
     setLoading(true);
     try {
+      console.log('🔑 Génération nouveau code général pour:', currentHotel.id);
+      
       const { data, error } = await supabase.rpc('generate_housekeeper_access_code', {
-        p_hotel_id: hotel.id,
+        p_hotel_id: currentHotel.id,
         p_housekeeper_id: null
       });
 
@@ -66,24 +160,25 @@ export const GeneralAccessCodes = () => {
         console.error('Erreur génération code général:', error);
         toast({
           variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de générer un nouveau code d'accès général"
+          title: "Erreur de génération",
+          description: `Erreur: ${error.message || 'Impossible de générer le code'}`
         });
         return;
       }
 
+      console.log('✅ Code général généré:', data);
       toast({
         title: "Code général généré",
         description: `Nouveau code d'accès: ${data}`
       });
 
-      await loadGeneralAccessCodes();
+      await loadGeneralAccessCodes(currentHotel.id);
     } catch (error: any) {
       console.error('Erreur génération codes généraux:', error);
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de générer un nouveau code d'accès général."
+        description: `Erreur technique: ${error.message || 'Erreur inconnue'}`
       });
     } finally {
       setLoading(false);
@@ -117,16 +212,48 @@ export const GeneralAccessCodes = () => {
     );
   }
 
-  if (!hotel) {
+  if (hotelLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
           <div className="text-center space-y-4">
             <RefreshCw className="h-8 w-8 mx-auto animate-spin text-primary" />
             <div>
-              <p className="text-muted-foreground">Configuration de l'hôtel en cours...</p>
+              <p className="text-muted-foreground">Vérification de votre établissement...</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Chargement des informations de l'établissement
+                Chargement des informations
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const currentHotel = hotelData || hotel;
+  
+  if (!currentHotel) {
+    return (
+      <Card>
+        <CardContent className="text-center py-8">
+          <div className="space-y-4">
+            <p className="text-destructive font-medium">
+              ❌ Impossible de charger votre établissement
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Aucun hôtel configuré pour votre compte.
+            </p>
+            <div className="space-y-2">
+              <Button
+                variant="outline" 
+                onClick={loadHotelDirectly}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Réessayer
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Si le problème persiste, retournez à la page principale pour configurer votre hôtel.
               </p>
             </div>
           </div>
@@ -142,7 +269,7 @@ export const GeneralAccessCodes = () => {
         <CardDescription>
           Codes d'accès généraux pour l'interface mobile - utilisables par n'importe quelle femme de chambre
           <span className="text-sm text-muted-foreground mt-1 block">
-            Hôtel: {hotel.name} ({hotel.hotel_code})
+            Hôtel: {currentHotel.name} ({currentHotel.hotel_code})
           </span>
         </CardDescription>
       </CardHeader>
@@ -237,7 +364,7 @@ export const GeneralAccessCodes = () => {
                   <p className="mt-2">
                     <strong>OU</strong> connexion en 2 étapes :
                   </p>
-                  <p>1. Code hôtel: <code className="bg-blue-100 px-2 py-1 rounded font-mono">{hotel.hotel_code}</code></p>
+                  <p>1. Code hôtel: <code className="bg-blue-100 px-2 py-1 rounded font-mono">{currentHotel.hotel_code}</code></p>
                   <p>2. Puis utiliser un code ci-dessus</p>
                 </div>
               </div>
