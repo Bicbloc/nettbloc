@@ -20,8 +20,7 @@ import { HousekeeperAuthProvider } from "./contexts/HousekeeperAuthContext";
 import HousekeeperAuth from "./pages/HousekeeperAuth";
 import HousekeeperDashboard from "./pages/HousekeeperDashboard";
 import HousekeeperProfile from "./pages/HousekeeperProfile";
-import HousekeeperWork from "./pages/HousekeeperWork";
-import Housekeeper from "./pages/Housekeeper";
+// Removed duplicate housekeeper pages
 import HousekeeperLogin from "./pages/HousekeeperLogin";
 import GuestMode from "./pages/GuestMode";
 import { AccessCodeRedirect } from "./components/AccessCodeRedirect";
@@ -57,10 +56,8 @@ const App = () => (
                    <Route path="/admin" element={<Admin />} />
             <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
             <Route path="/housekeeper/login" element={<HousekeeperLogin />} />
-            <Route path="/housekeeper" element={<Housekeeper />} />
             <Route path="/housekeeper/dashboard" element={<HousekeeperDashboard />} />
             <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
-            <Route path="/housekeeper/work" element={<HousekeeperWork />} />
             <Route path="/housekeeper/work-simple" element={<HousekeeperWorkSimple />} />
                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

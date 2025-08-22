@@ -32,8 +32,20 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
 
   const loadGuestModeData = async () => {
     try {
+      console.log('🔍 Debug: Chargement mode invité avec code:', accessCode);
+      
+      if (!accessCode) {
+        console.error('❌ Aucun code d\'accès fourni');
+        toast({
+          title: "Code manquant",
+          description: "Aucun code d'accès fourni",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Get access code info
-      const { data: codeData } = await supabase
+      const { data: codeData, error: codeError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
           *,
@@ -48,17 +60,41 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         .eq('is_active', true)
         .maybeSingle();
 
-      if (!codeData) {
+      console.log('🔍 Debug: Données code d\'accès:', codeData, 'Erreur:', codeError);
+
+      if (codeError) {
+        console.error('❌ Erreur recherche code:', codeError);
         toast({
-          title: "Code invalide",
-          description: "Code d'accès non trouvé ou expiré",
+          title: "Erreur de recherche",
+          description: "Impossible de vérifier le code d'accès",
           variant: "destructive"
         });
         return;
       }
 
+      if (!codeData || !codeData.hotels) {
+        console.error('❌ Code invalide ou hôtel non trouvé');
+        toast({
+          title: "Code invalide",
+          description: "Code d'accès non trouvé, expiré ou hôtel non configuré",
+          variant: "destructive"
+        });
+        
+        // Show fallback data for debugging
+        const fallbackRooms: Room[] = [
+          { number: '101', status: 'to_clean', priority: 'normal', notes: 'Mode démonstration - Code invalide' },
+          { number: '102', status: 'to_clean', priority: 'high', notes: 'Données de test' },
+          { number: '103', status: 'to_clean', priority: 'normal' }
+        ];
+        setRooms(fallbackRooms);
+        setHotel({ name: 'Hôtel Démonstration', hotel_code: 'DEMO', address: 'Mode test' });
+        setManagerName('Mode Démonstration');
+        return;
+      }
+
+      console.log('✅ Hôtel trouvé:', codeData.hotels.name);
       setHotel(codeData.hotels);
-      setManagerName('Client - Mode Distribution');
+      setManagerName('Mode Invité - Personnel d\'entretien');
 
       // Get all rooms from hotel (guest mode = access to all rooms, no assignment needed)
       const { data: roomsData, error: roomsError } = await supabase
@@ -67,8 +103,10 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         .eq('hotel_id', codeData.hotels.id)
         .order('room_number');
 
+      console.log('🔍 Debug: Chambres trouvées:', roomsData?.length || 0, 'Erreur:', roomsError);
+
       if (roomsError) {
-        console.error('Error loading rooms:', roomsError);
+        console.error('❌ Erreur chargement chambres:', roomsError);
         // Fallback to mock data if real rooms not available
         const fallbackRooms: Room[] = [
           { number: '101', status: 'to_clean', priority: 'normal', notes: 'Mode invité - données de démonstration' },
@@ -77,10 +115,28 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
           { number: '201', status: 'to_clean', priority: 'urgent', notes: 'Priorité absolue' },
           { number: '202', status: 'to_clean', priority: 'normal' }
         ];
+        console.log('⚠️ Utilisation des données de fallback');
         setRooms(fallbackRooms);
+        toast({
+          title: "Données de démonstration",
+          description: "Affichage des données de test car aucune chambre n'est configurée",
+          variant: "default"
+        });
+      } else if (!roomsData || roomsData.length === 0) {
+        console.log('⚠️ Aucune chambre configurée dans l\'hôtel');
+        // No rooms in hotel, show helpful message
+        const emptyStateRooms: Room[] = [
+          { number: 'Aucune chambre', status: 'to_clean', priority: 'normal', notes: 'Aucune chambre configurée dans cet hôtel' }
+        ];
+        setRooms(emptyStateRooms);
+        toast({
+          title: "Aucune chambre",
+          description: "Cet hôtel n'a pas encore de chambres configurées",
+          variant: "default"
+        });
       } else {
         // Convert database rooms to interface format
-        const formattedRooms: Room[] = (roomsData || []).map(room => ({
+        const formattedRooms: Room[] = roomsData.map(room => ({
           number: room.room_number,
           status: room.status === 'dirty' ? 'to_clean' : 
                   room.status === 'in_progress' ? 'in_progress' : 
@@ -92,9 +148,14 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         
         console.log('✅ Chambres chargées en mode invité:', formattedRooms.length);
         setRooms(formattedRooms);
+        toast({
+          title: "Mode invité activé",
+          description: `Accès à ${formattedRooms.length} chambre(s) en mode invité`,
+          variant: "default"
+        });
       }
     } catch (error) {
-      console.error('Error loading guest mode data:', error);
+      console.error('❌ Erreur générale mode invité:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les données",
