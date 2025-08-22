@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Room } from '@/services/pdfService';
+import { SessionPersistenceService } from './sessionPersistenceService';
 
 interface HotelSessionRaw {
   id: string;
@@ -128,9 +129,18 @@ export class HotelSessionService {
         return null;
       }
 
-      // Stocker le token localement
+      // Stocker le token localement et sauvegarder la session
       this.sessionToken = sessionToken;
       localStorage.setItem('hotel_session_token', sessionToken);
+      
+      // Sauvegarder les données de session pour la persistance
+      SessionPersistenceService.saveSessionData({
+        sessionToken: sessionToken,
+        hotelId: finalHotelId || '',
+        lastActiveDate: new Date().toISOString(),
+        room_data: [],
+        housekeeper_assignments: {}
+      });
       
       console.log('Session créée avec hotelId:', finalHotelId);
       return sessionToken;
@@ -192,6 +202,11 @@ export class HotelSessionService {
         return false;
       }
 
+      // Mettre à jour les données de persistance
+      SessionPersistenceService.updateSessionData({
+        room_data: rooms as any[]
+      });
+
       return true;
     } catch (err) {
       console.error('Erreur updateRoomData:', err);
@@ -243,6 +258,11 @@ export class HotelSessionService {
         console.error('Erreur mise à jour assignments:', error);
         return false;
       }
+
+      // Mettre à jour les données de persistance
+      SessionPersistenceService.updateSessionData({
+        housekeeper_assignments: assignments
+      });
 
       return true;
     } catch (err) {
@@ -366,18 +386,8 @@ export class HotelSessionService {
     };
   }
 
-  // Initialiser ou récupérer une session existante
+  // Modifier le service HotelSessionService pour utiliser la persistance
   static async initializeSession(): Promise<string | null> {
-    // Essayer de récupérer une session existante
-    const existingToken = this.getSessionToken();
-    if (existingToken) {
-      const session = await this.getSession(existingToken);
-      if (session) {
-        return existingToken;
-      }
-    }
-
-    // Créer une nouvelle session si aucune n'existe
-    return await this.createSession();
+    return await SessionPersistenceService.restoreOrCreateSession();
   }
 }

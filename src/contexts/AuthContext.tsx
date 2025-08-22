@@ -44,16 +44,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
-            
-            // Test server-side auth immediately after state change
-            if (session?.user) {
-              try {
-                const { data, error } = await supabase.rpc('test_auth_connection');
-                console.log('🔗 Server auth test:', { data, error, user_id: session.user.id });
-              } catch (err) {
-                console.error('❌ Server auth test failed:', err);
-              }
-            }
           }
         }, 0);
       }
@@ -69,16 +59,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
-          
-          // Test server-side auth on initialization
-          if (session?.user) {
-            try {
-              const { data, error } = await supabase.rpc('test_auth_connection');
-              console.log('🔗 Initial server auth test:', { data, error, user_id: session.user.id });
-            } catch (err) {
-              console.error('❌ Initial server auth test failed:', err);
-            }
-          }
         }
       } catch (error) {
         console.error('Failed to get session:', error);

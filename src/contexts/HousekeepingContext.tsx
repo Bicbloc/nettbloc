@@ -44,17 +44,22 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const { notifications, addNotification } = useNotifications(hotelId || undefined);
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
 
-  // Initialiser la session au chargement
+  // Initialiser la session avec persistance et archivage automatique
   useEffect(() => {
     const initializeSession = async () => {
       try {
+        console.log('🏠 Initialisation de la session avec persistance...');
+        // Le service gérera automatiquement:
+        // - La persistance de session même après déconnexion
+        // - L'archivage automatique des rapports si nouveau jour
+        // - La restauration de session du même jour
         const token = await HotelSessionService.initializeSession();
         if (token) {
-          console.log('Session initialisée:', token);
+          console.log('✅ Session initialisée avec persistance:', token);
           await loadSessionData();
         }
       } catch (error) {
-        console.error('Erreur initialisation session:', error);
+        console.error('❌ Erreur initialisation session:', error);
         setIsInitialized(true);
       }
     };
