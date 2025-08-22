@@ -74,6 +74,9 @@ const Index = () => {
   
   // Hook pour la gestion de l'abonnement
   const { plan, isPremium, isFree, canAccessFeature, loading: subscriptionLoading } = useSubscription();
+  
+  // Mode invité : supprimer la plupart des restrictions
+  const isGuestModeUnlocked = isGuestMode;
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
@@ -788,25 +791,79 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     setReportHousekeeper(housekeeperName);
     setReportAction("single");
     
-    if (email && isValid) {
-      // Si l'email est déjà valide, ouvrir le dialog pour les champs personnalisés
-      setIsReportDialogOpen(true);
-    } else {
-      // Sinon, ouvrir la boîte de dialogue pour entrer l'email
-      setIsEmailDialogOpen(true);
+    // Mode invité : seule restriction est les 50 chambres pour les rapports
+    if (isGuestMode) {
+      const roomsToClean = rooms.filter(room => 
+        room.cleaningType !== 'none' && room.status !== 'maintenance'
+      );
+      
+      if (roomsToClean.length > 50) {
+        toast({
+          variant: "destructive",
+          title: "Limite atteinte en mode invité",
+          description: "Passez au Premium pour générer des rapports de plus de 50 chambres."
+        });
+        return;
+      }
     }
+
+    // Pour les utilisateurs connectés, vérifier les limites selon le plan
+    if (isAuthenticated && !isPremium) {
+      const roomsToClean = rooms.filter(room => 
+        room.cleaningType !== 'none' && room.status !== 'maintenance'
+      );
+      
+      if (roomsToClean.length > 50) {
+        toast({
+          variant: "destructive",
+          title: "Limite atteinte",
+          description: "Le plan gratuit est limité à 50 chambres. Passez au Premium pour plus."
+        });
+        return;
+      }
+    }
+
+    // Toujours demander l'email pour le téléchargement du rapport
+    setIsEmailDialogOpen(true);
   };
   
   const handleGenerateAllReports = async () => {
     setReportAction("all");
     
-    if (email && isValid) {
-      // Si l'email est déjà valide, ouvrir le dialog pour les champs personnalisés
-      setIsReportDialogOpen(true);
-    } else {
-      // Sinon, ouvrir la boîte de dialogue pour entrer l'email
-      setIsEmailDialogOpen(true);
+    // Mode invité : seule restriction est les 50 chambres pour les rapports
+    if (isGuestMode) {
+      const roomsToClean = rooms.filter(room => 
+        room.cleaningType !== 'none' && room.status !== 'maintenance'
+      );
+      
+      if (roomsToClean.length > 50) {
+        toast({
+          variant: "destructive",
+          title: "Limite atteinte en mode invité",
+          description: "Passez au Premium pour générer des rapports de plus de 50 chambres."
+        });
+        return;
+      }
     }
+
+    // Pour les utilisateurs connectés, vérifier les limites selon le plan
+    if (isAuthenticated && !isPremium) {
+      const roomsToClean = rooms.filter(room => 
+        room.cleaningType !== 'none' && room.status !== 'maintenance'
+      );
+      
+      if (roomsToClean.length > 50) {
+        toast({
+          variant: "destructive",
+          title: "Limite atteinte",
+          description: "Le plan gratuit est limité à 50 chambres. Passez au Premium pour plus."
+        });
+        return;
+      }
+    }
+
+    // Toujours demander l'email pour le téléchargement du rapport
+    setIsEmailDialogOpen(true);
   };
   
   const totalRooms = rooms.length;

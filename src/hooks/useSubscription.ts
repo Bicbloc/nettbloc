@@ -35,32 +35,45 @@ export function useSubscription() {
       const isPremiumInProfile = profile?.plan === 'premium' || profile?.subscription_type === 'premium';
 
       if (isPremiumInProfile) {
-        // If premium in profile, check with Stripe to make sure it's still active
-        const { data, error } = await supabase.functions.invoke('check-subscription');
-        
-        if (error) {
-          console.warn('Stripe check failed, using profile data:', error);
-          // Fallback to profile data if Stripe check fails
-          setSubscription({
-            plan: 'premium',
-            subscribed: true,
-            loading: false
-          });
-          return;
-        }
-
+        // If premium in profile, use it directly (skip Stripe check to avoid issues)
         setSubscription({
-          plan: data.plan || 'premium',
-          subscribed: data.subscribed !== false, // Default to true if not explicitly false
-          subscription_end: data.subscription_end,
+          plan: 'premium',
+          subscribed: true,
           loading: false
         });
       } else {
-        setSubscription({
-          plan: 'free',
-          subscribed: false,
-          loading: false
-        });
+        // For free users, double-check with Stripe in case of database sync issues
+        try {
+          const { data, error } = await supabase.functions.invoke('check-subscription');
+          
+          if (!error && data?.plan === 'premium' && data?.subscribed) {
+            // Update local profile if Stripe says premium but DB says free
+            await supabase
+              .from('profiles')
+              .update({ plan: 'premium', subscription_type: 'premium' })
+              .eq('id', user.id);
+              
+            setSubscription({
+              plan: 'premium',
+              subscribed: true,
+              subscription_end: data.subscription_end,
+              loading: false
+            });
+          } else {
+            setSubscription({
+              plan: 'free',
+              subscribed: false,
+              loading: false
+            });
+          }
+        } catch (stripeError) {
+          console.warn('Stripe check failed, using profile data:', stripeError);
+          setSubscription({
+            plan: 'free',
+            subscribed: false,
+            loading: false
+          });
+        }
       }
     } catch (error) {
       console.error('Error checking subscription:', error);

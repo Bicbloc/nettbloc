@@ -151,6 +151,7 @@ export const useAutoSetup = () => {
         if (!hotelData) {
           console.log('📝 Création automatique nouvel hôtel...');
           const hotelName = profileData.company_name || `Établissement de ${user.email}`;
+          const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
 
           const { data: newHotel, error: createError } = await supabase
             .from('hotels')
@@ -158,7 +159,7 @@ export const useAutoSetup = () => {
               name: hotelName,
               email: user.email,
               user_id: user.id,
-              hotel_code: null // Le trigger auto_generate_hotel_code() va générer automatiquement
+              hotel_code: hotelCode // Génération directe du code
             })
             .select()
             .single();
@@ -168,39 +169,24 @@ export const useAutoSetup = () => {
             throw createError;
           }
           hotelData = newHotel;
-          console.log('✅ Hôtel créé automatiquement:', hotelData);
+          console.log('✅ Hôtel créé automatiquement avec code:', { hotel: hotelData, code: hotelCode });
+        }
+
+        // Phase 4.5: S'assurer que l'hôtel existant a un hotel_code
+        if (hotelData && !hotelData.hotel_code) {
+          console.log('🔧 Génération hotel_code manquant pour hôtel existant...');
+          const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
           
-          // Vérifier que le hotel_code a été généré par le trigger
-          if (!hotelData.hotel_code) {
-            console.warn('⚠️ hotel_code manquant après création, tentative de récupération...');
-            // Attendre un peu pour le trigger
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            const { data: refreshedHotel } = await supabase
-              .from('hotels')
-              .select('*')
-              .eq('id', hotelData.id)
-              .single();
-            
-            if (refreshedHotel?.hotel_code) {
-              hotelData = refreshedHotel;
-              console.log('✅ Hotel code récupéré après refresh:', refreshedHotel.hotel_code);
-            } else {
-              console.error('❌ Hotel code toujours manquant, génération manuelle...');
-              // Fallback: génération manuelle du code si le trigger a échoué
-              const manualCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
-              const { data: updatedHotel } = await supabase
-                .from('hotels')
-                .update({ hotel_code: manualCode })
-                .eq('id', hotelData.id)
-                .select()
-                .single();
-              
-              if (updatedHotel) {
-                hotelData = updatedHotel;
-                console.log('✅ Hotel code généré manuellement:', manualCode);
-              }
-            }
+          const { data: updatedHotel, error: updateError } = await supabase
+            .from('hotels')
+            .update({ hotel_code: hotelCode })
+            .eq('id', hotelData.id)
+            .select()
+            .single();
+          
+          if (!updateError && updatedHotel) {
+            hotelData = updatedHotel;
+            console.log('✅ Hotel code généré pour hôtel existant:', hotelCode);
           }
         }
 
@@ -224,6 +210,18 @@ export const useAutoSetup = () => {
             hasAccessCode: !!activeCode,
             profileCompanyName: profileData.company_name
           });
+
+          // Génération automatique des codes d'accès si hotel_code est disponible
+          if (hotelData.hotel_code && !activeCode) {
+            console.log('🔑 Génération automatique des codes d\'accès...');
+            try {
+              const { CodeGenerationService } = await import('@/services/codeGenerationService');
+              const results = await CodeGenerationService.forceGenerateAllMissingCodes();
+              console.log('✅ Codes d\'accès générés automatiquement:', results.generated, 'codes générés');
+            } catch (error) {
+              console.warn('⚠️ Génération codes d\'accès échouée:', error);
+            }
+          }
 
           // Ne pas afficher de toast si l'hôtel existait déjà (évite le spam)
           if (!existingHotel) {

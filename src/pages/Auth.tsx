@@ -99,25 +99,20 @@ const Auth = () => {
         description: "Vous êtes maintenant connecté."
       });
       
-      // Vérifier si l'utilisateur a déjà un plan configuré
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('plan, subscription_type')
-          .eq('id', (await supabase.auth.getUser()).data.user?.id)
-          .single();
-        
-        // Si l'utilisateur a déjà un plan, rediriger vers l'accueil
-        if (profile && (profile.plan !== 'free' || profile.subscription_type !== 'free')) {
+        // Vérifier si l'utilisateur a déjà un plan configuré
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('plan, subscription_type')
+            .eq('id', (await supabase.auth.getUser()).data.user?.id)
+            .single();
+          
+          // Toujours rediriger vers l'accueil - plus de sélection de plan forcée
           navigate('/');
-        } else {
-          // Sinon, rediriger vers la sélection de plan
-          navigate('/plan-selection');
+        } catch (error) {
+          // En cas d'erreur, rediriger vers l'accueil aussi
+          navigate('/');
         }
-      } catch (error) {
-        // En cas d'erreur, rediriger vers la sélection de plan par sécurité
-        navigate('/plan-selection');
-      }
     }
     
     setIsLoading(false);

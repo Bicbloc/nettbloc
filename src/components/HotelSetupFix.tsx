@@ -56,26 +56,15 @@ export const HotelSetupFix: React.FC<HotelSetupFixProps> = ({ onForceSetup }) =>
     );
   }
 
-  if (!hotel) {
+  // Ne pas afficher d'erreur si loading ou si l'auto-setup fonctionne
+  if (!hotel && !loading) {
     return (
-      <Card className="w-full max-w-md mx-auto border-destructive">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-destructive" />
-            <CardTitle className="text-destructive">Aucun hôtel trouvé</CardTitle>
-          </div>
-          <CardDescription>
-            Votre compte n'est pas associé à un hôtel.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm">
-            Pour utiliser le système de gestion des femmes de chambre, 
-            vous devez d'abord créer un hôtel.
+      <Card className="w-full max-w-md mx-auto">
+        <CardContent className="text-center py-6">
+          <RefreshCw className="h-6 w-6 mx-auto animate-spin text-primary mb-2" />
+          <p className="text-sm text-muted-foreground">
+            Configuration de votre établissement en cours...
           </p>
-          <Button onClick={() => window.location.href = '/settings'} className="w-full">
-            Configurer un hôtel
-          </Button>
         </CardContent>
       </Card>
     );
