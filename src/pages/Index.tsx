@@ -46,6 +46,7 @@ import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
+import { HousekeeperManagementEnhanced } from "@/components/HousekeeperManagementEnhanced";
 import { GeneralAccessCodes } from "@/components/GeneralAccessCodes";
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
 import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
@@ -1702,7 +1703,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             </div>
             
             {/* Section Gestion des femmes de chambre */}
-            <HousekeeperManagement />
+            <HousekeeperManagementEnhanced />
           </TabsContent>
 
           <TabsContent value="rooms" className="space-y-6">
