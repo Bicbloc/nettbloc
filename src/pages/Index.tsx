@@ -1469,20 +1469,14 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                  </Button>
                </>
              )}
-             {isAuthenticated && (
-               <>
-                  <Button asChild variant="outline">
-                    <a href="/housekeeper-login">
-                      <Smartphone className="mr-2 h-4 w-4" />
-                      Accès Femme de Chambre (Code Hôtel)
-                    </a>
-                  </Button>
-                  <Button asChild>
-                    <a href="/housekeeper/auth">
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      Espace Personnel Femme de Chambre
-                    </a>
-                  </Button>
+              {isAuthenticated && (
+                <>
+                   <Button asChild>
+                     <a href="/housekeeper/auth">
+                       <UserIcon className="mr-2 h-4 w-4" />
+                       Espace Personnel Femme de Chambre
+                     </a>
+                   </Button>
                   <NotificationBell hotelId={hotel?.id} />
                  <UserMenu />
                </>
