@@ -15,12 +15,14 @@ import { FileUp, Users, ArrowRight, CheckCircle, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { AccessCodeManagementService } from "@/services/accessCodeManagementService";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
+  hotelId?: string;
 }
 
-export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps) {
+export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -29,6 +31,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [existingHousekeepers, setExistingHousekeepers] = useState<any[]>([]);
+  const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
+  const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -87,7 +92,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
         description: `${data.length} chambres détectées. Configurez maintenant vos femmes de chambre.`,
       });
 
-      // Passer à l'étape suivante
+      // Charger les femmes de chambre existantes et passer à l'étape suivante
+      await loadExistingHousekeepers();
       setStep('housekeepers');
     } catch (error) {
       console.error("Erreur traitement PDF:", error);
@@ -112,12 +118,36 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
     setHousekeepers(housekeepers.filter((_, i) => i !== index));
   };
 
+  const loadExistingHousekeepers = async () => {
+    if (!hotelId) return;
+    
+    try {
+      setIsLoadingHousekeepers(true);
+      const housekeepersWithCodes = await AccessCodeManagementService.getHousekeepersWithCodes(hotelId);
+      setExistingHousekeepers(housekeepersWithCodes);
+    } catch (error) {
+      console.error('Erreur chargement femmes de chambre:', error);
+    } finally {
+      setIsLoadingHousekeepers(false);
+    }
+  };
+
+  const toggleExistingHousekeeper = (name: string) => {
+    setSelectedExisting(prev => 
+      prev.includes(name) 
+        ? prev.filter(n => n !== name)
+        : [...prev, name]
+    );
+  };
+
   const resetDialog = () => {
     setSelectedFile(null);
     setPdfData(null);
     setStep('upload');
     setHousekeepers([]);
     setNewHousekeeperName('');
+    setSelectedExisting([]);
+    setExistingHousekeepers([]);
   };
 
   const triggerFileInput = () => {
@@ -220,29 +250,83 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
           </p>
         </div>
 
-        {/* Ajouter une femme de chambre */}
-        <div className="flex gap-2">
-          <Input
-            placeholder="Nom de la femme de chambre"
-            value={newHousekeeperName}
-            onChange={(e) => setNewHousekeeperName(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addHousekeeper();
-              }
-            }}
-          />
-          <Button onClick={addHousekeeper} disabled={!newHousekeeperName.trim()}>
-            <Users className="h-4 w-4 mr-2" />
-            Ajouter
-          </Button>
+        {/* Section pour les femmes de chambre existantes avec codes */}
+        {(existingHousekeepers.length > 0 || isLoadingHousekeepers) && (
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-green-700">
+              ✅ Femmes de chambre existantes avec codes d'accès
+            </div>
+            
+            {isLoadingHousekeepers ? (
+              <div className="text-center py-4 text-muted-foreground">
+                Chargement des femmes de chambre...
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {existingHousekeepers.map((housekeeper) => (
+                  <div
+                    key={housekeeper.id}
+                    className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                      selectedExisting.includes(housekeeper.name) 
+                        ? 'bg-primary/10 border-primary' 
+                        : 'bg-muted/50 hover:bg-muted'
+                    }`}
+                    onClick={() => toggleExistingHousekeeper(housekeeper.name)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                        selectedExisting.includes(housekeeper.name) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                      }`}>
+                        {selectedExisting.includes(housekeeper.name) && (
+                          <div className="w-2 h-2 bg-white rounded-full" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{housekeeper.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Code: {housekeeper.access_code}
+                        </div>
+                      </div>
+                      <Badge 
+                        variant={housekeeper.is_active ? "default" : "secondary"}
+                        className="text-xs"
+                      >
+                        {housekeeper.is_active ? '✅ Actif' : '⏸️ Inactif'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Ajouter une nouvelle femme de chambre */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium">➕ Ajouter une nouvelle femme de chambre</div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nom de la femme de chambre"
+              value={newHousekeeperName}
+              onChange={(e) => setNewHousekeeperName(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addHousekeeper();
+                }
+              }}
+            />
+            <Button onClick={addHousekeeper} disabled={!newHousekeeperName.trim()}>
+              <Users className="h-4 w-4 mr-2" />
+              Ajouter
+            </Button>
+          </div>
         </div>
 
-        {/* Liste des femmes de chambre */}
+        {/* Liste des nouvelles femmes de chambre */}
         {housekeepers.length > 0 && (
           <div className="space-y-2">
-            <h4 className="font-medium">Femmes de chambre configurées ({housekeepers.length})</h4>
+            <h4 className="font-medium">Nouvelles femmes de chambre ({housekeepers.length})</h4>
             <div className="space-y-2">
               {housekeepers.map((name, index) => (
                 <Card key={index} className="p-3">
@@ -269,7 +353,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
         </Button>
         <Button
           onClick={() => setStep('distribution')}
-          disabled={housekeepers.length === 0}
+          disabled={selectedExisting.length === 0 && housekeepers.length === 0}
         >
           Choisir la distribution
           <ArrowRight className="ml-2 h-4 w-4" />
@@ -295,11 +379,14 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center gap-2 text-blue-800">
             <CheckCircle className="h-4 w-4" />
-            <span className="font-medium">{housekeepers.length} femmes de chambre configurées</span>
+            <span className="font-medium">{selectedExisting.length + housekeepers.length} femmes de chambre configurées</span>
           </div>
           <div className="text-blue-700 text-sm mt-1 space-x-2">
+            {selectedExisting.map((name, index) => (
+              <Badge key={`existing-${index}`} variant="outline" className="bg-green-100">{name} ✅</Badge>
+            ))}
             {housekeepers.map((name, index) => (
-              <Badge key={index} variant="outline">{name}</Badge>
+              <Badge key={`new-${index}`} variant="outline">{name} ➕</Badge>
             ))}
           </div>
         </div>
@@ -310,7 +397,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
             onClick={() => {
-              onWorkflowComplete(pdfData, housekeepers, 'random');
+              const allHousekeepers = [...selectedExisting, ...housekeepers];
+              onWorkflowComplete(pdfData, allHousekeepers, 'random');
               setOpen(false);
               resetDialog();
             }}
@@ -323,7 +411,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
             onClick={() => {
-              onWorkflowComplete(pdfData, housekeepers, 'floor');
+              const allHousekeepers = [...selectedExisting, ...housekeepers];
+              onWorkflowComplete(pdfData, allHousekeepers, 'floor');
               setOpen(false);
               resetDialog();
             }}
@@ -336,7 +425,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
             onClick={() => {
-              onWorkflowComplete(pdfData, housekeepers, 'cleaning-type');
+              const allHousekeepers = [...selectedExisting, ...housekeepers];
+              onWorkflowComplete(pdfData, allHousekeepers, 'cleaning-type');
               setOpen(false);
               resetDialog();
             }}
@@ -349,7 +439,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete }: PdfWorkflowDialogProps
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
             onClick={() => {
-              onWorkflowComplete(pdfData, housekeepers);
+              const allHousekeepers = [...selectedExisting, ...housekeepers];
+              onWorkflowComplete(pdfData, allHousekeepers);
               setOpen(false);
               resetDialog();
             }}
