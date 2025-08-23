@@ -281,6 +281,7 @@ export type Database = {
           created_at: string | null
           expires_at: string | null
           hotel_id: string | null
+          housekeeper_assignments: Json | null
           id: string
           is_active: boolean | null
           last_activity: string | null
@@ -292,6 +293,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string | null
           hotel_id?: string | null
+          housekeeper_assignments?: Json | null
           id?: string
           is_active?: boolean | null
           last_activity?: string | null
@@ -303,6 +305,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string | null
           hotel_id?: string | null
+          housekeeper_assignments?: Json | null
           id?: string
           is_active?: boolean | null
           last_activity?: string | null
@@ -1000,6 +1003,7 @@ export type Database = {
         Row: {
           created_at: string
           hotel_id: string | null
+          housekeeper_id: string | null
           id: string
           is_active: boolean
           last_activity: string
@@ -1012,6 +1016,7 @@ export type Database = {
         Insert: {
           created_at?: string
           hotel_id?: string | null
+          housekeeper_id?: string | null
           id?: string
           is_active?: boolean
           last_activity?: string
@@ -1024,6 +1029,7 @@ export type Database = {
         Update: {
           created_at?: string
           hotel_id?: string | null
+          housekeeper_id?: string | null
           id?: string
           is_active?: boolean
           last_activity?: string

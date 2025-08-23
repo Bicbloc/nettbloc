@@ -17,6 +17,7 @@ import { AccessCodeTester } from '@/components/AccessCodeTester';
 import { CodeAssignmentTest } from '@/components/CodeAssignmentTest';
 import { HousekeeperAuthTester } from '@/components/HousekeeperAuthTester';
 import { NotificationBell } from '@/components/NotificationBell';
+import { ConnectionDiagnostic } from '@/components/ConnectionDiagnostic';
 
 interface HotelData {
   id: string;
@@ -398,6 +399,7 @@ const Settings = () => {
 
           {/* Onglet Diagnostic */}
           <TabsContent value="diagnostic" className="space-y-6">
+            <ConnectionDiagnostic hotelId={settings.hotel?.id} />
             <HousekeeperAuthTester />
             <CodeAssignmentTest />
             <AccessCodeTester />

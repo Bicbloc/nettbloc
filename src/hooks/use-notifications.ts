@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from './use-toast';
+import { ConnectionManager } from '@/services/connectionManager';
 
 export interface Notification {
   id: string;
@@ -139,50 +140,81 @@ export const useNotifications = (hotelId?: string) => {
     }
 
     console.log('🔗 Configuration souscription temps réel pour l\'hôtel:', effectiveHotelId.slice(0, 8) + '...');
+    
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const connectionManager = ConnectionManager.getInstance();
 
-    const channel = supabase
-      .channel(`notifications_${effectiveHotelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `hotel_id=eq.${effectiveHotelId}`
-        },
-        (payload) => {
-          console.log('📡 Notification temps réel reçue:', payload.eventType);
-          
-          // Invalider le cache
-          notificationCache.delete(effectiveHotelId);
-          
-          // Recharger les notifications
-          loadNotifications();
-
-          // Afficher un toast pour les nouvelles notifications
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const newNotif = payload.new as Notification;
-            toast({
-              title: "📢 " + newNotif.title,
-              description: newNotif.description,
-              duration: 5000,
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Statut souscription:', status);
-        
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Souscription temps réel activée');
-        } else if (status === 'CLOSED') {
-          console.log('⚠️ Souscription fermée, tentative de reconnexion...');
-          // Reconnexion automatique après 5 secondes
-          setTimeout(() => {
+    const setupChannel = () => {
+      const channel = supabase
+        .channel(`notifications_${effectiveHotelId}_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `hotel_id=eq.${effectiveHotelId}`
+          },
+          (payload) => {
+            console.log('📡 Notification temps réel reçue:', payload.eventType);
+            
+            // Invalider le cache
+            notificationCache.delete(effectiveHotelId);
+            
+            // Recharger les notifications
             loadNotifications();
-          }, 5000);
-        }
-      });
+
+            // Afficher un toast pour les nouvelles notifications
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const newNotif = payload.new as Notification;
+              toast({
+                title: "📢 " + newNotif.title,
+                description: newNotif.description,
+                duration: 5000,
+              });
+            }
+          }
+        )
+        .subscribe(async (status) => {
+          console.log('📡 Statut souscription:', status);
+          
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Souscription temps réel activée');
+            reconnectAttempts = 0; // Reset des tentatives
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            console.log('⚠️ Souscription fermée, tentative de reconnexion...');
+            
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              // Vérifier la connexion avant de tenter la reconnexion
+              const isConnected = await connectionManager.checkConnection();
+              
+              if (isConnected) {
+                setTimeout(() => {
+                  console.log(`🔄 Reconnexion temps réel (${reconnectAttempts}/${maxReconnectAttempts})`);
+                  supabase.removeChannel(channel);
+                  setupChannel();
+                }, 2000 * reconnectAttempts);
+              } else {
+                console.log('❌ Connexion Supabase perdue, tentative de reconnexion...');
+                await connectionManager.attemptReconnection();
+              }
+            } else {
+              console.log('❌ Trop de tentatives de reconnexion, abandon');
+              toast({
+                variant: "destructive",
+                title: "Connexion perdue",
+                description: "Synchronisation temps réel indisponible. Rechargez la page."
+              });
+            }
+          }
+        });
+      
+      return channel;
+    };
+
+    const channel = setupChannel();
 
     // Chargement initial
     loadNotifications();
