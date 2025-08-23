@@ -7,15 +7,23 @@ export function useSessionTracking() {
 
     const createSession = async (user: any) => {
       try {
-        // First check if user already has an active session
-        const { data: existingSession } = await supabase
+        console.log('🔄 Creating session for user:', user.id);
+        
+        // First check if user already has an active session - use maybeSingle
+        const { data: existingSession, error: findError } = await supabase
           .from('user_sessions')
           .select('id')
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
+
+        if (findError && findError.code !== 'PGRST116') {
+          console.error('Error finding session:', findError);
+          return;
+        }
 
         if (existingSession) {
+          console.log('✅ Existing session found, updating');
           sessionId = existingSession.id;
           // Update last activity
           await supabase
@@ -25,12 +33,32 @@ export function useSessionTracking() {
           return;
         }
 
-        // Skip creating session if user_sessions table access issues
-        return;
+        // Create new session if none exists
+        console.log('➕ Creating new session');
+        const { data: newSession, error: createError } = await supabase
+          .from('user_sessions')
+          .insert({
+            user_id: user.id,
+            user_name: user.email || 'Utilisateur',
+            user_type: 'admin',
+            session_token: Math.random().toString(36),
+            is_active: true,
+            login_time: new Date().toISOString(),
+            last_activity: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+
+        if (createError) {
+          console.error('Error creating session:', createError);
+          return;
+        }
+
+        sessionId = newSession.id;
+        console.log('✅ Session created:', sessionId);
       } catch (error) {
         console.error('Error creating session:', error);
       }
-
     };
 
     const endSession = async () => {

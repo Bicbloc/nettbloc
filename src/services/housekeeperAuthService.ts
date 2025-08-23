@@ -10,9 +10,9 @@ export interface HousekeeperAuthResult {
 }
 
 export class HousekeeperAuthService {
-  // Authenticate with full access code (e.g., HTL002-ALA-0835)
+  // Authenticate with full access code - NO EXPIRATION CHECKS
   static async authenticateWithFullCode(accessCode: string): Promise<HousekeeperAuthResult> {
-    console.log('🔐 Authentification avec code complet:', accessCode);
+    console.log('🔐 Authentification avec code complet (permanente):', accessCode);
     
     try {
       // Validate code format
@@ -68,7 +68,7 @@ export class HousekeeperAuthService {
       const isLong = parts.length >= 3;
       const shortVariant = codeHotelPart && suffix ? `${codeHotelPart}-${suffix}` : normalized;
 
-      // 1) Try exact match in housekeeper_access_codes
+      // 1) Try exact match in housekeeper_access_codes - ONLY CHECK is_active (NO EXPIRATION)
       let { data: accessCodeData, error: codeError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
@@ -83,12 +83,12 @@ export class HousekeeperAuthService {
         `)
         .eq('access_code', normalized)
         .eq('hotel_id', hotel.id)
-        .eq('is_active', true)
+        .eq('is_active', true) // ONLY CHECK is_active - ignore expires_at
         .maybeSingle();
 
       console.log('🔍 Recherche (exact) dans housekeeper_access_codes:', { accessCodeData, codeError });
 
-      // 2) If not found and short format, try pattern HTLXXX-%-SUFFIX
+      // 2) If not found and short format, try pattern HTLXXX-%-SUFFIX - NO EXPIRATION CHECK
       if (!accessCodeData && isShort && codeHotelPart && suffix) {
         console.log('🔄 Recherche (pattern court) dans housekeeper_access_codes');
         const { data: patternCodes, error: patternErr } = await supabase
@@ -104,7 +104,7 @@ export class HousekeeperAuthService {
             )
           `)
           .eq('hotel_id', hotel.id)
-          .eq('is_active', true)
+          .eq('is_active', true) // ONLY CHECK is_active - ignore expires_at
           .ilike('access_code', `${codeHotelPart}-%-${suffix}`)
           .limit(1);
         if (!patternErr && patternCodes && patternCodes.length > 0) {
@@ -113,7 +113,7 @@ export class HousekeeperAuthService {
         }
       }
 
-      // 3) If not found and long format, try short variant HTLXXX-SUFFIX
+      // 3) If not found and long format, try short variant HTLXXX-SUFFIX - NO EXPIRATION CHECK
       if (!accessCodeData && isLong && shortVariant) {
         console.log('🔄 Recherche (variante courte) dans housekeeper_access_codes');
         const { data: shortCodes, error: shortErr } = await supabase
@@ -129,7 +129,7 @@ export class HousekeeperAuthService {
             )
           `)
           .eq('hotel_id', hotel.id)
-          .eq('is_active', true)
+          .eq('is_active', true) // ONLY CHECK is_active - ignore expires_at
           .eq('access_code', shortVariant)
           .limit(1);
         if (!shortErr && shortCodes && shortCodes.length > 0) {

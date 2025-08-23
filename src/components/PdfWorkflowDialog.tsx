@@ -123,8 +123,25 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     
     try {
       setIsLoadingHousekeepers(true);
-      const housekeepersWithCodes = await AccessCodeManagementService.getHousekeepersWithCodes(hotelId);
-      setExistingHousekeepers(housekeepersWithCodes);
+      
+      // Load both housekeepers and their access codes
+      const [housekeepersWithCodes, accessCodes] = await Promise.all([
+        AccessCodeManagementService.getHousekeepersWithCodes(hotelId),
+        AccessCodeManagementService.getHotelAccessCodes(hotelId)
+      ]);
+      
+      // Enhance housekeepers data with access codes
+      const enhancedHousekeepers = housekeepersWithCodes.map(hk => {
+        const relatedCode = accessCodes.find(code => code.housekeeper_id === hk.id);
+        return {
+          ...hk,
+          current_access_code: relatedCode?.access_code || hk.access_code,
+          code_is_active: relatedCode?.is_active ?? true,
+          code_used_at: relatedCode?.used_at
+        };
+      });
+      
+      setExistingHousekeepers(enhancedHousekeepers);
     } catch (error) {
       console.error('Erreur chargement femmes de chambre:', error);
     } finally {
@@ -284,15 +301,27 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                       <div className="flex-1">
                         <div className="font-medium">{housekeeper.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          Code: {housekeeper.access_code}
+                          Code: {housekeeper.current_access_code || housekeeper.access_code || 'Aucun code'}
                         </div>
+                        {housekeeper.code_used_at && (
+                          <div className="text-xs text-green-600">
+                            Dernière utilisation: {new Date(housekeeper.code_used_at).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
-                      <Badge 
-                        variant={housekeeper.is_active ? "default" : "secondary"}
-                        className="text-xs"
-                      >
-                        {housekeeper.is_active ? '✅ Actif' : '⏸️ Inactif'}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge 
+                          variant={housekeeper.is_active && housekeeper.code_is_active ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {housekeeper.is_active && housekeeper.code_is_active ? '✅ Actif' : '⏸️ Inactif'}
+                        </Badge>
+                        {housekeeper.current_access_code && (
+                          <Badge variant="outline" className="text-xs">
+                            🔑 Code permanent
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

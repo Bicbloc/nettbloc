@@ -18,6 +18,7 @@ import { CodeAssignmentTest } from '@/components/CodeAssignmentTest';
 import { HousekeeperAuthTester } from '@/components/HousekeeperAuthTester';
 import { NotificationBell } from '@/components/NotificationBell';
 import { ConnectionDiagnostic } from '@/components/ConnectionDiagnostic';
+import { AccessCodeRegenerationTool } from '@/components/AccessCodeRegenerationTool';
 
 interface HotelData {
   id: string;
@@ -301,11 +302,20 @@ const Settings = () => {
           <TabsContent value="access-codes" className="space-y-6">
             {settings.hotel ? (
               <div className="space-y-6">
+                {/* Outil de régénération de codes permanents */}
+                <AccessCodeRegenerationTool 
+                  hotelId={settings.hotel.id}
+                  onCodesUpdated={() => {
+                    // Force refresh of access codes display
+                    window.location.reload();
+                  }}
+                />
+                
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
                     Pour gérer les femmes de chambre et générer leurs codes d'accès, rendez-vous sur la page principale dans l'onglet "Vue d'ensemble".
-                    Cette section affiche uniquement les codes d'accès existants.
+                    Cette section affiche uniquement les codes d'accès existants et permet de les régénérer.
                   </AlertDescription>
                 </Alert>
                 <HousekeeperAccessCodes hotelId={settings.hotel.id} />

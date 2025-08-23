@@ -282,6 +282,7 @@ export type Database = {
           expires_at: string | null
           hotel_id: string | null
           housekeeper_assignments: Json | null
+          housekeeper_names: Json | null
           id: string
           is_active: boolean | null
           last_activity: string | null
@@ -294,6 +295,7 @@ export type Database = {
           expires_at?: string | null
           hotel_id?: string | null
           housekeeper_assignments?: Json | null
+          housekeeper_names?: Json | null
           id?: string
           is_active?: boolean | null
           last_activity?: string | null
@@ -306,6 +308,7 @@ export type Database = {
           expires_at?: string | null
           hotel_id?: string | null
           housekeeper_assignments?: Json | null
+          housekeeper_names?: Json | null
           id?: string
           is_active?: boolean | null
           last_activity?: string | null
@@ -1126,6 +1129,10 @@ export type Database = {
         }
         Returns: string
       }
+      generate_permanent_access_code: {
+        Args: { p_hotel_id: string; p_housekeeper_name?: string }
+        Returns: string
+      }
       generate_short_hotel_id: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1188,6 +1195,13 @@ export type Database = {
       log_password_reset_request: {
         Args: { p_email: string; p_request_ip?: unknown; p_user_agent?: string }
         Returns: string
+      }
+      regenerate_housekeeper_codes: {
+        Args: { p_hotel_id: string }
+        Returns: {
+          housekeeper_name: string
+          new_code: string
+        }[]
       }
       request_password_reset: {
         Args: { user_email: string }
