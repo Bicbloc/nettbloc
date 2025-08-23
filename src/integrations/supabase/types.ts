@@ -1132,6 +1132,14 @@ export type Database = {
         }
         Returns: string
       }
+      get_hotel_info_for_access_code: {
+        Args: { p_hotel_code: string }
+        Returns: {
+          hotel_code: string
+          hotel_id: string
+          hotel_name: string
+        }[]
+      }
       get_housekeeper_profile_id: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1181,6 +1189,10 @@ export type Database = {
       }
       validate_access_code_for_hotel: {
         Args: { access_code: string; hotel_uuid: string }
+        Returns: boolean
+      }
+      validate_hotel_code_exists: {
+        Args: { p_hotel_code: string }
         Returns: boolean
       }
       validate_housekeeper_access_code: {
