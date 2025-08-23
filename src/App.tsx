@@ -9,7 +9,7 @@ import MobileInterface from "./pages/MobileInterface";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
-import { AuthProvider } from "./contexts/AuthProvider";
+import { AuthProvider } from "./contexts/AuthContext";
 
 // Components supprimés - plus de header space
 const queryClient = new QueryClient();
