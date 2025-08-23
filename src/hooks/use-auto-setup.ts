@@ -203,6 +203,10 @@ export const useAutoSetup = () => {
           localStorage.setItem('selectedHotelCode', hotelData.hotel_code || '');
           localStorage.setItem('selectedHotelName', hotelData.name);
           
+          // CRITIQUE: Forcer la sauvegarde immédiate de l'hôtel
+          const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
+          await SessionPersistenceService.forceSaveCurrentSession(hotelData.id);
+          
           console.log('✅ Setup terminé avec succès:', {
             hotelId: hotelData.id,
             hotelCode: hotelData.hotel_code,

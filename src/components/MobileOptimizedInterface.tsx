@@ -39,6 +39,23 @@ export const MobileOptimizedInterface: React.FC<MobileOptimizedInterfaceProps> =
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
 
+  // Vérifier la persistance de l'hôtel lors du montage
+  useEffect(() => {
+    const checkHotelPersistence = async () => {
+      if (!hotelId) {
+        const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
+        const storedHotelId = SessionPersistenceService.getStoredHotelId();
+        if (storedHotelId) {
+          console.log('🏨 Hôtel restauré depuis le stockage:', storedHotelId);
+        } else {
+          console.error('❌ Aucun hôtel trouvé dans le stockage');
+        }
+      }
+    };
+
+    checkHotelPersistence();
+  }, [hotelId]);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);

@@ -168,4 +168,41 @@ export class SessionPersistenceService {
       });
     }
   }
+
+  // Forcer la sauvegarde de la session actuelle avec l'hôtel ID
+  static async forceSaveCurrentSession(hotelId: string): Promise<void> {
+    try {
+      const sessionData = {
+        sessionToken: '',
+        hotelId: hotelId,
+        lastActiveDate: new Date().toISOString(),
+      };
+      this.saveSessionData(sessionData);
+      
+      // Également sauvegarder l'hotelId dans localStorage pour compatibilité
+      localStorage.setItem('hotelId', hotelId);
+      localStorage.setItem('lastSavedHotelId', hotelId);
+      localStorage.setItem('hotelDataTimestamp', Date.now().toString());
+      
+      console.log('✅ Hotel session forcibly saved:', hotelId);
+    } catch (error) {
+      console.error('❌ Failed to force save session:', error);
+    }
+  }
+
+  // Restaurer l'hotelId depuis le stockage local
+  static getStoredHotelId(): string | null {
+    try {
+      const saved = this.getSavedSessionData();
+      if (saved?.hotelId) {
+        return saved.hotelId;
+      }
+      
+      // Fallback vers localStorage direct
+      return localStorage.getItem('hotelId') || localStorage.getItem('lastSavedHotelId');
+    } catch (error) {
+      console.error('❌ Failed to get stored hotel ID:', error);
+      return localStorage.getItem('hotelId');
+    }
+  }
 }

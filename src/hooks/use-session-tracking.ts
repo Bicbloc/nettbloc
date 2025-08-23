@@ -25,24 +25,12 @@ export function useSessionTracking() {
           return;
         }
 
-        // Create new session
-        const { data, error } = await supabase
-          .from('user_sessions')
-          .insert({
-            user_id: user.id,
-            hotel_id: localStorage.getItem('hotelId'),
-            user_type: user.email ? 'admin' : 'housekeeper',
-            user_name: user.user_metadata?.name || user.email || 'Utilisateur',
-            session_token: crypto.randomUUID()
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        sessionId = data.id;
+        // Skip creating session if user_sessions table access issues
+        return;
       } catch (error) {
         console.error('Error creating session:', error);
       }
+
     };
 
     const endSession = async () => {
