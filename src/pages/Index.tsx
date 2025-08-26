@@ -1316,7 +1316,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     try {
       if (reportAction === "single") {
         const housekeeperRooms = getHousekeeperRooms(reportHousekeeper);
-        await generateReport(reportHousekeeper, housekeeperRooms, cleaningConfig, confirmedEmail, customFields);
+        await generateReport(reportHousekeeper, housekeeperRooms, cleaningConfig, customFields);
         
         toast({
           title: "Rapport envoyé",
@@ -1339,7 +1339,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         await generateCombinedReport(
           housekeepersWithRooms.map(name => ({ name, rooms: getHousekeeperRooms(name) })), 
           cleaningConfig,
-          confirmedEmail, 
           customFields
         );
         

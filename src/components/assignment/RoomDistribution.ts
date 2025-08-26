@@ -226,9 +226,8 @@ export function autoDistributeRooms(
 export function generateCombinedReport(
   housekeeperRooms: { name: string; rooms: Room[] }[],
   config: any,
-  emailAddress: string,
   customFields?: any
 ): Promise<boolean> {
   // Call the implementation in reportService.ts
-  return generateCombinedReportService(housekeeperRooms, config, emailAddress, customFields);
+  return generateCombinedReportService(housekeeperRooms, config, customFields);
 }

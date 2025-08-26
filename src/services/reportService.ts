@@ -76,13 +76,9 @@ export async function generateReport(
   housekeeper: string,
   rooms: Room[],
   config: CleaningConfig,
-  emailAddress: string,
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
-    // Store the email in Supabase
-    await storeEmailAddress(emailAddress);
-    
     // Get today's date in French locale
     const today = new Date();
     const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -635,13 +631,9 @@ function generateRoomsTablesByFloor(data: ReportData): string {
 export async function generateCombinedReport(
   housekeeperRooms: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
-  emailAddress: string,
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
-    // Store the email in Supabase
-    await storeEmailAddress(emailAddress);
-    
     // Filter out housekeepers with no rooms
     const validHousekeepers = housekeeperRooms.filter(item => item.rooms.length > 0);
     

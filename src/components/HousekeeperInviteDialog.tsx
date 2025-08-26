@@ -52,29 +52,47 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
       const generatedCode = data as string;
       setAccessCode(generatedCode);
 
-      // Save invitation to access codes table temporarily
+      // Créer l'entrée dans housekeepers avec le code d'accès
+      const { data: housekeeperData, error: housekeeperError } = await supabase
+        .from('housekeepers')
+        .insert({
+          hotel_id: hotelId,
+          name: name,
+          access_code: generatedCode,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          is_active: true,
+          is_temporary: false
+        })
+        .select()
+        .single();
+
+      if (housekeeperError) {
+        console.error('Error creating housekeeper:', housekeeperError);
+        toast({
+          title: "Erreur",
+          description: "Impossible de créer la femme de chambre",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Créer l'entrée dans housekeeper_access_codes
       const { error: inviteError } = await supabase
         .from('housekeeper_access_codes')
         .insert({
           hotel_id: hotelId,
+          housekeeper_id: housekeeperData.id,
           access_code: generatedCode,
           invited_email: email,
           invited_name: name,
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        } as any);
+          created_by: (await supabase.auth.getUser()).data.user?.id,
+          is_active: true,
+          expires_at: null // Code permanent
+        });
 
       if (inviteError) {
-        console.error('Error saving invitation:', inviteError);
+        console.error('Error saving access code:', inviteError);
       }
-
-      // Update access code with invite info
-      await supabase
-        .from('housekeeper_access_codes')
-        .update({
-          invited_email: email,
-          invited_name: name
-        } as any)
-        .eq('access_code', generatedCode);
 
       // Send email invitation if email provided
       if (email) {
@@ -85,7 +103,7 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
               type: 'activation',
               companyName: name,
               accessCode: generatedCode,
-              activationLink: `${window.location.origin}/housekeeper/auth?code=${generatedCode}`
+              activationLink: `${window.location.origin}/mobile?code=${generatedCode}`
             }
           });
         } catch (emailError) {
@@ -213,10 +231,10 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
             </div>
 
             <div className="text-sm text-muted-foreground space-y-2">
-              <p>• Code valable 48h après première connexion</p>
-              <p>• Communiquez ce code à {name}</p>
-              {email && <p>• Email: {email}</p>}
-              {!email && <p>• Accès temporaire (sans compte requis)</p>}
+              <p>• Code permanent pour {name}</p>
+              <p>• Interface mobile: {window.location.origin}/mobile</p>
+              {email && <p>• Email d'invitation envoyé à: {email}</p>}
+              {!email && <p>• Communiquez ce code directement à {name}</p>}
             </div>
 
             <div className="flex justify-end space-x-2">
