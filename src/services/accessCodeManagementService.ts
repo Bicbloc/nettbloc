@@ -170,30 +170,62 @@ export class AccessCodeManagementService {
   // Get housekeepers with their access codes
   static async getHousekeepersWithCodes(hotelId: string): Promise<any[]> {
     try {
-      // Get all active housekeepers first
+      console.log('🔍 Chargement femmes de chambre pour hôtel:', hotelId);
+      
+      // D'abord, synchroniser les codes manquants
+      await this.syncAndGenerateMissingCodes(hotelId);
+      
+      // Get all housekeepers (both active and inactive for management)
       const { data: housekeepers, error } = await supabase
         .from('housekeepers')
         .select(`
-          *,
-          housekeeper_access_codes (
-            access_code,
-            is_active,
-            created_at,
-            used_at
-          )
+          id,
+          name,
+          access_code,
+          is_active,
+          created_at,
+          hotel_id
         `)
         .eq('hotel_id', hotelId)
-        .eq('is_active', true);
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Erreur récupération femmes de chambre:', error);
         return [];
       }
 
-      return housekeepers || [];
+      console.log('✅ Femmes de chambre trouvées:', housekeepers?.length || 0);
+      return (housekeepers || []).map(hk => ({
+        ...hk,
+        housekeeper_access_codes: hk.access_code ? [{ access_code: hk.access_code }] : []
+      }));
     } catch (error) {
       console.error('❌ Erreur récupération femmes de chambre avec codes:', error);
       return [];
+    }
+  }
+
+  // New method to sync and generate missing codes
+  static async syncAndGenerateMissingCodes(hotelId: string): Promise<void> {
+    try {
+      console.log('🔄 Synchronisation des codes pour hôtel:', hotelId);
+      
+      // Use the new SQL functions we created
+      const { data: syncResult, error: syncError } = await supabase
+        .rpc('sync_access_codes_with_housekeepers');
+      
+      if (!syncError && syncResult) {
+        console.log('✅ Codes synchronisés:', syncResult);
+      }
+      
+      const { data: generateResult, error: generateError } = await supabase
+        .rpc('generate_missing_access_codes_for_hotel', { p_hotel_id: hotelId });
+      
+      if (!generateError && generateResult) {
+        console.log('✅ Codes générés:', generateResult);
+      }
+    } catch (error) {
+      console.error('❌ Erreur synchronisation codes:', error);
     }
   }
 

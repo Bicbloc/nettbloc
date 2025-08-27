@@ -44,21 +44,15 @@ export function useSubscription() {
       } else {
         // For free users, double-check with Stripe in case of database sync issues
         try {
-          const { data, error } = await supabase.functions.invoke('check-subscription');
+          // Temporarily disable subscription check to avoid CHANNEL_ERROR
+          console.log('📡 Statut souscription: FALLBACK_MODE');
           
-          if (!error && data?.plan === 'premium' && data?.subscribed) {
-            // Update local profile if Stripe says premium but DB says free
-            await supabase
-              .from('profiles')
-              .update({ plan: 'premium', subscription_type: 'premium' })
-              .eq('id', user.id);
-              
-            setSubscription({
-              plan: 'premium',
-              subscribed: true,
-              subscription_end: data.subscription_end,
-              loading: false
-            });
+           if (false) { // Disable Stripe check temporarily
+             setSubscription({
+               plan: 'premium',
+               subscribed: true,
+               loading: false
+             });
           } else {
             setSubscription({
               plan: 'free',

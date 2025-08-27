@@ -1129,6 +1129,10 @@ export type Database = {
         }
         Returns: string
       }
+      generate_missing_access_codes_for_hotel: {
+        Args: { p_hotel_id: string }
+        Returns: number
+      }
       generate_permanent_access_code: {
         Args: { p_hotel_id: string; p_housekeeper_name?: string }
         Returns: string
@@ -1206,6 +1210,10 @@ export type Database = {
       request_password_reset: {
         Args: { user_email: string }
         Returns: boolean
+      }
+      sync_access_codes_with_housekeepers: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       validate_access_code_for_hotel: {
         Args: { access_code: string; hotel_uuid: string }

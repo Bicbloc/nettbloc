@@ -26,6 +26,7 @@ import GuestMode from "./pages/GuestMode";
 import { AccessCodeRedirect } from "./components/AccessCodeRedirect";
 import { HousekeeperGuestMode } from "./components/HousekeeperGuestMode";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
+import Mobile from "./pages/Mobile";
 
 // Components supprimés - plus de header space
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/housekeeper/dashboard" element={<HousekeeperDashboard />} />
             <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
             <Route path="/housekeeper/work-simple" element={<HousekeeperWorkSimple />} />
+            <Route path="/mobile" element={<Mobile />} />
                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
