@@ -6,18 +6,27 @@ export function useConnectionStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
   const [lastPingTime, setLastPingTime] = useState<number | null>(null);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
 
-  // Test Supabase connection
+  // Test Supabase connection avec gestion intelligente des erreurs
   const pingSupabase = useCallback(async () => {
     try {
       const start = Date.now();
-      await supabase.from('profiles').select('id').limit(1);
+      const { error } = await supabase.from('profiles').select('id').limit(1);
+      
+      if (error) {
+        setConsecutiveFailures(prev => prev + 1);
+        setIsSupabaseConnected(false);
+        return false;
+      }
+      
       const pingTime = Date.now() - start;
       setLastPingTime(pingTime);
       setIsSupabaseConnected(true);
+      setConsecutiveFailures(0);
       return true;
     } catch (error) {
-      console.error('Supabase ping failed:', error);
+      setConsecutiveFailures(prev => prev + 1);
       setIsSupabaseConnected(false);
       return false;
     }
@@ -52,30 +61,25 @@ export function useConnectionStatus() {
     };
   }, [pingSupabase]);
 
-  // Periodic Supabase health check
+  // Periodic Supabase health check - uniquement si nécessaire
   useEffect(() => {
     const interval = setInterval(async () => {
-      if (isOnline) {
+      // Ne ping que si on a eu des échecs récents ou si offline
+      if (isOnline && (consecutiveFailures > 0 || !isSupabaseConnected)) {
         const wasConnected = isSupabaseConnected;
         const isConnected = await pingSupabase();
         
         if (!wasConnected && isConnected) {
           toast({
-            title: "Base de données reconnectée",
-            description: "La connexion à la base de données est rétablie",
-          });
-        } else if (wasConnected && !isConnected) {
-          toast({
-            variant: "destructive",
-            title: "Problème de base de données",
-            description: "Connexion à la base de données interrompue",
+            title: "Connexion rétablie",
+            description: "Synchronisation automatique en cours...",
           });
         }
       }
-    }, 30000); // Check every 30 seconds
+    }, 60000); // Check toutes les 60 secondes au lieu de 30
 
     return () => clearInterval(interval);
-  }, [isOnline, isSupabaseConnected, pingSupabase]);
+  }, [isOnline, isSupabaseConnected, consecutiveFailures, pingSupabase]);
 
   // Initial ping
   useEffect(() => {

@@ -4,9 +4,10 @@ import { toast } from '@/hooks/use-toast';
 export class ConnectionManager {
   private static instance: ConnectionManager;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 2000;
+  private maxReconnectAttempts = 10;
+  private reconnectDelay = 1000;
   private isReconnecting = false;
+  private connectionCheckInterval: NodeJS.Timeout | null = null;
 
   static getInstance(): ConnectionManager {
     if (!ConnectionManager.instance) {
@@ -15,41 +16,42 @@ export class ConnectionManager {
     return ConnectionManager.instance;
   }
 
-  // Vérifier l'état de la connexion
+  // Vérifier l'état de la connexion avec timeout
   async checkConnection(): Promise<boolean> {
     try {
-      const { data, error } = await supabase
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 5000)
+      );
+      
+      const connectionPromise = supabase
         .from('profiles')
         .select('id')
         .limit(1);
       
+      const { error } = await Promise.race([connectionPromise, timeoutPromise]) as any;
+      
       if (error) {
-        console.error('❌ Test de connexion échoué:', error);
         return false;
       }
       
-      console.log('✅ Connexion Supabase OK');
-      this.reconnectAttempts = 0; // Reset des tentatives
+      this.reconnectAttempts = 0;
       return true;
     } catch (error) {
-      console.error('❌ Erreur de connexion:', error);
       return false;
     }
   }
 
-  // Reconnecter automatiquement
+  // Reconnecter automatiquement avec stratégie intelligente
   async attemptReconnection(): Promise<boolean> {
     if (this.isReconnecting) {
-      console.log('🔄 Reconnexion déjà en cours...');
       return false;
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('❌ Trop de tentatives de reconnexion');
       toast({
         variant: "destructive",
-        title: "Connexion perdue",
-        description: "Impossible de rétablir la connexion. Rechargez la page."
+        title: "Connexion instable",
+        description: "Veuillez vérifier votre connexion internet."
       });
       return false;
     }
@@ -57,31 +59,32 @@ export class ConnectionManager {
     this.isReconnecting = true;
     this.reconnectAttempts++;
 
-    console.log(`🔄 Tentative de reconnexion ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-
     try {
-      // Attendre avant de tenter la reconnexion
-      await new Promise(resolve => setTimeout(resolve, this.reconnectDelay));
+      // Backoff exponentiel: 1s, 2s, 4s, 8s...
+      const delay = Math.min(Math.pow(2, this.reconnectAttempts - 1) * 1000, 15000);
+      await new Promise(resolve => setTimeout(resolve, delay));
       
-      // Tenter la reconnexion
       const connected = await this.checkConnection();
       
       if (connected) {
-        console.log('✅ Reconnexion réussie');
         this.isReconnecting = false;
         this.reconnectAttempts = 0;
+        this.reconnectDelay = 1000;
+        
+        toast({
+          title: "Connexion rétablie",
+          description: "Synchronisation en cours...",
+        });
         return true;
       } else {
-        // Augmenter le délai pour la prochaine tentative
-        this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 10000);
         this.isReconnecting = false;
-        
-        // Tenter à nouveau après un délai
-        setTimeout(() => this.attemptReconnection(), 1000);
+        // Réessayer automatiquement
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          setTimeout(() => this.attemptReconnection(), 1000);
+        }
         return false;
       }
     } catch (error) {
-      console.error('❌ Erreur lors de la reconnexion:', error);
       this.isReconnecting = false;
       return false;
     }
@@ -90,8 +93,32 @@ export class ConnectionManager {
   // Réinitialiser le gestionnaire de connexion
   reset(): void {
     this.reconnectAttempts = 0;
-    this.reconnectDelay = 2000;
+    this.reconnectDelay = 1000;
     this.isReconnecting = false;
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
+  }
+
+  // Démarrer la surveillance de connexion
+  startMonitoring(): void {
+    if (this.connectionCheckInterval) return;
+    
+    this.connectionCheckInterval = setInterval(async () => {
+      const isConnected = await this.checkConnection();
+      if (!isConnected && this.reconnectAttempts === 0) {
+        this.attemptReconnection();
+      }
+    }, 60000); // Vérifier toutes les minutes
+  }
+
+  // Arrêter la surveillance
+  stopMonitoring(): void {
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
   }
 
   // Obtenir le statut actuel

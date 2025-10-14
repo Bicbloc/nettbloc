@@ -47,27 +47,28 @@ export const useRealtimeSync = ({
     }
   }, []);
 
-  // Fonction de reconnexion
+  // Fonction de reconnexion intelligente avec backoff exponentiel
   const attemptReconnection = useCallback(() => {
     if (reconnectAttempts.current >= maxReconnectAttempts) {
       console.log('❌ Trop de tentatives de reconnexion, abandon');
       toast({
         variant: "destructive",
-        title: "Connexion perdue",
-        description: "Impossible de rétablir la connexion temps réel. Rechargez la page."
+        title: "Connexion temps réel instable",
+        description: "Les données seront synchronisées au prochain rafraîchissement."
       });
       return;
     }
 
     reconnectAttempts.current++;
-    const delay = Math.min(reconnectInterval * reconnectAttempts.current, 30000);
+    // Backoff exponentiel: 1s, 2s, 4s, 8s, 16s...
+    const delay = Math.min(Math.pow(2, reconnectAttempts.current - 1) * 1000, 30000);
     
     console.log(`🔄 Tentative de reconnexion ${reconnectAttempts.current}/${maxReconnectAttempts} dans ${delay}ms`);
     
     reconnectTimeoutRef.current = setTimeout(() => {
       setupRealtimeConnection();
     }, delay);
-  }, [reconnectInterval]);
+  }, []);
 
   // Configuration de la connexion temps réel
   const setupRealtimeConnection = useCallback(() => {
@@ -115,21 +116,33 @@ export const useRealtimeSync = ({
       switch (status) {
         case 'SUBSCRIBED':
           console.log('✅ Connexion temps réel établie');
-          reconnectAttempts.current = 0; // Reset des tentatives de reconnexion
+          reconnectAttempts.current = 0;
           break;
           
         case 'CLOSED':
-          console.log('⚠️ Connexion fermée, tentative de reconnexion...');
-          attemptReconnection();
+          console.log('⚠️ Connexion fermée');
+          // Ne reconnecter que si on a une raison (pas une fermeture volontaire)
+          if (reconnectAttempts.current < maxReconnectAttempts) {
+            attemptReconnection();
+          }
           break;
           
         case 'CHANNEL_ERROR':
-          console.log('❌ Erreur de canal, tentative de reconnexion...');
+          console.log('❌ Erreur de canal');
+          // Attendre un peu avant de reconnecter en cas d'erreur
+          setTimeout(() => {
+            if (reconnectAttempts.current < maxReconnectAttempts) {
+              attemptReconnection();
+            }
+          }, 2000);
+          break;
+          
+        case 'TIMED_OUT':
+          console.log('⏱️ Timeout de connexion');
           attemptReconnection();
           break;
           
         default:
-          console.log('🔄 Connexion en cours...');
           break;
       }
     });
