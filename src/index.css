@@ -1,5 +1,5 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+/* Fonts loaded in index.html */
 
 @tailwind base;
 @tailwind components;
@@ -42,15 +42,21 @@
     --gradient-accent: linear-gradient(135deg, hsl(142, 76%, 73%) 0%, hsl(47, 96%, 89%) 100%);
     
     /* Premium/Freemium colors */
-    --premium: 45 93% 47%; /* Gold */
-    --premium-foreground: 0 0% 0%;
-    --premium-light: 48 96% 89%;
-    --freemium: 240 4.8% 95.9%; /* Muted */
-    --freemium-foreground: 240 5.9% 10%;
+    --premium: 280 70% 60%;
+    --premium-foreground: 0 0% 100%;
+    --premium-light: 280 75% 70%;
+    --freemium: 200 100% 50%;
+    --freemium-foreground: 0 0% 100%;
     
     /* Premium gradients */
-    --gradient-premium: linear-gradient(135deg, hsl(45, 93%, 47%) 0%, hsl(43, 89%, 38%) 100%);
-    --gradient-freemium: linear-gradient(135deg, hsl(240, 4.8%, 95.9%) 0%, hsl(240, 5.9%, 90%) 100%);
+    --gradient-premium: linear-gradient(135deg, hsl(280, 70%, 60%) 0%, hsl(260, 65%, 55%) 100%);
+    --gradient-freemium: linear-gradient(135deg, hsl(200, 100%, 50%) 0%, hsl(220, 90%, 55%) 100%);
+    
+    /* Enhanced design tokens */
+    --hero-gradient: linear-gradient(135deg, hsl(220 70% 50%) 0%, hsl(280 70% 60%) 100%);
+    --card-glow: 0 8px 32px -8px hsl(var(--primary) / 0.15);
+    --hover-lift: translateY(-2px);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     
     /* Modern shadows */
     --shadow-sm: 0 1px 2px 0 hsl(240 5.9% 10% / 0.05);

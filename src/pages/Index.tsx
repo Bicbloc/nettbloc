@@ -66,6 +66,8 @@ import { redistributeRooms, getDistributionStats } from "@/utils/redistributionU
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
 import { UpgradeButton } from "@/components/UpgradeButton";
 import { useSubscription } from "@/hooks/useSubscription";
+import { HeroHeader } from "@/components/HeroHeader";
+import { StatsOverview } from "@/components/StatsOverview";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -1397,51 +1399,48 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
 
   return (
     <>
-      <div className="flex min-h-screen flex-col bg-slate-50">
-      <div className="container mx-auto py-6">
-         {/* Header avec navigation et authentification */}
-         <div className="flex justify-between items-center mb-6">
-           <div>
-             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-               <Building className="h-8 w-8 text-primary" />
-               NettoBloc
-               {isGuestMode && (
-                 <Badge variant="outline" className="ml-2">
-                   Mode Invité
-                 </Badge>
-               )}
-               {/* Badge de plan avec boutons d'upgrade/downgrade */}
-               {!subscriptionLoading && isAuthenticated && (
-                 <div className="flex items-center gap-2 ml-4">
-                   <Badge 
-                     variant={isPremium ? "default" : "secondary"}
-                     className={isPremium 
-                       ? "bg-gradient-premium text-premium-foreground border-premium/20" 
-                       : "bg-gradient-freemium text-freemium-foreground border-freemium/20"
-                     }
-                   >
-                     {isPremium ? "Premium" : "Freemium"}
-                   </Badge>
-                   {isFree && (
-                     <UpgradeButton 
-                       variant="outline" 
-                       size="sm"
-                       className="h-7 px-3 text-xs border-premium/30 hover:bg-premium/5" 
-                     />
+      <div className="flex min-h-screen flex-col bg-background">
+      <div className="container mx-auto py-6 px-4 md:px-6">
+         {/* Modern Header */}
+         <div className="flex justify-between items-center mb-8">
+           <div className="flex items-center gap-4">
+             <div className="flex items-center gap-3">
+               <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg">
+                 <Building className="h-6 w-6 text-primary-foreground" />
+               </div>
+               <div>
+                 <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                   HotelFlow
+                 </h1>
+                 <div className="flex items-center gap-2 mt-1">
+                   {isGuestMode && (
+                     <Badge variant="outline" className="text-xs">Mode Invité</Badge>
+                   )}
+                   {!subscriptionLoading && isAuthenticated && (
+                     <Badge 
+                       variant="secondary"
+                       className={isPremium 
+                         ? "bg-gradient-premium text-premium-foreground text-xs border-0" 
+                         : "bg-gradient-freemium text-freemium-foreground text-xs border-0"
+                       }
+                     >
+                       {isPremium ? "Premium" : "Freemium"}
+                     </Badge>
+                   )}
+                   {hotel && (
+                     <span className="text-xs text-muted-foreground">
+                       {hotel.name} • {hotel.hotel_code}
+                     </span>
                    )}
                  </div>
-               )}
-             </h1>
-             {hotel && (
-               <div className="text-sm text-muted-foreground mt-1">
-                 <strong>Hôtel:</strong> {hotel.name} | <strong>ID:</strong> <code className="bg-muted px-1 rounded">{hotel.hotel_code}</code>
-                 {/* Affichage des limites pour les comptes freemium */}
-                 {isFree && (
-                   <span className="ml-2 text-amber-600 font-medium">
-                     • Limité à 5 femmes de chambre
-                   </span>
-                 )}
                </div>
+             </div>
+             {isFree && isAuthenticated && (
+               <UpgradeButton 
+                 variant="outline" 
+                 size="sm"
+                 className="h-8 px-4 text-xs" 
+               />
              )}
            </div>
           
@@ -1495,10 +1494,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 />
         </div>
 
+        {/* Hero Header */}
+        <HeroHeader hotelName={hotel?.name} isPremium={isPremium} />
+        
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex items-center justify-between mb-4">
-            <TabsList className="grid w-full grid-cols-6 max-w-fit">
-              <TabsTrigger value="overview" className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-6">
+            <TabsList className="grid w-full grid-cols-6 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
+              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Layers className="h-4 w-4" />
                 Vue d'ensemble
               </TabsTrigger>
@@ -1545,62 +1547,14 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             </div>
           </div>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Chambres</CardTitle>
-                  <Bed className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{totalRooms}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {roomsToClean} à nettoyer
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Femmes de chambre</CardTitle>
-                  <UserIcon className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{housekeeperNames.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {recommendedHousekeepers} recommandées
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Nettoyage complet</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{fullCleaningRooms}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {quickCleaningRooms} recouches
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Priorité élevée</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{priorityRooms}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {cleanRooms} déjà propres
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value="overview" className="space-y-6 animate-fade-in">
+            {/* Stats Overview Component */}
+            <StatsOverview rooms={rooms} housekeeperCount={housekeeperNames.length} />
 
             <div className="grid gap-6 md:grid-cols-3">
-              <Card>
+              <Card className="border-border/50 hover:shadow-modern-lg transition-all duration-300">
                 <CardHeader>
-                  <CardTitle>Actions rapides</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Actions rapides</CardTitle>
                   <CardDescription>
                     Gérez votre planning de nettoyage
                   </CardDescription>
@@ -1654,9 +1608,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-border/50 hover:shadow-modern-lg transition-all duration-300">
                 <CardHeader>
-                  <CardTitle>Résumé du planning</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Résumé du planning</CardTitle>
                   <CardDescription>
                     Aperçu des chambres et nettoyages
                   </CardDescription>
