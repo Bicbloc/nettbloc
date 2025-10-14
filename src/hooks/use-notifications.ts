@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from './use-toast';
-import { ConnectionManager } from '@/services/connectionManager';
+import { realtimeManager } from '@/services/RealtimeManager';
 
 export interface Notification {
   id: string;
@@ -130,99 +130,37 @@ export const useNotifications = (hotelId?: string) => {
     }
   }, [getEffectiveHotelId]);
 
-  // Souscription temps réel améliorée avec reconnexion automatique
+  // Souscription temps réel via RealtimeManager centralisé
   useEffect(() => {
     const effectiveHotelId = getEffectiveHotelId();
-    
-    if (!effectiveHotelId) {
-      console.log('⚠️ Pas de souscription temps réel: hotelId manquant');
-      return;
-    }
+    if (!effectiveHotelId) return;
 
-    console.log('🔗 Configuration souscription temps réel pour l\'hôtel:', effectiveHotelId.slice(0, 8) + '...');
-    
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-    const connectionManager = ConnectionManager.getInstance();
+    // Connexion au manager centralisé
+    realtimeManager.connect(effectiveHotelId);
 
-    const setupChannel = () => {
-      const channel = supabase
-        .channel(`notifications_${effectiveHotelId}_${Date.now()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'notifications',
-            filter: `hotel_id=eq.${effectiveHotelId}`
-          },
-          (payload) => {
-            console.log('📡 Notification temps réel reçue:', payload.eventType);
-            
-            // Invalider le cache
-            notificationCache.delete(effectiveHotelId);
-            
-            // Recharger les notifications
-            loadNotifications();
-
-            // Afficher un toast pour les nouvelles notifications
-            if (payload.eventType === 'INSERT' && payload.new) {
-              const newNotif = payload.new as Notification;
-              toast({
-                title: "📢 " + newNotif.title,
-                description: newNotif.description,
-                duration: 5000,
-              });
-            }
-          }
-        )
-        .subscribe(async (status) => {
-          console.log('📡 Statut souscription:', status);
-          
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ Souscription temps réel activée');
-            reconnectAttempts = 0; // Reset des tentatives
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            console.log('⚠️ Souscription fermée, tentative de reconnexion...');
-            
-            if (reconnectAttempts < maxReconnectAttempts) {
-              reconnectAttempts++;
-              // Vérifier la connexion avant de tenter la reconnexion
-              const isConnected = await connectionManager.checkConnection();
-              
-              if (isConnected) {
-                setTimeout(() => {
-                  console.log(`🔄 Reconnexion temps réel (${reconnectAttempts}/${maxReconnectAttempts})`);
-                  supabase.removeChannel(channel);
-                  setupChannel();
-                }, 2000 * reconnectAttempts);
-              } else {
-                console.log('❌ Connexion Supabase perdue, tentative de reconnexion...');
-                await connectionManager.attemptReconnection();
-              }
-            } else {
-              console.log('❌ Trop de tentatives de reconnexion, abandon');
-              toast({
-                variant: "destructive",
-                title: "Connexion perdue",
-                description: "Synchronisation temps réel indisponible. Rechargez la page."
-              });
-            }
-          }
-        });
+    // S'abonner aux changements
+    const subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
+      console.log('📨 Nouvelle notification:', payload.eventType);
       
-      return channel;
-    };
+      // Invalider le cache
+      notificationCache.delete(effectiveHotelId);
+      loadNotifications();
 
-    const channel = setupChannel();
+      // Toast uniquement pour les nouvelles notifications
+      if (payload.eventType === 'INSERT' && payload.new) {
+        const newNotif = payload.new as Notification;
+        toast({
+          title: newNotif.title,
+          description: newNotif.description,
+        });
+      }
+    });
 
     // Chargement initial
     loadNotifications();
 
-    // Nettoyage
     return () => {
-      console.log('🧹 Nettoyage souscription temps réel');
-      supabase.removeChannel(channel);
+      realtimeManager.unsubscribe(subscriptionId);
     };
   }, [getEffectiveHotelId, loadNotifications]);
 

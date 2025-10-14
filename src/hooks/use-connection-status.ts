@@ -45,11 +45,16 @@ export function useConnectionStatus() {
 
     const handleOffline = () => {
       setIsOnline(false);
-      toast({
-        variant: "destructive",
-        title: "Connexion perdue",
-        description: "Vérifiez votre connexion internet",
-      });
+      // Toast uniquement si vraiment offline (pas juste une erreur temporaire)
+      setTimeout(() => {
+        if (!navigator.onLine) {
+          toast({
+            variant: "destructive",
+            title: "Pas de connexion",
+            description: "Vérifiez votre connexion internet",
+          });
+        }
+      }, 2000);
     };
 
     window.addEventListener('online', handleOnline);
@@ -64,19 +69,20 @@ export function useConnectionStatus() {
   // Periodic Supabase health check - uniquement si nécessaire
   useEffect(() => {
     const interval = setInterval(async () => {
-      // Ne ping que si on a eu des échecs récents ou si offline
-      if (isOnline && (consecutiveFailures > 0 || !isSupabaseConnected)) {
+      // Ne ping que si on a eu des échecs récents
+      if (isOnline && consecutiveFailures > 0) {
         const wasConnected = isSupabaseConnected;
         const isConnected = await pingSupabase();
         
-        if (!wasConnected && isConnected) {
+        // Toast uniquement si c'était vraiment déconnecté ET que ça se rétablit
+        if (!wasConnected && isConnected && consecutiveFailures >= 3) {
           toast({
             title: "Connexion rétablie",
-            description: "Synchronisation automatique en cours...",
+            description: "Tout fonctionne à nouveau",
           });
         }
       }
-    }, 60000); // Check toutes les 60 secondes au lieu de 30
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [isOnline, isSupabaseConnected, consecutiveFailures, pingSupabase]);
