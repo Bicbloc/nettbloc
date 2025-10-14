@@ -101,6 +101,7 @@ export function useSubscription() {
 
     // Premium features
     const premiumFeatures = [
+      'mobile_access',        // Accès mobile réservé premium
       'data_archiving',
       'advanced_team_management',
       'priority_support',

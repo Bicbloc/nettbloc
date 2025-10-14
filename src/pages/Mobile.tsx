@@ -22,8 +22,52 @@ export default function Mobile() {
   const navigate = useNavigate();
   const [accessCode, setAccessCode] = useState(searchParams.get('code') || '');
   const [session, setSession] = useState<HousekeeperSession | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isPremiumHotel, setIsPremiumHotel] = useState(false);
+
+  // Vérifier si l'hôtel a un plan premium
+  useEffect(() => {
+    const checkHotelPremium = async () => {
+      const savedSession = localStorage.getItem('housekeeper_mobile_session');
+      if (savedSession) {
+        try {
+          const sessionData = JSON.parse(savedSession);
+          const { data: hotel } = await supabase
+            .from('hotels')
+            .select('user_id')
+            .eq('id', sessionData.hotel_id)
+            .single();
+
+          if (hotel?.user_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('plan, subscription_type')
+              .eq('id', hotel.user_id)
+              .single();
+
+            const premium = profile?.plan === 'premium' || profile?.subscription_type === 'premium';
+            setIsPremiumHotel(premium);
+            
+            if (!premium) {
+              localStorage.removeItem('housekeeper_mobile_session');
+              setSession(null);
+              toast({
+                title: "Accès Premium requis",
+                description: "Cette fonctionnalité est réservée aux hôtels Premium",
+                variant: "destructive"
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Erreur vérification premium:', error);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    checkHotelPremium();
+  }, []);
 
   useEffect(() => {
     // Si on a un code dans l'URL, essayer de s'authentifier automatiquement
@@ -75,6 +119,34 @@ export default function Mobile() {
           variant: "destructive"
         });
         return;
+      }
+
+      // Vérifier si l'hôtel est premium
+      const { data: hotel } = await supabase
+        .from('hotels')
+        .select('user_id')
+        .eq('id', auth.hotel_id)
+        .single();
+
+      if (hotel?.user_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plan, subscription_type')
+          .eq('id', hotel.user_id)
+          .single();
+
+        const premium = profile?.plan === 'premium' || profile?.subscription_type === 'premium';
+        
+        if (!premium) {
+          toast({
+            title: "Accès Premium requis",
+            description: "L'accès mobile est réservé aux hôtels Premium",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        setIsPremiumHotel(true);
       }
 
       // Créer la session housekeeper
@@ -188,6 +260,19 @@ export default function Mobile() {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center gap-4 py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Vérification de l'accès...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
       <div className="max-w-md mx-auto space-y-6">
@@ -198,7 +283,10 @@ export default function Mobile() {
                 <Smartphone className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <CardTitle>Interface Mobile Femme de Chambre</CardTitle>
+            <CardTitle className="flex items-center justify-center gap-2">
+              Interface Mobile Femme de Chambre
+              <Badge variant="premium" className="text-xs">Premium</Badge>
+            </CardTitle>
             <p className="text-muted-foreground">
               Saisissez votre code d'accès pour vous connecter
             </p>

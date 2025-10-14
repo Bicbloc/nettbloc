@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2 } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -2087,7 +2087,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <h2 className="text-2xl font-bold">Accès mobile</h2>
             </div>
 
-            {!isDistributed ? (
+            {!canAccessFeature('mobile_access') ? (
+              <Alert className="border-premium">
+                <Lock className="h-4 w-4" />
+                <AlertTitle>Fonctionnalité Premium</AlertTitle>
+                <AlertDescription className="flex flex-col gap-4">
+                  <p>L'accès mobile aux codes d'accès pour les femmes de chambre est réservé aux utilisateurs Premium.</p>
+                  <UpgradeButton />
+                </AlertDescription>
+              </Alert>
+            ) : !isDistributed ? (
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Distribution requise</AlertTitle>
@@ -2099,6 +2108,10 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <>
                 <div className="flex items-center justify-between mb-4">
                   <NotificationBell hotelId={currentHotelId} />
+                  <Badge variant="premium" className="gap-1">
+                    <Smartphone className="h-3 w-3" />
+                    Accès Mobile Premium
+                  </Badge>
                 </div>
                 
                 {/* Codes d'accès généraux pour l'interface mobile */}
