@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,11 +16,14 @@ import {
   CheckCircle,
   AlertTriangle,
   ArrowRight,
-  Loader2
+  Loader2,
+  Search,
+  X
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { processPdf, Room } from '@/services/pdfService';
 import { useNavigate } from 'react-router-dom';
+import { AccessCodeManagementService } from '@/services/accessCodeManagementService';
 
 type DistributionMethod = 'random' | 'floor' | 'cleaning-type';
 
@@ -43,6 +46,11 @@ const AnalysisWorkflow = () => {
   const [recommendedHousekeepers, setRecommendedHousekeepers] = useState(0);
   const [housekeeperNames, setHousekeeperNames] = useState<string[]>([]);
   const [distributionMethod, setDistributionMethod] = useState<DistributionMethod>('random');
+  const [existingHousekeepers, setExistingHousekeepers] = useState<any[]>([]);
+  const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAllExisting, setShowAllExisting] = useState(false);
+  const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
   
   const steps: AnalysisStep[] = [
     {
@@ -134,6 +142,58 @@ const AnalysisWorkflow = () => {
     updated[index] = newName;
     setHousekeeperNames(updated);
   };
+
+  const loadExistingHousekeepers = async () => {
+    const selectedHotelId = localStorage.getItem('selectedHotelId');
+    if (!selectedHotelId) return;
+    
+    try {
+      setIsLoadingHousekeepers(true);
+      const [housekeepersWithCodes, accessCodes] = await Promise.all([
+        AccessCodeManagementService.getHousekeepersWithCodes(selectedHotelId),
+        AccessCodeManagementService.getHotelAccessCodes(selectedHotelId)
+      ]);
+      
+      const enhancedHousekeepers = housekeepersWithCodes.map(hk => {
+        const relatedCode = accessCodes.find(code => code.housekeeper_id === hk.id);
+        return {
+          ...hk,
+          current_access_code: relatedCode?.access_code || hk.access_code,
+          code_is_active: relatedCode?.is_active ?? true,
+          code_used_at: relatedCode?.used_at
+        };
+      });
+      
+      setExistingHousekeepers(enhancedHousekeepers);
+    } catch (error) {
+      console.error('Erreur chargement femmes de chambre:', error);
+    } finally {
+      setIsLoadingHousekeepers(false);
+    }
+  };
+
+  const toggleExistingHousekeeper = (name: string) => {
+    setSelectedExisting(prev => 
+      prev.includes(name) 
+        ? prev.filter(n => n !== name)
+        : [...prev, name]
+    );
+  };
+
+  const filteredExistingHousekeepers = existingHousekeepers.filter(hk => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      hk.name.toLowerCase().includes(query) ||
+      (hk.current_access_code || hk.access_code || '').toLowerCase().includes(query)
+    );
+  });
+
+  useEffect(() => {
+    if (currentStep === 3) {
+      loadExistingHousekeepers();
+    }
+  }, [currentStep]);
 
   const handleApplyDistribution = () => {
     if (housekeeperNames.length === 0) {
@@ -278,40 +338,177 @@ const AnalysisWorkflow = () => {
             <strong>Nombre recommandé :</strong> {recommendedHousekeepers} femmes de chambre
           </AlertDescription>
         </Alert>
-        
+
+        {/* Barre de recherche */}
         <div className="space-y-2">
-          <Label>Noms des femmes de chambre ({housekeeperNames.length}/{recommendedHousekeepers})</Label>
-          {housekeeperNames.map((name, index) => (
-            <div key={index} className="flex gap-2">
-              <Input
-                value={name}
-                onChange={(e) => handleHousekeeperNameChange(index, e.target.value)}
-                placeholder={`Femme de chambre ${index + 1}`}
-              />
+          <Label>Rechercher une femme de chambre existante</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher par nom ou code d'accès..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Femmes de chambre existantes */}
+        {(existingHousekeepers.length > 0 || isLoadingHousekeepers) && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium text-green-700">
+                ✅ Femmes de chambre existantes ({filteredExistingHousekeepers.length})
+              </Label>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleRemoveHousekeeper(index)}
+                onClick={() => setShowAllExisting(!showAllExisting)}
               >
-                Supprimer
+                {showAllExisting ? 'Masquer' : 'Voir tout'}
               </Button>
             </div>
-          ))}
-        </div>
+            
+            {isLoadingHousekeepers ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                Chargement des femmes de chambre...
+              </div>
+            ) : showAllExisting || searchQuery ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {filteredExistingHousekeepers.map((housekeeper) => (
+                  <div
+                    key={housekeeper.id}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedExisting.includes(housekeeper.name) 
+                        ? 'bg-primary/10 border-primary' 
+                        : 'bg-muted/50 hover:bg-muted'
+                    }`}
+                    onClick={() => toggleExistingHousekeeper(housekeeper.name)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                        selectedExisting.includes(housekeeper.name) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                      }`}>
+                        {selectedExisting.includes(housekeeper.name) && (
+                          <div className="w-2 h-2 bg-white rounded-full" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{housekeeper.name}</div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          Code: {housekeeper.current_access_code || housekeeper.access_code || 'Aucun'}
+                        </div>
+                      </div>
+                      <Badge 
+                        variant={housekeeper.is_active && housekeeper.code_is_active ? "default" : "secondary"}
+                        className="text-xs shrink-0"
+                      >
+                        {housekeeper.is_active && housekeeper.code_is_active ? '✅' : '⏸️'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                {filteredExistingHousekeepers.length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground text-sm">
+                    Aucune femme de chambre trouvée
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-2">
+                Cliquez sur "Voir tout" ou utilisez la recherche
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section sélection actuelle */}
+        {selectedExisting.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              Femmes existantes sélectionnées ({selectedExisting.length})
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {selectedExisting.map((name) => (
+                <Badge key={name} variant="secondary" className="gap-1">
+                  {name}
+                  <X 
+                    className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                    onClick={() => toggleExistingHousekeeper(name)}
+                  />
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
         
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleAddHousekeeper} className="flex-1">
+        {/* Ajouter nouvelles femmes de chambre */}
+        <div className="space-y-2">
+          <Label>➕ Ajouter une nouvelle femme de chambre</Label>
+          <div className="space-y-2">
+            {housekeeperNames.map((name, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={name}
+                  onChange={(e) => handleHousekeeperNameChange(index, e.target.value)}
+                  placeholder={`Femme de chambre ${index + 1}`}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRemoveHousekeeper(index)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button variant="outline" onClick={handleAddHousekeeper} className="w-full">
+            <Users className="mr-2 h-4 w-4" />
             Ajouter une femme de chambre
           </Button>
-          <Button 
-            onClick={() => setCurrentStep(4)}
-            disabled={housekeeperNames.length === 0}
-            className="flex-1"
-          >
-            Continuer
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
         </div>
+
+        {/* Total sélectionné */}
+        {(selectedExisting.length > 0 || housekeeperNames.length > 0) && (
+          <Alert>
+            <AlertDescription>
+              <strong>Total sélectionné :</strong> {selectedExisting.length + housekeeperNames.length} femmes de chambre
+              {selectedExisting.length > 0 && ` (${selectedExisting.length} existantes, ${housekeeperNames.length} nouvelles)`}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <Button 
+          onClick={() => {
+            const allSelected = [...selectedExisting, ...housekeeperNames];
+            if (allSelected.length === 0) {
+              toast({
+                variant: "destructive",
+                title: "Erreur",
+                description: "Veuillez sélectionner ou ajouter au moins une femme de chambre."
+              });
+              return;
+            }
+            setHousekeeperNames(allSelected);
+            setCurrentStep(4);
+          }}
+          className="w-full"
+        >
+          Continuer
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
       </CardContent>
     </Card>
   );
