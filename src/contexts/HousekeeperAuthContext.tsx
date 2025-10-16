@@ -179,7 +179,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   };
 
   const signUp = async (email: string, password: string, name: string, phone?: string) => {
-    const redirectUrl = `${window.location.origin}/housekeeper/auth`;
+    const redirectUrl = `${window.location.origin}/housekeeper/login`;
     
     const { data, error } = await supabase.auth.signUp({
       email,

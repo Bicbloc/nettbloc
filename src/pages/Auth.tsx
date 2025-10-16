@@ -163,7 +163,7 @@ const Auth = () => {
   };
 
   const handleGuestMode = () => {
-    navigate('/guest-mode');
+    navigate('/guest');
   };
 
   const handleHousekeeperAccess = () => {

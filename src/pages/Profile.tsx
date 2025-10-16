@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Building, Calendar, Edit2, Save, X } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -144,14 +145,14 @@ const Profile = () => {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="space-y-6">
-        {/* Header avec bouton retour */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <BackButton />
             <div>
-              <h1 className="text-3xl font-bold">Mon Profil</h1>
+              <h1 className="text-3xl font-bold">Mon Compte</h1>
               <p className="text-muted-foreground">
-                Gérez vos informations personnelles et votre compte
+                Profil et paramètres
               </p>
             </div>
           </div>
@@ -165,164 +166,222 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Grid layout pour organiser les sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Colonne principale - Informations générales */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Informations principales */}
+        {/* Onglets */}
+        <Tabs defaultValue="profile" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="profile" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Profil
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Paramètres
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Onglet Profil */}
+          <TabsContent value="profile" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Colonne principale */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Informations principales */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Informations générales
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Email */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                      <Label className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Email
+                      </Label>
+                      <div className="md:col-span-2">
+                        <Input
+                          value={profile.email}
+                          disabled
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Non modifiable
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Nom établissement */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                      <Label className="flex items-center gap-2">
+                        <Building className="h-4 w-4" />
+                        Établissement
+                      </Label>
+                      <div className="md:col-span-2">
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <Input
+                              value={editedCompanyName}
+                              onChange={(e) => setEditedCompanyName(e.target.value)}
+                              placeholder="Nom de votre établissement"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={handleSave}
+                                disabled={isSaving}
+                              >
+                                <Save className="h-3 w-3 mr-1" />
+                                {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancel}
+                                disabled={isSaving}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Annuler
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="flex-1">
+                              {profile.company_name || 'Non défini'}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setIsEditing(true)}
+                            >
+                              <Edit2 className="h-3 w-3 mr-1" />
+                              Modifier
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dates */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div>
+                        <Label className="flex items-center gap-2 mb-2">
+                          <Calendar className="h-4 w-4" />
+                          Créé le
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(profile.created_at), 'PPP', { locale: fr })}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="flex items-center gap-2 mb-2">
+                          <Calendar className="h-4 w-4" />
+                          Mis à jour
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(profile.updated_at), 'PPP', { locale: fr })}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Limites */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Limites du plan</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center p-4 bg-muted/30 rounded-lg">
+                        <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
+                          {subscribed && plan === 'premium' ? '∞' : '1'}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Hôtels</p>
+                      </div>
+                      <div className="text-center p-4 bg-muted/30 rounded-lg">
+                        <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
+                          {subscribed && plan === 'premium' ? '∞' : '50'}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Chambres</p>
+                      </div>
+                      <div className="text-center p-4 bg-muted/30 rounded-lg">
+                        <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
+                          {subscribed && plan === 'premium' ? '∞' : '10'}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Personnel</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Colonne latérale */}
+              <div className="space-y-6">
+                <SubscriptionCard />
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Onglet Paramètres */}
+          <TabsContent value="settings" className="space-y-6 mt-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Informations générales
+                  <Bell className="h-5 w-5" />
+                  Notifications
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Email */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                  <Label className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Adresse email
-                  </Label>
-                  <div className="md:col-span-2">
-                    <Input
-                      value={profile.email}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      L'email ne peut pas être modifié
-                    </p>
-                  </div>
-                </div>
-
-                {/* Nom de l'entreprise */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                  <Label className="flex items-center gap-2">
-                    <Building className="h-4 w-4" />
-                    Nom de l'établissement
-                  </Label>
-                  <div className="md:col-span-2">
-                    {isEditing ? (
-                      <div className="space-y-3">
-                          <Input
-                            value={editedCompanyName}
-                            onChange={(e) => setEditedCompanyName(e.target.value)}
-                            placeholder="Nom de votre établissement (hôtel, résidence, etc.)"
-                            className="w-full"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Ce nom sera utilisé pour identifier votre établissement
-                          </p>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={handleSave}
-                            disabled={isSaving}
-                            className="flex items-center gap-1"
-                          >
-                            <Save className="h-3 w-3" />
-                            {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleCancel}
-                            disabled={isSaving}
-                            className="flex items-center gap-1"
-                          >
-                            <X className="h-3 w-3" />
-                            Annuler
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="flex-1">
-                          {profile.company_name || 'Non défini'}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setIsEditing(true)}
-                          className="flex items-center gap-1"
-                        >
-                          <Edit2 className="h-3 w-3" />
-                          Modifier
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Dates */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2">
-                      <Calendar className="h-4 w-4" />
-                      Date de création
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(profile.created_at), 'PPP', { locale: fr })}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2">
-                      <Calendar className="h-4 w-4" />
-                      Dernière mise à jour
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(profile.updated_at), 'PPP', { locale: fr })}
-                    </p>
-                  </div>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Gérez vos préférences de notifications pour rester informé de l'activité de votre établissement.
+                </p>
+                <div className="pt-2">
+                  <NotificationBell />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Limitations et quotas */}
             <Card>
               <CardHeader>
-                <CardTitle>Limites du plan actuel</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Préférences
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-muted/30 rounded-lg">
-                    <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
-                      {subscribed && plan === 'premium' ? '∞' : '1'}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Hôtels autorisés</p>
-                    {!subscribed && (
-                      <p className="text-xs text-muted-foreground mt-1">Upgrade pour plus</p>
-                    )}
-                  </div>
-                  <div className="text-center p-4 bg-muted/30 rounded-lg">
-                    <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
-                      {subscribed && plan === 'premium' ? '∞' : '50'}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Chambres max</p>
-                    {!subscribed && (
-                      <p className="text-xs text-muted-foreground mt-1">Upgrade pour plus</p>
-                    )}
-                  </div>
-                  <div className="text-center p-4 bg-muted/30 rounded-lg">
-                    <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
-                      {subscribed && plan === 'premium' ? '∞' : '10'}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Femmes de chambre max</p>
-                    {!subscribed && (
-                      <p className="text-xs text-muted-foreground mt-1">Upgrade pour plus</p>
-                    )}
-                  </div>
-                </div>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Les paramètres avancés sont accessibles depuis le tableau de bord principal.
+                </p>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Colonne latérale - Abonnement */}
-          <div className="space-y-6">
-            <SubscriptionCard />
-          </div>
-        </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                  <LogOut className="h-5 w-5" />
+                  Déconnexion
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Vous serez redirigé vers la page de connexion.
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    window.location.href = '/auth';
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Se déconnecter
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

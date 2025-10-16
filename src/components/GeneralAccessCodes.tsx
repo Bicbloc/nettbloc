@@ -201,7 +201,7 @@ export const GeneralAccessCodes = () => {
   };
 
   const copyDirectLink = (accessCode: string) => {
-    const directLink = `${window.location.origin}/hotel/guest?code=${accessCode}`;
+    const directLink = `${window.location.origin}/guest?code=${accessCode}`;
     navigator.clipboard.writeText(directLink).then(() => {
       toast({
         title: "Lien copié !",

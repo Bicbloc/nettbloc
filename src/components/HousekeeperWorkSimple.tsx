@@ -40,7 +40,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         description: "Code d'accès ou hôtel non spécifié",
         variant: "destructive"
       });
-      navigate('/housekeeper/auth');
+      navigate('/housekeeper/login');
     }
   }, [accessCode, hotelId]);
 
@@ -55,7 +55,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
           description: authResult.error || "Code d'accès non valide",
           variant: "destructive"
         });
-        navigate('/housekeeper/auth');
+        navigate('/housekeeper/login');
         return;
       }
 
@@ -198,7 +198,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   };
 
   const handleLogout = () => {
-    navigate('/housekeeper/auth');
+    navigate('/housekeeper/login');
   };
 
   if (isLoading) {

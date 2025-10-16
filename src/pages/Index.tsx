@@ -1451,13 +1451,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                     <a href="/housekeeper-login">
                       <Smartphone className="mr-2 h-4 w-4" />
                       Accès Femme de Chambre (Code Hôtel)
-                    </a>
-                  </Button>
-                  <Button asChild>
-                    <a href="/housekeeper/auth">
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      Espace Personnel Femme de Chambre
-                    </a>
+                  </a>
+                </Button>
+                <Button asChild>
+                  <a href="/housekeeper/login">
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    Espace Personnel Femme de Chambre
+                  </a>
                   </Button>
                  <Button asChild>
                    <a href="/auth">
@@ -1467,13 +1467,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                  </Button>
                </>
              )}
-              {isAuthenticated && (
-                <>
-                   <Button asChild>
-                     <a href="/housekeeper/auth">
-                       <UserIcon className="mr-2 h-4 w-4" />
-                       Espace Personnel Femme de Chambre
-                     </a>
+            {isAuthenticated && (
+              <>
+                 <Button asChild>
+                   <a href="/housekeeper/login">
+                     <UserIcon className="mr-2 h-4 w-4" />
+                     Espace Personnel Femme de Chambre
+                   </a>
                    </Button>
                   <NotificationBell hotelId={hotel?.id} />
                  <UserMenu />
@@ -1534,15 +1534,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               >
                 <Archive className="h-4 w-4" />
                 Archives
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => navigate('/analysis')}
-                className="flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                Analyse guidée
               </Button>
             </div>
           </div>

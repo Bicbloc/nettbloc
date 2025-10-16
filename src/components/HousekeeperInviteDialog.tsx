@@ -103,7 +103,7 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
               type: 'activation',
               companyName: name,
               accessCode: generatedCode,
-              activationLink: `${window.location.origin}/mobile?code=${generatedCode}`
+              activationLink: `${window.location.origin}/housekeeper/work?code=${generatedCode}`
             }
           });
         } catch (emailError) {
@@ -232,7 +232,7 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
 
             <div className="text-sm text-muted-foreground space-y-2">
               <p>• Code permanent pour {name}</p>
-              <p>• Interface mobile: {window.location.origin}/mobile</p>
+              <p>• Interface mobile: {window.location.origin}/housekeeper/work</p>
               {email && <p>• Email d'invitation envoyé à: {email}</p>}
               {!email && <p>• Communiquez ce code directement à {name}</p>}
             </div>

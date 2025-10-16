@@ -287,7 +287,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
   }
 
   if (!hotel) {
-    return <Navigate to="/housekeeper/auth" replace />;
+    return <Navigate to="/housekeeper/login" replace />;
   }
 
   return (
@@ -303,7 +303,7 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
             Bonjour {managerName} • Mode Gestion • {hotel.address}
           </p>
         </div>
-        <Button variant="outline" onClick={() => window.location.href = '/housekeeper/auth'}>
+        <Button variant="outline" onClick={() => window.location.href = '/housekeeper/login'}>
           <LogOut className="h-4 w-4 mr-2" />
           Quitter
         </Button>
