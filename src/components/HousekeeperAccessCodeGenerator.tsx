@@ -75,6 +75,13 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
 
       setGeneratedCode(accessCode);
       
+      // Copier automatiquement le code dans le presse-papiers
+      try {
+        await navigator.clipboard.writeText(accessCode);
+      } catch (error) {
+        console.warn('Impossible de copier automatiquement le code:', error);
+      }
+      
       // Envoyer un email d'activation si un email est fourni
       if (email) {
         try {
@@ -96,8 +103,8 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
             });
           } else {
             toast({
-              title: "Code généré et email envoyé",
-              description: `Code d'accès généré pour ${housekeeperName} et email d'activation envoyé.`
+              title: "Code généré et copié",
+              description: `Code d'accès généré pour ${housekeeperName}, email envoyé et code copié dans le presse-papiers.`
             });
           }
         } catch (emailError) {
@@ -110,8 +117,8 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
         }
       } else {
         toast({
-          title: "Code généré",
-          description: `Code d'accès généré pour ${housekeeperName}: ${accessCode}`
+          title: "Code généré et copié",
+          description: `Code d'accès généré pour ${housekeeperName} et copié dans le presse-papiers: ${accessCode}`
         });
       }
 

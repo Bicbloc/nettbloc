@@ -463,10 +463,19 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         refreshHousekeepers();
       }
 
-      toast({
-        title: "Code généré",
-        description: `Code d'accès généré pour ${housekeeperName}: ${codeData}`
-      });
+      // Copier automatiquement le code dans le presse-papiers
+      try {
+        await navigator.clipboard.writeText(codeData);
+        toast({
+          title: "Code généré et copié",
+          description: `Code d'accès généré pour ${housekeeperName} et copié: ${codeData}`
+        });
+      } catch (clipboardError) {
+        toast({
+          title: "Code généré",
+          description: `Code d'accès généré pour ${housekeeperName}: ${codeData} (impossible de copier automatiquement)`
+        });
+      }
 
       return codeData;
     } catch (error) {
