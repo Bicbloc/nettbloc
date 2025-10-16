@@ -140,7 +140,7 @@ export default function HousekeeperLogin() {
         description: `Bienvenue ${housekeeper.name} !`
       });
 
-      navigate('/housekeeper');
+      navigate('/housekeeper/work');
       
     } catch (error) {
       console.error("Erreur lors de la connexion:", error);
@@ -204,7 +204,7 @@ export default function HousekeeperLogin() {
         description: `Bienvenue ${housekeeper.name} !`
       });
 
-      navigate('/housekeeper');
+      navigate('/housekeeper/work');
 
     } catch (error) {
       console.error('💥 Erreur connexion directe:', error);
