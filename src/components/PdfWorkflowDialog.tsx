@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -34,6 +34,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [existingHousekeepers, setExistingHousekeepers] = useState<any[]>([]);
   const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
   const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAllExisting, setShowAllExisting] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -165,6 +167,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setNewHousekeeperName('');
     setSelectedExisting([]);
     setExistingHousekeepers([]);
+    setSearchQuery('');
+    setShowAllExisting(false);
   };
 
   const triggerFileInput = () => {
@@ -267,64 +271,144 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           </p>
         </div>
 
+        {/* Barre de recherche */}
+        {existingHousekeepers.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-muted-foreground">
+              Rechercher une femme de chambre existante
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom ou code d'accès..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Section pour les femmes de chambre existantes avec codes */}
         {(existingHousekeepers.length > 0 || isLoadingHousekeepers) && (
           <div className="space-y-3">
-            <div className="text-sm font-medium text-green-700">
-              ✅ Femmes de chambre existantes avec codes d'accès
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium text-green-700">
+                ✅ Femmes de chambre existantes ({existingHousekeepers.filter((hk) => {
+                  if (!searchQuery) return true;
+                  const query = searchQuery.toLowerCase();
+                  return (
+                    hk.name.toLowerCase().includes(query) ||
+                    (hk.current_access_code || hk.access_code || '').toLowerCase().includes(query)
+                  );
+                }).length})
+              </div>
+              {existingHousekeepers.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllExisting(!showAllExisting)}
+                >
+                  {showAllExisting ? 'Masquer' : 'Voir tout'}
+                </Button>
+              )}
             </div>
             
             {isLoadingHousekeepers ? (
               <div className="text-center py-4 text-muted-foreground">
                 Chargement des femmes de chambre...
               </div>
-            ) : (
-              <div className="space-y-3">
-                {existingHousekeepers.map((housekeeper) => (
-                  <div
-                    key={housekeeper.id}
-                    className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                      selectedExisting.includes(housekeeper.name) 
-                        ? 'bg-primary/10 border-primary' 
-                        : 'bg-muted/50 hover:bg-muted'
-                    }`}
-                    onClick={() => toggleExistingHousekeeper(housekeeper.name)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                        selectedExisting.includes(housekeeper.name) ? 'bg-primary border-primary' : 'border-muted-foreground'
-                      }`}>
-                        {selectedExisting.includes(housekeeper.name) && (
-                          <div className="w-2 h-2 bg-white rounded-full" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{housekeeper.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Code: {housekeeper.current_access_code || housekeeper.access_code || 'Aucun code'}
+            ) : showAllExisting || searchQuery ? (
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {existingHousekeepers
+                  .filter((hk) => {
+                    if (!searchQuery) return true;
+                    const query = searchQuery.toLowerCase();
+                    return (
+                      hk.name.toLowerCase().includes(query) ||
+                      (hk.current_access_code || hk.access_code || '').toLowerCase().includes(query)
+                    );
+                  })
+                  .map((housekeeper) => (
+                    <div
+                      key={housekeeper.id}
+                      className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                        selectedExisting.includes(housekeeper.name) 
+                          ? 'bg-primary/10 border-primary' 
+                          : 'bg-muted/50 hover:bg-muted'
+                      }`}
+                      onClick={() => toggleExistingHousekeeper(housekeeper.name)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                          selectedExisting.includes(housekeeper.name) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                        }`}>
+                          {selectedExisting.includes(housekeeper.name) && (
+                            <div className="w-2 h-2 bg-white rounded-full" />
+                          )}
                         </div>
-                        {housekeeper.code_used_at && (
-                          <div className="text-xs text-green-600">
-                            Dernière utilisation: {new Date(housekeeper.code_used_at).toLocaleDateString()}
+                        <div className="flex-1">
+                          <div className="font-medium">{housekeeper.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Code: {housekeeper.current_access_code || housekeeper.access_code || 'Aucun code'}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Badge 
-                          variant={housekeeper.is_active && housekeeper.code_is_active ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {housekeeper.is_active && housekeeper.code_is_active ? '✅ Actif' : '⏸️ Inactif'}
-                        </Badge>
-                        {housekeeper.current_access_code && (
-                          <Badge variant="outline" className="text-xs">
-                            🔑 Code permanent
+                          {housekeeper.code_used_at && (
+                            <div className="text-xs text-green-600">
+                              Dernière utilisation: {new Date(housekeeper.code_used_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Badge 
+                            variant={housekeeper.is_active && housekeeper.code_is_active ? "default" : "secondary"}
+                            className="text-xs"
+                          >
+                            {housekeeper.is_active && housekeeper.code_is_active ? '✅ Actif' : '⏸️ Inactif'}
                           </Badge>
-                        )}
+                          {housekeeper.current_access_code && (
+                            <Badge variant="outline" className="text-xs">
+                              🔑 Code permanent
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  ))}
+                {existingHousekeepers.filter((hk) => {
+                  if (!searchQuery) return true;
+                  const query = searchQuery.toLowerCase();
+                  return (
+                    hk.name.toLowerCase().includes(query) ||
+                    (hk.current_access_code || hk.access_code || '').toLowerCase().includes(query)
+                  );
+                }).length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground text-sm">
+                    Aucune femme de chambre trouvée
                   </div>
-                ))}
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-2">
+                Cliquez sur "Voir tout" ou utilisez la recherche
+              </div>
+            )}
+
+            {/* Sélection actuelle */}
+            {selectedExisting.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-sm text-green-800">
+                  ✅ {selectedExisting.length} femme{selectedExisting.length > 1 ? 's' : ''} de chambre sélectionnée{selectedExisting.length > 1 ? 's' : ''}
+                </p>
               </div>
             )}
           </div>
@@ -488,8 +572,15 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     </>
   );
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      resetDialog();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <FileUp className="mr-2 h-4 w-4" />
