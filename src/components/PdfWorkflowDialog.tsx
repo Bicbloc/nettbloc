@@ -35,7 +35,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
   const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAllExisting, setShowAllExisting] = useState(false);
+  const [showAllExisting, setShowAllExisting] = useState(true);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -328,7 +328,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
               <div className="text-center py-4 text-muted-foreground">
                 Chargement des femmes de chambre...
               </div>
-            ) : showAllExisting || searchQuery ? (
+            ) : existingHousekeepers.length > 0 ? (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {existingHousekeepers
                   .filter((hk) => {
@@ -399,7 +399,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
               </div>
             ) : (
               <div className="text-sm text-muted-foreground text-center py-2">
-                Cliquez sur "Voir tout" ou utilisez la recherche
+                Aucune femme de chambre existante
               </div>
             )}
 
