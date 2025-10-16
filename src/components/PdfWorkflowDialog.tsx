@@ -15,7 +15,7 @@ import { FileUp, Users, ArrowRight, CheckCircle, X, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { AccessCodeManagementService } from "@/services/accessCodeManagementService";
+import { SimpleCodeService, HousekeeperWithCode } from "@/services/simpleCodeService";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -31,7 +31,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [existingHousekeepers, setExistingHousekeepers] = useState<any[]>([]);
+  const [existingHousekeepers, setExistingHousekeepers] = useState<HousekeeperWithCode[]>([]);
   const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
   const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -125,27 +125,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     
     try {
       setIsLoadingHousekeepers(true);
-      
-      // Load both housekeepers and their access codes
-      const [housekeepersWithCodes, accessCodes] = await Promise.all([
-        AccessCodeManagementService.getHousekeepersWithCodes(hotelId),
-        AccessCodeManagementService.getHotelAccessCodes(hotelId)
-      ]);
-      
-      // Enhance housekeepers data with access codes
-      const enhancedHousekeepers = housekeepersWithCodes.map(hk => {
-        const relatedCode = accessCodes.find(code => code.housekeeper_id === hk.id);
-        return {
-          ...hk,
-          current_access_code: relatedCode?.access_code || hk.access_code,
-          code_is_active: relatedCode?.is_active ?? true,
-          code_used_at: relatedCode?.used_at
-        };
-      });
-      
-      setExistingHousekeepers(enhancedHousekeepers);
+      const housekeepersData = await SimpleCodeService.getHousekeepersWithCodes(hotelId);
+      setExistingHousekeepers(housekeepersData);
     } catch (error) {
-      console.error('Erreur chargement femmes de chambre:', error);
+      console.error('Error loading housekeepers:', error);
     } finally {
       setIsLoadingHousekeepers(false);
     }
@@ -309,7 +292,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                   const query = searchQuery.toLowerCase();
                   return (
                     hk.name.toLowerCase().includes(query) ||
-                    (hk.current_access_code || hk.access_code || '').toLowerCase().includes(query)
+                    (hk.access_code || '').toLowerCase().includes(query)
                   );
                 }).length})
               </div>
@@ -336,7 +319,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                     const query = searchQuery.toLowerCase();
                     return (
                       hk.name.toLowerCase().includes(query) ||
-                      (hk.current_access_code || hk.access_code || '').toLowerCase().includes(query)
+                      (hk.access_code || '').toLowerCase().includes(query)
                     );
                   })
                   .map((housekeeper) => (
@@ -360,26 +343,16 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                         <div className="flex-1">
                           <div className="font-medium">{housekeeper.name}</div>
                           <div className="text-sm text-muted-foreground">
-                            Code: {housekeeper.current_access_code || housekeeper.access_code || 'Aucun code'}
+                            Code: {housekeeper.access_code || 'Aucun code'}
                           </div>
-                          {housekeeper.code_used_at && (
-                            <div className="text-xs text-green-600">
-                              Dernière utilisation: {new Date(housekeeper.code_used_at).toLocaleDateString()}
-                            </div>
-                          )}
                         </div>
                         <div className="flex flex-col gap-1">
                           <Badge 
-                            variant={housekeeper.is_active && housekeeper.code_is_active ? "default" : "secondary"}
+                            variant={housekeeper.is_active ? "default" : "secondary"}
                             className="text-xs"
                           >
-                            {housekeeper.is_active && housekeeper.code_is_active ? '✅ Actif' : '⏸️ Inactif'}
+                            {housekeeper.is_active ? '✅ Actif' : '⏸️ Inactif'}
                           </Badge>
-                          {housekeeper.current_access_code && (
-                            <Badge variant="outline" className="text-xs">
-                              🔑 Code permanent
-                            </Badge>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -389,7 +362,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                   const query = searchQuery.toLowerCase();
                   return (
                     hk.name.toLowerCase().includes(query) ||
-                    (hk.current_access_code || hk.access_code || '').toLowerCase().includes(query)
+                    (hk.access_code || '').toLowerCase().includes(query)
                   );
                 }).length === 0 && (
                   <div className="text-center py-4 text-muted-foreground text-sm">

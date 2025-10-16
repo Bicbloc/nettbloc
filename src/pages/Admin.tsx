@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { HousekeeperTeamManager } from '@/components/HousekeeperTeamManager';
-import { HotelAdminPanel } from '@/components/HotelAdminPanel';
+
 import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -679,7 +679,16 @@ const Admin = () => {
   }
 
   if (!isSuperAdmin) {
-    return <HotelAdminPanel />;
+    return (
+      <Card className="m-6">
+        <CardHeader>
+          <CardTitle>Accès refusé</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Seuls les super administrateurs peuvent accéder à cette page.</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

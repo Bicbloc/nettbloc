@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, Users, Mail, Key, Copy, Eye, EyeOff, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { HousekeeperInviteDialog } from './HousekeeperInviteDialog';
-import { AccessCodeManagementService } from '@/services/accessCodeManagementService';
+import { SimpleCodeService } from '@/services/simpleCodeService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface HousekeeperWithCode {
@@ -64,7 +64,7 @@ export function HousekeeperSetupDialog({
     
     setIsLoadingHousekeepers(true);
     try {
-      const housekeepersWithCodes = await AccessCodeManagementService.getHousekeepersWithCodes(hotelId);
+      const housekeepersWithCodes = await SimpleCodeService.getHousekeepersWithCodes(hotelId);
       setExistingWithCodes(housekeepersWithCodes);
     } catch (error) {
       console.error('Erreur chargement femmes de chambre:', error);
@@ -397,7 +397,7 @@ export function HousekeeperSetupDialog({
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    AccessCodeManagementService.copyToClipboard(housekeeper.access_code!);
+                                    SimpleCodeService.copyToClipboard(housekeeper.access_code!);
                                   }}
                                   className="p-1 h-6 w-6"
                                 >

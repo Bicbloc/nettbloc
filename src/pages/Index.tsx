@@ -46,8 +46,8 @@ import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
-import { HousekeeperManagementEnhanced } from "@/components/HousekeeperManagementEnhanced";
-import { GeneralAccessCodes } from "@/components/GeneralAccessCodes";
+
+
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
 import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
 import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
@@ -1641,10 +1641,18 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <ActiveUsersPanel />
             </div>
             
-            {/* Section Gestion des femmes de chambre */}
-            <HousekeeperManagementEnhanced 
-              hotelId={(hotel?.id as string) || (currentHotelId as string) || ''}
-            />
+            {/* Section Gestion des femmes de chambre - Simplifiée */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Personnel</CardTitle>
+                <CardDescription>
+                  Gérez vos femmes de chambre et leurs codes d'accès
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <HousekeeperManagement />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="rooms" className="space-y-6">
@@ -2073,7 +2081,19 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           </TabsContent>
 
           <TabsContent value="access-codes" className="space-y-6">
-            <GeneralAccessCodes key={`general-access-codes-${currentHotelId}`} />
+            <Card>
+              <CardHeader>
+                <CardTitle>Codes d'accès des femmes de chambre</CardTitle>
+                <CardDescription>
+                  Chaque femme de chambre dispose d'un code d'accès unique pour se connecter
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Gérez les codes d'accès depuis l'onglet "Personnel"
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="mobile" className="space-y-6">
@@ -2108,10 +2128,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   </Badge>
                 </div>
                 
-                {/* Codes d'accès généraux pour l'interface mobile */}
-                <GeneralAccessCodes key={`mobile-access-codes-${currentHotelId}`} />
-                
-                {/* Affichage des femmes de chambre avec leurs assignations */}
+                {/* Affichage des femmes de chambre avec leurs codes d'accès */}
                 {housekeeperNames.length > 0 && (
                   <div className="mt-6">
                     <h3 className="text-lg font-semibold mb-4">Accès femmes de chambre</h3>
