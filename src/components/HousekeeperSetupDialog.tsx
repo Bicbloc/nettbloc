@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Users, Mail, Key, Copy, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Plus, Users, Mail, Key, Copy, Eye, EyeOff, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { HousekeeperInviteDialog } from './HousekeeperInviteDialog';
 import { AccessCodeManagementService } from '@/services/accessCodeManagementService';
@@ -54,6 +54,8 @@ export function HousekeeperSetupDialog({
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [visibleCodes, setVisibleCodes] = useState<Set<string>>(new Set()); // Codes visible by default
   const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAllExisting, setShowAllExisting] = useState(false);
   const { toast } = useToast();
 
   // Load existing housekeepers with their access codes from database
@@ -99,6 +101,8 @@ export function HousekeeperSetupDialog({
       }
       setNewHousekeeper('');
       setVisibleCodes(new Set());
+      setSearchQuery('');
+      setShowAllExisting(false);
     }
   }, [isOpen, roomCount, JSON.stringify(initialHousekeepers), JSON.stringify(existingHousekeepers), hotelId]);
 
@@ -291,82 +295,139 @@ export function HousekeeperSetupDialog({
           {/* Section pour les femmes de chambre existantes avec codes */}
           {(existingWithCodes.length > 0 || isLoadingHousekeepers) && (
             <div className="space-y-3">
-              <div className="text-sm font-medium text-green-700">
-                ✅ Femmes de chambre existantes avec codes d'accès
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-green-700">
+                  ✅ Femmes de chambre existantes ({existingWithCodes.length})
+                </div>
+                {existingWithCodes.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllExisting(!showAllExisting)}
+                  >
+                    {showAllExisting ? 'Masquer' : 'Voir tout'}
+                  </Button>
+                )}
+              </div>
+
+              {/* Barre de recherche */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher par nom ou code d'accès..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               
               {isLoadingHousekeepers ? (
                 <div className="text-center py-4 text-muted-foreground">
                   Chargement des femmes de chambre...
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {existingWithCodes.map((housekeeper) => (
-                    <div
-                      key={housekeeper.id}
-                      className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                        selectedExisting.includes(housekeeper.name) 
-                          ? 'bg-primary/10 border-primary' 
-                          : 'bg-muted/50 hover:bg-muted'
-                      }`}
-                      onClick={() => toggleExistingHousekeeper(housekeeper.name)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                          selectedExisting.includes(housekeeper.name) ? 'bg-primary border-primary' : 'border-muted-foreground'
-                        }`}>
-                          {selectedExisting.includes(housekeeper.name) && (
-                            <div className="w-2 h-2 bg-white rounded-full" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{housekeeper.name}</span>
-                            <Badge variant={housekeeper.is_active ? "default" : "secondary"}>
-                              {housekeeper.is_active ? "Actif" : "Inactif"}
-                            </Badge>
+              ) : showAllExisting || searchQuery ? (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {existingWithCodes
+                    .filter((hk) => {
+                      if (!searchQuery) return true;
+                      const query = searchQuery.toLowerCase();
+                      return (
+                        hk.name.toLowerCase().includes(query) ||
+                        (hk.access_code || '').toLowerCase().includes(query)
+                      );
+                    })
+                    .map((housekeeper) => (
+                      <div
+                        key={housekeeper.id}
+                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                          selectedExisting.includes(housekeeper.name) 
+                            ? 'bg-primary/10 border-primary' 
+                            : 'bg-muted/50 hover:bg-muted'
+                        }`}
+                        onClick={() => toggleExistingHousekeeper(housekeeper.name)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                            selectedExisting.includes(housekeeper.name) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                          }`}>
+                            {selectedExisting.includes(housekeeper.name) && (
+                              <div className="w-2 h-2 bg-white rounded-full" />
+                            )}
                           </div>
-                          {housekeeper.access_code && (
-                            <div className="flex items-center gap-2 mt-2">
-                              <Key className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-mono text-sm">
-                                {formatCode(housekeeper.access_code, housekeeper.id)}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleCodeVisibility(housekeeper.id);
-                                }}
-                                className="p-1 h-6 w-6"
-                              >
-                                {visibleCodes.has(housekeeper.id) ? (
-                                  <Eye className="h-3 w-3" />
-                                ) : (
-                                  <EyeOff className="h-3 w-3" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  AccessCodeManagementService.copyToClipboard(housekeeper.access_code!);
-                                }}
-                                className="p-1 h-6 w-6"
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{housekeeper.name}</span>
+                              <Badge variant={housekeeper.is_active ? "default" : "secondary"}>
+                                {housekeeper.is_active ? "Actif" : "Inactif"}
+                              </Badge>
                             </div>
-                          )}
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Créé le: {new Date(housekeeper.created_at).toLocaleDateString()}
+                            {housekeeper.access_code && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <Key className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-mono text-sm">
+                                  {formatCode(housekeeper.access_code, housekeeper.id)}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleCodeVisibility(housekeeper.id);
+                                  }}
+                                  className="p-1 h-6 w-6"
+                                >
+                                  {visibleCodes.has(housekeeper.id) ? (
+                                    <Eye className="h-3 w-3" />
+                                  ) : (
+                                    <EyeOff className="h-3 w-3" />
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    AccessCodeManagementService.copyToClipboard(housekeeper.access_code!);
+                                  }}
+                                  className="p-1 h-6 w-6"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Créé le: {new Date(housekeeper.created_at).toLocaleDateString()}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                    {existingWithCodes.filter((hk) => {
+                      if (!searchQuery) return true;
+                      const query = searchQuery.toLowerCase();
+                      return (
+                        hk.name.toLowerCase().includes(query) ||
+                        (hk.access_code || '').toLowerCase().includes(query)
+                      );
+                    }).length === 0 && (
+                      <div className="text-center py-4 text-muted-foreground text-sm">
+                        Aucune femme de chambre trouvée
+                      </div>
+                    )}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground text-center py-2">
+                  Cliquez sur "Voir tout" ou utilisez la recherche
                 </div>
               )}
               
