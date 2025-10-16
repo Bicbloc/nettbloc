@@ -1109,6 +1109,10 @@ export type Database = {
           hotel_name: string
         }[]
       }
+      generate_and_insert_access_code: {
+        Args: { p_hotel_id: string; p_housekeeper_name: string }
+        Returns: string
+      }
       generate_hotel_access_code: {
         Args: { hotel_uuid: string }
         Returns: string

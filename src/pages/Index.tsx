@@ -444,24 +444,15 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
 
     try {
       const { data: codeData, error } = await supabase
-        .rpc('generate_housekeeper_access_code_simple', {
+        .rpc('generate_and_insert_access_code', {
           p_hotel_id: hotel.id,
           p_housekeeper_name: housekeeperName
         });
 
       if (error) throw error;
 
-      // Mettre à jour la femme de chambre avec le nouveau code
-      const housekeeper = housekeepers.find(h => h.name === housekeeperName);
-      if (housekeeper) {
-        await supabase
-          .from('housekeepers')
-          .update({ access_code: codeData })
-          .eq('id', housekeeper.id);
-
-        // Rafraîchir la liste des femmes de chambre
-        refreshHousekeepers();
-      }
+      // Rafraîchir la liste des femmes de chambre
+      refreshHousekeepers();
 
       // Copier automatiquement le code dans le presse-papiers
       try {

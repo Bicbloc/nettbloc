@@ -211,9 +211,9 @@ export function HousekeeperSetupDialog({
 
     for (const housekeeperName of newHousekeepers) {
       try {
-        // Générer le code d'accès
+        // Générer et insérer le code d'accès avec la nouvelle fonction
         const { data: accessCode, error: codeError } = await supabase.rpc(
-          'generate_housekeeper_access_code_simple',
+          'generate_and_insert_access_code',
           {
             p_hotel_id: hotelId,
             p_housekeeper_name: housekeeperName
@@ -222,42 +222,6 @@ export function HousekeeperSetupDialog({
 
         if (codeError) {
           console.error('Erreur génération code pour', housekeeperName, ':', codeError);
-          continue;
-        }
-
-        // Créer l'entrée dans housekeepers
-        const { data: housekeeperData, error: housekeeperError } = await supabase
-          .from('housekeepers')
-          .insert({
-            hotel_id: hotelId,
-            name: housekeeperName,
-            access_code: accessCode,
-            user_id: (await supabase.auth.getUser()).data.user?.id,
-            is_active: true,
-            is_temporary: false
-          })
-          .select()
-          .single();
-
-        if (housekeeperError) {
-          console.error('Erreur création femme de chambre', housekeeperName, ':', housekeeperError);
-          continue;
-        }
-
-        // Créer l'entrée dans housekeeper_access_codes
-        const { error: accessCodeError } = await supabase
-          .from('housekeeper_access_codes')
-          .insert({
-            hotel_id: hotelId,
-            housekeeper_id: housekeeperData.id,
-            access_code: accessCode,
-            created_by: (await supabase.auth.getUser()).data.user?.id,
-            is_active: true,
-            expires_at: null // Code permanent
-          });
-
-        if (accessCodeError) {
-          console.error('Erreur création code d\'accès pour', housekeeperName, ':', accessCodeError);
         } else {
           console.log('✅ Femme de chambre créée avec code:', housekeeperName, accessCode);
         }

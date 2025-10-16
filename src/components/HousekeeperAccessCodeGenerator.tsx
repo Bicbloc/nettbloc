@@ -34,44 +34,37 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
 
     setLoading(true);
     try {
-      // Générer le code d'accès
+      // Générer et insérer le code d'accès avec la nouvelle fonction
       const { data: accessCode, error } = await supabase
-        .rpc('generate_housekeeper_access_code_simple', {
+        .rpc('generate_and_insert_access_code', {
           p_hotel_id: hotelId,
           p_housekeeper_name: housekeeperName
         });
 
       if (error) throw error;
 
-      // Créer également une entrée dans la table housekeepers
-      const { error: housekeeperError } = await supabase
-        .from('housekeepers')
-        .insert({
-          hotel_id: hotelId,
-          name: housekeeperName,
-          access_code: accessCode,
-          is_temporary: true,
-          is_active: true,
-          user_id: (await supabase.auth.getUser()).data.user?.id
-        });
+      // Mettre à jour l'email si fourni
+      if (email) {
+        const { data: housekeeper } = await supabase
+          .from('housekeepers')
+          .select('id')
+          .eq('hotel_id', hotelId)
+          .eq('name', housekeeperName)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (housekeeperError) {
-        console.warn('Erreur création housekeeper:', housekeeperError);
+        if (housekeeper) {
+          await supabase
+            .from('housekeeper_access_codes')
+            .update({
+              invited_email: email,
+              invited_name: housekeeperName
+            })
+            .eq('housekeeper_id', housekeeper.id);
+        }
       }
-
-      // Créer l'entrée dans housekeeper_access_codes avec l'email si fourni
-      const { error: insertError } = await supabase
-        .from('housekeeper_access_codes')
-        .insert({
-          hotel_id: hotelId,
-          access_code: accessCode,
-          invited_name: housekeeperName,
-          invited_email: email || null,
-          is_active: true,
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        });
-
-      if (insertError) throw insertError;
 
       setGeneratedCode(accessCode);
       
