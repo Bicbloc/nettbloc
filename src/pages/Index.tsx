@@ -1552,6 +1552,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <PdfWorkflowDialog 
+                    hotelId={currentHotelId}
                     onWorkflowComplete={(data, housekeepers, distributionMethod) => {
                       handlePdfProcessed(data, housekeepers, distributionMethod);
                     }}
@@ -1655,6 +1656,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   existingRooms={rooms} 
                 />
                     <PdfWorkflowDialog 
+                      hotelId={currentHotelId}
                       onWorkflowComplete={(data, housekeepers, distributionMethod) => {
                         handlePdfProcessed(data, housekeepers, distributionMethod);
                       }}
@@ -1684,6 +1686,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       existingRooms={rooms} 
                     />
                 <PdfWorkflowDialog 
+                  hotelId={currentHotelId}
                   onWorkflowComplete={(data, housekeepers, distributionMethod) => {
                     handlePdfProcessed(data, housekeepers, distributionMethod);
                   }}
