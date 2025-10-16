@@ -587,7 +587,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           Importer un Rapport
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
+      <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
         {step === 'upload' && renderUploadStep()}
         {step === 'housekeepers' && renderHousekeepersStep()}
         {step === 'distribution' && renderDistributionStep()}
