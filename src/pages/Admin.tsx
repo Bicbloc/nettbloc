@@ -28,6 +28,8 @@ import { ForceCodeGenerationButton } from '@/components/ForceCodeGenerationButto
 import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
+import { SessionsManagementPanel } from '@/components/SessionsManagementPanel';
+import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -764,7 +766,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="users">
             <User className="h-4 w-4 mr-2" />
             Utilisateurs
@@ -772,6 +774,10 @@ const Admin = () => {
           <TabsTrigger value="sessions">
             <Monitor className="h-4 w-4 mr-2" />
             Sessions
+          </TabsTrigger>
+          <TabsTrigger value="audit">
+            <Activity className="h-4 w-4 mr-2" />
+            Journal
           </TabsTrigger>
           <TabsTrigger value="hotels">
             <Hotel className="h-4 w-4 mr-2" />
@@ -783,7 +789,7 @@ const Admin = () => {
           </TabsTrigger>
           <TabsTrigger value="housekeeper-requests">
             <Users className="h-4 w-4 mr-2" />
-            Demandes femmes de chambre
+            Demandes
           </TabsTrigger>
           <TabsTrigger value="system">
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -1108,87 +1114,11 @@ const Admin = () => {
         </TabsContent>
 
         <TabsContent value="sessions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sessions actives en temps réel</CardTitle>
-              <CardDescription>
-                Surveillance et contrôle des connexions utilisateurs
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Utilisateur</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Connexion</TableHead>
-                    <TableHead>Dernière activité</TableHead>
-                    <TableHead>Durée</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessions.map((session) => {
-                    const loginTime = new Date(session.login_time);
-                    const lastActivity = new Date(session.last_activity);
-                    const duration = Math.floor((lastActivity.getTime() - loginTime.getTime()) / (1000 * 60));
-                    
-                    return (
-                      <TableRow key={session.id}>
-                        <TableCell className="font-medium">{session.user_name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{session.user_type}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(loginTime, 'dd/MM/yyyy HH:mm', { locale: fr })}
-                        </TableCell>
-                        <TableCell>
-                          {format(lastActivity, 'dd/MM/yyyy HH:mm', { locale: fr })}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={duration > 60 ? 'destructive' : 'default'}>
-                            {duration}m
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="outline">
-                                <LogOut className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Forcer la déconnexion</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Êtes-vous sûr de vouloir déconnecter {session.user_name} ?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => forceLogout(session.id, session.user_id)}
-                                >
-                                  Déconnecter
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              
-              {sessions.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Aucune session active</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <SessionsManagementPanel />
+        </TabsContent>
+
+        <TabsContent value="audit" className="space-y-4">
+          <AuditLogPanel />
         </TabsContent>
 
         <TabsContent value="hotels" className="space-y-4">
