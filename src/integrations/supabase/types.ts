@@ -766,7 +766,7 @@ export type Database = {
           completed_at: string | null
           email: string
           id: string
-          request_ip: unknown | null
+          request_ip: unknown
           requested_at: string | null
           status: string | null
           user_agent: string | null
@@ -776,7 +776,7 @@ export type Database = {
           completed_at?: string | null
           email: string
           id?: string
-          request_ip?: unknown | null
+          request_ip?: unknown
           requested_at?: string | null
           status?: string | null
           user_agent?: string | null
@@ -786,7 +786,7 @@ export type Database = {
           completed_at?: string | null
           email?: string
           id?: string
-          request_ip?: unknown | null
+          request_ip?: unknown
           requested_at?: string | null
           status?: string | null
           user_agent?: string | null
@@ -844,6 +844,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      report_training_patterns: {
+        Row: {
+          created_at: string
+          created_by: string
+          extracted_data: Json
+          hotel_id: string
+          id: string
+          raw_text: string
+          report_name: string
+          updated_at: string
+          validated: boolean
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          extracted_data?: Json
+          hotel_id: string
+          id?: string
+          raw_text: string
+          report_name: string
+          updated_at?: string
+          validated?: boolean
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          extracted_data?: Json
+          hotel_id?: string
+          id?: string
+          raw_text?: string
+          report_name?: string
+          updated_at?: string
+          validated?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_training_patterns_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       room_status_updates: {
         Row: {
@@ -1089,20 +1133,14 @@ export type Database = {
           deleted_housekeepers: number
         }[]
       }
-      cleanup_expired_hotel_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_inactive_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_expired_hotel_sessions: { Args: never; Returns: undefined }
+      cleanup_inactive_sessions: { Args: never; Returns: undefined }
       extend_trial_period: {
         Args: { p_extension_days: number; p_reason?: string; p_user_id: string }
         Returns: boolean
       }
       fix_access_code_inconsistencies: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           fixed_housekeepers: number
           hotel_code: string
@@ -1141,10 +1179,7 @@ export type Database = {
         Args: { p_hotel_id: string; p_housekeeper_name?: string }
         Returns: string
       }
-      generate_short_hotel_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_short_hotel_id: { Args: never; Returns: string }
       generate_temporary_hotel_access_code: {
         Args: {
           p_duration_hours?: number
@@ -1161,10 +1196,7 @@ export type Database = {
           hotel_name: string
         }[]
       }
-      get_housekeeper_profile_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_housekeeper_profile_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1211,14 +1243,8 @@ export type Database = {
           new_code: string
         }[]
       }
-      request_password_reset: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
-      sync_access_codes_with_housekeepers: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      request_password_reset: { Args: { user_email: string }; Returns: boolean }
+      sync_access_codes_with_housekeepers: { Args: never; Returns: number }
       validate_access_code_for_hotel: {
         Args: { access_code: string; hotel_uuid: string }
         Returns: boolean

@@ -30,6 +30,7 @@ import { SubscriptionManagementDialog } from '@/components/SubscriptionManagemen
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
 import { SessionsManagementPanel } from '@/components/SessionsManagementPanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
+import { ReportTrainingPanel } from '@/components/ReportTrainingPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -766,7 +767,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="users">
             <User className="h-4 w-4 mr-2" />
             Utilisateurs
@@ -790,6 +791,10 @@ const Admin = () => {
           <TabsTrigger value="housekeeper-requests">
             <Users className="h-4 w-4 mr-2" />
             Demandes
+          </TabsTrigger>
+          <TabsTrigger value="training">
+            <Database className="h-4 w-4 mr-2" />
+            Entraînement IA
           </TabsTrigger>
           <TabsTrigger value="system">
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -1327,6 +1332,10 @@ const Admin = () => {
               En cas de problème, contactez le support technique.
             </AlertDescription>
           </Alert>
+        </TabsContent>
+
+        <TabsContent value="training" className="space-y-6">
+          <ReportTrainingPanel />
         </TabsContent>
       </Tabs>
       
