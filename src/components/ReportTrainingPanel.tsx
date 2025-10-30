@@ -55,43 +55,77 @@ export function ReportTrainingPanel() {
 
   const autoExtractRooms = (text: string): ExtractedRoom[] => {
     const rooms: ExtractedRoom[] = [];
-    const roomPattern = /\b([1-9]\d{2})\b/g;
     const foundRooms = new Set<string>();
+    
+    // Pattern pour numéros de chambres (2 ou 3 chiffres, pas les années)
+    const roomPattern = /\b([1-9]\d{1,2})\b/g;
     
     let match;
     while ((match = roomPattern.exec(text)) !== null) {
       const roomNumber = match[1];
       
-      if (/^20(2[5-8])$/.test(roomNumber)) continue;
+      // Ignorer les années et numéros trop grands
+      if (parseInt(roomNumber) > 999 || /^20(2[0-9])$/.test(roomNumber)) continue;
       if (foundRooms.has(roomNumber)) continue;
       
       foundRooms.add(roomNumber);
       
-      const start = Math.max(0, match.index - 100);
-      const end = Math.min(text.length, match.index + 300);
-      const context = text.substring(start, end);
+      // Contexte autour du numéro de chambre
+      const start = Math.max(0, match.index - 200);
+      const end = Math.min(text.length, match.index + 400);
+      const context = text.substring(start, end).toUpperCase();
       
-      const dates = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-      const hasINS = /\bINS\b/.test(context);
+      // Extraction des dates (plusieurs formats)
+      const dates4 = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+      const dates2 = context.match(/\d{2}\/\d{2}\/\d{2}/g) || [];
+      const allDates = [...dates4, ...dates2];
+      
+      // Détection des statuts - Format Apaleo anglais
       const hasDIR = /\bDIR\b/.test(context);
+      const hasINS = /\bINS\b/.test(context);
+      const hasCleaning = /\bCLEANING\b/.test(context);
       const hasOCC = /\bOCC\b/.test(context);
+      
+      // Format Apaleo français
+      const hasRecouche = /\bRECOUCHE\b/.test(context);
+      const hasParti = /\bPARTI\b/.test(context);
+      const hasDepart = /\bDEPART\b/.test(context);
+      const hasEnArrivee = /\bEN ARRIVEE\b/.test(context);
+      const hasSale = /\bSALE\b/.test(context);
+      
+      // Format Medialog
+      const hasDraps = /\bDRAPS\b/.test(context);
       
       let status = 'unknown';
       let cleaningType: 'full' | 'quick' | 'none' = 'none';
       
-      if (hasOCC) {
-        status = 'occupied';
-        cleaningType = 'none';
-      } else if (hasINS) {
+      // Logique de détection
+      if (hasINS) {
         status = 'inspected';
         cleaningType = 'none';
-      } else if (hasDIR) {
+      } else if (hasOCC) {
+        status = 'occupied';
+        cleaningType = 'none';
+      } else if (hasDIR || hasSale) {
         status = 'dirty';
         cleaningType = 'full';
-      } else if (dates.length >= 2) {
+      } else if (hasDepart || hasParti || hasEnArrivee) {
+        status = hasDepart || hasParti ? 'checkout' : 'arrival';
+        cleaningType = 'full';
+      } else if (hasDraps) {
+        status = 'change-sheets';
+        cleaningType = 'full';
+      } else if (hasRecouche) {
+        status = 'stayover';
+        cleaningType = 'quick';
+      } else if (hasCleaning) {
+        status = 'to-clean';
+        cleaningType = 'full';
+      } else if (allDates.length >= 2) {
+        // Si deux dates, probablement départ
         status = 'checkout';
         cleaningType = 'full';
-      } else if (dates.length === 1) {
+      } else if (allDates.length === 1) {
         status = 'stayover';
         cleaningType = 'quick';
       }
@@ -99,8 +133,8 @@ export function ReportTrainingPanel() {
       rooms.push({
         roomNumber: roomNumber.padStart(3, '0'),
         status,
-        arrivalDate: dates[0] || '',
-        departureDate: dates[dates.length - 1] || '',
+        arrivalDate: allDates[0] || '',
+        departureDate: allDates[allDates.length - 1] || '',
         cleaningType,
         validated: false
       });
