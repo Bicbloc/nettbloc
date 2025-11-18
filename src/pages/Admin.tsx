@@ -1335,7 +1335,12 @@ const Admin = () => {
         </TabsContent>
 
         <TabsContent value="training" className="space-y-6">
-          <ReportTrainingPanel />
+          {hotels.length > 0 && <ReportTrainingPanel hotelId={hotels[0].id} />}
+          {hotels.length === 0 && (
+            <Alert>
+              <AlertDescription>Aucun hôtel disponible pour l'entraînement IA</AlertDescription>
+            </Alert>
+          )}
         </TabsContent>
       </Tabs>
       
