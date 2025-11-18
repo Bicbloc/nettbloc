@@ -1,17 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import * as pdfjs from 'pdfjs-dist';
-import { FileUp, Trash2, Check, X, Download } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Upload, FileText, Check, X, Brain, Sparkles } from "lucide-react";
+import * as pdfjsLib from 'pdfjs-dist';
+import { smartExtractionService, type ExtractedRoom as SmartExtractedRoom } from "@/services/smartExtractionService";
 
-// Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ExtractedRoom {
   roomNumber: string;
@@ -20,25 +20,31 @@ interface ExtractedRoom {
   departureDate: string;
   cleaningType: 'full' | 'quick' | 'none';
   validated: boolean;
+  confidence?: number;
 }
 
 interface TrainingReport {
-  id?: string;
   name: string;
   rawText: string;
-  extractedData: ExtractedRoom[];
+  extractedRooms: ExtractedRoom[];
   validated: boolean;
 }
 
-export function ReportTrainingPanel() {
+export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
+  const { toast } = useToast();
   const [reports, setReports] = useState<TrainingReport[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [selectedReport, setSelectedReport] = useState<TrainingReport | null>(null);
-  const [editingRoom, setEditingRoom] = useState<ExtractedRoom | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [selectedPmsType, setSelectedPmsType] = useState<string>('auto');
+  const [detectedPmsType, setDetectedPmsType] = useState<string>('');
+
+  useEffect(() => {
+    smartExtractionService.loadLearnedPatterns(hotelId);
+  }, [hotelId]);
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     
     let fullText = '';
     for (let i = 1; i <= pdf.numPages; i++) {
@@ -53,455 +59,342 @@ export function ReportTrainingPanel() {
     return fullText;
   };
 
-  const autoExtractRooms = (text: string): ExtractedRoom[] => {
-    const rooms: ExtractedRoom[] = [];
-    const foundRooms = new Set<string>();
+  const autoExtractRooms = (text: string, pmsType?: string): ExtractedRoom[] => {
+    const smartRooms = smartExtractionService.extractRooms(text, pmsType);
     
-    // Pattern pour numéros de chambres (2 ou 3 chiffres, pas les années)
-    const roomPattern = /\b([1-9]\d{1,2})\b/g;
-    
-    let match;
-    while ((match = roomPattern.exec(text)) !== null) {
-      const roomNumber = match[1];
-      
-      // Ignorer les années et numéros trop grands
-      if (parseInt(roomNumber) > 999 || /^20(2[0-9])$/.test(roomNumber)) continue;
-      if (foundRooms.has(roomNumber)) continue;
-      
-      foundRooms.add(roomNumber);
-      
-      // Contexte autour du numéro de chambre
-      const start = Math.max(0, match.index - 200);
-      const end = Math.min(text.length, match.index + 400);
-      const context = text.substring(start, end).toUpperCase();
-      
-      // Extraction des dates (plusieurs formats)
-      const dates4 = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-      const dates2 = context.match(/\d{2}\/\d{2}\/\d{2}/g) || [];
-      const allDates = [...dates4, ...dates2];
-      
-      // Détection des statuts - Format Apaleo anglais
-      const hasDIR = /\bDIR\b/.test(context);
-      const hasINS = /\bINS\b/.test(context);
-      const hasCleaning = /\bCLEANING\b/.test(context);
-      const hasOCC = /\bOCC\b/.test(context);
-      
-      // Format Apaleo français
-      const hasRecouche = /\bRECOUCHE\b/.test(context);
-      const hasParti = /\bPARTI\b/.test(context);
-      const hasDepart = /\bDEPART\b/.test(context);
-      const hasEnArrivee = /\bEN ARRIVEE\b/.test(context);
-      const hasSale = /\bSALE\b/.test(context);
-      
-      // Format Medialog
-      const hasDraps = /\bDRAPS\b/.test(context);
-      
-      let status = 'unknown';
-      let cleaningType: 'full' | 'quick' | 'none' = 'none';
-      
-      // Logique de détection
-      if (hasINS) {
-        status = 'inspected';
-        cleaningType = 'none';
-      } else if (hasOCC) {
-        status = 'occupied';
-        cleaningType = 'none';
-      } else if (hasDIR || hasSale) {
-        status = 'dirty';
-        cleaningType = 'full';
-      } else if (hasDepart || hasParti || hasEnArrivee) {
-        status = hasDepart || hasParti ? 'checkout' : 'arrival';
-        cleaningType = 'full';
-      } else if (hasDraps) {
-        status = 'change-sheets';
-        cleaningType = 'full';
-      } else if (hasRecouche) {
-        status = 'stayover';
-        cleaningType = 'quick';
-      } else if (hasCleaning) {
-        status = 'to-clean';
-        cleaningType = 'full';
-      } else if (allDates.length >= 2) {
-        // Si deux dates, probablement départ
-        status = 'checkout';
-        cleaningType = 'full';
-      } else if (allDates.length === 1) {
-        status = 'stayover';
-        cleaningType = 'quick';
-      }
-      
-      rooms.push({
-        roomNumber: roomNumber.padStart(3, '0'),
-        status,
-        arrivalDate: allDates[0] || '',
-        departureDate: allDates[allDates.length - 1] || '',
-        cleaningType,
-        validated: false
-      });
+    if (!pmsType || pmsType === 'auto') {
+      const detected = smartExtractionService.detectPmsType(text);
+      setDetectedPmsType(detected);
     }
     
-    return rooms.sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
+    return smartRooms as ExtractedRoom[];
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    
-    setIsUploading(true);
-    
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    const newReports: TrainingReport[] = [];
+
     try {
-      const newReports: TrainingReport[] = [];
-      
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
-        if (file.type !== 'application/pdf') {
+        if (!file.type.includes('pdf')) {
           toast({
-            variant: "destructive",
-            title: "Fichier invalide",
+            title: "Format non supporté",
             description: `${file.name} n'est pas un PDF`,
+            variant: "destructive"
           });
           continue;
         }
-        
-        const rawText = await extractTextFromPdf(file);
-        const extractedData = autoExtractRooms(rawText);
-        
+
+        const text = await extractTextFromPdf(file);
+        const pmsType = selectedPmsType === 'auto' ? undefined : selectedPmsType;
+        const extractedRooms = autoExtractRooms(text, pmsType);
+
         newReports.push({
           name: file.name,
-          rawText,
-          extractedData,
+          rawText: text,
+          extractedRooms,
           validated: false
         });
       }
+
+      setReports([...reports, ...newReports]);
       
-      setReports(prev => [...prev, ...newReports]);
-      
-      toast({
-        title: "Rapports chargés",
-        description: `${newReports.length} rapport(s) traité(s)`,
-      });
+      if (newReports.length > 0) {
+        setSelectedReport(newReports[0]);
+        toast({
+          title: "Extraction réussie",
+          description: `${newReports.length} rapport(s) traité(s), ${newReports.reduce((sum, r) => sum + r.extractedRooms.length, 0)} chambres détectées`
+        });
+      }
     } catch (error) {
       console.error('Error processing PDFs:', error);
       toast({
-        variant: "destructive",
         title: "Erreur",
-        description: "Erreur lors du traitement des fichiers",
+        description: "Impossible de traiter les PDFs",
+        variant: "destructive"
       });
     } finally {
-      setIsUploading(false);
+      setUploading(false);
     }
   };
 
   const saveTrainingPattern = async (report: TrainingReport) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Non authentifié');
-      
-      const { data: hotels } = await supabase
-        .from('hotels')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (!hotels) throw new Error('Hôtel introuvable');
-      
-      const { error } = await supabase
-        .from('report_training_patterns')
-        .insert({
-          hotel_id: hotels.id,
-          report_name: report.name,
-          raw_text: report.rawText,
-          extracted_data: report.extractedData as any,
-          validated: report.validated,
-          created_by: user.id
-        } as any);
-      
-      if (error) throw error;
-      
+    if (!report.extractedRooms.some(r => r.validated)) {
       toast({
-        title: "Pattern sauvegardé",
-        description: "Le pattern d'entraînement a été enregistré",
+        title: "Aucune validation",
+        description: "Veuillez valider au moins une chambre",
+        variant: "destructive"
       });
-    } catch (error) {
+      return;
+    }
+
+    const pmsType = detectedPmsType || (selectedPmsType === 'auto' ? 'unknown' : selectedPmsType);
+    
+    const validatedCount = report.extractedRooms.filter(r => r.validated).length;
+    const accuracyScore = report.extractedRooms.length > 0 
+      ? validatedCount / report.extractedRooms.length 
+      : 0;
+
+    const { error } = await supabase
+      .from('report_training_patterns')
+      .insert([{
+        hotel_id: hotelId,
+        report_name: report.name,
+        raw_text: report.rawText,
+        extracted_data: report.extractedRooms as any,
+        validated: true,
+        pms_type: pmsType,
+        accuracy_score: accuracyScore,
+        created_by: (await supabase.auth.getUser()).data.user?.id
+      }]);
+
+    if (error) {
       console.error('Error saving pattern:', error);
       toast({
-        variant: "destructive",
         title: "Erreur",
-        description: "Erreur lors de la sauvegarde",
+        description: "Impossible de sauvegarder le pattern",
+        variant: "destructive"
       });
+      return;
     }
+
+    toast({
+      title: "Pattern sauvegardé",
+      description: `Pattern ${pmsType} enregistré avec succès (précision: ${(accuracyScore * 100).toFixed(1)}%)`
+    });
+
+    await smartExtractionService.loadLearnedPatterns(hotelId);
+    
+    setReports(reports.map(r => 
+      r.name === report.name ? { ...r, validated: true } : r
+    ));
   };
 
-  const updateRoomData = (room: ExtractedRoom) => {
+  const updateRoomData = (roomNumber: string, field: keyof ExtractedRoom, value: any) => {
     if (!selectedReport) return;
-    
-    const updatedData = selectedReport.extractedData.map(r => 
-      r.roomNumber === room.roomNumber ? room : r
+
+    const updatedRooms = selectedReport.extractedRooms.map(room =>
+      room.roomNumber === roomNumber ? { ...room, [field]: value } : room
     );
-    
-    setSelectedReport({
-      ...selectedReport,
-      extractedData: updatedData
-    });
-    
-    setReports(prev => prev.map(r => 
-      r.name === selectedReport.name 
-        ? { ...r, extractedData: updatedData }
-        : r
-    ));
+
+    const updatedReport = { ...selectedReport, extractedRooms: updatedRooms };
+    setSelectedReport(updatedReport);
+    setReports(reports.map(r => r.name === selectedReport.name ? updatedReport : r));
   };
 
   const validateRoom = (roomNumber: string) => {
-    if (!selectedReport) return;
-    
-    const updatedData = selectedReport.extractedData.map(r => 
-      r.roomNumber === roomNumber ? { ...r, validated: true } : r
-    );
-    
-    setSelectedReport({
-      ...selectedReport,
-      extractedData: updatedData
-    });
-    
-    setReports(prev => prev.map(r => 
-      r.name === selectedReport.name 
-        ? { ...r, extractedData: updatedData }
-        : r
-    ));
+    updateRoomData(roomNumber, 'validated', true);
   };
 
   const validateAllRooms = () => {
     if (!selectedReport) return;
-    
-    const updatedData = selectedReport.extractedData.map(r => ({ ...r, validated: true }));
-    const updatedReport = { ...selectedReport, extractedData: updatedData, validated: true };
+
+    const allValidated = selectedReport.extractedRooms.map(room => ({ ...room, validated: true }));
+    const updatedReport = { ...selectedReport, extractedRooms: allValidated };
     
     setSelectedReport(updatedReport);
-    setReports(prev => prev.map(r => 
-      r.name === selectedReport.name ? updatedReport : r
-    ));
-    
+    setReports(reports.map(r => r.name === selectedReport.name ? updatedReport : r));
+
     saveTrainingPattern(updatedReport);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Entraînement de l'algorithme</h2>
-          <p className="text-muted-foreground">
-            Téléchargez des rapports et validez les données extraites pour améliorer la reconnaissance
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Label htmlFor="pdf-upload" className="cursor-pointer">
-            <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-              <FileUp className="h-4 w-4" />
-              Télécharger des rapports
-            </div>
-          </Label>
-          <Input
-            id="pdf-upload"
-            type="file"
-            accept=".pdf"
-            multiple
-            className="hidden"
-            onChange={handleFileUpload}
-            disabled={isUploading}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Liste des rapports */}
-        <Card className="p-4 lg:col-span-1">
-          <h3 className="font-semibold mb-4">Rapports chargés ({reports.length})</h3>
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
-            {reports.map((report, idx) => (
-              <div
-                key={idx}
-                onClick={() => setSelectedReport(report)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                  selectedReport?.name === report.name
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted hover:bg-muted/80'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{report.name}</p>
-                    <p className="text-xs opacity-70">
-                      {report.extractedData.length} chambres
-                    </p>
-                  </div>
-                  {report.validated && (
-                    <Badge variant="outline" className="ml-2">
-                      <Check className="h-3 w-3" />
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
-            
-            {reports.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aucun rapport chargé
+      <Card className="p-6">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 mb-4">
+            <Brain className="h-6 w-6 text-primary" />
+            <div>
+              <h3 className="text-lg font-semibold">Entraînement Intelligent IA</h3>
+              <p className="text-sm text-muted-foreground">
+                Téléchargez des rapports PDF et sélectionnez le type de PMS pour améliorer la précision
               </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pms-type">Type de PMS</Label>
+              <Select value={selectedPmsType} onValueChange={setSelectedPmsType}>
+                <SelectTrigger id="pms-type">
+                  <SelectValue placeholder="Sélectionner le type de PMS" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Détection automatique
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="apaleo">Apaleo</SelectItem>
+                  <SelectItem value="medialog">Medialog</SelectItem>
+                  <SelectItem value="space">Space / Mews</SelectItem>
+                  <SelectItem value="custom">Personnalisé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {detectedPmsType && (
+              <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-sm">
+                  PMS détecté: <Badge variant="secondary">{detectedPmsType}</Badge>
+                </span>
+              </div>
             )}
           </div>
-        </Card>
 
-        {/* Données extraites */}
-        {selectedReport && (
-          <Card className="p-4 lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Données extraites - {selectedReport.name}</h3>
-              <Button onClick={validateAllRooms} size="sm">
+          <div>
+            <Label htmlFor="file-upload">Télécharger des rapports PDF</Label>
+            <div className="mt-2">
+              <label
+                htmlFor="file-upload"
+                className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors"
+              >
+                <div className="flex flex-col items-center">
+                  <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    {uploading ? "Traitement en cours..." : "Cliquez ou glissez des PDF ici"}
+                  </span>
+                </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  multiple
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
+          </div>
+
+          {reports.length > 0 && (
+            <div className="space-y-2">
+              <Label>Rapports chargés ({reports.length})</Label>
+              <div className="space-y-2">
+                {reports.map((report, index) => (
+                  <div
+                    key={index}
+                    onClick={() => setSelectedReport(report)}
+                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
+                      selectedReport?.name === report.name ? 'border-primary bg-primary/5' : 'hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">{report.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {report.extractedRooms.length} chambres détectées
+                        </div>
+                      </div>
+                    </div>
+                    {report.validated && (
+                      <Badge variant="secondary">
+                        <Check className="h-3 w-3 mr-1" />
+                        Validé
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {selectedReport && (
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-lg font-semibold">{selectedReport.name}</h4>
+                <p className="text-sm text-muted-foreground">
+                  {selectedReport.extractedRooms.filter(r => r.validated).length} / {selectedReport.extractedRooms.length} validées
+                </p>
+              </div>
+              <Button onClick={validateAllRooms} disabled={selectedReport.validated}>
                 <Check className="h-4 w-4 mr-2" />
-                Valider tout
+                Valider tout et enregistrer
               </Button>
             </div>
-            
-            <div className="space-y-3 max-h-[600px] overflow-y-auto">
-              {selectedReport.extractedData.map((room) => (
-                <Card key={room.roomNumber} className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-2">
-                      {editingRoom?.roomNumber === room.roomNumber ? (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-xs">Numéro</Label>
-                            <Input
-                              value={editingRoom.roomNumber}
-                              onChange={(e) => setEditingRoom({ ...editingRoom, roomNumber: e.target.value })}
-                              className="h-8"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Statut</Label>
-                            <Input
-                              value={editingRoom.status}
-                              onChange={(e) => setEditingRoom({ ...editingRoom, status: e.target.value })}
-                              className="h-8"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Arrivée</Label>
-                            <Input
-                              value={editingRoom.arrivalDate}
-                              onChange={(e) => setEditingRoom({ ...editingRoom, arrivalDate: e.target.value })}
-                              className="h-8"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Départ</Label>
-                            <Input
-                              value={editingRoom.departureDate}
-                              onChange={(e) => setEditingRoom({ ...editingRoom, departureDate: e.target.value })}
-                              className="h-8"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Type nettoyage</Label>
-                            <select
-                              value={editingRoom.cleaningType}
-                              onChange={(e) => setEditingRoom({ ...editingRoom, cleaningType: e.target.value as any })}
-                              className="w-full h-8 px-3 rounded-md border bg-background"
-                            >
-                              <option value="full">À blanc</option>
-                              <option value="quick">Recouche</option>
-                              <option value="none">Aucun</option>
-                            </select>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Chambre:</span>
-                            <span className="font-semibold ml-2">{room.roomNumber}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Statut:</span>
-                            <span className="ml-2">{room.status}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Arrivée:</span>
-                            <span className="ml-2">{room.arrivalDate || 'N/A'}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Départ:</span>
-                            <span className="ml-2">{room.departureDate || 'N/A'}</span>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-muted-foreground">Type:</span>
-                            <Badge className="ml-2" variant={
-                              room.cleaningType === 'full' ? 'destructive' :
-                              room.cleaningType === 'quick' ? 'default' : 'outline'
-                            }>
-                              {room.cleaningType === 'full' ? 'À blanc' :
-                               room.cleaningType === 'quick' ? 'Recouche' : 'Aucun'}
-                            </Badge>
-                          </div>
-                        </div>
+
+            <div className="space-y-2">
+              {selectedReport.extractedRooms.map((room, index) => (
+                <div
+                  key={index}
+                  className={`p-4 border rounded-lg ${room.validated ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">Chambre {room.roomNumber}</Badge>
+                      <Badge>{room.status}</Badge>
+                      <Badge variant={room.cleaningType === 'full' ? 'default' : room.cleaningType === 'quick' ? 'secondary' : 'outline'}>
+                        {room.cleaningType === 'full' ? 'Nettoyage complet' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun'}
+                      </Badge>
+                      {room.confidence && (
+                        <span className="text-xs text-muted-foreground">
+                          {(room.confidence * 100).toFixed(0)}% confiance
+                        </span>
                       )}
                     </div>
-                    
-                    <div className="flex gap-1 ml-4">
-                      {editingRoom?.roomNumber === room.roomNumber ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              updateRoomData(editingRoom);
-                              setEditingRoom(null);
-                            }}
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingRoom(null)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingRoom(room)}
-                          >
-                            Éditer
-                          </Button>
-                          {!room.validated && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => validateRoom(room.roomNumber)}
-                            >
-                              <Check className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
-                          {room.validated && (
-                            <Badge variant="outline" className="text-green-600">
-                              Validé
-                            </Badge>
-                          )}
-                        </>
-                      )}
+                    <Button
+                      size="sm"
+                      variant={room.validated ? "secondary" : "default"}
+                      onClick={() => validateRoom(room.roomNumber)}
+                      disabled={room.validated}
+                    >
+                      {room.validated ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-2 text-sm">
+                    <div>
+                      <Label className="text-xs">Numéro</Label>
+                      <Input
+                        value={room.roomNumber}
+                        onChange={(e) => updateRoomData(room.roomNumber, 'roomNumber', e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Statut</Label>
+                      <Input
+                        value={room.status}
+                        onChange={(e) => updateRoomData(room.roomNumber, 'status', e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Arrivée</Label>
+                      <Input
+                        value={room.arrivalDate}
+                        onChange={(e) => updateRoomData(room.roomNumber, 'arrivalDate', e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Départ</Label>
+                      <Input
+                        value={room.departureDate}
+                        onChange={(e) => updateRoomData(room.roomNumber, 'departureDate', e.target.value)}
+                        className="h-8"
+                      />
                     </div>
                   </div>
-                </Card>
+                </div>
               ))}
             </div>
-          </Card>
-        )}
-      </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
-}
+};

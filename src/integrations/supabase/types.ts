@@ -847,37 +847,49 @@ export type Database = {
       }
       report_training_patterns: {
         Row: {
+          accuracy_score: number | null
           created_at: string
           created_by: string
+          detection_rules: Json | null
           extracted_data: Json
           hotel_id: string
           id: string
+          pms_type: string | null
           raw_text: string
           report_name: string
           updated_at: string
           validated: boolean
+          validation_notes: string | null
         }
         Insert: {
+          accuracy_score?: number | null
           created_at?: string
           created_by: string
+          detection_rules?: Json | null
           extracted_data?: Json
           hotel_id: string
           id?: string
+          pms_type?: string | null
           raw_text: string
           report_name: string
           updated_at?: string
           validated?: boolean
+          validation_notes?: string | null
         }
         Update: {
+          accuracy_score?: number | null
           created_at?: string
           created_by?: string
+          detection_rules?: Json | null
           extracted_data?: Json
           hotel_id?: string
           id?: string
+          pms_type?: string | null
           raw_text?: string
           report_name?: string
           updated_at?: string
           validated?: boolean
+          validation_notes?: string | null
         }
         Relationships: [
           {
