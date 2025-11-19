@@ -84,8 +84,21 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         }
 
         const text = await extractTextFromPdf(file);
+        console.log('📄 Texte extrait:', text.substring(0, 200));
+        
         const pmsType = selectedPmsType === 'auto' ? undefined : selectedPmsType;
         const extractedRooms = autoExtractRooms(text, pmsType);
+        
+        console.log('🏠 Chambres extraites:', extractedRooms.length, extractedRooms);
+
+        if (extractedRooms.length === 0) {
+          toast({
+            title: "Aucune chambre détectée",
+            description: `Impossible d'extraire des chambres de ${file.name}. Vérifiez le format du PDF.`,
+            variant: "destructive"
+          });
+          continue;
+        }
 
         newReports.push({
           name: file.name,
@@ -304,14 +317,24 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
             <div className="flex-1">
               <Label htmlFor="pdf-upload">Upload PDF</Label>
-              <Input
-                id="pdf-upload"
-                type="file"
-                accept=".pdf"
-                multiple
-                onChange={handleFileUpload}
-                disabled={uploading}
-              />
+              <div className="relative">
+                <Input
+                  id="pdf-upload"
+                  type="file"
+                  accept=".pdf"
+                  multiple
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+                {uploading && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-md">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                      <span>Analyse en cours...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
