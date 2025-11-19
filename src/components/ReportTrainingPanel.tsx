@@ -5,23 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Brain, Sparkles } from "lucide-react";
+import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink } from "lucide-react";
 import * as pdfjsLib from 'pdfjs-dist';
-import { smartExtractionService, type ExtractedRoom as SmartExtractedRoom } from "@/services/smartExtractionService";
+import { smartExtractionService, type ExtractedRoom } from "@/services/smartExtractionService";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-interface ExtractedRoom {
-  roomNumber: string;
-  status: string;
-  arrivalDate: string;
-  departureDate: string;
-  cleaningType: 'full' | 'quick' | 'none';
-  validated: boolean;
-  confidence?: number;
-}
 
 interface TrainingReport {
   name: string;
@@ -37,6 +28,8 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [uploading, setUploading] = useState(false);
   const [selectedPmsType, setSelectedPmsType] = useState<string>('auto');
   const [detectedPmsType, setDetectedPmsType] = useState<string>('');
+  const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
+  const [mergingMode, setMergingMode] = useState(false);
 
   useEffect(() => {
     smartExtractionService.loadLearnedPatterns(hotelId);
@@ -67,7 +60,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
       setDetectedPmsType(detected);
     }
     
-    return smartRooms as ExtractedRoom[];
+    return smartRooms;
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,10 +105,10 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         });
       }
     } catch (error) {
-      console.error('Error processing PDFs:', error);
+      console.error('Erreur lors du traitement:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de traiter les PDFs",
+        description: "Erreur lors du traitement des fichiers",
         variant: "destructive"
       });
     } finally {
@@ -123,273 +116,364 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
     }
   };
 
-  const saveTrainingPattern = async (report: TrainingReport) => {
-    if (!report.extractedRooms.some(r => r.validated)) {
-      toast({
-        title: "Aucune validation",
-        description: "Veuillez valider au moins une chambre",
-        variant: "destructive"
-      });
-      return;
-    }
+  const updateRoomData = (index: number, field: keyof ExtractedRoom, value: any) => {
+    if (!selectedReport) return;
 
-    const pmsType = detectedPmsType || (selectedPmsType === 'auto' ? 'unknown' : selectedPmsType);
-    
-    const validatedCount = report.extractedRooms.filter(r => r.validated).length;
-    const accuracyScore = report.extractedRooms.length > 0 
-      ? validatedCount / report.extractedRooms.length 
-      : 0;
+    const updatedRooms = [...selectedReport.extractedRooms];
+    updatedRooms[index] = { ...updatedRooms[index], [field]: value };
+    setSelectedReport({ ...selectedReport, extractedRooms: updatedRooms });
+  };
 
-    const { error } = await supabase
-      .from('report_training_patterns')
-      .insert([{
-        hotel_id: hotelId,
-        report_name: report.name,
-        raw_text: report.rawText,
-        extracted_data: report.extractedRooms as any,
-        validated: true,
-        pms_type: pmsType,
-        accuracy_score: accuracyScore,
-        created_by: (await supabase.auth.getUser()).data.user?.id
-      }]);
+  const validateRoom = (index: number) => {
+    if (!selectedReport) return;
 
-    if (error) {
-      console.error('Error saving pattern:', error);
+    const updatedRooms = [...selectedReport.extractedRooms];
+    updatedRooms[index] = { ...updatedRooms[index], validated: !updatedRooms[index].validated };
+    setSelectedReport({ ...selectedReport, extractedRooms: updatedRooms });
+  };
+
+  const validateAllRooms = async () => {
+    if (!selectedReport) return;
+
+    const updatedRooms = selectedReport.extractedRooms.map(room => ({
+      ...room,
+      validated: true
+    }));
+
+    setSelectedReport({ ...selectedReport, extractedRooms: updatedRooms, validated: true });
+    await saveTrainingPattern(updatedRooms);
+  };
+
+  const mergeSelectedRooms = () => {
+    if (!selectedReport || selectedRooms.size < 2) {
       toast({
         title: "Erreur",
-        description: "Impossible de sauvegarder le pattern",
+        description: "Sélectionnez au moins 2 chambres à fusionner",
         variant: "destructive"
       });
       return;
     }
 
+    const selectedIndices = Array.from(selectedRooms).sort((a, b) => a - b);
+    const roomsToMerge = selectedIndices.map(i => selectedReport.extractedRooms[i]);
+    const roomNumbers = roomsToMerge.map(r => r.roomNumber);
+    
+    const mergedRoom: ExtractedRoom = {
+      roomNumber: roomNumbers.join('-'),
+      status: roomsToMerge[0].status,
+      arrivalDate: roomsToMerge[0].arrivalDate,
+      departureDate: roomsToMerge[0].departureDate,
+      cleaningType: roomsToMerge[0].cleaningType,
+      validated: true,
+      isConnected: true,
+      connectedRooms: roomNumbers,
+      originalText: roomsToMerge.map(r => r.originalText || r.roomNumber).join(' + ')
+    };
+
+    const updatedRooms = selectedReport.extractedRooms.filter((_, i) => !selectedRooms.has(i));
+    updatedRooms.push(mergedRoom);
+
+    setSelectedReport({ ...selectedReport, extractedRooms: updatedRooms });
+    setSelectedRooms(new Set());
+    setMergingMode(false);
     toast({
-      title: "Pattern sauvegardé",
-      description: `Pattern ${pmsType} enregistré avec succès (précision: ${(accuracyScore * 100).toFixed(1)}%)`
+      title: "Succès",
+      description: "Chambres fusionnées avec succès"
     });
-
-    await smartExtractionService.loadLearnedPatterns(hotelId);
-    
-    setReports(reports.map(r => 
-      r.name === report.name ? { ...r, validated: true } : r
-    ));
   };
 
-  const updateRoomData = (roomNumber: string, field: keyof ExtractedRoom, value: any) => {
+  const splitConnectedRoom = (index: number) => {
     if (!selectedReport) return;
 
-    const updatedRooms = selectedReport.extractedRooms.map(room =>
-      room.roomNumber === roomNumber ? { ...room, [field]: value } : room
-    );
+    const room = selectedReport.extractedRooms[index];
+    if (!room.isConnected || !room.connectedRooms) {
+      toast({
+        title: "Erreur",
+        description: "Cette chambre n'est pas connectée",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    const updatedReport = { ...selectedReport, extractedRooms: updatedRooms };
-    setSelectedReport(updatedReport);
-    setReports(reports.map(r => r.name === selectedReport.name ? updatedReport : r));
+    const separatedRooms: ExtractedRoom[] = room.connectedRooms.map(roomNum => ({
+      roomNumber: roomNum,
+      status: room.status,
+      arrivalDate: room.arrivalDate,
+      departureDate: room.departureDate,
+      cleaningType: room.cleaningType,
+      validated: true,
+      originalText: roomNum
+    }));
+
+    const updatedRooms = [...selectedReport.extractedRooms];
+    updatedRooms.splice(index, 1, ...separatedRooms);
+
+    setSelectedReport({ ...selectedReport, extractedRooms: updatedRooms });
+    toast({
+      title: "Succès",
+      description: "Chambres séparées avec succès"
+    });
   };
 
-  const validateRoom = (roomNumber: string) => {
-    updateRoomData(roomNumber, 'validated', true);
+  const toggleRoomSelection = (index: number) => {
+    const newSelection = new Set(selectedRooms);
+    if (newSelection.has(index)) {
+      newSelection.delete(index);
+    } else {
+      newSelection.add(index);
+    }
+    setSelectedRooms(newSelection);
   };
 
-  const validateAllRooms = () => {
-    if (!selectedReport) return;
+  const saveTrainingPattern = async (rooms: ExtractedRoom[]) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Erreur",
+        description: "Vous devez être connecté",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    const allValidated = selectedReport.extractedRooms.map(room => ({ ...room, validated: true }));
-    const updatedReport = { ...selectedReport, extractedRooms: allValidated };
-    
-    setSelectedReport(updatedReport);
-    setReports(reports.map(r => r.name === selectedReport.name ? updatedReport : r));
+    const { error } = await supabase.from('report_training_patterns').insert([{
+      hotel_id: hotelId,
+      report_name: selectedReport?.name || 'rapport',
+      pms_type: detectedPmsType || selectedPmsType,
+      raw_text: selectedReport?.rawText || '',
+      extracted_data: rooms as any,
+      validated: true,
+      created_by: user.id,
+      detection_rules: {
+        connected_rooms: rooms.filter(r => r.isConnected).map(r => ({
+          pattern: r.roomNumber,
+          rooms: r.connectedRooms
+        }))
+      }
+    }]);
 
-    saveTrainingPattern(updatedReport);
+    if (error) {
+      console.error('Erreur:', error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la sauvegarde",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Succès",
+        description: "Pattern d'entraînement sauvegardé"
+      });
+      await smartExtractionService.loadLearnedPatterns(hotelId);
+    }
   };
+
+  const availablePmsTypes = smartExtractionService.getAvailablePmsTypes();
 
   return (
     <div className="space-y-6">
       <Card className="p-6">
         <div className="space-y-4">
-          <div className="flex items-center gap-3 mb-4">
-            <Brain className="h-6 w-6 text-primary" />
-            <div>
-              <h3 className="text-lg font-semibold">Entraînement Intelligent IA</h3>
-              <p className="text-sm text-muted-foreground">
-                Téléchargez des rapports PDF et sélectionnez le type de PMS pour améliorer la précision
-              </p>
-            </div>
+          <div>
+            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+              <Brain className="w-5 h-5" />
+              Entraînement de l'IA
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Uploadez vos rapports PDF pour entraîner l'IA à reconnaître le format spécifique de votre PMS
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="pms-type">Type de PMS</Label>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Label>Type de PMS</Label>
               <Select value={selectedPmsType} onValueChange={setSelectedPmsType}>
-                <SelectTrigger id="pms-type">
-                  <SelectValue placeholder="Sélectionner le type de PMS" />
+                <SelectTrigger>
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Détection automatique
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="apaleo">Apaleo</SelectItem>
-                  <SelectItem value="medialog">Medialog</SelectItem>
-                  <SelectItem value="space">Space / Mews</SelectItem>
-                  <SelectItem value="custom">Personnalisé</SelectItem>
+                  <SelectItem value="auto">Auto-détection</SelectItem>
+                  {availablePmsTypes.map(type => (
+                    <SelectItem key={type} value={type}>
+                      {type.toUpperCase()}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            {detectedPmsType && (
-              <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-sm">
-                  PMS détecté: <Badge variant="secondary">{detectedPmsType}</Badge>
-                </span>
-              </div>
-            )}
-          </div>
 
-          <div>
-            <Label htmlFor="file-upload">Télécharger des rapports PDF</Label>
-            <div className="mt-2">
-              <label
-                htmlFor="file-upload"
-                className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors"
-              >
-                <div className="flex flex-col items-center">
-                  <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {uploading ? "Traitement en cours..." : "Cliquez ou glissez des PDF ici"}
-                  </span>
-                </div>
-                <input
-                  id="file-upload"
-                  type="file"
-                  multiple
-                  accept=".pdf"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                />
-              </label>
+            <div className="flex-1">
+              <Label htmlFor="pdf-upload">Upload PDF</Label>
+              <Input
+                id="pdf-upload"
+                type="file"
+                accept=".pdf"
+                multiple
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
             </div>
           </div>
 
-          {reports.length > 0 && (
-            <div className="space-y-2">
-              <Label>Rapports chargés ({reports.length})</Label>
-              <div className="space-y-2">
-                {reports.map((report, index) => (
-                  <div
-                    key={index}
-                    onClick={() => setSelectedReport(report)}
-                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedReport?.name === report.name ? 'border-primary bg-primary/5' : 'hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-4 w-4" />
-                      <div>
-                        <div className="font-medium">{report.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {report.extractedRooms.length} chambres détectées
-                        </div>
-                      </div>
-                    </div>
-                    {report.validated && (
-                      <Badge variant="secondary">
-                        <Check className="h-3 w-3 mr-1" />
-                        Validé
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+          {detectedPmsType && (
+            <Badge variant="secondary" className="flex items-center gap-2 w-fit">
+              <Sparkles className="w-3 h-3" />
+              PMS détecté: {detectedPmsType.toUpperCase()}
+            </Badge>
           )}
         </div>
       </Card>
+
+      {reports.length > 0 && (
+        <Card className="p-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Rapports uploadés</h3>
+            <div className="grid gap-2">
+              {reports.map((report, index) => (
+                <Button
+                  key={index}
+                  variant={selectedReport?.name === report.name ? "default" : "outline"}
+                  className="justify-start"
+                  onClick={() => setSelectedReport(report)}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  {report.name} ({report.extractedRooms.length} chambres)
+                </Button>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {selectedReport && (
         <Card className="p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-lg font-semibold">{selectedReport.name}</h4>
-                <p className="text-sm text-muted-foreground">
-                  {selectedReport.extractedRooms.filter(r => r.validated).length} / {selectedReport.extractedRooms.length} validées
-                </p>
-              </div>
-              <Button onClick={validateAllRooms} disabled={selectedReport.validated}>
-                <Check className="h-4 w-4 mr-2" />
-                Valider tout et enregistrer
-              </Button>
+              <h3 className="text-lg font-semibold">Validation des données</h3>
+              <Badge variant={selectedReport.validated ? "default" : "secondary"}>
+                {selectedReport.validated ? "Validé" : "En attente"}
+              </Badge>
             </div>
 
-            <div className="space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                onClick={validateAllRooms}
+                className="flex-1"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Valider toutes les chambres
+              </Button>
+              <Button
+                onClick={() => {
+                  setMergingMode(!mergingMode);
+                  setSelectedRooms(new Set());
+                }}
+                variant={mergingMode ? "default" : "outline"}
+                className="flex-1"
+              >
+                <Link2 className="w-4 h-4 mr-2" />
+                {mergingMode ? "Annuler fusion" : "Fusionner chambres"}
+              </Button>
+              {mergingMode && selectedRooms.size >= 2 && (
+                <Button onClick={mergeSelectedRooms} variant="secondary">
+                  Confirmer fusion ({selectedRooms.size} chambres)
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-3">
               {selectedReport.extractedRooms.map((room, index) => (
-                <div
-                  key={index}
-                  className={`p-4 border rounded-lg ${room.validated ? 'bg-green-50 dark:bg-green-950/20' : ''}`}
+                <Card 
+                  key={index} 
+                  className={`p-4 ${room.validated ? 'border-green-500' : 'border-yellow-500'} ${
+                    mergingMode && selectedRooms.has(index) ? 'ring-2 ring-primary' : ''
+                  }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Chambre {room.roomNumber}</Badge>
-                      <Badge>{room.status}</Badge>
-                      <Badge variant={room.cleaningType === 'full' ? 'default' : room.cleaningType === 'quick' ? 'secondary' : 'outline'}>
-                        {room.cleaningType === 'full' ? 'Nettoyage complet' : room.cleaningType === 'quick' ? 'Recouche' : 'Aucun'}
-                      </Badge>
-                      {room.confidence && (
-                        <span className="text-xs text-muted-foreground">
-                          {(room.confidence * 100).toFixed(0)}% confiance
-                        </span>
-                      )}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {mergingMode && (
+                          <Checkbox
+                            checked={selectedRooms.has(index)}
+                            onCheckedChange={() => toggleRoomSelection(index)}
+                          />
+                        )}
+                        {room.isConnected && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Link2 className="w-3 h-3 mr-1" />
+                            Connectées
+                          </Badge>
+                        )}
+                        <Label className="font-medium">Chambre {room.roomNumber}</Label>
+                      </div>
+                      <div className="flex gap-2">
+                        {room.isConnected && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => splitConnectedRoom(index)}
+                            title="Séparer les chambres"
+                          >
+                            <Unlink className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant={room.validated ? "default" : "outline"}
+                          onClick={() => validateRoom(index)}
+                        >
+                          {room.validated ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={room.validated ? "secondary" : "default"}
-                      onClick={() => validateRoom(room.roomNumber)}
-                      disabled={room.validated}
-                    >
-                      {room.validated ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-                    </Button>
+                    
+                    {room.connectedRooms && room.connectedRooms.length > 0 && (
+                      <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                        <strong>Chambres liées:</strong> {room.connectedRooms.join(', ')}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs">Statut</Label>
+                        <Input
+                          value={room.status}
+                          onChange={(e) => updateRoomData(index, 'status', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Type de nettoyage</Label>
+                        <Select
+                          value={room.cleaningType}
+                          onValueChange={(value) => updateRoomData(index, 'cleaningType', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="full">Complet</SelectItem>
+                            <SelectItem value="quick">Rapide</SelectItem>
+                            <SelectItem value="none">Aucun</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Arrivée</Label>
+                        <Input
+                          value={room.arrivalDate}
+                          onChange={(e) => updateRoomData(index, 'arrivalDate', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Départ</Label>
+                        <Input
+                          value={room.departureDate}
+                          onChange={(e) => updateRoomData(index, 'departureDate', e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="grid grid-cols-4 gap-2 text-sm">
-                    <div>
-                      <Label className="text-xs">Numéro</Label>
-                      <Input
-                        value={room.roomNumber}
-                        onChange={(e) => updateRoomData(room.roomNumber, 'roomNumber', e.target.value)}
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Statut</Label>
-                      <Input
-                        value={room.status}
-                        onChange={(e) => updateRoomData(room.roomNumber, 'status', e.target.value)}
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Arrivée</Label>
-                      <Input
-                        value={room.arrivalDate}
-                        onChange={(e) => updateRoomData(room.roomNumber, 'arrivalDate', e.target.value)}
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Départ</Label>
-                      <Input
-                        value={room.departureDate}
-                        onChange={(e) => updateRoomData(room.roomNumber, 'departureDate', e.target.value)}
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                </div>
+                </Card>
               ))}
             </div>
           </div>
