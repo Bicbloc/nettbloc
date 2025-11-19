@@ -17,9 +17,11 @@ export interface ExtractedRoom {
   cleaningType: 'full' | 'quick' | 'none';
   validated: boolean;
   confidence?: number;
+  isConnected?: boolean;
+  connectedRooms?: string[];
+  originalText?: string;
 }
 
-// Patterns par défaut pour les PMS connus
 const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
   apaleo: {
     pms_type: 'apaleo',
@@ -36,6 +38,21 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'EN ARRIVEE': { status: 'arrival', cleaning: 'full' }
     },
     date_formats: ['dd/MM/yyyy', 'dd/MM/yy'],
+    context_window: 300,
+    priority: 1
+  },
+  mews: {
+    pms_type: 'mews',
+    room_number_regex: '\\b([1-9]\\d{2})\\b',
+    status_keywords: {
+      'Dirty': { status: 'dirty', cleaning: 'full' },
+      'Clean': { status: 'clean', cleaning: 'none' },
+      'Inspected': { status: 'inspected', cleaning: 'none' },
+      'Out of Service': { status: 'out-of-order', cleaning: 'none' },
+      'Occupied Clean': { status: 'occupied', cleaning: 'none' },
+      'Occupied Dirty': { status: 'occupied', cleaning: 'quick' }
+    },
+    date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd'],
     context_window: 300,
     priority: 1
   },
@@ -72,9 +89,15 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
 export class SmartExtractionService {
   private patterns: Map<string, PmsPattern> = new Map();
   private learnedPatterns: any[] = [];
+  private connectedRoomPatterns = [
+    /(\d{3,4})\s*[-–—]\s*(\d{3,4})/g,
+    /(\d{3,4})\s*[+&]\s*(\d{3,4})/g,
+    /(\d{3,4})\s*\/\s*(\d{3,4})/g,
+    /(\d{3,4})\s*et\s*(\d{3,4})/gi,
+    /(\d{3,4})\s*,\s*(\d{3,4})/g,
+  ];
 
   constructor() {
-    // Charger les patterns par défaut
     Object.values(DEFAULT_PATTERNS).forEach(pattern => {
       this.patterns.set(pattern.pms_type, pattern);
     });
@@ -94,15 +117,12 @@ export class SmartExtractionService {
     }
 
     this.learnedPatterns = data || [];
-    
-    // Analyser les patterns validés pour améliorer les règles
     this.analyzeAndUpdatePatterns();
   }
 
   private analyzeAndUpdatePatterns(): void {
     const pmsGroups = new Map<string, any[]>();
     
-    // Grouper par type de PMS
     this.learnedPatterns.forEach(pattern => {
       const pmsType = pattern.pms_type || 'unknown';
       if (!pmsGroups.has(pmsType)) {
@@ -111,217 +131,242 @@ export class SmartExtractionService {
       pmsGroups.get(pmsType)!.push(pattern);
     });
 
-    // Pour chaque type de PMS, analyser les patterns
     pmsGroups.forEach((patterns, pmsType) => {
       if (pmsType === 'unknown' || patterns.length < 3) return;
 
       const statusCounts = new Map<string, { cleaning: string; count: number }>();
-      const extractedData = patterns.flatMap(p => p.extracted_data || []);
 
-      extractedData.forEach((room: any) => {
-        const key = room.status;
-        if (!statusCounts.has(key)) {
-          statusCounts.set(key, { cleaning: room.cleaningType, count: 0 });
-        }
-        statusCounts.get(key)!.count++;
+      patterns.forEach(p => {
+        const extractedData = Array.isArray(p.extracted_data) ? p.extracted_data : [];
+        extractedData.forEach((room: any) => {
+          const key = room.status;
+          if (!statusCounts.has(key)) {
+            statusCounts.set(key, { cleaning: room.cleaningType, count: 0 });
+          }
+          statusCounts.get(key)!.count++;
+        });
       });
 
-      // Mettre à jour ou créer le pattern pour ce PMS
-      const existingPattern = this.patterns.get(pmsType) || DEFAULT_PATTERNS[pmsType];
+      const existingPattern = this.patterns.get(pmsType);
       if (existingPattern) {
-        const updatedKeywords = { ...existingPattern.status_keywords };
-        
-        statusCounts.forEach((value, status) => {
-          if (value.count >= 2) {
-            updatedKeywords[status.toUpperCase()] = {
-              status: status.toLowerCase().replace(/\s+/g, '-'),
-              cleaning: value.cleaning as 'full' | 'quick' | 'none'
+        const newKeywords = { ...existingPattern.status_keywords };
+        statusCounts.forEach((data, status) => {
+          if (data.count >= 2) {
+            newKeywords[status] = {
+              status,
+              cleaning: data.cleaning as 'full' | 'quick' | 'none'
             };
           }
         });
-
-        this.patterns.set(pmsType, {
-          ...existingPattern,
-          status_keywords: updatedKeywords
-        });
+        existingPattern.status_keywords = newKeywords;
       }
     });
   }
 
   detectPmsType(text: string): string {
-    const upperText = text.toUpperCase();
-    
-    // Détection par mots-clés spécifiques
-    if (upperText.includes('APALEO') || 
-        (upperText.includes('DIR') && upperText.includes('INS'))) {
-      return 'apaleo';
-    }
-    
-    if (upperText.includes('MEDIALOG') || 
-        upperText.includes('DRAPS')) {
-      return 'medialog';
-    }
-    
-    if (upperText.includes('SPACE STATUS') || 
-        upperText.includes('MEWS')) {
-      return 'space';
-    }
-
-    // Scoring par patterns
     const scores = new Map<string, number>();
-    
+
     this.patterns.forEach((pattern, pmsType) => {
       let score = 0;
       Object.keys(pattern.status_keywords).forEach(keyword => {
-        if (upperText.includes(keyword)) {
+        if (text.toUpperCase().includes(keyword.toUpperCase())) {
           score += 1;
         }
       });
       scores.set(pmsType, score);
     });
 
-    // Retourner le PMS avec le meilleur score
-    let bestPms = 'unknown';
-    let bestScore = 0;
-    
+    let maxScore = 0;
+    let detectedType = 'unknown';
     scores.forEach((score, pmsType) => {
-      if (score > bestScore) {
-        bestScore = score;
-        bestPms = pmsType;
+      if (score > maxScore) {
+        maxScore = score;
+        detectedType = pmsType;
       }
     });
 
-    return bestScore >= 2 ? bestPms : 'unknown';
+    return maxScore >= 2 ? detectedType : 'unknown';
   }
 
   extractRooms(text: string, pmsType?: string): ExtractedRoom[] {
-    const detectedPmsType = pmsType || this.detectPmsType(text);
-    const pattern = this.patterns.get(detectedPmsType) || this.getFallbackPattern();
-    
-    return this.extractWithPattern(text, pattern);
+    const selectedPattern = pmsType
+      ? this.patterns.get(pmsType)
+      : this.patterns.get(this.detectPmsType(text));
+
+    if (!selectedPattern) {
+      return this.extractWithGenericPattern(text);
+    }
+
+    return this.extractWithPattern(text, selectedPattern);
   }
 
   private extractWithPattern(text: string, pattern: PmsPattern): ExtractedRoom[] {
+    const lines = text.split('\n').filter(line => line.trim());
     const rooms: ExtractedRoom[] = [];
-    const foundRooms = new Set<string>();
-    const roomPattern = new RegExp(pattern.room_number_regex, 'g');
-    
-    let match;
-    while ((match = roomPattern.exec(text)) !== null) {
-      const roomNumber = match[1];
+
+    for (const line of lines) {
+      const connectedInfo = this.detectConnectedRooms(line);
       
-      if (parseInt(roomNumber) > 999 || /^20(2[0-9])$/.test(roomNumber)) continue;
-      if (foundRooms.has(roomNumber)) continue;
-      
-      foundRooms.add(roomNumber);
-      
-      const start = Math.max(0, match.index - pattern.context_window);
-      const end = Math.min(text.length, match.index + pattern.context_window);
-      const context = text.substring(start, end).toUpperCase();
-      
-      const dates = this.extractDates(context);
-      const { status, cleaningType, confidence } = this.detectStatus(context, pattern);
-      
-      rooms.push({
-        roomNumber: roomNumber.padStart(3, '0'),
-        status,
-        arrivalDate: dates[0] || '',
-        departureDate: dates[dates.length - 1] || '',
-        cleaningType,
-        validated: false,
-        confidence
-      });
+      if (connectedInfo.isConnected) {
+        const room = this.extractRoomFromLine(line, pattern);
+        if (room) {
+          room.isConnected = true;
+          room.connectedRooms = connectedInfo.rooms;
+          room.roomNumber = connectedInfo.rooms.join('-');
+          room.originalText = line;
+          
+          const context = this.getContext(lines, lines.indexOf(line), pattern.context_window);
+          const dates = this.extractDates(context);
+          room.arrivalDate = dates.checkIn || '';
+          room.departureDate = dates.checkOut || '';
+          
+          rooms.push(room);
+        }
+        continue;
+      }
+
+      const room = this.extractRoomFromLine(line, pattern);
+      if (room) {
+        const context = this.getContext(lines, lines.indexOf(line), pattern.context_window);
+        const dates = this.extractDates(context);
+        room.arrivalDate = dates.checkIn || '';
+        room.departureDate = dates.checkOut || '';
+        room.originalText = line;
+        rooms.push(room);
+      }
     }
-    
+
     return rooms;
   }
 
-  private extractDates(context: string): string[] {
-    const dates4 = context.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-    const dates2 = context.match(/\d{2}\/\d{2}\/\d{2}/g) || [];
-    return [...dates4, ...dates2];
+  private extractRoomFromLine(line: string, pattern: PmsPattern): ExtractedRoom | null {
+    const regex = new RegExp(pattern.room_number_regex);
+    const roomMatch = line.match(regex);
+    if (!roomMatch) return null;
+
+    const roomNumber = roomMatch[1] || roomMatch[0];
+    const { status, cleaningType } = this.detectStatus(line, pattern);
+
+    if (!status) return null;
+
+    return {
+      roomNumber,
+      status,
+      arrivalDate: '',
+      departureDate: '',
+      cleaningType,
+      validated: false,
+      confidence: 0.8
+    };
   }
 
-  private detectStatus(
-    context: string, 
-    pattern: PmsPattern
-  ): { status: string; cleaningType: 'full' | 'quick' | 'none'; confidence: number } {
-    let bestMatch: { status: string; cleaningType: 'full' | 'quick' | 'none'; confidence: number } = { 
-      status: 'unknown', 
-      cleaningType: 'none', 
-      confidence: 0 
-    };
-    
-    Object.entries(pattern.status_keywords).forEach(([keyword, mapping]) => {
-      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-      if (regex.test(context)) {
-        const confidence = keyword.length / 20;
-        if (confidence > bestMatch.confidence) {
-          bestMatch = {
-            status: mapping.status,
-            cleaningType: mapping.cleaning,
-            confidence: Math.min(confidence, 1)
-          };
-        }
+  private detectConnectedRooms(line: string): { isConnected: boolean; rooms: string[] } {
+    for (const pattern of this.connectedRoomPatterns) {
+      const matches = [...line.matchAll(pattern)];
+      if (matches.length > 0) {
+        const rooms = matches.flatMap(m => [m[1], m[2]]);
+        return { isConnected: true, rooms };
       }
-    });
+    }
+    return { isConnected: false, rooms: [] };
+  }
 
-    if (bestMatch.confidence === 0) {
-      const dates = this.extractDates(context);
-      if (dates.length >= 2) {
-        bestMatch = { status: 'checkout', cleaningType: 'full', confidence: 0.5 };
-      } else if (dates.length === 1) {
-        bestMatch = { status: 'stayover', cleaningType: 'quick', confidence: 0.4 };
+  private getContext(lines: string[], lineIndex: number, windowSize: number): string {
+    const start = Math.max(0, lineIndex - 1);
+    const end = Math.min(lines.length, lineIndex + 2);
+    return lines.slice(start, end).join(' ');
+  }
+
+  private detectStatus(context: string, pattern: PmsPattern): {
+    status: string;
+    cleaningType: 'full' | 'quick' | 'none';
+  } {
+    const contextUpper = context.toUpperCase();
+
+    for (const [keyword, config] of Object.entries(pattern.status_keywords)) {
+      if (contextUpper.includes(keyword.toUpperCase())) {
+        return {
+          status: config.status,
+          cleaningType: config.cleaning
+        };
       }
     }
 
-    return bestMatch;
+    return { status: '', cleaningType: 'none' };
   }
 
-  private getFallbackPattern(): PmsPattern {
+  private extractDates(context: string): { checkIn?: string; checkOut?: string } {
+    const datePatterns = [
+      /(\d{1,2}\/\d{1,2}\/\d{2,4})/g,
+      /(\d{1,2}-\d{1,2}-\d{2,4})/g
+    ];
+
+    const dates: string[] = [];
+    datePatterns.forEach(pattern => {
+      const matches = context.match(pattern);
+      if (matches) {
+        dates.push(...matches);
+      }
+    });
+
     return {
-      pms_type: 'generic',
-      room_number_regex: '\\b([1-9]\\d{1,2})\\b',
-      status_keywords: {
-        'DIR': { status: 'dirty', cleaning: 'full' },
-        'CLEAN': { status: 'clean', cleaning: 'none' },
-        'OCC': { status: 'occupied', cleaning: 'none' },
-        'DEPART': { status: 'checkout', cleaning: 'full' }
-      },
-      date_formats: ['dd/MM/yyyy'],
-      context_window: 250,
-      priority: 99
+      checkIn: dates[0],
+      checkOut: dates[1]
     };
+  }
+
+  private extractWithGenericPattern(text: string): ExtractedRoom[] {
+    const rooms: ExtractedRoom[] = [];
+    const lines = text.split('\n').filter(line => line.trim());
+
+    for (const line of lines) {
+      const roomMatch = line.match(/\b([1-9]\d{2,3})\b/);
+      if (!roomMatch) continue;
+
+      const roomNumber = roomMatch[1];
+      const status = this.guessStatus(line);
+
+      if (status) {
+        rooms.push({
+          roomNumber,
+          status,
+          arrivalDate: '',
+          departureDate: '',
+          cleaningType: 'full',
+          validated: false,
+          confidence: 0.5
+        });
+      }
+    }
+
+    return rooms;
+  }
+
+  private guessStatus(line: string): string {
+    const lineUpper = line.toUpperCase();
+    if (lineUpper.includes('DIRTY') || lineUpper.includes('SALE')) return 'dirty';
+    if (lineUpper.includes('CLEAN') || lineUpper.includes('PROPRE')) return 'clean';
+    if (lineUpper.includes('CHECKOUT') || lineUpper.includes('DEPART')) return 'checkout';
+    if (lineUpper.includes('OCCUPIED') || lineUpper.includes('OCCUP')) return 'occupied';
+    return '';
+  }
+
+  async savePattern(hotelId: string, pmsType: string, patternData: any): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('report_training_patterns').insert([{
+      hotel_id: hotelId,
+      pms_type: pmsType,
+      detection_rules: patternData,
+      validated: false,
+      created_by: user?.id || '',
+      report_name: 'pattern',
+      raw_text: '',
+      extracted_data: []
+    }]);
   }
 
   getAvailablePmsTypes(): string[] {
     return Array.from(this.patterns.keys());
-  }
-
-  getPattern(pmsType: string): PmsPattern | undefined {
-    return this.patterns.get(pmsType);
-  }
-
-  async savePattern(hotelId: string, pmsType: string, pattern: Partial<PmsPattern>): Promise<boolean> {
-    const { error } = await supabase
-      .from('report_training_patterns')
-      .insert([{
-        hotel_id: hotelId,
-        pms_type: pmsType,
-        detection_rules: pattern as any,
-        validated: true,
-        report_name: `Pattern ${pmsType}`,
-        raw_text: '',
-        extracted_data: [],
-        created_by: (await supabase.auth.getUser()).data.user?.id
-      }]);
-
-    if (error) {
-      console.error('Error saving pattern:', error);
-      return false;
-    }
-
-    return true;
   }
 }
 
