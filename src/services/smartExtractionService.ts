@@ -25,25 +25,33 @@ export interface ExtractedRoom {
 const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
   apaleo: {
     pms_type: 'apaleo',
-    room_number_regex: '\\b([1-9]\\d{2})\\b',
+    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
     status_keywords: {
       'DIR': { status: 'dirty', cleaning: 'full' },
+      'DIRTY': { status: 'dirty', cleaning: 'full' },
       'INS': { status: 'inspected', cleaning: 'none' },
+      'INSPECTED': { status: 'inspected', cleaning: 'none' },
       'OCC': { status: 'occupied', cleaning: 'none' },
+      'OCCUPIED': { status: 'occupied', cleaning: 'none' },
       'CLEANING': { status: 'to-clean', cleaning: 'full' },
       'DEPART': { status: 'checkout', cleaning: 'full' },
+      'DEPARTURE': { status: 'checkout', cleaning: 'full' },
       'PARTI': { status: 'checkout', cleaning: 'full' },
+      'CHECKOUT': { status: 'checkout', cleaning: 'full' },
       'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
+      'STAYOVER': { status: 'stayover', cleaning: 'quick' },
       'SALE': { status: 'dirty', cleaning: 'full' },
-      'EN ARRIVEE': { status: 'arrival', cleaning: 'full' }
+      'EN ARRIVEE': { status: 'arrival', cleaning: 'full' },
+      'ARRIVAL': { status: 'arrival', cleaning: 'full' },
+      'ARRIVEE': { status: 'arrival', cleaning: 'full' }
     },
-    date_formats: ['dd/MM/yyyy', 'dd/MM/yy'],
+    date_formats: ['dd/MM/yyyy', 'dd/MM/yy', 'dd.MM.yyyy', 'dd-MM-yyyy'],
     context_window: 300,
     priority: 1
   },
   mews: {
     pms_type: 'mews',
-    room_number_regex: '\\b([1-9]\\d{2})\\b',
+    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
     status_keywords: {
       'Dirty': { status: 'dirty', cleaning: 'full' },
       'Clean': { status: 'clean', cleaning: 'none' },
@@ -52,35 +60,109 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'Occupied Clean': { status: 'occupied', cleaning: 'none' },
       'Occupied Dirty': { status: 'occupied', cleaning: 'quick' }
     },
-    date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd'],
+    date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd.MM.yyyy'],
     context_window: 300,
     priority: 1
   },
   medialog: {
     pms_type: 'medialog',
-    room_number_regex: '\\b([1-9]\\d{1,2})\\b',
+    room_number_regex: '\\b([1-9]\\d{1,3})\\b',
     status_keywords: {
       'DRAPS': { status: 'change-sheets', cleaning: 'full' },
       'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
       'BLANC': { status: 'dirty', cleaning: 'full' },
+      'À BLANC': { status: 'dirty', cleaning: 'full' },
       'NE PAS NETTOYER': { status: 'occupied', cleaning: 'none' },
+      'DEPART': { status: 'checkout', cleaning: 'full' },
+      'DÉPART': { status: 'checkout', cleaning: 'full' }
+    },
+    date_formats: ['dd/MM/yyyy', 'dd/MM/yy'],
+    context_window: 250,
+    priority: 2
+  },
+  opera: {
+    pms_type: 'opera',
+    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
+    status_keywords: {
+      'DIRTY': { status: 'dirty', cleaning: 'full' },
+      'CLEAN': { status: 'clean', cleaning: 'none' },
+      'INSPECTED': { status: 'inspected', cleaning: 'none' },
+      'OUT OF ORDER': { status: 'out-of-order', cleaning: 'none' },
+      'OOO': { status: 'out-of-order', cleaning: 'none' },
+      'PICKUP': { status: 'stayover', cleaning: 'quick' },
+      'VACANT': { status: 'vacant', cleaning: 'full' },
+      'OCCUPIED': { status: 'occupied', cleaning: 'none' },
+      'DUE OUT': { status: 'checkout', cleaning: 'full' },
+      'CHECKOUT': { status: 'checkout', cleaning: 'full' }
+    },
+    date_formats: ['dd-MMM-yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd', 'dd MMM yyyy'],
+    context_window: 300,
+    priority: 1
+  },
+  protel: {
+    pms_type: 'protel',
+    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
+    status_keywords: {
+      'DIRTY': { status: 'dirty', cleaning: 'full' },
+      'CLEAN': { status: 'clean', cleaning: 'none' },
+      'CHECKED OUT': { status: 'checkout', cleaning: 'full' },
+      'OCCUPIED': { status: 'occupied', cleaning: 'none' },
+      'VACANT': { status: 'vacant', cleaning: 'full' },
+      'OUT OF ORDER': { status: 'out-of-order', cleaning: 'none' },
+      'BLOCKED': { status: 'blocked', cleaning: 'none' }
+    },
+    date_formats: ['dd.MM.yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'],
+    context_window: 300,
+    priority: 2
+  },
+  fidelio: {
+    pms_type: 'fidelio',
+    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
+    status_keywords: {
+      'DRT': { status: 'dirty', cleaning: 'full' },
+      'CLN': { status: 'clean', cleaning: 'none' },
+      'INS': { status: 'inspected', cleaning: 'none' },
+      'OOO': { status: 'out-of-order', cleaning: 'none' },
+      'OCC': { status: 'occupied', cleaning: 'none' },
+      'VAC': { status: 'vacant', cleaning: 'full' },
+      'DEP': { status: 'checkout', cleaning: 'full' }
+    },
+    date_formats: ['dd-MMM-yy', 'dd/MM/yy', 'ddMMMyy'],
+    context_window: 250,
+    priority: 2
+  },
+  rms: {
+    pms_type: 'rms',
+    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
+    status_keywords: {
+      'SALE': { status: 'dirty', cleaning: 'full' },
+      'PROPRE': { status: 'clean', cleaning: 'none' },
+      'CONTRÔLÉ': { status: 'inspected', cleaning: 'none' },
+      'CONTROLE': { status: 'inspected', cleaning: 'none' },
+      'HS': { status: 'out-of-order', cleaning: 'none' },
+      'OCCUPÉ': { status: 'occupied', cleaning: 'none' },
+      'OCCUPE': { status: 'occupied', cleaning: 'none' },
+      'LIBRE': { status: 'vacant', cleaning: 'full' },
+      'DÉPART': { status: 'checkout', cleaning: 'full' },
       'DEPART': { status: 'checkout', cleaning: 'full' }
     },
-    date_formats: ['dd/MM/yyyy'],
-    context_window: 250,
+    date_formats: ['dd/MM/yyyy', 'dd/MM/yy'],
+    context_window: 300,
     priority: 2
   },
   space: {
     pms_type: 'space',
-    room_number_regex: '\\b([1-9]\\d{2})\\b',
+    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
     status_keywords: {
       'Dirty': { status: 'dirty', cleaning: 'full' },
       'Clean': { status: 'clean', cleaning: 'none' },
       'Inspected': { status: 'inspected', cleaning: 'none' },
       'Out of Order': { status: 'out-of-order', cleaning: 'none' },
-      'Occupied': { status: 'occupied', cleaning: 'none' }
+      'Occupied': { status: 'occupied', cleaning: 'none' },
+      'Vacant': { status: 'vacant', cleaning: 'full' },
+      'Checkout': { status: 'checkout', cleaning: 'full' }
     },
-    date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd'],
+    date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd.MM.yyyy'],
     context_window: 300,
     priority: 3
   }
@@ -90,11 +172,15 @@ export class SmartExtractionService {
   private patterns: Map<string, PmsPattern> = new Map();
   private learnedPatterns: any[] = [];
   private connectedRoomPatterns = [
-    /(\d{3,4})\s*[-–—]\s*(\d{3,4})/g,
-    /(\d{3,4})\s*[+&]\s*(\d{3,4})/g,
-    /(\d{3,4})\s*\/\s*(\d{3,4})/g,
-    /(\d{3,4})\s*et\s*(\d{3,4})/gi,
-    /(\d{3,4})\s*,\s*(\d{3,4})/g,
+    /(\d{2,4})\s*[-–—]\s*(\d{2,4})/g,           // 101-102, 101–102
+    /(\d{2,4})\s*[+&]\s*(\d{2,4})/g,            // 101+102, 101&102
+    /(\d{2,4})\s*\/\s*(\d{2,4})/g,              // 101/102
+    /(\d{2,4})\s*et\s*(\d{2,4})/gi,             // 101 et 102
+    /(\d{2,4})\s*and\s*(\d{2,4})/gi,            // 101 and 102
+    /(\d{2,4})\s*,\s*(\d{2,4})/g,               // 101, 102
+    /(\d{2,4})\s*→\s*(\d{2,4})/g,               // 101→102
+    /(\d{2,4})\s*<->\s*(\d{2,4})/g,             // 101<->102
+    /(?:chambre|room|rm)?\s*(\d{2,4})\s*(?:avec|with)\s*(?:chambre|room|rm)?\s*(\d{2,4})/gi, // chambre 101 avec 102
   ];
 
   constructor() {
@@ -164,12 +250,45 @@ export class SmartExtractionService {
   }
 
   detectPmsType(text: string): string {
+    const textUpper = text.toUpperCase();
+    
+    // Mots-clés spécifiques par PMS
+    const pmsKeywords: Record<string, string[]> = {
+      'opera': ['OPERA', 'ORACLE HOSPITALITY', 'MICROS', 'OPERA PMS', 'OPERA CLOUD'],
+      'protel': ['PROTEL', 'PROTEL PMS', 'PROTEL HOTELSOFTWARE', 'PROTEL AIR'],
+      'fidelio': ['FIDELIO', 'FIDELIO SUITE 8', 'FIDELIO V8'],
+      'mews': ['MEWS', 'COMMANDER', 'MEWS SYSTEMS', 'MEWS COMMANDER'],
+      'apaleo': ['APALEO', 'CLOUD PMS', 'HOUSEKEEPING REPORT'],
+      'medialog': ['MEDIALOG', 'PLANNING MENAGE', 'PLANNING MÉNAGE'],
+      'rms': ['RMS HOTEL', 'RMS CLOUD', 'RMS HOSPITALITY'],
+      'space': ['SPACE PMS', 'ROOM MANAGEMENT', 'GUESTLINE']
+    };
+
+    // Vérifier les mots-clés spécifiques d'abord
+    let maxKeywordMatches = 0;
+    let detectedFromKeywords = '';
+
+    for (const [pmsType, keywords] of Object.entries(pmsKeywords)) {
+      const matches = keywords.filter(keyword => textUpper.includes(keyword)).length;
+      if (matches > maxKeywordMatches) {
+        maxKeywordMatches = matches;
+        detectedFromKeywords = pmsType;
+      }
+    }
+
+    // Si un PMS est détecté par mots-clés, le retourner
+    if (maxKeywordMatches > 0) {
+      console.log(`🔍 PMS détecté par mots-clés: ${detectedFromKeywords}`);
+      return detectedFromKeywords;
+    }
+
+    // Sinon, utiliser le scoring basé sur les status keywords
     const scores = new Map<string, number>();
 
     this.patterns.forEach((pattern, pmsType) => {
       let score = 0;
       Object.keys(pattern.status_keywords).forEach(keyword => {
-        if (text.toUpperCase().includes(keyword.toUpperCase())) {
+        if (textUpper.includes(keyword.toUpperCase())) {
           score += 1;
         }
       });
@@ -185,7 +304,9 @@ export class SmartExtractionService {
       }
     });
 
-    return maxScore >= 2 ? detectedType : 'unknown';
+    const result = maxScore >= 2 ? detectedType : 'unknown';
+    console.log(`🔍 PMS détecté par scoring: ${result} (score: ${maxScore})`);
+    return result;
   }
 
   extractRooms(text: string, pmsType?: string): ExtractedRoom[] {
@@ -296,22 +417,44 @@ export class SmartExtractionService {
   }
 
   private extractDates(context: string): { checkIn?: string; checkOut?: string } {
+    // Patterns pour différents formats de dates
     const datePatterns = [
-      /(\d{1,2}\/\d{1,2}\/\d{2,4})/g,
-      /(\d{1,2}-\d{1,2}-\d{2,4})/g
+      // dd/MM/yyyy, dd-MM-yyyy, dd.MM.yyyy
+      /\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\b/g,
+      // yyyy-MM-dd, yyyy/MM/dd
+      /\b(\d{4})[\/\-](\d{2})[\/\-](\d{2})\b/g,
+      // dd MMM yyyy (ex: 15 Jan 2024, 15 Janv 2024)
+      /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Janv|Févr|Mars|Avr|Mai|Juin|Juil|Août|Sept)[a-z]*\.?\s+(\d{2,4})\b/gi,
+      // dd-MMM-yy (ex: 15-Jan-24)
+      /\b(\d{1,2})[-\/]([A-Z][a-z]{2})[-\/](\d{2})\b/g,
+      // MMM dd, yyyy (ex: Jan 15, 2024)
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/gi,
+      // ddMMMyy (ex: 15Jan24)
+      /\b(\d{2})([A-Z][a-z]{2})(\d{2})\b/g
     ];
 
     const dates: string[] = [];
+    const uniqueDates = new Set<string>();
+    
+    // Extraire toutes les dates trouvées
     datePatterns.forEach(pattern => {
-      const matches = context.match(pattern);
-      if (matches) {
-        dates.push(...matches);
+      const regex = new RegExp(pattern.source, pattern.flags);
+      let match;
+      while ((match = regex.exec(context)) !== null) {
+        const dateStr = match[0].trim();
+        // Éviter les doublons
+        if (!uniqueDates.has(dateStr)) {
+          uniqueDates.add(dateStr);
+          dates.push(dateStr);
+        }
       }
     });
 
+    console.log(`📅 Dates extraites du contexte (${dates.length}):`, dates);
+
     return {
       checkIn: dates[0],
-      checkOut: dates[1]
+      checkOut: dates[1] || dates[0] // Si une seule date, l'utiliser pour les deux
     };
   }
 
@@ -344,10 +487,47 @@ export class SmartExtractionService {
 
   private guessStatus(line: string): string {
     const lineUpper = line.toUpperCase();
-    if (lineUpper.includes('DIRTY') || lineUpper.includes('SALE')) return 'dirty';
-    if (lineUpper.includes('CLEAN') || lineUpper.includes('PROPRE')) return 'clean';
-    if (lineUpper.includes('CHECKOUT') || lineUpper.includes('DEPART')) return 'checkout';
-    if (lineUpper.includes('OCCUPIED') || lineUpper.includes('OCCUP')) return 'occupied';
+    
+    // Chambre sale / à nettoyer
+    if (lineUpper.match(/\b(DIRTY|SALE|DIR|DRAPS?|BLANC|À\s*BLANC|DRT)\b/)) {
+      return 'dirty';
+    }
+    
+    // Chambre propre
+    if (lineUpper.match(/\b(CLEAN|PROPRE|CLN|INSPEC|INS)\b/)) {
+      return 'clean';
+    }
+    
+    // Départ / checkout
+    if (lineUpper.match(/\b(CHECKOUT|CHECK-OUT|D[ÉE]PART|DEPARTED?|DEP|VACATING|DUE\s*OUT)\b/)) {
+      return 'checkout';
+    }
+    
+    // Occupée
+    if (lineUpper.match(/\b(OCCUPIED?|OCCUP[ÉE]E?|OCC|STAY)\b/)) {
+      return 'occupied';
+    }
+    
+    // Recouche / stayover
+    if (lineUpper.match(/\b(RECOUCHE|STAY\s*OVER|PICK\s*UP|REFRESH)\b/)) {
+      return 'stayover';
+    }
+    
+    // Arrivée
+    if (lineUpper.match(/\b(ARRIVAL|ARRIV[ÉE]E?|ARR|CHECKING\s*IN|DUE\s*IN)\b/)) {
+      return 'arrival';
+    }
+    
+    // Hors service
+    if (lineUpper.match(/\b(OUT\s*OF\s*ORDER|OOO|OUT\s*OF\s*SERVICE|H\.?S\.?|BLOCKED?)\b/)) {
+      return 'out-of-order';
+    }
+    
+    // Vacant / libre
+    if (lineUpper.match(/\b(VACANT|LIBRE|VAC|EMPTY|AVAILABLE)\b/)) {
+      return 'vacant';
+    }
+    
     return '';
   }
 
