@@ -178,9 +178,11 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         title: "Échec du traitement",
         description: "Une erreur s'est produite lors du traitement du fichier PDF.",
       });
+      // Fermer le dialogue même en cas d'erreur pour éviter l'impression de blocage
+      setOpen(false);
+      resetDialog();
     }
-  };
-
+   };
   const addHousekeeper = () => {
     if (newHousekeeperName.trim() && !housekeepers.includes(newHousekeeperName.trim())) {
       setHousekeepers([...housekeepers, newHousekeeperName.trim()]);
