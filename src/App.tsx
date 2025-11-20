@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
+import RoomRegistry from "./pages/RoomRegistry";
 import PlanSelection from "./pages/PlanSelection";
 import Success from "./pages/Success";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
@@ -42,6 +43,7 @@ const App = () => (
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/room-registry" element={<RoomRegistry />} />
                   <Route path="/housekeeper/login" element={<HousekeeperLogin />} />
                   <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
