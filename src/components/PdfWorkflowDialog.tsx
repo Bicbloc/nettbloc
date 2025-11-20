@@ -11,11 +11,13 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { SimpleCodeService, HousekeeperWithCode } from "@/services/simpleCodeService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -36,6 +38,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllExisting, setShowAllExisting] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -84,18 +88,65 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
     try {
       setIsUploading(true);
+      setUploadProgress(0);
       
-      // Traiter le PDF
+      // Étape 1: Lecture du PDF
+      setUploadStatus('📄 Lecture du PDF...');
+      setUploadProgress(20);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Étape 2: Extraction des données
+      setUploadStatus('🔍 Extraction des chambres...');
+      setUploadProgress(40);
       const data = await processPdf(selectedFile);
       setPdfData(data);
       
+      // Étape 3: Enregistrement des chambres
+      setUploadStatus('💾 Enregistrement des chambres...');
+      setUploadProgress(60);
+      
+      if (hotelId && data.length > 0) {
+        // Formater les données pour la fonction upsert_rooms_from_pdf
+        const roomsData = data.map((room: any) => ({
+          room_number: room.roomNumber || room.room_number,
+          floor: room.floor,
+          room_type: room.type || room.room_type,
+          building: room.building,
+          zone: room.zone,
+          source: selectedFile.name,
+          metadata: {
+            status: room.status,
+            raw_data: room
+          }
+        }));
+
+        const { data: result, error } = await supabase.rpc('upsert_rooms_from_pdf', {
+          p_hotel_id: hotelId,
+          p_rooms: roomsData,
+          p_source: `pdf_import_${new Date().toISOString()}`
+        });
+
+        if (error) {
+          console.error('Erreur enregistrement chambres:', error);
+        } else {
+          console.log('Chambres enregistrées:', result);
+        }
+      }
+      
+      setUploadProgress(80);
+      setUploadStatus('✅ Chargement des femmes de chambre...');
+      
+      await loadExistingHousekeepers();
+      
+      setUploadProgress(100);
+      setUploadStatus('✅ Terminé !');
+      
       toast({
-        title: "PDF analysé avec succès",
-        description: `${data.length} chambres détectées. Configurez maintenant vos femmes de chambre.`,
+        title: "✅ PDF analysé avec succès",
+        description: `${data.length} chambres détectées et enregistrées. Configurez maintenant vos femmes de chambre.`,
       });
 
-      // Charger les femmes de chambre existantes et passer à l'étape suivante
-      await loadExistingHousekeepers();
+      await new Promise(resolve => setTimeout(resolve, 500));
       setStep('housekeepers');
     } catch (error) {
       console.error("Erreur traitement PDF:", error);
@@ -172,48 +223,60 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         </DialogDescription>
       </DialogHeader>
       
-      <div 
-        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onClick={triggerFileInput}
-      >
-        <div className="space-y-4">
-          <div className="flex justify-center">
-            <FileUp className="h-10 w-10 text-gray-400" />
+      {isUploading && (
+        <div className="space-y-4 py-6">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <p className="text-sm font-medium">{uploadStatus}</p>
           </div>
-          <div>
-            <p className="text-sm font-medium">
-              {selectedFile ? selectedFile.name : "Glissez et déposez votre fichier ici"}
-            </p>
-            {!selectedFile && (
-              <p className="text-xs text-gray-500 mt-1">
-                Fichiers PDF uniquement, jusqu'à 10MB
+          <Progress value={uploadProgress} className="h-2" />
+        </div>
+      )}
+      
+      {!isUploading && (
+        <div 
+          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onClick={triggerFileInput}
+        >
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <FileUp className="h-10 w-10 text-gray-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                {selectedFile ? selectedFile.name : "Glissez et déposez votre fichier ici"}
               </p>
-            )}
-          </div>
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                triggerFileInput();
-              }}
-            >
-              Sélectionner un fichier
-            </Button>
+              {!selectedFile && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Fichiers PDF uniquement, jusqu'à 10MB
+                </p>
+              )}
+            </div>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerFileInput();
+                }}
+              >
+                Sélectionner un fichier
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       
       <DialogFooter>
         <Button variant="outline" onClick={() => setOpen(false)}>

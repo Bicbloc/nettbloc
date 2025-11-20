@@ -326,6 +326,71 @@ export type Database = {
           },
         ]
       }
+      hotel_rooms_registry: {
+        Row: {
+          building: string | null
+          capacity: number | null
+          created_at: string | null
+          floor: number | null
+          hotel_id: string
+          id: string
+          imported_at: string | null
+          imported_from: string | null
+          is_active: boolean | null
+          last_seen_at: string | null
+          metadata: Json | null
+          room_number: string
+          room_type: string | null
+          source: string | null
+          updated_at: string | null
+          zone: string | null
+        }
+        Insert: {
+          building?: string | null
+          capacity?: number | null
+          created_at?: string | null
+          floor?: number | null
+          hotel_id: string
+          id?: string
+          imported_at?: string | null
+          imported_from?: string | null
+          is_active?: boolean | null
+          last_seen_at?: string | null
+          metadata?: Json | null
+          room_number: string
+          room_type?: string | null
+          source?: string | null
+          updated_at?: string | null
+          zone?: string | null
+        }
+        Update: {
+          building?: string | null
+          capacity?: number | null
+          created_at?: string | null
+          floor?: number | null
+          hotel_id?: string
+          id?: string
+          imported_at?: string | null
+          imported_from?: string | null
+          is_active?: boolean | null
+          last_seen_at?: string | null
+          metadata?: Json | null
+          room_number?: string
+          room_type?: string | null
+          source?: string | null
+          updated_at?: string | null
+          zone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_rooms_registry_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_sessions: {
         Row: {
           created_at: string | null
@@ -1728,6 +1793,14 @@ export type Database = {
       }
       request_password_reset: { Args: { user_email: string }; Returns: boolean }
       sync_access_codes_with_housekeepers: { Args: never; Returns: number }
+      upsert_rooms_from_pdf: {
+        Args: { p_hotel_id: string; p_rooms: Json; p_source?: string }
+        Returns: {
+          inserted: number
+          total: number
+          updated: number
+        }[]
+      }
       validate_access_code_for_hotel: {
         Args: { access_code: string; hotel_uuid: string }
         Returns: boolean
