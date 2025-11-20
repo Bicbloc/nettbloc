@@ -338,19 +338,22 @@ export class SmartExtractionService {
       const connectedInfo = this.detectConnectedRooms(line);
       
       if (connectedInfo.isConnected) {
-        const room = this.extractRoomFromLine(line, pattern);
-        if (room) {
-          room.isConnected = true;
-          room.connectedRooms = connectedInfo.rooms;
-          room.roomNumber = connectedInfo.rooms.join('-');
-          room.originalText = line;
-          
-          const context = this.getContext(lines, lines.indexOf(line), pattern.context_window);
-          const dates = this.extractDates(context);
-          room.arrivalDate = dates.checkIn || '';
-          room.departureDate = dates.checkOut || '';
-          
-          rooms.push(room);
+        // Create a separate room entry for each connected room pair
+        for (const roomPair of connectedInfo.roomPairs) {
+          const room = this.extractRoomFromLine(line, pattern);
+          if (room) {
+            room.isConnected = true;
+            room.connectedRooms = roomPair;
+            room.roomNumber = roomPair.join('-');
+            room.originalText = line;
+            
+            const context = this.getContext(lines, lines.indexOf(line), pattern.context_window);
+            const dates = this.extractDates(context);
+            room.arrivalDate = dates.checkIn || '';
+            room.departureDate = dates.checkOut || '';
+            
+            rooms.push(room);
+          }
         }
         continue;
       }
@@ -390,15 +393,16 @@ export class SmartExtractionService {
     };
   }
 
-  private detectConnectedRooms(line: string): { isConnected: boolean; rooms: string[] } {
+  private detectConnectedRooms(line: string): { isConnected: boolean; roomPairs: string[][] } {
     for (const pattern of this.connectedRoomPatterns) {
       const matches = [...line.matchAll(pattern)];
       if (matches.length > 0) {
-        const rooms = matches.flatMap(m => [m[1], m[2]]);
-        return { isConnected: true, rooms };
+        // Create an array of pairs instead of flattening everything
+        const roomPairs = matches.map(m => [m[1], m[2]]);
+        return { isConnected: true, roomPairs };
       }
     }
-    return { isConnected: false, rooms: [] };
+    return { isConnected: false, roomPairs: [] };
   }
 
   private getContext(lines: string[], lineIndex: number, windowSize: number): string {
