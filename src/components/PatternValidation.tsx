@@ -30,9 +30,19 @@ interface PatternValidationProps {
   annotations: any[];
   extractedRooms: any[];
   patterns?: any;
+  hotelId: string;
+  reportName: string;
+  pmsType: string;
 }
 
-export const PatternValidation = ({ annotations, extractedRooms, patterns }: PatternValidationProps) => {
+export const PatternValidation = ({ 
+  annotations, 
+  extractedRooms, 
+  patterns,
+  hotelId,
+  reportName,
+  pmsType
+}: PatternValidationProps) => {
   const { toast } = useToast();
   const [metrics, setMetrics] = useState<ValidationMetrics | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -72,6 +82,22 @@ export const PatternValidation = ({ annotations, extractedRooms, patterns }: Pat
       if (data?.metrics) {
         setMetrics(data.metrics);
         setRecommendations(data.summary?.recommendations || []);
+        
+        // Sauvegarder dans l'historique
+        const user = await supabase.auth.getUser();
+        await supabase.from('pattern_validation_history').insert([{
+          hotel_id: hotelId,
+          report_name: reportName,
+          pms_type: pmsType,
+          metrics: data.metrics,
+          error_analysis: {
+            recommendations: data.summary?.recommendations || [],
+            quality: data.summary?.quality
+          },
+          annotations_count: annotations.length,
+          extracted_count: extractedRooms.length,
+          created_by: user.data.user?.id || ''
+        }]);
         
         toast({
           title: "Validation terminée",

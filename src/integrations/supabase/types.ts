@@ -794,6 +794,56 @@ export type Database = {
         }
         Relationships: []
       }
+      pattern_validation_history: {
+        Row: {
+          annotations_count: number | null
+          created_at: string | null
+          created_by: string
+          error_analysis: Json | null
+          extracted_count: number | null
+          hotel_id: string
+          id: string
+          metrics: Json
+          pms_type: string | null
+          report_name: string
+          validation_date: string | null
+        }
+        Insert: {
+          annotations_count?: number | null
+          created_at?: string | null
+          created_by: string
+          error_analysis?: Json | null
+          extracted_count?: number | null
+          hotel_id: string
+          id?: string
+          metrics?: Json
+          pms_type?: string | null
+          report_name: string
+          validation_date?: string | null
+        }
+        Update: {
+          annotations_count?: number | null
+          created_at?: string | null
+          created_by?: string
+          error_analysis?: Json | null
+          extracted_count?: number | null
+          hotel_id?: string
+          id?: string
+          metrics?: Json
+          pms_type?: string | null
+          report_name?: string
+          validation_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pattern_validation_history_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -1113,6 +1163,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analyze_error_trends: {
+        Args: { p_days?: number; p_hotel_id: string }
+        Returns: Json
+      }
       approve_housekeeper_access_request: {
         Args: { admin_user_id: string; request_id: string }
         Returns: string

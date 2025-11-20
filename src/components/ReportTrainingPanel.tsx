@@ -9,9 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3 } from "lucide-react";
+import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle } from "lucide-react";
 import { TextAnnotationTool } from "./TextAnnotationTool";
 import { PatternValidation } from "./PatternValidation";
+import { ErrorAnalysisDashboard } from "./ErrorAnalysisDashboard";
 import * as pdfjsLib from 'pdfjs-dist';
 import { smartExtractionService, type ExtractedRoom } from "@/services/smartExtractionService";
 
@@ -502,7 +503,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         {selectedReport && (
           <Card className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4 mb-4">
+              <TabsList className="grid w-full grid-cols-5 mb-4">
                 <TabsTrigger value="validation">Validation</TabsTrigger>
                 <TabsTrigger value="preview">
                   <Eye className="h-4 w-4 mr-2" />
@@ -515,6 +516,10 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 <TabsTrigger value="metrics">
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Métriques
+                </TabsTrigger>
+                <TabsTrigger value="analysis">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Analyse
                 </TabsTrigger>
               </TabsList>
 
@@ -678,7 +683,14 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
               annotations={manualAnnotations}
               extractedRooms={selectedReport.extractedRooms}
               patterns={learnedPatterns}
+              hotelId={hotelId}
+              reportName={selectedReport.name}
+              pmsType={detectedPmsType || selectedPmsType}
             />
+          </TabsContent>
+
+          <TabsContent value="analysis">
+            <ErrorAnalysisDashboard hotelId={hotelId} />
           </TabsContent>
         </Tabs>
         </Card>
