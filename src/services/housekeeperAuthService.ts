@@ -27,16 +27,19 @@ export class HousekeeperAuthService {
       const normalized = accessCode.trim().toUpperCase();
 
       // Utiliser la fonction SQL centralisée
+      console.log('📞 Appel RPC authenticate_housekeeper_by_code avec:', normalized);
       const { data, error } = await supabase.rpc('authenticate_housekeeper_by_code', {
         p_access_code: normalized
       });
+
+      console.log('📊 Réponse RPC brute:', { data, error });
 
       if (error) {
         console.error('💥 Erreur RPC authenticate_housekeeper_by_code:', error);
         return {
           success: false,
-          error: "Erreur lors de l'authentification",
-          debugInfo: { error }
+          error: `Erreur RPC: ${error.message}`,
+          debugInfo: { error, normalized }
         };
       }
 
