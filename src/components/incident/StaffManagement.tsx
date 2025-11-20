@@ -38,18 +38,35 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
         .order("name");
       
       if (error) throw error;
-      return data;
+      // Exclure le rôle "Femme de chambre" de la gestion du personnel
+      return data?.filter(role => role.name.toLowerCase() !== "femme de chambre") || [];
     },
   });
 
   const { data: housekeepers } = useQuery({
-    queryKey: ["housekeepers", hotelId],
+    queryKey: ["staff-members", hotelId],
     queryFn: async () => {
+      // Récupérer d'abord les rôles pour filtrer
+      const { data: allRoles, error: rolesError } = await supabase
+        .from("staff_roles")
+        .select("id, name")
+        .eq("hotel_id", hotelId)
+        .eq("is_active", true);
+
+      if (rolesError) throw rolesError;
+
+      // Trouver les IDs des rôles non-femmes de chambre
+      const staffRoleIds = allRoles
+        ?.filter(role => role.name.toLowerCase() !== "femme de chambre")
+        .map(role => role.id) || [];
+
+      // Récupérer uniquement le personnel (pas les femmes de chambre)
       const { data, error } = await supabase
         .from("housekeepers")
         .select("*, staff_roles(name)")
         .eq("hotel_id", hotelId)
         .eq("is_active", true)
+        .in("role_id", staffRoleIds)
         .order("name");
       
       if (error) throw error;
@@ -143,7 +160,12 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Gestion du personnel</CardTitle>
+          <div>
+            <CardTitle>Gestion du personnel</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Techniciens, équipiers et autres membres du staff (hors femmes de chambre)
+            </p>
+          </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>

@@ -42,12 +42,30 @@ export const HousekeeperTeamManager: React.FC<HousekeeperTeamManagerProps> = ({
   const fetchHousekeepers = async () => {
     console.log('Fetching housekeepers for hotel:', hotelId);
     try {
-      // Fetch from housekeepers table
-      const { data: housekeepersData, error: housekeepersError } = await supabase
+      // D'abord, récupérer le rôle "Femme de chambre"
+      const { data: roles, error: rolesError } = await supabase
+        .from('staff_roles')
+        .select('id, name')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true);
+
+      if (rolesError) throw rolesError;
+
+      const housekeeperRole = roles?.find(role => role.name.toLowerCase() === "femme de chambre");
+
+      // Fetch from housekeepers table - uniquement les femmes de chambre
+      let housekeepersQuery = supabase
         .from('housekeepers')
         .select('*')
         .eq('hotel_id', hotelId)
-        .eq('is_active', true)
+        .eq('is_active', true);
+
+      // Si le rôle "Femme de chambre" existe, filtrer dessus
+      if (housekeeperRole) {
+        housekeepersQuery = housekeepersQuery.eq('role_id', housekeeperRole.id);
+      }
+
+      const { data: housekeepersData, error: housekeepersError } = await housekeepersQuery
         .order('created_at', { ascending: false });
 
       // Fetch from access codes with invite info
