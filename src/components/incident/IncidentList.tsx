@@ -22,9 +22,10 @@ export function IncidentList({ hotelId }: IncidentListProps) {
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
 
   const { data: incidents, isLoading } = useQuery({
-    queryKey: ["incidents", hotelId, filterStatus],
+    queryKey: ["incidents", hotelId, filterStatus, filterPriority],
     queryFn: async () => {
       let query = supabase
         .from("incidents")
@@ -54,7 +55,24 @@ export function IncidentList({ hotelId }: IncidentListProps) {
         query = query.eq("status", filterStatus);
       }
 
+      if (filterPriority !== "all") {
+        query = query.eq("priority", filterPriority);
+      }
+
       const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: staffRoles } = useQuery({
+    queryKey: ["staff-roles", hotelId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("staff_roles")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .eq("is_active", true);
       if (error) throw error;
       return data;
     },
@@ -76,6 +94,36 @@ export function IncidentList({ hotelId }: IncidentListProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
       toast({ title: "Statut mis à jour" });
+    },
+  });
+
+  const updatePriorityMutation = useMutation({
+    mutationFn: async ({ incidentId, priority }: { incidentId: string; priority: string }) => {
+      const { error } = await supabase
+        .from("incidents")
+        .update({ priority })
+        .eq("id", incidentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      toast({ title: "Priorité mise à jour" });
+    },
+  });
+
+  const assignStaffMutation = useMutation({
+    mutationFn: async ({ incidentId, roleId }: { incidentId: string; roleId: string }) => {
+      const { error } = await supabase
+        .from("incidents")
+        .update({ assigned_to_role_id: roleId })
+        .eq("id", incidentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      toast({ title: "Personnel assigné" });
     },
   });
 
@@ -125,19 +173,33 @@ export function IncidentList({ hotelId }: IncidentListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-bold">Incidents</h2>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filtrer par statut" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous</SelectItem>
-            <SelectItem value="new">Nouveau</SelectItem>
-            <SelectItem value="in_progress">En cours</SelectItem>
-            <SelectItem value="resolved">Résolu</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrer par statut" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              <SelectItem value="new">Nouveau</SelectItem>
+              <SelectItem value="in_progress">En cours</SelectItem>
+              <SelectItem value="resolved">Résolu</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterPriority} onValueChange={setFilterPriority}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrer par priorité" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes les priorités</SelectItem>
+              <SelectItem value="low">Faible</SelectItem>
+              <SelectItem value="medium">Moyen</SelectItem>
+              <SelectItem value="high">Élevé</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid gap-4">
@@ -158,25 +220,53 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                       </Badge>
                     )}
                     {incident.priority && (
-                      <Badge variant={incident.priority === "high" ? "destructive" : "outline"}>
-                        {incident.priority === "high" ? "Urgent" : incident.priority === "medium" ? "Moyen" : "Faible"}
+                      <Badge 
+                        variant={
+                          incident.priority === "urgent" || incident.priority === "high" 
+                            ? "destructive" 
+                            : "outline"
+                        }
+                      >
+                        {incident.priority === "urgent" 
+                          ? "🚨 Urgent" 
+                          : incident.priority === "high" 
+                          ? "Élevé" 
+                          : incident.priority === "medium" 
+                          ? "Moyen" 
+                          : "Faible"}
                       </Badge>
                     )}
                   </div>
                 </div>
-                <Select
-                  value={incident.status}
-                  onValueChange={(status) => updateStatusMutation.mutate({ incidentId: incident.id, status })}
-                >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">Nouveau</SelectItem>
-                    <SelectItem value="in_progress">En cours</SelectItem>
-                    <SelectItem value="resolved">Résolu</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select
+                    value={incident.priority || "medium"}
+                    onValueChange={(priority) => updatePriorityMutation.mutate({ incidentId: incident.id, priority })}
+                  >
+                    <SelectTrigger className="w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Faible</SelectItem>
+                      <SelectItem value="medium">Moyen</SelectItem>
+                      <SelectItem value="high">Élevé</SelectItem>
+                      <SelectItem value="urgent">🚨 Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={incident.status}
+                    onValueChange={(status) => updateStatusMutation.mutate({ incidentId: incident.id, status })}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">Nouveau</SelectItem>
+                      <SelectItem value="in_progress">En cours</SelectItem>
+                      <SelectItem value="resolved">Résolu</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -197,9 +287,27 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                   <span className="font-semibold">Lieu:</span>{" "}
                   {incident.location_type === "room" ? `Chambre ${incident.location_reference}` : incident.location_reference}
                 </div>
-                <div>
-                  <span className="font-semibold">Assigné à:</span>{" "}
-                  {incident.staff_roles?.name || incident.assigned_to_other || "Non assigné"}
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">Assigné à:</span>
+                  <Select
+                    value={incident.assigned_to_role_id || "unassigned"}
+                    onValueChange={(roleId) => {
+                      if (roleId === "unassigned") return;
+                      assignStaffMutation.mutate({ incidentId: incident.id, roleId });
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Non assigné</SelectItem>
+                      {staffRoles?.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

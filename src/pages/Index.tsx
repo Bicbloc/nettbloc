@@ -50,6 +50,7 @@ import { IncidentList } from "@/components/incident/IncidentList";
 import { StaffManagement } from "@/components/incident/StaffManagement";
 import { IncidentInventoryManager } from "@/components/incident/IncidentInventoryManager";
 import { IncidentReportDialog } from "@/components/incident/IncidentReportDialog";
+import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
 
 
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
@@ -2206,12 +2207,23 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               )}
             </div>
 
-            <Tabs defaultValue="incidents" className="space-y-4">
+            <Tabs defaultValue="dashboard" className="space-y-4">
               <TabsList>
+                <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
                 <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
                 <TabsTrigger value="staff">Personnel</TabsTrigger>
                 <TabsTrigger value="inventory">Inventaire</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="dashboard" className="space-y-4">
+                {currentHotelId ? (
+                  <IncidentDashboard hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné pour afficher le tableau de bord</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
 
               <TabsContent value="incidents" className="space-y-4">
                 {currentHotelId ? (
