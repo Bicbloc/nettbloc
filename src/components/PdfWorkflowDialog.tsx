@@ -109,58 +109,41 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       let updatedCount = 0;
       
       if (hotelId && data.length > 0) {
-        // Formater les données pour la fonction upsert_rooms_from_pdf
+        // Formater les données pour le registre des chambres (hotel_rooms_registry)
         const roomsData = data.map((room: any) => {
           const roomNumber = room.roomNumber || room.room_number || room.number;
 
           return {
+            hotel_id: hotelId,
             room_number: roomNumber,
-            floor: room.floor,
-            room_type: room.type || room.room_type,
-            building: room.building,
-            zone: room.zone,
-            source: selectedFile.name,
+            floor: room.floor ?? null,
+            room_type: room.type || room.room_type || null,
+            building: room.building || null,
+            zone: room.zone || null,
+            source: 'pdf_import',
+            imported_from: selectedFile.name,
             metadata: {
               status: room.status,
-              raw_data: room
-            }
+              raw_data: room,
+            },
           };
-        });
+        }).filter(r => !!r.room_number);
 
-        // Appel RPC avec timeout pour éviter un blocage de l'interface
-        const timeoutMs = 15000; // 15 secondes max pour l'enregistrement
-        const rpcPromise = supabase.rpc('upsert_rooms_from_pdf', {
-          p_hotel_id: hotelId,
-          p_rooms: roomsData,
-          p_source: `pdf_import_${new Date().toISOString()}`
-        });
-
-        const rpcResult = await Promise.race([
-          rpcPromise,
-          new Promise((resolve) =>
-            setTimeout(() => {
-              console.warn('Timeout sur upsert_rooms_from_pdf, on continue côté UI');
-              resolve('timeout');
-            }, timeoutMs)
-          ),
-        ]);
-
-        if (rpcResult !== 'timeout') {
-          const { data: result, error } = rpcResult as any;
+        try {
+          const { error } = await supabase
+            .from('hotel_rooms_registry')
+            .upsert(roomsData, { onConflict: 'hotel_id,room_number' });
 
           if (error) {
-            console.error('Erreur enregistrement chambres:', error);
+            console.error('Erreur enregistrement chambres (registre):', error);
             throw error;
-          } else {
-            console.log('Chambres enregistrées:', result);
-            if (result && result.length > 0) {
-              insertedCount = result[0].inserted || 0;
-              updatedCount = result[0].updated || 0;
-            }
           }
-        } else {
-          // Pas de blocage : on laisse l'enregistrement se terminer côté serveur si possible
-          console.log('upsert_rooms_from_pdf exécuté en arrière-plan (timeout atteint)');
+
+          console.log('Chambres enregistrées dans le registre:', roomsData.length);
+          insertedCount = roomsData.length; // Compte simplifié pour le message
+        } catch (err) {
+          console.error('Erreur lors de la mise à jour du registre des chambres:', err);
+          throw err;
         }
       }
       
@@ -168,7 +151,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       const message = insertedCount > 0 && updatedCount > 0 
         ? `${insertedCount} nouvelles chambres ajoutées, ${updatedCount} chambres mises à jour.`
         : insertedCount > 0 
-        ? `${insertedCount} nouvelles chambres ajoutées au registre.`
+        ? `${insertedCount} chambres enregistrées dans le registre.`
         : updatedCount > 0
         ? `${updatedCount} chambres mises à jour dans le registre.`
         : `${data.length} chambres traitées.`;
