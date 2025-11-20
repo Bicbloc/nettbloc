@@ -31,6 +31,10 @@ import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequest
 import { SessionsManagementPanel } from '@/components/SessionsManagementPanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { ReportTrainingPanel } from '@/components/ReportTrainingPanel';
+import { IncidentList } from '@/components/incident/IncidentList';
+import { StaffManagement } from '@/components/incident/StaffManagement';
+import { IncidentInventoryManager } from '@/components/incident/IncidentInventoryManager';
+import { IncidentReportDialog } from '@/components/incident/IncidentReportDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -767,7 +771,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="users">
             <User className="h-4 w-4 mr-2" />
             Utilisateurs
@@ -791,6 +795,10 @@ const Admin = () => {
           <TabsTrigger value="housekeeper-requests">
             <Users className="h-4 w-4 mr-2" />
             Demandes
+          </TabsTrigger>
+          <TabsTrigger value="incidents">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Incidents
           </TabsTrigger>
           <TabsTrigger value="training">
             <Database className="h-4 w-4 mr-2" />
@@ -1271,6 +1279,56 @@ const Admin = () => {
             <HousekeeperTeamManager hotelId={user?.id || ''} />
             <HousekeeperAccessRequests />
           </div>
+        </TabsContent>
+
+        <TabsContent value="incidents" className="space-y-4">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">Gestion des incidents</h2>
+              <p className="text-muted-foreground">Gérer les incidents, le personnel et l'inventaire</p>
+            </div>
+            {hotels.length > 0 && (
+              <IncidentReportDialog hotelId={hotels[0].id} userType="admin" />
+            )}
+          </div>
+
+          <Tabs defaultValue="incidents" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
+              <TabsTrigger value="staff">Personnel</TabsTrigger>
+              <TabsTrigger value="inventory">Inventaire</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="incidents" className="space-y-4">
+              {hotels.length > 0 ? (
+                <IncidentList hotelId={hotels[0].id} />
+              ) : (
+                <Alert>
+                  <AlertDescription>Aucun hôtel disponible pour gérer les incidents</AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+
+            <TabsContent value="staff" className="space-y-4">
+              {hotels.length > 0 ? (
+                <StaffManagement hotelId={hotels[0].id} />
+              ) : (
+                <Alert>
+                  <AlertDescription>Aucun hôtel disponible pour gérer le personnel</AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+
+            <TabsContent value="inventory" className="space-y-4">
+              {hotels.length > 0 ? (
+                <IncidentInventoryManager hotelId={hotels[0].id} />
+              ) : (
+                <Alert>
+                  <AlertDescription>Aucun hôtel disponible pour gérer l'inventaire</AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="system" className="space-y-4">
