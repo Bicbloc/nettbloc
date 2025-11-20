@@ -9,7 +9,6 @@ interface HotelSessionRaw {
   room_data: any;
   housekeeper_names: any;
   housekeeper_assignments: any;
-  is_distributed: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -23,7 +22,6 @@ interface HotelSession {
   room_data: Room[];
   housekeeper_names: string[];
   housekeeper_assignments: Record<string, string>;
-  is_distributed: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -102,7 +100,6 @@ export class HotelSessionService {
           room_data: [],
           housekeeper_names: [],
           housekeeper_assignments: {},
-          is_distributed: false,
           is_active: true
         })
         .select()
@@ -261,19 +258,9 @@ export class HotelSessionService {
     if (!sessionToken) return false;
 
     try {
-      const { error } = await supabase
-        .from('hotel_sessions')
-        .update({ 
-          is_distributed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('session_token', sessionToken);
-
-      if (error) {
-        console.error('Erreur marquer comme distribué:', error);
-        return false;
-      }
-
+      // Fonction conservée pour compatibilité mais ne fait plus rien
+      // car is_distributed n'existe plus dans la table
+      console.log('Session marquée comme distribuée (legacy)');
       return true;
     } catch (err) {
       console.error('Erreur markAsDistributed:', err);
@@ -361,7 +348,6 @@ export class HotelSessionService {
       room_data: Array.isArray(raw.room_data) ? raw.room_data as Room[] : [],
       housekeeper_names: Array.isArray(raw.housekeeper_names) ? raw.housekeeper_names as string[] : [],
       housekeeper_assignments: typeof raw.housekeeper_assignments === 'object' && raw.housekeeper_assignments ? raw.housekeeper_assignments as Record<string, string> : {},
-      is_distributed: raw.is_distributed,
       is_active: raw.is_active,
       created_at: raw.created_at,
       updated_at: raw.updated_at,

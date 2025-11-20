@@ -97,7 +97,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           });
           
           setIsDistributed(prev => {
-            const newDistributed = session.is_distributed || false;
+            const newDistributed = false; // Toujours faux car is_distributed n'existe plus
             return prev !== newDistributed ? newDistributed : prev;
           });
 
@@ -119,7 +119,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       if (session) {
         setHousekeeperNames(session.housekeeper_names || []);
         setRooms(session.room_data || []);
-        setIsDistributed(session.is_distributed || false);
+        setIsDistributed(false); // Toujours faux car is_distributed n'existe plus
         
         // Récupérer l'ID réel de l'hôtel depuis la base de données
         let sessionHotelId = session.hotel_id;
@@ -172,7 +172,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         console.log('Données de session chargées:', {
           housekeepers: session.housekeeper_names?.length || 0,
           rooms: session.room_data?.length || 0,
-          distributed: session.is_distributed,
+          distributed: false,
           hotelId: sessionHotelId
         });
       }
