@@ -67,6 +67,21 @@ export function IncidentReportDialogSimple({
     },
   });
 
+  // Fetch registered rooms from PDF imports
+  const { data: registeredRooms } = useQuery({
+    queryKey: ["registered-rooms", hotelId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hotel_rooms_registry")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .eq("is_active", true)
+        .order("room_number");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Fetch categories
   const { data: categories } = useQuery({
     queryKey: ["incident-categories", hotelId],
@@ -392,10 +407,31 @@ export function IncidentReportDialogSimple({
                 name="location_reference"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numéro/Référence</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: 101, RDC, Parking B..." {...field} />
-                    </FormControl>
+                    <FormLabel>
+                      {form.watch("location_type") === "room" ? "Numéro de chambre" : "Référence"}
+                    </FormLabel>
+                    {form.watch("location_type") === "room" && registeredRooms && registeredRooms.length > 0 ? (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-[200px]">
+                          {registeredRooms.map((room) => (
+                            <SelectItem key={room.id} value={room.room_number}>
+                              {room.room_number}
+                              {room.floor && ` - Étage ${room.floor}`}
+                              {room.room_type && ` (${room.room_type})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <FormControl>
+                        <Input placeholder="Ex: 101, RDC, Parking B..." {...field} />
+                      </FormControl>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
