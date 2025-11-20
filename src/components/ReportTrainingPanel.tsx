@@ -186,7 +186,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
       cleaningType: roomsToMerge[0].cleaningType,
       validated: true,
       isConnected: true,
-      connectedRooms: roomNumbers,
+      linkedRooms: roomNumbers,
       originalText: roomsToMerge.map(r => r.originalText || r.roomNumber).join(' + ')
     };
 
@@ -206,7 +206,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
     if (!selectedReport) return;
 
     const room = selectedReport.extractedRooms[index];
-    if (!room.isConnected || !room.connectedRooms) {
+    if (!room.isConnected || !room.linkedRooms) {
       toast({
         title: "Erreur",
         description: "Cette chambre n'est pas connectée",
@@ -215,7 +215,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
       return;
     }
 
-    const separatedRooms: ExtractedRoom[] = room.connectedRooms.map(roomNum => ({
+    const separatedRooms: ExtractedRoom[] = room.linkedRooms.map(roomNum => ({
       roomNumber: roomNum,
       status: room.status,
       arrivalDate: room.arrivalDate,
@@ -267,7 +267,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
       detection_rules: {
         connected_rooms: rooms.filter(r => r.isConnected).map(r => ({
           pattern: r.roomNumber,
-          rooms: r.connectedRooms
+          rooms: r.linkedRooms
         }))
       }
     }]);
@@ -603,9 +603,9 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                       </div>
                     </div>
                     
-                    {room.connectedRooms && room.connectedRooms.length > 0 && (
+                    {room.linkedRooms && room.linkedRooms.length > 0 && (
                       <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
-                        <strong>Chambres liées:</strong> {room.connectedRooms.join(', ')}
+                        <strong>Chambres liées:</strong> {room.linkedRooms.join(', ')}
                       </div>
                     )}
 

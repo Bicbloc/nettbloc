@@ -18,7 +18,7 @@ export interface ExtractedRoom {
   validated: boolean;
   confidence?: number;
   isConnected?: boolean;
-  connectedRooms?: string[];
+  linkedRooms?: string[];
   originalText?: string;
 }
 
@@ -338,21 +338,24 @@ export class SmartExtractionService {
       const connectedInfo = this.detectConnectedRooms(line);
       
       if (connectedInfo.isConnected) {
-        // Create a separate room entry for each connected room pair
+        // Create separate room entries for each room in connected pairs
         for (const roomPair of connectedInfo.roomPairs) {
-          const room = this.extractRoomFromLine(line, pattern);
-          if (room) {
-            room.isConnected = true;
-            room.connectedRooms = roomPair;
-            room.roomNumber = roomPair.join('-');
-            room.originalText = line;
-            
+          const baseRoom = this.extractRoomFromLine(line, pattern);
+          if (baseRoom) {
             const context = this.getContext(lines, lines.indexOf(line), pattern.context_window);
             const dates = this.extractDates(context);
-            room.arrivalDate = dates.checkIn || '';
-            room.departureDate = dates.checkOut || '';
             
-            rooms.push(room);
+            // Create one room entry for each room number in the pair
+            roomPair.forEach((roomNum, index) => {
+              const linkedRoom = { ...baseRoom };
+              linkedRoom.roomNumber = roomNum;
+              linkedRoom.isConnected = true;
+              linkedRoom.linkedRooms = [roomPair[1 - index]]; // Link to the other room
+              linkedRoom.arrivalDate = dates.checkIn || '';
+              linkedRoom.departureDate = dates.checkOut || '';
+              linkedRoom.originalText = line;
+              rooms.push(linkedRoom);
+            });
           }
         }
         continue;
