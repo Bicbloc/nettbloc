@@ -30,17 +30,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Camera, Upload, X } from "lucide-react";
+import { AlertTriangle, Camera, X } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const incidentSchema = z.object({
   title: z.string().min(3, "Le titre doit contenir au moins 3 caractères"),
-  category_id: z.string().min(1, "Sélectionnez une catégorie"),
   item_id: z.string().min(1, "Sélectionnez un article"),
   type_id: z.string().min(1, "Sélectionnez un type"),
-  priority: z.enum(["low", "medium", "high", "urgent"]),
-  location_type: z.string().min(1, "Sélectionnez un lieu"),
   location_reference: z.string().min(1, "Précisez le lieu"),
+  assigned_to_role_id: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -57,17 +55,13 @@ export function IncidentReportDialogSimple({
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
   const form = useForm<z.infer<typeof incidentSchema>>({
     resolver: zodResolver(incidentSchema),
-    defaultValues: {
-      priority: "medium",
-      location_type: "room",
-    },
+    defaultValues: {},
   });
 
-  // Fetch registered rooms from PDF imports
+  // Fetch registered rooms
   const { data: registeredRooms } = useQuery({
     queryKey: ["registered-rooms", hotelId],
     queryFn: async () => {
@@ -82,35 +76,33 @@ export function IncidentReportDialogSimple({
     },
   });
 
-  // Fetch categories
-  const { data: categories } = useQuery({
-    queryKey: ["incident-categories", hotelId],
+  // Fetch categories with items
+  const { data: categoriesWithItems } = useQuery({
+    queryKey: ["categories-with-items", hotelId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: categories, error: catError } = await supabase
         .from("incident_categories")
         .select("*")
         .eq("is_active", true)
         .order("display_order");
-      if (error) throw error;
-      return data;
-    },
-  });
+      
+      if (catError) throw catError;
 
-  // Fetch items filtered by category
-  const { data: items } = useQuery({
-    queryKey: ["incident-items", hotelId, selectedCategoryId],
-    queryFn: async () => {
-      if (!selectedCategoryId) return [];
-      const { data, error } = await supabase
+      // Fetch all items
+      const { data: items, error: itemError } = await supabase
         .from("incident_items")
         .select("*")
-        .eq("category_id", selectedCategoryId)
         .eq("is_active", true)
         .order("display_order");
-      if (error) throw error;
-      return data;
+      
+      if (itemError) throw itemError;
+
+      // Group items by category
+      return categories.map(cat => ({
+        ...cat,
+        items: items.filter(item => item.category_id === cat.id)
+      }));
     },
-    enabled: !!selectedCategoryId,
   });
 
   // Fetch types
@@ -127,10 +119,33 @@ export function IncidentReportDialogSimple({
     },
   });
 
+  // Fetch staff roles (system roles for all hotels)
+  const { data: staffRoles } = useQuery({
+    queryKey: ["staff-roles-system"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("staff_roles")
+        .select("*")
+        .is("hotel_id", null)
+        .eq("is_system", true)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const createIncidentMutation = useMutation({
     mutationFn: async (values: z.infer<typeof incidentSchema>) => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error("Non authentifié");
+
+      // Get item details to extract category
+      const { data: item } = await supabase
+        .from("incident_items")
+        .select("category_id")
+        .eq("id", values.item_id)
+        .single();
 
       // Create incident
       const { data: incident, error: incidentError } = await supabase
@@ -139,11 +154,12 @@ export function IncidentReportDialogSimple({
           hotel_id: hotelId,
           title: values.title,
           description: values.description,
-          category_id: values.category_id,
+          category_id: item?.category_id,
           item_id: values.item_id,
           type_id: values.type_id,
-          priority: values.priority,
-          location_type: values.location_type,
+          assigned_to_role_id: values.assigned_to_role_id || null,
+          priority: "medium",
+          location_type: "room",
           location_reference: values.location_reference,
           reported_by: user.user.id,
           reported_by_name: user.user.email || "Utilisateur",
@@ -218,7 +234,7 @@ export function IncidentReportDialogSimple({
           Signaler un incident
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -226,69 +242,69 @@ export function IncidentReportDialogSimple({
           </DialogTitle>
         </DialogHeader>
 
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit((values) =>
-              createIncidentMutation.mutate(values)
-            )}
-            className="space-y-4"
-          >
-            {/* Quick Title */}
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Titre court</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: WC bouché chambre 101" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+        <ScrollArea className="flex-1 pr-4">
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit((values) =>
+                createIncidentMutation.mutate(values)
               )}
-            />
-
-            {/* Category */}
-            <FormField
-              control={form.control}
-              name="category_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Où est le problème ?</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      setSelectedCategoryId(value);
-                      form.setValue("item_id", "");
-                    }}
-                    value={field.value}
-                  >
+              className="space-y-4"
+            >
+              {/* Title */}
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Titre court *</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner..." />
-                      </SelectTrigger>
+                      <Input placeholder="Ex: WC bouché chambre 101" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {categories?.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.icon} {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Item */}
-            {selectedCategoryId && (
+              {/* Item organized by category */}
               <FormField
                 control={form.control}
                 name="item_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quel élément ?</FormLabel>
+                    <FormLabel>Quel élément ? *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner l'élément..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-[300px]">
+                        {categoriesWithItems?.map((category) => (
+                          <div key={category.id}>
+                            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground bg-muted/50">
+                              {category.icon} {category.name}
+                            </div>
+                            {category.items.map((item: any) => (
+                              <SelectItem key={item.id} value={item.id} className="pl-6">
+                                {item.name}
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Type */}
+              <FormField
+                control={form.control}
+                name="type_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type de problème *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -296,9 +312,15 @@ export function IncidentReportDialogSimple({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {items?.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name}
+                        {types?.map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: type.color || '#gray' }}
+                              />
+                              {type.name}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -307,110 +329,15 @@ export function IncidentReportDialogSimple({
                   </FormItem>
                 )}
               />
-            )}
 
-            {/* Type */}
-            <FormField
-              control={form.control}
-              name="type_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Type de problème</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {types?.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: type.color }}
-                            />
-                            {type.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Priority */}
-            <FormField
-              control={form.control}
-              name="priority"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Urgence</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="low">
-                        <Badge variant="outline">Faible</Badge>
-                      </SelectItem>
-                      <SelectItem value="medium">
-                        <Badge className="bg-yellow-500">Moyen</Badge>
-                      </SelectItem>
-                      <SelectItem value="high">
-                        <Badge className="bg-orange-500">Élevé</Badge>
-                      </SelectItem>
-                      <SelectItem value="urgent">
-                        <Badge variant="destructive">🚨 Urgent</Badge>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Location */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="location_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type de lieu</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="room">Chambre</SelectItem>
-                        <SelectItem value="common_area">Zone commune</SelectItem>
-                        <SelectItem value="office">Office</SelectItem>
-                        <SelectItem value="technical">Technique</SelectItem>
-                        <SelectItem value="parking">Parking</SelectItem>
-                        <SelectItem value="restaurant">Restaurant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+              {/* Location */}
               <FormField
                 control={form.control}
                 name="location_reference"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      {form.watch("location_type") === "room" ? "Numéro de chambre" : "Référence"}
-                    </FormLabel>
-                    {form.watch("location_type") === "room" && registeredRooms && registeredRooms.length > 0 ? (
+                    <FormLabel>Numéro de chambre *</FormLabel>
+                    {registeredRooms && registeredRooms.length > 0 ? (
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
@@ -422,88 +349,113 @@ export function IncidentReportDialogSimple({
                             <SelectItem key={room.id} value={room.room_number}>
                               {room.room_number}
                               {room.floor && ` - Étage ${room.floor}`}
-                              {room.room_type && ` (${room.room_type})`}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
                       <FormControl>
-                        <Input placeholder="Ex: 101, RDC, Parking B..." {...field} />
+                        <Input placeholder="Ex: 101, 205..." {...field} />
                       </FormControl>
                     )}
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (optionnelle)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Détails supplémentaires..."
-                      {...field}
-                      rows={3}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* Assign to role */}
+              <FormField
+                control={form.control}
+                name="assigned_to_role_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigner à (optionnel)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir un service..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {staffRoles?.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Photos */}
-            <div className="space-y-2">
-              <FormLabel>Photos (optionnelles)</FormLabel>
-              <div className="flex flex-wrap gap-2">
-                {selectedImages.map((image, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={URL.createObjectURL(image)}
-                      alt={`Preview ${index}`}
-                      className="w-20 h-20 object-cover rounded border"
+              {/* Description */}
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Détails (optionnel)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Informations supplémentaires..."
+                        {...field}
+                        rows={3}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Photos */}
+              <div className="space-y-2">
+                <FormLabel>Photos (optionnel)</FormLabel>
+                <div className="flex flex-wrap gap-2">
+                  {selectedImages.map((image, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Preview ${index}`}
+                        className="w-20 h-20 object-cover rounded border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6"
+                        onClick={() => removeImage(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-accent">
+                    <div className="text-center">
+                      <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Ajouter</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleImageSelect}
                     />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 h-6 w-6"
-                      onClick={() => removeImage(index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-                <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-accent">
-                  <div className="text-center">
-                    <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Ajouter</span>
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageSelect}
-                  />
-                </label>
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={createIncidentMutation.isPending}
-            >
-              {createIncidentMutation.isPending ? "Envoi..." : "Envoyer le signalement"}
-            </Button>
-          </form>
-        </Form>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={createIncidentMutation.isPending}
+              >
+                {createIncidentMutation.isPending ? "Envoi..." : "Envoyer le signalement"}
+              </Button>
+            </form>
+          </Form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
