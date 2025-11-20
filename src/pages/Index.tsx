@@ -42,6 +42,7 @@ import { RedistributionDialog, RedistributionMethod } from "@/components/Redistr
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
 import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
@@ -1481,6 +1482,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                      Espace Personnel Femme de Chambre
                    </a>
                    </Button>
+                  <DailyReportCloseButton 
+                    hotelId={currentHotelId || hotel?.id || ''} 
+                    onReportClosed={() => {
+                      console.log('Rapport clôturé, rafraîchissement...');
+                      window.location.reload();
+                    }}
+                  />
                   <NotificationBell hotelId={hotel?.id} />
                  <UserMenu />
                </>
