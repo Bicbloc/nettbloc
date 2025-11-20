@@ -66,13 +66,15 @@ export function IncidentList({ hotelId }: IncidentListProps) {
   });
 
   const { data: staffRoles } = useQuery({
-    queryKey: ["staff-roles", hotelId],
+    queryKey: ["staff-roles-system"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("staff_roles")
         .select("*")
-        .eq("hotel_id", hotelId)
-        .eq("is_active", true);
+        .is("hotel_id", null)
+        .eq("is_system", true)
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -206,53 +208,35 @@ export function IncidentList({ hotelId }: IncidentListProps) {
         {incidents?.map((incident) => (
           <Card key={incident.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1 flex-1">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(incident.status)}
                     <CardTitle className="text-lg">{incident.title}</CardTitle>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">{getStatusLabel(incident.status)}</Badge>
+                    {incident.incident_categories && (
+                      <Badge variant="outline">
+                        {incident.incident_categories.icon} {incident.incident_categories.name}
+                      </Badge>
+                    )}
+                    {incident.incident_items && (
+                      <Badge variant="secondary">
+                        {incident.incident_items.name}
+                      </Badge>
+                    )}
                     {incident.incident_types && (
-                      <Badge style={{ backgroundColor: incident.incident_types.color }}>
+                      <Badge style={{ backgroundColor: incident.incident_types.color, color: '#fff' }}>
                         {incident.incident_types.name}
                       </Badge>
                     )}
-                    {incident.priority && (
-                      <Badge 
-                        variant={
-                          incident.priority === "urgent" || incident.priority === "high" 
-                            ? "destructive" 
-                            : "outline"
-                        }
-                      >
-                        {incident.priority === "urgent" 
-                          ? "🚨 Urgent" 
-                          : incident.priority === "high" 
-                          ? "Élevé" 
-                          : incident.priority === "medium" 
-                          ? "Moyen" 
-                          : "Faible"}
-                      </Badge>
-                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    📍 Chambre {incident.location_reference}
                   </div>
                 </div>
+                
                 <div className="flex gap-2">
-                  <Select
-                    value={incident.priority || "medium"}
-                    onValueChange={(priority) => updatePriorityMutation.mutate({ incidentId: incident.id, priority })}
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Faible</SelectItem>
-                      <SelectItem value="medium">Moyen</SelectItem>
-                      <SelectItem value="high">Élevé</SelectItem>
-                      <SelectItem value="urgent">🚨 Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <Select
                     value={incident.status}
                     onValueChange={(status) => updateStatusMutation.mutate({ incidentId: incident.id, status })}
@@ -261,9 +245,9 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="new">Nouveau</SelectItem>
-                      <SelectItem value="in_progress">En cours</SelectItem>
-                      <SelectItem value="resolved">Résolu</SelectItem>
+                      <SelectItem value="new">📌 Nouveau</SelectItem>
+                      <SelectItem value="in_progress">⏳ En cours</SelectItem>
+                      <SelectItem value="resolved">✅ Résolu</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -271,49 +255,37 @@ export function IncidentList({ hotelId }: IncidentListProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               {incident.description && (
-                <p className="text-sm text-muted-foreground">{incident.description}</p>
+                <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
+                  {incident.description}
+                </p>
               )}
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-semibold">Catégorie:</span>{" "}
-                  {incident.incident_categories?.name || "N/A"}
-                </div>
-                <div>
-                  <span className="font-semibold">Article:</span>{" "}
-                  {incident.incident_items?.name || "N/A"}
-                </div>
-                <div>
-                  <span className="font-semibold">Lieu:</span>{" "}
-                  {incident.location_type === "room" ? `Chambre ${incident.location_reference}` : incident.location_reference}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">Assigné à:</span>
-                  <Select
-                    value={incident.assigned_to_role_id || "unassigned"}
-                    onValueChange={(roleId) => {
-                      if (roleId === "unassigned") return;
-                      assignStaffMutation.mutate({ incidentId: incident.id, roleId });
-                    }}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Non assigné</SelectItem>
-                      {staffRoles?.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Assigné à:</span>
+                <Select
+                  value={incident.assigned_to_role_id || "unassigned"}
+                  onValueChange={(roleId) => {
+                    if (roleId === "unassigned") return;
+                    assignStaffMutation.mutate({ incidentId: incident.id, roleId });
+                  }}
+                >
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Non assigné" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">❌ Non assigné</SelectItem>
+                    {staffRoles?.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        👤 {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="text-xs text-muted-foreground">
-                Signalé par {incident.reported_by_name} ({incident.reported_by_type}) le{" "}
-                {format(new Date(incident.created_at), "PPp", { locale: fr })}
+              <div className="text-xs text-muted-foreground border-t pt-2">
+                Signalé par {incident.reported_by_name} le{" "}
+                {format(new Date(incident.created_at), "dd/MM/yyyy à HH:mm", { locale: fr })}
               </div>
 
               {incident.incident_images && incident.incident_images.length > 0 && (
@@ -324,7 +296,7 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                       href={img.image_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="relative w-20 h-20 rounded border overflow-hidden hover:opacity-80 transition-opacity"
+                      className="relative w-24 h-24 rounded border overflow-hidden hover:opacity-80 transition-opacity"
                     >
                       <img src={img.image_url} alt="Incident" className="w-full h-full object-cover" />
                     </a>
@@ -338,36 +310,27 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                     <MessageSquare className="h-4 w-4" />
                     Commentaires ({incident.incident_comments.length})
                   </h4>
-                  {incident.incident_comments.slice(0, 2).map((comment: any) => (
-                    <div key={comment.id} className="bg-muted p-2 rounded text-sm">
+                  {incident.incident_comments.slice(-3).map((comment: any) => (
+                    <div key={comment.id} className="bg-muted p-3 rounded text-sm">
                       <div className="font-semibold">{comment.user_name}</div>
-                      <div className="text-muted-foreground">{comment.comment}</div>
+                      <div className="text-muted-foreground mt-1">{comment.comment}</div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(comment.created_at), "PPp", { locale: fr })}
+                        {format(new Date(comment.created_at), "dd/MM à HH:mm", { locale: fr })}
                       </div>
                     </div>
                   ))}
-                  {incident.incident_comments.length > 2 && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => setSelectedIncident(incident.id)}
-                    >
-                      Voir tous les commentaires
-                    </Button>
-                  )}
                 </div>
               )}
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedIncident(incident.id)}
-                >
-                  Ajouter un commentaire
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedIncident(incident.id)}
+                className="w-full"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Ajouter un commentaire
+              </Button>
             </CardContent>
           </Card>
         ))}
