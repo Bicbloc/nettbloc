@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, Clock, MessageSquare, Image as ImageIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, MessageSquare, Image as ImageIcon, X, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -21,6 +22,7 @@ export function IncidentList({ hotelId }: IncidentListProps) {
   const queryClient = useQueryClient();
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [commentImages, setCommentImages] = useState<File[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
 
@@ -65,14 +67,14 @@ export function IncidentList({ hotelId }: IncidentListProps) {
     },
   });
 
-  const { data: staffRoles } = useQuery({
-    queryKey: ["staff-roles-system"],
+  // Récupérer les membres du personnel spécifiques de cet hôtel
+  const { data: staffMembers } = useQuery({
+    queryKey: ["staff-members", hotelId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("staff_roles")
-        .select("*")
-        .is("hotel_id", null)
-        .eq("is_system", true)
+        .from("housekeepers")
+        .select("id, name, staff_roles(name)")
+        .eq("hotel_id", hotelId)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -115,10 +117,10 @@ export function IncidentList({ hotelId }: IncidentListProps) {
   });
 
   const assignStaffMutation = useMutation({
-    mutationFn: async ({ incidentId, roleId }: { incidentId: string; roleId: string }) => {
+    mutationFn: async ({ incidentId, staffId }: { incidentId: string; staffId: string }) => {
       const { error } = await supabase
         .from("incidents")
-        .update({ assigned_to_role_id: roleId })
+        .update({ assigned_to_user_id: staffId })
         .eq("id", incidentId);
       
       if (error) throw error;
@@ -130,9 +132,11 @@ export function IncidentList({ hotelId }: IncidentListProps) {
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: async ({ incidentId, comment }: { incidentId: string; comment: string }) => {
+    mutationFn: async ({ incidentId, comment, images }: { incidentId: string; comment: string; images: File[] }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
+      
+      // Insérer le commentaire
+      const { data: commentData, error: commentError } = await supabase
         .from("incident_comments")
         .insert({
           incident_id: incidentId,
@@ -140,13 +144,40 @@ export function IncidentList({ hotelId }: IncidentListProps) {
           user_id: user?.id || "",
           user_name: user?.email || "Anonyme",
           user_type: "admin"
-        });
+        })
+        .select()
+        .single();
       
-      if (error) throw error;
+      if (commentError) throw commentError;
+
+      // Uploader les images si présentes
+      if (images.length > 0) {
+        for (const image of images) {
+          const fileExt = image.name.split(".").pop();
+          const fileName = `${incidentId}/comment-${commentData.id}-${Date.now()}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("incident-images")
+            .upload(fileName, image);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from("incident-images")
+            .getPublicUrl(fileName);
+
+          await supabase.from("incident_images").insert({
+            incident_id: incidentId,
+            image_url: publicUrl,
+            uploaded_by: user?.id || "",
+          });
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
       setComment("");
+      setCommentImages([]);
       toast({ title: "Commentaire ajouté" });
     },
   });
@@ -263,10 +294,10 @@ export function IncidentList({ hotelId }: IncidentListProps) {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold">Assigné à:</span>
                 <Select
-                  value={incident.assigned_to_role_id || "unassigned"}
-                  onValueChange={(roleId) => {
-                    if (roleId === "unassigned") return;
-                    assignStaffMutation.mutate({ incidentId: incident.id, roleId });
+                  value={incident.assigned_to_user_id || "unassigned"}
+                  onValueChange={(staffId) => {
+                    if (staffId === "unassigned") return;
+                    assignStaffMutation.mutate({ incidentId: incident.id, staffId });
                   }}
                 >
                   <SelectTrigger className="w-[220px]">
@@ -274,9 +305,9 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">❌ Non assigné</SelectItem>
-                    {staffRoles?.map((role) => (
-                      <SelectItem key={role.id} value={role.id}>
-                        👤 {role.name}
+                    {staffMembers?.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        👤 {member.name} {member.staff_roles ? `(${(member.staff_roles as any).name})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -336,7 +367,11 @@ export function IncidentList({ hotelId }: IncidentListProps) {
         ))}
       </div>
 
-      <Dialog open={!!selectedIncident} onOpenChange={() => setSelectedIncident(null)}>
+      <Dialog open={!!selectedIncident} onOpenChange={() => {
+        setSelectedIncident(null);
+        setComment("");
+        setCommentImages([]);
+      }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Ajouter un commentaire</DialogTitle>
@@ -348,16 +383,63 @@ export function IncidentList({ hotelId }: IncidentListProps) {
               placeholder="Votre commentaire..."
               rows={4}
             />
+            
+            {/* Image upload section */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Photos (optionnel)</label>
+              <div className="flex flex-wrap gap-2">
+                {commentImages.map((image, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={URL.createObjectURL(image)}
+                      alt={`Preview ${index}`}
+                      className="w-20 h-20 object-cover rounded border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6"
+                      onClick={() => setCommentImages(prev => prev.filter((_, i) => i !== index))}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+                <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-accent">
+                  <div className="text-center">
+                    <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Ajouter</span>
+                  </div>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setCommentImages(prev => [...prev, ...Array.from(e.target.files || [])]);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
             <Button
               onClick={() => {
                 if (selectedIncident && comment.trim()) {
-                  addCommentMutation.mutate({ incidentId: selectedIncident, comment });
+                  addCommentMutation.mutate({ 
+                    incidentId: selectedIncident, 
+                    comment,
+                    images: commentImages 
+                  });
                   setSelectedIncident(null);
                 }
               }}
-              disabled={!comment.trim()}
+              disabled={!comment.trim() || addCommentMutation.isPending}
             >
-              Ajouter
+              {addCommentMutation.isPending ? "Envoi..." : "Ajouter"}
             </Button>
           </div>
         </DialogContent>
