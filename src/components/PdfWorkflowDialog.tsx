@@ -109,6 +109,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       let updatedCount = 0;
       
       if (hotelId && data.length > 0) {
+        console.log('🔄 Début enregistrement dans hotel_rooms_registry pour', data.length, 'chambres');
+        
         // Formater les données pour le registre des chambres (hotel_rooms_registry)
         const roomsData = data.map((room: any) => {
           const roomNumber = room.roomNumber || room.room_number || room.number;
@@ -129,32 +131,46 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           };
         }).filter(r => !!r.room_number);
 
+        console.log('📝 Données formatées:', roomsData.length, 'chambres valides');
+
         try {
-          const { error } = await supabase
+          // Timeout pour éviter un blocage
+          const upsertPromise = supabase
             .from('hotel_rooms_registry')
             .upsert(roomsData, { onConflict: 'hotel_id,room_number' });
 
+          const result = await Promise.race([
+            upsertPromise,
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout enregistrement (10s)')), 10000)
+            )
+          ]);
+
+          const { error } = result as any;
+
           if (error) {
-            console.error('Erreur enregistrement chambres (registre):', error);
+            console.error('❌ Erreur enregistrement chambres (registre):', error);
             throw error;
           }
 
-          console.log('Chambres enregistrées dans le registre:', roomsData.length);
-          insertedCount = roomsData.length; // Compte simplifié pour le message
-        } catch (err) {
-          console.error('Erreur lors de la mise à jour du registre des chambres:', err);
-          throw err;
+          console.log('✅ Chambres enregistrées dans le registre:', roomsData.length);
+          insertedCount = roomsData.length;
+        } catch (err: any) {
+          console.error('❌ Erreur lors de la mise à jour du registre des chambres:', err);
+          // Ne pas bloquer l'UI, continuer malgré l'erreur
+          insertedCount = 0;
+          toast({
+            variant: "destructive",
+            title: "Erreur d'enregistrement",
+            description: err.message || "Impossible d'enregistrer les chambres dans le registre",
+          });
         }
       }
       
       // Message détaillé avec nombre de chambres ajoutées et mises à jour
-      const message = insertedCount > 0 && updatedCount > 0 
-        ? `${insertedCount} nouvelles chambres ajoutées, ${updatedCount} chambres mises à jour.`
-        : insertedCount > 0 
+      const message = insertedCount > 0 
         ? `${insertedCount} chambres enregistrées dans le registre.`
-        : updatedCount > 0
-        ? `${updatedCount} chambres mises à jour dans le registre.`
-        : `${data.length} chambres traitées.`;
+        : `${data.length} chambres extraites (non enregistrées - voir erreur ci-dessus).`;
       
       setUploadProgress(100);
       setUploadStatus('✅ Terminé !');
