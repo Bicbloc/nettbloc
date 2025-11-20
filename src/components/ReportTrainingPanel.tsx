@@ -13,6 +13,7 @@ import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2,
 import { TextAnnotationTool } from "./TextAnnotationTool";
 import { PatternValidation } from "./PatternValidation";
 import { ErrorAnalysisDashboard } from "./ErrorAnalysisDashboard";
+import { ConnectedRoomRulesManager } from "./ConnectedRoomRulesManager";
 import * as pdfjsLib from 'pdfjs-dist';
 import { smartExtractionService, type ExtractedRoom } from "@/services/smartExtractionService";
 
@@ -503,7 +504,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         {selectedReport && (
           <Card className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-5 mb-4">
+              <TabsList className="grid w-full grid-cols-6 mb-4">
                 <TabsTrigger value="validation">Validation</TabsTrigger>
                 <TabsTrigger value="preview">
                   <Eye className="h-4 w-4 mr-2" />
@@ -520,6 +521,10 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 <TabsTrigger value="analysis">
                   <AlertCircle className="h-4 w-4 mr-2" />
                   Analyse
+                </TabsTrigger>
+                <TabsTrigger value="rules">
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Règles
                 </TabsTrigger>
               </TabsList>
 
@@ -691,6 +696,10 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
           <TabsContent value="analysis">
             <ErrorAnalysisDashboard hotelId={hotelId} />
+          </TabsContent>
+
+          <TabsContent value="rules">
+            <ConnectedRoomRulesManager hotelId={hotelId} />
           </TabsContent>
         </Tabs>
         </Card>
