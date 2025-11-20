@@ -22,3 +22,9 @@ verify_jwt = false
 
 [functions.archive-daily-data]
 verify_jwt = false
+
+[functions.learn-pattern]
+verify_jwt = true
+
+[functions.test-patterns]
+verify_jwt = true
