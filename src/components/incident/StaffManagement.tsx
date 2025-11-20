@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
 
 interface StaffManagementProps {
   hotelId: string;
@@ -22,6 +23,9 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newStaffName, setNewStaffName] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
+  
+  // Initialiser les données par défaut si nécessaire
+  useIncidentDefaults(hotelId);
 
   const { data: roles } = useQuery({
     queryKey: ["staff-roles", hotelId],
@@ -43,7 +47,7 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("housekeepers")
-        .select("*")
+        .select("*, staff_roles(name)")
         .eq("hotel_id", hotelId)
         .eq("is_active", true)
         .order("name");
@@ -54,7 +58,7 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
   });
 
   const addStaffMutation = useMutation({
-    mutationFn: async ({ name, roleType }: { name: string; roleType: string }) => {
+    mutationFn: async ({ name, roleId }: { name: string; roleId: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) throw new Error("Non authentifié");
@@ -68,13 +72,14 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
 
       if (codeError) throw codeError;
 
-      // Add to housekeepers table (works for all staff types)
+      // Add to housekeepers table with role_id
       const { error: housekeeperError } = await supabase
         .from("housekeepers")
         .insert({
           hotel_id: hotelId,
           name: name,
           access_code: accessCodeData,
+          role_id: roleId,
           user_id: user.id,
           is_active: true
         });
@@ -129,19 +134,10 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
 
     addStaffMutation.mutate({
       name: newStaffName.trim(),
-      roleType: selectedRole,
+      roleId: selectedRole,
     });
   };
 
-  const getRoleLabel = (roleName: string) => {
-    const roleMap: Record<string, string> = {
-      housekeeper: "Femme de chambre",
-      technician: "Technicien",
-      maintenance: "Maintenance",
-      team_member: "Équipier",
-    };
-    return roleMap[roleName] || roleName;
-  };
 
   return (
     <Card>
@@ -178,7 +174,7 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
                     <SelectContent>
                       {roles?.map((role) => (
                         <SelectItem key={role.id} value={role.id}>
-                          {getRoleLabel(role.name)}
+                          {role.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -217,7 +213,7 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
                 </TableCell>
                 <TableCell>
                   <Badge variant="secondary">
-                    {staff.is_temporary ? "Temporaire" : "Permanent"}
+                    {(staff.staff_roles as any)?.name || "Non assigné"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
