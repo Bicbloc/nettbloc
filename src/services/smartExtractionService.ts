@@ -53,12 +53,21 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
     pms_type: 'mews',
     room_number_regex: '\\b([1-9]\\d{2,4})\\b',
     status_keywords: {
+      // English keywords
       'Dirty': { status: 'dirty', cleaning: 'full' },
       'Clean': { status: 'clean', cleaning: 'none' },
       'Inspected': { status: 'inspected', cleaning: 'none' },
       'Out of Service': { status: 'out-of-order', cleaning: 'none' },
       'Occupied Clean': { status: 'occupied', cleaning: 'none' },
-      'Occupied Dirty': { status: 'occupied', cleaning: 'quick' }
+      'Occupied Dirty': { status: 'occupied', cleaning: 'quick' },
+      // French keywords (common in Mews reports)
+      'SAL': { status: 'dirty', cleaning: 'full' },
+      'INS': { status: 'inspected', cleaning: 'none' },
+      'COC': { status: 'occupied', cleaning: 'none' },
+      'CLA': { status: 'clean', cleaning: 'none' },
+      'DLX': { status: 'clean', cleaning: 'none' },
+      'SUP': { status: 'clean', cleaning: 'none' },
+      'FAM': { status: 'clean', cleaning: 'none' }
     },
     date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd.MM.yyyy'],
     context_window: 300,
@@ -257,7 +266,7 @@ export class SmartExtractionService {
       'opera': ['OPERA', 'ORACLE HOSPITALITY', 'MICROS', 'OPERA PMS', 'OPERA CLOUD'],
       'protel': ['PROTEL', 'PROTEL PMS', 'PROTEL HOTELSOFTWARE', 'PROTEL AIR'],
       'fidelio': ['FIDELIO', 'FIDELIO SUITE 8', 'FIDELIO V8'],
-      'mews': ['MEWS', 'COMMANDER', 'MEWS SYSTEMS', 'MEWS COMMANDER'],
+      'mews': ['MEWS', 'COMMANDER', 'MEWS SYSTEMS', 'MEWS COMMANDER', 'STATUT DES ESPACES'],
       'apaleo': ['APALEO', 'CLOUD PMS', 'HOUSEKEEPING REPORT'],
       'medialog': ['MEDIALOG', 'PLANNING MENAGE', 'PLANNING MÉNAGE'],
       'rms': ['RMS HOTEL', 'RMS CLOUD', 'RMS HOSPITALITY'],
