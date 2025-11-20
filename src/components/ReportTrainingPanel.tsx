@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye } from "lucide-react";
+import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2 } from "lucide-react";
+import { TextAnnotationTool } from "./TextAnnotationTool";
 import * as pdfjsLib from 'pdfjs-dist';
 import { smartExtractionService, type ExtractedRoom } from "@/services/smartExtractionService";
 
@@ -32,6 +33,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [mergingMode, setMergingMode] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("validation");
+  const [learnedPatterns, setLearnedPatterns] = useState<any>(null);
 
   useEffect(() => {
     smartExtractionService.loadLearnedPatterns(hotelId);
@@ -400,6 +402,14 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
     );
   };
 
+  const handlePatternsLearned = (patterns: any) => {
+    setLearnedPatterns(patterns);
+    toast({
+      title: "Patterns appris",
+      description: "Les nouveaux patterns ont été appris et seront utilisés pour les prochaines extractions",
+    });
+  };
+
   const availablePmsTypes = smartExtractionService.getAvailablePmsTypes();
 
   return (
@@ -487,16 +497,20 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         </Card>
       )}
 
-      {selectedReport && (
-        <Card className="p-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="validation">Validation</TabsTrigger>
-              <TabsTrigger value="preview">
-                <Eye className="h-4 w-4 mr-2" />
-                Prévisualisation texte
-              </TabsTrigger>
-            </TabsList>
+        {selectedReport && (
+          <Card className="p-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3 mb-4">
+                <TabsTrigger value="validation">Validation</TabsTrigger>
+                <TabsTrigger value="preview">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Prévisualisation
+                </TabsTrigger>
+                <TabsTrigger value="learn">
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Apprentissage
+                </TabsTrigger>
+              </TabsList>
 
             <TabsContent value="validation" className="space-y-4">
               <div className="flex items-center justify-between">
@@ -631,6 +645,25 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
           <TabsContent value="preview">
             {renderTextPreview()}
+          </TabsContent>
+
+          <TabsContent value="learn">
+            <TextAnnotationTool
+              rawText={selectedReport.rawText}
+              hotelId={hotelId}
+              reportName={selectedReport.name}
+              pmsType={detectedPmsType || selectedPmsType}
+              onPatternsLearned={handlePatternsLearned}
+            />
+            
+            {learnedPatterns && (
+              <Card className="p-4 mt-4">
+                <h4 className="font-semibold mb-2">Patterns appris</h4>
+                <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-60">
+                  {JSON.stringify(learnedPatterns, null, 2)}
+                </pre>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
         </Card>
