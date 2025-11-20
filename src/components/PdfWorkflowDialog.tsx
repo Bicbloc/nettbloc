@@ -105,6 +105,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setUploadStatus('💾 Enregistrement des chambres...');
       setUploadProgress(60);
       
+      let insertedCount = 0;
+      let updatedCount = 0;
+      
       if (hotelId && data.length > 0) {
         // Formater les données pour la fonction upsert_rooms_from_pdf
         const roomsData = data.map((room: any) => ({
@@ -128,26 +131,47 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
         if (error) {
           console.error('Erreur enregistrement chambres:', error);
+          throw error;
         } else {
           console.log('Chambres enregistrées:', result);
+          if (result && result.length > 0) {
+            insertedCount = result[0].inserted || 0;
+            updatedCount = result[0].updated || 0;
+          }
         }
       }
       
-      setUploadProgress(80);
-      setUploadStatus('✅ Chargement des femmes de chambre...');
-      
-      await loadExistingHousekeepers();
+      setUploadProgress(90);
+      setUploadStatus('✅ Finalisation...');
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       setUploadProgress(100);
       setUploadStatus('✅ Terminé !');
       
+      // Message détaillé avec nombre de chambres ajoutées et mises à jour
+      const message = insertedCount > 0 && updatedCount > 0 
+        ? `${insertedCount} nouvelles chambres ajoutées, ${updatedCount} chambres mises à jour.`
+        : insertedCount > 0 
+        ? `${insertedCount} nouvelles chambres ajoutées au registre.`
+        : updatedCount > 0
+        ? `${updatedCount} chambres mises à jour dans le registre.`
+        : `${data.length} chambres traitées.`;
+      
       toast({
-        title: "✅ PDF analysé avec succès",
-        description: `${data.length} chambres détectées et enregistrées. Configurez maintenant vos femmes de chambre.`,
+        title: "✅ Analyse terminée",
+        description: message,
       });
 
+      // Fermer le dialogue après 500ms
       await new Promise(resolve => setTimeout(resolve, 500));
-      setStep('housekeepers');
+      
+      // Appeler le callback avec les données du PDF pour continuer le workflow si nécessaire
+      onWorkflowComplete(data, [], undefined);
+      
+      // Fermer le dialogue et réinitialiser
+      setOpen(false);
+      resetDialog();
+      
     } catch (error) {
       console.error("Erreur traitement PDF:", error);
       toast({
