@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Shield, Crown } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Crown, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionBadge } from './SubscriptionBadge';
 
@@ -76,6 +76,10 @@ const UserMenu = () => {
         <DropdownMenuItem onClick={() => navigate('/profile')}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Paramètres</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/room-registry')}>
+          <Building2 className="mr-2 h-4 w-4" />
+          <span>Registre des chambres</span>
         </DropdownMenuItem>
         {isSuperAdmin && (
           <DropdownMenuItem onClick={() => navigate('/admin')}>
