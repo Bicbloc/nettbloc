@@ -769,6 +769,332 @@ export type Database = {
           },
         ]
       }
+      incident_categories: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          hotel_id: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          hotel_id?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          hotel_id?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_categories_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_comments: {
+        Row: {
+          comment: string
+          created_at: string | null
+          id: string
+          incident_id: string
+          user_id: string
+          user_name: string
+          user_type: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string | null
+          id?: string
+          incident_id: string
+          user_id: string
+          user_name: string
+          user_type: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string | null
+          id?: string
+          incident_id?: string
+          user_id?: string
+          user_name?: string
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_comments_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_images: {
+        Row: {
+          id: string
+          image_url: string
+          incident_id: string
+          uploaded_at: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          id?: string
+          image_url: string
+          incident_id: string
+          uploaded_at?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          id?: string
+          image_url?: string
+          incident_id?: string
+          uploaded_at?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_images_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_items: {
+        Row: {
+          category_id: string | null
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          hotel_id: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "incident_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_items_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_types: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          hotel_id: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          name: string
+          severity: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name: string
+          severity?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          severity?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_types_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incidents: {
+        Row: {
+          assigned_to_other: string | null
+          assigned_to_role_id: string | null
+          assigned_to_user_id: string | null
+          category_id: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          hotel_id: string
+          id: string
+          item_id: string | null
+          location_reference: string | null
+          location_type: string | null
+          priority: string | null
+          reported_by: string
+          reported_by_name: string
+          reported_by_type: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string | null
+          title: string
+          type_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to_other?: string | null
+          assigned_to_role_id?: string | null
+          assigned_to_user_id?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          hotel_id: string
+          id?: string
+          item_id?: string | null
+          location_reference?: string | null
+          location_type?: string | null
+          priority?: string | null
+          reported_by: string
+          reported_by_name: string
+          reported_by_type: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          title: string
+          type_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to_other?: string | null
+          assigned_to_role_id?: string | null
+          assigned_to_user_id?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          hotel_id?: string
+          id?: string
+          item_id?: string | null
+          location_reference?: string | null
+          location_type?: string | null
+          priority?: string | null
+          reported_by?: string
+          reported_by_name?: string
+          reported_by_type?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          title?: string
+          type_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidents_assigned_to_role_id_fkey"
+            columns: ["assigned_to_role_id"]
+            isOneToOne: false
+            referencedRelation: "staff_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "incident_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "incident_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_type_id_fkey"
+            columns: ["type_id"]
+            isOneToOne: false
+            referencedRelation: "incident_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -1088,6 +1414,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_roles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          hotel_id: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_roles_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
