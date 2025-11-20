@@ -74,7 +74,6 @@ export class SessionPersistenceService {
         summary: JSON.parse(JSON.stringify({
           total_rooms: session.room_data?.length || 0,
           completed_rooms: session.room_data?.filter((room: any) => room.status === 'completed').length || 0,
-          is_distributed: session.is_distributed,
           housekeeper_assignments: session.housekeeper_assignments || {},
           archived_at: new Date().toISOString()
         })),
