@@ -799,6 +799,7 @@ export type Database = {
           is_active: boolean
           is_temporary: boolean
           name: string
+          role_id: string | null
           updated_at: string
           user_id: string
         }
@@ -810,6 +811,7 @@ export type Database = {
           is_active?: boolean
           is_temporary?: boolean
           name: string
+          role_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -821,6 +823,7 @@ export type Database = {
           is_active?: boolean
           is_temporary?: boolean
           name?: string
+          role_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -830,6 +833,13 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "housekeepers_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "staff_roles"
             referencedColumns: ["id"]
           },
         ]
@@ -1683,6 +1693,10 @@ export type Database = {
       }
       cleanup_expired_hotel_sessions: { Args: never; Returns: undefined }
       cleanup_inactive_sessions: { Args: never; Returns: undefined }
+      create_hotel_incident_defaults: {
+        Args: { p_hotel_id: string }
+        Returns: undefined
+      }
       extend_trial_period: {
         Args: { p_extension_days: number; p_reason?: string; p_user_id: string }
         Returns: boolean

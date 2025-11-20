@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Save, X, Package, AlertTriangle, Users, Tags } from "lucide-react";
+import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,9 @@ export const IncidentInventoryManager = ({ hotelId }: IncidentInventoryManagerPr
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>("categories");
   const [loading, setLoading] = useState(false);
+  
+  // Initialiser les données par défaut si nécessaire
+  useIncidentDefaults(hotelId);
 
   // Categories
   const [categories, setCategories] = useState<any[]>([]);

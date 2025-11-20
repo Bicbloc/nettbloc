@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Camera, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
 
 const incidentSchema = z.object({
   title: z.string().min(3, "Le titre doit contenir au moins 3 caractères"),
@@ -55,6 +56,9 @@ export function IncidentReportDialogSimple({
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  
+  // Initialiser les données par défaut si nécessaire
+  useIncidentDefaults(hotelId);
 
   const form = useForm<z.infer<typeof incidentSchema>>({
     resolver: zodResolver(incidentSchema),
@@ -83,15 +87,17 @@ export function IncidentReportDialogSimple({
       const { data: categories, error: catError } = await supabase
         .from("incident_categories")
         .select("*")
+        .eq("hotel_id", hotelId)
         .eq("is_active", true)
         .order("display_order");
       
       if (catError) throw catError;
 
-      // Fetch all items
+      // Fetch all items for this hotel
       const { data: items, error: itemError } = await supabase
         .from("incident_items")
         .select("*")
+        .eq("hotel_id", hotelId)
         .eq("is_active", true)
         .order("display_order");
       
@@ -112,6 +118,7 @@ export function IncidentReportDialogSimple({
       const { data, error } = await supabase
         .from("incident_types")
         .select("*")
+        .eq("hotel_id", hotelId)
         .eq("is_active", true)
         .order("severity", { ascending: false });
       if (error) throw error;
@@ -119,15 +126,14 @@ export function IncidentReportDialogSimple({
     },
   });
 
-  // Fetch staff roles (system roles for all hotels)
+  // Fetch staff roles for this hotel
   const { data: staffRoles } = useQuery({
-    queryKey: ["staff-roles-system"],
+    queryKey: ["staff-roles", hotelId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("staff_roles")
         .select("*")
-        .is("hotel_id", null)
-        .eq("is_system", true)
+        .eq("hotel_id", hotelId)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;

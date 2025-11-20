@@ -27,6 +27,7 @@ import {
 } from "recharts";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
 
 interface IncidentDashboardProps {
   hotelId: string;
@@ -47,6 +48,9 @@ const PRIORITY_COLORS = {
 };
 
 export function IncidentDashboard({ hotelId }: IncidentDashboardProps) {
+  // Initialiser les données par défaut si nécessaire
+  useIncidentDefaults(hotelId);
+  
   const { data: stats } = useQuery({
     queryKey: ["incident-stats", hotelId],
     queryFn: async () => {
