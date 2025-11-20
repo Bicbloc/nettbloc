@@ -44,22 +44,38 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const { notifications, addNotification } = useNotifications(hotelId || undefined);
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
 
-  // Initialiser la session avec persistance et archivage automatique
+  // Initialiser la session avec persistance RENFORCÉE
   useEffect(() => {
     const initializeSession = async () => {
       try {
-        console.log('🏠 Initialisation de la session avec persistance...');
-        // Le service gérera automatiquement:
-        // - La persistance de session même après déconnexion
-        // - L'archivage automatique des rapports si nouveau jour
-        // - La restauration de session du même jour
+        console.log('🏠 Initialisation de la session avec persistance renforcée...');
+        
+        // ÉTAPE 1: Restaurer l'hôtel depuis TOUS les emplacements possibles
+        const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
+        const savedHotelId = SessionPersistenceService.getStoredHotelId();
+        
+        if (savedHotelId) {
+          setHotelId(savedHotelId);
+          console.log('✅ Hotel ID restauré:', savedHotelId);
+        }
+        
+        // ÉTAPE 2: Initialiser/restaurer la session
         const token = await HotelSessionService.initializeSession();
         if (token) {
-          console.log('✅ Session initialisée avec persistance:', token);
+          console.log('✅ Session initialisée:', token);
+          
+          // ÉTAPE 3: Charger les données de session
           await loadSessionData();
+          
+          // ÉTAPE 4: Forcer la sauvegarde immédiate
+          const session = await HotelSessionService.getSession();
+          if (session?.hotel_id) {
+            await SessionPersistenceService.forceSaveCurrentSession(session.hotel_id);
+          }
         }
       } catch (error) {
         console.error('❌ Erreur initialisation session:', error);
+      } finally {
         setIsInitialized(true);
       }
     };
@@ -67,7 +83,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     initializeSession();
   }, []);
 
-  // Synchronisation en temps réel avec persistance - vérifier les changements toutes les 2 secondes
+  // Synchronisation temps réel ROBUSTE avec sauvegarde continue
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -75,8 +91,18 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       try {
         const session = await HotelSessionService.getSession();
         if (session) {
-          // Sauvegarder automatiquement les données de session
+          // SAUVEGARDE CONTINUE dans localStorage + SessionPersistenceService
           const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
+          
+          // Sauvegarder l'hotel_id dans TOUS les emplacements
+          if (session.hotel_id) {
+            localStorage.setItem('selectedHotelId', session.hotel_id);
+            localStorage.setItem('hotelId', session.hotel_id);
+            localStorage.setItem('lastSavedHotelId', session.hotel_id);
+            setHotelId(session.hotel_id);
+          }
+          
+          // Sauvegarder les données de session complètes
           SessionPersistenceService.updateSessionData({
             sessionToken: HotelSessionService.getSessionToken() || '',
             hotelId: session.hotel_id || '',
@@ -95,22 +121,27 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             const newRooms = session.room_data || [];
             return JSON.stringify(prev) !== JSON.stringify(newRooms) ? newRooms : prev;
           });
-          
-          setIsDistributed(prev => {
-            const newDistributed = false; // Toujours faux car is_distributed n'existe plus
-            return prev !== newDistributed ? newDistributed : prev;
-          });
 
-          // Charger les vraies femmes de chambre depuis la base si on a un hotelId
-          refreshHousekeepers();
+          // Rafraîchir les femmes de chambre
+          if (session.hotel_id) {
+            refreshHousekeepers();
+          }
         }
       } catch (error) {
-        console.error('Erreur synchronisation:', error);
+        console.error('⚠️ Erreur synchronisation, tentative de récupération...', error);
+        
+        // RÉCUPÉRATION AUTOMATIQUE en cas d'erreur
+        const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
+        const savedHotelId = SessionPersistenceService.getStoredHotelId();
+        if (savedHotelId && !hotelId) {
+          console.log('🔄 Restauration automatique de l\'hotel_id:', savedHotelId);
+          setHotelId(savedHotelId);
+        }
       }
-    }, 2000); // Vérifier toutes les 2 secondes pour une meilleure réactivité
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, [isInitialized]);
+  }, [isInitialized, hotelId]);
 
   // Charger les données de la session
   const loadSessionData = async () => {

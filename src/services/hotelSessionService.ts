@@ -41,57 +41,50 @@ export class HotelSessionService {
     try {
       const sessionToken = this.generateSessionToken();
       
-      // Si pas d'hotelId fourni, essayer de le récupérer depuis localStorage ou le user actuel
+      // RÉCUPÉRATION ROBUSTE de l'hotel_id depuis TOUTES les sources
       let finalHotelId = hotelId;
+
       if (!finalHotelId) {
-        const savedHotelId = localStorage.getItem('selectedHotelId');
-        const savedHotelCode = localStorage.getItem('selectedHotelCode');
+        // Priorité 1: localStorage (tous les emplacements)
+        const savedHotelId = localStorage.getItem('selectedHotelId') || 
+                           localStorage.getItem('hotelId') || 
+                           localStorage.getItem('lastSavedHotelId');
         
         if (savedHotelId) {
           finalHotelId = savedHotelId;
           console.log('🏨 Session: Hotel ID récupéré depuis localStorage:', finalHotelId);
-        } else if (savedHotelCode) {
-          // Récupérer l'hotel ID réel depuis la base via le code
-          try {
-            const { supabase } = await import('@/integrations/supabase/client');
-            const { data: hotel } = await supabase
-              .from('hotels')
-              .select('id')
-              .eq('hotel_code', savedHotelCode)
-              .single();
-            
-            if (hotel) {
-              finalHotelId = hotel.id;
-              localStorage.setItem('selectedHotelId', hotel.id);
-              console.log('🏨 Session: Hotel ID récupéré depuis la base via code:', finalHotelId);
-            }
-          } catch (error) {
-            console.error('❌ Session: Erreur récupération hotel via code:', error);
-          }
         } else {
-          // Essayer de récupérer l'hôtel du user connecté
-          try {
-            const { supabase } = await import('@/integrations/supabase/client');
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-              const { data: hotel } = await supabase
-                .from('hotels')
-                .select('id')
-                .eq('user_id', user.id)
-                .single();
+          // Priorité 2: SessionPersistenceService
+          const persistedHotelId = SessionPersistenceService.getStoredHotelId();
+          
+          if (persistedHotelId) {
+            finalHotelId = persistedHotelId;
+            console.log('🏨 Session: Hotel ID récupéré depuis SessionPersistence:', finalHotelId);
+          } else {
+            // Priorité 3: récupérer l'hôtel de l'utilisateur connecté
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
               
-              if (hotel) {
-                finalHotelId = hotel.id;
-                console.log('🏨 Session: Hotel ID récupéré depuis user connecté:', finalHotelId);
+              if (user) {
+                const { data: hotel } = await supabase
+                  .from('hotels')
+                  .select('id')
+                  .eq('user_id', user.id)
+                  .maybeSingle();
+                
+                if (hotel) {
+                  finalHotelId = hotel.id;
+                  console.log('🏨 Session: Hotel ID récupéré depuis user connecté:', finalHotelId);
+                }
               }
+            } catch (error) {
+              console.error('❌ Session: Erreur récupération hotel du user:', error);
             }
-          } catch (error) {
-            console.error('❌ Session: Erreur récupération hotel du user:', error);
           }
         }
       }
 
+      // Créer la session en DB
       const { data, error } = await supabase
         .from('hotel_sessions')
         .insert({
@@ -100,19 +93,29 @@ export class HotelSessionService {
           room_data: [],
           housekeeper_names: [],
           housekeeper_assignments: {},
-          is_active: true
+          is_active: true,
+          last_activity: new Date().toISOString()
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Erreur création session:', error);
+        console.error('❌ Erreur création session:', error);
         return null;
       }
 
-      // Stocker le token localement et sauvegarder la session
+      // SAUVEGARDE MULTI-EMPLACEMENTS pour éviter toute perte
       this.sessionToken = sessionToken;
       localStorage.setItem('hotel_session_token', sessionToken);
+      localStorage.setItem('sessionToken', sessionToken);
+      localStorage.setItem('hotelSessionToken', sessionToken);
+      
+      if (finalHotelId) {
+        localStorage.setItem('selectedHotelId', finalHotelId);
+        localStorage.setItem('hotelId', finalHotelId);
+        localStorage.setItem('lastSavedHotelId', finalHotelId);
+        localStorage.setItem('hotelDataTimestamp', Date.now().toString());
+      }
       
       // Sauvegarder les données de session pour la persistance
       SessionPersistenceService.saveSessionData({
