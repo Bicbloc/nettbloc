@@ -160,6 +160,56 @@ export type Database = {
           },
         ]
       }
+      connected_room_rules: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          description: string | null
+          hotel_id: string
+          id: string
+          is_active: boolean | null
+          pattern_regex: string
+          priority: number | null
+          rule_name: string
+          rule_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean | null
+          pattern_regex: string
+          priority?: number | null
+          rule_name: string
+          rule_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean | null
+          pattern_regex?: string
+          priority?: number | null
+          rule_name?: string
+          rule_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connected_room_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_reports: {
         Row: {
           created_at: string | null

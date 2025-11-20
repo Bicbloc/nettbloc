@@ -180,6 +180,7 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
 export class SmartExtractionService {
   private patterns: Map<string, PmsPattern> = new Map();
   private learnedPatterns: any[] = [];
+  private customConnectedRoomPatterns: RegExp[] = [];
   private connectedRoomPatterns = [
     /(\d{2,4})\s*[-–—]\s*(\d{2,4})/g,           // 101-102, 101–102
     /(\d{2,4})\s*[+&]\s*(\d{2,4})/g,            // 101+102, 101&102
@@ -213,6 +214,41 @@ export class SmartExtractionService {
 
     this.learnedPatterns = data || [];
     this.analyzeAndUpdatePatterns();
+    
+    // Also load custom connected room rules
+    await this.loadCustomConnectedRoomRules(hotelId);
+  }
+
+  async loadCustomConnectedRoomRules(hotelId: string): Promise<void> {
+    try {
+      const { data, error } = await supabase
+        .from('connected_room_rules')
+        .select('pattern_regex, priority')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .order('priority', { ascending: false });
+
+      if (error) {
+        console.error('Error loading custom connected room rules:', error);
+        return;
+      }
+
+      // Add custom patterns with higher priority (at the beginning)
+      if (data && data.length > 0) {
+        this.customConnectedRoomPatterns = data.map(rule => {
+          try {
+            return new RegExp(rule.pattern_regex, 'gi');
+          } catch (e) {
+            console.error(`Invalid regex pattern: ${rule.pattern_regex}`, e);
+            return null;
+          }
+        }).filter((pattern): pattern is RegExp => pattern !== null);
+        
+        console.log(`✅ Loaded ${this.customConnectedRoomPatterns.length} custom connected room rules`);
+      }
+    } catch (error) {
+      console.error('Error in loadCustomConnectedRoomRules:', error);
+    }
   }
 
   private analyzeAndUpdatePatterns(): void {
@@ -397,6 +433,21 @@ export class SmartExtractionService {
   }
 
   private detectConnectedRooms(line: string): { isConnected: boolean; roomPairs: string[][] } {
+    // Try custom patterns first (higher priority)
+    for (const pattern of this.customConnectedRoomPatterns) {
+      // Reset regex state
+      pattern.lastIndex = 0;
+      const matches = [...line.matchAll(pattern)];
+      if (matches.length > 0) {
+        const roomPairs = matches.map(m => [m[1], m[2]]).filter(pair => pair[0] && pair[1]);
+        if (roomPairs.length > 0) {
+          console.log(`🔗 Detected connected rooms using custom rule: ${roomPairs.map(p => p.join('-')).join(', ')}`);
+          return { isConnected: true, roomPairs };
+        }
+      }
+    }
+    
+    // Fallback to default patterns
     for (const pattern of this.connectedRoomPatterns) {
       const matches = [...line.matchAll(pattern)];
       if (matches.length > 0) {
