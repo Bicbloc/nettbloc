@@ -123,21 +123,40 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           }
         }));
 
-        const { data: result, error } = await supabase.rpc('upsert_rooms_from_pdf', {
+        // Appel RPC avec timeout pour éviter un blocage de l'interface
+        const timeoutMs = 15000; // 15 secondes max pour l'enregistrement
+        const rpcPromise = supabase.rpc('upsert_rooms_from_pdf', {
           p_hotel_id: hotelId,
           p_rooms: roomsData,
           p_source: `pdf_import_${new Date().toISOString()}`
         });
 
-        if (error) {
-          console.error('Erreur enregistrement chambres:', error);
-          throw error;
-        } else {
-          console.log('Chambres enregistrées:', result);
-          if (result && result.length > 0) {
-            insertedCount = result[0].inserted || 0;
-            updatedCount = result[0].updated || 0;
+        const rpcResult = await Promise.race([
+          rpcPromise,
+          new Promise((resolve) =>
+            setTimeout(() => {
+              console.warn('Timeout sur upsert_rooms_from_pdf, on continue côté UI');
+              resolve('timeout');
+            }, timeoutMs)
+          ),
+        ]);
+
+        if (rpcResult !== 'timeout') {
+          const { data: result, error } = rpcResult as any;
+
+          if (error) {
+            console.error('Erreur enregistrement chambres:', error);
+            throw error;
+          } else {
+            console.log('Chambres enregistrées:', result);
+            if (result && result.length > 0) {
+              insertedCount = result[0].inserted || 0;
+              updatedCount = result[0].updated || 0;
+            }
           }
+        } else {
+          // Pas de blocage : on laisse l'enregistrement se terminer côté serveur si possible
+          console.log('upsert_rooms_from_pdf exécuté en arrière-plan (timeout atteint)');
         }
       }
       
