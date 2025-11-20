@@ -110,18 +110,22 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       
       if (hotelId && data.length > 0) {
         // Formater les données pour la fonction upsert_rooms_from_pdf
-        const roomsData = data.map((room: any) => ({
-          room_number: room.roomNumber || room.room_number,
-          floor: room.floor,
-          room_type: room.type || room.room_type,
-          building: room.building,
-          zone: room.zone,
-          source: selectedFile.name,
-          metadata: {
-            status: room.status,
-            raw_data: room
-          }
-        }));
+        const roomsData = data.map((room: any) => {
+          const roomNumber = room.roomNumber || room.room_number || room.number;
+
+          return {
+            room_number: roomNumber,
+            floor: room.floor,
+            room_type: room.type || room.room_type,
+            building: room.building,
+            zone: room.zone,
+            source: selectedFile.name,
+            metadata: {
+              status: room.status,
+              raw_data: room
+            }
+          };
+        });
 
         // Appel RPC avec timeout pour éviter un blocage de l'interface
         const timeoutMs = 15000; // 15 secondes max pour l'enregistrement
