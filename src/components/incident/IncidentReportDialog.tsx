@@ -49,6 +49,7 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
   const [items, setItems] = useState<any[]>([]);
   const [types, setTypes] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
+  const [registeredRooms, setRegisteredRooms] = useState<Array<{ room_number: string; id: string }>>([]);
 
   // Form
   const [formData, setFormData] = useState({
@@ -70,8 +71,25 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
   useEffect(() => {
     if (open) {
       loadInventory();
+      loadRegisteredRooms();
     }
   }, [open, hotelId]);
+
+  const loadRegisteredRooms = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hotel_rooms_registry')
+        .select('id, room_number')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .order('room_number');
+
+      if (error) throw error;
+      setRegisteredRooms(data || []);
+    } catch (error) {
+      console.error('Erreur lors du chargement des chambres:', error);
+    }
+  };
 
   const loadInventory = async () => {
     const [categoriesRes, typesRes, rolesRes] = await Promise.all([
@@ -332,12 +350,36 @@ export const IncidentReportDialog = ({ hotelId, userType, trigger, onSuccess }: 
             </div>
             <div>
               <Label>Numéro/Référence</Label>
-              <Input
-                value={formData.location_reference}
-                onChange={(e) => setFormData(prev => ({ ...prev, location_reference: e.target.value }))}
-                placeholder="Ex: 102, Hall, Parking"
-                maxLength={100}
-              />
+              {formData.location_type === 'room' && registeredRooms.length > 0 ? (
+                <Select
+                  value={formData.location_reference}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, location_reference: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une chambre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {registeredRooms.map((room) => (
+                      <SelectItem key={room.id} value={room.room_number}>
+                        Chambre {room.room_number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={formData.location_reference}
+                  onChange={(e) => setFormData(prev => ({ ...prev, location_reference: e.target.value }))}
+                  placeholder={
+                    formData.location_type === 'room' 
+                      ? "Ex: 102, 205..." 
+                      : formData.location_type === 'common_area'
+                      ? "Ex: Hall, Restaurant..."
+                      : "Précisez la localisation"
+                  }
+                  maxLength={100}
+                />
+              )}
             </div>
           </div>
 
