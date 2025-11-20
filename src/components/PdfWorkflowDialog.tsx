@@ -134,16 +134,19 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         console.log('📝 Données formatées:', roomsData.length, 'chambres valides');
 
         try {
-          // Timeout pour éviter un blocage
+          // Timeout augmenté pour éviter des échecs inutiles sur les gros imports
           const upsertPromise = supabase
             .from('hotel_rooms_registry')
             .upsert(roomsData, { onConflict: 'hotel_id,room_number' });
 
           const result = await Promise.race([
             upsertPromise,
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout enregistrement (10s)')), 10000)
-            )
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Timeout enregistrement (30s) - le serveur est peut-être lent, réessayez dans un instant.')),
+                30000
+              )
+            ),
           ]);
 
           const { error } = result as any;
