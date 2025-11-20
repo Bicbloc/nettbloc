@@ -36,6 +36,71 @@ export class HousekeeperAuthService {
 
       if (error) {
         console.error('💥 Erreur RPC authenticate_housekeeper_by_code:', error);
+
+        // Fallback spécifique si la fonction SQL a un bug de colonne ("hotel id" au lieu de "hotel_id")
+        if (error.message && error.message.toLowerCase().includes('hotel id')) {
+          console.warn('⚠️ Erreur de colonne dans la fonction RPC, fallback via requête directe sur les tables');
+
+          const { data: codeRecord, error: fallbackError } = await supabase
+            .from('housekeeper_access_codes')
+            .select(`
+              id,
+              access_code,
+              hotel_id,
+              housekeeper_id,
+              hotels (
+                id,
+                name,
+                hotel_code
+              ),
+              housekeepers (
+                id,
+                name,
+                is_active
+              )
+            `)
+            .eq('access_code', normalized)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (fallbackError || !codeRecord) {
+            console.error('❌ Fallback direct échoué:', { fallbackError, codeRecord });
+            return {
+              success: false,
+              error: "Code d'accès introuvable ou inactif (fallback)",
+              debugInfo: { fallbackError, codeRecord, normalized }
+            };
+          }
+
+          const hotel = {
+            id: (codeRecord as any).hotels?.id,
+            name: (codeRecord as any).hotels?.name,
+            hotel_code: (codeRecord as any).hotels?.hotel_code,
+          };
+
+          const housekeeper = {
+            id: (codeRecord as any).housekeepers?.id,
+            name: (codeRecord as any).housekeepers?.name,
+            access_code: (codeRecord as any).access_code,
+            hotel_id: (codeRecord as any).hotel_id,
+            is_active: (codeRecord as any).housekeepers?.is_active ?? true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            user_id: 'housekeeper_fallback',
+            is_temporary: false,
+            role_id: null
+          };
+
+          console.log('✅ Authentification réussie via fallback direct:', { hotel, housekeeper });
+
+          return {
+            success: true,
+            user: housekeeper,
+            hotel,
+            debugInfo: { source: 'fallback_query', hotel, housekeeper, raw: codeRecord }
+          };
+        }
+
         return {
           success: false,
           error: `Erreur RPC: ${error.message}`,
