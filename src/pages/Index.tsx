@@ -46,6 +46,10 @@ import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
+import { IncidentList } from "@/components/incident/IncidentList";
+import { StaffManagement } from "@/components/incident/StaffManagement";
+import { IncidentInventoryManager } from "@/components/incident/IncidentInventoryManager";
+import { IncidentReportDialog } from "@/components/incident/IncidentReportDialog";
 
 
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
@@ -1499,7 +1503,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full grid-cols-6 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
+            <TabsList className="grid w-full grid-cols-7 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
               <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Layers className="h-4 w-4" />
                 Vue d'ensemble
@@ -1515,6 +1519,10 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <TabsTrigger value="access-codes" className="flex items-center gap-2">
                 <Key className="h-4 w-4" />
                 Codes d'accès
+              </TabsTrigger>
+              <TabsTrigger value="incidents" className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Incidents
               </TabsTrigger>
               <TabsTrigger value="reports" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
@@ -2185,6 +2193,56 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 )}
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="incidents" className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">Gestion des incidents</h2>
+                <p className="text-muted-foreground">Gérer les incidents, le personnel et l'inventaire</p>
+              </div>
+              {currentHotelId && (
+                <IncidentReportDialog hotelId={currentHotelId} userType="admin" />
+              )}
+            </div>
+
+            <Tabs defaultValue="incidents" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
+                <TabsTrigger value="staff">Personnel</TabsTrigger>
+                <TabsTrigger value="inventory">Inventaire</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="incidents" className="space-y-4">
+                {currentHotelId ? (
+                  <IncidentList hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné pour gérer les incidents</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              <TabsContent value="staff" className="space-y-4">
+                {currentHotelId ? (
+                  <StaffManagement hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné pour gérer le personnel</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              <TabsContent value="inventory" className="space-y-4">
+                {currentHotelId ? (
+                  <IncidentInventoryManager hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné pour gérer l'inventaire</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </div>
