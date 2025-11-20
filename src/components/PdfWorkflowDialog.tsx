@@ -180,14 +180,14 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         description: message,
       });
       
-      // Réinitialiser et fermer
+      // Charger les femmes de chambre existantes et passer à l'étape suivante
+      await loadExistingHousekeepers();
+      
       setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
         setUploadStatus('');
-        setOpen(false);
-        resetDialog();
-        onWorkflowComplete(data, [], undefined);
+        setStep('housekeepers'); // Passer à l'étape des femmes de chambre
       }, 800);
       
     } catch (error) {
