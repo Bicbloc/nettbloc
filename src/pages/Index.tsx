@@ -51,6 +51,7 @@ import { StaffManagement } from "@/components/incident/StaffManagement";
 import { IncidentInventoryManager } from "@/components/incident/IncidentInventoryManager";
 import { IncidentReportDialogSimple } from "@/components/incident/IncidentReportDialogSimple";
 import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
+import { RolePermissionsManager } from "@/components/incident/RolePermissionsManager";
 
 
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
@@ -2213,6 +2214,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
                 <TabsTrigger value="staff">Personnel</TabsTrigger>
                 <TabsTrigger value="inventory">Inventaire</TabsTrigger>
+                <TabsTrigger value="permissions">Permissions</TabsTrigger>
               </TabsList>
 
               <TabsContent value="dashboard" className="space-y-4">
@@ -2251,6 +2253,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 ) : (
                   <Alert>
                     <AlertDescription>Aucun hôtel sélectionné pour gérer l'inventaire</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              <TabsContent value="permissions" className="space-y-4">
+                {currentHotelId ? (
+                  <RolePermissionsManager hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné pour gérer les permissions</AlertDescription>
                   </Alert>
                 )}
               </TabsContent>
