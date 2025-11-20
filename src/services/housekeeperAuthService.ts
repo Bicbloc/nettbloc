@@ -10,312 +10,81 @@ export interface HousekeeperAuthResult {
 }
 
 export class HousekeeperAuthService {
-  // Authenticate with full access code - NO EXPIRATION CHECKS
+  // Authentification avec code complet en s'alignant sur la fonction SQL authenticate_housekeeper_by_code
   static async authenticateWithFullCode(accessCode: string): Promise<HousekeeperAuthResult> {
-    console.log('🔐 Authentification avec code complet (permanente):', accessCode);
-    
+    console.log('🔐 Authentification (RPC) avec code complet:', accessCode);
+
     try {
-      // Validate code format
-      if (!accessCode || accessCode.length < 8) {
+      // Validation basique
+      if (!accessCode || accessCode.trim().length < 8) {
         return {
           success: false,
-          error: 'Code d\'accès invalide (trop court)',
+          error: "Code d'accès invalide (trop court)",
           debugInfo: { providedCode: accessCode }
         };
       }
 
-      // Extraire et normaliser le code hôtel
-      const rawHotelPart = accessCode.split('-')[0]?.trim().toUpperCase();
-      const hotelCode = rawHotelPart || '';
-      console.log('🏨 Code hôtel extrait:', hotelCode);
+      const normalized = accessCode.trim().toUpperCase();
 
-      // Rechercher l'hôtel par code exact (insensible à la casse)
-      let { data: hotel, error: hotelError } = await supabase
-        .from('hotels')
-        .select('*')
-        .eq('hotel_code', hotelCode)
-        .maybeSingle();
+      // Utiliser la fonction SQL centralisée
+      const { data, error } = await supabase.rpc('authenticate_housekeeper_by_code', {
+        p_access_code: normalized
+      });
 
-      // Fallback: tenter via l'ID déterministe si non trouvé
-      if (!hotel) {
-        const deterministicId = generateHotelId(hotelCode);
-        const { data: byId, error: byIdError } = await supabase
-          .from('hotels')
-          .select('*')
-          .eq('id', deterministicId)
-          .maybeSingle();
-        hotel = byId as any;
-        hotelError = byIdError as any;
-      }
-
-      if (hotelError || !hotel) {
-        console.error('❌ Hôtel non trouvé:', { hotelCode, error: hotelError });
+      if (error) {
+        console.error('💥 Erreur RPC authenticate_housekeeper_by_code:', error);
         return {
           success: false,
-          error: `Hôtel avec le code "${hotelCode}" introuvable`,
-          debugInfo: { hotelCode, hotelError, triedDeterministicId: true }
+          error: "Erreur lors de l'authentification",
+          debugInfo: { error }
         };
       }
 
-      console.log('✅ Hôtel trouvé:', hotel);
+      const result = (data as any)?.[0];
 
-      // Normalize code to support both short (HTL002-1234) and long (HTL002-NAME-1234) formats
-      const normalized = (accessCode || '').trim().toUpperCase();
-      const parts = normalized.split('-').filter(Boolean);
-      const codeHotelPart = parts[0] || hotelCode;
-      const suffix = parts.length >= 3 ? parts[2] : (parts[1] || '');
-      const isShort = parts.length === 2;
-      const isLong = parts.length >= 3;
-      const shortVariant = codeHotelPart && suffix ? `${codeHotelPart}-${suffix}` : normalized;
+      console.log('📊 Résultat RPC authenticate_housekeeper_by_code:', result);
 
-      // 1) Try DIRECT in housekeepers table FIRST (most reliable)
-      console.log('🔍 Recherche DIRECTE dans housekeepers...');
-      let accessCodeData: any = null;
-      
-      let { data: directHousekeeper, error: directError } = await supabase
-        .from('housekeepers')
-        .select('*')
-        .eq('access_code', normalized)
-        .eq('hotel_id', hotel.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (directHousekeeper && !directError) {
-        console.log('✅ Trouvé directement dans housekeepers:', directHousekeeper);
-        
-        // Create mock access code data for compatibility
-        accessCodeData = {
-          id: 'mock-' + directHousekeeper.id,
-          access_code: normalized,
-          hotel_id: hotel.id,
-          housekeeper_id: directHousekeeper.id,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          created_by: null,
-          expires_at: null,
-          used_at: null,
-          housekeepers: directHousekeeper
-        };
-      }
-
-      // 2) If not found, try in housekeeper_access_codes
-      if (!accessCodeData) {
-        console.log('🔍 Recherche dans housekeeper_access_codes...');
-        let { data: codeData, error: codeError } = await supabase
-          .from('housekeeper_access_codes')
-          .select(`
-            *,
-            housekeepers (
-              id,
-              name,
-              hotel_id,
-              user_id,
-              is_active
-            )
-          `)
-          .eq('access_code', normalized)
-          .eq('hotel_id', hotel.id)
-          .eq('is_active', true)
-          .maybeSingle();
-        
-        if (codeData && !codeError) {
-          accessCodeData = codeData;
-        }
-      }
-
-      console.log('🔍 Résultat recherche:', { accessCodeData, directError });
-
-      // 3) If not found and short format, try pattern in housekeepers first
-      if (!accessCodeData && isShort && codeHotelPart && suffix) {
-        console.log('🔄 Recherche (pattern court) dans housekeepers');
-        const { data: hkList, error: hkListErr } = await supabase
-          .from('housekeepers')
-          .select('*')
-          .eq('hotel_id', hotel.id)
-          .eq('is_active', true)
-          .ilike('access_code', `${codeHotelPart}-%-${suffix}`)
-          .limit(1);
-          
-        if (!hkListErr && hkList && hkList.length > 0) {
-          const hk = hkList[0];
-          accessCodeData = {
-            id: 'mock-' + hk.id,
-            access_code: hk.access_code,
-            hotel_id: hotel.id,
-            housekeeper_id: hk.id,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            created_by: null,
-            expires_at: null,
-            used_at: null,
-            housekeepers: hk
-          } as any;
-        }
-      }
-
-      // 4) If not found, try pattern in housekeeper_access_codes
-      if (!accessCodeData && isShort && codeHotelPart && suffix) {
-        console.log('🔄 Recherche (pattern court) dans housekeeper_access_codes');
-        const { data: patternCodes, error: patternErr } = await supabase
-          .from('housekeeper_access_codes')
-          .select(`
-            *,
-            housekeepers (
-              id,
-              name,
-              hotel_id,
-              user_id,
-              is_active
-            )
-          `)
-          .eq('hotel_id', hotel.id)
-          .eq('is_active', true)
-          .ilike('access_code', `${codeHotelPart}-%-${suffix}`)
-          .limit(1);
-        if (!patternErr && patternCodes && patternCodes.length > 0) {
-          accessCodeData = patternCodes[0] as any;
-        }
-      }
-
-      // 5) If not found and long format, try short variant in housekeepers
-      if (!accessCodeData && isLong && shortVariant) {
-        console.log('🔄 Recherche (variante courte) dans housekeepers');
-        const { data: hkShort, error: hkShortErr } = await supabase
-          .from('housekeepers')
-          .select('*')
-          .eq('hotel_id', hotel.id)
-          .eq('is_active', true)
-          .eq('access_code', shortVariant)
-          .limit(1);
-        if (!hkShortErr && hkShort && hkShort.length > 0) {
-          const hk = hkShort[0];
-          accessCodeData = {
-            id: 'mock-' + hk.id,
-            access_code: hk.access_code,
-            hotel_id: hotel.id,
-            housekeeper_id: hk.id,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            created_by: null,
-            expires_at: null,
-            used_at: null,
-            housekeepers: hk
-          } as any;
-        }
-      }
-
-      // 6) If not found, try short variant in housekeeper_access_codes
-      if (!accessCodeData && isLong && shortVariant) {
-        console.log('🔄 Recherche (variante courte) dans housekeeper_access_codes');
-        const { data: shortCodes, error: shortErr } = await supabase
-          .from('housekeeper_access_codes')
-          .select(`
-            *,
-            housekeepers (
-              id,
-              name,
-              hotel_id,
-              user_id,
-              is_active
-            )
-          `)
-          .eq('hotel_id', hotel.id)
-          .eq('is_active', true)
-          .eq('access_code', shortVariant)
-          .limit(1);
-        if (!shortErr && shortCodes && shortCodes.length > 0) {
-          accessCodeData = shortCodes[0] as any;
-        }
-      }
-
-      if (!accessCodeData) {
-        console.error('❌ Code d\'accès non trouvé dans les deux tables:', { accessCode });
-        
-        // Try to find any code with this pattern for debugging
-        const { data: allCodes } = await supabase
-          .from('housekeeper_access_codes')
-          .select('access_code, hotel_id, is_active, housekeeper_id')
-          .eq('hotel_id', hotel.id);
-          
-        const { data: allHousekeepers } = await supabase
-          .from('housekeepers')
-          .select('name, access_code, hotel_id, is_active')
-          .eq('hotel_id', hotel.id);
-        
-        console.log('🔍 Debug - Codes disponibles:', allCodes);
-        console.log('🔍 Debug - Femmes de chambre disponibles:', allHousekeepers);
-        
+      if (!result || !result.success) {
         return {
           success: false,
-          error: `Code d'accès "${accessCode}" introuvable`,
-          debugInfo: { 
-            accessCode, 
-            hotelId: hotel.id,
-            availableCodes: allCodes,
-            availableHousekeepers: allHousekeepers,
-            searchedInBothTables: true
-          }
+          error: `Code d'accès "${accessCode}" introuvable ou inactif`,
+          debugInfo: { accessCode: normalized, rpcResult: data }
         };
       }
 
-      const housekeeper = accessCodeData.housekeepers;
-      
-      // Handle general access codes (no specific housekeeper assigned)
-      if (!accessCodeData.housekeeper_id) {
-        console.log('✅ Code d\'accès général détecté, création d\'un profil invité');
-        const guestHousekeeper = {
-          id: 'guest-' + accessCodeData.id,
-          name: accessCodeData.invited_name || 'Femme de chambre invitée',
-          hotel_id: hotel.id,
-          user_id: 'guest',
-          is_active: true,
-          access_code: accessCodeData.access_code,
-          is_temporary: true
-        };
-        
-        // Mark code as used
-        await supabase
-          .from('housekeeper_access_codes')
-          .update({ used_at: new Date().toISOString() })
-          .eq('id', accessCodeData.id);
+      // Construire les objets hotel et housekeeper compatibles avec le reste de l'app
+      const hotel = {
+        id: result.hotel_id,
+        name: result.hotel_name,
+        hotel_code: result.hotel_code
+      };
 
-        return {
-          success: true,
-          user: guestHousekeeper,
-          hotel: hotel,
-          debugInfo: { accessCodeData, guestHousekeeper, hotel, isGeneralCode: true }
-        };
-      }
-      
-      // Handle specific housekeeper codes
-      if (!housekeeper || !housekeeper.is_active) {
-        return {
-          success: false,
-          error: 'Femme de chambre inactive ou non trouvée',
-          debugInfo: { housekeeper, accessCodeData }
-        };
-      }
+      const housekeeper = {
+        id: result.housekeeper_id,
+        name: result.housekeeper_name,
+        access_code: result.resolved_access_code,
+        hotel_id: result.hotel_id,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        user_id: 'housekeeper_rpc',
+        is_temporary: false,
+        role_id: null
+      };
 
-      console.log('✅ Authentification réussie:', housekeeper);
-
-      // Mark code as used
-      await supabase
-        .from('housekeeper_access_codes')
-        .update({ used_at: new Date().toISOString() })
-        .eq('id', accessCodeData.id);
+      console.log('✅ Authentification réussie via RPC:', { hotel, housekeeper, code_source: result.code_source });
 
       return {
         success: true,
         user: housekeeper,
         hotel: hotel,
-        debugInfo: { accessCodeData, housekeeper, hotel }
+        debugInfo: { raw: result, hotel, housekeeper }
       };
-
     } catch (error) {
-      console.error('💥 Erreur authentification:', error);
+      console.error('💥 Erreur inattendue authenticateWithFullCode:', error);
       return {
         success: false,
-        error: 'Erreur lors de l\'authentification',
+        error: "Erreur lors de l'authentification",
         debugInfo: { error }
       };
     }
@@ -365,7 +134,7 @@ export class HousekeeperAuthService {
 
     } catch (error) {
       console.error('💥 Erreur recherche hôtel:', error);
-      return { success: false, error: 'Erreur lors de la recherche de l\'hôtel', debugInfo: { error } };
+      return { success: false, error: "Erreur lors de la recherche de l'hôtel", debugInfo: { error } };
     }
   }
 
