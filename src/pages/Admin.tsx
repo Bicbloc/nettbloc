@@ -35,6 +35,7 @@ import { IncidentList } from '@/components/incident/IncidentList';
 import { StaffManagement } from '@/components/incident/StaffManagement';
 import { IncidentInventoryManager } from '@/components/incident/IncidentInventoryManager';
 import { IncidentReportDialog } from '@/components/incident/IncidentReportDialog';
+import { RolePermissionsManager } from '@/components/incident/RolePermissionsManager';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -1297,6 +1298,7 @@ const Admin = () => {
               <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
               <TabsTrigger value="staff">Personnel</TabsTrigger>
               <TabsTrigger value="inventory">Inventaire</TabsTrigger>
+              <TabsTrigger value="permissions">Permissions</TabsTrigger>
             </TabsList>
 
             <TabsContent value="incidents" className="space-y-4">
@@ -1325,6 +1327,16 @@ const Admin = () => {
               ) : (
                 <Alert>
                   <AlertDescription>Aucun hôtel disponible pour gérer l'inventaire</AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+
+            <TabsContent value="permissions" className="space-y-4">
+              {hotels.length > 0 ? (
+                <RolePermissionsManager hotelId={hotels[0].id} />
+              ) : (
+                <Alert>
+                  <AlertDescription>Aucun hôtel disponible pour gérer les permissions</AlertDescription>
                 </Alert>
               )}
             </TabsContent>

@@ -1496,6 +1496,61 @@ export type Database = {
           },
         ]
       }
+      staff_role_permissions: {
+        Row: {
+          can_resolve: boolean
+          can_view: boolean
+          created_at: string | null
+          hotel_id: string
+          id: string
+          incident_type_id: string
+          role_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          can_resolve?: boolean
+          can_view?: boolean
+          created_at?: string | null
+          hotel_id: string
+          id?: string
+          incident_type_id: string
+          role_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          can_resolve?: boolean
+          can_view?: boolean
+          created_at?: string | null
+          hotel_id?: string
+          id?: string
+          incident_type_id?: string
+          role_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_role_permissions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_role_permissions_incident_type_id_fkey"
+            columns: ["incident_type_id"]
+            isOneToOne: false
+            referencedRelation: "incident_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "staff_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_roles: {
         Row: {
           created_at: string | null
