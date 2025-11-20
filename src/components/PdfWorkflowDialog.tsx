@@ -141,13 +141,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         }
       }
       
-      setUploadProgress(90);
-      setUploadStatus('✅ Finalisation...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      setUploadProgress(100);
-      setUploadStatus('✅ Terminé !');
-      
       // Message détaillé avec nombre de chambres ajoutées et mises à jour
       const message = insertedCount > 0 && updatedCount > 0 
         ? `${insertedCount} nouvelles chambres ajoutées, ${updatedCount} chambres mises à jour.`
@@ -157,30 +150,34 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         ? `${updatedCount} chambres mises à jour dans le registre.`
         : `${data.length} chambres traitées.`;
       
+      setUploadProgress(100);
+      setUploadStatus('✅ Terminé !');
+      
       toast({
         title: "✅ Analyse terminée",
         description: message,
       });
-
-      // Fermer le dialogue après 500ms
-      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Appeler le callback avec les données du PDF pour continuer le workflow si nécessaire
-      onWorkflowComplete(data, [], undefined);
-      
-      // Fermer le dialogue et réinitialiser
-      setOpen(false);
-      resetDialog();
+      // Réinitialiser et fermer
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+        setUploadStatus('');
+        setOpen(false);
+        resetDialog();
+        onWorkflowComplete(data, [], undefined);
+      }, 800);
       
     } catch (error) {
       console.error("Erreur traitement PDF:", error);
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
       toast({
         variant: "destructive",
         title: "Échec du traitement",
         description: "Une erreur s'est produite lors du traitement du fichier PDF.",
       });
-    } finally {
-      setIsUploading(false);
     }
   };
 
