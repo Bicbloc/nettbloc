@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink } from "lucide-react";
+import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye } from "lucide-react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { smartExtractionService, type ExtractedRoom } from "@/services/smartExtractionService";
 
@@ -30,6 +31,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [detectedPmsType, setDetectedPmsType] = useState<string>('');
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [mergingMode, setMergingMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("validation");
 
   useEffect(() => {
     smartExtractionService.loadLearnedPatterns(hotelId);
@@ -281,6 +283,123 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
     }
   };
 
+  // Fonction pour surligner le texte avec les chambres détectées
+  const highlightRoomsInText = (text: string, rooms: ExtractedRoom[]) => {
+    if (!rooms || rooms.length === 0) return [{ text, isHighlighted: false }];
+
+    // Trier les chambres par ordre décroissant de longueur pour éviter les conflits
+    const sortedRooms = [...rooms].sort((a, b) => 
+      b.roomNumber.length - a.roomNumber.length
+    );
+
+    const segments: { text: string; isHighlighted: boolean; roomIndex?: number }[] = [];
+    const positions: { start: number; end: number; roomIndex: number }[] = [];
+
+    // Trouver toutes les positions des chambres dans le texte
+    sortedRooms.forEach((room, roomIndex) => {
+      const roomNumber = room.roomNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${roomNumber}\\b`, 'gi');
+      let match;
+      
+      while ((match = regex.exec(text)) !== null) {
+        // Vérifier qu'il n'y a pas de chevauchement
+        const overlap = positions.some(pos => 
+          (match.index >= pos.start && match.index < pos.end) ||
+          (match.index + match[0].length > pos.start && match.index + match[0].length <= pos.end)
+        );
+        
+        if (!overlap) {
+          positions.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            roomIndex
+          });
+        }
+      }
+    });
+
+    // Trier les positions par ordre d'apparition
+    positions.sort((a, b) => a.start - b.start);
+
+    // Créer les segments
+    let lastIndex = 0;
+    positions.forEach(pos => {
+      // Texte avant
+      if (pos.start > lastIndex) {
+        segments.push({
+          text: text.substring(lastIndex, pos.start),
+          isHighlighted: false
+        });
+      }
+      // Texte surligné
+      segments.push({
+        text: text.substring(pos.start, pos.end),
+        isHighlighted: true,
+        roomIndex: pos.roomIndex
+      });
+      lastIndex = pos.end;
+    });
+
+    // Reste du texte
+    if (lastIndex < text.length) {
+      segments.push({
+        text: text.substring(lastIndex),
+        isHighlighted: false
+      });
+    }
+
+    return segments.length > 0 ? segments : [{ text, isHighlighted: false }];
+  };
+
+  // Rendu de la prévisualisation du texte
+  const renderTextPreview = () => {
+    if (!selectedReport) return null;
+
+    const segments = highlightRoomsInText(selectedReport.rawText, selectedReport.extractedRooms);
+    
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Texte brut extrait</h3>
+            <p className="text-sm text-muted-foreground">
+              {selectedReport.extractedRooms.length} chambre(s) détectée(s) et surlignée(s)
+            </p>
+          </div>
+          <Badge variant="outline" className="gap-2">
+            <Eye className="h-3 w-3" />
+            Prévisualisation
+          </Badge>
+        </div>
+
+        <Card className="p-4">
+          <div className="bg-muted/30 rounded-md p-4 max-h-[600px] overflow-auto font-mono text-sm whitespace-pre-wrap break-words">
+            {segments.map((segment, idx) => (
+              segment.isHighlighted ? (
+                <mark
+                  key={idx}
+                  className="bg-primary/20 text-primary font-semibold px-1 rounded cursor-pointer hover:bg-primary/30 transition-colors"
+                  title={segment.roomIndex !== undefined ? `Chambre ${selectedReport.extractedRooms[segment.roomIndex]?.roomNumber}` : ''}
+                >
+                  {segment.text}
+                </mark>
+              ) : (
+                <span key={idx}>{segment.text}</span>
+              )
+            ))}
+          </div>
+        </Card>
+
+        <div className="flex gap-2 text-xs text-muted-foreground items-center">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-primary/20 rounded" />
+            <span>Chambres détectées</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const availablePmsTypes = smartExtractionService.getAvailablePmsTypes();
 
   return (
@@ -370,42 +489,51 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
       {selectedReport && (
         <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Validation des données</h3>
-              <Badge variant={selectedReport.validated ? "default" : "secondary"}>
-                {selectedReport.validated ? "Validé" : "En attente"}
-              </Badge>
-            </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="validation">Validation</TabsTrigger>
+              <TabsTrigger value="preview">
+                <Eye className="h-4 w-4 mr-2" />
+                Prévisualisation texte
+              </TabsTrigger>
+            </TabsList>
 
-            <div className="flex gap-2 flex-wrap">
-              <Button 
-                onClick={validateAllRooms}
-                className="flex-1"
-              >
-                <Check className="w-4 h-4 mr-2" />
-                Valider toutes les chambres
-              </Button>
-              <Button
-                onClick={() => {
-                  setMergingMode(!mergingMode);
-                  setSelectedRooms(new Set());
-                }}
-                variant={mergingMode ? "default" : "outline"}
-                className="flex-1"
-              >
-                <Link2 className="w-4 h-4 mr-2" />
-                {mergingMode ? "Annuler fusion" : "Fusionner chambres"}
-              </Button>
-              {mergingMode && selectedRooms.size >= 2 && (
-                <Button onClick={mergeSelectedRooms} variant="secondary">
-                  Confirmer fusion ({selectedRooms.size} chambres)
+            <TabsContent value="validation" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Validation des données</h3>
+                <Badge variant={selectedReport.validated ? "default" : "secondary"}>
+                  {selectedReport.validated ? "Validé" : "En attente"}
+                </Badge>
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                <Button 
+                  onClick={validateAllRooms}
+                  className="flex-1"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Valider toutes les chambres
                 </Button>
-              )}
-            </div>
+                <Button
+                  onClick={() => {
+                    setMergingMode(!mergingMode);
+                    setSelectedRooms(new Set());
+                  }}
+                  variant={mergingMode ? "default" : "outline"}
+                  className="flex-1"
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  {mergingMode ? "Annuler fusion" : "Fusionner chambres"}
+                </Button>
+                {mergingMode && selectedRooms.size >= 2 && (
+                  <Button onClick={mergeSelectedRooms} variant="secondary">
+                    Confirmer fusion ({selectedRooms.size} chambres)
+                  </Button>
+                )}
+              </div>
 
-            <div className="space-y-3">
-              {selectedReport.extractedRooms.map((room, index) => (
+              <div className="space-y-3">
+                {selectedReport.extractedRooms.map((room, index) => (
                 <Card 
                   key={index} 
                   className={`p-4 ${room.validated ? 'border-green-500' : 'border-yellow-500'} ${
@@ -499,7 +627,12 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 </Card>
               ))}
             </div>
-          </div>
+          </TabsContent>
+
+          <TabsContent value="preview">
+            {renderTextPreview()}
+          </TabsContent>
+        </Tabs>
         </Card>
       )}
     </div>
