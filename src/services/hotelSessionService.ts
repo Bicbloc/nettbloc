@@ -6,7 +6,6 @@ interface HotelSessionRaw {
   id: string;
   session_token: string;
   hotel_id: string | null;
-  ip_address: unknown;
   room_data: any;
   housekeeper_names: any;
   housekeeper_assignments: any;
@@ -21,7 +20,6 @@ interface HotelSession {
   id: string;
   session_token: string;
   hotel_id: string | null;
-  ip_address: string | null;
   room_data: Room[];
   housekeeper_names: string[];
   housekeeper_assignments: Record<string, string>;
@@ -40,23 +38,10 @@ export class HotelSessionService {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Obtenir l'adresse IP du client
-  private static async getClientIP(): Promise<string | null> {
-    try {
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip;
-    } catch (error) {
-      console.error('Erreur récupération IP:', error);
-      return null;
-    }
-  }
-
   // Créer une nouvelle session d'hôtel
   static async createSession(hotelId?: string): Promise<string | null> {
     try {
       const sessionToken = this.generateSessionToken();
-      const ipAddress = await this.getClientIP();
       
       // Si pas d'hotelId fourni, essayer de le récupérer depuis localStorage ou le user actuel
       let finalHotelId = hotelId;
@@ -114,7 +99,6 @@ export class HotelSessionService {
         .insert({
           session_token: sessionToken,
           hotel_id: finalHotelId || null,
-          ip_address: ipAddress,
           room_data: [],
           housekeeper_names: [],
           housekeeper_assignments: {},
@@ -374,7 +358,6 @@ export class HotelSessionService {
       id: raw.id,
       session_token: raw.session_token,
       hotel_id: raw.hotel_id,
-      ip_address: raw.ip_address as string | null,
       room_data: Array.isArray(raw.room_data) ? raw.room_data as Room[] : [],
       housekeeper_names: Array.isArray(raw.housekeeper_names) ? raw.housekeeper_names as string[] : [],
       housekeeper_assignments: typeof raw.housekeeper_assignments === 'object' && raw.housekeeper_assignments ? raw.housekeeper_assignments as Record<string, string> : {},
