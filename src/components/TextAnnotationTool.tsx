@@ -24,6 +24,7 @@ interface TextAnnotationToolProps {
   reportName: string;
   pmsType: string;
   onPatternsLearned: (patterns: any) => void;
+  onAnnotationsChanged?: (annotations: Annotation[]) => void;
 }
 
 export const TextAnnotationTool = ({ 
@@ -31,7 +32,8 @@ export const TextAnnotationTool = ({
   hotelId, 
   reportName, 
   pmsType,
-  onPatternsLearned 
+  onPatternsLearned,
+  onAnnotationsChanged
 }: TextAnnotationToolProps) => {
   const { toast } = useToast();
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -87,6 +89,11 @@ export const TextAnnotationTool = ({
     setCustomValue('');
     selection.removeAllRanges();
 
+    // Notifier le parent
+    if (onAnnotationsChanged) {
+      onAnnotationsChanged([...annotations, newAnnotation]);
+    }
+
     toast({
       title: "Annotation ajoutée",
       description: `${fieldLabels[selectedField as keyof typeof fieldLabels]}: ${selectedText}`,
@@ -94,7 +101,13 @@ export const TextAnnotationTool = ({
   };
 
   const removeAnnotation = (id: string) => {
-    setAnnotations(prev => prev.filter(a => a.id !== id));
+    const updatedAnnotations = annotations.filter(a => a.id !== id);
+    setAnnotations(updatedAnnotations);
+    
+    // Notifier le parent
+    if (onAnnotationsChanged) {
+      onAnnotationsChanged(updatedAnnotations);
+    }
   };
 
   const renderAnnotatedText = () => {

@@ -9,8 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2 } from "lucide-react";
+import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3 } from "lucide-react";
 import { TextAnnotationTool } from "./TextAnnotationTool";
+import { PatternValidation } from "./PatternValidation";
 import * as pdfjsLib from 'pdfjs-dist';
 import { smartExtractionService, type ExtractedRoom } from "@/services/smartExtractionService";
 
@@ -34,6 +35,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [mergingMode, setMergingMode] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("validation");
   const [learnedPatterns, setLearnedPatterns] = useState<any>(null);
+  const [manualAnnotations, setManualAnnotations] = useState<any[]>([]);
 
   useEffect(() => {
     smartExtractionService.loadLearnedPatterns(hotelId);
@@ -500,7 +502,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         {selectedReport && (
           <Card className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsList className="grid w-full grid-cols-4 mb-4">
                 <TabsTrigger value="validation">Validation</TabsTrigger>
                 <TabsTrigger value="preview">
                   <Eye className="h-4 w-4 mr-2" />
@@ -509,6 +511,10 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 <TabsTrigger value="learn">
                   <Wand2 className="h-4 w-4 mr-2" />
                   Apprentissage
+                </TabsTrigger>
+                <TabsTrigger value="metrics">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Métriques
                 </TabsTrigger>
               </TabsList>
 
@@ -654,6 +660,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
               reportName={selectedReport.name}
               pmsType={detectedPmsType || selectedPmsType}
               onPatternsLearned={handlePatternsLearned}
+              onAnnotationsChanged={setManualAnnotations}
             />
             
             {learnedPatterns && (
@@ -664,6 +671,14 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 </pre>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="metrics">
+            <PatternValidation
+              annotations={manualAnnotations}
+              extractedRooms={selectedReport.extractedRooms}
+              patterns={learnedPatterns}
+            />
           </TabsContent>
         </Tabs>
         </Card>
