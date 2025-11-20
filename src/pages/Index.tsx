@@ -49,7 +49,7 @@ import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { IncidentList } from "@/components/incident/IncidentList";
 import { StaffManagement } from "@/components/incident/StaffManagement";
 import { IncidentInventoryManager } from "@/components/incident/IncidentInventoryManager";
-import { IncidentReportDialog } from "@/components/incident/IncidentReportDialog";
+import { IncidentReportDialogSimple } from "@/components/incident/IncidentReportDialogSimple";
 import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
 
 
@@ -2203,7 +2203,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 <p className="text-muted-foreground">Gérer les incidents, le personnel et l'inventaire</p>
               </div>
               {currentHotelId && (
-                <IncidentReportDialog hotelId={currentHotelId} userType="admin" />
+                <IncidentReportDialogSimple hotelId={currentHotelId} userType="admin" />
               )}
             </div>
 
