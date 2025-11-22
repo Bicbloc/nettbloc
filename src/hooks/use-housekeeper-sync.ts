@@ -40,15 +40,18 @@ export function useHousekeeperSync() {
         if (!existingNames.includes(name.toLowerCase())) {
           try {
             const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, name);
-            if (housekeeper) {
-              result.synchronized++;
-              console.log(`✅ Femme de chambre synchronisée: ${name} -> ${housekeeper.access_code}`);
-            } else {
-              result.errors.push(`Échec synchronisation: ${name}`);
-            }
-          } catch (error) {
+            result.synchronized++;
+            console.log(`✅ Femme de chambre synchronisée: ${name} -> ${housekeeper.access_code}`);
+          } catch (error: any) {
             console.error(`Erreur synchronisation ${name}:`, error);
-            result.errors.push(`Erreur synchronisation: ${name}`);
+            const errorMsg = error.message || `Erreur synchronisation: ${name}`;
+            result.errors.push(errorMsg);
+            
+            // Si erreur de session, arrêter et informer l'utilisateur
+            if (errorMsg.includes('Session expirée') || errorMsg.includes('reconnecter')) {
+              result.success = false;
+              break;
+            }
           }
         }
       }
@@ -65,11 +68,22 @@ export function useHousekeeperSync() {
 
       if (result.errors.length > 0) {
         result.success = false;
-        toast({
-          title: "Synchronisation partielle",
-          description: `${result.errors.length} erreur(s) lors de la synchronisation`,
-          variant: "destructive"
-        });
+        const firstError = result.errors[0];
+        
+        // Message spécifique si problème de session
+        if (firstError.includes('Session expirée') || firstError.includes('reconnecter')) {
+          toast({
+            title: "Session expirée",
+            description: "Veuillez vous reconnecter pour continuer",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Synchronisation partielle",
+            description: `${result.errors.length} erreur(s) lors de la synchronisation`,
+            variant: "destructive"
+          });
+        }
       }
 
     } catch (error) {

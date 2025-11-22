@@ -256,13 +256,23 @@ export class SupabaseService {
     try {
       console.log('🔧 Début création femme de chambre:', { hotelId, name });
       
-      // Récupérer l'utilisateur actuel pour obtenir son ID
+      // Vérifier la session active d'abord
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('❌ Session expirée ou invalide:', sessionError);
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
+      // Récupérer l'utilisateur actuel
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         console.error('❌ Aucun utilisateur connecté');
-        return null;
+        throw new Error('Utilisateur non connecté. Veuillez vous reconnecter.');
       }
+
+      console.log('✅ Session valide pour user:', user.email);
 
       // Générer un code d'accès unique avec la nouvelle fonction simplifiée
       const { data: accessCode, error: codeError } = await supabase
@@ -273,7 +283,10 @@ export class SupabaseService {
 
       if (codeError) {
         console.error('❌ Erreur génération code d\'accès:', codeError);
-        return null;
+        if (codeError.message?.includes('introuvable') || codeError.message?.includes('non autorisé')) {
+          throw new Error('Accès à l\'hôtel non autorisé. Vérifiez votre connexion.');
+        }
+        throw new Error(`Erreur génération code: ${codeError.message}`);
       }
 
       console.log('✅ Code d\'accès généré:', accessCode);
@@ -298,9 +311,10 @@ export class SupabaseService {
       
       console.log('✅ Femme de chambre créée avec succès:', data);
       return data as Housekeeper;
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Erreur createHousekeeper:', err);
-      return null;
+      // Rethrow avec message explicite pour l'UI
+      throw err;
     }
   }
 
