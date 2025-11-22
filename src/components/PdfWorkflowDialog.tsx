@@ -183,15 +183,15 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         description: message,
       });
       
-      // Charger les femmes de chambre existantes et passer à l'étape suivante
-      await loadExistingHousekeepers();
-      
+      // Débloquer l'UI immédiatement
       setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
         setUploadStatus('');
         setStep('housekeepers'); // Passer à l'étape des femmes de chambre
-      }, 800);
+        // Charger les femmes de chambre en arrière-plan
+        loadExistingHousekeepers();
+      }, 500);
       
     } catch (error) {
       console.error("Erreur traitement PDF:", error);
