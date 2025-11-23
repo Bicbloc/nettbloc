@@ -167,7 +167,7 @@ const Auth = () => {
   };
 
   const handleHousekeeperAccess = () => {
-    navigate('/housekeeper/login');
+    navigate('/housekeeper/auth');
   };
 
 
