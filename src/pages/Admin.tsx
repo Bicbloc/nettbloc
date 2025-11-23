@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
-  Hotel, Users, BarChart3, CreditCard, Calendar, Gift
+  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
@@ -793,9 +793,12 @@ const Admin = () => {
             <Key className="h-4 w-4 mr-2" />
             Codes d'accès
           </TabsTrigger>
-          <TabsTrigger value="housekeeper-requests">
+          <TabsTrigger value="housekeeper-requests" className="relative">
             <Users className="h-4 w-4 mr-2" />
             Demandes
+            <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+              !
+            </Badge>
           </TabsTrigger>
           <TabsTrigger value="incidents">
             <AlertTriangle className="h-4 w-4 mr-2" />
@@ -1276,8 +1279,15 @@ const Admin = () => {
         </TabsContent>
 
         <TabsContent value="housekeeper-requests" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HousekeeperTeamManager hotelId={user?.id || ''} />
+          <Alert className="bg-blue-50 border-blue-200">
+            <Bell className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Comment ça marche ?</strong> Les femmes de chambre créent un compte et soumettent une demande avec votre code d'hôtel. 
+              Vous recevez une notification et pouvez <strong>valider</strong> ou <strong>suspendre</strong> leur accès.
+            </AlertDescription>
+          </Alert>
+          
+          <div className="grid grid-cols-1 gap-6">
             <HousekeeperAccessRequests />
           </div>
         </TabsContent>

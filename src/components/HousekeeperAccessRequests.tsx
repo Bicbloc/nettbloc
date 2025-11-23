@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Bell, Check, X, Clock } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Bell, Check, X, Clock, Ban } from 'lucide-react';
 
 interface AccessRequest {
   id: string;
@@ -28,6 +30,32 @@ export const HousekeeperAccessRequests = () => {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+
+  // Écouter les nouvelles demandes en temps réel
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('access_requests_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'housekeeper_access_requests'
+        },
+        (payload) => {
+          console.log('Nouvelle demande reçue:', payload);
+          toast.success('📨 Nouvelle demande d\'accès reçue !');
+          loadRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const loadRequests = async () => {
     if (!user) return;
@@ -185,16 +213,36 @@ export const HousekeeperAccessRequests = () => {
   return (
     <Card className="p-6">
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Bell className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Demandes d'accès des femmes de chambre</h2>
-          {pendingRequests.length > 0 && (
-            <Badge variant="secondary">{pendingRequests.length} en attente</Badge>
-          )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            <h2 className="text-xl font-semibold">Demandes d'accès</h2>
+            {pendingRequests.length > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                {pendingRequests.length} nouvelle{pendingRequests.length > 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
         </div>
 
+        {pendingRequests.length > 0 && (
+          <Alert className="bg-orange-50 border-orange-200">
+            <Bell className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>{pendingRequests.length} demande{pendingRequests.length > 1 ? 's' : ''} en attente</strong> de validation. 
+              Les femmes de chambre pourront accéder à votre hôtel après votre approbation.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {requests.length === 0 ? (
-          <p className="text-muted-foreground">Aucune demande d'accès</p>
+          <div className="text-center py-8">
+            <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground">Aucune demande d'accès pour le moment</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Les nouvelles demandes apparaîtront ici automatiquement
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
             {requests.map((request) => (
@@ -204,11 +252,11 @@ export const HousekeeperAccessRequests = () => {
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-medium">{request.housekeeper_profiles.name}</h3>
+                    <h3 className="font-medium text-lg">{request.housekeeper_profiles.name}</h3>
                     <Badge variant={getStatusVariant(request.status)} className="gap-1">
                       {getStatusIcon(request.status)}
-                      {request.status === 'pending' ? 'En attente' : 
-                       request.status === 'approved' ? 'Approuvée' : 'Rejetée'}
+                      {request.status === 'pending' ? '🔔 En attente' : 
+                       request.status === 'approved' ? '✅ Validée' : '❌ Suspendue'}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -226,20 +274,20 @@ export const HousekeeperAccessRequests = () => {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="destructive"
                       onClick={() => handleRejectRequest(request.id)}
                       className="gap-1"
                     >
-                      <X className="h-4 w-4" />
-                      Rejeter
+                      <Ban className="h-4 w-4" />
+                      Suspendre
                     </Button>
                     <Button
                       size="sm"
                       onClick={() => handleApproveRequest(request.id)}
-                      className="gap-1"
+                      className="gap-1 bg-green-600 hover:bg-green-700"
                     >
                       <Check className="h-4 w-4" />
-                      Approuver
+                      Valider
                     </Button>
                   </div>
                 )}
