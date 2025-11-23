@@ -27,9 +27,16 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const accessCode = searchParams.get('access_code');
-  const hotelId = searchParams.get('hotel');
-  const housekeeperName = searchParams.get('name') || 'Femme de chambre';
+  // Essayer d'abord les query params, puis le localStorage
+  const accessCodeFromUrl = searchParams.get('access_code');
+  const hotelIdFromUrl = searchParams.get('hotel');
+  const housekeeperNameFromUrl = searchParams.get('name');
+
+  // Récupérer depuis localStorage si pas dans l'URL
+  const housekeeperData = localStorage.getItem('housekeeper') ? JSON.parse(localStorage.getItem('housekeeper')!) : null;
+  const accessCode = accessCodeFromUrl || housekeeperData?.accessCode;
+  const hotelId = hotelIdFromUrl || localStorage.getItem('selectedHotelId');
+  const housekeeperName = housekeeperNameFromUrl || housekeeperData?.name || 'Femme de chambre';
 
   useEffect(() => {
     if (accessCode && hotelId) {
@@ -37,9 +44,14 @@ export const HousekeeperWorkSimple: React.FC = () => {
     } else {
       toast({
         title: "Paramètres manquants",
-        description: "Code d'accès ou hôtel non spécifié",
+        description: "Code d'accès ou hôtel non spécifié. Veuillez vous reconnecter.",
         variant: "destructive"
       });
+      // Nettoyer le localStorage
+      localStorage.removeItem('housekeeper');
+      localStorage.removeItem('selectedHotelId');
+      localStorage.removeItem('selectedHotelName');
+      localStorage.removeItem('selectedHotelCode');
       navigate('/housekeeper/login');
     }
   }, [accessCode, hotelId]);
@@ -198,6 +210,11 @@ export const HousekeeperWorkSimple: React.FC = () => {
   };
 
   const handleLogout = () => {
+    // Nettoyer le localStorage
+    localStorage.removeItem('housekeeper');
+    localStorage.removeItem('selectedHotelId');
+    localStorage.removeItem('selectedHotelName');
+    localStorage.removeItem('selectedHotelCode');
     navigate('/housekeeper/login');
   };
 
