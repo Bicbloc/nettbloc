@@ -9,7 +9,6 @@ import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide
 import { SupabaseService } from "@/services/supabaseService";
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import BackButton from '@/components/BackButton';
-import { HousekeeperAuthTester } from '@/components/HousekeeperAuthTester';
 
 export default function HousekeeperLogin() {
   const [step, setStep] = useState<"direct" | "hotel" | "housekeeper">("direct");
@@ -225,13 +224,10 @@ export default function HousekeeperLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex flex-col items-center justify-center p-4 relative gap-6">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex flex-col items-center justify-center p-4 relative">
       <div className="absolute top-4 left-4">
         <BackButton to="/" />
       </div>
-      
-      {/* Composant de test pour diagnostiquer les problèmes */}
-      <HousekeeperAuthTester />
       
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
