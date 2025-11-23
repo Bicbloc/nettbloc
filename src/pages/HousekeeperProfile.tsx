@@ -3,8 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   ArrowLeft, 
   Calendar, 
@@ -15,7 +25,12 @@ import {
   Award,
   CheckCircle2,
   Building2,
-  Zap
+  Zap,
+  Edit,
+  Mail,
+  Phone,
+  User as UserIcon,
+  LogOut
 } from 'lucide-react';
 import { GamificationService } from '@/services/gamificationService';
 import { BadgeDisplay } from '@/components/gamification/BadgeDisplay';
@@ -46,6 +61,12 @@ export default function HousekeeperProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [levelData, setLevelData] = useState<any>(null);
   const [badges, setBadges] = useState<any[]>([]);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [stats, setStats] = useState<Stats>({
     totalRoomsCleaned: 0,
     totalHotelsWorked: 0,
@@ -60,31 +81,58 @@ export default function HousekeeperProfile() {
   const hotelId = localStorage.getItem('selectedHotelId');
 
   useEffect(() => {
-    if (!housekeeperData || !hotelId) {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session?.user) {
+      // Charger le profil depuis Supabase
+      const { data: profile } = await supabase
+        .from('housekeeper_profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile) {
+        setUserProfile(profile);
+        setEditName(profile.name);
+        setEditEmail(profile.email);
+        setEditPhone(profile.phone || '');
+        
+        if (hotelId) {
+          loadStats(session.user.id);
+        }
+      }
+    } else if (!housekeeperData || !hotelId) {
       toast({
         title: "Non connecté",
         description: "Veuillez vous connecter pour voir votre profil",
         variant: "destructive"
       });
-      navigate('/housekeeper/login');
+      navigate('/housekeeper/auth');
       return;
+    } else {
+      loadStats(housekeeperData.id);
     }
-    loadStats();
-  }, []);
+  };
 
-  const loadStats = async () => {
+  const loadStats = async (userId: string) => {
+    if (!hotelId) return;
+    
     try {
       // Charger les données de gamification
       const level = await GamificationService.getHousekeeperLevel(
-        housekeeperData.id,
-        hotelId!
+        userId,
+        hotelId
       );
       setLevelData(level);
 
       // Charger les badges avec leur statut
       const badgesData = await GamificationService.getBadgesWithUnlockStatus(
-        housekeeperData.id,
-        hotelId!
+        userId,
+        hotelId
       );
       setBadges(badgesData);
 
@@ -102,7 +150,7 @@ export default function HousekeeperProfile() {
           )
         `)
         .eq('hotel_id', hotelId)
-        .eq('housekeeper_id', housekeeperData.id)
+        .eq('housekeeper_id', userId)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false })
         .limit(50);
@@ -157,6 +205,79 @@ export default function HousekeeperProfile() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      toast({
+        variant: "destructive",
+        title: "Non connecté",
+        description: "Veuillez vous reconnecter"
+      });
+      return;
+    }
+
+    if (!editName.trim() || !editEmail.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Champs requis",
+        description: "Le nom et l'email sont requis"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('housekeeper_profiles')
+        .update({
+          name: editName.trim(),
+          email: editEmail.trim(),
+          phone: editPhone.trim() || null
+        })
+        .eq('id', session.user.id);
+
+      if (error) throw error;
+
+      setUserProfile({
+        ...userProfile,
+        name: editName.trim(),
+        email: editEmail.trim(),
+        phone: editPhone.trim() || null
+      });
+
+      // Mettre à jour localStorage si nécessaire
+      if (housekeeperData) {
+        localStorage.setItem('housekeeper', JSON.stringify({
+          ...housekeeperData,
+          name: editName.trim()
+        }));
+      }
+
+      toast({
+        title: "Profil mis à jour ! ✅",
+        description: "Vos informations ont été enregistrées"
+      });
+
+      setShowEditDialog(false);
+    } catch (error: any) {
+      console.error('Erreur mise à jour profil:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de mettre à jour le profil"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.clear();
+    navigate('/housekeeper/auth');
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('fr-FR', { 
@@ -203,11 +324,25 @@ export default function HousekeeperProfile() {
         <Card className="p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
           <div className="flex items-center gap-4">
             <div className="h-20 w-20 rounded-full bg-white/20 flex items-center justify-center text-3xl font-bold">
-              {housekeeperData.name.charAt(0).toUpperCase()}
+              {(userProfile?.name || housekeeperData?.name || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-1">{housekeeperData.name}</h1>
-              <p className="text-blue-100">Code: {housekeeperData.accessCode}</p>
+              <h1 className="text-3xl font-bold mb-1">{userProfile?.name || housekeeperData?.name}</h1>
+              {userProfile?.email && (
+                <div className="flex items-center gap-2 text-blue-100 mb-1">
+                  <Mail className="h-4 w-4" />
+                  <span>{userProfile.email}</span>
+                </div>
+              )}
+              {userProfile?.phone && (
+                <div className="flex items-center gap-2 text-blue-100 mb-1">
+                  <Phone className="h-4 w-4" />
+                  <span>{userProfile.phone}</span>
+                </div>
+              )}
+              {housekeeperData?.accessCode && (
+                <p className="text-blue-100 text-sm">Code: {housekeeperData.accessCode}</p>
+              )}
               {levelData && (
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="secondary" className="bg-yellow-500 text-white border-none">
@@ -220,7 +355,70 @@ export default function HousekeeperProfile() {
                 </div>
               )}
             </div>
-            <Award className="h-16 w-16 opacity-20" />
+            <div className="flex gap-2">
+              {userProfile && (
+                <>
+                  <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-white hover:bg-white/20">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Modifier
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Modifier mon profil</DialogTitle>
+                        <DialogDescription>
+                          Mettez à jour vos informations personnelles
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="editName">Nom complet</Label>
+                          <Input
+                            id="editName"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Marie Dupont"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="editEmail">Email</Label>
+                          <Input
+                            id="editEmail"
+                            type="email"
+                            value={editEmail}
+                            onChange={(e) => setEditEmail(e.target.value)}
+                            placeholder="marie@example.com"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="editPhone">Téléphone (optionnel)</Label>
+                          <Input
+                            id="editPhone"
+                            type="tel"
+                            value={editPhone}
+                            onChange={(e) => setEditPhone(e.target.value)}
+                            placeholder="+33 6 12 34 56 78"
+                          />
+                        </div>
+                        <Button
+                          onClick={handleSaveProfile}
+                          disabled={isSaving}
+                          className="w-full"
+                        >
+                          {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button variant="ghost" size="sm" onClick={handleLogout} className="text-white hover:bg-white/20">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Déconnexion
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </Card>
       </div>
