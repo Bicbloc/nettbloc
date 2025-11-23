@@ -47,6 +47,11 @@ interface Assignment {
   };
 }
 
+interface HousekeeperRole {
+  id: string;
+  name: string;
+}
+
 interface Stats {
   totalRoomsCleaned: number;
   totalHotelsWorked: number;
@@ -67,6 +72,7 @@ export default function HousekeeperProfile() {
   const [editPhone, setEditPhone] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [housekeeperRole, setHousekeeperRole] = useState<HousekeeperRole | null>(null);
   const [stats, setStats] = useState<Stats>({
     totalRoomsCleaned: 0,
     totalHotelsWorked: 0,
@@ -85,80 +91,108 @@ export default function HousekeeperProfile() {
   }, []);
 
   const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.user) {
-      // Charger le profil depuis Supabase
-      const { data: profile } = await supabase
-        .from('housekeeper_profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Charger le profil depuis Supabase
+        const { data: profile } = await supabase
+          .from('housekeeper_profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
 
-      if (profile) {
-        setUserProfile(profile);
-        setEditName(profile.name);
-        setEditEmail(profile.email);
-        setEditPhone(profile.phone || '');
-        
-        if (hotelId) {
-          loadStats(session.user.id);
+        if (profile) {
+          setUserProfile(profile);
+          setEditName(profile.name);
+          setEditEmail(profile.email);
+          setEditPhone(profile.phone || '');
+          
+          if (hotelId) {
+            // Charger le rôle depuis housekeepers
+            const { data: housekeeperData } = await supabase
+              .from('housekeepers')
+              .select('role_id, staff_roles(id, name)')
+              .eq('hotel_id', hotelId)
+              .eq('user_id', session.user.id)
+              .single();
+            
+            if (housekeeperData?.staff_roles) {
+              setHousekeeperRole(housekeeperData.staff_roles as HousekeeperRole);
+            }
+            
+            loadStats(session.user.id);
+          }
         }
+      } else if (!housekeeperData || !hotelId) {
+        toast({
+          title: "Non connecté",
+          description: "Veuillez vous connecter pour voir votre profil",
+          variant: "destructive"
+        });
+        navigate('/housekeeper/auth');
+        return;
+      } else {
+        // Charger le rôle pour les sessions non authentifiées
+        const { data: housekeeperRoleData } = await supabase
+          .from('housekeepers')
+          .select('role_id, staff_roles(id, name)')
+          .eq('hotel_id', hotelId)
+          .eq('id', housekeeperData.id)
+          .single();
+        
+        if (housekeeperRoleData?.staff_roles) {
+          setHousekeeperRole(housekeeperRoleData.staff_roles as HousekeeperRole);
+        }
+        
+        loadStats(housekeeperData.id);
       }
-    } else if (!housekeeperData || !hotelId) {
-      toast({
-        title: "Non connecté",
-        description: "Veuillez vous connecter pour voir votre profil",
-        variant: "destructive"
-      });
-      navigate('/housekeeper/auth');
-      return;
-    } else {
-      loadStats(housekeeperData.id);
+    } catch (error) {
+      console.error('Erreur auth:', error);
+      setIsLoading(false);
     }
   };
 
   const loadStats = async (userId: string) => {
-    if (!hotelId) return;
+    if (!hotelId) {
+      setIsLoading(false);
+      return;
+    }
     
     try {
-      // Charger les données de gamification
-      const level = await GamificationService.getHousekeeperLevel(
-        userId,
-        hotelId
-      );
-      setLevelData(level);
+      // Charger en parallèle pour optimiser
+      const [level, badgesData, assignmentsResult] = await Promise.all([
+        GamificationService.getHousekeeperLevel(userId, hotelId),
+        GamificationService.getBadgesWithUnlockStatus(userId, hotelId),
+        supabase
+          .from('assignments')
+          .select(`
+            id,
+            completed_at,
+            started_at,
+            actual_duration,
+            rooms (
+              room_number,
+              room_type
+            )
+          `)
+          .eq('hotel_id', hotelId)
+          .eq('housekeeper_id', userId)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(10) // Réduit de 50 à 10 pour plus de rapidité
+      ]);
 
-      // Charger les badges avec leur statut
-      const badgesData = await GamificationService.getBadgesWithUnlockStatus(
-        userId,
-        hotelId
-      );
+      setLevelData(level);
       setBadges(badgesData);
 
-      // Charger toutes les assignations complétées
-      const { data: assignments, error } = await supabase
-        .from('assignments')
-        .select(`
-          id,
-          completed_at,
-          started_at,
-          actual_duration,
-          rooms (
-            room_number,
-            room_type
-          )
-        `)
-        .eq('hotel_id', hotelId)
-        .eq('housekeeper_id', userId)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: false })
-        .limit(50);
-
-      if (error) {
-        console.error('Erreur chargement stats:', error);
+      if (assignmentsResult.error) {
+        console.error('Erreur chargement stats:', assignmentsResult.error);
+        setIsLoading(false);
         return;
       }
+
+      const assignments = assignmentsResult.data;
 
       const completedAssignments = assignments || [];
       
@@ -187,9 +221,9 @@ export default function HousekeeperProfile() {
 
       setStats({
         totalRoomsCleaned: totalRooms,
-        totalHotelsWorked: 1, // Pour l'instant, on compte juste l'hôtel actuel
+        totalHotelsWorked: 1,
         averageTimePerRoom: avgTime,
-        recentAssignments: completedAssignments.slice(0, 10) as Assignment[],
+        recentAssignments: completedAssignments as Assignment[],
         performanceByDay
       });
 
@@ -327,7 +361,14 @@ export default function HousekeeperProfile() {
               {(userProfile?.name || housekeeperData?.name || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-1">{userProfile?.name || housekeeperData?.name}</h1>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-3xl font-bold">{userProfile?.name || housekeeperData?.name}</h1>
+                {housekeeperRole && (
+                  <Badge variant="secondary" className="bg-white/20 text-white border-none">
+                    {housekeeperRole.name}
+                  </Badge>
+                )}
+              </div>
               {userProfile?.email && (
                 <div className="flex items-center gap-2 text-blue-100 mb-1">
                   <Mail className="h-4 w-4" />
