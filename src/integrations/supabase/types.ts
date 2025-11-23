@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievement_badges: {
+        Row: {
+          category: string
+          code: string
+          created_at: string | null
+          criteria: Json
+          description: string
+          icon: string
+          id: string
+          name: string
+          points: number
+          rarity: string
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string | null
+          criteria: Json
+          description: string
+          icon: string
+          id?: string
+          name: string
+          points?: number
+          rarity?: string
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string | null
+          criteria?: Json
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          points?: number
+          rarity?: string
+        }
+        Relationships: []
+      }
       activities: {
         Row: {
           activity_type: string
@@ -641,6 +680,51 @@ export type Database = {
           },
         ]
       }
+      housekeeper_achievements: {
+        Row: {
+          badge_code: string
+          created_at: string | null
+          hotel_id: string
+          housekeeper_id: string
+          id: string
+          progress: Json | null
+          unlocked_at: string | null
+        }
+        Insert: {
+          badge_code: string
+          created_at?: string | null
+          hotel_id: string
+          housekeeper_id: string
+          id?: string
+          progress?: Json | null
+          unlocked_at?: string | null
+        }
+        Update: {
+          badge_code?: string
+          created_at?: string | null
+          hotel_id?: string
+          housekeeper_id?: string
+          id?: string
+          progress?: Json | null
+          unlocked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "housekeeper_achievements_badge_code_fkey"
+            columns: ["badge_code"]
+            isOneToOne: false
+            referencedRelation: "achievement_badges"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "housekeeper_achievements_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       housekeeper_hotel_history: {
         Row: {
           created_at: string
@@ -741,6 +825,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "housekeeper_invitations_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      housekeeper_levels: {
+        Row: {
+          best_streak: number
+          created_at: string | null
+          current_level: number
+          current_streak: number
+          hotel_id: string
+          housekeeper_id: string
+          id: string
+          last_activity_date: string | null
+          perfect_rooms_count: number
+          rooms_cleaned_count: number
+          speed_bonus_count: number
+          total_xp: number
+          updated_at: string | null
+        }
+        Insert: {
+          best_streak?: number
+          created_at?: string | null
+          current_level?: number
+          current_streak?: number
+          hotel_id: string
+          housekeeper_id: string
+          id?: string
+          last_activity_date?: string | null
+          perfect_rooms_count?: number
+          rooms_cleaned_count?: number
+          speed_bonus_count?: number
+          total_xp?: number
+          updated_at?: string | null
+        }
+        Update: {
+          best_streak?: number
+          created_at?: string | null
+          current_level?: number
+          current_streak?: number
+          hotel_id?: string
+          housekeeper_id?: string
+          id?: string
+          last_activity_date?: string | null
+          perfect_rooms_count?: number
+          rooms_cleaned_count?: number
+          speed_bonus_count?: number
+          total_xp?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "housekeeper_levels_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
@@ -1710,6 +1850,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_housekeeper_xp: {
+        Args: {
+          p_hotel_id: string
+          p_housekeeper_id: string
+          p_is_fast?: boolean
+          p_is_perfect?: boolean
+          p_room_cleaned?: boolean
+          p_xp_amount: number
+        }
+        Returns: Json
+      }
       analyze_error_trends: {
         Args: { p_days?: number; p_hotel_id: string }
         Returns: Json
@@ -1731,6 +1882,7 @@ export type Database = {
           success: boolean
         }[]
       }
+      calculate_level: { Args: { total_xp: number }; Returns: number }
       can_manage_hotel_data: {
         Args: { target_hotel_id: string }
         Returns: boolean

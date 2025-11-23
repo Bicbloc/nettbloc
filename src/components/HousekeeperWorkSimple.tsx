@@ -7,6 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User } from 'lucide-react';
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
+import { GamificationService } from '@/services/gamificationService';
+import { BadgeUnlockNotification } from './gamification/BadgeUnlockNotification';
+import { LevelUpNotification } from './gamification/LevelUpNotification';
+import { LevelProgressBar } from './gamification/LevelProgressBar';
 
 interface Room {
   id: string;
@@ -26,6 +30,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [levelData, setLevelData] = useState<any>(null);
+  const [newBadges, setNewBadges] = useState<any[]>([]);
+  const [levelUpData, setLevelUpData] = useState<number | null>(null);
 
   // Essayer d'abord les query params, puis le localStorage
   const accessCodeFromUrl = searchParams.get('access_code');
@@ -73,6 +80,13 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
       setHotel(authResult.hotel);
       setHousekeeper(authResult.user);
+
+      // Charger les données de niveau
+      const level = await GamificationService.getHousekeeperLevel(
+        authResult.user?.id || authResult.user?.access_code,
+        hotelId!
+      );
+      setLevelData(level);
 
       // Charger les assignations de cette femme de chambre
       const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -131,6 +145,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
   };
 
   const updateRoomStatus = async (roomId: string, newStatus: string) => {
+    const startTime = Date.now();
+    
     try {
       // Mettre à jour le statut de la chambre
       const { error: roomError } = await supabase
@@ -150,20 +166,76 @@ export const HousekeeperWorkSimple: React.FC = () => {
         return;
       }
 
-      // Mettre à jour l'assignation si elle existe
+      // Calculer la durée si la chambre est terminée
+      let duration = 0;
       const assignment = assignments.find(a => a.rooms?.id === roomId);
+      
+      if (assignment && newStatus === 'clean') {
+        const startedAt = new Date(assignment.started_at || assignment.assigned_at).getTime();
+        duration = Math.round((Date.now() - startedAt) / 60000); // en minutes
+      }
+
+      // Mettre à jour l'assignation si elle existe
       if (assignment) {
+        const updateData: any = {
+          status: newStatus === 'clean' ? 'completed' : 'in_progress',
+        };
+        
+        if (newStatus === 'in_progress') {
+          updateData.started_at = new Date().toISOString();
+        } else if (newStatus === 'clean') {
+          updateData.completed_at = new Date().toISOString();
+          updateData.actual_duration = duration;
+        }
+
         const { error: assignmentError } = await supabase
           .from('assignments')
-          .update({ 
-            status: newStatus === 'clean' ? 'completed' : 'in_progress',
-            started_at: newStatus === 'in_progress' ? new Date().toISOString() : assignment.started_at,
-            completed_at: newStatus === 'clean' ? new Date().toISOString() : null
-          })
+          .update(updateData)
           .eq('id', assignment.id);
 
         if (assignmentError) {
           console.error('Erreur mise à jour assignation:', assignmentError);
+        }
+      }
+
+      // Si la chambre est terminée, ajouter de l'XP
+      if (newStatus === 'clean' && housekeeper && hotelId) {
+        const gamificationResult = await GamificationService.addXpForRoomCleaned(
+          housekeeper.id || housekeeper.access_code,
+          hotelId,
+          duration
+        );
+
+        if (gamificationResult) {
+          // Recharger les données de niveau
+          const updatedLevel = await GamificationService.getHousekeeperLevel(
+            housekeeper.id || housekeeper.access_code,
+            hotelId
+          );
+          setLevelData(updatedLevel);
+
+          // Afficher les notifications de nouveaux badges
+          if (gamificationResult.new_badges && gamificationResult.new_badges.length > 0) {
+            for (const badgeCode of gamificationResult.new_badges) {
+              const badgeData = await GamificationService.getBadgeByCode(badgeCode);
+              if (badgeData) {
+                setNewBadges(prev => [...prev, badgeData]);
+              }
+            }
+          }
+
+          // Afficher la notification de level up
+          if (gamificationResult.level_up) {
+            setLevelUpData(gamificationResult.current_level);
+          }
+
+          // Toast avec XP gagné
+          toast({
+            title: "🎉 Chambre terminée !",
+            description: `+${duration <= 20 ? 80 : duration <= 30 ? 65 : 50} XP${
+              duration <= 20 ? ' (Bonus vitesse !)' : ''
+            }`,
+          });
         }
       }
 
@@ -191,13 +263,13 @@ export const HousekeeperWorkSimple: React.FC = () => {
           }
         });
 
-      const statusText = newStatus === 'clean' ? 'terminée' : 
-                        newStatus === 'in_progress' ? 'en cours' : 'à nettoyer';
-      
-      toast({
-        title: "Statut mis à jour",
-        description: `Chambre ${rooms.find(r => r.id === roomId)?.room_number} : ${statusText}`
-      });
+      if (newStatus !== 'clean') {
+        const statusText = newStatus === 'in_progress' ? 'en cours' : 'à nettoyer';
+        toast({
+          title: "Statut mis à jour",
+          description: `Chambre ${rooms.find(r => r.id === roomId)?.room_number} : ${statusText}`
+        });
+      }
 
     } catch (error) {
       console.error('Erreur mise à jour statut:', error);
@@ -233,6 +305,22 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      {/* Notifications de badges et level up */}
+      {newBadges.map((badge, index) => (
+        <BadgeUnlockNotification
+          key={badge.code + index}
+          badge={badge}
+          onClose={() => setNewBadges(prev => prev.filter((_, i) => i !== index))}
+        />
+      ))}
+      
+      {levelUpData && (
+        <LevelUpNotification
+          newLevel={levelUpData}
+          onClose={() => setLevelUpData(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -262,6 +350,17 @@ export const HousekeeperWorkSimple: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* Barre de progression du niveau */}
+        {levelData && (
+          <div className="mb-4">
+            <LevelProgressBar
+              currentLevel={levelData.current_level}
+              totalXp={levelData.total_xp}
+              currentStreak={levelData.current_streak}
+            />
+          </div>
+        )}
 
         {/* Session Info */}
         <Card className="p-4 bg-blue-50 border-blue-200">
