@@ -88,7 +88,7 @@ export default function HousekeeperSignup() {
 
       toast({
         title: "Inscription réussie ! 🎉",
-        description: "Vérifiez votre email pour confirmer votre compte, puis connectez-vous"
+        description: "Connectez-vous avec votre email et ajoutez le code de votre hôtel"
       });
 
       navigate('/housekeeper/auth');

@@ -52,9 +52,9 @@ export default function HousekeeperHotels() {
 
       setProfile(profileData);
 
-      // Charger les hôtels enregistrés via l'historique
-      const { data: historyData } = await supabase
-        .from('housekeeper_hotel_history')
+      // Charger les hôtels enregistrés (uniquement ceux approuvés)
+      const { data: approvedHotels } = await supabase
+        .from('housekeeper_access_requests')
         .select(`
           hotel_id,
           hotels (
@@ -64,12 +64,13 @@ export default function HousekeeperHotels() {
           )
         `)
         .eq('housekeeper_profile_id', profileData.id)
-        .order('started_at', { ascending: false });
+        .eq('status', 'approved')
+        .order('requested_at', { ascending: false });
 
-      if (historyData) {
+      if (approvedHotels) {
         const uniqueHotels = Array.from(
-          new Map(historyData.map(item => [item.hotel_id, item.hotels])).values()
-        );
+          new Map(approvedHotels.map(item => [item.hotel_id, item.hotels])).values()
+        ).filter(h => h !== null);
         setHotels(uniqueHotels);
       }
 
@@ -104,28 +105,44 @@ export default function HousekeeperHotels() {
         throw new Error("Code d'hôtel invalide");
       }
 
-      // Créer ou mettre à jour l'historique
-      const { error: historyError } = await supabase
-        .from('housekeeper_hotel_history')
-        .upsert({
+      // Vérifier si une demande existe déjà
+      const { data: existingRequest } = await supabase
+        .from('housekeeper_access_requests')
+        .select('id, status')
+        .eq('housekeeper_profile_id', profile.id)
+        .eq('hotel_id', hotelData.id)
+        .maybeSingle();
+
+      if (existingRequest) {
+        if (existingRequest.status === 'pending') {
+          throw new Error("Une demande d'accès est déjà en attente pour cet hôtel");
+        }
+        if (existingRequest.status === 'approved') {
+          throw new Error("Vous êtes déjà approuvé pour cet hôtel");
+        }
+      }
+
+      // Créer une demande d'accès
+      const { error: requestError } = await supabase
+        .from('housekeeper_access_requests')
+        .insert({
           housekeeper_profile_id: profile.id,
           hotel_id: hotelData.id,
-          started_at: new Date().toISOString(),
-          rooms_cleaned: 0
-        }, {
-          onConflict: 'housekeeper_profile_id,hotel_id'
+          hotel_code: hotelCode.trim().toUpperCase(),
+          status: 'pending',
+          requested_at: new Date().toISOString()
         });
 
-      if (historyError) throw historyError;
+      if (requestError) throw requestError;
 
       toast({
-        title: "Hôtel ajouté ! ✅",
-        description: `${hotelData.name} a été ajouté à votre liste`
+        title: "Demande envoyée ! 📤",
+        description: `Votre demande pour ${hotelData.name} est en attente d'approbation`
       });
 
       setHotelCode('');
       setShowAddDialog(false);
-      checkUser(); // Rafraîchir les données
+      checkUser(); // Rafraîchir
 
     } catch (error: any) {
       console.error('Erreur ajout hôtel:', error);
@@ -277,7 +294,7 @@ export default function HousekeeperHotels() {
           <DialogHeader>
             <DialogTitle>Ajouter un hôtel</DialogTitle>
             <DialogDescription>
-              Entrez le code fourni par l'hôtel pour vous connecter
+              Demandez l'accès avec le code fourni par votre responsable
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -299,12 +316,12 @@ export default function HousekeeperHotels() {
               {isAddingHotel ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Ajout en cours...
+                  Envoi de la demande...
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  Ajouter l'hôtel
+                  Envoyer la demande
                 </>
               )}
             </Button>
