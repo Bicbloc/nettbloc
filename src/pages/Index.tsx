@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1526,9 +1526,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 <UserIcon className="h-4 w-4" />
                 Affectation
               </TabsTrigger>
-              <TabsTrigger value="access-codes" className="flex items-center gap-2">
+              <TabsTrigger value="access-codes" className="flex items-center gap-2 relative">
                 <Key className="h-4 w-4" />
                 Codes d'accès
+                <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
+                  !
+                </Badge>
               </TabsTrigger>
               <TabsTrigger value="incidents" className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
@@ -2101,15 +2104,50 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           <TabsContent value="access-codes" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Codes d'accès des femmes de chambre</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5" />
+                  Gestion des codes d'accès
+                </CardTitle>
                 <CardDescription>
-                  Chaque femme de chambre dispose d'un code d'accès unique pour se connecter
+                  Codes d'accès des femmes de chambre et demandes en attente
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  Gérez les codes d'accès depuis l'onglet "Personnel"
-                </p>
+                <Tabs defaultValue="requests" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="requests" className="relative">
+                      Demandes d'accès
+                      <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
+                        !
+                      </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="codes">
+                      Codes existants
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="requests" className="space-y-4">
+                    <Alert className="bg-blue-50 border-blue-200">
+                      <Bell className="h-4 w-4 text-blue-600" />
+                      <AlertDescription className="text-blue-800">
+                        <strong>📋 Comment ça marche ?</strong> Les femmes de chambre s'inscrivent et soumettent une demande avec votre code d'hôtel. 
+                        Vous recevez une notification ici et pouvez <strong>valider</strong> ou <strong>suspendre</strong> leur accès.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <HousekeeperAccessRequests />
+                  </TabsContent>
+                  
+                  <TabsContent value="codes" className="space-y-4">
+                    <p className="text-muted-foreground">
+                      Codes d'accès des femmes de chambre déjà validées. 
+                      Gérez le personnel complet depuis l'onglet "Vue d'ensemble".
+                    </p>
+                    <div className="mt-4">
+                      <HousekeeperManagement />
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>
