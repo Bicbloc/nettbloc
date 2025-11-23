@@ -18,6 +18,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { HousekeeperAuthProvider } from "./contexts/HousekeeperAuthContext";
 import HousekeeperLogin from "./pages/HousekeeperLogin";
 import GuestMode from "./pages/GuestMode";
+import HousekeeperProfile from "./pages/HousekeeperProfile";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
 
 // Components supprimés - plus de header space
@@ -46,6 +47,7 @@ const App = () => (
                   <Route path="/room-registry" element={<RoomRegistry />} />
                   <Route path="/housekeeper/login" element={<HousekeeperLogin />} />
                   <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
+                  <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
