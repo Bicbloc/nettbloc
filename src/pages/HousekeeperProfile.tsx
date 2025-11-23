@@ -14,8 +14,12 @@ import {
   TrendingUp,
   Award,
   CheckCircle2,
-  Building2
+  Building2,
+  Zap
 } from 'lucide-react';
+import { GamificationService } from '@/services/gamificationService';
+import { BadgeDisplay } from '@/components/gamification/BadgeDisplay';
+import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
 
 interface Assignment {
   id: string;
@@ -40,6 +44,8 @@ export default function HousekeeperProfile() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const [levelData, setLevelData] = useState<any>(null);
+  const [badges, setBadges] = useState<any[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalRoomsCleaned: 0,
     totalHotelsWorked: 0,
@@ -68,6 +74,20 @@ export default function HousekeeperProfile() {
 
   const loadStats = async () => {
     try {
+      // Charger les données de gamification
+      const level = await GamificationService.getHousekeeperLevel(
+        housekeeperData.id,
+        hotelId!
+      );
+      setLevelData(level);
+
+      // Charger les badges avec leur statut
+      const badgesData = await GamificationService.getBadgesWithUnlockStatus(
+        housekeeperData.id,
+        hotelId!
+      );
+      setBadges(badgesData);
+
       // Charger toutes les assignations complétées
       const { data: assignments, error } = await supabase
         .from('assignments')
@@ -188,11 +208,33 @@ export default function HousekeeperProfile() {
             <div className="flex-1">
               <h1 className="text-3xl font-bold mb-1">{housekeeperData.name}</h1>
               <p className="text-blue-100">Code: {housekeeperData.accessCode}</p>
+              {levelData && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary" className="bg-yellow-500 text-white border-none">
+                    <Zap className="h-3 w-3 mr-1" />
+                    Niveau {levelData.current_level}
+                  </Badge>
+                  <span className="text-sm text-blue-100">
+                    {levelData.total_xp} XP
+                  </span>
+                </div>
+              )}
             </div>
             <Award className="h-16 w-16 opacity-20" />
           </div>
         </Card>
       </div>
+
+      {/* Barre de progression du niveau */}
+      {levelData && (
+        <div className="mb-6">
+          <LevelProgressBar
+            currentLevel={levelData.current_level}
+            totalXp={levelData.total_xp}
+            currentStreak={levelData.current_streak}
+          />
+        </div>
+      )}
 
       {/* Statistiques principales */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -270,6 +312,13 @@ export default function HousekeeperProfile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Badges */}
+      {badges.length > 0 && (
+        <div className="mb-6">
+          <BadgeDisplay badges={badges} title="Collection de Badges" />
+        </div>
+      )}
 
       {/* Historique récent */}
       <Card>
