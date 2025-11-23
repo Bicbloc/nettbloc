@@ -33,11 +33,48 @@ export const HousekeeperAccessRequests = () => {
     if (!user) return;
 
     try {
-      // Temporairement désactivé en attendant la régénération des types
-      const data: any[] = [];
-      const error = null;
+      // Charger les demandes d'accès pour les hôtels de l'utilisateur
+      const { data: userHotels, error: hotelsError } = await supabase
+        .from('hotels')
+        .select('id')
+        .eq('user_id', user.id);
 
-      setRequests(data || []);
+      if (hotelsError) throw hotelsError;
+
+      const hotelIds = userHotels?.map(h => h.id) || [];
+
+      if (hotelIds.length === 0) {
+        setRequests([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('housekeeper_access_requests')
+        .select(`
+          id,
+          housekeeper_profile_id,
+          hotel_id,
+          hotel_code,
+          status,
+          requested_at,
+          housekeeper_profiles!inner(
+            name,
+            email,
+            phone
+          ),
+          hotels!inner(
+            name
+          )
+        `)
+        .in('hotel_id', hotelIds)
+        .order('requested_at', { ascending: false });
+
+      if (error) throw error;
+
+      setRequests((data as any[])?.map(req => ({
+        ...req,
+        status: req.status as 'pending' | 'approved' | 'rejected'
+      })) || []);
     } catch (error) {
       console.error('Error loading requests:', error);
       toast.error('Erreur lors du chargement des demandes');
@@ -48,6 +85,11 @@ export const HousekeeperAccessRequests = () => {
 
   const handleApproveRequest = async (requestId: string) => {
     try {
+      // Récupérer les détails de la demande
+      const request = requests.find(r => r.id === requestId);
+      if (!request) return;
+
+      // Appeler le RPC pour approuver la demande
       const { data, error } = await supabase.rpc('approve_housekeeper_access_request', {
         request_id: requestId,
         admin_user_id: user?.id
@@ -59,7 +101,17 @@ export const HousekeeperAccessRequests = () => {
         return;
       }
 
-      toast.success('Demande approuvée avec succès !');
+      // Créer une entrée dans housekeeper_hotel_history
+      await supabase
+        .from('housekeeper_hotel_history')
+        .insert({
+          housekeeper_profile_id: request.housekeeper_profile_id,
+          hotel_id: request.hotel_id,
+          started_at: new Date().toISOString(),
+          rooms_cleaned: 0
+        });
+
+      toast.success('Demande approuvée ! La femme de chambre peut maintenant accéder à l\'hôtel.');
       loadRequests();
     } catch (error) {
       console.error('Error approving request:', error);
@@ -69,8 +121,16 @@ export const HousekeeperAccessRequests = () => {
 
   const handleRejectRequest = async (requestId: string) => {
     try {
-      // Temporairement désactivé en attendant la régénération des types
-      const error = null;
+      const { error } = await supabase
+        .from('housekeeper_access_requests')
+        .update({ 
+          status: 'rejected',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id 
+        })
+        .eq('id', requestId);
+
+      if (error) throw error;
 
       toast.success('Demande rejetée');
       loadRequests();
