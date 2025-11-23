@@ -17,6 +17,9 @@ import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { HousekeeperAuthProvider } from "./contexts/HousekeeperAuthContext";
 import HousekeeperLogin from "./pages/HousekeeperLogin";
+import HousekeeperAuth from "./pages/HousekeeperAuth";
+import HousekeeperSignup from "./pages/HousekeeperSignup";
+import HousekeeperHotels from "./pages/HousekeeperHotels";
 import GuestMode from "./pages/GuestMode";
 import HousekeeperProfile from "./pages/HousekeeperProfile";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
@@ -46,6 +49,9 @@ const App = () => (
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/room-registry" element={<RoomRegistry />} />
                   <Route path="/housekeeper/login" element={<HousekeeperLogin />} />
+                  <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
+                  <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
+                  <Route path="/housekeeper/hotels" element={<HousekeeperHotels />} />
                   <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
                   <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
