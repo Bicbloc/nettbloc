@@ -30,6 +30,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    let sessionChecked = false;
     
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -38,22 +39,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         console.log('🔐 Auth state changed:', { event, session_exists: !!session, user_id: session?.user?.id });
         
-        // Use setTimeout to prevent blocking the auth callback
-        setTimeout(async () => {
-          if (isMounted) {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-          }
-        }, 0);
+        // Clear timeout since auth state changed
+        if (timeoutId) clearTimeout(timeoutId);
+        sessionChecked = true;
+        
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
       }
     );
 
-    // Get initial session with timeout
+    // Get initial session with immediate response
     const initializeSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('❌ Session error:', error);
+          if (isMounted) {
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+        
         console.log('🚀 Initial session:', { session_exists: !!session, user_id: session?.user?.id });
+        sessionChecked = true;
         
         if (isMounted) {
           setSession(session);
@@ -61,8 +75,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setLoading(false);
         }
       } catch (error) {
-        console.error('Failed to get session:', error);
+        console.error('❌ Failed to get session:', error);
         if (isMounted) {
+          setSession(null);
+          setUser(null);
           setLoading(false);
         }
       }
@@ -70,13 +86,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initializeSession();
 
-    // Set timeout fallback
+    // Reduced timeout with check
     timeoutId = setTimeout(() => {
-      if (isMounted && loading) {
-        console.log('⏰ Auth timeout reached, setting loading to false');
+      if (isMounted && !sessionChecked) {
+        console.log('⏰ Auth timeout - no session response, continuing as unauthenticated');
+        setSession(null);
+        setUser(null);
         setLoading(false);
       }
-    }, 5000);
+    }, 2000); // Reduced from 5000 to 2000ms
 
     return () => {
       setIsMounted(false);
