@@ -12,6 +12,8 @@ import BackButton from '@/components/BackButton';
 export default function HousekeeperSignup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -19,7 +21,7 @@ export default function HousekeeperSignup() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim() || !email.trim()) {
+    if (!name.trim() || !email.trim() || !password) {
       toast({
         variant: "destructive",
         title: "Champs requis",
@@ -28,12 +30,31 @@ export default function HousekeeperSignup() {
       return;
     }
 
+    if (password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Mot de passe trop court",
+        description: "Le mot de passe doit contenir au moins 6 caractères"
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Mots de passe différents",
+        description: "Les mots de passe ne correspondent pas"
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Envoyer un lien magique par email
-      const { error: authError } = await supabase.auth.signInWithOtp({
+      // Créer le compte Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
+        password,
         options: {
           emailRedirectTo: `${window.location.origin}/housekeeper/hotels`,
           data: {
@@ -45,9 +66,29 @@ export default function HousekeeperSignup() {
 
       if (authError) throw authError;
 
+      if (!authData.user) {
+        throw new Error("Erreur lors de la création du compte");
+      }
+
+      // Créer le profil femme de chambre
+      const { error: profileError } = await supabase
+        .from('housekeeper_profiles')
+        .insert({
+          id: authData.user.id,
+          name: name,
+          email: email,
+          is_active: true,
+          total_rooms_cleaned: 0,
+          total_hotels_worked: 0
+        });
+
+      if (profileError) {
+        console.error('Erreur création profil:', profileError);
+      }
+
       toast({
-        title: "Email envoyé ! 📧",
-        description: "Vérifiez votre boîte mail pour vous connecter"
+        title: "Inscription réussie ! 🎉",
+        description: "Vérifiez votre email pour confirmer votre compte, puis connectez-vous"
       });
 
       navigate('/housekeeper/auth');
@@ -79,7 +120,7 @@ export default function HousekeeperSignup() {
           </div>
           <CardTitle className="text-2xl font-bold text-gray-800">Créer un compte</CardTitle>
           <CardDescription>
-            Recevez un lien de connexion par email (sans mot de passe)
+            Inscrivez-vous pour gérer vos services dans plusieurs hôtels
           </CardDescription>
         </CardHeader>
 
@@ -104,7 +145,7 @@ export default function HousekeeperSignup() {
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2 font-medium">
                 <Mail className="h-4 w-4" />
-                Email professionnel
+                Email
               </Label>
               <Input
                 id="email"
@@ -115,9 +156,39 @@ export default function HousekeeperSignup() {
                 className="h-11"
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Vous recevrez un lien de connexion à chaque fois
-              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="flex items-center gap-2 font-medium">
+                <Lock className="h-4 w-4" />
+                Mot de passe
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11"
+                required
+              />
+              <p className="text-xs text-muted-foreground">Minimum 6 caractères</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="flex items-center gap-2 font-medium">
+                <Lock className="h-4 w-4" />
+                Confirmer le mot de passe
+              </Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="h-11"
+                required
+              />
             </div>
 
             <Button
