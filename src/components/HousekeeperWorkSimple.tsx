@@ -141,6 +141,22 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
     if (!error && roomsData) {
       setRooms(roomsData);
+      
+      // Si aucune chambre trouvée, afficher un message informatif
+      if (roomsData.length === 0) {
+        toast({
+          title: "Aucune chambre à nettoyer",
+          description: "Toutes les chambres sont propres ou aucune chambre n'est configurée pour cet établissement.",
+          variant: "default"
+        });
+      }
+    } else if (error) {
+      console.error('Erreur chargement chambres:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les chambres",
+        variant: "destructive"
+      });
     }
   };
 
@@ -414,12 +430,17 @@ export const HousekeeperWorkSimple: React.FC = () => {
         <CardContent>
           {rooms.length === 0 ? (
             <div className="text-center py-8">
-              <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                Aucune chambre assignée
+              <Home className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                Aucune chambre à nettoyer
               </h3>
-              <p className="text-gray-500">
-                En attente d'assignation par l'administrateur
+              <p className="text-gray-500 mb-4">
+                {isLoading 
+                  ? "Chargement des chambres..." 
+                  : "Toutes les chambres sont propres ou aucune chambre n'est configurée pour cet établissement."}
+              </p>
+              <p className="text-sm text-gray-400">
+                L'administrateur doit créer des chambres ou vous assigner des chambres à nettoyer.
               </p>
             </div>
           ) : (
