@@ -269,4 +269,53 @@ export class SessionPersistenceService {
       return [];
     }
   }
+
+  // Restaurer une session depuis un rapport archivé
+  static async restoreFromArchive(reportId: string): Promise<boolean> {
+    try {
+      console.log('🔄 Restoring report from archive:', reportId);
+
+      // Récupérer le rapport archivé
+      const { data: report, error } = await supabase
+        .from('daily_reports')
+        .select('*')
+        .eq('id', reportId)
+        .single();
+
+      if (error || !report) {
+        console.error('❌ Failed to fetch archived report:', error);
+        return false;
+      }
+
+      // Désactiver la session actuelle si elle existe
+      const currentToken = HotelSessionService.getSessionToken();
+      if (currentToken) {
+        await HotelSessionService.deactivateSession(currentToken);
+      }
+
+      // Créer une nouvelle session avec les données du rapport
+      const newToken = await HotelSessionService.createSession(report.hotel_id);
+      if (!newToken) {
+        console.error('❌ Failed to create new session');
+        return false;
+      }
+
+      // Sauvegarder les données restaurées dans la session locale
+      this.saveSessionData({
+        sessionToken: newToken,
+        hotelId: report.hotel_id,
+        lastActiveDate: new Date().toISOString(),
+        room_data: report.room_data || [],
+        housekeeper_assignments: report.summary?.housekeeper_assignments || {},
+        uploaded_reports: report.summary?.uploaded_reports || [],
+        incidents: report.summary?.incidents || []
+      });
+
+      console.log('✅ Report restored successfully from archive');
+      return true;
+    } catch (error) {
+      console.error('❌ Error restoring from archive:', error);
+      return false;
+    }
+  }
 }
