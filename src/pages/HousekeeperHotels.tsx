@@ -33,12 +33,12 @@ export default function HousekeeperHotels() {
         return;
       }
 
-      // Charger le profil
+      // Charger le profil par email
       const { data: profileData, error: profileError } = await supabase
         .from('housekeeper_profiles')
         .select('*')
-        .eq('id', session.user.id)
-        .single();
+        .eq('email', session.user.email)
+        .maybeSingle();
 
       if (profileError || !profileData) {
         toast({
