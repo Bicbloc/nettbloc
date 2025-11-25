@@ -120,6 +120,9 @@ const Index = () => {
   // Auto-setup automatique de l'hôtel et génération des codes
   const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
   
+  // Utiliser l'hotel du hook useAutoSetup comme source unique de vérité
+  const currentHotelId = hotel?.id || null;
+  
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
@@ -136,8 +139,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     toKnowItems: [] 
   });
   const [showInviteDialog, setShowInviteDialog] = useState(false);
-
-  // États pour la gestion des hôtels
+  
+  // États pour la gestion des hôtels (conservés pour compatibilité)
   const [availableHotels, setAvailableHotels] = useState<any[]>([]);
   const [selectedHotel, setSelectedHotel] = useState<any | null>(null);
   const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
@@ -164,18 +167,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   
-  // État pour l'ID hôtel réel depuis la base de données
-  const [realHotelId, setRealHotelId] = useState<string | null>(null);
   const [existingHousekeepers, setExistingHousekeepers] = useState<string[]>([]);
   
-  // ID d'hôtel - utilise l'ID réel de la base ou le localStorage
-  const currentHotelId = realHotelId || selectedHotel?.id || localStorage.getItem("selectedHotelId");
-  
-  console.log("🏨 Hotel ID pour notifications:", {
-    hotelCode,
-    realHotelId,
-    currentHotelId,
-    selectedHotelId: selectedHotel?.id
+  console.log("🏨 Hotel ID synchronisé:", {
+    hotelId: currentHotelId,
+    hotelName: hotel?.name,
+    setupComplete: isSetupComplete
   });
   
   const { addNotification } = useNotifications(currentHotelId);
@@ -269,40 +266,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
 
-  // Charger les valeurs depuis localStorage et récupérer l'ID réel de l'hôtel
+  // Synchroniser hotel code quand l'hotel est chargé
   useEffect(() => {
-    const loadHotelData = async () => {
-      const savedHotelCode = localStorage.getItem('selectedHotelCode');
-      const savedUserEmail = localStorage.getItem('userEmail');
-      
-      if (savedHotelCode && savedUserEmail) {
-        setHotelCode(savedHotelCode);
-        setUserEmail(savedUserEmail);
-        
-        console.log('🔍 Récupération de l\'hôtel par code:', savedHotelCode);
-        
-        // Récupérer l'ID réel de l'hôtel depuis la base de données
-        const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
-        
-        if (hotel) {
-          console.log('✅ Hôtel trouvé dans la base:', hotel);
-          setRealHotelId(hotel.id);
-          localStorage.setItem('selectedHotelId', hotel.id);
-          
-          // Vérifier l'association email/code hôtel
-          const storedCode = getHotelCodeForEmail(savedUserEmail);
-          
-          // Code authentifié pour le mode invité
-          console.log('✅ Code hôtel vérifié pour le mode invité');
-        } else {
-          console.warn('❌ Aucun hôtel trouvé pour le code:', savedHotelCode);
-          // Suppression du popup intrusif; l'auto-setup et la configuration guidée gèreront le cas automatiquement.
-        }
-      }
-    };
-    
-    loadHotelData();
-  }, []);
+    if (hotel?.hotel_code) {
+      setHotelCode(hotel.hotel_code);
+      console.log('✅ Hotel code synchronisé:', hotel.hotel_code);
+    }
+  }, [hotel?.hotel_code]);
   
   // Calculer le nombre recommandé de femmes de chambre
   useEffect(() => {
