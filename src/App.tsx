@@ -22,6 +22,8 @@ import HousekeeperSignup from "./pages/HousekeeperSignup";
 import HousekeeperHotels from "./pages/HousekeeperHotels";
 import GuestMode from "./pages/GuestMode";
 import HousekeeperProfile from "./pages/HousekeeperProfile";
+import TechnicianLogin from "./pages/TechnicianLogin";
+import TechnicianDashboard from "./pages/TechnicianDashboard";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
 
 // Components supprimés - plus de header space
@@ -54,6 +56,8 @@ const App = () => (
                   <Route path="/housekeeper/hotels" element={<HousekeeperHotels />} />
                   <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
                   <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
+                  <Route path="/technician/login" element={<TechnicianLogin />} />
+                  <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

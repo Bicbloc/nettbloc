@@ -11,6 +11,9 @@ import { GamificationService } from '@/services/gamificationService';
 import { BadgeUnlockNotification } from './gamification/BadgeUnlockNotification';
 import { LevelUpNotification } from './gamification/LevelUpNotification';
 import { LevelProgressBar } from './gamification/LevelProgressBar';
+import { IncidentReportDialogSimple } from './incident/IncidentReportDialogSimple';
+import { Textarea } from './ui/textarea';
+import { AlertTriangle, MessageSquare } from 'lucide-react';
 
 interface Room {
   id: string;
@@ -33,6 +36,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [levelData, setLevelData] = useState<any>(null);
   const [newBadges, setNewBadges] = useState<any[]>([]);
   const [levelUpData, setLevelUpData] = useState<number | null>(null);
+  const [roomNotes, setRoomNotes] = useState<Record<string, string>>({});
 
   // Essayer d'abord les query params, puis le localStorage
   const accessCodeFromUrl = searchParams.get('access_code');
@@ -225,12 +229,19 @@ export const HousekeeperWorkSimple: React.FC = () => {
     
     try {
       // Mettre à jour le statut de la chambre
+      const updateData: any = { 
+        status: newStatus,
+        last_cleaned_at: newStatus === 'clean' ? new Date().toISOString() : null
+      };
+      
+      // Ajouter les notes si disponibles
+      if (roomNotes[roomId]) {
+        updateData.notes = roomNotes[roomId];
+      }
+      
       const { error: roomError } = await supabase
         .from('rooms')
-        .update({ 
-          status: newStatus,
-          last_cleaned_at: newStatus === 'clean' ? new Date().toISOString() : null
-        })
+        .update(updateData)
         .eq('id', roomId);
 
       if (roomError) {
@@ -566,15 +577,37 @@ export const HousekeeperWorkSimple: React.FC = () => {
                           📝 {room.notes}
                         </p>
                       )}
+                      
+                      {/* Champ de commentaires */}
+                      {room.status !== 'clean' && (
+                        <div className="mt-2 space-y-2">
+                          <Textarea
+                            placeholder="Ajouter un commentaire (optionnel)..."
+                            value={roomNotes[room.id] || ''}
+                            onChange={(e) => setRoomNotes({ ...roomNotes, [room.id]: e.target.value })}
+                            rows={2}
+                            className="text-xs sm:text-sm resize-none"
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                      {/* Bouton signaler incident */}
+                      {room.status !== 'clean' && (
+                        <IncidentReportDialogSimple 
+                          hotelId={hotelId!} 
+                          userType="housekeeper"
+                          defaultLocation={room.room_number}
+                        />
+                      )}
+                      
                       {room.status === 'dirty' && (
                         <Button 
                           onClick={() => updateRoomStatus(room.id, 'in_progress')}
                           variant="outline"
                           size="sm"
-                          className="flex-1 sm:flex-initial"
+                          className="w-full sm:w-auto"
                         >
                           Commencer
                         </Button>
@@ -582,7 +615,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
                       {room.status === 'in_progress' && (
                         <Button 
                           onClick={() => updateRoomStatus(room.id, 'clean')}
-                          className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-initial"
+                          className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
                           size="sm"
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
@@ -590,7 +623,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
                         </Button>
                       )}
                       {room.status === 'clean' && (
-                        <div className="flex items-center text-green-600">
+                        <div className="flex items-center text-green-600 w-full sm:w-auto justify-center">
                           <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                           <span className="text-sm sm:text-base">Terminée</span>
                         </div>

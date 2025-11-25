@@ -46,11 +46,13 @@ const incidentSchema = z.object({
 interface IncidentReportDialogSimpleProps {
   hotelId: string;
   userType: "admin" | "housekeeper";
+  defaultLocation?: string;
 }
 
 export function IncidentReportDialogSimple({
   hotelId,
   userType,
+  defaultLocation,
 }: IncidentReportDialogSimpleProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,7 +64,9 @@ export function IncidentReportDialogSimple({
 
   const form = useForm<z.infer<typeof incidentSchema>>({
     resolver: zodResolver(incidentSchema),
-    defaultValues: {},
+    defaultValues: {
+      location_reference: defaultLocation || '',
+    },
   });
 
   // Fetch registered rooms
@@ -235,9 +239,9 @@ export function IncidentReportDialogSimple({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
           <AlertTriangle className="h-4 w-4" />
-          Signaler un incident
+          <span className="text-xs sm:text-sm">Incident</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
