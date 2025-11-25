@@ -23,7 +23,9 @@ import HousekeeperHotels from "./pages/HousekeeperHotels";
 import GuestMode from "./pages/GuestMode";
 import HousekeeperProfile from "./pages/HousekeeperProfile";
 import TechnicianLogin from "./pages/TechnicianLogin";
+import TechnicianSignup from "./pages/TechnicianSignup";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
+import { TechnicianAuthProvider } from "./contexts/TechnicianAuthContext";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
 
 // Components supprimés - plus de header space
@@ -33,39 +35,42 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <HousekeeperAuthProvider>
-        <HousekeepingProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <div className="flex flex-col min-h-screen">
-            <div className="flex-grow">
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/guest" element={<GuestMode />} />
-                  <Route path="/plan-selection" element={<PlanSelection />} />
-                  <Route path="/success" element={<Success />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/room-registry" element={<RoomRegistry />} />
-                  <Route path="/housekeeper/login" element={<HousekeeperLogin />} />
-                  <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
-                  <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
-                  <Route path="/housekeeper/hotels" element={<HousekeeperHotels />} />
-                  <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
-                  <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
-                  <Route path="/technician/login" element={<TechnicianLogin />} />
-                  <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </BrowserRouter>
+        <TechnicianAuthProvider>
+          <HousekeepingProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <div className="flex flex-col min-h-screen">
+              <div className="flex-grow">
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/guest" element={<GuestMode />} />
+                    <Route path="/plan-selection" element={<PlanSelection />} />
+                    <Route path="/success" element={<Success />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/admin" element={<Admin />} />
+                    <Route path="/room-registry" element={<RoomRegistry />} />
+                    <Route path="/housekeeper/login" element={<HousekeeperLogin />} />
+                    <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
+                    <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
+                    <Route path="/housekeeper/hotels" element={<HousekeeperHotels />} />
+                    <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
+                    <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
+                    <Route path="/technician/signup" element={<TechnicianSignup />} />
+                    <Route path="/technician/login" element={<TechnicianLogin />} />
+                    <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </BrowserRouter>
+              </div>
             </div>
-          </div>
-        </TooltipProvider>
-        </HousekeepingProvider>
+          </TooltipProvider>
+          </HousekeepingProvider>
+        </TechnicianAuthProvider>
       </HousekeeperAuthProvider>
     </AuthProvider>
   </QueryClientProvider>
