@@ -44,6 +44,35 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const { notifications, addNotification } = useNotifications(hotelId || undefined);
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
 
+  // Écouter les changements de localStorage pour réagir au setup
+  useEffect(() => {
+    let attempts = 0;
+    const maxAttempts = 20; // 10 secondes max
+    
+    const checkForHotelId = () => {
+      const savedHotelId = localStorage.getItem('selectedHotelId');
+      if (savedHotelId && !hotelId) {
+        console.log('✅ Hotel ID détecté dans storage:', savedHotelId);
+        setHotelId(savedHotelId);
+        return true;
+      }
+      return false;
+    };
+    
+    // Vérifier toutes les 500ms
+    const interval = setInterval(() => {
+      if (checkForHotelId() || attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+      attempts++;
+    }, 500);
+    
+    // Vérification initiale
+    checkForHotelId();
+    
+    return () => clearInterval(interval);
+  }, [hotelId]);
+
   // Initialiser la session avec persistance RENFORCÉE
   useEffect(() => {
     const initializeSession = async () => {

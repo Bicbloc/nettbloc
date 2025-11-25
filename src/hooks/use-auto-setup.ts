@@ -32,7 +32,11 @@ export const useAutoSetup = () => {
   const hasAttemptedSetup = useRef(false);
   const lastUserIdRef = useRef<string | null>(null);
 
-  const setupHotel = useCallback(async (retryCount = 0) => {
+  const setupHotel = useCallback(async (
+    currentUser: typeof user,
+    currentIsAuthenticated: boolean,
+    retryCount = 0
+  ) => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = [1000, 2000, 4000]; // Exponential backoff
 
@@ -47,7 +51,7 @@ export const useAutoSetup = () => {
       hasAttemptedSetup.current = true;
     }
 
-    if (!isAuthenticated || !user?.id) {
+    if (!currentIsAuthenticated || !currentUser?.id) {
       console.log('🚫 Non authentifié, arrêt du setup');
       setLoading(false);
       setIsSetupComplete(false);
@@ -61,7 +65,7 @@ export const useAutoSetup = () => {
       if (retryCount < MAX_RETRIES) {
         console.log(`⏳ Session non prête, retry ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY[retryCount]}ms`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]));
-        return setupHotel(retryCount + 1);
+        return setupHotel(currentUser, currentIsAuthenticated, retryCount + 1);
       } else {
         console.log('🚫 Session non établie après plusieurs tentatives');
         setLoading(false);
@@ -69,7 +73,7 @@ export const useAutoSetup = () => {
       }
     }
 
-    console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
+    console.log('🏨 Auto-setup: Démarrage pour user:', currentUser.email);
     setLoading(true);
     
     try {
@@ -79,7 +83,7 @@ export const useAutoSetup = () => {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .maybeSingle();
 
       if (profileError) {
@@ -93,13 +97,13 @@ export const useAutoSetup = () => {
         console.log('📝 Création automatique du profil utilisateur...');
         
         // Récupérer les métadonnées de l'utilisateur Supabase
-        const companyFromMetadata = user.user_metadata?.company_name;
+        const companyFromMetadata = currentUser.user_metadata?.company_name;
         
         const { data: newProfile, error: createProfileError } = await supabase
           .from('profiles')
           .insert({
-            id: user.id,
-            email: user.email || '',
+            id: currentUser.id,
+            email: currentUser.email || '',
             company_name: companyFromMetadata || null
           })
           .select()
@@ -125,7 +129,7 @@ export const useAutoSetup = () => {
       const { data: existingHotel, error: hotelError } = await supabase
         .from('hotels')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
         .maybeSingle();
 
       if (hotelError) {
@@ -172,15 +176,15 @@ export const useAutoSetup = () => {
       // Phase 4: Si pas d'hôtel du tout, en créer un automatiquement
       if (!hotelData) {
         console.log('📝 Création automatique nouvel hôtel...');
-        const hotelName = profileData.company_name || `Établissement de ${user.email}`;
+        const hotelName = profileData.company_name || `Établissement de ${currentUser.email}`;
         const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
 
         const { data: newHotel, error: createError } = await supabase
           .from('hotels')
           .insert({
             name: hotelName,
-            email: user.email,
-            user_id: user.id,
+            email: currentUser.email,
+            user_id: currentUser.id,
             hotel_code: hotelCode
           })
           .select()
@@ -267,7 +271,7 @@ export const useAutoSetup = () => {
       setLoading(false);
       console.log('🏁 Auto-setup terminé');
     }
-  }, [isAuthenticated, user, toast]);
+  }, [toast]);
 
   useEffect(() => {
     console.log('🔄 useAutoSetup effect déclenché', {
@@ -302,7 +306,11 @@ export const useAutoSetup = () => {
     }
 
     if (!hasAttemptedSetup.current) {
-      setupHotel();
+      console.log('✅ [useAutoSetup] User authentifié, lancement setup avec délai...');
+      // Petit délai pour laisser React propager les états
+      setTimeout(() => {
+        setupHotel(user, isAuthenticated);
+      }, 100);
     }
   }, [authLoading, isAuthenticated, user?.id]);
 
