@@ -82,7 +82,7 @@ import { StatsOverview } from "@/components/StatsOverview";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
   const location = useLocation();
@@ -174,6 +174,31 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     hotelName: hotel?.name,
     setupComplete: isSetupComplete
   });
+  
+  // Fallback: si useAutoSetup ne fournit pas d'hôtel, récupérer directement depuis Supabase
+  useEffect(() => {
+    if (!isAuthenticated || loading) return;
+    if (hotel) return;
+    
+    const fetchHotelFallback = async () => {
+      try {
+        const hotels = await SupabaseService.getHotels();
+        const userHotel = hotels.find(h => !user || h.email === user.email) || hotels[0];
+        if (userHotel) {
+          console.log('✅ Fallback hôtel défini dans Index:', userHotel);
+          localStorage.setItem('selectedHotelId', userHotel.id);
+          localStorage.setItem('selectedHotelCode', userHotel.hotel_code || '');
+          localStorage.setItem('selectedHotelName', userHotel.name);
+        } else {
+          console.warn('⚠️ Aucun hôtel trouvé pour cet utilisateur (fallback Index)');
+        }
+      } catch (error) {
+        console.error('❌ Erreur fallback récupération hôtel dans Index:', error);
+      }
+    };
+    
+    fetchHotelFallback();
+  }, [isAuthenticated, loading, hotel, user]);
   
   const { addNotification } = useNotifications(currentHotelId);
 
