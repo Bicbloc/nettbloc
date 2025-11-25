@@ -36,15 +36,15 @@ export const useAutoSetup = () => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = [1000, 2000, 4000]; // Exponential backoff
 
-    // Marquer immédiatement la tentative de setup pour éviter les doubles appels
-    if (retryCount === 0) {
-      hasAttemptedSetup.current = true;
-    }
-
     // Éviter les exécutions multiples dans un même cycle
     if (hasAttemptedSetup.current && retryCount === 0) {
       console.log('🚫 Setup déjà tenté dans ce cycle, ignore...');
       return;
+    }
+
+    // Marquer la tentative de setup pour éviter les doubles appels
+    if (retryCount === 0) {
+      hasAttemptedSetup.current = true;
     }
 
     if (!isAuthenticated || !user?.id) {
