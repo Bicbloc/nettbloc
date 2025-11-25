@@ -157,12 +157,14 @@ export default function HousekeeperHotels() {
   };
 
   const handleSelectHotel = (hotel: any) => {
-    // Stocker les infos dans le localStorage
+    // Stocker les infos dans le localStorage pour une femme de chambre authentifiée
     localStorage.setItem('selectedHotelId', hotel.id);
     localStorage.setItem('selectedHotelName', hotel.name);
-    localStorage.setItem('housekeeper', JSON.stringify({
+    localStorage.setItem('housekeeperProfile', JSON.stringify({
       id: profile.id,
-      name: profile.name
+      name: profile.name,
+      email: profile.email,
+      isAuthenticated: true
     }));
 
     toast({
