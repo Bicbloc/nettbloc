@@ -126,6 +126,17 @@ export const HousekeeperWorkSimple: React.FC = () => {
       setLevelData(level);
 
       // Charger les assignations de cette femme de chambre
+      // Utiliser l'ID du profil pour les femmes de chambre authentifiées
+      const housekeeperId = isAuthenticatedHousekeeper 
+        ? housekeeperProfile.id 
+        : (authResult.user?.id || authResult.user?.access_code);
+
+      console.log('🔍 Recherche assignations pour:', {
+        housekeeperId,
+        hotelId,
+        isAuthenticated: isAuthenticatedHousekeeper
+      });
+
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -139,9 +150,11 @@ export const HousekeeperWorkSimple: React.FC = () => {
           )
         `)
         .eq('hotel_id', hotelId)
-        .eq('housekeeper_id', authResult.user?.id || authResult.user?.access_code)
+        .eq('housekeeper_id', housekeeperId)
         .in('status', ['assigned', 'in_progress'])
         .order('created_at', { ascending: false });
+
+      console.log('📋 Assignations trouvées:', assignmentsData);
 
       if (assignmentsError) {
         console.error('Erreur chargement assignations:', assignmentsError);

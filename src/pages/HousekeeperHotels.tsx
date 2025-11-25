@@ -17,6 +17,7 @@ export default function HousekeeperHotels() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingHotel, setIsAddingHotel] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [hotelAssignments, setHotelAssignments] = useState<Record<string, number>>({});
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -72,6 +73,20 @@ export default function HousekeeperHotels() {
           new Map(approvedHotels.map(item => [item.hotel_id, item.hotels])).values()
         ).filter(h => h !== null);
         setHotels(uniqueHotels);
+
+        // Charger le nombre de chambres assignées pour chaque hôtel
+        const assignmentCounts: Record<string, number> = {};
+        for (const hotel of uniqueHotels) {
+          const { count } = await supabase
+            .from('assignments')
+            .select('*', { count: 'exact', head: true })
+            .eq('hotel_id', hotel.id)
+            .eq('housekeeper_id', profileData.id)
+            .in('status', ['assigned', 'in_progress']);
+          
+          assignmentCounts[hotel.id] = count || 0;
+        }
+        setHotelAssignments(assignmentCounts);
       }
 
     } catch (error) {
@@ -264,26 +279,54 @@ export default function HousekeeperHotels() {
               </div>
             ) : (
               <div className="grid gap-3">
-                {hotels.map((hotel: any) => (
-                  <button
-                    key={hotel.id}
-                    onClick={() => handleSelectHotel(hotel)}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="bg-purple-100 p-2 rounded">
-                        <Building2 className="h-5 w-5 text-purple-600" />
+                {hotels.map((hotel: any) => {
+                  const assignedRooms = hotelAssignments[hotel.id] || 0;
+                  const hasAssignments = assignedRooms > 0;
+                  
+                  return (
+                    <button
+                      key={hotel.id}
+                      onClick={() => handleSelectHotel(hotel)}
+                      className={`flex items-center justify-between p-4 border-2 rounded-lg hover:bg-accent transition-all text-left ${
+                        hasAssignments 
+                          ? 'border-green-500 bg-green-50 dark:bg-green-950' 
+                          : 'border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded ${
+                          hasAssignments 
+                            ? 'bg-green-100 dark:bg-green-900' 
+                            : 'bg-purple-100 dark:bg-purple-900'
+                        }`}>
+                          <Building2 className={`h-5 w-5 ${
+                            hasAssignments 
+                              ? 'text-green-600 dark:text-green-400' 
+                              : 'text-purple-600 dark:text-purple-400'
+                          }`} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{hotel.name}</p>
+                            {hasAssignments && (
+                              <Badge variant="default" className="bg-green-600">
+                                {assignedRooms} {assignedRooms === 1 ? 'chambre' : 'chambres'}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Code: {hotel.hotel_code}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{hotel.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Code: {hotel.hotel_code}
-                        </p>
-                      </div>
-                    </div>
-                    <CheckCircle2 className="h-5 w-5 text-purple-600" />
-                  </button>
-                ))}
+                      <CheckCircle2 className={`h-5 w-5 ${
+                        hasAssignments 
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-purple-600 dark:text-purple-400'
+                      }`} />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </CardContent>
