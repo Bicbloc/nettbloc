@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Building, LogIn, Archive, Link, Trash2, Lock, Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -83,15 +83,11 @@ import { StatsOverview } from "@/components/StatsOverview";
 const Index = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loading } = useAuth();
-  const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
   const location = useLocation();
   
   // Hook pour la gestion de l'abonnement
   const { plan, isPremium, isFree, canAccessFeature, loading: subscriptionLoading } = useSubscription();
-  
-  // Mode invité : supprimer la plupart des restrictions
-  const isGuestModeUnlocked = isGuestMode;
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
@@ -299,8 +295,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     
   }, [rooms, cleaningConfig]);
 
-  // Redirect to auth if not authenticated and not in guest mode - AFTER ALL HOOKS
-  if (!loading && !isAuthenticated && !isGuestMode) {
+  // Redirect to auth if not authenticated - AFTER ALL HOOKS
+  if (!loading && !isAuthenticated) {
     return <Navigate to="/auth" replace />;
   }
   
@@ -775,22 +771,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const handleGenerateReport = async (housekeeperName: string, housekeeperRooms: Room[]) => {
     setReportHousekeeper(housekeeperName);
     setReportAction("single");
-    
-    // Mode invité : seule restriction est les 50 chambres pour les rapports
-    if (isGuestMode) {
-      const roomsToClean = rooms.filter(room => 
-        room.cleaningType !== 'none' && room.status !== 'maintenance'
-      );
-      
-      if (roomsToClean.length > 50) {
-        toast({
-          variant: "destructive",
-          title: "Limite atteinte en mode invité",
-          description: "Passez au Premium pour générer des rapports de plus de 50 chambres."
-        });
-        return;
-      }
-    }
 
     // Pour les utilisateurs connectés, vérifier les limites selon le plan
     if (isAuthenticated && !isPremium) {
@@ -815,13 +795,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const handleGenerateAllReports = async () => {
     setReportAction("all");
     
-    // Mode invité : seule restriction est les 50 chambres pour les rapports
-    if (isGuestMode) {
-      const roomsToClean = rooms.filter(room => 
-        room.cleaningType !== 'none' && room.status !== 'maintenance'
-      );
-      
-      if (roomsToClean.length > 50) {
+    // Pour les utilisateurs connectés, vérifier les limites selon le plan
+    if (isAuthenticated && !isPremium) {
         toast({
           variant: "destructive",
           title: "Limite atteinte en mode invité",
@@ -1391,12 +1366,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                </div>
                <div>
                  <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                   HotelFlow
+                 HotelFlow
                  </h1>
                  <div className="flex items-center gap-2 mt-1">
-                   {isGuestMode && (
-                     <Badge variant="outline" className="text-xs">Mode Invité</Badge>
-                   )}
                    {!subscriptionLoading && isAuthenticated && (
                      <Badge 
                        variant="secondary"
@@ -1424,13 +1396,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                />
              )}
            </div>
-          
+           
            <div className="flex items-center space-x-4">
-             {!isAuthenticated && !isGuestMode && (
+             {!isAuthenticated && (
                <>
                   <Button asChild variant="outline">
                     <a href="/housekeeper-login">
-                      <Smartphone className="mr-2 h-4 w-4" />
+                      <UserIcon className="mr-2 h-4 w-4" />
                       Accès Femme de Chambre (Code Hôtel)
                   </a>
                 </Button>
@@ -1500,13 +1472,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 <UserIcon className="h-4 w-4" />
                 Affectation
               </TabsTrigger>
-              <TabsTrigger value="access-codes" className="flex items-center gap-2 relative">
-                <Key className="h-4 w-4" />
-                Codes d'accès
-                <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
-                  !
-                </Badge>
-              </TabsTrigger>
               <TabsTrigger value="linen" className="flex items-center gap-2">
                 🧺
                 Inventaire Linge
@@ -1518,10 +1483,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <TabsTrigger value="reports" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Rapports
-              </TabsTrigger>
-              <TabsTrigger value="mobile" className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4" />
-                Mobile
               </TabsTrigger>
             </TabsList>
             <div className="flex gap-2">
@@ -2456,6 +2417,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
+      </div>
       </div>
     </>
   );
