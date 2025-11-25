@@ -8,7 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserPlus, Search, Clock, CheckCircle } from 'lucide-react';
 import { HousekeeperInviteDialog } from './HousekeeperInviteDialog';
-import { HousekeeperAccessCodeGenerator } from './HousekeeperAccessCodeGenerator';
 
 interface Housekeeper {
   id: string;
@@ -258,21 +257,11 @@ export const HousekeeperTeamManager: React.FC<HousekeeperTeamManagerProps> = ({
       </CardContent>
 
       {/* Dialogs pour la gestion des femmes de chambre */}
-      <div className="space-y-4">
-        <HousekeeperAccessCodeGenerator 
-          hotelId={hotelId}
-          onCodeGenerated={(code, email) => {
-            console.log('Code généré:', code, 'pour email:', email);
-            fetchHousekeepers(); // Rafraîchir la liste
-          }}
-        />
-        
-        <HousekeeperInviteDialog
-          open={showInviteDialog}
-          onOpenChange={setShowInviteDialog}
-          hotelId={hotelId}
-        />
-      </div>
+      <HousekeeperInviteDialog
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        hotelId={hotelId}
+      />
     </Card>
   );
 };

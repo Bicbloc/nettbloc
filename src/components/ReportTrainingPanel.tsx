@@ -33,6 +33,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [uploading, setUploading] = useState(false);
   const [selectedPmsType, setSelectedPmsType] = useState<string>('auto');
   const [detectedPmsType, setDetectedPmsType] = useState<string>('');
+  const [manualPmsName, setManualPmsName] = useState<string>('');
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [mergingMode, setMergingMode] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("validation");
@@ -447,9 +448,23 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 </SelectContent>
               </Select>
             </div>
-
+            
             <div className="flex-1">
-              <Label htmlFor="pdf-upload">Upload PDF</Label>
+              <Label htmlFor="manual-pms-name">Nom du PMS (si non reconnu)</Label>
+              <Input
+                id="manual-pms-name"
+                placeholder="Entrez le nom de votre PMS..."
+                value={manualPmsName}
+                onChange={(e) => setManualPmsName(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Si votre PMS n'est pas reconnu automatiquement, saisissez son nom ici
+              </p>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <Label htmlFor="pdf-upload">Upload PDF</Label>
               <div className="relative">
                 <Input
                   id="pdf-upload"
@@ -469,7 +484,6 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 )}
               </div>
             </div>
-          </div>
 
           {detectedPmsType && (
             <Badge variant="secondary" className="flex items-center gap-2 w-fit">
