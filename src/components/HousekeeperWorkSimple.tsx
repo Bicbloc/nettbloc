@@ -379,7 +379,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const totalRooms = rooms.length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 lg:p-6">
       {/* Notifications de badges et level up */}
       {newBadges.map((badge, index) => (
         <BadgeUnlockNotification
@@ -397,31 +397,45 @@ export const HousekeeperWorkSimple: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-gray-800 truncate">
                 {hotel?.name}
               </h1>
-              <p className="text-gray-600 flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                {hotel?.address || 'Adresse non spécifiée'}
+              <p className="text-xs sm:text-base text-gray-600 flex items-center gap-2 truncate">
+                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="truncate">{hotel?.address || 'Adresse non spécifiée'}</span>
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {isAuthenticatedHousekeeper && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/housekeeper/hotels')}
+                className="flex-1 sm:flex-initial"
+              >
+                <Building2 className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Mes Hôtels</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate('/housekeeper/profile')}
+              className="flex-1 sm:flex-initial"
             >
-              <User className="h-4 w-4" />
+              <User className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Profil</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={handleLogout} className="flex-1 sm:flex-initial">
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Déconnexion</span>
             </Button>
           </div>
         </div>
@@ -438,22 +452,22 @@ export const HousekeeperWorkSimple: React.FC = () => {
         )}
 
          {/* Session Info */}
-         <Card className="p-4 bg-blue-50 border-blue-200">
-           <div className="flex items-center justify-between">
-             <div className="flex items-center gap-4">
+         <Card className="p-3 sm:p-4 bg-blue-50 border-blue-200">
+           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
                <div>
-                 <p className="font-medium text-blue-800">Connecté en tant que</p>
-                 <p className="text-sm text-blue-600">{housekeeperName}</p>
+                 <p className="text-xs sm:text-sm font-medium text-blue-800">Connecté en tant que</p>
+                 <p className="text-sm sm:text-base text-blue-600 truncate">{housekeeperName}</p>
                </div>
                {!isAuthenticatedHousekeeper && (
                  <div>
-                   <p className="font-medium text-blue-800">Code d'accès</p>
+                   <p className="text-xs sm:text-sm font-medium text-blue-800">Code d'accès</p>
                    <p className="text-sm font-mono text-blue-600">{accessCode}</p>
                  </div>
                )}
              </div>
-             <Badge variant="default" className="bg-green-100 text-green-800">
-               <CheckCircle className="h-4 w-4 mr-1" />
+             <Badge variant="default" className="bg-green-100 text-green-800 whitespace-nowrap">
+               <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                Connecté
              </Badge>
            </div>
@@ -461,21 +475,21 @@ export const HousekeeperWorkSimple: React.FC = () => {
       </div>
 
       {/* Progress */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Progression</h3>
-            <Badge variant="outline" className="text-lg px-3 py-1">
+      <Card className="mb-4 sm:mb-6">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="text-base sm:text-lg font-semibold">Progression</h3>
+            <Badge variant="outline" className="text-sm sm:text-lg px-2 sm:px-3 py-1">
               {completedRooms} / {totalRooms}
             </Badge>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
             <div 
-              className="bg-green-500 h-3 rounded-full transition-all duration-300"
+              className="bg-green-500 h-2 sm:h-3 rounded-full transition-all duration-300"
               style={{ width: `${totalRooms > 0 ? (completedRooms / totalRooms) * 100 : 0}%` }}
             />
           </div>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
             {completedRooms === totalRooms && totalRooms > 0 
               ? 'Toutes les chambres terminées !' 
               : `${totalRooms - completedRooms} chambres restantes`}
@@ -486,30 +500,30 @@ export const HousekeeperWorkSimple: React.FC = () => {
       {/* Room List */}
       <Card>
         <CardHeader>
-          <CardTitle>Mes chambres assignées</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Mes chambres assignées</CardTitle>
         </CardHeader>
         <CardContent>
           {rooms.length === 0 ? (
             <div className="text-center py-8">
-              <Home className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">
+              <Home className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
                 Aucune chambre à nettoyer
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-xs sm:text-base text-gray-500 mb-4 px-4">
                 {isLoading 
                   ? "Chargement des chambres..." 
                   : "Toutes les chambres sont propres ou aucune chambre n'est configurée pour cet établissement."}
               </p>
-              <p className="text-sm text-gray-400">
+              <p className="text-xs sm:text-sm text-gray-400 px-4">
                 L'administrateur doit créer des chambres ou vous assigner des chambres à nettoyer.
               </p>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               {rooms.map(room => (
                 <div
                   key={room.id}
-                  className={`p-4 rounded-lg border-2 ${
+                  className={`p-3 sm:p-4 rounded-lg border-2 ${
                     room.status === 'clean' 
                       ? 'bg-green-100 text-green-800 border-green-200'
                       : room.status === 'in_progress'
@@ -517,22 +531,22 @@ export const HousekeeperWorkSimple: React.FC = () => {
                       : 'bg-gray-100 text-gray-800 border-gray-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl font-bold">Chambre {room.room_number}</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
                          <Badge className={
-                           room.cleaning_priority === 3 ? 'bg-red-100 text-red-800' :
-                           room.cleaning_priority === 2 ? 'bg-orange-100 text-orange-800' :
-                           'bg-gray-100 text-gray-800'
+                           room.cleaning_priority === 3 ? 'bg-red-100 text-red-800 text-xs' :
+                           room.cleaning_priority === 2 ? 'bg-orange-100 text-orange-800 text-xs' :
+                           'bg-gray-100 text-gray-800 text-xs'
                          }>
                            {room.cleaning_priority === 3 ? 'Urgent' : 
                             room.cleaning_priority === 2 ? 'Prioritaire' : 'Normal'}
                          </Badge>
                          <Badge variant="outline" className={
                            room.status === 'to_clean' || room.status === 'dirty' 
-                             ? 'bg-blue-100 text-blue-800 border-blue-300' 
-                             : 'bg-gray-100 text-gray-800'
+                             ? 'bg-blue-100 text-blue-800 border-blue-300 text-xs' 
+                             : 'bg-gray-100 text-gray-800 text-xs'
                          }>
                            {room.status === 'to_clean' || room.status === 'dirty' 
                              ? '🧹 À blanc' 
@@ -540,17 +554,19 @@ export const HousekeeperWorkSimple: React.FC = () => {
                          </Badge>
                       </div>
                       {room.notes && (
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                           📝 {room.notes}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       {room.status === 'dirty' && (
                         <Button 
                           onClick={() => updateRoomStatus(room.id, 'in_progress')}
                           variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-initial"
                         >
                           Commencer
                         </Button>
@@ -558,7 +574,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
                       {room.status === 'in_progress' && (
                         <Button 
                           onClick={() => updateRoomStatus(room.id, 'clean')}
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-initial"
+                          size="sm"
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Terminer
@@ -566,8 +583,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
                       )}
                       {room.status === 'clean' && (
                         <div className="flex items-center text-green-600">
-                          <CheckCircle className="h-5 w-5 mr-2" />
-                          Terminée
+                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                          <span className="text-sm sm:text-base">Terminée</span>
                         </div>
                       )}
                     </div>

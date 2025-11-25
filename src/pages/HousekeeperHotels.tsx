@@ -209,26 +209,27 @@ export default function HousekeeperHotels() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-3 sm:p-4 lg:p-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         {/* Profil */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-purple-100 p-3 rounded-full">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="bg-purple-100 p-3 rounded-full flex-shrink-0">
                   <User className="h-6 w-6 text-purple-600" />
                 </div>
-                <div>
-                  <CardTitle>{profile.name}</CardTitle>
-                  <CardDescription>{profile.email}</CardDescription>
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="truncate">{profile.name}</CardTitle>
+                  <CardDescription className="truncate">{profile.email}</CardDescription>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate('/housekeeper/profile')}
+                  className="w-full sm:w-auto"
                 >
                   <User className="h-4 w-4 mr-2" />
                   Mon profil
@@ -237,6 +238,7 @@ export default function HousekeeperHotels() {
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
+                  className="w-full sm:w-auto"
                 >
                   <LogOut className="h-4 w-4 mr-2" />
                   Déconnexion
@@ -249,19 +251,20 @@ export default function HousekeeperHotels() {
         {/* Mes hôtels */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                   <Building2 className="h-5 w-5" />
                   Mes hôtels
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm">
                   Sélectionnez un hôtel pour commencer à travailler
                 </CardDescription>
               </div>
               <Button
                 onClick={() => setShowAddDialog(true)}
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Ajouter un hôtel
@@ -270,19 +273,19 @@ export default function HousekeeperHotels() {
           </CardHeader>
           <CardContent>
             {hotels.length === 0 ? (
-              <div className="text-center py-12">
-                <Building2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="font-semibold text-lg mb-2">Aucun hôtel enregistré</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+              <div className="text-center py-8 sm:py-12">
+                <Building2 className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="font-semibold text-base sm:text-lg mb-2">Aucun hôtel enregistré</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-4 px-4">
                   Ajoutez votre premier hôtel pour commencer à travailler
                 </p>
-                <Button onClick={() => setShowAddDialog(true)}>
+                <Button onClick={() => setShowAddDialog(true)} className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Ajouter un hôtel
                 </Button>
               </div>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-2 sm:gap-3">
                 {hotels.map((hotel: any) => {
                   const assignedRooms = hotelAssignments[hotel.id] || 0;
                   const hasAssignments = assignedRooms > 0;
@@ -291,14 +294,14 @@ export default function HousekeeperHotels() {
                     <button
                       key={hotel.id}
                       onClick={() => handleSelectHotel(hotel)}
-                      className={`flex items-center justify-between p-4 border-2 rounded-lg hover:bg-accent transition-all text-left ${
+                      className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border-2 rounded-lg hover:bg-accent transition-all text-left gap-3 ${
                         hasAssignments 
                           ? 'border-green-500 bg-green-50 dark:bg-green-950' 
                           : 'border-border'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded ${
+                      <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className={`p-2 rounded flex-shrink-0 ${
                           hasAssignments 
                             ? 'bg-green-100 dark:bg-green-900' 
                             : 'bg-purple-100 dark:bg-purple-900'
@@ -309,21 +312,21 @@ export default function HousekeeperHotels() {
                               : 'text-purple-600 dark:text-purple-400'
                           }`} />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{hotel.name}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium truncate">{hotel.name}</p>
                             {hasAssignments && (
-                              <Badge variant="default" className="bg-green-600">
+                              <Badge variant="default" className="bg-green-600 text-xs">
                                 {assignedRooms} {assignedRooms === 1 ? 'chambre' : 'chambres'}
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs sm:text-sm text-muted-foreground truncate">
                             Code: {hotel.hotel_code}
                           </p>
                         </div>
                       </div>
-                      <CheckCircle2 className={`h-5 w-5 ${
+                      <CheckCircle2 className={`h-5 w-5 flex-shrink-0 ${
                         hasAssignments 
                           ? 'text-green-600 dark:text-green-400' 
                           : 'text-purple-600 dark:text-purple-400'
