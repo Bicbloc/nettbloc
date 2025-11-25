@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -66,21 +66,13 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   const [profile, setProfile] = useState<HousekeeperProfile | null>(null);
   const [currentHotelSession, setCurrentHotelSession] = useState<HotelSession | null>(null);
   const [loading, setLoading] = useState(true);
-  const isMountedRef = useRef(true);
+  const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
-    // Timeout de sécurité - force la fin du loading après 5 secondes
-    const timeoutId = setTimeout(() => {
-      if (isMountedRef.current && loading) {
-        console.warn('⚠️ Housekeeper auth timeout - forcing loading to false');
-        setLoading(false);
-      }
-    }, 5000);
-
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (!isMountedRef.current) return;
+        if (!isMounted) return;
 
         console.log('🔐 Housekeeper auth changed:', { event, session_exists: !!session });
 
@@ -92,7 +84,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         if (session?.user) {
           // Defer profile loading to avoid blocking auth callback
           setTimeout(() => {
-            if (isMountedRef.current) {
+            if (isMounted) {
               loadHousekeeperProfile(session.user);
             }
           }, 0);
@@ -106,26 +98,9 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     // Get initial session
     const initializeSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error('❌ Housekeeper session error:', error);
-          if (error.message?.includes('refresh_token') || error.message?.includes('invalid')) {
-            console.log('🧹 Nettoyage session corrompue housekeeper');
-            await supabase.auth.signOut();
-            localStorage.clear();
-          }
-          if (isMountedRef.current) {
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-            setCurrentHotelSession(null);
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (isMountedRef.current) {
+        if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
 
@@ -136,7 +111,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         }
       } catch (error) {
         console.error('Failed to get session:', error);
-        if (isMountedRef.current) {
+        if (isMounted) {
           setLoading(false);
         }
       }
@@ -145,8 +120,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     initializeSession();
 
     return () => {
-      isMountedRef.current = false;
-      clearTimeout(timeoutId);
+      setIsMounted(false);
       subscription.unsubscribe();
     };
   }, []);

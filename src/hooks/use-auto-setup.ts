@@ -25,111 +25,111 @@ interface HotelWithCodes extends HotelData {
 export const useAutoSetup = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  
-  // ⚡ Initialisation immédiate depuis localStorage pour affichage instantané
-  const [hotel, setHotel] = useState<HotelData | null>(() => {
-    const savedId = localStorage.getItem('selectedHotelId');
-    const savedCode = localStorage.getItem('selectedHotelCode');
-    const savedName = localStorage.getItem('selectedHotelName');
-    
-    if (savedId && savedCode && savedName) {
-      console.log('⚡ [useAutoSetup] Hotel chargé instantanément depuis cache:', savedName);
-      return { id: savedId, hotel_code: savedCode, name: savedName } as HotelData;
-    }
-    return null;
-  });
-  
+  const [hotel, setHotel] = useState<HotelData | null>(null);
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const hasAttemptedSetup = useRef(false);
-  const lastUserIdRef = useRef<string | null>(null);
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
 
   const setupHotel = useCallback(async (retryCount = 0) => {
     const MAX_RETRIES = 3;
-    const RETRY_DELAY = [500, 1000, 2000];
-
-    console.log('⚙️ [useAutoSetup] setupHotel appelé, tentative', retryCount + 1);
-
-    // IMPORTANT: Récupérer DIRECTEMENT la session depuis Supabase
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log('⚙️ [useAutoSetup] Session récupérée:', {
-      hasSession: !!session,
-      userId: session?.user?.id,
-      email: session?.user?.email
-    });
+    const RETRY_DELAY = [1000, 2000, 4000]; // Exponential backoff
     
-    if (!session?.user?.id) {
-      if (retryCount < MAX_RETRIES) {
-        console.log(`⏳ Session non prête, retry ${retryCount + 1}/${MAX_RETRIES}`);
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]));
-        return setupHotel(retryCount + 1);
-      }
-      console.log('🚫 Session non établie après plusieurs tentatives');
-      setLoading(false);
+    // Éviter les exécutions multiples dans un même cycle
+    if (hasAttemptedSetup.current && retryCount === 0) {
+      console.log('🚫 Setup déjà tenté dans ce cycle, ignore...');
       return;
     }
 
-    const currentUser = session.user;
-    console.log('🏨 Auto-setup: Démarrage pour user:', currentUser.email);
+    if (!isAuthenticated || !user?.id) {
+      console.log('🚫 Non authentifié, arrêt du setup');
+      setLoading(false);
+      setIsSetupComplete(false);
+      hasAttemptedSetup.current = false;
+      return;
+    }
+
+    // Vérifier que la session est bien établie avec un token valide
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      if (retryCount < MAX_RETRIES) {
+        console.log(`⏳ Session non prête, retry ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY[retryCount]}ms`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]));
+        return setupHotel(retryCount + 1);
+      } else {
+        console.log('🚫 Session non établie après plusieurs tentatives');
+        setLoading(false);
+        return;
+      }
+    }
+
+    console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
+    hasAttemptedSetup.current = true;
     setLoading(true);
     
     try {
-      // Phase 1: Vérification de cohérence des données (non bloquante)
+      // Phase 1: Vérification de cohérence des données
       console.log('🔍 Vérification cohérence profil + hôtel...');
-      let profileData: any = null;
-
-      try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.warn('⚠️ Erreur recherche profil (ignorée):', profileError.message);
-        } else if (profile) {
-          profileData = profile;
-          console.log('✅ Profil utilisateur disponible:', profileData);
-        }
-      } catch (profileFatalError) {
-        console.warn('⚠️ Impossible de charger le profil (ignoré):', profileFatalError);
-      }
-
-      // Phase 2: Rechercher l'hôtel existant
-      const { data: existingHotelByUser, error: hotelErrorByUser } = await supabase
-        .from('hotels')
+      
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
         .select('*')
-        .eq('user_id', currentUser.id)
+        .eq('id', user.id)
         .maybeSingle();
 
-      if (hotelErrorByUser) {
-        console.error('❌ Erreur recherche hôtel par user_id:', hotelErrorByUser);
+      if (profileError) {
+        console.error('❌ Erreur recherche profil:', profileError);
+        throw profileError;
       }
 
-      let existingHotel = existingHotelByUser;
+      // Si le profil n'existe pas, le créer automatiquement avec les métadonnées utilisateur
+      let profileData = profile;
+      if (!profile) {
+        console.log('📝 Création automatique du profil utilisateur...');
+        
+        // Récupérer les métadonnées de l'utilisateur Supabase
+        const companyFromMetadata = user.user_metadata?.company_name;
+        
+        const { data: newProfile, error: createProfileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email || '',
+            company_name: companyFromMetadata || null
+          })
+          .select()
+          .single();
 
-      // Fallback: si aucun hôtel trouvé via user_id, essayer par email (cas anciens comptes)
-      if (!existingHotel && currentUser.email) {
-        const { data: existingHotelByEmail, error: hotelErrorByEmail } = await supabase
-          .from('hotels')
-          .select('*')
-          .eq('email', currentUser.email)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (hotelErrorByEmail) {
-          console.error('❌ Erreur recherche hôtel par email:', hotelErrorByEmail);
+        if (createProfileError) {
+          console.error('❌ Erreur création profil:', createProfileError);
+          toast({
+            variant: "destructive",
+            title: "Erreur de configuration",
+            description: "Impossible de créer votre profil. Veuillez réessayer."
+          });
+          setLoading(false);
+          return;
         }
-
-        if (existingHotelByEmail) {
-          console.log('✅ Hôtel existant trouvé par email:', existingHotelByEmail);
-          existingHotel = existingHotelByEmail;
-        }
+        profileData = newProfile;
+        console.log('✅ Profil créé automatiquement:', profileData);
       }
 
-      let hotelData: HotelData | null = existingHotel || null;
+      console.log('✅ Profil utilisateur disponible:', profileData);
+
+      // Phase 2: Rechercher l'hôtel existant
+      const { data: existingHotel, error: hotelError } = await supabase
+        .from('hotels')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (hotelError) {
+        console.error('❌ Erreur recherche hôtel:', hotelError);
+        throw hotelError;
+      }
+
+      let hotelData: HotelData | null = existingHotel;
       let activeCode: string | null = null;
 
       // Phase 3: Si hôtel trouvé, chercher les codes d'accès actifs
@@ -168,15 +168,15 @@ export const useAutoSetup = () => {
       // Phase 4: Si pas d'hôtel du tout, en créer un automatiquement
       if (!hotelData) {
         console.log('📝 Création automatique nouvel hôtel...');
-        const hotelName = profileData.company_name || `Établissement de ${currentUser.email}`;
+        const hotelName = profileData.company_name || `Établissement de ${user.email}`;
         const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
 
         const { data: newHotel, error: createError } = await supabase
           .from('hotels')
           .insert({
             name: hotelName,
-            email: currentUser.email,
-            user_id: currentUser.id,
+            email: user.email,
+            user_id: user.id,
             hotel_code: hotelCode
           })
           .select()
@@ -263,31 +263,44 @@ export const useAutoSetup = () => {
       setLoading(false);
       console.log('🏁 Auto-setup terminé');
     }
-  }, [toast]);
+  }, [isAuthenticated, user, toast]);
 
   useEffect(() => {
+    console.log('🔄 useAutoSetup effect déclenché', {
+      authLoading,
+      isAuthenticated,
+      userId: user?.id,
+      lastUserId,
+      hasAttempted: hasAttemptedSetup.current
+    });
+
+    // Attendre que l'auth soit complètement initialisée
     if (authLoading) {
-      console.log('⏳ Auth en cours de chargement...');
       return;
     }
 
-    if (!isAuthenticated) {
-      console.log('❌ Utilisateur non authentifié, reset du state');
+    // Si pas connecté, réinitialiser l'état local
+    if (!user?.id || !isAuthenticated) {
       setHotel(null);
       setAccessCode(null);
       setIsSetupComplete(false);
       setLoading(false);
       hasAttemptedSetup.current = false;
+      setLastUserId(null);
       return;
     }
 
-    if (!hasAttemptedSetup.current) {
-      console.log('🚀 Démarrage du setup automatique');
-      hasAttemptedSetup.current = true;
-      setLoading(true);
-      setupHotel(); // Pas de paramètres - récupère directement la session
+    // Nouvel utilisateur connecté -> on réinitialise le flag de setup
+    if (lastUserId !== user.id) {
+      console.log('👤 Nouvel utilisateur détecté, réinitialisation du setup');
+      hasAttemptedSetup.current = false;
+      setLastUserId(user.id);
     }
-  }, [authLoading, isAuthenticated, setupHotel]);
+
+    if (!hasAttemptedSetup.current) {
+      setupHotel();
+    }
+  }, [authLoading, isAuthenticated, user?.id, lastUserId, setupHotel]);
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
