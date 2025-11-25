@@ -56,6 +56,7 @@ import { IncidentInventoryManager } from "@/components/incident/IncidentInventor
 import { IncidentReportDialogSimple } from "@/components/incident/IncidentReportDialogSimple";
 import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
 import { RolePermissionsManager } from "@/components/incident/RolePermissionsManager";
+import { IncidentReportPrint } from "@/components/incident/IncidentReportPrint";
 
 
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
@@ -1516,7 +1517,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full grid-cols-7 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
+            <TabsList className="grid w-full grid-cols-8 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
               <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Layers className="h-4 w-4" />
                 Vue d'ensemble
@@ -1535,6 +1536,10 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
                   !
                 </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="linen" className="flex items-center gap-2">
+                🧺
+                Inventaire Linge
               </TabsTrigger>
               <TabsTrigger value="incidents" className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
@@ -2246,6 +2251,53 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             )}
           </TabsContent>
 
+          <TabsContent value="linen" className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">🧺 Inventaire du linge</h2>
+                <p className="text-muted-foreground">Gérer les types de linge, entraîner l'IA et assigner les tâches</p>
+              </div>
+            </div>
+
+            <Tabs defaultValue="types" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="types">Types de linge</TabsTrigger>
+                <TabsTrigger value="training">Entraînement IA</TabsTrigger>
+                <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="types" className="space-y-4">
+                {currentHotelId ? (
+                  <LinenTypeManager hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              <TabsContent value="training" className="space-y-4">
+                {currentHotelId ? (
+                  <LinenTrainingManager hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              <TabsContent value="tasks" className="space-y-4">
+                {currentHotelId ? (
+                  <LinenTaskAssignment hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
           <TabsContent value="incidents" className="space-y-6">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -2264,6 +2316,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 <TabsTrigger value="staff">Personnel</TabsTrigger>
                 <TabsTrigger value="inventory">Inventaire</TabsTrigger>
                 <TabsTrigger value="permissions">Permissions</TabsTrigger>
+                <TabsTrigger value="print">Imprimer rapport</TabsTrigger>
               </TabsList>
 
               <TabsContent value="dashboard" className="space-y-4">
@@ -2312,6 +2365,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 ) : (
                   <Alert>
                     <AlertDescription>Aucun hôtel sélectionné pour gérer les permissions</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              <TabsContent value="print" className="space-y-4">
+                {currentHotelId ? (
+                  <IncidentReportPrint hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné pour imprimer les rapports</AlertDescription>
                   </Alert>
                 )}
               </TabsContent>
