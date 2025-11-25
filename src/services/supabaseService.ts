@@ -253,6 +253,19 @@ export class SupabaseService {
   }
 
   static async createHousekeeper(hotelId: string, name: string): Promise<Housekeeper | null> {
+    // Vérifier d'abord si le nom existe déjà (insensible à la casse)
+    const { data: existing } = await supabase
+      .from('housekeepers')
+      .select('*')
+      .eq('hotel_id', hotelId)
+      .ilike('name', name.trim())
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (existing) {
+      console.log('Femme de chambre existe déjà:', existing.name);
+      return existing as Housekeeper;
+    }
     try {
       console.log('🔧 Début création femme de chambre:', { hotelId, name });
       

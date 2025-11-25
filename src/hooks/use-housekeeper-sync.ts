@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { SupabaseService } from '@/services/supabaseService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SyncResult {
   success: boolean;
@@ -39,6 +40,20 @@ export function useHousekeeperSync() {
       for (const name of housekeeperNames) {
         if (!existingNames.includes(name.toLowerCase())) {
           try {
+            // Vérifier à nouveau en base avant création (protection contre race conditions)
+            const { data: doubleCheck } = await supabase
+              .from('housekeepers')
+              .select('id')
+              .eq('hotel_id', selectedHotelId)
+              .ilike('name', name.trim())
+              .eq('is_active', true)
+              .maybeSingle();
+            
+            if (doubleCheck) {
+              console.log(`⏭️ Skipping duplicate: ${name}`);
+              continue;
+            }
+            
             const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, name);
             result.synchronized++;
             console.log(`✅ Femme de chambre synchronisée: ${name} -> ${housekeeper.access_code}`);
