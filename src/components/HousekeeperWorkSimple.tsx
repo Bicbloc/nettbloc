@@ -136,7 +136,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
       console.log('🔍 Recherche assignations pour:', {
         housekeeperId,
         hotelId,
-        isAuthenticated: isAuthenticatedHousekeeper
+        isAuthenticated: isAuthenticatedHousekeeper,
+        profileId: housekeeperProfile?.id
       });
 
       const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -157,6 +158,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         .order('created_at', { ascending: false });
 
       console.log('📋 Assignations trouvées:', assignmentsData);
+      console.log('❌ Erreur assignations (le cas échéant):', assignmentsError);
 
       if (assignmentsError) {
         console.error('Erreur chargement assignations:', assignmentsError);
@@ -184,12 +186,18 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
   const loadAllPendingRooms = async () => {
     // Fallback: charger toutes les chambres à nettoyer
+    console.log('🔄 Fallback: Chargement de toutes les chambres à nettoyer pour hotel:', hotelId);
     const { data: roomsData, error } = await supabase
       .from('rooms')
       .select('*')
       .eq('hotel_id', hotelId)
       .in('status', ['dirty', 'to_clean'])
       .order('room_number');
+
+    console.log('🏠 Chambres en fallback:', roomsData);
+    if (error) {
+      console.error('❌ Erreur fallback chambres:', error);
+    }
 
     if (!error && roomsData) {
       setRooms(roomsData);

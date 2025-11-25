@@ -54,7 +54,8 @@ export default function HousekeeperHotels() {
       setProfile(profileData);
 
       // Charger les hôtels enregistrés (uniquement ceux approuvés)
-      const { data: approvedHotels } = await supabase
+      console.log('🔍 Chargement des hôtels approuvés pour:', profileData.id);
+      const { data: approvedHotels, error: hotelsError } = await supabase
         .from('housekeeper_access_requests')
         .select(`
           hotel_id,
@@ -68,6 +69,11 @@ export default function HousekeeperHotels() {
         .eq('status', 'approved')
         .order('requested_at', { ascending: false });
 
+      console.log('📋 Hôtels approuvés trouvés:', approvedHotels);
+      if (hotelsError) {
+        console.error('❌ Erreur chargement hôtels:', hotelsError);
+      }
+
       if (approvedHotels) {
         const uniqueHotels = Array.from(
           new Map(approvedHotels.map(item => [item.hotel_id, item.hotels])).values()
@@ -77,16 +83,23 @@ export default function HousekeeperHotels() {
         // Charger le nombre de chambres assignées pour chaque hôtel
         const assignmentCounts: Record<string, number> = {};
         for (const hotel of uniqueHotels) {
-          const { count } = await supabase
+          console.log(`🔍 Chargement assignations pour hôtel ${hotel.name} (${hotel.id})`);
+          const { count, error: assignError } = await supabase
             .from('assignments')
             .select('*', { count: 'exact', head: true })
             .eq('hotel_id', hotel.id)
             .eq('housekeeper_id', profileData.id)
             .in('status', ['assigned', 'in_progress']);
           
+          console.log(`📊 Assignations pour ${hotel.name}:`, count);
+          if (assignError) {
+            console.error(`❌ Erreur assignations pour ${hotel.name}:`, assignError);
+          }
+          
           assignmentCounts[hotel.id] = count || 0;
         }
         setHotelAssignments(assignmentCounts);
+        console.log('✅ Comptage assignations final:', assignmentCounts);
       }
 
     } catch (error) {
