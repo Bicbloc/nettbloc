@@ -1355,8 +1355,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   // Plus de blocage complet de l'interface
 
   return (
-    <>
-      <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <div className="container mx-auto py-6 px-4 md:px-6">
          {/* Modern Header */}
          <div className="flex justify-between items-center mb-8">
@@ -2427,7 +2426,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       />
       </div>
     </div>
-    </>
   );
 }
 
