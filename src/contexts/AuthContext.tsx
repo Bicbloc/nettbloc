@@ -102,41 +102,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      // Nettoyer uniquement les clés hotel spécifiques, pas les clés Supabase
-      const keysToRemove = [
-        'selectedHotelId',
-        'selectedHotelCode', 
-        'selectedHotelName',
-        'currentHotelId',
-        'hotelId',
-        'lastSavedHotelId'
-      ];
-      
-      keysToRemove.forEach(key => localStorage.removeItem(key));
-      console.log('🧹 Données hotel nettoyées pour nouvelle connexion');
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) {
-        console.error('❌ Erreur de connexion:', error);
-        return { error };
-      }
-      
-      if (data?.session) {
-        console.log('✅ Connexion réussie, session établie');
-        setSession(data.session);
-        setUser(data.session.user);
-      }
-      
-      return { error: null };
-    } catch (error) {
-      console.error('❌ Erreur lors de la connexion:', error);
-      return { error };
-    }
+    // Nettoyer tous les hotel IDs du localStorage avant la connexion
+    localStorage.removeItem('selectedHotelId');
+    localStorage.removeItem('selectedHotelCode');
+    localStorage.removeItem('selectedHotelName');
+    localStorage.removeItem('currentHotelId');
+    localStorage.removeItem('hotelId');
+    localStorage.removeItem('lastSavedHotelId');
+    console.log('🧹 localStorage nettoyé pour nouvelle connexion');
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    
+    return { error };
   };
 
   const signOut = async () => {

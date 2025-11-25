@@ -20,6 +20,7 @@ import HousekeeperLogin from "./pages/HousekeeperLogin";
 import HousekeeperAuth from "./pages/HousekeeperAuth";
 import HousekeeperSignup from "./pages/HousekeeperSignup";
 import HousekeeperHotels from "./pages/HousekeeperHotels";
+import GuestMode from "./pages/GuestMode";
 import HousekeeperProfile from "./pages/HousekeeperProfile";
 import TechnicianLogin from "./pages/TechnicianLogin";
 import TechnicianSignup from "./pages/TechnicianSignup";
@@ -45,6 +46,7 @@ const App = () => (
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/guest" element={<GuestMode />} />
                     <Route path="/plan-selection" element={<PlanSelection />} />
                     <Route path="/success" element={<Success />} />
                     <Route path="/profile" element={<Profile />} />

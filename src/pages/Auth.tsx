@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
-import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,13 +9,12 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Building, Users, Shield, UserCheck, KeyRound, User, Wrench } from 'lucide-react';
+import { Loader2, Building, Users, Shield, UserCheck, KeyRound, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const Auth = () => {
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
   const { signIn: housekeeperSignIn, signUp: housekeeperSignUp } = useHousekeeperAuth();
-  const { signIn: technicianSignIn, signUp: technicianSignUp } = useTechnicianAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [formData, setFormData] = useState({
@@ -26,9 +24,7 @@ const Auth = () => {
     companyName: '',
     newPassword: '',
     confirmNewPassword: '',
-    housekeeperName: '',
-    technicianName: '',
-    technicianPhone: ''
+    housekeeperName: ''
   });
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -106,20 +102,20 @@ const Auth = () => {
         description: "Vous êtes maintenant connecté."
       });
       
-      // Vérifier si l'utilisateur a déjà un plan configuré
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('plan, subscription_type')
-          .eq('id', (await supabase.auth.getUser()).data.user?.id)
-          .single();
-        
-        // Toujours rediriger vers l'accueil - plus de sélection de plan forcée
-        navigate('/');
-      } catch (error) {
-        // En cas d'erreur, rediriger vers l'accueil aussi
-        navigate('/');
-      }
+        // Vérifier si l'utilisateur a déjà un plan configuré
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('plan, subscription_type')
+            .eq('id', (await supabase.auth.getUser()).data.user?.id)
+            .single();
+          
+          // Toujours rediriger vers l'accueil - plus de sélection de plan forcée
+          navigate('/');
+        } catch (error) {
+          // En cas d'erreur, rediriger vers l'accueil aussi
+          navigate('/');
+        }
     }
     
     setIsLoading(false);
@@ -167,6 +163,10 @@ const Auth = () => {
     }
     
     setIsLoading(false);
+  };
+
+  const handleGuestMode = () => {
+    navigate('/guest');
   };
 
   const handleHousekeeperSignIn = async (e: React.FormEvent) => {
@@ -239,85 +239,12 @@ const Auth = () => {
         title: "Inscription réussie ! 🎉",
         description: "Vous pouvez maintenant vous connecter"
       });
+      // Rester sur l'onglet de connexion femme de chambre
     }
     
     setIsLoading(false);
   };
 
-  const handleTechnicianSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    const { error } = await technicianSignIn(formData.email, formData.password);
-    
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur de connexion",
-        description: error.message === "Invalid login credentials" 
-          ? "Email ou mot de passe incorrect" 
-          : error.message
-      });
-    } else {
-      toast({
-        title: "Connexion réussie ! 🎉",
-        description: "Bienvenue"
-      });
-      navigate('/technician/dashboard');
-    }
-    
-    setIsLoading(false);
-  };
-
-  const handleTechnicianSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.technicianName.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Le nom est obligatoire."
-      });
-      return;
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Les mots de passe ne correspondent pas."
-      });
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Mot de passe trop court",
-        description: "Le mot de passe doit contenir au moins 6 caractères"
-      });
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    const { error } = await technicianSignUp(formData.email, formData.password, formData.technicianName, formData.technicianPhone);
-    
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur d'inscription",
-        description: error.message
-      });
-    } else {
-      toast({
-        title: "Inscription réussie ! 🎉",
-        description: "Vous pouvez maintenant vous connecter"
-      });
-    }
-    
-    setIsLoading(false);
-  };
 
   const handlePasswordReset = async () => {
     if (!formData.email.trim()) {
@@ -416,25 +343,37 @@ const Auth = () => {
       <div className="absolute top-4 left-4">
         <BackButton to="/" />
       </div>
-      <div className="w-full max-w-6xl space-y-6">
+      <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <Building className="h-12 w-12 mx-auto text-primary" />
           <h1 className="text-3xl font-bold">Nettobloc</h1>
           <p className="text-muted-foreground">Gestion hôtelière simplifiée</p>
         </div>
 
-        {isPasswordReset ? (
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <KeyRound className="h-5 w-5" />
-                Nouveau mot de passe
-              </CardTitle>
-              <CardDescription>
-                Définissez votre nouveau mot de passe
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {isPasswordReset ? (
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5" />
+                  Nouveau mot de passe
+                </div>
+              ) : (
+                "Bienvenue"
+              )}
+            </CardTitle>
+            <CardDescription>
+              {isPasswordReset ? 
+                "Définissez votre nouveau mot de passe" :
+                isAuthenticated && forceAuth ? 
+                  "Vous êtes déjà connecté. Vous pouvez vous déconnecter ou changer de compte." :
+                  "Connectez-vous ou créez un compte pour gérer vos hôtels"
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isPasswordReset ? (
+              // Interface de changement de mot de passe
               <form onSubmit={handleNewPasswordSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="new-password">Nouveau mot de passe</Label>
@@ -478,34 +417,139 @@ const Auth = () => {
                   </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Section Gestionnaires d'hôtel */}
-            <Card className="border-primary/20">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Building className="h-6 w-6 text-primary" />
-                  <div>
-                    <CardTitle>Gestionnaires d'hôtel</CardTitle>
-                    <CardDescription>Gérez vos établissements</CardDescription>
+            ) : (
+              <>
+                {isAuthenticated && forceAuth && (
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 mb-2">Vous êtes déjà connecté.</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={async () => {
+                        await supabase.auth.signOut();
+                        toast({
+                          title: "Déconnexion réussie",
+                          description: "Vous pouvez maintenant vous reconnecter."
+                        });
+                      }}
+                    >
+                      Se déconnecter
+                    </Button>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
+                )}
                 <Tabs defaultValue="signin" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="signin">Connexion</TabsTrigger>
+                <TabsTrigger value="signup">Inscription</TabsTrigger>
+                <TabsTrigger value="housekeeper">Femme de chambre</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signin" className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email">Email</Label>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      placeholder="votre@email.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password">Mot de passe</Label>
+                    <Input
+                      id="signin-password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Se connecter
+                  </Button>
+                  <div className="text-center">
+                    <Button 
+                      variant="link" 
+                      type="button"
+                      onClick={handlePasswordReset}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Mot de passe oublié ?
+                    </Button>
+                  </div>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="signup" className="space-y-4">
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-company">Nom de l'entreprise *</Label>
+                    <Input
+                      id="signup-company"
+                      placeholder="Mon Hôtel"
+                      value={formData.companyName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Obligatoire pour créer votre hôtel et gérer votre compte
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="votre@email.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Mot de passe</Label>
+                    <Input
+                      id="signup-password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-confirm">Confirmer le mot de passe</Label>
+                    <Input
+                      id="signup-confirm"
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Créer un compte
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="housekeeper" className="space-y-4">
+                <Tabs defaultValue="hk-signin" className="space-y-4">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="signin">Connexion</TabsTrigger>
-                    <TabsTrigger value="signup">Inscription</TabsTrigger>
+                    <TabsTrigger value="hk-signin">Connexion</TabsTrigger>
+                    <TabsTrigger value="hk-signup">Inscription</TabsTrigger>
                   </TabsList>
                   
-                  <TabsContent value="signin" className="space-y-4">
-                    <form onSubmit={handleSignIn} className="space-y-4">
+                  <TabsContent value="hk-signin" className="space-y-4">
+                    <form onSubmit={handleHousekeeperSignIn} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="manager-signin-email">Email</Label>
+                        <Label htmlFor="hk-signin-email">Email</Label>
                         <Input
-                          id="manager-signin-email"
+                          id="hk-signin-email"
                           type="email"
                           placeholder="votre@email.com"
                           value={formData.email}
@@ -514,309 +558,116 @@ const Auth = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="manager-signin-password">Mot de passe</Label>
+                        <Label htmlFor="hk-signin-password">Mot de passe</Label>
                         <Input
-                          id="manager-signin-password"
+                          id="hk-signin-password"
                           type="password"
                           value={formData.password}
                           onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                           required
                         />
                       </div>
-                      <Button type="submit" className="w-full" disabled={isLoading}>
+                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Se connecter
                       </Button>
-                      <div className="text-center">
-                        <Button 
-                          variant="link" 
-                          type="button"
-                          onClick={handlePasswordReset}
-                          className="text-sm text-muted-foreground"
+                      <div className="text-center pt-4 border-t">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Vous avez un code d'accès unique ?
+                        </p>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => navigate('/housekeeper/login')}
+                          className="text-purple-600 hover:text-purple-700"
                         >
-                          Mot de passe oublié ?
+                          Connexion avec code d'accès
                         </Button>
                       </div>
                     </form>
                   </TabsContent>
                   
-                  <TabsContent value="signup" className="space-y-4">
-                    <form onSubmit={handleSignUp} className="space-y-4">
+                  <TabsContent value="hk-signup" className="space-y-4">
+                    <form onSubmit={handleHousekeeperSignUp} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="manager-signup-company">Nom de l'entreprise *</Label>
+                        <Label htmlFor="hk-signup-name">Nom complet *</Label>
                         <Input
-                          id="manager-signup-company"
-                          placeholder="Mon Hôtel"
-                          value={formData.companyName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                          id="hk-signup-name"
+                          placeholder="Marie Dupont"
+                          value={formData.housekeeperName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, housekeeperName: e.target.value }))}
                           required
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="manager-signup-email">Email</Label>
+                        <Label htmlFor="hk-signup-email">Email</Label>
                         <Input
-                          id="manager-signup-email"
+                          id="hk-signup-email"
                           type="email"
-                          placeholder="votre@email.com"
+                          placeholder="marie@example.com"
                           value={formData.email}
                           onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                           required
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="manager-signup-password">Mot de passe</Label>
+                        <Label htmlFor="hk-signup-password">Mot de passe</Label>
                         <Input
-                          id="manager-signup-password"
+                          id="hk-signup-password"
                           type="password"
+                          placeholder="Minimum 6 caractères"
                           value={formData.password}
                           onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                           required
+                          minLength={6}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="manager-signup-confirm">Confirmer le mot de passe</Label>
+                        <Label htmlFor="hk-signup-confirm">Confirmer le mot de passe</Label>
                         <Input
-                          id="manager-signup-confirm"
+                          id="hk-signup-confirm"
                           type="password"
+                          placeholder="Répétez le mot de passe"
                           value={formData.confirmPassword}
                           onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                           required
+                          minLength={6}
                         />
                       </div>
-                      <Button type="submit" className="w-full" disabled={isLoading}>
+                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
                         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         S'inscrire
                       </Button>
                     </form>
                   </TabsContent>
                 </Tabs>
-              </CardContent>
-            </Card>
+              </TabsContent>
+            </Tabs>
 
-            {/* Section Personnel */}
-            <Card className="border-purple-500/20">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Users className="h-6 w-6 text-purple-600" />
-                  <div>
-                    <CardTitle>Personnel</CardTitle>
-                    <CardDescription>Femmes de chambre et techniciens</CardDescription>
-                  </div>
+            <div className="mt-6 pt-6 border-t space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Shield className="h-4 w-4" />
+                  <span>Ou continuer sans compte :</span>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="housekeeper" className="space-y-4">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="housekeeper">
-                      <User className="h-4 w-4 mr-2" />
-                      Femme de chambre
-                    </TabsTrigger>
-                    <TabsTrigger value="technician">
-                      <Wrench className="h-4 w-4 mr-2" />
-                      Technicien
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  {/* Onglet Femme de chambre */}
-                  <TabsContent value="housekeeper" className="space-y-4">
-                    <Tabs defaultValue="hk-signin">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="hk-signin">Connexion</TabsTrigger>
-                        <TabsTrigger value="hk-signup">Inscription</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="hk-signin" className="space-y-4 mt-4">
-                        <form onSubmit={handleHousekeeperSignIn} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="hk-signin-email">Email</Label>
-                            <Input
-                              id="hk-signin-email"
-                              type="email"
-                              placeholder="votre@email.com"
-                              value={formData.email}
-                              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="hk-signin-password">Mot de passe</Label>
-                            <Input
-                              id="hk-signin-password"
-                              type="password"
-                              value={formData.password}
-                              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Se connecter
-                          </Button>
-                        </form>
-                      </TabsContent>
-                      
-                      <TabsContent value="hk-signup" className="space-y-4 mt-4">
-                        <form onSubmit={handleHousekeeperSignUp} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="hk-signup-name">Nom complet *</Label>
-                            <Input
-                              id="hk-signup-name"
-                              placeholder="Prénom Nom"
-                              value={formData.housekeeperName}
-                              onChange={(e) => setFormData(prev => ({ ...prev, housekeeperName: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="hk-signup-email">Email</Label>
-                            <Input
-                              id="hk-signup-email"
-                              type="email"
-                              placeholder="votre@email.com"
-                              value={formData.email}
-                              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="hk-signup-password">Mot de passe</Label>
-                            <Input
-                              id="hk-signup-password"
-                              type="password"
-                              placeholder="Minimum 6 caractères"
-                              value={formData.password}
-                              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                              required
-                              minLength={6}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="hk-signup-confirm">Confirmer le mot de passe</Label>
-                            <Input
-                              id="hk-signup-confirm"
-                              type="password"
-                              value={formData.confirmPassword}
-                              onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                              required
-                              minLength={6}
-                            />
-                          </div>
-                          <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            S'inscrire
-                          </Button>
-                        </form>
-                      </TabsContent>
-                    </Tabs>
-                  </TabsContent>
-                  
-                  {/* Onglet Technicien */}
-                  <TabsContent value="technician" className="space-y-4">
-                    <Tabs defaultValue="tech-signin">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="tech-signin">Connexion</TabsTrigger>
-                        <TabsTrigger value="tech-signup">Inscription</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="tech-signin" className="space-y-4 mt-4">
-                        <form onSubmit={handleTechnicianSignIn} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="tech-signin-email">Email</Label>
-                            <Input
-                              id="tech-signin-email"
-                              type="email"
-                              placeholder="votre@email.com"
-                              value={formData.email}
-                              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tech-signin-password">Mot de passe</Label>
-                            <Input
-                              id="tech-signin-password"
-                              type="password"
-                              value={formData.password}
-                              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Se connecter
-                          </Button>
-                        </form>
-                      </TabsContent>
-                      
-                      <TabsContent value="tech-signup" className="space-y-4 mt-4">
-                        <form onSubmit={handleTechnicianSignUp} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="tech-signup-name">Nom complet *</Label>
-                            <Input
-                              id="tech-signup-name"
-                              placeholder="Prénom Nom"
-                              value={formData.technicianName}
-                              onChange={(e) => setFormData(prev => ({ ...prev, technicianName: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tech-signup-phone">Téléphone</Label>
-                            <Input
-                              id="tech-signup-phone"
-                              type="tel"
-                              placeholder="+33 6 12 34 56 78"
-                              value={formData.technicianPhone}
-                              onChange={(e) => setFormData(prev => ({ ...prev, technicianPhone: e.target.value }))}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tech-signup-email">Email</Label>
-                            <Input
-                              id="tech-signup-email"
-                              type="email"
-                              placeholder="votre@email.com"
-                              value={formData.email}
-                              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tech-signup-password">Mot de passe</Label>
-                            <Input
-                              id="tech-signup-password"
-                              type="password"
-                              placeholder="Minimum 6 caractères"
-                              value={formData.password}
-                              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                              required
-                              minLength={6}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tech-signup-confirm">Confirmer le mot de passe</Label>
-                            <Input
-                              id="tech-signup-confirm"
-                              type="password"
-                              value={formData.confirmPassword}
-                              onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                              required
-                              minLength={6}
-                            />
-                          </div>
-                          <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            S'inscrire
-                          </Button>
-                        </form>
-                      </TabsContent>
-                    </Tabs>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleGuestMode}
+                  type="button"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Mode invité (pas de sauvegarde)
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  En mode invité, vos données ne seront pas sauvegardées et seront réinitialisées à chaque session.
+                </p>
+              </div>
+            </div>
+            </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

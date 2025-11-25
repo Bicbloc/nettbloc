@@ -7,8 +7,6 @@ interface SessionPersistenceData {
   lastActiveDate: string;
   room_data?: any[];
   housekeeper_assignments?: Record<string, string>;
-  uploaded_reports?: any[];
-  incidents?: any[];
 }
 
 export class SessionPersistenceService {
@@ -68,9 +66,6 @@ export class SessionPersistenceService {
       const session = await HotelSessionService.getSession(sessionToken);
       if (!session) return false;
 
-      // Récupérer les données persistées localement (rapports uploadés, incidents)
-      const persistedData = this.getSavedSessionData();
-
       // Créer un rapport quotidien avec les données de la session
       const reportData = {
         hotel_id: hotelId,
@@ -80,8 +75,6 @@ export class SessionPersistenceService {
           total_rooms: session.room_data?.length || 0,
           completed_rooms: session.room_data?.filter((room: any) => room.status === 'completed').length || 0,
           housekeeper_assignments: session.housekeeper_assignments || {},
-          uploaded_reports: persistedData?.uploaded_reports || [],
-          incidents: persistedData?.incidents || [],
           archived_at: new Date().toISOString()
         })),
         notes: `Rapport archivé automatiquement - session du ${new Date(session.updated_at).toLocaleDateString()}`
@@ -96,7 +89,7 @@ export class SessionPersistenceService {
         return false;
       }
 
-      console.log('✅ Report archived successfully with uploaded reports and incidents');
+      console.log('✅ Report archived successfully');
       return true;
     } catch (error) {
       console.error('❌ Error archiving report:', error);
@@ -209,113 +202,6 @@ export class SessionPersistenceService {
     } catch (error) {
       console.error('❌ Failed to get stored hotel ID:', error);
       return localStorage.getItem('hotelId');
-    }
-  }
-
-  // Sauvegarder un rapport uploadé dans la session
-  static saveUploadedReport(reportData: any): void {
-    try {
-      const current = this.getSavedSessionData();
-      if (current) {
-        const uploadedReports = current.uploaded_reports || [];
-        uploadedReports.push({
-          ...reportData,
-          uploaded_at: new Date().toISOString()
-        });
-        this.updateSessionData({ uploaded_reports: uploadedReports });
-        console.log('✅ Uploaded report saved to session:', reportData);
-      }
-    } catch (error) {
-      console.error('❌ Failed to save uploaded report:', error);
-    }
-  }
-
-  // Sauvegarder un incident dans la session
-  static saveIncident(incidentData: any): void {
-    try {
-      const current = this.getSavedSessionData();
-      if (current) {
-        const incidents = current.incidents || [];
-        incidents.push({
-          ...incidentData,
-          created_at: new Date().toISOString()
-        });
-        this.updateSessionData({ incidents: incidents });
-        console.log('✅ Incident saved to session:', incidentData);
-      }
-    } catch (error) {
-      console.error('❌ Failed to save incident:', error);
-    }
-  }
-
-  // Récupérer les rapports uploadés de la session
-  static getUploadedReports(): any[] {
-    try {
-      const saved = this.getSavedSessionData();
-      return saved?.uploaded_reports || [];
-    } catch (error) {
-      console.error('❌ Failed to get uploaded reports:', error);
-      return [];
-    }
-  }
-
-  // Récupérer les incidents de la session
-  static getIncidents(): any[] {
-    try {
-      const saved = this.getSavedSessionData();
-      return saved?.incidents || [];
-    } catch (error) {
-      console.error('❌ Failed to get incidents:', error);
-      return [];
-    }
-  }
-
-  // Restaurer une session depuis un rapport archivé
-  static async restoreFromArchive(reportId: string): Promise<boolean> {
-    try {
-      console.log('🔄 Restoring report from archive:', reportId);
-
-      // Récupérer le rapport archivé
-      const { data: report, error } = await supabase
-        .from('daily_reports')
-        .select('*')
-        .eq('id', reportId)
-        .single();
-
-      if (error || !report) {
-        console.error('❌ Failed to fetch archived report:', error);
-        return false;
-      }
-
-      // Désactiver la session actuelle si elle existe
-      const currentToken = HotelSessionService.getSessionToken();
-      if (currentToken) {
-        await HotelSessionService.deactivateSession(currentToken);
-      }
-
-      // Créer une nouvelle session avec les données du rapport
-      const newToken = await HotelSessionService.createSession(report.hotel_id);
-      if (!newToken) {
-        console.error('❌ Failed to create new session');
-        return false;
-      }
-
-      // Sauvegarder les données restaurées dans la session locale
-      this.saveSessionData({
-        sessionToken: newToken,
-        hotelId: report.hotel_id,
-        lastActiveDate: new Date().toISOString(),
-        room_data: report.room_data || [],
-        housekeeper_assignments: report.summary?.housekeeper_assignments || {},
-        uploaded_reports: report.summary?.uploaded_reports || [],
-        incidents: report.summary?.incidents || []
-      });
-
-      console.log('✅ Report restored successfully from archive');
-      return true;
-    } catch (error) {
-      console.error('❌ Error restoring from archive:', error);
-      return false;
     }
   }
 }
