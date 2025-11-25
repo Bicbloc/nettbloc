@@ -2321,7 +2321,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           </TabsContent>
         </Tabs>
       </div>
-      </div>
 
       <ManualAssignmentDialog
         isOpen={isManualAssignmentOpen}
@@ -2426,6 +2425,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
+      </div>
     </>
   );
 }
