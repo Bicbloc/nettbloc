@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -26,13 +26,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(true);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    // Timeout de sécurité - force la fin du loading après 5 secondes
+    const timeoutId = setTimeout(() => {
+      if (isMountedRef.current && loading) {
+        console.warn('⚠️ Auth timeout - forcing loading to false');
+        setLoading(false);
+      }
+    }, 5000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (!isMounted) return;
+        if (!isMountedRef.current) return;
 
         console.log('🔐 Auth state changed:', { event, session_exists: !!session, user_id: session?.user?.id });
 
@@ -50,7 +58,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (error) {
           console.error('❌ Session error:', error);
-          if (isMounted) {
+          // Nettoyer le localStorage si session corrompue
+          if (error.message?.includes('refresh_token') || error.message?.includes('invalid')) {
+            console.log('🧹 Nettoyage session corrompue');
+            await supabase.auth.signOut();
+            localStorage.clear();
+          }
+          if (isMountedRef.current) {
             setSession(null);
             setUser(null);
             setLoading(false);
@@ -60,14 +74,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         console.log('🚀 Initial session:', { session_exists: !!session, user_id: session?.user?.id });
 
-        if (isMounted) {
+        if (isMountedRef.current) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
         }
       } catch (error) {
         console.error('❌ Failed to get session:', error);
-        if (isMounted) {
+        if (isMountedRef.current) {
           setSession(null);
           setUser(null);
           setLoading(false);
@@ -78,7 +92,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initializeSession();
 
     return () => {
-      setIsMounted(false);
+      isMountedRef.current = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
