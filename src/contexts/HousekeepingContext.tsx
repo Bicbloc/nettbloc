@@ -528,6 +528,14 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         access_code: h.access_code
       })));
       
+      // Mettre à jour aussi housekeeperNames avec tous les noms disponibles
+      const allNames = dbHousekeepers.map(h => h.name);
+      setHousekeeperNames(prevNames => {
+        // Combiner les noms existants avec les nouveaux (sans doublons)
+        const combined = [...new Set([...prevNames, ...allNames])];
+        return combined;
+      });
+      
       console.log('✅ Femmes de chambre chargées depuis la base:', dbHousekeepers.length);
     } catch (error) {
       console.error('❌ Erreur chargement femmes de chambre:', error);

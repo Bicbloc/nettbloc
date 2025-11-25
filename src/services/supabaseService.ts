@@ -483,6 +483,9 @@ export class SupabaseService {
   }
 
   static async getHousekeepers(hotelId?: string): Promise<Housekeeper[]> {
+    const housekeepers: Housekeeper[] = [];
+    
+    // 1. Récupérer les femmes de chambre temporaires (table housekeepers)
     let query = supabase
       .from('housekeepers')
       .select('*')
@@ -493,13 +496,57 @@ export class SupabaseService {
       query = query.eq('hotel_id', hotelId);
     }
     
-    const { data, error } = await query;
+    const { data: tempHousekeepers, error: tempError } = await query;
     
-    if (error) {
-      console.error('Erreur récupération femmes de chambre:', error);
-      return [];
+    if (tempError) {
+      console.error('Erreur récupération femmes de chambre temporaires:', tempError);
+    } else if (tempHousekeepers) {
+      housekeepers.push(...tempHousekeepers as Housekeeper[]);
     }
-    return (data || []) as Housekeeper[];
+    
+    // 2. Récupérer les femmes de chambre authentifiées avec des sessions actives
+    if (hotelId) {
+      const { data: activeSessions, error: sessionError } = await supabase
+        .from('hotel_access_sessions')
+        .select(`
+          access_code,
+          housekeeper_profile_id,
+          housekeeper_profiles!inner(id, name, email)
+        `)
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .gt('expires_at', new Date().toISOString());
+      
+      if (sessionError) {
+        console.error('Erreur récupération sessions actives:', sessionError);
+      } else if (activeSessions && activeSessions.length > 0) {
+        console.log(`✅ ${activeSessions.length} femme(s) de chambre authentifiée(s) trouvée(s)`);
+        
+        // Convertir les sessions en format Housekeeper
+        for (const session of activeSessions) {
+          const profile = session.housekeeper_profiles as any;
+          if (profile) {
+            housekeepers.push({
+              id: profile.id,
+              hotel_id: hotelId,
+              name: profile.name,
+              access_code: session.access_code,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              user_id: profile.id
+            } as Housekeeper);
+          }
+        }
+      }
+    }
+    
+    if (housekeepers.length === 0) {
+      console.log('⚠️ Aucune femme de chambre trouvée pour l\'hôtel:', hotelId);
+    }
+    
+    console.log(`✅ Total: ${housekeepers.length} femme(s) de chambre récupérée(s)`);
+    return housekeepers;
   }
 
   static async deactivateHousekeeper(id: string): Promise<boolean> {
