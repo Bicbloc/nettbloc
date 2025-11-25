@@ -29,36 +29,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    let sessionChecked = false;
-    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!isMounted) return;
-        
+
         console.log('🔐 Auth state changed:', { event, session_exists: !!session, user_id: session?.user?.id });
-        
-        // Clear timeout since auth state changed
-        if (timeoutId) clearTimeout(timeoutId);
-        sessionChecked = true;
-        
-        // Use setTimeout(0) to prevent blocking the auth callback
-        setTimeout(() => {
-          if (isMounted) {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-          }
-        }, 0);
+
+        // Keep this callback lightweight and synchronous
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
       }
     );
 
-    // Get initial session with immediate response
+    // Get initial session
     const initializeSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        
+
         if (error) {
           console.error('❌ Session error:', error);
           if (isMounted) {
@@ -68,10 +57,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
           return;
         }
-        
+
         console.log('🚀 Initial session:', { session_exists: !!session, user_id: session?.user?.id });
-        sessionChecked = true;
-        
+
         if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
@@ -89,20 +77,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initializeSession();
 
-    // Extended timeout - give more time for auth to complete
-    timeoutId = setTimeout(() => {
-      if (isMounted && !sessionChecked) {
-        console.log('⏰ Auth timeout - no session response after 5s, continuing as unauthenticated');
-        setSession(null);
-        setUser(null);
-        setLoading(false);
-      }
-    }, 5000); // Back to 5000ms for reliability
-
     return () => {
       setIsMounted(false);
       subscription.unsubscribe();
-      if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
 
