@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,11 +9,12 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Building, Users, Shield, UserCheck, KeyRound } from 'lucide-react';
+import { Loader2, Building, Users, Shield, UserCheck, KeyRound, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const Auth = () => {
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
+  const { signIn: housekeeperSignIn, signUp: housekeeperSignUp } = useHousekeeperAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [formData, setFormData] = useState({
@@ -21,7 +23,8 @@ const Auth = () => {
     confirmPassword: '',
     companyName: '',
     newPassword: '',
-    confirmNewPassword: ''
+    confirmNewPassword: '',
+    housekeeperName: ''
   });
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -166,8 +169,80 @@ const Auth = () => {
     navigate('/guest');
   };
 
-  const handleHousekeeperAccess = () => {
-    navigate('/housekeeper/auth');
+  const handleHousekeeperSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    const { error } = await housekeeperSignIn(formData.email, formData.password);
+    
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur de connexion",
+        description: error.message === "Invalid login credentials" 
+          ? "Email ou mot de passe incorrect" 
+          : error.message
+      });
+    } else {
+      toast({
+        title: "Connexion réussie ! 🎉",
+        description: "Bienvenue"
+      });
+      navigate('/housekeeper/hotels');
+    }
+    
+    setIsLoading(false);
+  };
+
+  const handleHousekeeperSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.housekeeperName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Le nom est obligatoire."
+      });
+      return;
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Les mots de passe ne correspondent pas."
+      });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast({
+        variant: "destructive",
+        title: "Mot de passe trop court",
+        description: "Le mot de passe doit contenir au moins 6 caractères"
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    const { error } = await housekeeperSignUp(formData.email, formData.password, formData.housekeeperName);
+    
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Erreur d'inscription",
+        description: error.message
+      });
+    } else {
+      toast({
+        title: "Inscription réussie ! 🎉",
+        description: "Vous pouvez maintenant vous connecter"
+      });
+      // Rester sur l'onglet de connexion femme de chambre
+    }
+    
+    setIsLoading(false);
   };
 
 
@@ -363,9 +438,10 @@ const Auth = () => {
                   </div>
                 )}
                 <Tabs defaultValue="signin" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="signin">Connexion</TabsTrigger>
                 <TabsTrigger value="signup">Inscription</TabsTrigger>
+                <TabsTrigger value="housekeeper">Femme de chambre</TabsTrigger>
               </TabsList>
               
               <TabsContent value="signin" className="space-y-4">
@@ -460,6 +536,112 @@ const Auth = () => {
                   </Button>
                 </form>
               </TabsContent>
+
+              <TabsContent value="housekeeper" className="space-y-4">
+                <Tabs defaultValue="hk-signin" className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="hk-signin">Connexion</TabsTrigger>
+                    <TabsTrigger value="hk-signup">Inscription</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="hk-signin" className="space-y-4">
+                    <form onSubmit={handleHousekeeperSignIn} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="hk-signin-email">Email</Label>
+                        <Input
+                          id="hk-signin-email"
+                          type="email"
+                          placeholder="votre@email.com"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="hk-signin-password">Mot de passe</Label>
+                        <Input
+                          id="hk-signin-password"
+                          type="password"
+                          value={formData.password}
+                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
+                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Se connecter
+                      </Button>
+                      <div className="text-center pt-4 border-t">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Vous avez un code d'accès unique ?
+                        </p>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => navigate('/housekeeper/login')}
+                          className="text-purple-600 hover:text-purple-700"
+                        >
+                          Connexion avec code d'accès
+                        </Button>
+                      </div>
+                    </form>
+                  </TabsContent>
+                  
+                  <TabsContent value="hk-signup" className="space-y-4">
+                    <form onSubmit={handleHousekeeperSignUp} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="hk-signup-name">Nom complet *</Label>
+                        <Input
+                          id="hk-signup-name"
+                          placeholder="Marie Dupont"
+                          value={formData.housekeeperName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, housekeeperName: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="hk-signup-email">Email</Label>
+                        <Input
+                          id="hk-signup-email"
+                          type="email"
+                          placeholder="marie@example.com"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="hk-signup-password">Mot de passe</Label>
+                        <Input
+                          id="hk-signup-password"
+                          type="password"
+                          placeholder="Minimum 6 caractères"
+                          value={formData.password}
+                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="hk-signup-confirm">Confirmer le mot de passe</Label>
+                        <Input
+                          id="hk-signup-confirm"
+                          type="password"
+                          placeholder="Répétez le mot de passe"
+                          value={formData.confirmPassword}
+                          onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
+                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        S'inscrire
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
+              </TabsContent>
             </Tabs>
 
             <div className="mt-6 pt-6 border-t space-y-4">
@@ -479,25 +661,6 @@ const Auth = () => {
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   En mode invité, vos données ne seront pas sauvegardées et seront réinitialisées à chaque session.
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <UserCheck className="h-4 w-4" />
-                  <span>Accès personnel de ménage :</span>
-                </div>
-                <Button 
-                  variant="secondary" 
-                  className="w-full" 
-                  onClick={handleHousekeeperAccess}
-                  type="button"
-                >
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  Accès Femme de Chambre
-                </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  Interface dédiée pour le personnel de ménage avec code d'accès.
                 </p>
               </div>
             </div>
