@@ -11,7 +11,7 @@ import { SupabaseService } from '@/services/supabaseService';
 import { CodeGenerationService } from '@/services/codeGenerationService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useAutoSetup } from '@/hooks/use-auto-setup';
-import { useOptimizedSync } from '@/hooks/use-optimized-sync';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Housekeeper {
   id: string;
@@ -31,7 +31,6 @@ export const HousekeeperManagement = () => {
   const { toast } = useToast();
   const { hotel, isSetupComplete } = useAutoSetup();
   const { housekeeperNames, setHousekeeperNames, refreshHousekeepers } = useHousekeeping();
-  const { generateAccessCodesBatch, isProcessing } = useOptimizedSync();
 
   // Filtrage et recherche optimisés - DOIT être avant le return conditionnel
   const filteredHousekeepers = useMemo(() => {
@@ -180,10 +179,9 @@ export const HousekeeperManagement = () => {
     try {
       console.log('🔄 Génération optimisée des codes...');
       
-      // Utiliser la génération par batch optimisée
+      // Récupérer les femmes de chambre sans codes
       const missingHousekeepers = housekeepers
-        .filter(h => h.is_active && (!h.access_code || h.access_code.trim() === ''))
-        .map(h => h.name);
+        .filter(h => h.is_active && (!h.access_code || h.access_code.trim() === ''));
 
       if (missingHousekeepers.length === 0) {
         toast({
@@ -193,18 +191,44 @@ export const HousekeeperManagement = () => {
         return;
       }
 
-      const results = await generateAccessCodesBatch(hotel.id, missingHousekeepers);
+      // Générer les codes un par un directement
+      let generated = 0;
+      const errors: string[] = [];
+
+      // Récupérer le code de l'hôtel
+      const { data: hotelData } = await supabase
+        .from('hotels')
+        .select('hotel_code')
+        .eq('id', hotel.id)
+        .single();
+
+      const hotelCode = hotelData?.hotel_code || 'HTL';
+
+      for (const housekeeper of missingHousekeepers) {
+        try {
+          const accessCode = await CodeGenerationService.generateUniqueCode(hotelCode, housekeeper.name);
+          
+          await supabase
+            .from('housekeepers')
+            .update({ access_code: accessCode })
+            .eq('id', housekeeper.id);
+          
+          generated++;
+        } catch (error: any) {
+          errors.push(`${housekeeper.name}: ${error.message}`);
+        }
+      }
       
-      if (results.errors.length > 0) {
+      if (errors.length > 0) {
         toast({
           variant: "destructive",
           title: "Génération avec erreurs",
-          description: `${results.generated} codes générés, ${results.errors.length} erreurs.`
+          description: `${generated} codes générés, ${errors.length} erreurs.`
         });
       } else {
         toast({
           title: "Codes générés",
-          description: `${results.generated} code(s) d'accès généré(s) avec succès.`
+          description: `${generated} code(s) d'accès généré(s) avec succès.`
         });
       }
 
@@ -346,7 +370,7 @@ export const HousekeeperManagement = () => {
             <div className="flex items-end">
               <Button 
                 onClick={handleCreateHousekeeper}
-                disabled={isLoading || isProcessing || !newHousekeeperName.trim()}
+                disabled={isLoading || !newHousekeeperName.trim()}
                 className="flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
@@ -382,14 +406,14 @@ export const HousekeeperManagement = () => {
                   <RefreshCw className="h-4 w-4" />
                   Actualiser
                 </Button>
-                <Button
-                  onClick={handleGenerateAllCodes}
-                  disabled={isGeneratingCodes || isProcessing}
-                  className="flex items-center gap-2"
-                >
-                  <Key className="h-4 w-4" />
-                  {isGeneratingCodes || isProcessing ? 'Génération optimisée...' : 'Générer codes manquants'}
-                </Button>
+                 <Button
+                   onClick={handleGenerateAllCodes}
+                   disabled={isGeneratingCodes}
+                   className="flex items-center gap-2"
+                 >
+                   <Key className="h-4 w-4" />
+                   {isGeneratingCodes ? 'Génération...' : 'Générer codes manquants'}
+                 </Button>
                 <Button
                   variant="destructive"
                   onClick={handleCleanupAll}
