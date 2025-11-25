@@ -29,6 +29,7 @@ import { SuspensionDialog } from '@/components/SuspensionDialog';
 import { SubscriptionManagementDialog } from '@/components/SubscriptionManagementDialog';
 import { HousekeeperAccessRequests } from '@/components/HousekeeperAccessRequests';
 import { SessionsManagementPanel } from '@/components/SessionsManagementPanel';
+import { SessionHistoryPanel } from '@/components/SessionHistoryPanel';
 import { AuditLogPanel } from '@/components/AuditLogPanel';
 import { ReportTrainingPanel } from '@/components/ReportTrainingPanel';
 import { IncidentList } from '@/components/incident/IncidentList';
@@ -781,6 +782,10 @@ const Admin = () => {
             <Monitor className="h-4 w-4 mr-2" />
             Sessions
           </TabsTrigger>
+          <TabsTrigger value="session-history">
+            <Clock className="h-4 w-4 mr-2" />
+            Historique Sessions
+          </TabsTrigger>
           <TabsTrigger value="audit">
             <Activity className="h-4 w-4 mr-2" />
             Journal
@@ -1132,6 +1137,10 @@ const Admin = () => {
 
         <TabsContent value="sessions" className="space-y-4">
           <SessionsManagementPanel />
+        </TabsContent>
+
+        <TabsContent value="session-history" className="space-y-4">
+          <SessionHistoryPanel />
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-4">
