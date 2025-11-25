@@ -69,35 +69,29 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    let sessionInitialized = false;
-    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!isMounted) return;
-        
+
         console.log('🔐 Housekeeper auth changed:', { event, session_exists: !!session });
-        
-        // Clear timeout
-        if (timeoutId) clearTimeout(timeoutId);
-        sessionInitialized = true;
-        
-        // Use setTimeout(0) to prevent blocking
-        setTimeout(() => {
-          if (isMounted) {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-            
-            if (session?.user) {
+
+        // Keep callback synchronous and light
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+
+        if (session?.user) {
+          // Defer profile loading to avoid blocking auth callback
+          setTimeout(() => {
+            if (isMounted) {
               loadHousekeeperProfile(session.user);
-            } else {
-              setProfile(null);
-              setCurrentHotelSession(null);
             }
-          }
-        }, 0);
+          }, 0);
+        } else {
+          setProfile(null);
+          setCurrentHotelSession(null);
+        }
       }
     );
 
@@ -105,12 +99,11 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     const initializeSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        sessionInitialized = true;
-        
+
         if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
-          
+
           if (session?.user) {
             await loadHousekeeperProfile(session.user);
           }
@@ -126,18 +119,9 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
 
     initializeSession();
 
-    // Extended timeout
-    timeoutId = setTimeout(() => {
-      if (isMounted && !sessionInitialized) {
-        console.log('⏰ Housekeeper auth timeout - continuing as unauthenticated');
-        setLoading(false);
-      }
-    }, 5000);
-
     return () => {
       setIsMounted(false);
       subscription.unsubscribe();
-      if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
 
