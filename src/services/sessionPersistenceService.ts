@@ -7,6 +7,8 @@ interface SessionPersistenceData {
   lastActiveDate: string;
   room_data?: any[];
   housekeeper_assignments?: Record<string, string>;
+  uploaded_reports?: any[];
+  incidents?: any[];
 }
 
 export class SessionPersistenceService {
@@ -66,6 +68,9 @@ export class SessionPersistenceService {
       const session = await HotelSessionService.getSession(sessionToken);
       if (!session) return false;
 
+      // Récupérer les données persistées localement (rapports uploadés, incidents)
+      const persistedData = this.getSavedSessionData();
+
       // Créer un rapport quotidien avec les données de la session
       const reportData = {
         hotel_id: hotelId,
@@ -75,6 +80,8 @@ export class SessionPersistenceService {
           total_rooms: session.room_data?.length || 0,
           completed_rooms: session.room_data?.filter((room: any) => room.status === 'completed').length || 0,
           housekeeper_assignments: session.housekeeper_assignments || {},
+          uploaded_reports: persistedData?.uploaded_reports || [],
+          incidents: persistedData?.incidents || [],
           archived_at: new Date().toISOString()
         })),
         notes: `Rapport archivé automatiquement - session du ${new Date(session.updated_at).toLocaleDateString()}`
@@ -89,7 +96,7 @@ export class SessionPersistenceService {
         return false;
       }
 
-      console.log('✅ Report archived successfully');
+      console.log('✅ Report archived successfully with uploaded reports and incidents');
       return true;
     } catch (error) {
       console.error('❌ Error archiving report:', error);
@@ -202,6 +209,64 @@ export class SessionPersistenceService {
     } catch (error) {
       console.error('❌ Failed to get stored hotel ID:', error);
       return localStorage.getItem('hotelId');
+    }
+  }
+
+  // Sauvegarder un rapport uploadé dans la session
+  static saveUploadedReport(reportData: any): void {
+    try {
+      const current = this.getSavedSessionData();
+      if (current) {
+        const uploadedReports = current.uploaded_reports || [];
+        uploadedReports.push({
+          ...reportData,
+          uploaded_at: new Date().toISOString()
+        });
+        this.updateSessionData({ uploaded_reports: uploadedReports });
+        console.log('✅ Uploaded report saved to session:', reportData);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save uploaded report:', error);
+    }
+  }
+
+  // Sauvegarder un incident dans la session
+  static saveIncident(incidentData: any): void {
+    try {
+      const current = this.getSavedSessionData();
+      if (current) {
+        const incidents = current.incidents || [];
+        incidents.push({
+          ...incidentData,
+          created_at: new Date().toISOString()
+        });
+        this.updateSessionData({ incidents: incidents });
+        console.log('✅ Incident saved to session:', incidentData);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save incident:', error);
+    }
+  }
+
+  // Récupérer les rapports uploadés de la session
+  static getUploadedReports(): any[] {
+    try {
+      const saved = this.getSavedSessionData();
+      return saved?.uploaded_reports || [];
+    } catch (error) {
+      console.error('❌ Failed to get uploaded reports:', error);
+      return [];
+    }
+  }
+
+  // Récupérer les incidents de la session
+  static getIncidents(): any[] {
+    try {
+      const saved = this.getSavedSessionData();
+      return saved?.incidents || [];
+    } catch (error) {
+      console.error('❌ Failed to get incidents:', error);
+      return [];
     }
   }
 }
