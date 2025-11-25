@@ -43,10 +43,12 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const housekeeperData = localStorage.getItem('housekeeper') ? JSON.parse(localStorage.getItem('housekeeper')!) : null;
   const housekeeperProfile = localStorage.getItem('housekeeperProfile') ? JSON.parse(localStorage.getItem('housekeeperProfile')!) : null;
   
-  const accessCode = accessCodeFromUrl || housekeeperData?.accessCode;
-  const hotelId = hotelIdFromUrl || localStorage.getItem('selectedHotelId');
-  const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
-  const isAuthenticatedHousekeeper = housekeeperProfile?.isAuthenticated;
+   const isAuthenticatedHousekeeper = housekeeperProfile?.isAuthenticated;
+   const accessCode = isAuthenticatedHousekeeper 
+     ? null 
+     : (accessCodeFromUrl || housekeeperData?.accessCode);
+   const hotelId = hotelIdFromUrl || localStorage.getItem('selectedHotelId');
+   const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
 
   useEffect(() => {
     // Une femme de chambre authentifiée n'a pas besoin de code d'accès
@@ -435,25 +437,27 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </div>
         )}
 
-        {/* Session Info */}
-        <Card className="p-4 bg-blue-50 border-blue-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
-                <p className="font-medium text-blue-800">Connecté en tant que</p>
-                <p className="text-sm text-blue-600">{housekeeperName}</p>
-              </div>
-              <div>
-                <p className="font-medium text-blue-800">Code d'accès</p>
-                <p className="text-sm font-mono text-blue-600">{accessCode}</p>
-              </div>
-            </div>
-            <Badge variant="default" className="bg-green-100 text-green-800">
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Connecté
-            </Badge>
-          </div>
-        </Card>
+         {/* Session Info */}
+         <Card className="p-4 bg-blue-50 border-blue-200">
+           <div className="flex items-center justify-between">
+             <div className="flex items-center gap-4">
+               <div>
+                 <p className="font-medium text-blue-800">Connecté en tant que</p>
+                 <p className="text-sm text-blue-600">{housekeeperName}</p>
+               </div>
+               {!isAuthenticatedHousekeeper && (
+                 <div>
+                   <p className="font-medium text-blue-800">Code d'accès</p>
+                   <p className="text-sm font-mono text-blue-600">{accessCode}</p>
+                 </div>
+               )}
+             </div>
+             <Badge variant="default" className="bg-green-100 text-green-800">
+               <CheckCircle className="h-4 w-4 mr-1" />
+               Connecté
+             </Badge>
+           </div>
+         </Card>
       </div>
 
       {/* Progress */}

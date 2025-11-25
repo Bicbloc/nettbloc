@@ -172,23 +172,27 @@ export default function HousekeeperHotels() {
   };
 
   const handleSelectHotel = (hotel: any) => {
-    // Stocker les infos dans le localStorage pour une femme de chambre authentifiée
-    localStorage.setItem('selectedHotelId', hotel.id);
-    localStorage.setItem('selectedHotelName', hotel.name);
-    localStorage.setItem('housekeeperProfile', JSON.stringify({
-      id: profile.id,
-      name: profile.name,
-      email: profile.email,
-      isAuthenticated: true
-    }));
-
-    toast({
-      title: "Hôtel sélectionné ! 🏨",
-      description: `Vous travaillez maintenant pour ${hotel.name}`
-    });
-
-    navigate('/housekeeper/work');
-  };
+     // Nettoyer les anciennes données de connexion (codes temporaires)
+     localStorage.removeItem('housekeeper');
+ 
+     // Stocker les infos dans le localStorage pour une femme de chambre authentifiée
+     localStorage.setItem('selectedHotelId', hotel.id);
+     localStorage.setItem('selectedHotelName', hotel.name);
+     localStorage.setItem('selectedHotelCode', hotel.hotel_code || '');
+     localStorage.setItem('housekeeperProfile', JSON.stringify({
+       id: profile.id,
+       name: profile.name,
+       email: profile.email,
+       isAuthenticated: true
+     }));
+ 
+     toast({
+       title: "Hôtel sélectionné ! 🏨",
+       description: `Vous travaillez maintenant pour ${hotel.name}`
+     });
+ 
+     navigate('/housekeeper/work');
+   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
