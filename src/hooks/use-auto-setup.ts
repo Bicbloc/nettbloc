@@ -68,53 +68,26 @@ export const useAutoSetup = () => {
     setLoading(true);
     
     try {
-      // Phase 1: Vérification de cohérence des données
+      // Phase 1: Vérification de cohérence des données (non bloquante)
       console.log('🔍 Vérification cohérence profil + hôtel...');
-      
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', currentUser.id)
-        .maybeSingle();
+      let profileData: any = null;
 
-      if (profileError) {
-        console.error('❌ Erreur recherche profil:', profileError);
-        throw profileError;
-      }
-
-      // Si le profil n'existe pas, le créer automatiquement avec les métadonnées utilisateur
-      let profileData = profile;
-      if (!profile) {
-        console.log('📝 Création automatique du profil utilisateur...');
-        
-        // Récupérer les métadonnées de l'utilisateur Supabase
-        const companyFromMetadata = currentUser.user_metadata?.company_name;
-        
-        const { data: newProfile, error: createProfileError } = await supabase
+      try {
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            id: currentUser.id,
-            email: currentUser.email || '',
-            company_name: companyFromMetadata || null
-          })
-          .select()
-          .single();
+          .select('*')
+          .eq('id', currentUser.id)
+          .maybeSingle();
 
-        if (createProfileError) {
-          console.error('❌ Erreur création profil:', createProfileError);
-          toast({
-            variant: "destructive",
-            title: "Erreur de configuration",
-            description: "Impossible de créer votre profil. Veuillez réessayer."
-          });
-          setLoading(false);
-          return;
+        if (profileError) {
+          console.warn('⚠️ Erreur recherche profil (ignorée):', profileError.message);
+        } else if (profile) {
+          profileData = profile;
+          console.log('✅ Profil utilisateur disponible:', profileData);
         }
-        profileData = newProfile;
-        console.log('✅ Profil créé automatiquement:', profileData);
+      } catch (profileFatalError) {
+        console.warn('⚠️ Impossible de charger le profil (ignoré):', profileFatalError);
       }
-
-      console.log('✅ Profil utilisateur disponible:', profileData);
 
       // Phase 2: Rechercher l'hôtel existant
       const { data: existingHotelByUser, error: hotelErrorByUser } = await supabase
