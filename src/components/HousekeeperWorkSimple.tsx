@@ -39,43 +39,80 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const hotelIdFromUrl = searchParams.get('hotel');
   const housekeeperNameFromUrl = searchParams.get('name');
 
-  // Récupérer depuis localStorage si pas dans l'URL
+  // Récupérer depuis localStorage
   const housekeeperData = localStorage.getItem('housekeeper') ? JSON.parse(localStorage.getItem('housekeeper')!) : null;
+  const housekeeperProfile = localStorage.getItem('housekeeperProfile') ? JSON.parse(localStorage.getItem('housekeeperProfile')!) : null;
+  
   const accessCode = accessCodeFromUrl || housekeeperData?.accessCode;
   const hotelId = hotelIdFromUrl || localStorage.getItem('selectedHotelId');
-  const housekeeperName = housekeeperNameFromUrl || housekeeperData?.name || 'Femme de chambre';
+  const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
+  const isAuthenticatedHousekeeper = housekeeperProfile?.isAuthenticated;
 
   useEffect(() => {
-    if (accessCode && hotelId) {
+    // Une femme de chambre authentifiée n'a pas besoin de code d'accès
+    if ((accessCode && hotelId) || (isAuthenticatedHousekeeper && hotelId)) {
       loadWorkData();
     } else {
       toast({
         title: "Paramètres manquants",
-        description: "Code d'accès ou hôtel non spécifié. Veuillez vous reconnecter.",
+        description: "Veuillez vous reconnecter.",
         variant: "destructive"
       });
       // Nettoyer le localStorage
       localStorage.removeItem('housekeeper');
+      localStorage.removeItem('housekeeperProfile');
       localStorage.removeItem('selectedHotelId');
       localStorage.removeItem('selectedHotelName');
       localStorage.removeItem('selectedHotelCode');
       navigate('/housekeeper/login');
     }
-  }, [accessCode, hotelId]);
+  }, [accessCode, hotelId, isAuthenticatedHousekeeper]);
 
   const loadWorkData = async () => {
     try {
-      // Vérifier l'authentification avec le code
-      const authResult = await HousekeeperAuthService.authenticateWithFullCode(accessCode!);
+      let authResult: any;
       
-      if (!authResult.success) {
-        toast({
-          title: "Code invalide",
-          description: authResult.error || "Code d'accès non valide",
-          variant: "destructive"
-        });
-        navigate('/housekeeper/login');
-        return;
+      // Si c'est une femme de chambre authentifiée (avec profil)
+      if (isAuthenticatedHousekeeper && housekeeperProfile) {
+        // Récupérer l'hôtel
+        const { data: hotelData, error: hotelError } = await supabase
+          .from('hotels')
+          .select('*')
+          .eq('id', hotelId)
+          .single();
+
+        if (hotelError || !hotelData) {
+          toast({
+            title: "Erreur",
+            description: "Hôtel non trouvé",
+            variant: "destructive"
+          });
+          navigate('/housekeeper/hotels');
+          return;
+        }
+
+        authResult = {
+          success: true,
+          hotel: hotelData,
+          user: {
+            id: housekeeperProfile.id,
+            name: housekeeperProfile.name,
+            email: housekeeperProfile.email
+          }
+        };
+      } else {
+        // Vérifier l'authentification avec le code (femmes de chambre temporaires)
+        authResult = await HousekeeperAuthService.authenticateWithFullCode(accessCode!);
+        
+        if (!authResult.success) {
+          toast({
+            title: "Code invalide",
+            description: authResult.error || "Code d'accès non valide",
+            variant: "destructive"
+          });
+          navigate('/housekeeper/login');
+          return;
+        }
       }
 
       setHotel(authResult.hotel);
@@ -300,10 +337,17 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const handleLogout = () => {
     // Nettoyer le localStorage
     localStorage.removeItem('housekeeper');
+    localStorage.removeItem('housekeeperProfile');
     localStorage.removeItem('selectedHotelId');
     localStorage.removeItem('selectedHotelName');
     localStorage.removeItem('selectedHotelCode');
-    navigate('/housekeeper/login');
+    
+    // Rediriger vers la page appropriée
+    if (isAuthenticatedHousekeeper) {
+      navigate('/housekeeper/hotels');
+    } else {
+      navigate('/housekeeper/login');
+    }
   };
 
   if (isLoading) {
