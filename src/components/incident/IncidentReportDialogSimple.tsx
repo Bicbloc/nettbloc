@@ -30,10 +30,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Camera, X, Sparkles } from "lucide-react";
+import { AlertTriangle, Camera, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
-import { useIncidentAI } from "@/hooks/use-incident-ai";
 
 const incidentSchema = z.object({
   title: z.string().min(3, "Le titre doit contenir au moins 3 caractères"),
@@ -59,7 +58,6 @@ export function IncidentReportDialogSimple({
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const { analyzeImage, isAnalyzing } = useIncidentAI(hotelId);
   
   // Initialiser les données par défaut si nécessaire
   useIncidentDefaults(hotelId);
@@ -236,43 +234,6 @@ export function IncidentReportDialogSimple({
 
   const removeImage = (index: number) => {
     setSelectedImages(selectedImages.filter((_, i) => i !== index));
-  };
-
-  const handleAIAnalysis = async () => {
-    if (selectedImages.length === 0) {
-      toast({
-        title: "Aucune image",
-        description: "Ajoutez une photo avant l'analyse IA",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const analysisResult = await analyzeImage(selectedImages[0]);
-    
-    if (analysisResult) {
-      // Trouver les IDs correspondants
-      const itemMatch = categoriesWithItems
-        ?.flatMap(cat => cat.items)
-        .find((item: any) => item.name.toLowerCase() === analysisResult.item.toLowerCase());
-
-      const typeMatch = types?.find(
-        type => type.name.toLowerCase().includes(analysisResult.type.toLowerCase())
-      );
-
-      // Pré-remplir le formulaire
-      form.setValue('title', analysisResult.suggestedTitle);
-      if (itemMatch) form.setValue('item_id', itemMatch.id);
-      if (typeMatch) form.setValue('type_id', typeMatch.id);
-      if (analysisResult.description) {
-        form.setValue('description', analysisResult.description);
-      }
-
-      // Rafraîchir les données si un nouvel item a été créé
-      if (analysisResult.isNewItem) {
-        queryClient.invalidateQueries({ queryKey: ["categories-with-items"] });
-      }
-    }
   };
 
   return (
@@ -459,22 +420,7 @@ export function IncidentReportDialogSimple({
 
               {/* Photos */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <FormLabel>Photos (optionnel)</FormLabel>
-                  {selectedImages.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAIAnalysis}
-                      disabled={isAnalyzing}
-                      className="gap-2"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      {isAnalyzing ? "Analyse..." : "Analyser avec IA"}
-                    </Button>
-                  )}
-                </div>
+                <FormLabel>Photos (optionnel)</FormLabel>
                 <div className="flex flex-wrap gap-2">
                   {selectedImages.map((image, index) => (
                     <div key={index} className="relative">
