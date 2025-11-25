@@ -29,13 +29,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const isMountedRef = useRef(true);
 
   useEffect(() => {
-    // Timeout de sécurité - force la fin du loading après 5 secondes
+    // Timeout de sécurité réduit - force la fin du loading après 2 secondes
     const timeoutId = setTimeout(() => {
       if (isMountedRef.current && loading) {
         console.warn('⚠️ Auth timeout - forcing loading to false');
         setLoading(false);
       }
-    }, 5000);
+    }, 2000);
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

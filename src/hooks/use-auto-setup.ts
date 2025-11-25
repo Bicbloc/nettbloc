@@ -25,7 +25,20 @@ interface HotelWithCodes extends HotelData {
 export const useAutoSetup = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [hotel, setHotel] = useState<HotelData | null>(null);
+  
+  // ⚡ Initialisation immédiate depuis localStorage pour affichage instantané
+  const [hotel, setHotel] = useState<HotelData | null>(() => {
+    const savedId = localStorage.getItem('selectedHotelId');
+    const savedCode = localStorage.getItem('selectedHotelCode');
+    const savedName = localStorage.getItem('selectedHotelName');
+    
+    if (savedId && savedCode && savedName) {
+      console.log('⚡ [useAutoSetup] Hotel chargé instantanément depuis cache:', savedName);
+      return { id: savedId, hotel_code: savedCode, name: savedName } as HotelData;
+    }
+    return null;
+  });
+  
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -306,11 +319,9 @@ export const useAutoSetup = () => {
     }
 
     if (!hasAttemptedSetup.current) {
-      console.log('✅ [useAutoSetup] User authentifié, lancement setup avec délai...');
-      // Petit délai pour laisser React propager les états
-      setTimeout(() => {
-        setupHotel(user, isAuthenticated);
-      }, 100);
+      console.log('✅ [useAutoSetup] User authentifié, lancement setup IMMÉDIAT');
+      // Appel immédiat sans délai artificiel
+      setupHotel(user, isAuthenticated);
     }
   }, [authLoading, isAuthenticated, user?.id]);
 
