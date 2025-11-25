@@ -1310,6 +1310,220 @@ export type Database = {
           },
         ]
       }
+      linen_inventory_entries: {
+        Row: {
+          ai_confidence: number | null
+          count_method: string | null
+          counted_at: string | null
+          created_at: string | null
+          id: string
+          linen_type_id: string
+          notes: string | null
+          photo_url: string | null
+          quantity_clean: number | null
+          quantity_damaged: number | null
+          quantity_dirty: number | null
+          task_id: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          count_method?: string | null
+          counted_at?: string | null
+          created_at?: string | null
+          id?: string
+          linen_type_id: string
+          notes?: string | null
+          photo_url?: string | null
+          quantity_clean?: number | null
+          quantity_damaged?: number | null
+          quantity_dirty?: number | null
+          task_id: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          count_method?: string | null
+          counted_at?: string | null
+          created_at?: string | null
+          id?: string
+          linen_type_id?: string
+          notes?: string | null
+          photo_url?: string | null
+          quantity_clean?: number | null
+          quantity_damaged?: number | null
+          quantity_dirty?: number | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linen_inventory_entries_linen_type_id_fkey"
+            columns: ["linen_type_id"]
+            isOneToOne: false
+            referencedRelation: "linen_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "linen_inventory_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "linen_inventory_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      linen_inventory_tasks: {
+        Row: {
+          assigned_by: string
+          assigned_to: string
+          completed_at: string | null
+          created_at: string | null
+          hotel_id: string
+          id: string
+          notes: string | null
+          started_at: string | null
+          status: string | null
+          task_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_by: string
+          assigned_to: string
+          completed_at?: string | null
+          created_at?: string | null
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          started_at?: string | null
+          status?: string | null
+          task_date?: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_by?: string
+          assigned_to?: string
+          completed_at?: string | null
+          created_at?: string | null
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          started_at?: string | null
+          status?: string | null
+          task_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linen_inventory_tasks_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      linen_training_samples: {
+        Row: {
+          actual_count: number
+          ai_predicted_count: number | null
+          created_at: string | null
+          created_by: string
+          hotel_id: string
+          id: string
+          image_url: string
+          linen_type_id: string
+          notes: string | null
+        }
+        Insert: {
+          actual_count: number
+          ai_predicted_count?: number | null
+          created_at?: string | null
+          created_by: string
+          hotel_id: string
+          id?: string
+          image_url: string
+          linen_type_id: string
+          notes?: string | null
+        }
+        Update: {
+          actual_count?: number
+          ai_predicted_count?: number | null
+          created_at?: string | null
+          created_by?: string
+          hotel_id?: string
+          id?: string
+          image_url?: string
+          linen_type_id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linen_training_samples_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "linen_training_samples_linen_type_id_fkey"
+            columns: ["linen_type_id"]
+            isOneToOne: false
+            referencedRelation: "linen_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      linen_types: {
+        Row: {
+          category: string | null
+          color: string | null
+          created_at: string | null
+          dimensions: string | null
+          display_order: number | null
+          hotel_id: string
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+          weight_per_unit: number | null
+        }
+        Insert: {
+          category?: string | null
+          color?: string | null
+          created_at?: string | null
+          dimensions?: string | null
+          display_order?: number | null
+          hotel_id: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+          weight_per_unit?: number | null
+        }
+        Update: {
+          category?: string | null
+          color?: string | null
+          created_at?: string | null
+          dimensions?: string | null
+          display_order?: number | null
+          hotel_id?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+          weight_per_unit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linen_types_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string

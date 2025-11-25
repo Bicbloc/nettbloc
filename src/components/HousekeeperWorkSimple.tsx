@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle } from 'lucide-react';
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import { GamificationService } from '@/services/gamificationService';
 import { BadgeUnlockNotification } from './gamification/BadgeUnlockNotification';
@@ -14,6 +14,7 @@ import { LevelProgressBar } from './gamification/LevelProgressBar';
 import { IncidentReportDialogSimple } from './incident/IncidentReportDialogSimple';
 import { Textarea } from './ui/textarea';
 import { AlertTriangle, MessageSquare } from 'lucide-react';
+import { LinenInventorySection } from './linen/LinenInventorySection';
 
 interface Room {
   id: string;
@@ -37,6 +38,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [newBadges, setNewBadges] = useState<any[]>([]);
   const [levelUpData, setLevelUpData] = useState<number | null>(null);
   const [roomNotes, setRoomNotes] = useState<Record<string, string>>({});
+  const [showGeneralIncidentDialog, setShowGeneralIncidentDialog] = useState(false);
 
   // Essayer d'abord les query params, puis le localStorage
   const accessCodeFromUrl = searchParams.get('access_code');
@@ -516,6 +518,14 @@ export const HousekeeperWorkSimple: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Linen Inventory Section - Only shows if task assigned */}
+      {housekeeper?.id && (
+        <LinenInventorySection 
+          hotelId={hotelId!} 
+          housekeeperId={housekeeper.id}
+        />
+      )}
+
       {/* Room List */}
       <Card>
         <CardHeader>
@@ -636,6 +646,42 @@ export const HousekeeperWorkSimple: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Floating Incident Report Button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button
+          size="lg"
+          className="rounded-full shadow-lg bg-red-500 hover:bg-red-600 text-white h-14 w-14 sm:h-auto sm:w-auto sm:px-6"
+          onClick={() => setShowGeneralIncidentDialog(true)}
+        >
+          <AlertCircle className="h-6 w-6 sm:mr-2" />
+          <span className="hidden sm:inline">Signaler un incident</span>
+        </Button>
+      </div>
+
+      {/* General Incident Dialog */}
+      {showGeneralIncidentDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Signaler un incident</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowGeneralIncidentDialog(false)}
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="p-4">
+              <IncidentReportDialogSimple 
+                hotelId={hotelId!} 
+                userType="housekeeper"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
