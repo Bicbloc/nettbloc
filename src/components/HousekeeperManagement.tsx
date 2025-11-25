@@ -89,7 +89,9 @@ export const HousekeeperManagement = () => {
   };
 
   const handleCreateHousekeeper = async () => {
-    if (!newHousekeeperName.trim()) {
+    const trimmedName = newHousekeeperName.trim();
+    
+    if (!trimmedName) {
       toast({
         variant: "destructive",
         title: "Erreur",
@@ -107,12 +109,16 @@ export const HousekeeperManagement = () => {
       return;
     }
 
-    // Vérifier si le nom existe déjà
-    if (housekeepers.some(h => h.name.toLowerCase() === newHousekeeperName.toLowerCase() && h.is_active)) {
+    // Vérifier si le nom existe déjà (insensible à la casse)
+    const nameExists = housekeepers.some(
+      h => h.name.toLowerCase() === trimmedName.toLowerCase() && h.is_active
+    );
+    
+    if (nameExists) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "Une femme de chambre avec ce nom existe déjà"
+        title: "Doublon détecté",
+        description: `Une femme de chambre nommée "${trimmedName}" existe déjà`
       });
       return;
     }

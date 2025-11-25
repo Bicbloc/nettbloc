@@ -140,7 +140,9 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
   });
 
   const handleAddStaff = () => {
-    if (!newStaffName.trim() || !selectedRole) {
+    const trimmedName = newStaffName.trim();
+    
+    if (!trimmedName || !selectedRole) {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs",
@@ -148,9 +150,23 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
       });
       return;
     }
+    
+    // Vérifier si le nom existe déjà (insensible à la casse)
+    const nameExists = housekeepers?.some(
+      s => s.name.toLowerCase() === trimmedName.toLowerCase() && s.is_active
+    );
+    
+    if (nameExists) {
+      toast({
+        title: "Doublon détecté",
+        description: `Un membre du personnel nommé "${trimmedName}" existe déjà`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     addStaffMutation.mutate({
-      name: newStaffName.trim(),
+      name: trimmedName,
       roleId: selectedRole,
     });
   };
