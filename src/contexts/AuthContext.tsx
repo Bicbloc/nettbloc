@@ -32,9 +32,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let timeoutId: NodeJS.Timeout;
     let sessionChecked = false;
     
-    // Set up auth state listener
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!isMounted) return;
         
         console.log('🔐 Auth state changed:', { event, session_exists: !!session, user_id: session?.user?.id });
@@ -43,11 +43,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (timeoutId) clearTimeout(timeoutId);
         sessionChecked = true;
         
-        if (isMounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
-        }
+        // Use setTimeout(0) to prevent blocking the auth callback
+        setTimeout(() => {
+          if (isMounted) {
+            setSession(session);
+            setUser(session?.user ?? null);
+            setLoading(false);
+          }
+        }, 0);
       }
     );
 
@@ -86,15 +89,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initializeSession();
 
-    // Reduced timeout with check
+    // Extended timeout - give more time for auth to complete
     timeoutId = setTimeout(() => {
       if (isMounted && !sessionChecked) {
-        console.log('⏰ Auth timeout - no session response, continuing as unauthenticated');
+        console.log('⏰ Auth timeout - no session response after 5s, continuing as unauthenticated');
         setSession(null);
         setUser(null);
         setLoading(false);
       }
-    }, 2000); // Reduced from 5000 to 2000ms
+    }, 5000); // Back to 5000ms for reliability
 
     return () => {
       setIsMounted(false);

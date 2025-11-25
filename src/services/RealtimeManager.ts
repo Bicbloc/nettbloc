@@ -45,8 +45,13 @@ class RealtimeManager {
 
     // Debounce: éviter les tentatives trop rapprochées
     const now = Date.now();
-    if (this.isConnecting || (now - this.lastConnectionAttempt < this.minTimeBetweenAttempts)) {
-      console.log('⏳ RealtimeManager: Connexion déjà en cours ou trop tôt, ignoré');
+    if (this.isConnecting) {
+      console.log('⏳ RealtimeManager: Connexion déjà en cours, ignoré');
+      return false;
+    }
+
+    if (now - this.lastConnectionAttempt < this.minTimeBetweenAttempts) {
+      console.log('⏳ RealtimeManager: Trop tôt pour reconnecter, ignoré');
       return false;
     }
 
@@ -57,7 +62,8 @@ class RealtimeManager {
     }
 
     // Déconnecter l'ancien canal si changement d'hôtel
-    if (this.hotelId !== hotelId) {
+    if (this.hotelId && this.hotelId !== hotelId) {
+      console.log('🔄 RealtimeManager: Changement d\'hôtel détecté');
       this.disconnect();
     }
 
@@ -91,11 +97,18 @@ class RealtimeManager {
 
     // Gérer le statut de connexion
     return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ RealtimeManager: Timeout de connexion');
+        this.isConnecting = false;
+        resolve(false);
+      }, 10000); // 10 secondes max
+
       this.channel!.subscribe((status) => {
         console.log('📡 RealtimeManager statut:', status);
         
         switch (status) {
           case 'SUBSCRIBED':
+            clearTimeout(timeoutId);
             console.log('✅ RealtimeManager: Connexion établie');
             this.reconnectAttempts = 0;
             this.isConnecting = false;
@@ -105,6 +118,7 @@ class RealtimeManager {
           case 'CLOSED':
           case 'CHANNEL_ERROR':
           case 'TIMED_OUT':
+            clearTimeout(timeoutId);
             console.log('❌ RealtimeManager: Erreur', status);
             this.isConnecting = false;
             this.scheduleReconnect();

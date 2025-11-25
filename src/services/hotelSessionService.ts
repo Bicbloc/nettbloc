@@ -41,47 +41,46 @@ export class HotelSessionService {
     try {
       const sessionToken = this.generateSessionToken();
       
-      // RÉCUPÉRATION ROBUSTE de l'hotel_id depuis TOUTES les sources
+      // RÉCUPÉRATION OPTIMISÉE de l'hotel_id - UNE SEULE SOURCE À LA FOIS
       let finalHotelId = hotelId;
 
       if (!finalHotelId) {
-        // Priorité 1: localStorage (tous les emplacements)
-        const savedHotelId = localStorage.getItem('selectedHotelId') || 
-                           localStorage.getItem('hotelId') || 
-                           localStorage.getItem('lastSavedHotelId');
+        // Priorité 1: localStorage (source principale)
+        finalHotelId = localStorage.getItem('selectedHotelId') || 
+                       localStorage.getItem('currentHotelId') ||
+                       SessionPersistenceService.getStoredHotelId() ||
+                       undefined;
         
-        if (savedHotelId) {
-          finalHotelId = savedHotelId;
-          console.log('🏨 Session: Hotel ID récupéré depuis localStorage:', finalHotelId);
+        if (finalHotelId) {
+          console.log('✅ Hotel ID depuis localStorage:', finalHotelId.slice(0, 8) + '...');
         } else {
-          // Priorité 2: SessionPersistenceService
-          const persistedHotelId = SessionPersistenceService.getStoredHotelId();
-          
-          if (persistedHotelId) {
-            finalHotelId = persistedHotelId;
-            console.log('🏨 Session: Hotel ID récupéré depuis SessionPersistence:', finalHotelId);
-          } else {
-            // Priorité 3: récupérer l'hôtel de l'utilisateur connecté
-            try {
-              const { data: { user } } = await supabase.auth.getUser();
+          // Priorité 2: récupérer depuis le profil user (une seule fois)
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+              const { data: hotel } = await supabase
+                .from('hotels')
+                .select('id')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
               
-              if (user) {
-                const { data: hotel } = await supabase
-                  .from('hotels')
-                  .select('id')
-                  .eq('user_id', user.id)
-                  .maybeSingle();
-                
-                if (hotel) {
-                  finalHotelId = hotel.id;
-                  console.log('🏨 Session: Hotel ID récupéré depuis user connecté:', finalHotelId);
-                }
+              if (hotel) {
+                finalHotelId = hotel.id;
+                console.log('✅ Hotel ID depuis profil user:', finalHotelId.slice(0, 8) + '...');
               }
-            } catch (error) {
-              console.error('❌ Session: Erreur récupération hotel du user:', error);
             }
+          } catch (error) {
+            console.error('❌ Erreur récupération hotel:', error);
           }
         }
+      }
+
+      if (!finalHotelId) {
+        console.warn('❌ Impossible de créer session: pas de hotel_id');
+        return null;
       }
 
       // Créer la session en DB
@@ -89,7 +88,7 @@ export class HotelSessionService {
         .from('hotel_sessions')
         .insert({
           session_token: sessionToken,
-          hotel_id: finalHotelId || null,
+          hotel_id: finalHotelId,
           room_data: [],
           housekeeper_names: [],
           housekeeper_assignments: {},
@@ -104,32 +103,25 @@ export class HotelSessionService {
         return null;
       }
 
-      // SAUVEGARDE MULTI-EMPLACEMENTS pour éviter toute perte
+      // SAUVEGARDE UNIQUE dans les emplacements principaux
       this.sessionToken = sessionToken;
-      localStorage.setItem('hotel_session_token', sessionToken);
-      localStorage.setItem('sessionToken', sessionToken);
       localStorage.setItem('hotelSessionToken', sessionToken);
+      localStorage.setItem('selectedHotelId', finalHotelId);
+      localStorage.setItem('currentHotelId', finalHotelId);
       
-      if (finalHotelId) {
-        localStorage.setItem('selectedHotelId', finalHotelId);
-        localStorage.setItem('hotelId', finalHotelId);
-        localStorage.setItem('lastSavedHotelId', finalHotelId);
-        localStorage.setItem('hotelDataTimestamp', Date.now().toString());
-      }
-      
-      // Sauvegarder les données de session pour la persistance
+      // Sauvegarder dans le service de persistance
       SessionPersistenceService.saveSessionData({
         sessionToken: sessionToken,
-        hotelId: finalHotelId || '',
+        hotelId: finalHotelId,
         lastActiveDate: new Date().toISOString(),
         room_data: [],
         housekeeper_assignments: {}
       });
       
-      console.log('Session créée avec hotelId:', finalHotelId);
+      console.log('✅ Session créée:', sessionToken.slice(0, 10) + '...', 'Hotel:', finalHotelId.slice(0, 8) + '...');
       return sessionToken;
     } catch (err) {
-      console.error('Erreur createSession:', err);
+      console.error('❌ Erreur createSession:', err);
       return null;
     }
   }
