@@ -300,7 +300,7 @@ export const useAutoSetup = () => {
     if (!hasAttemptedSetup.current) {
       setupHotel();
     }
-  }, [authLoading, isAuthenticated, user?.id, lastUserId, setupHotel]);
+  }, [authLoading, isAuthenticated, user?.id, lastUserId]); // Retrait de setupHotel des dépendances
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
