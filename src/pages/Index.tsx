@@ -80,7 +80,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { StatsOverview } from "@/components/StatsOverview";
 
-const Index = () => {
+function Index() {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
@@ -2417,9 +2417,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
-      </div>
-    </>
+    </div>
+  </>
   );
-};
+}
 
 export default Index;
