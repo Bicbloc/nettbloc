@@ -139,18 +139,39 @@ export const useAutoSetup = () => {
       console.log('✅ Profil utilisateur disponible:', profileData);
 
       // Phase 2: Rechercher l'hôtel existant
-      const { data: existingHotel, error: hotelError } = await supabase
+      const { data: existingHotelByUser, error: hotelErrorByUser } = await supabase
         .from('hotels')
         .select('*')
         .eq('user_id', currentUser.id)
         .maybeSingle();
 
-      if (hotelError) {
-        console.error('❌ Erreur recherche hôtel:', hotelError);
-        throw hotelError;
+      if (hotelErrorByUser) {
+        console.error('❌ Erreur recherche hôtel par user_id:', hotelErrorByUser);
       }
 
-      let hotelData: HotelData | null = existingHotel;
+      let existingHotel = existingHotelByUser;
+
+      // Fallback: si aucun hôtel trouvé via user_id, essayer par email (cas anciens comptes)
+      if (!existingHotel && currentUser.email) {
+        const { data: existingHotelByEmail, error: hotelErrorByEmail } = await supabase
+          .from('hotels')
+          .select('*')
+          .eq('email', currentUser.email)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (hotelErrorByEmail) {
+          console.error('❌ Erreur recherche hôtel par email:', hotelErrorByEmail);
+        }
+
+        if (existingHotelByEmail) {
+          console.log('✅ Hôtel existant trouvé par email:', existingHotelByEmail);
+          existingHotel = existingHotelByEmail;
+        }
+      }
+
+      let hotelData: HotelData | null = existingHotel || null;
       let activeCode: string | null = null;
 
       // Phase 3: Si hôtel trouvé, chercher les codes d'accès actifs
