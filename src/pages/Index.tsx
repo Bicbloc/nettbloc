@@ -2418,7 +2418,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
       </div>
-      </div>
     </>
   );
 };
