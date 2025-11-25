@@ -43,6 +43,7 @@ import { ReportFields as CustomReportFields } from "@/components/ReportCustomFie
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
+import { ReportHistoryDialog } from "@/components/ReportHistoryDialog";
 import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
@@ -1428,13 +1429,20 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                      Espace Personnel Femme de Chambre
                    </a>
                    </Button>
-                  <DailyReportCloseButton 
-                    hotelId={currentHotelId || hotel?.id || ''} 
-                    onReportClosed={() => {
-                      console.log('Rapport clôturé, rafraîchissement...');
-                      window.location.reload();
-                    }}
-                  />
+                   <ReportHistoryDialog
+                     hotelId={currentHotelId || hotel?.id || ''}
+                     onRestore={() => {
+                       console.log('Rapport restauré, rafraîchissement...');
+                       window.location.reload();
+                     }}
+                   />
+                   <DailyReportCloseButton 
+                     hotelId={currentHotelId || hotel?.id || ''} 
+                     onReportClosed={() => {
+                       console.log('Rapport clôturé, rafraîchissement...');
+                       window.location.reload();
+                     }}
+                   />
                   <NotificationBell hotelId={hotel?.id} />
                  <UserMenu />
                </>
@@ -2417,9 +2425,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
-    </div>
-  </>
+      </div>
+    </>
   );
 }
+
+export default Index;
+
+export default Index;
 
 export default Index;
