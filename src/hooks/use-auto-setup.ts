@@ -45,47 +45,25 @@ export const useAutoSetup = () => {
   const hasAttemptedSetup = useRef(false);
   const lastUserIdRef = useRef<string | null>(null);
 
-  const setupHotel = useCallback(async (
-    currentUser: typeof user,
-    currentIsAuthenticated: boolean,
-    retryCount = 0
-  ) => {
+  const setupHotel = useCallback(async (retryCount = 0) => {
     const MAX_RETRIES = 3;
-    const RETRY_DELAY = [1000, 2000, 4000]; // Exponential backoff
+    const RETRY_DELAY = [500, 1000, 2000];
 
-    // Éviter les exécutions multiples dans un même cycle
-    if (hasAttemptedSetup.current && retryCount === 0) {
-      console.log('🚫 Setup déjà tenté dans ce cycle, ignore...');
-      return;
-    }
-
-    // Marquer la tentative de setup pour éviter les doubles appels
-    if (retryCount === 0) {
-      hasAttemptedSetup.current = true;
-    }
-
-    if (!currentIsAuthenticated || !currentUser?.id) {
-      console.log('🚫 Non authentifié, arrêt du setup');
-      setLoading(false);
-      setIsSetupComplete(false);
-      hasAttemptedSetup.current = false;
-      return;
-    }
-
-    // Vérifier que la session est bien établie avec un token valide
+    // IMPORTANT: Récupérer DIRECTEMENT la session depuis Supabase
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
+    
+    if (!session?.user?.id) {
       if (retryCount < MAX_RETRIES) {
-        console.log(`⏳ Session non prête, retry ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY[retryCount]}ms`);
+        console.log(`⏳ Session non prête, retry ${retryCount + 1}/${MAX_RETRIES}`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]));
-        return setupHotel(currentUser, currentIsAuthenticated, retryCount + 1);
-      } else {
-        console.log('🚫 Session non établie après plusieurs tentatives');
-        setLoading(false);
-        return;
+        return setupHotel(retryCount + 1);
       }
+      console.log('🚫 Session non établie après plusieurs tentatives');
+      setLoading(false);
+      return;
     }
 
+    const currentUser = session.user;
     console.log('🏨 Auto-setup: Démarrage pour user:', currentUser.email);
     setLoading(true);
     
@@ -308,43 +286,28 @@ export const useAutoSetup = () => {
   }, [toast]);
 
   useEffect(() => {
-    console.log('🔄 useAutoSetup effect déclenché', {
-      authLoading,
-      isAuthenticated,
-      userId: user?.id,
-      lastUserId: lastUserIdRef.current,
-      hasAttempted: hasAttemptedSetup.current
-    });
-
-    // Attendre que l'auth soit complètement initialisée
     if (authLoading) {
+      console.log('⏳ Auth en cours de chargement...');
       return;
     }
 
-    // Si pas connecté, réinitialiser l'état local
-    if (!user?.id || !isAuthenticated) {
+    if (!isAuthenticated) {
+      console.log('❌ Utilisateur non authentifié, reset du state');
       setHotel(null);
       setAccessCode(null);
       setIsSetupComplete(false);
       setLoading(false);
       hasAttemptedSetup.current = false;
-      lastUserIdRef.current = null;
       return;
     }
 
-    // Nouvel utilisateur connecté -> on réinitialise le flag de setup
-    if (lastUserIdRef.current !== user.id) {
-      console.log('👤 Nouvel utilisateur détecté, réinitialisation du setup');
-      hasAttemptedSetup.current = false;
-      lastUserIdRef.current = user.id;
-    }
-
     if (!hasAttemptedSetup.current) {
-      console.log('✅ [useAutoSetup] User authentifié, lancement setup IMMÉDIAT');
-      // Appel immédiat sans délai artificiel
-      setupHotel(user, isAuthenticated);
+      console.log('🚀 Démarrage du setup automatique');
+      hasAttemptedSetup.current = true;
+      setLoading(true);
+      setupHotel(); // Pas de paramètres - récupère directement la session
     }
-  }, [authLoading, isAuthenticated, user?.id]);
+  }, [authLoading, isAuthenticated, setupHotel]);
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
