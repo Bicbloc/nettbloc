@@ -1,0 +1,331 @@
+import { createContext, useContext, useEffect, useState } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+interface TechnicianProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  is_active: boolean;
+  total_hotels_worked: number;
+}
+
+interface HotelSession {
+  id: string;
+  hotel_id: string;
+  hotel_name?: string;
+  is_active: boolean;
+  access_code: string;
+}
+
+interface TechnicianAuthContextType {
+  user: User | null;
+  session: Session | null;
+  profile: TechnicianProfile | null;
+  currentHotelSession: HotelSession | null;
+  loading: boolean;
+  signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signOut: () => Promise<void>;
+  connectToHotel: (hotelCode: string) => Promise<{ success: boolean; error?: any }>;
+  requestHotelAccess: (hotelCode: string) => Promise<{ success: boolean; error?: any }>;
+  disconnectFromHotel: () => Promise<void>;
+  updateProfile: (updates: Partial<TechnicianProfile>) => Promise<{ error: any }>;
+}
+
+const TechnicianAuthContext = createContext<TechnicianAuthContextType | undefined>(undefined);
+
+export const useTechnicianAuth = () => {
+  const context = useContext(TechnicianAuthContext);
+  if (!context) {
+    throw new Error('useTechnicianAuth must be used within TechnicianAuthProvider');
+  }
+  return context;
+};
+
+export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<TechnicianProfile | null>(null);
+  const [currentHotelSession, setCurrentHotelSession] = useState<HotelSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadTechnicianProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        setTimeout(() => {
+          loadTechnicianProfile(session.user.id);
+        }, 0);
+      } else {
+        setProfile(null);
+        setCurrentHotelSession(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadTechnicianProfile = async (userId: string) => {
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('housekeeper_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) throw profileError;
+      setProfile(profileData);
+
+      const { data: sessionData } = await supabase
+        .from('hotel_access_sessions')
+        .select(`
+          id,
+          hotel_id,
+          access_code,
+          is_active,
+          hotels (
+            name
+          )
+        `)
+        .eq('housekeeper_profile_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (sessionData) {
+        setCurrentHotelSession({
+          id: sessionData.id,
+          hotel_id: sessionData.hotel_id,
+          hotel_name: (sessionData.hotels as any)?.name,
+          is_active: sessionData.is_active,
+          access_code: sessionData.access_code
+        });
+      }
+    } catch (error) {
+      console.error('Error loading technician profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signUp = async (email: string, password: string, name: string, phone?: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/technician/login`;
+      
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: { name, phone }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('housekeeper_profiles')
+          .insert({
+            id: authData.user.id,
+            name,
+            email,
+            phone: phone || null,
+            is_active: true
+          });
+
+        if (profileError) throw profileError;
+      }
+
+      return { error: null };
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      return { error };
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      return { error };
+    } catch (error: any) {
+      return { error };
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      if (currentHotelSession) {
+        await disconnectFromHotel();
+      }
+      await supabase.auth.signOut();
+      setProfile(null);
+      setCurrentHotelSession(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const requestHotelAccess = async (hotelCode: string) => {
+    if (!user || !profile) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+      const { data: hotel, error: hotelError } = await supabase
+        .from('hotels')
+        .select('id')
+        .eq('hotel_code', hotelCode.toUpperCase())
+        .single();
+
+      if (hotelError || !hotel) {
+        throw new Error('Code établissement invalide');
+      }
+
+      const { error: requestError } = await supabase
+        .from('housekeeper_access_requests')
+        .insert({
+          housekeeper_profile_id: profile.id,
+          hotel_id: hotel.id,
+          hotel_code: hotelCode.toUpperCase(),
+          status: 'pending'
+        });
+
+      if (requestError) throw requestError;
+
+      toast({
+        title: "Demande envoyée ✅",
+        description: "Votre demande d'accès a été envoyée à l'établissement"
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error requesting access:', error);
+      return { success: false, error };
+    }
+  };
+
+  const connectToHotel = async (hotelCode: string) => {
+    if (!user || !profile) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+      const { data: hotel, error: hotelError } = await supabase
+        .from('hotels')
+        .select('id, name')
+        .eq('hotel_code', hotelCode.toUpperCase())
+        .single();
+
+      if (hotelError || !hotel) {
+        throw new Error('Code établissement invalide');
+      }
+
+      const { data: existingSession } = await supabase
+        .from('hotel_access_sessions')
+        .select('*')
+        .eq('housekeeper_profile_id', profile.id)
+        .eq('hotel_id', hotel.id)
+        .eq('is_active', true)
+        .single();
+
+      if (existingSession) {
+        setCurrentHotelSession({
+          id: existingSession.id,
+          hotel_id: hotel.id,
+          hotel_name: hotel.name,
+          is_active: true,
+          access_code: existingSession.access_code
+        });
+        return { success: true };
+      }
+
+      return await requestHotelAccess(hotelCode);
+    } catch (error: any) {
+      console.error('Error connecting to hotel:', error);
+      return { success: false, error };
+    }
+  };
+
+  const disconnectFromHotel = async () => {
+    if (!currentHotelSession) return;
+
+    try {
+      await supabase
+        .from('hotel_access_sessions')
+        .update({
+          is_active: false,
+          ended_at: new Date().toISOString()
+        })
+        .eq('id', currentHotelSession.id);
+
+      setCurrentHotelSession(null);
+
+      toast({
+        title: "Déconnexion réussie",
+        description: "Vous avez été déconnecté de l'établissement"
+      });
+    } catch (error) {
+      console.error('Error disconnecting from hotel:', error);
+    }
+  };
+
+  const updateProfile = async (updates: Partial<TechnicianProfile>) => {
+    if (!user || !profile) {
+      return { error: 'Not authenticated' };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('housekeeper_profiles')
+        .update(updates)
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      setProfile({ ...profile, ...updates });
+      return { error: null };
+    } catch (error: any) {
+      return { error };
+    }
+  };
+
+  const value = {
+    user,
+    session,
+    profile,
+    currentHotelSession,
+    loading,
+    signUp,
+    signIn,
+    signOut,
+    connectToHotel,
+    requestHotelAccess,
+    disconnectFromHotel,
+    updateProfile
+  };
+
+  return (
+    <TechnicianAuthContext.Provider value={value}>
+      {children}
+    </TechnicianAuthContext.Provider>
+  );
+};

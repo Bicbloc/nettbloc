@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,29 +7,27 @@ import { Wrench, LogOut, Building2, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IncidentList } from '@/components/incident/IncidentList';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
+import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
+import { TechnicianAccessRequest } from '@/components/TechnicianAccessRequest';
 
 export default function TechnicianDashboard() {
-  const [session, setSession] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile, currentHotelSession, loading, signOut } = useTechnicianAuth();
 
   useEffect(() => {
-    const sessionData = localStorage.getItem('technicianSession');
-    if (!sessionData) {
+    if (!loading && !profile) {
       toast({
         variant: "destructive",
         title: "Session expirée",
         description: "Veuillez vous reconnecter"
       });
       navigate('/technician/login');
-      return;
     }
+  }, [loading, profile, navigate, toast]);
 
-    setSession(JSON.parse(sessionData));
-  }, [navigate, toast]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('technicianSession');
+  const handleLogout = async () => {
+    await signOut();
     toast({
       title: "Déconnexion réussie",
       description: "À bientôt !"
@@ -37,10 +35,40 @@ export default function TechnicianDashboard() {
     navigate('/technician/login');
   };
 
-  if (!session) {
+  if (loading || !profile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 flex items-center justify-center">
         <div className="animate-pulse">Chargement...</div>
+      </div>
+    );
+  }
+
+  if (!currentHotelSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 p-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-100 p-3 rounded-full">
+                    <Wrench className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">{profile.name}</CardTitle>
+                    <div className="text-sm text-muted-foreground">Technicien</div>
+                  </div>
+                </div>
+                <Button variant="outline" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Déconnexion
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+
+          <TechnicianAccessRequest />
+        </div>
       </div>
     );
   }
@@ -57,10 +85,10 @@ export default function TechnicianDashboard() {
                   <Wrench className="h-6 w-6 text-blue-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">{session.technicianName}</CardTitle>
+                  <CardTitle className="text-xl">{profile.name}</CardTitle>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Building2 className="h-4 w-4" />
-                    {session.hotelName}
+                    {currentHotelSession.hotel_name}
                   </div>
                 </div>
               </div>
@@ -91,7 +119,7 @@ export default function TechnicianDashboard() {
                 <CardTitle>Gestion des incidents</CardTitle>
               </CardHeader>
               <CardContent>
-                <IncidentList hotelId={session.hotelId} />
+                <IncidentList hotelId={currentHotelSession.hotel_id} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -103,7 +131,7 @@ export default function TechnicianDashboard() {
               </CardHeader>
               <CardContent className="flex justify-center">
                 <IncidentReportDialogSimple 
-                  hotelId={session.hotelId} 
+                  hotelId={currentHotelSession.hotel_id} 
                   userType="admin"
                 />
               </CardContent>
