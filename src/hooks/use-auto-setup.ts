@@ -49,8 +49,15 @@ export const useAutoSetup = () => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = [500, 1000, 2000];
 
+    console.log('⚙️ [useAutoSetup] setupHotel appelé, tentative', retryCount + 1);
+
     // IMPORTANT: Récupérer DIRECTEMENT la session depuis Supabase
     const { data: { session } } = await supabase.auth.getSession();
+    console.log('⚙️ [useAutoSetup] Session récupérée:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      email: session?.user?.email
+    });
     
     if (!session?.user?.id) {
       if (retryCount < MAX_RETRIES) {
