@@ -30,12 +30,17 @@ export const useAutoSetup = () => {
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const hasAttemptedSetup = useRef(false);
-  const [lastUserId, setLastUserId] = useState<string | null>(null);
+  const lastUserIdRef = useRef<string | null>(null);
 
   const setupHotel = useCallback(async (retryCount = 0) => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = [1000, 2000, 4000]; // Exponential backoff
-    
+
+    // Marquer immédiatement la tentative de setup pour éviter les doubles appels
+    if (retryCount === 0) {
+      hasAttemptedSetup.current = true;
+    }
+
     // Éviter les exécutions multiples dans un même cycle
     if (hasAttemptedSetup.current && retryCount === 0) {
       console.log('🚫 Setup déjà tenté dans ce cycle, ignore...');
@@ -65,7 +70,6 @@ export const useAutoSetup = () => {
     }
 
     console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
-    hasAttemptedSetup.current = true;
     setLoading(true);
     
     try {
@@ -270,7 +274,7 @@ export const useAutoSetup = () => {
       authLoading,
       isAuthenticated,
       userId: user?.id,
-      lastUserId,
+      lastUserId: lastUserIdRef.current,
       hasAttempted: hasAttemptedSetup.current
     });
 
@@ -286,21 +290,21 @@ export const useAutoSetup = () => {
       setIsSetupComplete(false);
       setLoading(false);
       hasAttemptedSetup.current = false;
-      setLastUserId(null);
+      lastUserIdRef.current = null;
       return;
     }
 
     // Nouvel utilisateur connecté -> on réinitialise le flag de setup
-    if (lastUserId !== user.id) {
+    if (lastUserIdRef.current !== user.id) {
       console.log('👤 Nouvel utilisateur détecté, réinitialisation du setup');
       hasAttemptedSetup.current = false;
-      setLastUserId(user.id);
+      lastUserIdRef.current = user.id;
     }
 
     if (!hasAttemptedSetup.current) {
       setupHotel();
     }
-  }, [authLoading, isAuthenticated, user?.id, lastUserId]); // Retrait de setupHotel des dépendances
+  }, [authLoading, isAuthenticated, user?.id]);
 
   const generateNewAccessCode = async () => {
     if (!hotel) return;
