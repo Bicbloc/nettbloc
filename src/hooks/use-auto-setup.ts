@@ -32,9 +32,12 @@ export const useAutoSetup = () => {
   const hasAttemptedSetup = useRef(false);
   const [lastUserId, setLastUserId] = useState<string | null>(null);
 
-  const setupHotel = useCallback(async () => {
+  const setupHotel = useCallback(async (retryCount = 0) => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = [1000, 2000, 4000]; // Exponential backoff
+    
     // Éviter les exécutions multiples dans un même cycle
-    if (hasAttemptedSetup.current) {
+    if (hasAttemptedSetup.current && retryCount === 0) {
       console.log('🚫 Setup déjà tenté dans ce cycle, ignore...');
       return;
     }
@@ -45,6 +48,20 @@ export const useAutoSetup = () => {
       setIsSetupComplete(false);
       hasAttemptedSetup.current = false;
       return;
+    }
+
+    // Vérifier que la session est bien établie avec un token valide
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      if (retryCount < MAX_RETRIES) {
+        console.log(`⏳ Session non prête, retry ${retryCount + 1}/${MAX_RETRIES} dans ${RETRY_DELAY[retryCount]}ms`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]));
+        return setupHotel(retryCount + 1);
+      } else {
+        console.log('🚫 Session non établie après plusieurs tentatives');
+        setLoading(false);
+        return;
+      }
     }
 
     console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
