@@ -70,17 +70,25 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
+    let sessionInitialized = false;
     
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!isMounted) return;
         
-        // Use setTimeout to prevent blocking the auth callback
+        console.log('🔐 Housekeeper auth changed:', { event, session_exists: !!session });
+        
+        // Clear timeout
+        if (timeoutId) clearTimeout(timeoutId);
+        sessionInitialized = true;
+        
+        // Use setTimeout(0) to prevent blocking
         setTimeout(() => {
           if (isMounted) {
             setSession(session);
             setUser(session?.user ?? null);
+            setLoading(false);
             
             if (session?.user) {
               loadHousekeeperProfile(session.user);
@@ -88,7 +96,6 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
               setProfile(null);
               setCurrentHotelSession(null);
             }
-            setLoading(false);
           }
         }, 0);
       }
@@ -98,6 +105,8 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     const initializeSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        sessionInitialized = true;
+        
         if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
@@ -117,9 +126,10 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
 
     initializeSession();
 
-    // Set timeout fallback
+    // Extended timeout
     timeoutId = setTimeout(() => {
-      if (isMounted && loading) {
+      if (isMounted && !sessionInitialized) {
+        console.log('⏰ Housekeeper auth timeout - continuing as unauthenticated');
         setLoading(false);
       }
     }, 5000);
