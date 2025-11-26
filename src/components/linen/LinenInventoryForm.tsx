@@ -158,6 +158,8 @@ export const LinenInventoryForm = ({ taskId, hotelId, onComplete }: LinenInvento
                 onClick={() => handlePhotoCount(type.id)}
                 variant="outline"
                 size="sm"
+                disabled={saveMutation.isPending}
+                type="button"
               >
                 <Camera className="h-4 w-4 mr-2" />
                 Compter par photo
@@ -205,9 +207,14 @@ export const LinenInventoryForm = ({ taskId, hotelId, onComplete }: LinenInvento
         );
       })}
 
-      <Button onClick={() => saveMutation.mutate()} className="w-full" size="lg">
+      <Button 
+        onClick={() => saveMutation.mutate()} 
+        className="w-full" 
+        size="lg"
+        disabled={saveMutation.isPending || Object.keys(entries).length === 0}
+      >
         <Save className="h-4 w-4 mr-2" />
-        Enregistrer l'inventaire
+        {saveMutation.isPending ? "Enregistrement..." : "Enregistrer l'inventaire"}
       </Button>
 
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>

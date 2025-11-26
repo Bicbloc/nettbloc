@@ -85,18 +85,20 @@ export const LinenPhotoCounter = ({
           variant="outline"
           className="flex-1"
           disabled={isCounting}
+          type="button"
         >
-          <Camera className="h-4 w-4 mr-2" />
-          Prendre une photo
+          {isCounting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
+          {isCounting ? "Analyse..." : "Prendre une photo"}
         </Button>
         <Button
           onClick={() => fileInputRef.current?.click()}
           variant="outline"
           className="flex-1"
           disabled={isCounting}
+          type="button"
         >
-          <Upload className="h-4 w-4 mr-2" />
-          Choisir une photo
+          {isCounting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+          {isCounting ? "Analyse..." : "Choisir une photo"}
         </Button>
       </div>
 
