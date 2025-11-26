@@ -13,8 +13,9 @@ import { LevelUpNotification } from './gamification/LevelUpNotification';
 import { LevelProgressBar } from './gamification/LevelProgressBar';
 import { IncidentReportDialogSimple } from './incident/IncidentReportDialogSimple';
 import { Textarea } from './ui/textarea';
-import { AlertTriangle, MessageSquare } from 'lucide-react';
+import { AlertTriangle, MessageSquare, Package } from 'lucide-react';
 import { LinenInventorySection } from './linen/LinenInventorySection';
+import { LinenQuickInventory } from './linen/LinenQuickInventory';
 
 interface Room {
   id: string;
@@ -39,6 +40,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [levelUpData, setLevelUpData] = useState<number | null>(null);
   const [roomNotes, setRoomNotes] = useState<Record<string, string>>({});
   const [showGeneralIncidentDialog, setShowGeneralIncidentDialog] = useState(false);
+  const [showLinenInventory, setShowLinenInventory] = useState(false);
+  const [activeLinenTask, setActiveLinenTask] = useState<string | null>(null);
 
   // Essayer d'abord les query params, puis le localStorage
   const accessCodeFromUrl = searchParams.get('access_code');
@@ -386,6 +389,56 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
+  const handleOpenLinenInventory = async () => {
+    if (!hotelId) return;
+    
+    try {
+      // Create or get today's linen inventory task
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if there's already a task for today
+      const { data: existingTasks } = await supabase
+        .from('linen_inventory_tasks')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('assigned_to', housekeeper?.id || housekeeperProfile?.id)
+        .eq('task_date', today)
+        .single();
+      
+      let taskId: string;
+      
+      if (existingTasks) {
+        taskId = existingTasks.id;
+      } else {
+        // Create a new task
+        const { data: newTask, error } = await supabase
+          .from('linen_inventory_tasks')
+          .insert({
+            hotel_id: hotelId,
+            assigned_to: housekeeper?.id || housekeeperProfile?.id,
+            assigned_by: housekeeper?.id || housekeeperProfile?.id,
+            task_date: today,
+            status: 'pending'
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        taskId = newTask.id;
+      }
+      
+      setActiveLinenTask(taskId);
+      setShowLinenInventory(true);
+    } catch (error) {
+      console.error('Erreur création tâche inventaire:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la tâche d'inventaire",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -647,6 +700,18 @@ export const HousekeeperWorkSimple: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Floating Linen Inventory Button */}
+      <div className="fixed bottom-24 right-6 z-50">
+        <Button
+          size="lg"
+          className="rounded-full shadow-lg bg-blue-500 hover:bg-blue-600 text-white h-14 w-14 sm:h-auto sm:w-auto sm:px-6"
+          onClick={handleOpenLinenInventory}
+        >
+          <Package className="h-6 w-6 sm:mr-2" />
+          <span className="hidden sm:inline">Inventaire linge</span>
+        </Button>
+      </div>
+
       {/* Floating Incident Report Button */}
       <div className="fixed bottom-6 right-6 z-50">
         <Button
@@ -681,6 +746,18 @@ export const HousekeeperWorkSimple: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Linen Quick Inventory */}
+      {showLinenInventory && activeLinenTask && hotelId && (
+        <LinenQuickInventory
+          taskId={activeLinenTask}
+          hotelId={hotelId}
+          onClose={() => {
+            setShowLinenInventory(false);
+            setActiveLinenTask(null);
+          }}
+        />
       )}
     </div>
   );

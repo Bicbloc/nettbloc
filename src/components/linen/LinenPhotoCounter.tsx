@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Camera, Upload, Loader2 } from "lucide-react";
+import { Camera, Upload, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 interface LinenPhotoCounterProps {
   linenTypeId: string;
@@ -130,19 +131,58 @@ export const LinenPhotoCounter = ({
           )}
 
           {result && !isCounting && (
-            <div className="space-y-2">
-              <div className="text-center">
-                <div className="text-3xl font-bold">{result.count}</div>
-                <div className="text-sm text-muted-foreground">pièces détectées</div>
+            <Card className={`p-4 border-2 ${
+              result.confidence >= 0.7 ? 'bg-green-50 border-green-500' :
+              result.confidence >= 0.5 ? 'bg-orange-50 border-orange-500' :
+              'bg-red-50 border-red-500'
+            }`}>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-lg">Résultat:</span>
+                  <Badge className={`text-lg ${
+                    result.confidence >= 0.7 ? 'bg-green-600' :
+                    result.confidence >= 0.5 ? 'bg-orange-600' :
+                    'bg-red-600'
+                  }`}>
+                    {result.count} pièces
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Niveau de confiance:</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${
+                          result.confidence >= 0.7 ? 'bg-green-600' :
+                          result.confidence >= 0.5 ? 'bg-orange-600' :
+                          'bg-red-600'
+                        }`}
+                        style={{ width: `${result.confidence * 100}%` }}
+                      />
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {Math.round(result.confidence * 100)}%
+                    </Badge>
+                  </div>
+                </div>
+                {result.notes && (
+                  <div className="pt-2 border-t">
+                    <p className="text-sm font-medium mb-1">💡 Observations:</p>
+                    <p className="text-sm text-muted-foreground">{result.notes}</p>
+                  </div>
+                )}
+                {result.confidence < 0.6 && (
+                  <div className="pt-2 border-t">
+                    <p className="text-sm font-semibold text-orange-700 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      {result.confidence < 0.5 
+                        ? "⚠️ Confiance faible - Recommandé de reprendre la photo" 
+                        : "⚠️ Vérifiez le résultat avant de valider"}
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Confiance</span>
-                <span className="font-medium">{Math.round(result.confidence * 100)}%</span>
-              </div>
-              {result.notes && (
-                <div className="text-sm text-muted-foreground italic">{result.notes}</div>
-              )}
-            </div>
+            </Card>
           )}
         </Card>
       )}
