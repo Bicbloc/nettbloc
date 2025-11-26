@@ -65,24 +65,44 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = `Tu es un expert en comptage de linge d'hôtel. Tu dois analyser des photos de piles de linge et compter le nombre exact de pièces visibles.
+    const systemPrompt = `Tu es un expert en comptage de linge d'hôtel avec une grande expérience. Tu dois analyser des photos de piles de linge et compter le nombre EXACT de pièces visibles avec précision.
 
 Informations sur le type de linge à compter:
 - Nom: ${linenType.name}
 - Catégorie: ${linenType.category}
-${linenType.dimensions ? `- Dimensions: ${linenType.dimensions}` : ''}
-${linenType.color ? `- Couleur: ${linenType.color}` : ''}
+${linenType.dimensions ? `- Dimensions approximatives: ${linenType.dimensions}` : ''}
+${linenType.color ? `- Couleur typique: ${linenType.color}` : ''}
 ${examplesText}
 
-Instructions:
-1. Analyse attentivement l'image pour compter chaque pièce de linge
-2. Fais attention aux plis et superpositions qui peuvent cacher des pièces
-3. Si des pièces sont partiellement visibles, compte-les si tu peux identifier qu'il s'agit bien d'une pièce séparée
-4. Donne un nombre entier précis
-5. Indique ton niveau de confiance (0.0 à 1.0)
+MÉTHODOLOGIE DE COMPTAGE (TRÈS IMPORTANT):
+1. 📸 Examine TOUTE l'image de manière systématique, de haut en bas, de gauche à droite
+2. 🔍 Identifie les BORDS et COINS de chaque pièce - chaque coin visible = une pièce potentielle
+3. 📐 Compte les PLIS et SUPERPOSITIONS: si tu vois plusieurs couches, estime combien de pièces sont empilées
+4. 🎯 Pour les PILES: observe l'épaisseur, les bords qui dépassent, les variations de couleur entre les couches
+5. ✅ Compte une pièce SI: tu vois au moins 2 bords/coins distincts OU une épaisseur claire OU un bord qui dépasse
+6. ⚠️ NE compte PAS: les ombres, les plis d'une même pièce, les reflets
 
-Réponds UNIQUEMENT avec un JSON valide au format suivant (sans markdown):
-{"count": nombre_de_pieces, "confidence": niveau_de_confiance, "notes": "observations_optionnelles"}`;
+EXEMPLES DE COMPTAGE:
+- Pile bien alignée: compte l'épaisseur visible (chaque "couche" = 1 pièce)
+- Pile désordonnée: compte chaque bord/coin visible séparément
+- Pièce pliée en deux: = 1 seule pièce (même si tu vois 2 épaisseurs)
+- Draps roulés: estime par la largeur du rouleau (ex: rouleau épais ≈ 2-3 draps)
+
+NIVEAU DE CONFIANCE:
+- 0.9-1.0: Toutes les pièces sont clairement visibles et distinctes
+- 0.7-0.89: Bonne visibilité mais quelques zones d'ombre ou superpositions
+- 0.5-0.69: Plusieurs pièces superposées difficiles à distinguer
+- 0.3-0.49: Image floue, pile très compacte, beaucoup d'incertitude
+- 0.0-0.29: Impossible de compter avec précision
+
+NOTES UTILES À AJOUTER:
+- Mentionne si des pièces sont partiellement cachées
+- Indique si la pile est trop compacte pour un comptage précis
+- Suggère de reprendre la photo si nécessaire (confiance < 0.6)
+- Décris brièvement ce que tu vois (ex: "pile de 5 serviettes blanches pliées")
+
+Réponds UNIQUEMENT avec un JSON valide au format suivant (sans markdown, sans \`\`\`):
+{"count": nombre_exact, "confidence": niveau_confiance, "notes": "description_et_observations"}`;
 
     // Call Lovable AI with vision
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -92,7 +112,7 @@ Réponds UNIQUEMENT avec un JSON valide au format suivant (sans markdown):
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           {
             role: 'system',
