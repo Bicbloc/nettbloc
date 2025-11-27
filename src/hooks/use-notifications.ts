@@ -19,7 +19,7 @@ export interface Notification {
 
 // Cache pour améliorer les performances
 const notificationCache = new Map<string, { data: Notification[], timestamp: number }>();
-const CACHE_DURATION = 30000; // 30 secondes
+const CACHE_DURATION = 10000; // 10 secondes pour une meilleure réactivité
 
 export const useNotifications = (hotelId?: string) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -130,37 +130,63 @@ export const useNotifications = (hotelId?: string) => {
     }
   }, [getEffectiveHotelId]);
 
-  // Souscription temps réel via RealtimeManager centralisé
+  // Souscription temps réel via RealtimeManager centralisé avec retry
   useEffect(() => {
     const effectiveHotelId = getEffectiveHotelId();
     if (!effectiveHotelId) return;
 
-    // Connexion au manager centralisé
-    realtimeManager.connect(effectiveHotelId);
+    let subscriptionId: string | null = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 5;
+    let retryTimeout: NodeJS.Timeout | null = null;
 
-    // S'abonner aux changements
-    const subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
-      console.log('📨 Nouvelle notification:', payload.eventType);
-      
-      // Invalider le cache
-      notificationCache.delete(effectiveHotelId);
-      loadNotifications();
+    const setupRealtime = async () => {
+      try {
+        // Connexion au manager centralisé
+        await realtimeManager.connect(effectiveHotelId);
 
-      // Toast uniquement pour les nouvelles notifications
-      if (payload.eventType === 'INSERT' && payload.new) {
-        const newNotif = payload.new as Notification;
-        toast({
-          title: newNotif.title,
-          description: newNotif.description,
+        // S'abonner aux changements
+        subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
+          console.log('📨 Nouvelle notification:', payload.eventType);
+          
+          // Invalider le cache
+          notificationCache.delete(effectiveHotelId);
+          loadNotifications();
+
+          // Toast uniquement pour les nouvelles notifications
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const newNotif = payload.new as Notification;
+            toast({
+              title: newNotif.title,
+              description: newNotif.description,
+            });
+          }
         });
+
+        retryCount = 0; // Reset retry count on success
+        console.log('✅ Realtime notifications connected');
+      } catch (error) {
+        console.error('❌ Failed to setup realtime:', error);
+        
+        // Retry with exponential backoff
+        if (retryCount < MAX_RETRIES) {
+          retryCount++;
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+          console.log(`🔄 Retrying realtime connection in ${delay}ms (attempt ${retryCount}/${MAX_RETRIES})`);
+          retryTimeout = setTimeout(setupRealtime, delay);
+        }
       }
-    });
+    };
 
     // Chargement initial
     loadNotifications();
+    
+    // Setup realtime
+    setupRealtime();
 
     return () => {
-      realtimeManager.unsubscribe(subscriptionId);
+      if (retryTimeout) clearTimeout(retryTimeout);
+      if (subscriptionId) realtimeManager.unsubscribe(subscriptionId);
     };
   }, [getEffectiveHotelId, loadNotifications]);
 
