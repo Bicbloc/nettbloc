@@ -99,13 +99,7 @@ const Index = () => {
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   const [showHousekeeperManagement, setShowHousekeeperManagement] = useState(false);
   
-  // Vérifier que le contexte est disponible
-  const housekeepingContext = useHousekeeping();
-  
-  if (!housekeepingContext) {
-    return <div>Erreur de contexte HousekeepingProvider</div>;
-  }
-  
+  // Utiliser directement le contexte (le hook lance déjà une erreur si indisponible)
   const { 
     housekeeperNames, 
     setHousekeeperNames,

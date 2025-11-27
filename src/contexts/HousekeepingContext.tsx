@@ -41,8 +41,12 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
   const [hotelId, setHotelId] = useState<string | null>(null);
-  const { notifications, addNotification } = useNotifications(hotelId || undefined);
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
+  
+  // Hook notifications APRÈS les autres états pour éviter les problèmes de montage
+  const notificationsHook = useNotifications(hotelId || undefined);
+  const notifications = notificationsHook?.notifications || [];
+  const addNotificationFn = notificationsHook?.addNotification;
 
   // Initialiser la session avec persistance RENFORCÉE
   useEffect(() => {
@@ -412,8 +416,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       console.error('Erreur mise à jour statut chambre:', error);
     }
 
-    // Ajouter notification pour l'admin - FORMAT AMÉLIORÉ
-    if (housekeeperName && hotelId) {
+    // Ajouter notification pour l'admin - FORMAT AMÉLIORÉ (avec sécurité)
+    if (housekeeperName && hotelId && addNotificationFn) {
       console.log('🔔 Création notification avec hotelId:', hotelId);
       
       let notification;
@@ -457,7 +461,9 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       }
 
       console.log('📝 Envoi notification:', notification);
-      addNotification(notification);
+      if (addNotificationFn) {
+        await addNotificationFn(notification);
+      }
     } else {
       console.warn('⚠️ Notification non créée - manque housekeeperName ou hotelId:', { housekeeperName, hotelId });
     }
@@ -564,7 +570,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     setIsDistributed,
     getHousekeeperRooms,
     updateRoomStatus,
-    addNotification,
+    addNotification: addNotificationFn || (async () => null),
     validateHotelConnection,
     refreshHousekeepers,
   };
