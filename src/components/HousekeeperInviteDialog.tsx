@@ -31,96 +31,148 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
     console.log('Generating access code for hotel:', hotelId, 'and name:', name);
     setIsLoading(true);
     try {
-      // Generate access code with name
-      const { data, error } = await supabase.rpc(
-        'generate_housekeeper_access_code_simple',
-        {
-          p_hotel_id: hotelId,
-          p_housekeeper_name: name
-        }
-      );
+      // Vérifier si la femme de chambre existe déjà
+      const { data: existingHousekeeper } = await supabase
+        .from('housekeepers')
+        .select('id, name, access_code')
+        .eq('hotel_id', hotelId)
+        .eq('name', name)
+        .eq('is_active', true)
+        .maybeSingle();
 
-      if (error) {
+      let generatedCode: string;
+      let housekeeperData: any;
+
+      if (existingHousekeeper) {
+        console.log('✅ Femme de chambre déjà existante:', existingHousekeeper);
+        generatedCode = existingHousekeeper.access_code;
+        housekeeperData = existingHousekeeper;
+        
         toast({
-          title: "Erreur",
-          description: "Impossible de générer le code d'accès",
-          variant: "destructive"
+          title: "Code existant trouvé",
+          description: `${name} possède déjà un code d'accès`
         });
-        return;
+      } else {
+        // Generate access code with name
+        const { data, error } = await supabase.rpc(
+          'generate_housekeeper_access_code_simple',
+          {
+            p_hotel_id: hotelId,
+            p_housekeeper_name: name
+          }
+        );
+
+        if (error) {
+          console.error('RPC Error:', error);
+          toast({
+            title: "Erreur",
+            description: "Impossible de générer le code d'accès",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        generatedCode = data as string;
+
+        // Créer l'entrée dans housekeepers avec le code d'accès
+        const { data: newHousekeeper, error: housekeeperError } = await supabase
+          .from('housekeepers')
+          .insert({
+            hotel_id: hotelId,
+            name: name,
+            access_code: generatedCode,
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            is_active: true,
+            is_temporary: false
+          })
+          .select()
+          .single();
+
+        if (housekeeperError) {
+          console.error('Error creating housekeeper:', housekeeperError);
+          toast({
+            title: "Erreur",
+            description: `Impossible de créer la femme de chambre: ${housekeeperError.message}`,
+            variant: "destructive"
+          });
+          return;
+        }
+
+        housekeeperData = newHousekeeper;
       }
 
-      const generatedCode = data as string;
       setAccessCode(generatedCode);
 
-      // Créer l'entrée dans housekeepers avec le code d'accès
-      const { data: housekeeperData, error: housekeeperError } = await supabase
-        .from('housekeepers')
-        .insert({
-          hotel_id: hotelId,
-          name: name,
-          access_code: generatedCode,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          is_active: true,
-          is_temporary: false
-        })
-        .select()
-        .single();
-
-      if (housekeeperError) {
-        console.error('Error creating housekeeper:', housekeeperError);
-        toast({
-          title: "Erreur",
-          description: "Impossible de créer la femme de chambre",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Créer l'entrée dans housekeeper_access_codes
+      // Créer ou mettre à jour l'entrée dans housekeeper_access_codes
       const { error: inviteError } = await supabase
         .from('housekeeper_access_codes')
-        .insert({
+        .upsert({
           hotel_id: hotelId,
           housekeeper_id: housekeeperData.id,
           access_code: generatedCode,
-          invited_email: email,
+          invited_email: email || null,
           invited_name: name,
           created_by: (await supabase.auth.getUser()).data.user?.id,
           is_active: true,
           expires_at: null // Code permanent
+        }, {
+          onConflict: 'housekeeper_id'
         });
 
       if (inviteError) {
         console.error('Error saving access code:', inviteError);
       }
 
-      // Send email invitation if email provided
+      // Send email invitation if email provided (with retry)
       if (email) {
-        try {
-          await supabase.functions.invoke('send-activation-email', {
-            body: {
-              email,
-              type: 'activation',
-              companyName: name,
-              accessCode: generatedCode,
-              activationLink: `${window.location.origin}/housekeeper/work?code=${generatedCode}`
+        let emailSent = false;
+        let retries = 3;
+        
+        while (!emailSent && retries > 0) {
+          try {
+            const { error: emailError } = await supabase.functions.invoke('send-activation-email', {
+              body: {
+                email,
+                type: 'activation',
+                companyName: name,
+                accessCode: generatedCode,
+                activationLink: `${window.location.origin}/housekeeper/work?code=${generatedCode}`
+              }
+            });
+            
+            if (emailError) throw emailError;
+            
+            emailSent = true;
+            console.log('✅ Email invitation sent successfully');
+          } catch (emailError) {
+            retries--;
+            console.error(`❌ Error sending invitation email (${retries} retries left):`, emailError);
+            
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
             }
+          }
+        }
+        
+        if (!emailSent) {
+          toast({
+            title: "Attention",
+            description: "Code créé mais l'email n'a pas pu être envoyé. Communiquez le code manuellement.",
+            variant: "default"
           });
-        } catch (emailError) {
-          console.error('Error sending invitation email:', emailError);
         }
       }
 
       setStep('code');
       toast({
         title: "Code généré",
-        description: "Code d'accès créé avec succès"
+        description: existingHousekeeper ? "Code d'accès existant récupéré" : "Nouveau code d'accès créé avec succès"
       });
     } catch (error) {
       console.error('Error generating code:', error);
       toast({
         title: "Erreur",
-        description: "Erreur lors de la génération du code",
+        description: `Erreur lors de la génération du code: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
         variant: "destructive"
       });
     } finally {

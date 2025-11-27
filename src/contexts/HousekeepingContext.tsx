@@ -99,11 +99,12 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             localStorage.setItem('selectedHotelId', session.hotel_id);
             localStorage.setItem('hotelId', session.hotel_id);
             localStorage.setItem('lastSavedHotelId', session.hotel_id);
+            localStorage.setItem('currentHotelId', session.hotel_id);
             setHotelId(session.hotel_id);
           }
           
           // Sauvegarder les données de session complètes
-          SessionPersistenceService.updateSessionData({
+          SessionPersistenceService.saveSessionData({
             sessionToken: HotelSessionService.getSessionToken() || '',
             hotelId: session.hotel_id || '',
             lastActiveDate: new Date().toISOString(),
@@ -122,26 +123,36 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             return JSON.stringify(prev) !== JSON.stringify(newRooms) ? newRooms : prev;
           });
 
-          // Rafraîchir les femmes de chambre
-          if (session.hotel_id) {
+          // Rafraîchir les femmes de chambre moins fréquemment
+          if (session.hotel_id && Math.random() < 0.1) { // 10% des fois seulement
             refreshHousekeepers();
           }
         }
       } catch (error) {
         console.error('⚠️ Erreur synchronisation, tentative de récupération...', error);
         
-        // RÉCUPÉRATION AUTOMATIQUE en cas d'erreur
+        // RÉCUPÉRATION AUTOMATIQUE en cas d'erreur avec fallback vers données locales
         const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
-        const savedHotelId = SessionPersistenceService.getStoredHotelId();
-        if (savedHotelId && !hotelId) {
-          console.log('🔄 Restauration automatique de l\'hotel_id:', savedHotelId);
-          setHotelId(savedHotelId);
+        const savedData = SessionPersistenceService.getSavedSessionData();
+        
+        if (savedData) {
+          console.log('🔄 Restauration depuis session locale');
+          if (savedData.hotelId && !hotelId) {
+            setHotelId(savedData.hotelId);
+            localStorage.setItem('selectedHotelId', savedData.hotelId);
+          }
+          if (savedData.room_data && rooms.length === 0) {
+            setRooms(savedData.room_data);
+          }
+          if (savedData.housekeeper_assignments && housekeeperNames.length === 0) {
+            setHousekeeperNames(Object.keys(savedData.housekeeper_assignments));
+          }
         }
       }
-    }, 2000);
+    }, 5000); // Réduit à 5 secondes au lieu de 2 pour moins de charge
 
     return () => clearInterval(interval);
-  }, [isInitialized, hotelId]);
+  }, [isInitialized, hotelId, rooms.length, housekeeperNames.length]);
 
   // Charger les données de la session
   const loadSessionData = async () => {

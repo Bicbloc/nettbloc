@@ -11,9 +11,10 @@ interface SessionPersistenceData {
 
 export class SessionPersistenceService {
   private static readonly STORAGE_KEY = 'hotel_session_persistence';
-  private static readonly MAX_SESSION_DAYS = 1; // Sessions expire after 1 day
+  private static readonly MAX_SESSION_DAYS = 7; // Sessions expire after 7 days
+  private static readonly BACKUP_KEY = 'hotel_session_backup';
 
-  // Sauvegarder la session en cours
+  // Sauvegarder la session en cours avec backup
   static saveSessionData(sessionData: SessionPersistenceData): void {
     try {
       const dataWithTimestamp = {
@@ -21,18 +22,48 @@ export class SessionPersistenceService {
         savedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + (this.MAX_SESSION_DAYS * 24 * 60 * 60 * 1000)).toISOString()
       };
+      
+      // Sauvegarde principale
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(dataWithTimestamp));
-      console.log('✅ Session data saved:', dataWithTimestamp);
+      
+      // Sauvegarde de backup
+      localStorage.setItem(this.BACKUP_KEY, JSON.stringify(dataWithTimestamp));
+      
+      // Sauvegarde dans sessionStorage pour double sécurité
+      sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(dataWithTimestamp));
+      
+      console.log('✅ Session data saved with backup:', {
+        hotelId: dataWithTimestamp.hotelId.slice(0, 8) + '...',
+        rooms: dataWithTimestamp.room_data?.length || 0,
+        housekeepers: Object.keys(dataWithTimestamp.housekeeper_assignments || {}).length
+      });
     } catch (error) {
       console.error('❌ Failed to save session data:', error);
     }
   }
 
-  // Récupérer les données de session sauvegardées
+  // Récupérer les données de session sauvegardées avec fallbacks
   static getSavedSessionData(): SessionPersistenceData | null {
     try {
-      const saved = localStorage.getItem(this.STORAGE_KEY);
-      if (!saved) return null;
+      // Essayer localStorage principal
+      let saved = localStorage.getItem(this.STORAGE_KEY);
+      
+      // Fallback vers backup si principal échoue
+      if (!saved) {
+        console.log('⚠️ Primary storage empty, trying backup...');
+        saved = localStorage.getItem(this.BACKUP_KEY);
+      }
+      
+      // Fallback vers sessionStorage
+      if (!saved) {
+        console.log('⚠️ Backup empty, trying sessionStorage...');
+        saved = sessionStorage.getItem(this.STORAGE_KEY);
+      }
+      
+      if (!saved) {
+        console.log('⚠️ No saved session data found in any storage');
+        return null;
+      }
 
       const data = JSON.parse(saved);
       
@@ -42,6 +73,12 @@ export class SessionPersistenceService {
         this.clearSavedSession();
         return null;
       }
+
+      console.log('✅ Session data restored:', {
+        hotelId: data.hotelId?.slice(0, 8) + '...',
+        rooms: data.room_data?.length || 0,
+        age: data.savedAt ? Math.round((Date.now() - new Date(data.savedAt).getTime()) / 1000 / 60) + ' minutes' : 'unknown'
+      });
 
       return data;
     } catch (error) {
@@ -150,7 +187,9 @@ export class SessionPersistenceService {
   static clearSavedSession(): void {
     try {
       localStorage.removeItem(this.STORAGE_KEY);
-      console.log('🧹 Saved session data cleared');
+      localStorage.removeItem(this.BACKUP_KEY);
+      sessionStorage.removeItem(this.STORAGE_KEY);
+      console.log('🧹 Saved session data cleared from all storages');
     } catch (error) {
       console.error('❌ Failed to clear saved session:', error);
     }
