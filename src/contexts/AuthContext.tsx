@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { HotelStorageService } from '@/services/hotelStorageService';
 
 interface AuthContextType {
   user: User | null;
@@ -103,12 +104,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     // Nettoyer tous les hotel IDs du localStorage avant la connexion
-    localStorage.removeItem('selectedHotelId');
-    localStorage.removeItem('selectedHotelCode');
-    localStorage.removeItem('selectedHotelName');
-    localStorage.removeItem('currentHotelId');
-    localStorage.removeItem('hotelId');
-    localStorage.removeItem('lastSavedHotelId');
+    HotelStorageService.clear();
     console.log('🧹 localStorage nettoyé pour nouvelle connexion');
     
     const { error } = await supabase.auth.signInWithPassword({
@@ -120,6 +116,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    HotelStorageService.clear();
     await supabase.auth.signOut();
   };
 

@@ -8,6 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, Loader2, LogIn, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
+import { HotelStorageService } from '@/services/hotelStorageService';
+import { safeQuery, retryQuery } from '@/services/queryUtils';
 
 export default function HousekeeperAuth() {
   const [email, setEmail] = useState('');
@@ -39,13 +41,24 @@ export default function HousekeeperAuth() {
       if (error) throw error;
 
       if (data.user) {
-        const { data: profile } = await supabase
-          .from('housekeeper_profiles')
-          .select('*')
-          .eq('email', data.user.email)
-          .single();
+        // Check if profile exists with timeout and retry
+        const profileResult = await retryQuery(async () => {
+          const profileQuery = supabase
+            .from('housekeeper_profiles')
+            .select('*')
+            .eq('email', data.user.email)
+            .maybeSingle();
+          return await profileQuery;
+        });
 
-        if (profile) {
+        if (profileResult.error) {
+          throw profileResult.error;
+        }
+
+        if (profileResult.data) {
+          // Store profile data
+          localStorage.setItem('housekeeper_profile', JSON.stringify(profileResult.data));
+          
           toast({
             title: "Connexion réussie ! 🎉",
             description: "Bienvenue"

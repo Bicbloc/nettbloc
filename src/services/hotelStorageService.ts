@@ -15,7 +15,14 @@ export class HotelStorageService {
         ...hotel,
         timestamp: Date.now(),
       };
+      // Save to new key
       localStorage.setItem(this.KEY, JSON.stringify(session));
+      
+      // Also save to legacy keys for retrocompatibility
+      localStorage.setItem('selectedHotelId', hotel.id);
+      localStorage.setItem('selectedHotelCode', hotel.code);
+      localStorage.setItem('selectedHotelName', hotel.name);
+      localStorage.setItem('currentHotelId', hotel.id);
     } catch (error) {
       console.error('Failed to save hotel session:', error);
     }
@@ -23,18 +30,32 @@ export class HotelStorageService {
 
   static get(): HotelSession | null {
     try {
+      // Try new format first
       const stored = localStorage.getItem(this.KEY);
-      if (!stored) return null;
-
-      const session: HotelSession = JSON.parse(stored);
-      
-      // Check if expired
-      if (Date.now() - session.timestamp > this.EXPIRY_MS) {
-        this.clear();
-        return null;
+      if (stored) {
+        const session: HotelSession = JSON.parse(stored);
+        
+        // Check if expired
+        if (Date.now() - session.timestamp > this.EXPIRY_MS) {
+          this.clear();
+          return null;
+        }
+        
+        return session;
       }
 
-      return session;
+      // Fallback to legacy keys
+      const id = localStorage.getItem('selectedHotelId');
+      if (id) {
+        return {
+          id,
+          name: localStorage.getItem('selectedHotelName') || '',
+          code: localStorage.getItem('selectedHotelCode') || '',
+          timestamp: Date.now()
+        };
+      }
+
+      return null;
     } catch (error) {
       console.error('Failed to retrieve hotel session:', error);
       this.clear();

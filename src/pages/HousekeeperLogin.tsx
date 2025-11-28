@@ -9,6 +9,7 @@ import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide
 import { SupabaseService } from "@/services/supabaseService";
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import BackButton from '@/components/BackButton';
+import { HotelStorageService } from '@/services/hotelStorageService';
 
 export default function HousekeeperLogin() {
   const [step, setStep] = useState<"direct" | "hotel" | "housekeeper">("direct");
@@ -129,10 +130,12 @@ export default function HousekeeperLogin() {
         accessCode: housekeeperCode
       }));
       
-      // Sauvegarder l'hôtel sélectionné
-      localStorage.setItem('selectedHotelId', selectedHotel.id);
-      localStorage.setItem('selectedHotelName', selectedHotel.name);
-      localStorage.setItem('selectedHotelCode', selectedHotel.hotel_code || '');
+      // Sauvegarder l'hôtel sélectionné avec le service centralisé
+      HotelStorageService.save({
+        id: selectedHotel.id,
+        name: selectedHotel.name,
+        code: selectedHotel.hotel_code || ''
+      });
       
       toast({
         title: "Connexion réussie",
@@ -194,9 +197,12 @@ export default function HousekeeperLogin() {
         accessCode: fullAccessCode
       }));
       
-      localStorage.setItem('selectedHotelId', hotel.id);
-      localStorage.setItem('selectedHotelName', hotel.name);
-      localStorage.setItem('selectedHotelCode', hotel.hotel_code || '');
+      // Sauvegarder l'hôtel avec le service centralisé
+      HotelStorageService.save({
+        id: hotel.id,
+        name: hotel.name,
+        code: hotel.hotel_code || ''
+      });
 
       toast({
         title: "Connexion réussie",
