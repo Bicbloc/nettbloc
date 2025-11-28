@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, LogOut, User, Loader2, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { HotelStorageService } from '@/services/hotelStorageService';
 
 export default function HousekeeperHotels() {
   const [profile, setProfile] = useState<any>(null);
@@ -218,6 +219,7 @@ export default function HousekeeperHotels() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    HotelStorageService.clear();
     localStorage.clear();
     navigate('/housekeeper/auth');
   };

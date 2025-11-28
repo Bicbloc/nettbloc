@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { safeQuery, retryQuery } from './queryUtils';
 
 export interface HousekeeperProfile {
   id: string;
@@ -30,11 +29,9 @@ export class UnifiedHousekeeperService {
   // Authentication
   static async authenticateWithCode(accessCode: string): Promise<AuthResult> {
     try {
-      const rpcCall = supabase.rpc('authenticate_housekeeper_by_code', {
+      const { data, error } = await supabase.rpc('authenticate_housekeeper_by_code', {
         p_access_code: accessCode.trim().toUpperCase(),
       });
-
-      const { data, error } = await safeQuery(rpcCall);
 
       if (error) throw error;
 
@@ -116,17 +113,14 @@ export class UnifiedHousekeeperService {
     }
 
     try {
-      return await retryQuery(async () => {
-        const query = supabase
-          .from('housekeepers')
-          .select('id, name, access_code, is_active, created_at')
-          .eq('hotel_id', hotelId)
-          .order('created_at', { ascending: false });
-
-        const { data, error } = await safeQuery(query);
-        if (error) throw error;
-        return data || [];
-      });
+      const { data, error } = await supabase
+        .from('housekeepers')
+        .select('id, name, access_code, is_active, created_at')
+        .eq('hotel_id', hotelId)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error loading housekeepers:', error);
       return [];

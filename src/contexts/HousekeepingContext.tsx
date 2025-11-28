@@ -3,6 +3,7 @@ import { Room } from '@/services/pdfService';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { supabase } from '@/integrations/supabase/client';
+import { HotelStorageService } from '@/services/hotelStorageService';
 
 interface HousekeepingContextType {
   housekeeperNames: string[];
@@ -55,13 +56,12 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       try {
         console.log('🏠 Initialisation de la session avec persistance renforcée...');
         
-        // ÉTAPE 1: Restaurer l'hôtel depuis TOUS les emplacements possibles
-        const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
-        const savedHotelId = SessionPersistenceService.getStoredHotelId();
+        // ÉTAPE 1: Restaurer l'hôtel depuis le service centralisé
+        const hotelSession = HotelStorageService.get();
         
-        if (savedHotelId) {
-          setHotelId(savedHotelId);
-          console.log('✅ Hotel ID restauré:', savedHotelId);
+        if (hotelSession?.id) {
+          setHotelId(hotelSession.id);
+          console.log('✅ Hotel ID restauré depuis HotelStorageService:', hotelSession.id);
         }
         
         // ÉTAPE 2: Initialiser/restaurer la session
@@ -72,10 +72,18 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           // ÉTAPE 3: Charger les données de session
           await loadSessionData();
           
-          // ÉTAPE 4: Forcer la sauvegarde immédiate
+          // ÉTAPE 4: Forcer la sauvegarde immédiate avec le service centralisé
           const session = await HotelSessionService.getSession();
           if (session?.hotel_id) {
-            await SessionPersistenceService.forceSaveCurrentSession(session.hotel_id);
+            // Get hotel info from session
+            const hotelCode = localStorage.getItem('selectedHotelCode') || '';
+            const hotelName = localStorage.getItem('selectedHotelName') || '';
+            
+            HotelStorageService.save({
+              id: session.hotel_id,
+              name: hotelName,
+              code: hotelCode
+            });
           }
         }
       } catch (error) {
