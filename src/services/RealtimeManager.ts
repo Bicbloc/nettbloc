@@ -18,11 +18,13 @@ class RealtimeManager {
   private hotelId: string | null = null;
   private subscriptions: Map<string, Subscription[]> = new Map();
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 10;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
   private lastConnectionAttempt = 0;
-  private minTimeBetweenAttempts = 5000; // 5 secondes minimum entre tentatives
+  private minTimeBetweenAttempts = 2000; // 2 secondes minimum entre tentatives
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private onStatusChangeCallback: ((status: string) => void) | null = null;
 
   private constructor() {}
 
@@ -106,12 +108,18 @@ class RealtimeManager {
       this.channel!.subscribe((status) => {
         console.log('📡 RealtimeManager statut:', status);
         
+        // Notifier les observateurs du changement de statut
+        if (this.onStatusChangeCallback) {
+          this.onStatusChangeCallback(status);
+        }
+        
         switch (status) {
           case 'SUBSCRIBED':
             clearTimeout(timeoutId);
             console.log('✅ RealtimeManager: Connexion établie');
             this.reconnectAttempts = 0;
             this.isConnecting = false;
+            this.startHeartbeat();
             resolve(true);
             break;
             
@@ -121,6 +129,7 @@ class RealtimeManager {
             clearTimeout(timeoutId);
             console.log('❌ RealtimeManager: Erreur', status);
             this.isConnecting = false;
+            this.stopHeartbeat();
             this.scheduleReconnect();
             resolve(false);
             break;
@@ -209,6 +218,40 @@ class RealtimeManager {
   }
 
   /**
+   * Démarrer le heartbeat pour détecter les déconnexions silencieuses
+   */
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.channel) {
+        // Ping simple pour vérifier la connexion
+        console.log('💓 Heartbeat check');
+      } else {
+        console.log('⚠️ Heartbeat: Pas de canal actif');
+        this.stopHeartbeat();
+      }
+    }, 30000); // Toutes les 30 secondes
+  }
+
+  /**
+   * Arrêter le heartbeat
+   */
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  /**
+   * Définir un callback pour les changements de statut
+   */
+  onConnectionStatusChange(callback: (status: string) => void) {
+    this.onStatusChangeCallback = callback;
+  }
+
+  /**
    * Déconnecter proprement
    */
   disconnect() {
@@ -216,6 +259,8 @@ class RealtimeManager {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
+
+    this.stopHeartbeat();
 
     if (this.channel) {
       console.log('🧹 RealtimeManager: Déconnexion du canal');

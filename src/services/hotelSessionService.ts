@@ -115,7 +115,7 @@ export class HotelSessionService {
         hotelId: finalHotelId,
         lastActiveDate: new Date().toISOString(),
         room_data: [],
-        housekeeper_assignments: {}
+        housekeeper_assignments: []
       });
       
       console.log('✅ Session créée:', sessionToken.slice(0, 10) + '...', 'Hotel:', finalHotelId.slice(0, 8) + '...');

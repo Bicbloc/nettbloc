@@ -70,7 +70,7 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         hotelId: hotelId,
         lastActiveDate: new Date().toISOString(),
         room_data: [],
-        housekeeper_assignments: {}
+        housekeeper_assignments: []
       });
 
       toast.success('Journée clôturée ! Nouvelle session créée pour demain.');

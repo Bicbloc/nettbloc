@@ -183,14 +183,16 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         description: message,
       });
       
-      // Débloquer l'UI immédiatement
+      // Charger les housekeepers AVANT de passer à l'étape 2
+      setUploadStatus('👥 Chargement des femmes de chambre...');
+      const housekeepersLoaded = await loadExistingHousekeepers();
+      
+      // Débloquer l'UI
       setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
         setUploadStatus('');
         setStep('housekeepers'); // Passer à l'étape des femmes de chambre
-        // Charger les femmes de chambre en arrière-plan
-        loadExistingHousekeepers();
       }, 500);
       
     } catch (error) {
@@ -219,15 +221,46 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setHousekeepers(housekeepers.filter((_, i) => i !== index));
   };
 
-  const loadExistingHousekeepers = async () => {
-    if (!hotelId) return;
+  const loadExistingHousekeepers = async (attempt = 1): Promise<boolean> => {
+    // Validation et fallback du hotelId
+    const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId') || localStorage.getItem('currentHotelId');
+    
+    if (!effectiveHotelId) {
+      console.error('❌ HotelId manquant pour charger les housekeepers');
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "ID de l'hôtel manquant"
+      });
+      return false;
+    }
     
     try {
       setIsLoadingHousekeepers(true);
-      const housekeepersData = await SimpleCodeService.getHousekeepersWithCodes(hotelId);
+      console.log(`🔄 Tentative ${attempt}/3 de chargement des housekeepers...`);
+      
+      const housekeepersData = await SimpleCodeService.getHousekeepersWithCodes(effectiveHotelId);
       setExistingHousekeepers(housekeepersData);
+      console.log(`✅ ${housekeepersData.length} housekeepers chargés`);
+      
+      return true;
     } catch (error) {
-      console.error('Error loading housekeepers:', error);
+      console.error(`❌ Erreur tentative ${attempt}:`, error);
+      
+      // Retry avec délai exponentiel
+      if (attempt < 3) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+        console.log(`⏳ Nouvelle tentative dans ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return loadExistingHousekeepers(attempt + 1);
+      }
+      
+      toast({
+        variant: "destructive",
+        title: "Erreur de chargement",
+        description: "Impossible de charger les femmes de chambre"
+      });
+      return false;
     } finally {
       setIsLoadingHousekeepers(false);
     }
@@ -407,15 +440,25 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                   );
                 }).length})
               </div>
-              {existingHousekeepers.length > 0 && (
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowAllExisting(!showAllExisting)}
+                  onClick={() => loadExistingHousekeepers()}
+                  disabled={isLoadingHousekeepers}
                 >
-                  {showAllExisting ? 'Masquer' : 'Voir tout'}
+                  {isLoadingHousekeepers ? '🔄' : '🔄'} Rafraîchir
                 </Button>
-              )}
+                {existingHousekeepers.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllExisting(!showAllExisting)}
+                  >
+                    {showAllExisting ? 'Masquer' : 'Voir tout'}
+                  </Button>
+                )}
+              </div>
             </div>
             
             {isLoadingHousekeepers ? (

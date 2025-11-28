@@ -6,7 +6,8 @@ interface SessionPersistenceData {
   hotelId: string;
   lastActiveDate: string;
   room_data?: any[];
-  housekeeper_assignments?: Record<string, string>;
+  housekeeper_assignments?: any; // Flexible: peut être un array ou un Record
+  lastSyncTimestamp?: number;
 }
 
 export class SessionPersistenceService {
@@ -17,25 +18,31 @@ export class SessionPersistenceService {
   // Sauvegarder la session en cours avec backup
   static saveSessionData(sessionData: SessionPersistenceData): void {
     try {
+      // Vérification de cohérence avant sauvegarde
+      if (!sessionData.hotelId || sessionData.hotelId.length < 10) {
+        console.warn('⚠️ HotelId invalide, sauvegarde annulée');
+        return;
+      }
+
       const dataWithTimestamp = {
         ...sessionData,
         savedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + (this.MAX_SESSION_DAYS * 24 * 60 * 60 * 1000)).toISOString()
+        expiresAt: new Date(Date.now() + (this.MAX_SESSION_DAYS * 24 * 60 * 60 * 1000)).toISOString(),
+        lastSyncTimestamp: Date.now()
       };
       
-      // Sauvegarde principale
+      // Triple sauvegarde pour redondance maximale
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(dataWithTimestamp));
-      
-      // Sauvegarde de backup
       localStorage.setItem(this.BACKUP_KEY, JSON.stringify(dataWithTimestamp));
-      
-      // Sauvegarde dans sessionStorage pour double sécurité
       sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(dataWithTimestamp));
       
       console.log('✅ Session data saved with backup:', {
         hotelId: dataWithTimestamp.hotelId.slice(0, 8) + '...',
         rooms: dataWithTimestamp.room_data?.length || 0,
-        housekeepers: Object.keys(dataWithTimestamp.housekeeper_assignments || {}).length
+        housekeepers: Array.isArray(sessionData.housekeeper_assignments) 
+          ? sessionData.housekeeper_assignments.length 
+          : Object.keys(sessionData.housekeeper_assignments || {}).length,
+        lastSyncTimestamp: new Date(dataWithTimestamp.lastSyncTimestamp).toLocaleString()
       });
     } catch (error) {
       console.error('❌ Failed to save session data:', error);
@@ -67,6 +74,13 @@ export class SessionPersistenceService {
 
       const data = JSON.parse(saved);
       
+      // Vérification de cohérence des données
+      if (!data.hotelId || data.hotelId.length < 10) {
+        console.warn('⚠️ Données corrompues: hotelId invalide');
+        this.clearSavedSession();
+        return null;
+      }
+      
       // Vérifier si la session a expiré
       if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
         console.log('⚠️ Saved session expired, clearing');
@@ -74,10 +88,22 @@ export class SessionPersistenceService {
         return null;
       }
 
+      // Vérifier la fraîcheur des données (max 24h)
+      if (data.lastSyncTimestamp) {
+        const hoursSinceSync = (Date.now() - data.lastSyncTimestamp) / (1000 * 60 * 60);
+        if (hoursSinceSync > 24) {
+          console.warn('⚠️ Données obsolètes (>24h depuis dernière sync)');
+        }
+      }
+
       console.log('✅ Session data restored:', {
         hotelId: data.hotelId?.slice(0, 8) + '...',
         rooms: data.room_data?.length || 0,
-        age: data.savedAt ? Math.round((Date.now() - new Date(data.savedAt).getTime()) / 1000 / 60) + ' minutes' : 'unknown'
+        housekeepers: Array.isArray(data.housekeeper_assignments) 
+          ? data.housekeeper_assignments.length 
+          : Object.keys(data.housekeeper_assignments || {}).length,
+        age: data.savedAt ? Math.round((Date.now() - new Date(data.savedAt).getTime()) / 1000 / 60) + ' minutes' : 'unknown',
+        lastSyncTimestamp: data.lastSyncTimestamp ? new Date(data.lastSyncTimestamp).toLocaleString() : 'N/A'
       });
 
       return data;

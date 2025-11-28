@@ -19,7 +19,7 @@ export interface Notification {
 
 // Cache pour améliorer les performances
 const notificationCache = new Map<string, { data: Notification[], timestamp: number }>();
-const CACHE_DURATION = 10000; // 10 secondes pour une meilleure réactivité
+const CACHE_DURATION = 5000; // 5 secondes pour une réactivité maximale
 
 export const useNotifications = (hotelId?: string) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -130,7 +130,7 @@ export const useNotifications = (hotelId?: string) => {
     }
   }, [getEffectiveHotelId]);
 
-  // Souscription temps réel via RealtimeManager centralisé avec retry
+  // Souscription temps réel via RealtimeManager centralisé avec retry + polling fallback
   useEffect(() => {
     const effectiveHotelId = getEffectiveHotelId();
     if (!effectiveHotelId) return;
@@ -139,6 +139,8 @@ export const useNotifications = (hotelId?: string) => {
     let retryCount = 0;
     const MAX_RETRIES = 5;
     let retryTimeout: NodeJS.Timeout | null = null;
+    let pollingInterval: NodeJS.Timeout | null = null;
+    let realtimeConnected = false;
 
     const setupRealtime = async () => {
       try {
@@ -148,6 +150,7 @@ export const useNotifications = (hotelId?: string) => {
         // S'abonner aux changements
         subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
           console.log('📨 Nouvelle notification:', payload.eventType);
+          realtimeConnected = true;
           
           // Invalider le cache
           notificationCache.delete(effectiveHotelId);
@@ -167,6 +170,7 @@ export const useNotifications = (hotelId?: string) => {
         console.log('✅ Realtime notifications connected');
       } catch (error) {
         console.error('❌ Failed to setup realtime:', error);
+        realtimeConnected = false;
         
         // Retry with exponential backoff
         if (retryCount < MAX_RETRIES) {
@@ -174,8 +178,25 @@ export const useNotifications = (hotelId?: string) => {
           const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
           console.log(`🔄 Retrying realtime connection in ${delay}ms (attempt ${retryCount}/${MAX_RETRIES})`);
           retryTimeout = setTimeout(setupRealtime, delay);
+        } else {
+          // Fallback sur polling après tous les retries
+          console.log('⚠️ Realtime failed, using polling fallback');
+          startPolling();
         }
       }
+    };
+
+    const startPolling = () => {
+      if (pollingInterval) return;
+      
+      console.log('🔄 Démarrage du polling fallback (toutes les 10s)');
+      pollingInterval = setInterval(() => {
+        if (!realtimeConnected) {
+          console.log('📡 Polling notifications...');
+          notificationCache.delete(effectiveHotelId);
+          loadNotifications();
+        }
+      }, 10000); // Toutes les 10 secondes
     };
 
     // Chargement initial
@@ -186,6 +207,7 @@ export const useNotifications = (hotelId?: string) => {
 
     return () => {
       if (retryTimeout) clearTimeout(retryTimeout);
+      if (pollingInterval) clearInterval(pollingInterval);
       if (subscriptionId) realtimeManager.unsubscribe(subscriptionId);
     };
   }, [getEffectiveHotelId, loadNotifications]);
