@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Room } from '@/services/pdfService';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { HotelSessionService } from '@/services/hotelSessionService';
@@ -42,6 +42,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   
   const [hotelId, setHotelId] = useState<string | null>(null);
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   
   // Hook notifications APRÈS les autres états pour éviter les problèmes de montage
   const notificationsHook = useNotifications(hotelId || undefined);
@@ -530,34 +531,62 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   //   return () => clearInterval(interval);
   // }, [hotelId]);
 
-  // Fonction pour charger les femmes de chambre depuis la base
-  const refreshHousekeepers = async () => {
+  // Rafraîchir la liste des housekeepers depuis la BD - AUTOMATIQUE toutes les 30s
+  const refreshHousekeepers = useCallback(async () => {
     const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
     if (!currentHotelId) return;
     
     try {
-      const { SupabaseService } = await import('@/services/supabaseService');
-      const dbHousekeepers = await SupabaseService.getHousekeepers(currentHotelId);
+      console.log('🔄 Rafraîchissement des housekeepers...');
+      const { data, error } = await supabase
+        .from('housekeepers')
+        .select('id, name, access_code')
+        .eq('hotel_id', currentHotelId)
+        .eq('is_active', true);
       
-      setHousekeepers(dbHousekeepers.map(h => ({
-        id: h.id,
-        name: h.name,
-        access_code: h.access_code
-      })));
+      if (error) throw error;
       
-      // Mettre à jour aussi housekeeperNames avec tous les noms disponibles
-      const allNames = dbHousekeepers.map(h => h.name);
-      setHousekeeperNames(prevNames => {
-        // Combiner les noms existants avec les nouveaux (sans doublons)
-        const combined = [...new Set([...prevNames, ...allNames])];
-        return combined;
-      });
-      
-      console.log('✅ Femmes de chambre chargées depuis la base:', dbHousekeepers.length);
+      if (data && data.length > 0) {
+        setHousekeepers(data);
+        console.log(`✅ ${data.length} housekeepers rafraîchis depuis la BD`);
+        
+        // Mettre à jour aussi housekeeperNames
+        const allNames = data.map(h => h.name);
+        setHousekeeperNames(prevNames => {
+          const combined = [...new Set([...prevNames, ...allNames])];
+          return combined;
+        });
+        
+        // Sauvegarder immédiatement dans la session
+        const sessionData = await HotelSessionService.getSession();
+        if (sessionData?.hotel_id) {
+          const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
+          SessionPersistenceService.updateSessionData({
+            housekeeper_assignments: data.map(hk => ({
+              housekeeper_id: hk.id,
+              housekeeper_name: hk.name,
+              access_code: hk.access_code
+            }))
+          });
+        }
+      }
     } catch (error) {
-      console.error('❌ Erreur chargement femmes de chambre:', error);
+      console.error('❌ Erreur lors du rafraîchissement des housekeepers:', error);
     }
-  };
+  }, [hotelId]);
+
+  // Rafraîchissement automatique des housekeepers toutes les 30 secondes
+  useEffect(() => {
+    if (!hotelId) return;
+    
+    refreshHousekeepers(); // Appel initial
+    
+    const refreshInterval = setInterval(() => {
+      refreshHousekeepers();
+    }, 30000); // 30 secondes
+    
+    return () => clearInterval(refreshInterval);
+  }, [hotelId, refreshHousekeepers]);
 
   const value = {
     housekeeperNames,
