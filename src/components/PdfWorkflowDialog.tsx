@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { SimpleCodeService, HousekeeperWithCode } from "@/services/simpleCodeService";
+import { UnifiedHousekeeperService, HousekeeperWithCode } from "@/services/unifiedHousekeeperService";
 import { supabase } from "@/integrations/supabase/client";
 
 interface PdfWorkflowDialogProps {
@@ -236,7 +236,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setIsLoadingHousekeepers(true);
       console.log(`🔄 Tentative ${attempt}/2 de chargement des housekeepers...`);
       
-      const housekeepersData = await SimpleCodeService.getHousekeepersWithCodes(effectiveHotelId);
+      const housekeepersData = await UnifiedHousekeeperService.getCodesForHotel(effectiveHotelId);
       setExistingHousekeepers(housekeepersData);
       console.log(`✅ ${housekeepersData.length} housekeepers chargés`);
       

@@ -82,22 +82,29 @@ export default function HousekeeperHotels() {
 
         // Charger le nombre de chambres assignées pour chaque hôtel
         const assignmentCounts: Record<string, number> = {};
-        for (const hotel of uniqueHotels) {
-          console.log(`🔍 Chargement assignations pour hôtel ${hotel.name} (${hotel.id})`);
-          const { count, error: assignError } = await supabase
-            .from('assignments')
-            .select('*', { count: 'exact', head: true })
-            .eq('hotel_id', hotel.id)
-            .eq('housekeeper_id', profileData.id)
-            .in('status', ['assigned', 'in_progress']);
-          
-          console.log(`📊 Assignations pour ${hotel.name}:`, count);
-          if (assignError) {
-            console.error(`❌ Erreur assignations pour ${hotel.name}:`, assignError);
+        // Load assignments in parallel with timeout
+        const assignmentPromises = uniqueHotels.map(async (hotel) => {
+          try {
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Timeout')), 10000)
+            );
+
+            const queryPromise = supabase
+              .from('assignments')
+              .select('*', { count: 'exact', head: true })
+              .eq('hotel_id', hotel.id)
+              .eq('housekeeper_id', profileData.id)
+              .in('status', ['assigned', 'in_progress']);
+
+            const { count } = await Promise.race([queryPromise, timeoutPromise]);
+            assignmentCounts[hotel.id] = count || 0;
+          } catch (error) {
+            console.error(`Error loading assignments for hotel ${hotel.id}:`, error);
+            assignmentCounts[hotel.id] = 0;
           }
-          
-          assignmentCounts[hotel.id] = count || 0;
-        }
+        });
+
+        await Promise.all(assignmentPromises);
         setHotelAssignments(assignmentCounts);
         console.log('✅ Comptage assignations final:', assignmentCounts);
       }
@@ -185,27 +192,29 @@ export default function HousekeeperHotels() {
   };
 
   const handleSelectHotel = (hotel: any) => {
-     // Nettoyer les anciennes données de connexion (codes temporaires)
-     localStorage.removeItem('housekeeper');
- 
-     // Stocker les infos dans le localStorage pour une femme de chambre authentifiée
-     localStorage.setItem('selectedHotelId', hotel.id);
-     localStorage.setItem('selectedHotelName', hotel.name);
-     localStorage.setItem('selectedHotelCode', hotel.hotel_code || '');
-     localStorage.setItem('housekeeperProfile', JSON.stringify({
-       id: profile.id,
-       name: profile.name,
-       email: profile.email,
-       isAuthenticated: true
-     }));
- 
-     toast({
-       title: "Hôtel sélectionné ! 🏨",
-       description: `Vous travaillez maintenant pour ${hotel.name}`
-     });
- 
-     navigate('/housekeeper/work');
-   };
+    import('@/services/hotelStorageService').then(({ HotelStorageService }) => {
+      HotelStorageService.save({
+        id: hotel.id,
+        name: hotel.name,
+        code: hotel.hotel_code,
+      });
+      
+      // Store housekeeper profile
+      localStorage.setItem('housekeeperProfile', JSON.stringify({
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        isAuthenticated: true
+      }));
+
+      toast({
+        title: "Hôtel sélectionné ! 🏨",
+        description: `Vous travaillez maintenant pour ${hotel.name}`
+      });
+
+      navigate('/housekeeper/work');
+    });
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

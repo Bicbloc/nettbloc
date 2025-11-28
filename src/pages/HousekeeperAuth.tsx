@@ -42,7 +42,7 @@ export default function HousekeeperAuth() {
         const { data: profile } = await supabase
           .from('housekeeper_profiles')
           .select('*')
-          .eq('id', data.user.id)
+          .eq('email', data.user.email)
           .single();
 
         if (profile) {
