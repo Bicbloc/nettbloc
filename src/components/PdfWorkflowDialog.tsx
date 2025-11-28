@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2 } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -183,17 +183,14 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         description: message,
       });
       
-      // Charger les housekeepers AVANT de passer à l'étape 2
-      setUploadStatus('👥 Chargement des femmes de chambre...');
-      const housekeepersLoaded = await loadExistingHousekeepers();
+      // Passer à l'étape 2 immédiatement et charger les housekeepers en arrière-plan
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
+      setStep('housekeepers');
       
-      // Débloquer l'UI
-      setTimeout(() => {
-        setIsUploading(false);
-        setUploadProgress(0);
-        setUploadStatus('');
-        setStep('housekeepers'); // Passer à l'étape des femmes de chambre
-      }, 500);
+      // Charger les housekeepers en arrière-plan (non-bloquant)
+      loadExistingHousekeepers();
       
     } catch (error) {
       console.error("Erreur traitement PDF:", error);
@@ -237,19 +234,24 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     
     try {
       setIsLoadingHousekeepers(true);
-      console.log(`🔄 Tentative ${attempt}/3 de chargement des housekeepers...`);
+      console.log(`🔄 Tentative ${attempt}/2 de chargement des housekeepers...`);
       
       const housekeepersData = await SimpleCodeService.getHousekeepersWithCodes(effectiveHotelId);
       setExistingHousekeepers(housekeepersData);
       console.log(`✅ ${housekeepersData.length} housekeepers chargés`);
       
+      toast({
+        title: "Femmes de chambre chargées",
+        description: `${housekeepersData.length} femme(s) de chambre disponible(s)`
+      });
+      
       return true;
     } catch (error) {
       console.error(`❌ Erreur tentative ${attempt}:`, error);
       
-      // Retry avec délai exponentiel
-      if (attempt < 3) {
-        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+      // Retry avec délai réduit (1s, 2s au lieu de 2s, 4s, 8s)
+      if (attempt < 2) {
+        const delay = attempt * 1000; // 1s, 2s
         console.log(`⏳ Nouvelle tentative dans ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return loadExistingHousekeepers(attempt + 1);
@@ -258,7 +260,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       toast({
         variant: "destructive",
         title: "Erreur de chargement",
-        description: "Impossible de charger les femmes de chambre"
+        description: "Impossible de charger les femmes de chambre. Vous pouvez en ajouter manuellement."
       });
       return false;
     } finally {
@@ -462,8 +464,24 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             </div>
             
             {isLoadingHousekeepers ? (
-              <div className="text-center py-4 text-muted-foreground">
-                Chargement des femmes de chambre...
+              <div className="text-center py-4 space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-muted-foreground">Chargement des femmes de chambre...</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsLoadingHousekeepers(false);
+                    toast({
+                      title: "Chargement annulé",
+                      description: "Vous pouvez ajouter des femmes de chambre manuellement ci-dessous."
+                    });
+                  }}
+                >
+                  Passer cette étape
+                </Button>
               </div>
             ) : existingHousekeepers.length > 0 ? (
               <div className="space-y-3 max-h-64 overflow-y-auto">
