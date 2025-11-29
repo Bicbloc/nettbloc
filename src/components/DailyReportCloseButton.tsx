@@ -69,7 +69,6 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         sessionToken: newToken,
         hotelId: hotelId,
         lastActiveDate: new Date().toISOString(),
-        room_data: [],
         housekeeper_assignments: []
       });
 

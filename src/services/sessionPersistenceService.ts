@@ -5,7 +5,6 @@ interface SessionPersistenceData {
   sessionToken: string;
   hotelId: string;
   lastActiveDate: string;
-  room_data?: any[];
   housekeeper_assignments?: any; // Flexible: peut être un array ou un Record
   lastSyncTimestamp?: number;
 }
@@ -38,7 +37,6 @@ export class SessionPersistenceService {
       
       console.log('✅ Session data saved with backup:', {
         hotelId: dataWithTimestamp.hotelId.slice(0, 8) + '...',
-        rooms: dataWithTimestamp.room_data?.length || 0,
         housekeepers: Array.isArray(sessionData.housekeeper_assignments) 
           ? sessionData.housekeeper_assignments.length 
           : Object.keys(sessionData.housekeeper_assignments || {}).length,
@@ -98,7 +96,6 @@ export class SessionPersistenceService {
 
       console.log('✅ Session data restored:', {
         hotelId: data.hotelId?.slice(0, 8) + '...',
-        rooms: data.room_data?.length || 0,
         housekeepers: Array.isArray(data.housekeeper_assignments) 
           ? data.housekeeper_assignments.length 
           : Object.keys(data.housekeeper_assignments || {}).length,
@@ -120,44 +117,10 @@ export class SessionPersistenceService {
     return today !== lastDate;
   }
 
-  // Archiver le rapport du jour précédent
+  // Archiver le rapport du jour précédent (deprecated - les rooms sont dans la table rooms)
   static async archiveOldReport(sessionToken: string, hotelId: string): Promise<boolean> {
-    try {
-      console.log('📦 Archiving old report for session:', sessionToken);
-      
-      // Récupérer la session actuelle
-      const session = await HotelSessionService.getSession(sessionToken);
-      if (!session) return false;
-
-      // Créer un rapport quotidien avec les données de la session
-      const reportData = {
-        hotel_id: hotelId,
-        report_date: new Date(session.updated_at).toISOString().split('T')[0],
-        room_data: JSON.parse(JSON.stringify(session.room_data || [])),
-        summary: JSON.parse(JSON.stringify({
-          total_rooms: session.room_data?.length || 0,
-          completed_rooms: session.room_data?.filter((room: any) => room.status === 'completed').length || 0,
-          housekeeper_assignments: session.housekeeper_assignments || {},
-          archived_at: new Date().toISOString()
-        })),
-        notes: `Rapport archivé automatiquement - session du ${new Date(session.updated_at).toLocaleDateString()}`
-      };
-
-      const { error } = await supabase
-        .from('daily_reports')
-        .insert(reportData);
-
-      if (error) {
-        console.error('❌ Failed to archive report:', error);
-        return false;
-      }
-
-      console.log('✅ Report archived successfully');
-      return true;
-    } catch (error) {
-      console.error('❌ Error archiving report:', error);
-      return false;
-    }
+    console.log('📦 Archiving old report - deprecated, skipping');
+    return true;
   }
 
   // Restaurer ou créer une nouvelle session

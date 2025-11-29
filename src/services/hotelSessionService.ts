@@ -6,26 +6,28 @@ interface HotelSessionRaw {
   id: string;
   session_token: string;
   hotel_id: string | null;
-  room_data: any;
   housekeeper_names: any;
   housekeeper_assignments: any;
   is_active: boolean;
   created_at: string;
   updated_at: string;
   expires_at: string;
+  user_id: string | null;
+  last_activity: string | null;
 }
 
 interface HotelSession {
   id: string;
   session_token: string;
   hotel_id: string | null;
-  room_data: Room[];
   housekeeper_names: string[];
   housekeeper_assignments: Record<string, string>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
   expires_at: string;
+  user_id: string | null;
+  last_activity: string | null;
 }
 
 export class HotelSessionService {
@@ -89,7 +91,6 @@ export class HotelSessionService {
         .insert({
           session_token: sessionToken,
           hotel_id: finalHotelId,
-          room_data: [],
           housekeeper_names: [],
           housekeeper_assignments: {},
           is_active: true,
@@ -114,7 +115,6 @@ export class HotelSessionService {
         sessionToken: sessionToken,
         hotelId: finalHotelId,
         lastActiveDate: new Date().toISOString(),
-        room_data: [],
         housekeeper_assignments: []
       });
       
@@ -159,35 +159,10 @@ export class HotelSessionService {
     }
   }
 
-  // Mettre à jour les données de chambre
+  // Mettre à jour les données de chambre (deprecated - les rooms sont maintenant dans la table rooms)
   static async updateRoomData(rooms: Room[]): Promise<boolean> {
-    const sessionToken = this.getSessionToken();
-    if (!sessionToken) return false;
-
-    try {
-      const { error } = await supabase
-        .from('hotel_sessions')
-        .update({ 
-          room_data: rooms as any,
-          updated_at: new Date().toISOString()
-        })
-        .eq('session_token', sessionToken);
-
-      if (error) {
-        console.error('Erreur mise à jour rooms:', error);
-        return false;
-      }
-
-      // Mettre à jour les données de persistance
-      SessionPersistenceService.updateSessionData({
-        room_data: rooms as any[]
-      });
-
-      return true;
-    } catch (err) {
-      console.error('Erreur updateRoomData:', err);
-      return false;
-    }
+    console.warn('updateRoomData est deprecated - les rooms sont dans la table rooms');
+    return true;
   }
 
   // Mettre à jour les noms des femmes de chambre
@@ -263,20 +238,10 @@ export class HotelSessionService {
     }
   }
 
-  // Mettre à jour le statut d'une chambre
+  // Mettre à jour le statut d'une chambre (deprecated - les rooms sont maintenant dans la table rooms)
   static async updateRoomStatus(roomNumber: string, newStatus: string): Promise<boolean> {
-    const session = await this.getSession();
-    if (!session) return false;
-
-    // Mettre à jour les données localement
-    const updatedRooms = session.room_data.map(room => 
-      room.number === roomNumber 
-        ? { ...room, status: newStatus }
-        : room
-    );
-
-    // Sauvegarder en base
-    return await this.updateRoomData(updatedRooms);
+    console.warn('updateRoomStatus est deprecated - utilisez la table rooms directement');
+    return true;
   }
 
   // Désactiver une session
@@ -340,13 +305,14 @@ export class HotelSessionService {
       id: raw.id,
       session_token: raw.session_token,
       hotel_id: raw.hotel_id,
-      room_data: Array.isArray(raw.room_data) ? raw.room_data as Room[] : [],
       housekeeper_names: Array.isArray(raw.housekeeper_names) ? raw.housekeeper_names as string[] : [],
       housekeeper_assignments: typeof raw.housekeeper_assignments === 'object' && raw.housekeeper_assignments ? raw.housekeeper_assignments as Record<string, string> : {},
       is_active: raw.is_active,
       created_at: raw.created_at,
       updated_at: raw.updated_at,
-      expires_at: raw.expires_at
+      expires_at: raw.expires_at,
+      user_id: raw.user_id,
+      last_activity: raw.last_activity
     };
   }
 
