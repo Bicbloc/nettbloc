@@ -101,31 +101,54 @@ export const useAutoSetup = () => {
       console.log('✅ Profil utilisateur disponible:', profileData);
 
       // Phase 2: Rechercher l'hôtel existant
-      const { data: existingHotel, error: hotelError } = await supabase
+      const { data: existingHotelByUser, error: hotelErrorByUser } = await supabase
         .from('hotels')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (hotelError) {
-        console.error('❌ Erreur recherche hôtel:', hotelError);
-        throw hotelError;
+      if (hotelErrorByUser) {
+        console.error('❌ Erreur recherche hôtel par user_id:', hotelErrorByUser);
+        throw hotelErrorByUser;
       }
 
-      let hotelData: HotelData | null = existingHotel;
+      let hotelData: HotelData | null = existingHotelByUser;
       let activeCode: string | null = null;
+      let hotelCreated = false;
+
+      // Fallback: si aucun hôtel lié au user_id, essayer par email (cas anciens comptes clients comme Artois)
+      if (!hotelData && user.email) {
+        console.log('🔍 Aucun hôtel trouvé par user_id, tentative de recherche par email...');
+        const { data: existingHotelByEmail, error: hotelErrorByEmail } = await supabase
+          .from('hotels')
+          .select('*')
+          .eq('email', user.email)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (hotelErrorByEmail) {
+          console.error('❌ Erreur recherche hôtel par email:', hotelErrorByEmail);
+          throw hotelErrorByEmail;
+        }
+
+        if (existingHotelByEmail) {
+          hotelData = existingHotelByEmail;
+          console.log('✅ Hôtel existant trouvé via email:', existingHotelByEmail);
+        }
+      }
 
       // Phase 3: Si hôtel trouvé, chercher les codes d'accès actifs
-      if (existingHotel) {
-        console.log('✅ Hôtel existant trouvé:', existingHotel);
+      if (hotelData) {
+        console.log('✅ Hôtel existant trouvé:', hotelData);
         
         // Vérifier que le nom de l'hôtel correspond au company_name du profil
-        if (existingHotel.name !== profileData.company_name && profileData.company_name) {
+        if (hotelData.name !== profileData.company_name && profileData.company_name) {
           console.log('🔄 Mise à jour nom hôtel pour correspondre au profil...');
           const { data: updatedHotel, error: updateError } = await supabase
             .from('hotels')
             .update({ name: profileData.company_name })
-            .eq('id', existingHotel.id)
+            .eq('id', hotelData.id)
             .select()
             .single();
 
@@ -138,7 +161,7 @@ export const useAutoSetup = () => {
         const { data: accessCodes } = await supabase
           .from('housekeeper_access_codes')
           .select('access_code')
-          .eq('hotel_id', existingHotel.id)
+          .eq('hotel_id', hotelData.id)
           .eq('is_active', true)
           .limit(1);
 
@@ -170,6 +193,7 @@ export const useAutoSetup = () => {
           throw createError;
         }
         hotelData = newHotel;
+        hotelCreated = true;
         console.log('✅ Hôtel créé automatiquement avec code:', { hotel: hotelData, code: hotelCode });
       }
 
@@ -226,7 +250,7 @@ export const useAutoSetup = () => {
           }
         }
 
-        if (!existingHotel) {
+        if (hotelCreated) {
           toast({
             title: "✅ Établissement configuré",
             description: `${profileData.company_name || hotelData.name} prêt à l'emploi !`
