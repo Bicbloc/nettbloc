@@ -1264,12 +1264,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         
         // Créer l'assignation dans Supabase
         if (roomId) {
-          console.log('✅ Création assignation manuelle:', { housekeeperId: housekeeper.id, housekeeperName, roomId, roomNumber: room.number });
+          console.log('✅ Création assignation manuelle:', { housekeeperId: housekeeper.user_id || housekeeper.id, housekeeperName, roomId, roomNumber: room.number });
           const { AssignmentService } = await import('@/services/assignmentService');
           await AssignmentService.assignRoom(
             currentHotelId,
             roomId,
-            housekeeper.id,
+            housekeeper.user_id || housekeeper.id,
             housekeeperName
           );
         }
@@ -1345,12 +1345,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       
       // Créer l'assignation dans Supabase
       if (roomId) {
-        console.log('✅ Création assignation directe:', { housekeeperId: housekeeper.id, housekeeperName, roomId });
+        console.log('✅ Création assignation directe:', { housekeeperId: housekeeper.user_id || housekeeper.id, housekeeperName, roomId });
         const { AssignmentService } = await import('@/services/assignmentService');
         await AssignmentService.assignRoom(
           currentHotelId,
           roomId,
-          housekeeper.id,
+          housekeeper.user_id || housekeeper.id,
           housekeeperName
         );
       }
