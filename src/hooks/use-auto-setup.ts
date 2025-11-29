@@ -100,11 +100,13 @@ export const useAutoSetup = () => {
 
       console.log('✅ Profil utilisateur disponible:', profileData);
 
-      // Phase 2: Rechercher l'hôtel existant
+      // Phase 2: Rechercher l'hôtel existant - PRIORITÉ À L'HÔTEL LE PLUS ANCIEN (avec données)
       const { data: existingHotelByUser, error: hotelErrorByUser } = await supabase
         .from('hotels')
         .select('*')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: true })  // Le plus ancien en premier
+        .limit(1)
         .maybeSingle();
 
       if (hotelErrorByUser) {
@@ -123,7 +125,7 @@ export const useAutoSetup = () => {
           .from('hotels')
           .select('*')
           .eq('email', user.email)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: true })  // Le plus ancien en premier
           .limit(1)
           .maybeSingle();
 
