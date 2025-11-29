@@ -1210,8 +1210,26 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   };
   
   const handleManualAssign = async (housekeeperName: string, selectedRooms: Room[]) => {
+    console.log('🔄 Assignation manuelle:', { housekeeperName, roomCount: selectedRooms.length, currentHotelId });
+    
     // Trouver l'ID de la femme de chambre
     const housekeeper = housekeepers.find(h => h.name === housekeeperName);
+    
+    if (!currentHotelId) {
+      console.error('❌ currentHotelId est null dans handleManualAssign!');
+      toast({
+        variant: "destructive",
+        title: "Erreur de configuration",
+        description: "Aucun hôtel sélectionné"
+      });
+      return;
+    }
+    
+    if (!housekeeper) {
+      console.error('❌ Femme de chambre introuvable dans handleManualAssign:', housekeeperName);
+      toast({ variant: "destructive", title: "Erreur", description: "Femme de chambre introuvable" });
+      return;
+    }
     
     // Persister dans Supabase pour synchronisation temps réel
     if (currentHotelId && housekeeper) {
@@ -1246,6 +1264,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         
         // Créer l'assignation dans Supabase
         if (roomId) {
+          console.log('✅ Création assignation manuelle:', { housekeeperId: housekeeper.id, housekeeperName, roomId, roomNumber: room.number });
           const { AssignmentService } = await import('@/services/assignmentService');
           await AssignmentService.assignRoom(
             currentHotelId,
@@ -1276,8 +1295,22 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
 
   // Fonction pour l'assignation directe depuis les chambres non assignées
   const handleDirectRoomAssignment = async (roomNumber: string, housekeeperName: string) => {
+    console.log('🔄 Tentative assignation directe:', { roomNumber, housekeeperName, currentHotelId });
+    
     // Trouver l'ID de la femme de chambre
     const housekeeper = housekeepers.find(h => h.name === housekeeperName);
+    
+    if (!currentHotelId) {
+      console.error('❌ currentHotelId est null!');
+      toast({ variant: "destructive", title: "Erreur", description: "Hôtel non configuré" });
+      return;
+    }
+    
+    if (!housekeeper) {
+      console.error('❌ Femme de chambre introuvable:', housekeeperName);
+      toast({ variant: "destructive", title: "Erreur", description: "Femme de chambre introuvable" });
+      return;
+    }
     
     // Persister dans Supabase pour synchronisation temps réel
     if (currentHotelId && housekeeper) {
@@ -1312,6 +1345,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       
       // Créer l'assignation dans Supabase
       if (roomId) {
+        console.log('✅ Création assignation directe:', { housekeeperId: housekeeper.id, housekeeperName, roomId });
         const { AssignmentService } = await import('@/services/assignmentService');
         await AssignmentService.assignRoom(
           currentHotelId,

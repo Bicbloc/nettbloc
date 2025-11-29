@@ -163,6 +163,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         profileId: housekeeperProfile?.id
       });
 
+      // Charger les assignations depuis Supabase - chercher par ID OU par nom
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -176,7 +177,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
           )
         `)
         .eq('hotel_id', hotelId)
-        .eq('housekeeper_id', housekeeperId)
+        .or(`housekeeper_id.eq.${housekeeperId},housekeeper_name.eq.${housekeeperName}`)
         .in('status', ['assigned', 'in_progress'])
         .order('created_at', { ascending: false });
 
