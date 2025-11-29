@@ -1209,8 +1209,55 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     setIsManualAssignmentOpen(true);
   };
   
-  const handleManualAssign = (housekeeperName: string, selectedRooms: Room[]) => {
-    // Unassign rooms from other housekeepers first
+  const handleManualAssign = async (housekeeperName: string, selectedRooms: Room[]) => {
+    // Trouver l'ID de la femme de chambre
+    const housekeeper = housekeepers.find(h => h.name === housekeeperName);
+    
+    // Persister dans Supabase pour synchronisation temps réel
+    if (currentHotelId && housekeeper) {
+      for (const room of selectedRooms) {
+        // Trouver ou créer la room dans Supabase
+        const { data: existingRoom } = await supabase
+          .from('rooms')
+          .select('id')
+          .eq('hotel_id', currentHotelId)
+          .eq('room_number', room.number)
+          .single();
+        
+        let roomId = existingRoom?.id;
+        
+        // Si la room n'existe pas, la créer
+        if (!roomId) {
+          const { data: newRoom } = await supabase
+            .from('rooms')
+            .insert({
+              hotel_id: currentHotelId,
+              room_number: room.number,
+              floor: room.floor,
+              status: room.status || 'dirty',
+              room_type: null,
+              cleaning_priority: room.priority === 'high' ? 2 : 1
+            })
+            .select('id')
+            .single();
+          
+          roomId = newRoom?.id;
+        }
+        
+        // Créer l'assignation dans Supabase
+        if (roomId) {
+          const { AssignmentService } = await import('@/services/assignmentService');
+          await AssignmentService.assignRoom(
+            currentHotelId,
+            roomId,
+            housekeeper.id,
+            housekeeperName
+          );
+        }
+      }
+    }
+    
+    // Mise à jour de l'état local
     const updatedRooms = rooms.map(room => {
       if (selectedRooms.some(selectedRoom => selectedRoom.number === room.number)) {
         return { ...room, assignedTo: housekeeperName };
@@ -1228,7 +1275,54 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   };
 
   // Fonction pour l'assignation directe depuis les chambres non assignées
-  const handleDirectRoomAssignment = (roomNumber: string, housekeeperName: string) => {
+  const handleDirectRoomAssignment = async (roomNumber: string, housekeeperName: string) => {
+    // Trouver l'ID de la femme de chambre
+    const housekeeper = housekeepers.find(h => h.name === housekeeperName);
+    
+    // Persister dans Supabase pour synchronisation temps réel
+    if (currentHotelId && housekeeper) {
+      // Trouver ou créer la room dans Supabase
+      const { data: existingRoom } = await supabase
+        .from('rooms')
+        .select('id')
+        .eq('hotel_id', currentHotelId)
+        .eq('room_number', roomNumber)
+        .single();
+      
+      let roomId = existingRoom?.id;
+      
+      // Si la room n'existe pas, la créer
+      if (!roomId) {
+        const room = rooms.find(r => r.number === roomNumber);
+        const { data: newRoom } = await supabase
+          .from('rooms')
+          .insert({
+            hotel_id: currentHotelId,
+            room_number: roomNumber,
+            floor: room?.floor,
+            status: room?.status || 'dirty',
+            room_type: null,
+            cleaning_priority: room?.priority === 'high' ? 2 : 1
+          })
+          .select('id')
+          .single();
+        
+        roomId = newRoom?.id;
+      }
+      
+      // Créer l'assignation dans Supabase
+      if (roomId) {
+        const { AssignmentService } = await import('@/services/assignmentService');
+        await AssignmentService.assignRoom(
+          currentHotelId,
+          roomId,
+          housekeeper.id,
+          housekeeperName
+        );
+      }
+    }
+    
+    // Mise à jour de l'état local
     const updatedRooms = rooms.map(room => {
       if (room.number === roomNumber) {
         return { ...room, assignedTo: housekeeperName };
