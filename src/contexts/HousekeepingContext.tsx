@@ -10,7 +10,7 @@ interface HousekeepingContextType {
   rooms: Room[];
   isDistributed: boolean;
   notifications: Notification[];
-  housekeepers: Array<{id: string, name: string, access_code: string}>;
+  housekeepers: Array<{id: string, name: string, access_code: string, user_id: string}>;
   setHousekeeperNames: React.Dispatch<React.SetStateAction<string[]>>;
   setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
   setIsDistributed: (distributed: boolean) => void;
@@ -42,7 +42,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
   const [hotelId, setHotelId] = useState<string | null>(null);
-  const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string}>>([]);
+  const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string, user_id: string}>>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   
   // Hook notifications APRÈS les autres états pour éviter les problèmes de montage
@@ -548,7 +548,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       console.log('🔄 Rafraîchissement des housekeepers...');
       const { data, error } = await supabase
         .from('housekeepers')
-        .select('id, name, access_code')
+        .select('id, name, access_code, user_id')
         .eq('hotel_id', currentHotelId)
         .eq('is_active', true);
       

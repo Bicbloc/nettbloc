@@ -163,7 +163,23 @@ export const HousekeeperWorkSimple: React.FC = () => {
         profileId: housekeeperProfile?.id
       });
 
-      // Charger les assignations depuis Supabase - chercher par ID OU par nom
+      // Récupérer l'ID du housekeeper dans la table housekeepers si authentifié
+      let housekeeperTableId = housekeeperId;
+      if (isAuthenticatedHousekeeper && housekeeperId) {
+        const { data: hkData } = await supabase
+          .from('housekeepers')
+          .select('id')
+          .eq('hotel_id', hotelId)
+          .eq('user_id', housekeeperId)
+          .single();
+        
+        if (hkData) {
+          housekeeperTableId = hkData.id;
+          console.log('🔗 ID housekeeper trouvé:', housekeeperTableId);
+        }
+      }
+
+      // Charger les assignations depuis Supabase - chercher par les deux IDs possibles ET par nom
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -177,7 +193,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
           )
         `)
         .eq('hotel_id', hotelId)
-        .or(`housekeeper_id.eq.${housekeeperId},housekeeper_name.eq.${housekeeperName}`)
+        .or(`housekeeper_id.eq.${housekeeperId},housekeeper_id.eq.${housekeeperTableId},housekeeper_name.eq.${housekeeperName}`)
         .in('status', ['assigned', 'in_progress'])
         .order('created_at', { ascending: false });
 
