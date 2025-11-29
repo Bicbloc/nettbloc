@@ -121,7 +121,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             sessionToken: HotelSessionService.getSessionToken() || '',
             hotelId: session.hotel_id || '',
             lastActiveDate: new Date().toISOString(),
-            room_data: session.room_data,
             housekeeper_assignments: session.housekeeper_assignments
           });
 
@@ -131,10 +130,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             return JSON.stringify(prev) !== JSON.stringify(newNames) ? newNames : prev;
           });
           
-          setRooms(prev => {
-            const newRooms = session.room_data || [];
-            return JSON.stringify(prev) !== JSON.stringify(newRooms) ? newRooms : prev;
-          });
+          // Les rooms sont maintenant dans la table rooms, pas dans la session
 
           // Rafraîchir les femmes de chambre moins fréquemment
           if (session.hotel_id && Math.random() < 0.1) { // 10% des fois seulement
@@ -154,9 +150,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             setHotelId(savedData.hotelId);
             localStorage.setItem('selectedHotelId', savedData.hotelId);
           }
-          if (savedData.room_data && rooms.length === 0) {
-            setRooms(savedData.room_data);
-          }
+          // Les rooms sont chargées depuis la table rooms, pas depuis savedData
           if (savedData.housekeeper_assignments && housekeeperNames.length === 0) {
             setHousekeeperNames(Object.keys(savedData.housekeeper_assignments));
           }
@@ -173,7 +167,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       const session = await HotelSessionService.getSession();
       if (session) {
         setHousekeeperNames(session.housekeeper_names || []);
-        setRooms(session.room_data || []);
+        // Les rooms sont chargées depuis la table rooms, pas depuis la session
         setIsDistributed(false); // Toujours faux car is_distributed n'existe plus
         
         // Récupérer l'ID réel de l'hôtel depuis la base de données
@@ -226,7 +220,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         setIsInitialized(true);
         console.log('Données de session chargées:', {
           housekeepers: session.housekeeper_names?.length || 0,
-          rooms: session.room_data?.length || 0,
           distributed: false,
           hotelId: sessionHotelId
         });
