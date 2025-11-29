@@ -158,6 +158,38 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
           console.log('✅ Chambres enregistrées dans le registre:', roomsData.length);
           insertedCount = roomsData.length;
+          
+          // Également enregistrer dans la table rooms pour la synchronisation temps réel
+          setUploadStatus('💾 Synchronisation avec les assignations...');
+          setUploadProgress(80);
+          
+          const roomsForSync = data.map((room: any) => {
+            const roomNumber = room.roomNumber || room.room_number || room.number;
+            return {
+              hotel_id: hotelId,
+              room_number: roomNumber,
+              floor: room.floor ?? null,
+              status: room.status || 'dirty',
+              room_type: room.type || room.room_type || null,
+              cleaning_priority: room.priority === 'high' ? 2 : 1,
+              notes: room.notes || null
+            };
+          }).filter(r => !!r.room_number);
+          
+          const { error: roomsError } = await supabase
+            .from('rooms')
+            .upsert(roomsForSync, { 
+              onConflict: 'hotel_id,room_number',
+              ignoreDuplicates: false 
+            });
+          
+          if (roomsError) {
+            console.warn('⚠️ Erreur synchronisation rooms:', roomsError);
+            // Ne pas bloquer si erreur, c'est juste pour la sync temps réel
+          } else {
+            console.log('✅ Chambres synchronisées dans rooms pour temps réel');
+          }
+          
         } catch (err: any) {
           console.error('❌ Erreur lors de la mise à jour du registre des chambres:', err);
           // Ne pas bloquer l'UI, continuer malgré l'erreur

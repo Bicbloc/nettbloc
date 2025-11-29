@@ -16,6 +16,7 @@ import { Textarea } from './ui/textarea';
 import { AlertTriangle, MessageSquare, Package } from 'lucide-react';
 import { LinenInventorySection } from './linen/LinenInventorySection';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
+import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 
 interface Room {
   id: string;
@@ -78,6 +79,19 @@ export const HousekeeperWorkSimple: React.FC = () => {
       navigate('/housekeeper/login');
     }
   }, [accessCode, hotelId, isAuthenticatedHousekeeper]);
+
+  // Synchronisation en temps réel des assignations et chambres
+  useRealtimeSync({
+    hotelId: hotelId || undefined,
+    tables: ['assignments', 'rooms'],
+    onUpdate: (table, payload) => {
+      console.log(`📡 Mise à jour temps réel ${table}:`, payload);
+      // Recharger les données quand il y a un changement
+      if (accessCode || isAuthenticatedHousekeeper) {
+        loadWorkData();
+      }
+    }
+  });
 
   const loadWorkData = async () => {
     try {
