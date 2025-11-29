@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import { GamificationService } from '@/services/gamificationService';
 import { BadgeUnlockNotification } from './gamification/BadgeUnlockNotification';
@@ -17,6 +17,7 @@ import { AlertTriangle, MessageSquare, Package } from 'lucide-react';
 import { LinenInventorySection } from './linen/LinenInventorySection';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
+import { useNotificationSound } from '@/hooks/use-notification-sound';
 
 interface Room {
   id: string;
@@ -43,6 +44,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [showGeneralIncidentDialog, setShowGeneralIncidentDialog] = useState(false);
   const [showLinenInventory, setShowLinenInventory] = useState(false);
   const [activeLinenTask, setActiveLinenTask] = useState<string | null>(null);
+  const [newRoomsCount, setNewRoomsCount] = useState(0);
+  
+  const { playInfo } = useNotificationSound();
 
   // Essayer d'abord les query params, puis le localStorage
   const accessCodeFromUrl = searchParams.get('access_code');
@@ -80,17 +84,94 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   }, [accessCode, hotelId, isAuthenticatedHousekeeper]);
 
-  // Synchronisation en temps réel des assignations et chambres
-  useRealtimeSync({
-    hotelId: hotelId || undefined,
-    tables: ['assignments', 'rooms'],
-    onUpdate: (table, payload) => {
-      console.log(`📡 Mise à jour temps réel ${table}:`, payload);
-      // Recharger les données quand il y a un changement
-      if (accessCode || isAuthenticatedHousekeeper) {
-        loadWorkData();
+  // Gestion intelligente des mises à jour temps réel
+  const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
+    console.log(`📡 Mise à jour temps réel ${table}:`, payload);
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+    
+    if (table === 'assignments') {
+      if (eventType === 'INSERT') {
+        // Nouvelle assignation - vérifier si c'est pour cette housekeeper
+        const housekeeperId = isAuthenticatedHousekeeper 
+          ? housekeeperProfile?.id 
+          : (housekeeper?.id || housekeeper?.access_code);
+        
+        const isForMe = newRecord.housekeeper_id === housekeeperId || 
+                        newRecord.housekeeper_name === housekeeperName;
+        
+        if (isForMe && newRecord.hotel_id === hotelId) {
+          console.log('🆕 Nouvelle assignation reçue pour moi!');
+          
+          // Charger la chambre complète
+          supabase
+            .from('rooms')
+            .select('*')
+            .eq('id', newRecord.room_id)
+            .single()
+            .then(({ data: roomData }) => {
+              if (roomData) {
+                // Ajouter la chambre à la liste
+                setRooms(prev => {
+                  // Vérifier si la chambre n'existe pas déjà
+                  if (!prev.find(r => r.id === roomData.id)) {
+                    return [...prev, roomData];
+                  }
+                  return prev;
+                });
+                
+                // Ajouter l'assignation
+                setAssignments(prev => [...prev, { ...newRecord, rooms: roomData }]);
+                
+                // Notification visuelle et sonore
+                toast({
+                  title: "🆕 Nouvelle chambre assignée !",
+                  description: `Chambre ${roomData.room_number} ajoutée à votre liste`,
+                  duration: 5000,
+                });
+                
+                playInfo();
+                
+                // Incrémenter le compteur de nouvelles chambres
+                setNewRoomsCount(prev => prev + 1);
+                setTimeout(() => setNewRoomsCount(0), 5000);
+              }
+            });
+        }
+      } else if (eventType === 'UPDATE') {
+        // Mise à jour d'une assignation existante
+        setAssignments(prev => prev.map(a => 
+          a.id === newRecord.id ? { ...a, ...newRecord } : a
+        ));
+      } else if (eventType === 'DELETE') {
+        // Assignation supprimée
+        setAssignments(prev => prev.filter(a => a.id !== oldRecord.id));
+        setRooms(prev => prev.filter(r => r.id !== oldRecord.room_id));
       }
     }
+    
+    if (table === 'rooms') {
+      if (eventType === 'UPDATE' || eventType === 'INSERT') {
+        // Mettre à jour le statut de la chambre localement
+        setRooms(prev => {
+          const exists = prev.find(r => r.id === newRecord.id);
+          if (exists) {
+            return prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r);
+          } else if (eventType === 'INSERT') {
+            return [...prev, newRecord];
+          }
+          return prev;
+        });
+      } else if (eventType === 'DELETE') {
+        setRooms(prev => prev.filter(r => r.id !== oldRecord.id));
+      }
+    }
+  }, [hotelId, housekeeperName, isAuthenticatedHousekeeper, housekeeperProfile, housekeeper, toast, playInfo]);
+
+  // Synchronisation en temps réel des assignations et chambres
+  const { isConnected } = useRealtimeSync({
+    hotelId: hotelId || undefined,
+    tables: ['assignments', 'rooms'],
+    onUpdate: handleRealtimeUpdate
   });
 
   const loadWorkData = async () => {
@@ -548,11 +629,44 @@ export const HousekeeperWorkSimple: React.FC = () => {
         {/* Barre de progression du niveau */}
         {levelData && (
           <div className="mb-4">
-            <LevelProgressBar
-              currentLevel={levelData.current_level}
-              totalXp={levelData.total_xp}
-              currentStreak={levelData.current_streak}
-            />
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex-1">
+                <LevelProgressBar
+                  currentLevel={levelData.current_level}
+                  totalXp={levelData.total_xp}
+                  currentStreak={levelData.current_streak}
+                />
+              </div>
+              {/* Indicateur de connexion temps réel */}
+              <Badge 
+                variant={isConnected ? "default" : "destructive"} 
+                className="flex items-center gap-1.5 shrink-0"
+              >
+                {isConnected ? (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <Wifi className="h-3 w-3" />
+                    <span className="hidden sm:inline">En direct</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-red-400" />
+                    <WifiOff className="h-3 w-3" />
+                    <span className="hidden sm:inline">Déconnecté</span>
+                  </>
+                )}
+              </Badge>
+            </div>
+            
+            {/* Badge de nouvelles chambres */}
+            {newRoomsCount > 0 && (
+              <Badge 
+                variant="secondary" 
+                className="bg-blue-500 text-white animate-bounce inline-flex items-center gap-1"
+              >
+                +{newRoomsCount} nouvelle{newRoomsCount > 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
         )}
 

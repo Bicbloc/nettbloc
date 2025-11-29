@@ -78,8 +78,8 @@ class RealtimeManager {
     const channelName = `realtime_${hotelId}_${Date.now()}`;
     this.channel = supabase.channel(channelName);
 
-    // Écouter les changements sur toutes les tables critiques
-    const tables = ['notifications', 'room_status_updates', 'assignments', 'housekeepers'];
+    // Écouter les changements sur toutes les tables critiques - incluant rooms pour la synchro temps réel
+    const tables = ['notifications', 'room_status_updates', 'assignments', 'rooms'];
     
     tables.forEach(table => {
       this.channel!.on(
