@@ -30,6 +30,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
+    // Timeout de sécurité - max 5 secondes de loading
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn('⚠️ Auth timeout - forcing loading to false');
+        setLoading(false);
+      }
+    }, 5000);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -46,8 +54,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Get initial session
     const initializeSession = async () => {
+      console.log('🚀 Starting session initialization...');
+      const startTime = Date.now();
+      
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
+
+        console.log('🚀 Session result:', {
+          duration: Date.now() - startTime,
+          session_exists: !!session,
+          user_id: session?.user?.id,
+          error: error?.message
+        });
 
         if (error) {
           console.error('❌ Session error:', error);
@@ -59,15 +77,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        console.log('🚀 Initial session:', { session_exists: !!session, user_id: session?.user?.id });
-
         if (isMounted) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
         }
       } catch (error) {
-        console.error('❌ Failed to get session:', error);
+        console.error('❌ Session init failed after', Date.now() - startTime, 'ms:', error);
         if (isMounted) {
           setSession(null);
           setUser(null);
@@ -79,6 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initializeSession();
 
     return () => {
+      clearTimeout(safetyTimeout);
       setIsMounted(false);
       subscription.unsubscribe();
     };
