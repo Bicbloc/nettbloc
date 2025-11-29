@@ -17,6 +17,7 @@ const Auth = () => {
   const { signIn: housekeeperSignIn, signUp: housekeeperSignUp } = useHousekeeperAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
+  const [showRetry, setShowRetry] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -28,6 +29,15 @@ const Auth = () => {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Afficher le bouton de retry après 3 secondes de loading
+  useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => setShowRetry(true), 3000);
+      return () => clearTimeout(timer);
+    }
+    setShowRetry(false);
+  }, [loading]);
 
   // Handle password reset from URL and hash
   useEffect(() => {
@@ -331,9 +341,14 @@ const Auth = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <p className="ml-4 text-muted-foreground">Vérification de l'authentification...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Vérification de l'authentification...</p>
+        {showRetry && (
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Rafraîchir la page
+          </Button>
+        )}
       </div>
     );
   }

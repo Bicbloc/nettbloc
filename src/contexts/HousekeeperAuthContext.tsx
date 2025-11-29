@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
 
 interface HousekeeperProfile {
   id: string;
@@ -61,71 +62,28 @@ export const useHousekeeperAuth = () => {
 };
 
 export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  // Utiliser l'auth centralisé au lieu de dupliquer
+  const { user, session, loading: authLoading } = useAuth();
+  
+  // États spécifiques aux housekeepers
   const [profile, setProfile] = useState<HousekeeperProfile | null>(null);
   const [currentHotelSession, setCurrentHotelSession] = useState<HotelSession | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
+  // Charger le profil housekeeper quand l'utilisateur change
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
-
-        console.log('🔐 Housekeeper auth changed:', { event, session_exists: !!session });
-
-        // Keep callback synchronous and light
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-
-        if (session?.user) {
-          // Defer profile loading to avoid blocking auth callback
-          setTimeout(() => {
-            if (isMounted) {
-              loadHousekeeperProfile(session.user);
-            }
-          }, 0);
-        } else {
-          setProfile(null);
-          setCurrentHotelSession(null);
-        }
-      }
-    );
-
-    // Get initial session
-    const initializeSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (isMounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-
-          if (session?.user) {
-            await loadHousekeeperProfile(session.user);
-          }
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Failed to get session:', error);
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeSession();
-
-    return () => {
-      setIsMounted(false);
-      subscription.unsubscribe();
-    };
-  }, []);
+    if (user && !authLoading) {
+      console.log('🔐 Loading housekeeper profile for user:', user.id);
+      loadHousekeeperProfile(user);
+    } else if (!user) {
+      console.log('🔐 No user, clearing housekeeper data');
+      setProfile(null);
+      setCurrentHotelSession(null);
+    }
+  }, [user, authLoading]);
 
   const loadHousekeeperProfile = async (user: User) => {
+    setProfileLoading(true);
     try {
       const { data: profileData, error } = await supabase
         .from('housekeeper_profiles')
@@ -134,11 +92,13 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         .maybeSingle();
 
       if (error) {
-        console.error('Error loading housekeeper profile:', error);
+        console.error('❌ Error loading housekeeper profile:', error);
+        setProfileLoading(false);
         return;
       }
 
       if (profileData) {
+        console.log('✅ Housekeeper profile loaded:', profileData.id);
         setProfile(profileData);
         
         // Load current active hotel session if any
@@ -159,16 +119,23 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
           .maybeSingle();
 
         if (sessionData && !sessionError) {
+          console.log('✅ Active hotel session found:', sessionData.id);
           setCurrentHotelSession({
             ...sessionData,
             hotel: Array.isArray(sessionData.hotels) ? sessionData.hotels[0] : sessionData.hotels,
             started_at: sessionData.started_at || sessionData.created_at,
             rooms_cleaned_today: sessionData.rooms_cleaned_today || 0
           } as HotelSession);
+        } else {
+          console.log('ℹ️ No active hotel session');
         }
+      } else {
+        console.log('ℹ️ No housekeeper profile found for user');
       }
     } catch (error) {
-      console.error('Error in loadHousekeeperProfile:', error);
+      console.error('❌ Error in loadHousekeeperProfile:', error);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -495,7 +462,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     session,
     profile,
     currentHotelSession,
-    loading,
+    loading: authLoading || profileLoading,
     signUp,
     signIn,
     signOut,
