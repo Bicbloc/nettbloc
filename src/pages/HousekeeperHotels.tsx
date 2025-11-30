@@ -195,21 +195,20 @@ export default function HousekeeperHotels() {
   const handleSelectHotel = (hotel: any) => {
     console.log('🏨 Sélection hôtel:', hotel);
     
-    // Nettoyer complètement le localStorage avant de sauvegarder
-    localStorage.removeItem('selectedHotelId');
-    localStorage.removeItem('selectedHotelName');
-    localStorage.removeItem('selectedHotelCode');
-    localStorage.removeItem('housekeeper');
-    
-    import('@/services/hotelStorageService').then(({ HotelStorageService }) => {
-      // Forcer la sauvegarde avec les nouvelles données
+    try {
+      // 1. Nettoyer TOUT le localStorage lié à l'hôtel
+      HotelStorageService.clear();
+      localStorage.removeItem('housekeeper');
+      localStorage.removeItem('housekeeperProfile');
+      
+      // 2. Sauvegarder de manière synchrone (throws error if fails)
       HotelStorageService.save({
         id: hotel.id,
         name: hotel.name,
         code: hotel.hotel_code,
       });
       
-      // Store housekeeper profile
+      // 3. Sauvegarder le profil housekeeper
       localStorage.setItem('housekeeperProfile', JSON.stringify({
         id: profile.id,
         name: profile.name,
@@ -217,19 +216,32 @@ export default function HousekeeperHotels() {
         isAuthenticated: true
       }));
 
-      console.log('✅ Données sauvegardées:', {
-        hotelId: localStorage.getItem('selectedHotelId'),
-        profileId: profile.id
+      // 4. Vérifier que les données sont bien sauvegardées
+      const savedId = localStorage.getItem('selectedHotelId');
+      console.log('✅ Données sauvegardées:', { 
+        hotelId: savedId, 
+        expected: hotel.id,
+        match: savedId === hotel.id 
       });
 
+      // 5. Naviguer seulement après confirmation de la sauvegarde
+      if (savedId === hotel.id) {
+        toast({
+          title: "Hôtel sélectionné ! 🏨",
+          description: `Vous travaillez maintenant pour ${hotel.name}`
+        });
+        navigate('/housekeeper/work');
+      } else {
+        throw new Error('Échec de la sauvegarde localStorage');
+      }
+    } catch (error) {
+      console.error('❌ Erreur sélection hôtel:', error);
       toast({
-        title: "Hôtel sélectionné ! 🏨",
-        description: `Vous travaillez maintenant pour ${hotel.name}`
+        variant: "destructive",
+        title: "Erreur de synchronisation",
+        description: "Veuillez réessayer de sélectionner l'hôtel"
       });
-
-      // Naviguer vers la page de travail
-      navigate('/housekeeper/work');
-    });
+    }
   };
 
   const handleLogout = async () => {
