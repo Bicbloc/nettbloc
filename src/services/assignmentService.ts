@@ -34,6 +34,20 @@ export class AssignmentService {
     try {
       console.log('🔄 Assignation chambre:', { hotelId, roomId, housekeeperId, housekeeperName });
 
+      // Récupérer le housekeeper_profile_id si disponible
+      let housekeeperProfileId: string | null = null;
+      if (housekeeperId) {
+        const { data: hkData } = await supabase
+          .from('housekeepers')
+          .select('user_id')
+          .eq('id', housekeeperId)
+          .single();
+        
+        if (hkData?.user_id) {
+          housekeeperProfileId = hkData.user_id;
+        }
+      }
+
       const { data, error } = await supabase
         .from('assignments')
         .insert({

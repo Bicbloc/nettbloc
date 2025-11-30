@@ -302,7 +302,24 @@ export const HousekeeperWorkSimple: React.FC = () => {
         }
       }
 
-      // Charger les assignations depuis Supabase - chercher par les deux IDs possibles ET par nom
+      // Charger les assignations depuis Supabase - chercher par TOUS les identifiants possibles
+      // Construire une liste complète d'identifiants à rechercher
+      const possibleIds = [
+        housekeeperId,
+        housekeeperTableId,
+        housekeeperProfile?.id
+      ].filter(Boolean);
+
+      console.log('🔍 Recherche avec identifiants possibles:', possibleIds);
+
+      // Construire le filtre OR pour tous les IDs possibles
+      let orFilter = possibleIds.map(id => `housekeeper_id.eq.${id}`).join(',');
+      
+      // Ajouter également le filtre par nom
+      if (housekeeperName) {
+        orFilter += `,housekeeper_name.eq.${housekeeperName}`;
+      }
+
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -316,7 +333,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
           )
         `)
         .eq('hotel_id', hotelId)
-        .or(`housekeeper_id.eq.${housekeeperId},housekeeper_id.eq.${housekeeperTableId},housekeeper_name.eq.${housekeeperName}`)
+        .or(orFilter)
         .in('status', ['assigned', 'in_progress'])
         .order('created_at', { ascending: false });
 

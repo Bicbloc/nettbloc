@@ -188,12 +188,6 @@ export class HotelSessionService {
     }
   }
 
-  // Mettre à jour les données de chambre (deprecated - les rooms sont maintenant dans la table rooms)
-  static async updateRoomData(rooms: Room[]): Promise<boolean> {
-    console.warn('updateRoomData est deprecated - les rooms sont dans la table rooms');
-    return true;
-  }
-
   // Mettre à jour les noms des femmes de chambre
   static async updateHousekeeperNames(names: string[]): Promise<boolean> {
     const sessionToken = this.getSessionToken();
@@ -279,6 +273,50 @@ export class HotelSessionService {
   static async updateRoomStatus(roomNumber: string, newStatus: string): Promise<boolean> {
     console.warn('updateRoomStatus est deprecated - utilisez la table rooms directement');
     return true;
+  }
+
+  /**
+   * Mettre à jour les données complètes des chambres dans localStorage
+   * (Les rooms sont dans la table rooms, on garde juste l'état UI en local)
+   */
+  static updateRoomDataLocal(rooms: any[], hotelId: string): void {
+    try {
+      const roomData = rooms.map(room => ({
+        number: room.number,
+        status: room.status,
+        cleaningType: room.cleaningType,
+        assignedTo: room.assignedTo,
+        notes: room.notes,
+        isUrgent: room.isUrgent,
+        notUrgent: room.notUrgent,
+        isTwin: room.isTwin
+      }));
+
+      localStorage.setItem(`room_data_${hotelId}`, JSON.stringify(roomData));
+      console.log('✅ Room data sauvegardé localement:', rooms.length, 'chambres');
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde room_data local:', error);
+    }
+  }
+
+  /**
+   * Restaurer les données de chambres depuis localStorage
+   */
+  static restoreRoomDataLocal(hotelId: string): any[] {
+    try {
+      const stored = localStorage.getItem(`room_data_${hotelId}`);
+      if (!stored) {
+        console.log('⚠️ Aucune room_data locale à restaurer');
+        return [];
+      }
+
+      const roomData = JSON.parse(stored);
+      console.log('✅ Room data restauré localement:', roomData.length, 'chambres');
+      return roomData;
+    } catch (error) {
+      console.error('❌ Erreur restauration room_data local:', error);
+      return [];
+    }
   }
 
   // Désactiver une session
