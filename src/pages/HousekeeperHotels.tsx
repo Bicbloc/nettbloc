@@ -193,7 +193,16 @@ export default function HousekeeperHotels() {
   };
 
   const handleSelectHotel = (hotel: any) => {
+    console.log('🏨 Sélection hôtel:', hotel);
+    
+    // Nettoyer complètement le localStorage avant de sauvegarder
+    localStorage.removeItem('selectedHotelId');
+    localStorage.removeItem('selectedHotelName');
+    localStorage.removeItem('selectedHotelCode');
+    localStorage.removeItem('housekeeper');
+    
     import('@/services/hotelStorageService').then(({ HotelStorageService }) => {
+      // Forcer la sauvegarde avec les nouvelles données
       HotelStorageService.save({
         id: hotel.id,
         name: hotel.name,
@@ -208,11 +217,17 @@ export default function HousekeeperHotels() {
         isAuthenticated: true
       }));
 
+      console.log('✅ Données sauvegardées:', {
+        hotelId: localStorage.getItem('selectedHotelId'),
+        profileId: profile.id
+      });
+
       toast({
         title: "Hôtel sélectionné ! 🏨",
         description: `Vous travaillez maintenant pour ${hotel.name}`
       });
 
+      // Naviguer vers la page de travail
       navigate('/housekeeper/work');
     });
   };

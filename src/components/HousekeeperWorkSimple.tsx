@@ -45,6 +45,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [showLinenInventory, setShowLinenInventory] = useState(false);
   const [activeLinenTask, setActiveLinenTask] = useState<string | null>(null);
   const [newRoomsCount, setNewRoomsCount] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const { playInfo } = useNotificationSound();
 
@@ -176,6 +177,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
   const loadWorkData = async () => {
     try {
+      setIsRefreshing(true);
       let authResult: any;
       
       // Si c'est une femme de chambre authentifiée (avec profil)
@@ -302,7 +304,17 @@ export const HousekeeperWorkSimple: React.FC = () => {
       });
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    console.log('🔄 Rafraîchissement manuel déclenché');
+    await loadWorkData();
+    toast({
+      title: "✅ Données actualisées",
+      description: "La liste des chambres a été mise à jour"
+    });
   };
 
   const loadAllPendingRooms = async () => {
@@ -591,14 +603,35 @@ export const HousekeeperWorkSimple: React.FC = () => {
               <h1 className="text-lg sm:text-2xl font-bold text-gray-800 truncate">
                 {hotel?.name}
               </h1>
-              <p className="text-xs sm:text-base text-gray-600 flex items-center gap-2 truncate">
-                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">{hotel?.address || 'Adresse non spécifiée'}</span>
-              </p>
+               <p className="text-xs sm:text-base text-gray-600 flex items-center gap-2 truncate">
+                 <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                 <span className="truncate">{hotel?.address || 'Adresse non spécifiée'}</span>
+                 {isConnected ? (
+                   <Badge variant="default" className="text-xs bg-green-500 ml-2">
+                     <Wifi className="h-3 w-3 mr-1" />
+                     Temps réel
+                   </Badge>
+                 ) : (
+                   <Badge variant="outline" className="text-xs border-orange-500 text-orange-500 ml-2">
+                     <WifiOff className="h-3 w-3 mr-1" />
+                     Hors ligne
+                   </Badge>
+                 )}
+               </p>
             </div>
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              onClick={handleRefresh}
+              variant="ghost"
+              size="sm"
+              disabled={isRefreshing}
+              className="text-muted-foreground hover:text-primary"
+              title="Actualiser les données"
+            >
+              <Clock className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
             {isAuthenticatedHousekeeper && (
               <Button
                 variant="outline"
