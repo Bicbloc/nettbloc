@@ -50,50 +50,26 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const notifications = notificationsHook?.notifications || [];
   const addNotificationFn = notificationsHook?.addNotification;
 
-  // Initialiser la session avec persistance RENFORCÉE
+  // Phase 5: Simplified initialization - just load from storage
   useEffect(() => {
-    const initializeSession = async () => {
-      try {
-        console.log('🏠 Initialisation de la session avec persistance renforcée...');
-        
-        // ÉTAPE 1: Restaurer l'hôtel depuis le service centralisé
-        const hotelSession = HotelStorageService.get();
-        
-        if (hotelSession?.id) {
-          setHotelId(hotelSession.id);
-          console.log('✅ Hotel ID restauré depuis HotelStorageService:', hotelSession.id);
-        }
-        
-        // ÉTAPE 2: Initialiser/restaurer la session
-        const token = await HotelSessionService.initializeSession();
-        if (token) {
-          console.log('✅ Session initialisée:', token);
-          
-          // ÉTAPE 3: Charger les données de session
-          await loadSessionData();
-          
-          // ÉTAPE 4: Forcer la sauvegarde immédiate avec le service centralisé
-          const session = await HotelSessionService.getSession();
-          if (session?.hotel_id) {
-            // Get hotel info from session
-            const hotelCode = localStorage.getItem('selectedHotelCode') || '';
-            const hotelName = localStorage.getItem('selectedHotelName') || '';
-            
-            HotelStorageService.save({
-              id: session.hotel_id,
-              name: hotelName,
-              code: hotelCode
-            });
-          }
-        }
-      } catch (error) {
-        console.error('❌ Erreur initialisation session:', error);
-      } finally {
+    const initializeFromStorage = () => {
+      const hotelData = HotelStorageService.get();
+      if (hotelData?.id && hotelData.id.length > 30) {
+        setHotelId(hotelData.id);
+        console.log('✅ HousekeepingContext: Hotel ID chargé depuis storage');
         setIsInitialized(true);
       }
     };
-
-    initializeSession();
+    
+    initializeFromStorage();
+    
+    // Listen for storage changes (when hotel is set by useAutoSetup)
+    const handleStorageChange = () => {
+      initializeFromStorage();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Synchronisation temps réel ROBUSTE avec sauvegarde continue
@@ -254,8 +230,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         }
       });
 
-      // Persister immédiatement
-      HotelSessionService.updateHousekeeperAssignments(assignments);
+      // Persister immédiatement avec hotel_id
+      HotelSessionService.updateHousekeeperAssignments(assignments, hotelId || undefined);
     }
   }, [rooms, isInitialized]);
 

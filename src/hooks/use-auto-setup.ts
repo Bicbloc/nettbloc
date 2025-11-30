@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { HotelStorageService } from '@/services/hotelStorageService';
+import { HotelSessionService } from '@/services/hotelSessionService';
 
 interface HotelData {
   id: string;
@@ -201,6 +202,12 @@ export const useAutoSetup = () => {
       if (activeCode) {
         setAccessCode(activeCode);
         console.log('✅ Code d\'accès actif trouvé');
+      }
+
+      // Phase 1: Create/restore session immediately after hotel setup
+      const sessionToken = await HotelSessionService.createSession(hotelResult.id);
+      if (sessionToken) {
+        console.log('✅ Session créée/restaurée:', sessionToken);
       }
 
       setIsSetupComplete(true);

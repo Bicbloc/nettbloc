@@ -92,13 +92,17 @@ export class HotelSessionService {
         return null;
       }
 
-      // 3. DÉSACTIVER les anciennes sessions de cet hôtel pour garantir l'unicité
-      console.log('🔄 Désactivation anciennes sessions pour hôtel:', effectiveHotelId);
-      await supabase
+      // Phase 2: ALWAYS deactivate all previous active sessions for this hotel
+      console.log('🔄 Désactivation TOUTES anciennes sessions pour hôtel:', effectiveHotelId);
+      const { error: deactivateError } = await supabase
         .from('hotel_sessions')
         .update({ is_active: false })
         .eq('hotel_id', effectiveHotelId)
         .eq('is_active', true);
+
+      if (deactivateError) {
+        console.error('⚠️ Erreur désactivation anciennes sessions:', deactivateError);
+      }
 
       // 4. Générer un token unique
       const sessionToken = this.generateSessionToken();
@@ -125,10 +129,8 @@ export class HotelSessionService {
 
       console.log('✅ Session unique créée:', data.id);
       
-      // 6. Sauvegarder le token
-      this.sessionToken = sessionToken;
-      localStorage.setItem('hotel_session_token', sessionToken);
-      localStorage.setItem('hotelSessionToken', sessionToken);
+      // Phase 4: Store session token explicitly
+      this.setSessionToken(sessionToken);
       
       // Sauvegarder dans SessionPersistenceService
       SessionPersistenceService.saveSessionData({
@@ -143,6 +145,14 @@ export class HotelSessionService {
       console.error('Erreur createSession:', error);
       return null;
     }
+  }
+
+  // Phase 4: Explicit session token setter
+  static setSessionToken(token: string): void {
+    this.sessionToken = token;
+    localStorage.setItem('hotel_session_token', token);
+    localStorage.setItem('hotelSessionToken', token);
+    console.log('✅ Token de session défini:', token);
   }
 
   // Récupérer le token de session actuel
@@ -210,13 +220,16 @@ export class HotelSessionService {
     }
   }
 
-  // Mettre à jour les assignations des chambres
-  static async updateHousekeeperAssignments(assignments: Record<string, string>): Promise<boolean> {
-    const sessionToken = this.getSessionToken();
-    if (!sessionToken) return false;
-
+  // Phase 6: Use hotel_id instead of session_token for better reliability
+  static async updateHousekeeperAssignments(assignments: Record<string, string>, hotelId?: string): Promise<boolean> {
     try {
-      // PERSISTANCE RENFORCÉE: Sauvegarder immédiatement
+      // Get hotel ID from parameter or localStorage
+      const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId');
+      if (!effectiveHotelId) {
+        console.error('No hotel ID found for updateHousekeeperAssignments');
+        return false;
+      }
+
       const { error } = await supabase
         .from('hotel_sessions')
         .update({ 
@@ -224,20 +237,21 @@ export class HotelSessionService {
           last_activity: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('session_token', sessionToken);
+        .eq('hotel_id', effectiveHotelId)
+        .eq('is_active', true);
 
       if (error) {
         console.error('Erreur mise à jour assignments:', error);
         return false;
       }
 
-      // Mettre à jour SessionPersistenceService aussi pour double sauvegarde
+      // Also save to SessionPersistenceService for redundancy
       SessionPersistenceService.updateSessionData({
         housekeeper_assignments: assignments,
         lastSyncTimestamp: Date.now()
       });
 
-      console.log('✅ Assignments persistés (DB + localStorage)');
+      console.log('✅ Assignments persistés (DB + localStorage) via hotel_id');
       return true;
     } catch (err) {
       console.error('Erreur updateHousekeeperAssignments:', err);

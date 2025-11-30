@@ -123,51 +123,23 @@ export class SessionPersistenceService {
     return true;
   }
 
-  // Restaurer ou créer une nouvelle session
+  // Phase 3: Always create new session (which handles deactivation)
   static async restoreOrCreateSession(hotelId?: string): Promise<string | null> {
     try {
       const savedData = this.getSavedSessionData();
-      
-      if (savedData) {
-        console.log('🔄 Found saved session data:', savedData);
-        
-        // Vérifier si c'est un nouveau jour
-        if (this.isNewDay(savedData.lastActiveDate)) {
-          console.log('📅 New day detected, archiving old session');
-          
-          // Archiver l'ancien rapport
-          await this.archiveOldReport(savedData.sessionToken, savedData.hotelId);
-          
-          // Désactiver l'ancienne session
-          await HotelSessionService.deactivateSession(savedData.sessionToken);
-          
-          // Nettoyer les données sauvegardées
-          this.clearSavedSession();
-          
-          // Créer une nouvelle session
-          console.log('🆕 Creating new session for new day');
-          return await HotelSessionService.createSession(hotelId || savedData.hotelId);
-        } else {
-          // Même jour, essayer de restaurer la session existante
-          console.log('📋 Same day, attempting to restore session');
-          const existingSession = await HotelSessionService.getSession(savedData.sessionToken);
-          
-          if (existingSession && existingSession.is_active) {
-            console.log('✅ Session restored successfully');
-            return savedData.sessionToken;
-          } else {
-            console.log('⚠️ Saved session no longer active, creating new one');
-            this.clearSavedSession();
-            return await HotelSessionService.createSession(hotelId || savedData.hotelId);
-          }
-        }
-      } else {
-        // Pas de session sauvegardée, créer une nouvelle
-        console.log('🆕 No saved session, creating new one');
-        return await HotelSessionService.createSession(hotelId);
+      const effectiveHotelId = hotelId || savedData?.hotelId;
+
+      if (!effectiveHotelId) {
+        console.log('⚠️ No hotel ID available for session');
+        return null;
       }
+
+      // Always create a new session (which will deactivate old ones)
+      console.log('🆕 Creating new session (will deactivate old ones)');
+      return await HotelSessionService.createSession(effectiveHotelId);
+      
     } catch (error) {
-      console.error('❌ Error in session restoration:', error);
+      console.error('Error in restoreOrCreateSession:', error);
       return await HotelSessionService.createSession(hotelId);
     }
   }
