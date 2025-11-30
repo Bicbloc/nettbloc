@@ -10,6 +10,7 @@ import { Building2, Plus, LogOut, User, Loader2, CheckCircle2 } from 'lucide-rea
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { HotelStorageService } from '@/services/hotelStorageService';
+import { realtimeManager } from '@/services/RealtimeManager';
 
 export default function HousekeeperHotels() {
   const [profile, setProfile] = useState<any>(null);
@@ -224,7 +225,10 @@ export default function HousekeeperHotels() {
         match: savedId === hotel.id 
       });
 
-      // 5. Naviguer seulement après confirmation de la sauvegarde
+      // 5. Forcer la reconnexion realtime pour le nouvel hôtel
+      realtimeManager.disconnect();
+      
+      // 6. Naviguer seulement après confirmation de la sauvegarde
       if (savedId === hotel.id) {
         toast({
           title: "Hôtel sélectionné ! 🏨",

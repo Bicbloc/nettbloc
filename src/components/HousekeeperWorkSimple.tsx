@@ -103,15 +103,32 @@ export const HousekeeperWorkSimple: React.FC = () => {
     
     if (table === 'assignments') {
       if (eventType === 'INSERT') {
-        // Nouvelle assignation - vérifier si c'est pour cette housekeeper
-        const housekeeperId = isAuthenticatedHousekeeper 
-          ? housekeeperProfile?.id 
-          : (housekeeper?.id || housekeeper?.access_code);
+        // Identifiants possibles du housekeeper actuel
+        const possibleIds = [
+          housekeeperProfile?.id,
+          housekeeper?.id,
+          housekeeper?.access_code,
+          housekeeper?.user_id
+        ].filter(Boolean);
         
-        const isForMe = newRecord.housekeeper_id === housekeeperId || 
-                        newRecord.housekeeper_name === housekeeperName;
+        // Vérifier par ID OU par nom
+        const isForMe = possibleIds.includes(newRecord.housekeeper_id) || 
+                        newRecord.housekeeper_name === housekeeperName ||
+                        newRecord.housekeeper_name?.toLowerCase() === housekeeperName?.toLowerCase();
         
-        if (isForMe && newRecord.hotel_id === hotelId) {
+        // Vérifier que c'est pour le bon hôtel
+        const isCorrectHotel = newRecord.hotel_id === hotelId;
+        
+        console.log('🔍 Vérification assignation:', {
+          possibleIds,
+          recordHousekeeperId: newRecord.housekeeper_id,
+          recordHousekeeperName: newRecord.housekeeper_name,
+          housekeeperName,
+          isForMe,
+          isCorrectHotel
+        });
+        
+        if (isForMe && isCorrectHotel) {
           console.log('🆕 Nouvelle assignation reçue pour moi!');
           
           // Charger la chambre complète
@@ -185,6 +202,18 @@ export const HousekeeperWorkSimple: React.FC = () => {
     tables: ['assignments', 'rooms'],
     onUpdate: handleRealtimeUpdate
   });
+
+  // Polling de secours si le realtime échoue
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      if (!isConnected && hotelId) {
+        console.log('⏰ Polling de secours - realtime non connecté');
+        loadWorkData();
+      }
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
+  }, [isConnected, hotelId]);
 
   const loadWorkData = async () => {
     try {
@@ -612,7 +641,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
             <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold text-gray-800 truncate">
-                {hotel?.name}
+                {hotel?.name || localStorage.getItem('selectedHotelName') || 'Hôtel non identifié'}
               </h1>
                <p className="text-xs sm:text-base text-gray-600 flex items-center gap-2 truncate">
                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
