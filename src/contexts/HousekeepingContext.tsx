@@ -279,11 +279,39 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   };
 
+  // Sauvegarder les données complètes des chambres localement
   useEffect(() => {
-    if (isInitialized && rooms.length > 0) {
-      HotelSessionService.updateRoomData(rooms);
-    }
-  }, [rooms, isInitialized]);
+    if (!hotelId || rooms.length === 0) return;
+
+    const saveRoomData = async () => {
+      // Sauvegarder les assignations
+      const assignments = rooms
+        .filter(room => room.assignedTo)
+        .reduce((acc, room) => ({
+          ...acc,
+          [room.number]: room.assignedTo
+        }), {});
+
+      await HotelSessionService.updateHousekeeperAssignments(assignments, hotelId);
+
+      // Sauvegarder les données complètes des chambres localement
+      const roomData = rooms.map(room => ({
+        number: room.number,
+        status: room.status,
+        cleaningType: room.cleaningType,
+        assignedTo: room.assignedTo,
+        notes: room.notes,
+        isUrgent: room.isUrgent,
+        notUrgent: room.notUrgent,
+        isTwin: room.isTwin
+      }));
+
+      HotelSessionService.updateRoomDataLocal(roomData, hotelId);
+    };
+
+    const debounceTimeout = setTimeout(saveRoomData, 1000);
+    return () => clearTimeout(debounceTimeout);
+  }, [rooms, hotelId]);
 
   useEffect(() => {
     if (isInitialized) {

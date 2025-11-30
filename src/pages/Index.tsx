@@ -79,6 +79,8 @@ import { UpgradeButton } from "@/components/UpgradeButton";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { StatsOverview } from "@/components/StatsOverview";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { useCallback } from "react";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -170,6 +172,45 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   });
   
   const { addNotification } = useNotifications(currentHotelId);
+
+  // Gestion temps réel des mises à jour depuis les housekeepers
+  const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
+    console.log(`📡 Temps réel ${table}:`, payload);
+    const { eventType, new: newRecord } = payload;
+    
+    if (table === 'rooms' && (eventType === 'UPDATE' || eventType === 'INSERT')) {
+      // Mettre à jour l'état local quand un housekeeper change le statut
+      setRooms(prev => {
+        const existingIndex = prev.findIndex(r => r.number === newRecord.room_number);
+        if (existingIndex !== -1) {
+          return prev.map((r, i) => 
+            i === existingIndex 
+              ? { 
+                  ...r, 
+                  status: newRecord.status,
+                  cleaningType: newRecord.room_type === 'full' ? 'full' : (newRecord.room_type === 'quick' ? 'quick' : r.cleaningType),
+                  notes: newRecord.notes
+                } 
+              : r
+          );
+        }
+        return prev;
+      });
+
+      toast({
+        title: "🔄 Mise à jour",
+        description: `Chambre ${newRecord.room_number} mise à jour en temps réel`,
+        duration: 3000
+      });
+    }
+  }, [toast]);
+
+  // Ajouter des listeners temps réel
+  useRealtimeSync({
+    hotelId: currentHotelId || undefined,
+    tables: ['rooms', 'assignments'],
+    onUpdate: handleRealtimeUpdate
+  });
 
   // ALL useEffect hooks must be here too - before any conditional returns
   useEffect(() => {
@@ -300,12 +341,19 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
   
-  const handleRoomUpdate = (updatedRoom: Room) => {
+  const handleRoomUpdate = async (updatedRoom: Room) => {
+    // 1. Mise à jour locale immédiate (UX responsive)
     setRooms(prevRooms => 
       prevRooms.map(room => 
         room.number === updatedRoom.number ? updatedRoom : room
       )
     );
+    
+    // 2. Synchronisation temps réel vers Supabase
+    if (currentHotelId) {
+      const { RoomSyncService } = await import('@/services/roomSyncService');
+      await RoomSyncService.syncRoom(currentHotelId, updatedRoom);
+    }
   };
   
   const handleRoomUnassign = (roomToUnassign: Room) => {
@@ -475,7 +523,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     // Sauvegarder dans la session pour persistance
     try {
       const { HotelSessionService } = await import('@/services/hotelSessionService');
-      await HotelSessionService.updateRoomData(updatedRooms);
+      if (currentHotelId) {
+        HotelSessionService.updateRoomDataLocal(updatedRooms, currentHotelId);
+      }
       console.log('✅ Chambre ajoutée et sauvegardée:', newRoom.number);
       
       // Afficher un toast de confirmation
@@ -510,7 +560,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     // Sauvegarder dans la session
     try {
       const { HotelSessionService } = await import('@/services/hotelSessionService');
-      await HotelSessionService.updateRoomData(updatedRooms);
+      if (currentHotelId) {
+        HotelSessionService.updateRoomDataLocal(updatedRooms, currentHotelId);
+      }
       console.log('✅ Chambre supprimée et sauvegardée:', roomNumber);
       
       toast({
@@ -562,7 +614,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     // Sauvegarder dans la session
     try {
       const { HotelSessionService } = await import('@/services/hotelSessionService');
-      await HotelSessionService.updateRoomData(updatedRooms);
+      if (currentHotelId) {
+        HotelSessionService.updateRoomDataLocal(updatedRooms, currentHotelId);
+      }
       console.log('✅ Liaisons de chambres sauvegardées:', roomNumber, linkedRoomNumbers);
     } catch (error) {
       console.error('❌ Erreur sauvegarde liaisons:', error);
