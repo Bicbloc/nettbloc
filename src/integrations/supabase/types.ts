@@ -1653,6 +1653,7 @@ export type Database = {
         Row: {
           company_name: string | null
           created_at: string
+          current_hotel_id: string | null
           email: string
           id: string
           is_suspended: boolean
@@ -1669,6 +1670,7 @@ export type Database = {
         Insert: {
           company_name?: string | null
           created_at?: string
+          current_hotel_id?: string | null
           email: string
           id: string
           is_suspended?: boolean
@@ -1685,6 +1687,7 @@ export type Database = {
         Update: {
           company_name?: string | null
           created_at?: string
+          current_hotel_id?: string | null
           email?: string
           id?: string
           is_suspended?: boolean
@@ -1698,7 +1701,15 @@ export type Database = {
           trial_extension_reason?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_current_hotel_id_fkey"
+            columns: ["current_hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_training_patterns: {
         Row: {
