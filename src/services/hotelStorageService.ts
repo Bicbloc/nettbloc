@@ -11,10 +11,17 @@ export class HotelStorageService {
 
   static save(hotel: { id: string; name: string; code: string }): void {
     try {
+      // Validation des données
+      if (!hotel.id || hotel.id.length < 30) {
+        console.error('❌ HotelStorageService: ID invalide', hotel.id);
+        throw new Error('Invalid hotel ID');
+      }
+
       const session: HotelSession = {
         ...hotel,
         timestamp: Date.now(),
       };
+      
       // Save to new key
       localStorage.setItem(this.KEY, JSON.stringify(session));
       
@@ -23,8 +30,18 @@ export class HotelStorageService {
       localStorage.setItem('selectedHotelCode', hotel.code);
       localStorage.setItem('selectedHotelName', hotel.name);
       localStorage.setItem('currentHotelId', hotel.id);
+      
+      // Vérification immédiate
+      const verification = localStorage.getItem('selectedHotelId');
+      if (verification !== hotel.id) {
+        console.error('❌ Échec sauvegarde localStorage');
+        throw new Error('localStorage save failed');
+      }
+      
+      console.log('✅ Hotel session saved:', hotel.id.slice(0, 8) + '...');
     } catch (error) {
       console.error('Failed to save hotel session:', error);
+      throw error;
     }
   }
 

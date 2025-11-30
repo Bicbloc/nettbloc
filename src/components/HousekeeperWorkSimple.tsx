@@ -66,22 +66,33 @@ export const HousekeeperWorkSimple: React.FC = () => {
    const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
 
   useEffect(() => {
+    // Vérification renforcée de l'hotelId
+    const storedHotelId = localStorage.getItem('selectedHotelId');
+    
+    console.log('🔍 Vérification hotelId:', {
+      fromUrl: hotelIdFromUrl,
+      fromStorage: storedHotelId,
+      final: hotelId,
+      isAuthenticatedHousekeeper
+    });
+
+    // Validation stricte du hotelId (doit être un UUID valide)
+    if (hotelId && hotelId.length < 30) {
+      console.error('❌ HotelId invalide:', hotelId);
+      toast({
+        title: "Erreur de session",
+        description: "Hotel ID introuvable. Veuillez resélectionner votre hôtel.",
+        variant: "destructive"
+      });
+      navigate('/housekeeper/hotels');
+      return;
+    }
+
     // Une femme de chambre authentifiée n'a pas besoin de code d'accès
     if ((accessCode && hotelId) || (isAuthenticatedHousekeeper && hotelId)) {
       loadWorkData();
-    } else {
-      toast({
-        title: "Paramètres manquants",
-        description: "Veuillez vous reconnecter.",
-        variant: "destructive"
-      });
-      // Nettoyer le localStorage
-      localStorage.removeItem('housekeeper');
-      localStorage.removeItem('housekeeperProfile');
-      localStorage.removeItem('selectedHotelId');
-      localStorage.removeItem('selectedHotelName');
-      localStorage.removeItem('selectedHotelCode');
-      navigate('/housekeeper/login');
+    } else if (!accessCode && !isAuthenticatedHousekeeper) {
+      navigate('/housekeeper/auth');
     }
   }, [accessCode, hotelId, isAuthenticatedHousekeeper]);
 
