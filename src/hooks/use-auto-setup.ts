@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { HotelStorageService } from '@/services/hotelStorageService';
 
 interface HotelData {
   id: string;
@@ -32,247 +33,183 @@ export const useAutoSetup = () => {
   const hasAttemptedSetup = useRef(false);
   const [lastUserId, setLastUserId] = useState<string | null>(null);
 
+  // Helper functions
+  const createOrUpdateProfile = async (user: any) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        email: user.email,
+        company_name: user.user_metadata?.company_name || null
+      })
+      .select()
+      .single();
+    
+    if (error) console.error('Profile upsert error:', error);
+    return data;
+  };
+
+  const findUserHotel = async (user: any): Promise<HotelData | null> => {
+    const { data } = await supabase
+      .from('hotels')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    
+    return data;
+  };
+
+  const createHotel = async (user: any): Promise<HotelData | null> => {
+    const hotelName = user.user_metadata?.company_name || `Établissement de ${user.email}`;
+    const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+
+    const { data, error } = await supabase
+      .from('hotels')
+      .insert({
+        name: hotelName,
+        email: user.email,
+        user_id: user.id,
+        hotel_code: hotelCode
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Hotel creation error:', error);
+      return null;
+    }
+
+    return data;
+  };
+
+  const getActiveAccessCode = async (hotelId: string): Promise<string | null> => {
+    const { data } = await supabase
+      .from('housekeeper_access_codes')
+      .select('access_code')
+      .eq('hotel_id', hotelId)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    return data?.access_code || null;
+  };
+
   const setupHotel = useCallback(async () => {
-    // Éviter les exécutions multiples dans un même cycle
-    if (hasAttemptedSetup.current) {
-      console.log('🚫 Setup déjà tenté dans ce cycle, ignore...');
-      return;
-    }
-
-    if (!isAuthenticated || !user?.id) {
-      console.log('🚫 Non authentifié, arrêt du setup');
-      setLoading(false);
-      setIsSetupComplete(false);
-      hasAttemptedSetup.current = false;
-      return;
-    }
-
-    console.log('🏨 Auto-setup: Démarrage pour user:', user.email);
+    if (!user || loading) return;
+    
     hasAttemptedSetup.current = true;
+    console.log('🏨 Starting optimized hotel setup for user:', user.id);
     setLoading(true);
     
     try {
-      // Phase 1: Vérification de cohérence des données
-      console.log('🔍 Vérification cohérence profil + hôtel...');
-      
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('❌ Erreur recherche profil:', profileError);
-        throw profileError;
-      }
-
-      // Si le profil n'existe pas, le créer automatiquement avec les métadonnées utilisateur
-      let profileData = profile;
-      if (!profile) {
-        console.log('📝 Création automatique du profil utilisateur...');
-        
-        // Récupérer les métadonnées de l'utilisateur Supabase
-        const companyFromMetadata = user.user_metadata?.company_name;
-        
-        const { data: newProfile, error: createProfileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email || '',
-            company_name: companyFromMetadata || null
-          })
-          .select()
-          .single();
-
-        if (createProfileError) {
-          console.error('❌ Erreur création profil:', createProfileError);
-          toast({
-            variant: "destructive",
-            title: "Erreur de configuration",
-            description: "Impossible de créer votre profil. Veuillez réessayer."
-          });
-          setLoading(false);
-          return;
-        }
-        profileData = newProfile;
-        console.log('✅ Profil créé automatiquement:', profileData);
-      }
-
-      console.log('✅ Profil utilisateur disponible:', profileData);
-
-      // Phase 2: Rechercher l'hôtel existant - PRIORITÉ À L'HÔTEL LE PLUS ANCIEN (avec données)
-      const { data: existingHotelByUser, error: hotelErrorByUser } = await supabase
-        .from('hotels')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })  // Le plus ancien en premier
-        .limit(1)
-        .maybeSingle();
-
-      if (hotelErrorByUser) {
-        console.error('❌ Erreur recherche hôtel par user_id:', hotelErrorByUser);
-        throw hotelErrorByUser;
-      }
-
-      let hotelData: HotelData | null = existingHotelByUser;
-      let activeCode: string | null = null;
-      let hotelCreated = false;
-
-      // Fallback: si aucun hôtel lié au user_id, essayer par email (cas anciens comptes clients comme Artois)
-      if (!hotelData && user.email) {
-        console.log('🔍 Aucun hôtel trouvé par user_id, tentative de recherche par email...');
-        const { data: existingHotelByEmail, error: hotelErrorByEmail } = await supabase
-          .from('hotels')
-          .select('*')
-          .eq('email', user.email)
-          .order('created_at', { ascending: true })  // Le plus ancien en premier
-          .limit(1)
-          .maybeSingle();
-
-        if (hotelErrorByEmail) {
-          console.error('❌ Erreur recherche hôtel par email:', hotelErrorByEmail);
-          throw hotelErrorByEmail;
-        }
-
-        if (existingHotelByEmail) {
-          hotelData = existingHotelByEmail;
-          console.log('✅ Hôtel existant trouvé via email:', existingHotelByEmail);
-        }
-      }
-
-      // Phase 3: Si hôtel trouvé, chercher les codes d'accès actifs
-      if (hotelData) {
-        console.log('✅ Hôtel existant trouvé:', hotelData);
-        
-        // Vérifier que le nom de l'hôtel correspond au company_name du profil
-        if (hotelData.name !== profileData.company_name && profileData.company_name) {
-          console.log('🔄 Mise à jour nom hôtel pour correspondre au profil...');
-          const { data: updatedHotel, error: updateError } = await supabase
-            .from('hotels')
-            .update({ name: profileData.company_name })
-            .eq('id', hotelData.id)
-            .select()
-            .single();
-
-          if (!updateError && updatedHotel) {
-            hotelData = updatedHotel;
-            console.log('✅ Nom hôtel mis à jour:', profileData.company_name);
-          }
-        }
-        
-        const { data: accessCodes } = await supabase
-          .from('housekeeper_access_codes')
-          .select('access_code')
-          .eq('hotel_id', hotelData.id)
-          .eq('is_active', true)
-          .limit(1);
-
-        if (accessCodes && accessCodes.length > 0) {
-          activeCode = accessCodes[0].access_code;
-          console.log('✅ Code actif trouvé:', activeCode);
-        }
-      }
-
-      // Phase 4: Si pas d'hôtel du tout, en créer un automatiquement
-      if (!hotelData) {
-        console.log('📝 Création automatique nouvel hôtel...');
-        const hotelName = profileData.company_name || `Établissement de ${user.email}`;
-        const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
-
-        const { data: newHotel, error: createError } = await supabase
-          .from('hotels')
-          .insert({
-            name: hotelName,
-            email: user.email,
-            user_id: user.id,
-            hotel_code: hotelCode
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('❌ Erreur création hôtel:', createError);
-          throw createError;
-        }
-        hotelData = newHotel;
-        hotelCreated = true;
-        console.log('✅ Hôtel créé automatiquement avec code:', { hotel: hotelData, code: hotelCode });
-      }
-
-      // Phase 4.5: S'assurer que l'hôtel existant a un hotel_code
-      if (hotelData && !hotelData.hotel_code) {
-        console.log('🔧 Génération hotel_code manquant pour hôtel existant...');
-        const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
-        
-        const { data: updatedHotel, error: updateError } = await supabase
-          .from('hotels')
-          .update({ hotel_code: hotelCode })
-          .eq('id', hotelData.id)
-          .select()
-          .single();
-        
-        if (!updateError && updatedHotel) {
-          hotelData = updatedHotel;
-          console.log('✅ Hotel code généré pour hôtel existant:', hotelCode);
-        }
-      }
-
-      // Phase 5: Finaliser le setup avec les données trouvées/créées
-      if (hotelData) {
-        setHotel(hotelData);
-        setAccessCode(activeCode);
+      // PHASE 1: Vérification RAPIDE du cache localStorage
+      const cachedHotel = HotelStorageService.get();
+      if (cachedHotel && cachedHotel.id && cachedHotel.id.length > 30) {
+        console.log('⚡ CACHE HIT - Hôtel chargé depuis localStorage:', cachedHotel.id);
+        setHotel({
+          id: cachedHotel.id,
+          name: cachedHotel.name,
+          hotel_code: cachedHotel.code
+        });
         setIsSetupComplete(true);
         setLoading(false);
         
-        // Sauvegarde localStorage pour les autres composants
-        localStorage.setItem('selectedHotelId', hotelData.id);
-        localStorage.setItem('selectedHotelCode', hotelData.hotel_code || '');
-        localStorage.setItem('selectedHotelName', hotelData.name);
-        
-        const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
-        await SessionPersistenceService.forceSaveCurrentSession(hotelData.id);
-        
-        console.log('✅ Setup terminé avec succès:', {
-          hotelId: hotelData.id,
-          hotelCode: hotelData.hotel_code,
-          hotelName: hotelData.name,
-          hasAccessCode: !!activeCode,
-          profileCompanyName: profileData.company_name
+        // Charger le code d'accès en arrière-plan
+        getActiveAccessCode(cachedHotel.id).then(code => {
+          if (code) setAccessCode(code);
         });
+        
+        return; // Démarrage INSTANTANÉ!
+      }
 
-        // Génération automatique des codes d'accès si hotel_code est disponible
-        if (hotelData.hotel_code && !activeCode) {
-          console.log('🔑 Génération automatique des codes d\'accès...');
-          try {
-            const { CodeGenerationService } = await import('@/services/codeGenerationService');
-            const results = await CodeGenerationService.forceGenerateAllMissingCodes();
-            console.log('✅ Codes d\'accès générés automatiquement:', results.generated, 'codes générés');
-          } catch (error) {
-            console.warn('⚠️ Génération codes d\'accès échouée:', error);
-          }
+      console.log('📡 Cache miss - Chargement depuis base de données...');
+
+      // PHASE 2: Requête UNIQUE avec lien direct profiles.current_hotel_id
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select(`
+          id, 
+          email, 
+          company_name, 
+          current_hotel_id,
+          hotels!profiles_current_hotel_id_fkey(
+            id, 
+            name, 
+            hotel_code,
+            email
+          )
+        `)
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Profile query error:', profileError);
+        // Fallback: créer le profil
+        await createOrUpdateProfile(user);
+      }
+
+      let hotelResult: HotelData | null = null;
+
+      // Si l'hôtel est lié au profil, l'utiliser directement
+      if (profileData?.hotels) {
+        hotelResult = profileData.hotels as unknown as HotelData;
+        console.log('✅ Hôtel chargé via lien direct profiles.current_hotel_id');
+      } else {
+        // Fallback: chercher par user_id ou email
+        console.log('🔍 Recherche hôtel par user_id/email...');
+        hotelResult = await findUserHotel(user);
+        
+        if (!hotelResult) {
+          console.log('🆕 Création nouvel hôtel...');
+          hotelResult = await createHotel(user);
         }
 
-        if (hotelCreated) {
-          toast({
-            title: "✅ Établissement configuré",
-            description: `${profileData.company_name || hotelData.name} prêt à l'emploi !`
-          });
+        // Mettre à jour le lien direct dans profiles
+        if (hotelResult) {
+          await supabase
+            .from('profiles')
+            .update({ current_hotel_id: hotelResult.id })
+            .eq('id', user.id);
+          console.log('✅ Lien profiles.current_hotel_id mis à jour');
         }
       }
 
-    } catch (error) {
-      console.error('❌ Erreur auto-setup:', error);
-      hasAttemptedSetup.current = false; // Permettre un retry sur prochain changement d'état
-      toast({
-        variant: "destructive",
-        title: "Erreur configuration",
-        description: "Erreur lors de la configuration de l'hôtel. Veuillez réessayer ou contacter le support."
+      if (!hotelResult) {
+        console.error('❌ Impossible de trouver ou créer l\'hôtel');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Configuration hôtel terminée:', {
+        id: hotelResult.id,
+        name: hotelResult.name,
+        code: hotelResult.hotel_code
       });
+
+      // Sauvegarder dans le cache pour prochain chargement
+      setHotel(hotelResult);
+      HotelStorageService.save({
+        id: hotelResult.id,
+        name: hotelResult.name,
+        code: hotelResult.hotel_code || ''
+      });
+
+      // Charger le code d'accès
+      const activeCode = await getActiveAccessCode(hotelResult.id);
+      if (activeCode) {
+        setAccessCode(activeCode);
+        console.log('✅ Code d\'accès actif trouvé');
+      }
+
+      setIsSetupComplete(true);
+    } catch (error) {
+      console.error('❌ Erreur setupHotel:', error);
     } finally {
       setLoading(false);
-      console.log('🏁 Auto-setup terminé');
     }
-  }, [isAuthenticated, user, toast]);
+  }, [user]);
 
   useEffect(() => {
     console.log('🔄 useAutoSetup effect déclenché', {

@@ -41,87 +41,106 @@ export class HotelSessionService {
   // Créer une nouvelle session d'hôtel
   static async createSession(hotelId?: string): Promise<string | null> {
     try {
-      const sessionToken = this.generateSessionToken();
-      
-      // RÉCUPÉRATION OPTIMISÉE de l'hotel_id - UNE SEULE SOURCE À LA FOIS
-      let finalHotelId = hotelId;
+      // 1. Obtenir l'ID utilisateur courant
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ Utilisateur non authentifié');
+        return null;
+      }
 
-      if (!finalHotelId) {
-        // Priorité 1: localStorage (source principale)
-        finalHotelId = localStorage.getItem('selectedHotelId') || 
-                       localStorage.getItem('currentHotelId') ||
-                       SessionPersistenceService.getStoredHotelId() ||
-                       undefined;
+      // 2. Trouver l'hôtel
+      let effectiveHotelId = hotelId;
+      
+      if (!effectiveHotelId) {
+        // Essayer depuis localStorage
+        effectiveHotelId = localStorage.getItem('selectedHotelId') || 
+                          localStorage.getItem('currentHotelId') ||
+                          localStorage.getItem('hotelId') || null;
         
-        if (finalHotelId) {
-          console.log('✅ Hotel ID depuis localStorage:', finalHotelId.slice(0, 8) + '...');
+        console.log('🔍 HotelId depuis localStorage:', effectiveHotelId);
+      }
+      
+      // Si toujours pas trouvé, chercher dans le profil via current_hotel_id
+      if (!effectiveHotelId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('current_hotel_id')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.current_hotel_id) {
+          effectiveHotelId = profile.current_hotel_id;
+          console.log('✅ HotelId trouvé via profiles.current_hotel_id:', effectiveHotelId);
         } else {
-          // Priorité 2: récupérer depuis le profil user (une seule fois)
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-              const { data: hotel } = await supabase
-                .from('hotels')
-                .select('id')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-              
-              if (hotel) {
-                finalHotelId = hotel.id;
-                console.log('✅ Hotel ID depuis profil user:', finalHotelId.slice(0, 8) + '...');
-              }
-            }
-          } catch (error) {
-            console.error('❌ Erreur récupération hotel:', error);
+          // Fallback: chercher par user_id
+          const { data: hotel } = await supabase
+            .from('hotels')
+            .select('id')
+            .eq('user_id', user.id)
+            .limit(1)
+            .single();
+          
+          if (hotel) {
+            effectiveHotelId = hotel.id;
+            console.log('✅ HotelId trouvé via hotels.user_id:', effectiveHotelId);
           }
         }
       }
 
-      if (!finalHotelId) {
-        console.warn('❌ Impossible de créer session: pas de hotel_id');
+      if (!effectiveHotelId) {
+        console.error('❌ Impossible de déterminer l\'hôtel');
         return null;
       }
 
-      // Créer la session en DB
+      // 3. DÉSACTIVER les anciennes sessions de cet hôtel pour garantir l'unicité
+      console.log('🔄 Désactivation anciennes sessions pour hôtel:', effectiveHotelId);
+      await supabase
+        .from('hotel_sessions')
+        .update({ is_active: false })
+        .eq('hotel_id', effectiveHotelId)
+        .eq('is_active', true);
+
+      // 4. Générer un token unique
+      const sessionToken = this.generateSessionToken();
+
+      // 5. Créer la NOUVELLE session unique
       const { data, error } = await supabase
         .from('hotel_sessions')
         .insert({
+          hotel_id: effectiveHotelId,
+          user_id: user.id,
           session_token: sessionToken,
-          hotel_id: finalHotelId,
-          housekeeper_names: [],
-          housekeeper_assignments: {},
           is_active: true,
-          last_activity: new Date().toISOString()
+          housekeeper_assignments: {},
+          housekeeper_names: [],
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 jours
         })
         .select()
         .single();
 
       if (error) {
-        console.error('❌ Erreur création session:', error);
+        console.error('Erreur création session:', error);
         return null;
       }
 
-      // SAUVEGARDE UNIQUE dans les emplacements principaux
-      this.sessionToken = sessionToken;
-      localStorage.setItem('hotelSessionToken', sessionToken);
-      localStorage.setItem('selectedHotelId', finalHotelId);
-      localStorage.setItem('currentHotelId', finalHotelId);
+      console.log('✅ Session unique créée:', data.id);
       
-      // Sauvegarder dans le service de persistance
+      // 6. Sauvegarder le token
+      this.sessionToken = sessionToken;
+      localStorage.setItem('hotel_session_token', sessionToken);
+      localStorage.setItem('hotelSessionToken', sessionToken);
+      
+      // Sauvegarder dans SessionPersistenceService
       SessionPersistenceService.saveSessionData({
         sessionToken: sessionToken,
-        hotelId: finalHotelId,
+        hotelId: effectiveHotelId,
         lastActiveDate: new Date().toISOString(),
-        housekeeper_assignments: []
+        housekeeper_assignments: {}
       });
       
-      console.log('✅ Session créée:', sessionToken.slice(0, 10) + '...', 'Hotel:', finalHotelId.slice(0, 8) + '...');
       return sessionToken;
-    } catch (err) {
-      console.error('❌ Erreur createSession:', err);
+    } catch (error) {
+      console.error('Erreur createSession:', error);
       return null;
     }
   }
@@ -197,10 +216,12 @@ export class HotelSessionService {
     if (!sessionToken) return false;
 
     try {
+      // PERSISTANCE RENFORCÉE: Sauvegarder immédiatement
       const { error } = await supabase
         .from('hotel_sessions')
         .update({ 
           housekeeper_assignments: assignments as any,
+          last_activity: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('session_token', sessionToken);
@@ -210,11 +231,13 @@ export class HotelSessionService {
         return false;
       }
 
-      // Mettre à jour les données de persistance
+      // Mettre à jour SessionPersistenceService aussi pour double sauvegarde
       SessionPersistenceService.updateSessionData({
-        housekeeper_assignments: assignments
+        housekeeper_assignments: assignments,
+        lastSyncTimestamp: Date.now()
       });
 
+      console.log('✅ Assignments persistés (DB + localStorage)');
       return true;
     } catch (err) {
       console.error('Erreur updateHousekeeperAssignments:', err);

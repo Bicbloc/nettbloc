@@ -239,6 +239,26 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   }, [housekeeperNames, isInitialized]);
 
+  // NOUVEAU: Persister les assignations après chaque modification de rooms
+  useEffect(() => {
+    if (isInitialized && rooms.length > 0) {
+      // Créer un mapping housekeeper -> chambres assignées
+      const assignments: Record<string, string> = {};
+      rooms.forEach(room => {
+        if (room.assignedTo) {
+          if (!assignments[room.assignedTo]) {
+            assignments[room.assignedTo] = room.number;
+          } else {
+            assignments[room.assignedTo] += ',' + room.number;
+          }
+        }
+      });
+
+      // Persister immédiatement
+      HotelSessionService.updateHousekeeperAssignments(assignments);
+    }
+  }, [rooms, isInitialized]);
+
   // Fonction pour synchroniser les femmes de chambre avec la base de données
   const syncHousekeepersToDatabase = async () => {
     if (!hotelId || housekeeperNames.length === 0) return;

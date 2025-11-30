@@ -120,9 +120,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    // Nettoyer tous les hotel IDs du localStorage avant la connexion
-    HotelStorageService.clear();
-    console.log('🧹 localStorage nettoyé pour nouvelle connexion');
+    // Ne PAS nettoyer le localStorage - garder les données de session
+    // pour permettre la restauration rapide
+    console.log('🔐 Connexion sans nettoyage localStorage pour persistance');
     
     const { error } = await supabase.auth.signInWithPassword({
       email,
