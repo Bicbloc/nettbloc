@@ -453,10 +453,9 @@ const Auth = () => {
                   </div>
                 )}
                 <Tabs defaultValue="signin" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Connexion</TabsTrigger>
                 <TabsTrigger value="signup">Inscription</TabsTrigger>
-                <TabsTrigger value="housekeeper">Femme de chambre</TabsTrigger>
               </TabsList>
               
               <TabsContent value="signin" className="space-y-4">
@@ -552,114 +551,29 @@ const Auth = () => {
                 </form>
               </TabsContent>
 
-              <TabsContent value="housekeeper" className="space-y-4">
-                <Tabs defaultValue="hk-signin" className="space-y-4">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="hk-signin">Connexion</TabsTrigger>
-                    <TabsTrigger value="hk-signup">Inscription</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="hk-signin" className="space-y-4">
-                    <form onSubmit={handleHousekeeperSignIn} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signin-email">Email</Label>
-                        <Input
-                          id="hk-signin-email"
-                          type="email"
-                          placeholder="votre@email.com"
-                          value={formData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signin-password">Mot de passe</Label>
-                        <Input
-                          id="hk-signin-password"
-                          type="password"
-                          value={formData.password}
-                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
-                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Se connecter
-                      </Button>
-                      <div className="text-center pt-4 border-t">
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Vous avez un code d'accès unique ?
-                        </p>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          onClick={() => navigate('/housekeeper/login')}
-                          className="text-purple-600 hover:text-purple-700"
-                        >
-                          Connexion avec code d'accès
-                        </Button>
-                      </div>
-                    </form>
-                  </TabsContent>
-                  
-                  <TabsContent value="hk-signup" className="space-y-4">
-                    <form onSubmit={handleHousekeeperSignUp} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-name">Nom complet *</Label>
-                        <Input
-                          id="hk-signup-name"
-                          placeholder="Marie Dupont"
-                          value={formData.housekeeperName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, housekeeperName: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-email">Email</Label>
-                        <Input
-                          id="hk-signup-email"
-                          type="email"
-                          placeholder="marie@example.com"
-                          value={formData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-password">Mot de passe</Label>
-                        <Input
-                          id="hk-signup-password"
-                          type="password"
-                          placeholder="Minimum 6 caractères"
-                          value={formData.password}
-                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-confirm">Confirmer le mot de passe</Label>
-                        <Input
-                          id="hk-signup-confirm"
-                          type="password"
-                          placeholder="Répétez le mot de passe"
-                          value={formData.confirmPassword}
-                          onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
-                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        S'inscrire
-                      </Button>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              </TabsContent>
             </Tabs>
 
+            {/* Lien vers connexion femme de chambre */}
             <div className="mt-6 pt-6 border-t space-y-4">
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-5 w-5 text-emerald-600" />
+                  <span className="font-semibold text-emerald-800">Vous êtes femme de chambre ?</span>
+                </div>
+                <p className="text-sm text-emerald-700 mb-3">
+                  Accédez à l'interface mobile dédiée avec votre code d'accès
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-100" 
+                  onClick={() => navigate('/housekeeper/login')}
+                  type="button"
+                >
+                  <UserCheck className="mr-2 h-4 w-4" />
+                  Connexion Femme de chambre
+                </Button>
+              </div>
+              
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Shield className="h-4 w-4" />
@@ -675,7 +589,7 @@ const Auth = () => {
                   Mode invité (pas de sauvegarde)
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  En mode invité, vos données ne seront pas sauvegardées et seront réinitialisées à chaque session.
+                  En mode invité, vos données ne seront pas sauvegardées.
                 </p>
               </div>
             </div>

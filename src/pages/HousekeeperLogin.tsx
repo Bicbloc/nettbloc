@@ -438,7 +438,7 @@ export default function HousekeeperLogin() {
             </>
           )}
           
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-3">
             <Button 
               variant="ghost" 
               size="sm"
@@ -448,6 +448,18 @@ export default function HousekeeperLogin() {
               <ArrowLeft className="h-4 w-4" />
               Retour à l'accueil
             </Button>
+            <div className="pt-3 border-t">
+              <p className="text-xs text-gray-500 mb-2">Vous êtes gérant d'établissement ?</p>
+              <Button 
+                variant="link" 
+                size="sm"
+                onClick={() => navigate("/auth/establishment")}
+                className="text-blue-600"
+              >
+                <Building className="h-4 w-4 mr-1" />
+                Espace Établissement
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

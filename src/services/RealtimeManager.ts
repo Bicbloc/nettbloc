@@ -10,7 +10,7 @@ interface Subscription {
 
 /**
  * Singleton pour gérer UNE SEULE connexion temps réel pour toute l'app
- * Évite les conflits de canaux multiples et les reconnexions en boucle
+ * Avec heartbeat actif et reconnexion rapide
  */
 class RealtimeManager {
   private static instance: RealtimeManager;
@@ -18,21 +18,50 @@ class RealtimeManager {
   private hotelId: string | null = null;
   private subscriptions: Map<string, Subscription[]> = new Map();
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
+  private maxReconnectAttempts = 15;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
   private lastConnectionAttempt = 0;
-  private minTimeBetweenAttempts = 2000; // 2 secondes minimum entre tentatives
+  private minTimeBetweenAttempts = 1500; // 1.5 secondes minimum
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private pingInterval: NodeJS.Timeout | null = null;
   private onStatusChangeCallback: ((status: string) => void) | null = null;
+  private isOnline = true;
+  private lastSuccessfulPing = Date.now();
 
-  private constructor() {}
+  private constructor() {
+    // Écouter les changements de connectivité réseau
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => this.handleOnline());
+      window.addEventListener('offline', () => this.handleOffline());
+    }
+  }
 
   static getInstance(): RealtimeManager {
     if (!RealtimeManager.instance) {
       RealtimeManager.instance = new RealtimeManager();
     }
     return RealtimeManager.instance;
+  }
+
+  private handleOnline() {
+    console.log('🌐 Réseau: En ligne');
+    this.isOnline = true;
+    if (this.hotelId) {
+      // Reconnecter immédiatement
+      this.reconnectAttempts = 0;
+      this.forceReconnect();
+    }
+  }
+
+  private handleOffline() {
+    console.log('📵 Réseau: Hors ligne');
+    this.isOnline = false;
+    this.stopHeartbeat();
+    this.stopPing();
+    if (this.onStatusChangeCallback) {
+      this.onStatusChangeCallback('OFFLINE');
+    }
   }
 
   /**
@@ -119,7 +148,9 @@ class RealtimeManager {
             console.log('✅ RealtimeManager: Connexion établie');
             this.reconnectAttempts = 0;
             this.isConnecting = false;
+            this.lastSuccessfulPing = Date.now();
             this.startHeartbeat();
+            this.startPing();
             resolve(true);
             break;
             
@@ -139,25 +170,35 @@ class RealtimeManager {
   }
 
   /**
-   * Planifie une reconnexion avec backoff exponentiel
+   * Planifie une reconnexion avec backoff exponentiel (max 10s)
    */
   private scheduleReconnect() {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
 
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('❌ RealtimeManager: Abandon après', this.maxReconnectAttempts, 'tentatives');
+    if (!this.isOnline) {
+      console.log('📵 RealtimeManager: Hors ligne, attente du réseau...');
       return;
     }
 
-    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 30000);
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log('❌ RealtimeManager: Abandon après', this.maxReconnectAttempts, 'tentatives');
+      // Reset après 30s pour permettre une nouvelle tentative
+      setTimeout(() => {
+        this.reconnectAttempts = 0;
+      }, 30000);
+      return;
+    }
+
+    // Backoff exponentiel avec max 10 secondes (au lieu de 30)
+    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 10000);
     this.reconnectAttempts++;
 
     console.log(`🔄 RealtimeManager: Reconnexion dans ${delay}ms (tentative ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
     this.reconnectTimeout = setTimeout(() => {
-      if (this.hotelId) {
+      if (this.hotelId && this.isOnline) {
         this.connect(this.hotelId);
       }
     }, delay);
@@ -218,20 +259,60 @@ class RealtimeManager {
   }
 
   /**
-   * Démarrer le heartbeat pour détecter les déconnexions silencieuses
+   * Démarrer le heartbeat avec vrai ping vers Supabase
    */
   private startHeartbeat() {
     this.stopHeartbeat();
     
-    this.heartbeatInterval = setInterval(() => {
-      if (this.channel) {
-        // Ping simple pour vérifier la connexion
-        console.log('💓 Heartbeat check');
-      } else {
-        console.log('⚠️ Heartbeat: Pas de canal actif');
-        this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(async () => {
+      if (!this.channel || !this.isOnline) {
+        return;
       }
-    }, 30000); // Toutes les 30 secondes
+      
+      try {
+        // Vrai ping vers Supabase
+        const { error } = await supabase
+          .from('hotels')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+        
+        if (error) {
+          console.log('💔 Heartbeat: Échec -', error.message);
+          this.scheduleReconnect();
+        } else {
+          this.lastSuccessfulPing = Date.now();
+          console.log('💓 Heartbeat: OK');
+        }
+      } catch (err) {
+        console.log('💔 Heartbeat: Exception');
+        this.scheduleReconnect();
+      }
+    }, 20000); // Toutes les 20 secondes
+  }
+
+  /**
+   * Ping régulier pour maintenir la connexion active
+   */
+  private startPing() {
+    this.stopPing();
+    
+    this.pingInterval = setInterval(async () => {
+      if (!this.isOnline) return;
+      
+      const timeSinceLastPing = Date.now() - this.lastSuccessfulPing;
+      if (timeSinceLastPing > 60000) { // Plus de 60s sans ping réussi
+        console.log('⚠️ Ping: Connexion potentiellement perdue');
+        this.forceReconnect();
+      }
+    }, 15000); // Check toutes les 15 secondes
+  }
+
+  private stopPing() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
   }
 
   /**
@@ -261,6 +342,7 @@ class RealtimeManager {
     }
 
     this.stopHeartbeat();
+    this.stopPing();
 
     if (this.channel) {
       console.log('🧹 RealtimeManager: Déconnexion du canal');
