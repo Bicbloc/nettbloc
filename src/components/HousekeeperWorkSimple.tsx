@@ -701,17 +701,26 @@ export const HousekeeperWorkSimple: React.FC = () => {
     if (!hotelId) return;
     
     try {
-      // Create or get today's linen inventory task
       const today = new Date().toISOString().split('T')[0];
+      const assignedToId = housekeeperProfile?.id || housekeeper?.id;
+      
+      if (!assignedToId) {
+        toast({
+          title: "Erreur",
+          description: "Impossible d'identifier l'utilisateur",
+          variant: "destructive"
+        });
+        return;
+      }
       
       // Check if there's already a task for today
       const { data: existingTasks } = await supabase
         .from('linen_inventory_tasks')
         .select('*')
         .eq('hotel_id', hotelId)
-        .eq('assigned_to', housekeeper?.id || housekeeperProfile?.id)
+        .eq('assigned_to', assignedToId)
         .eq('task_date', today)
-        .single();
+        .maybeSingle();
       
       let taskId: string;
       
@@ -723,8 +732,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
           .from('linen_inventory_tasks')
           .insert({
             hotel_id: hotelId,
-            assigned_to: housekeeper?.id || housekeeperProfile?.id,
-            assigned_by: housekeeper?.id || housekeeperProfile?.id,
+            assigned_to: assignedToId,
+            assigned_by: assignedToId,
             task_date: today,
             status: 'pending'
           })
@@ -1038,24 +1047,32 @@ export const HousekeeperWorkSimple: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Linen Inventory Section - Only shows if task assigned */}
+      {/* Linen Inventory Section */}
       {activeTab === 'inventory' && (
         <>
-          {activeLinenTask && housekeeper?.id ? (
-            <LinenInventorySection 
-              hotelId={hotelId!} 
-              housekeeperId={housekeeper.id}
+          {showLinenInventory && activeLinenTask && hotelId ? (
+            <LinenQuickInventory
+              taskId={activeLinenTask}
+              hotelId={hotelId}
+              onClose={() => setShowLinenInventory(false)}
             />
           ) : (
             <Card className="mb-4 sm:mb-6">
               <CardContent className="pt-6 pb-6 text-center">
                 <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  Aucune tâche d'inventaire
+                  Inventaire du linge
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Aucune tâche d'inventaire ne vous est assignée aujourd'hui
+                <p className="text-sm text-muted-foreground mb-4">
+                  Comptez le linge propre et sale de l'établissement
                 </p>
+                <Button 
+                  onClick={handleOpenLinenInventory}
+                  className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Démarrer l'inventaire
+                </Button>
               </CardContent>
             </Card>
           )}
