@@ -5,7 +5,6 @@ import { Calendar, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { SessionPersistenceService } from '@/services/sessionPersistenceService';
-import { supabase } from '@/integrations/supabase/client';
 
 interface DailyReportCloseButtonProps {
   hotelId: string;
@@ -50,38 +49,12 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       console.log('🔒 Désactivation de la session actuelle...');
       await HotelSessionService.deactivateSession(currentToken);
 
-      // 4. Supprimer les assignations en cours
-      console.log('🗑️ Suppression des assignations en cours...');
-      const { error: deleteError } = await supabase
-        .from('assignments')
-        .delete()
-        .eq('hotel_id', hotelId)
-        .in('status', ['assigned', 'in_progress']);
-
-      if (deleteError) {
-        console.warn('⚠️ Erreur lors de la suppression des assignations:', deleteError);
-      }
-
-      // 5. Réinitialiser les chambres à "dirty"
-      console.log('🔄 Réinitialisation des chambres...');
-      const { error: updateError } = await supabase
-        .from('rooms')
-        .update({ status: 'dirty' })
-        .eq('hotel_id', hotelId)
-        .neq('status', 'out_of_order');
-
-      if (updateError) {
-        console.warn('⚠️ Erreur lors de la réinitialisation des chambres:', updateError);
-      }
-
-      // 6. Nettoyer le stockage local
+      // 4. Nettoyer le stockage local
       SessionPersistenceService.clearSavedSession();
       localStorage.removeItem('sessionToken');
       localStorage.removeItem('hotelSessionToken');
-      localStorage.removeItem('is_distributed');
-      localStorage.removeItem('housekeeper_assignments');
 
-      // 7. Créer une nouvelle session pour le lendemain
+      // 5. Créer une nouvelle session pour le lendemain
       console.log('🆕 Création de la nouvelle session...');
       const newToken = await HotelSessionService.createSession(hotelId);
 
@@ -91,22 +64,22 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         return;
       }
 
-      // 8. Sauvegarder la nouvelle session
+      // 6. Sauvegarder la nouvelle session
       SessionPersistenceService.saveSessionData({
         sessionToken: newToken,
         hotelId: hotelId,
         lastActiveDate: new Date().toISOString()
       });
 
-      toast.success('Journée clôturée ! Assignations réinitialisées, nouvelle session créée.');
+      toast.success('Journée clôturée ! Nouvelle session créée pour demain.');
       console.log('✅ Clôture terminée, nouveau token:', newToken);
 
-      // 9. Notifier le parent pour rafraîchir l'interface
+      // 7. Notifier le parent pour rafraîchir l'interface
       if (onReportClosed) {
         onReportClosed();
       }
 
-      // 10. Rafraîchir la page pour afficher la nouvelle session
+      // 8. Rafraîchir la page pour afficher la nouvelle session
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -143,10 +116,8 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
             Cette action va :
             <ul className="list-disc list-inside mt-2 space-y-1">
               <li>Archiver le rapport de la journée actuelle</li>
-              <li>Supprimer toutes les assignations en cours</li>
-              <li>Réinitialiser toutes les chambres à "À nettoyer"</li>
               <li>Créer une nouvelle session vierge pour demain</li>
-              <li>Réinitialiser l'état de distribution</li>
+              <li>Réinitialiser l'interface pour toutes les femmes de chambre</li>
             </ul>
             <p className="mt-4 font-semibold">Cette action est irréversible.</p>
           </AlertDialogDescription>
