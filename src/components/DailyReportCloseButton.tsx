@@ -68,8 +68,7 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       SessionPersistenceService.saveSessionData({
         sessionToken: newToken,
         hotelId: hotelId,
-        lastActiveDate: new Date().toISOString(),
-        housekeeper_assignments: []
+        lastActiveDate: new Date().toISOString()
       });
 
       toast.success('Journée clôturée ! Nouvelle session créée pour demain.');

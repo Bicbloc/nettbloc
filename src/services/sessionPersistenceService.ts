@@ -1,11 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { HotelSessionService } from './hotelSessionService';
 
+// Phase 6: Simplifié - uniquement les données essentielles de session
+// Les rooms et assignments sont maintenant exclusivement dans Supabase
 interface SessionPersistenceData {
   sessionToken: string;
   hotelId: string;
   lastActiveDate: string;
-  housekeeper_assignments?: any; // Flexible: peut être un array ou un Record
   lastSyncTimestamp?: number;
 }
 
@@ -35,12 +36,9 @@ export class SessionPersistenceService {
       localStorage.setItem(this.BACKUP_KEY, JSON.stringify(dataWithTimestamp));
       sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(dataWithTimestamp));
       
-      console.log('✅ Session data saved with backup:', {
+      console.log('✅ Session data saved:', {
         hotelId: dataWithTimestamp.hotelId.slice(0, 8) + '...',
-        housekeepers: Array.isArray(sessionData.housekeeper_assignments) 
-          ? sessionData.housekeeper_assignments.length 
-          : Object.keys(sessionData.housekeeper_assignments || {}).length,
-        lastSyncTimestamp: new Date(dataWithTimestamp.lastSyncTimestamp).toLocaleString()
+        lastSyncTimestamp: new Date(dataWithTimestamp.lastSyncTimestamp || Date.now()).toLocaleString()
       });
     } catch (error) {
       console.error('❌ Failed to save session data:', error);
@@ -96,9 +94,6 @@ export class SessionPersistenceService {
 
       console.log('✅ Session data restored:', {
         hotelId: data.hotelId?.slice(0, 8) + '...',
-        housekeepers: Array.isArray(data.housekeeper_assignments) 
-          ? data.housekeeper_assignments.length 
-          : Object.keys(data.housekeeper_assignments || {}).length,
         age: data.savedAt ? Math.round((Date.now() - new Date(data.savedAt).getTime()) / 1000 / 60) + ' minutes' : 'unknown',
         lastSyncTimestamp: data.lastSyncTimestamp ? new Date(data.lastSyncTimestamp).toLocaleString() : 'N/A'
       });

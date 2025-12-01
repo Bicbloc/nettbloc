@@ -136,8 +136,7 @@ export class HotelSessionService {
       SessionPersistenceService.saveSessionData({
         sessionToken: sessionToken,
         hotelId: effectiveHotelId,
-        lastActiveDate: new Date().toISOString(),
-        housekeeper_assignments: {}
+        lastActiveDate: new Date().toISOString()
       });
       
       return sessionToken;
@@ -241,7 +240,6 @@ export class HotelSessionService {
 
       // Also save to SessionPersistenceService for redundancy
       SessionPersistenceService.updateSessionData({
-        housekeeper_assignments: assignments,
         lastSyncTimestamp: Date.now()
       });
 
@@ -276,47 +274,21 @@ export class HotelSessionService {
   }
 
   /**
-   * Mettre à jour les données complètes des chambres dans localStorage
-   * (Les rooms sont dans la table rooms, on garde juste l'état UI en local)
+   * @deprecated Phase 4: Les rooms sont maintenant dans la table Supabase 'rooms' uniquement
+   * Utilisez la table 'rooms' directement
    */
   static updateRoomDataLocal(rooms: any[], hotelId: string): void {
-    try {
-      const roomData = rooms.map(room => ({
-        number: room.number,
-        status: room.status,
-        cleaningType: room.cleaningType,
-        assignedTo: room.assignedTo,
-        notes: room.notes,
-        isUrgent: room.isUrgent,
-        notUrgent: room.notUrgent,
-        isTwin: room.isTwin
-      }));
-
-      localStorage.setItem(`room_data_${hotelId}`, JSON.stringify(roomData));
-      console.log('✅ Room data sauvegardé localement:', rooms.length, 'chambres');
-    } catch (error) {
-      console.error('❌ Erreur sauvegarde room_data local:', error);
-    }
+    console.warn('⚠️ updateRoomDataLocal is deprecated - rooms are now in Supabase table "rooms" only');
+    // Ne rien faire - les rooms sont dans Supabase
   }
 
   /**
-   * Restaurer les données de chambres depuis localStorage
+   * @deprecated Phase 4: Les rooms sont maintenant dans la table Supabase 'rooms' uniquement
+   * Utilisez la table 'rooms' directement
    */
   static restoreRoomDataLocal(hotelId: string): any[] {
-    try {
-      const stored = localStorage.getItem(`room_data_${hotelId}`);
-      if (!stored) {
-        console.log('⚠️ Aucune room_data locale à restaurer');
-        return [];
-      }
-
-      const roomData = JSON.parse(stored);
-      console.log('✅ Room data restauré localement:', roomData.length, 'chambres');
-      return roomData;
-    } catch (error) {
-      console.error('❌ Erreur restauration room_data local:', error);
-      return [];
-    }
+    console.warn('⚠️ restoreRoomDataLocal is deprecated - rooms are now in Supabase table "rooms" only');
+    return [];
   }
 
   // Désactiver une session
