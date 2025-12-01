@@ -699,8 +699,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     }
   };
   
-  const handlePdfProcessed = async (data: Room[], housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
-    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeepers || []);
+  const handlePdfProcessed = async (data: Room[], housekeeperNames?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
+    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeeperNames || []);
     
     try {
       const floors = new Set<number>();
@@ -718,8 +718,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       );
 
       // Mettre à jour les noms des femmes de chambre si fournis
-      if (housekeepers && housekeepers.length > 0) {
-        setHousekeeperNames(housekeepers);
+      if (housekeeperNames && housekeeperNames.length > 0) {
+        setHousekeeperNames(housekeeperNames);
       }
 
       // PHASE 1: Synchroniser CHAQUE chambre PDF vers Supabase
@@ -743,20 +743,20 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       }
 
       // Auto-distribute if method specified
-      if (distributionMethod && housekeepers && housekeepers.length > 0) {
+      if (distributionMethod && housekeeperNames && housekeeperNames.length > 0) {
         console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
         // Simuler une distribution simple pour l'instant
-        const roomsPerHousekeeper = Math.ceil(sortedData.length / housekeepers.length);
+        const roomsPerHousekeeper = Math.ceil(sortedData.length / housekeeperNames.length);
         const updatedRooms = sortedData.map((room, index) => {
           const housekeeperIndex = Math.floor(index / roomsPerHousekeeper);
-          const assignedHousekeeper = housekeepers[housekeeperIndex] || housekeepers[0];
+          const assignedHousekeeper = housekeeperNames[housekeeperIndex] || housekeeperNames[0];
           return { ...room, assignedTo: assignedHousekeeper };
         });
         setRooms(updatedRooms);
         setIsDistributed(true);
         
         // Phase 1: Persister les assignations dans Supabase
-        if (currentHotelId) {
+        if (currentHotelId && housekeepers.length > 0) {
           for (const room of updatedRooms) {
             if (room.assignedTo) {
               const hk = housekeepers.find(h => h.name === room.assignedTo);
@@ -907,11 +907,11 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     
     // Update all rooms
     const updatedRooms = [...sortedRooms];
-    for (const housekeeper of housekeepers) {
-      for (const room of assignments[housekeeper]) {
+    for (const housekeeperName of housekeepersParam) {
+      for (const room of assignments[housekeeperName]) {
         const index = updatedRooms.findIndex(r => r.number === room.number);
         if (index !== -1) {
-          updatedRooms[index] = { ...updatedRooms[index], assignedTo: housekeeper };
+          updatedRooms[index] = { ...updatedRooms[index], assignedTo: housekeeperName };
         }
       }
     }
