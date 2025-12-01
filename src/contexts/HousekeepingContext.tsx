@@ -122,13 +122,10 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         if (savedData) {
           console.log('🔄 Restauration depuis session locale');
           if (savedData.hotelId && !hotelId) {
-            setHotelId(savedData.hotelId);
-            localStorage.setItem('selectedHotelId', savedData.hotelId);
-          }
-          // Les rooms sont chargées depuis la table rooms, pas depuis savedData
-          if (savedData.housekeeper_assignments && housekeeperNames.length === 0) {
-            setHousekeeperNames(Object.keys(savedData.housekeeper_assignments));
-          }
+          setHotelId(savedData.hotelId);
+          localStorage.setItem('selectedHotelId', savedData.hotelId);
+        }
+        // Les rooms sont chargées depuis la table rooms, pas depuis savedData
         }
       }
     }, 5000); // Réduit à 5 secondes au lieu de 2 pour moins de charge
