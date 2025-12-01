@@ -239,6 +239,24 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const loadWorkData = async () => {
     try {
       setIsRefreshing(true);
+      
+      // Charger immédiatement depuis le cache pour affichage rapide
+      const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
+      const cachedData = localStorage.getItem(cachedKey);
+      if (cachedData && rooms.length === 0) {
+        try {
+          const { assignments: cachedAssignments, rooms: cachedRooms, timestamp } = JSON.parse(cachedData);
+          // Utiliser le cache si moins de 12h
+          if (Date.now() - timestamp < 12 * 60 * 60 * 1000) {
+            console.log('📦 Chargement rapide depuis le cache');
+            setAssignments(cachedAssignments || []);
+            setRooms(cachedRooms || []);
+          }
+        } catch (e) {
+          console.error('Erreur parsing cache initial:', e);
+        }
+      }
+      
       let authResult: any;
       
       // Si c'est une femme de chambre authentifiée (avec profil)
@@ -361,6 +379,22 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
       if (assignmentsError) {
         console.error('Erreur chargement assignations:', assignmentsError);
+        // Essayer de charger depuis le cache localStorage
+        const cachedData = localStorage.getItem(`assignments_${hotelId}_${housekeeperId}`);
+        if (cachedData) {
+          try {
+            const { assignments: cachedAssignments, rooms: cachedRooms, timestamp } = JSON.parse(cachedData);
+            // Utiliser le cache si moins de 12h
+            if (Date.now() - timestamp < 12 * 60 * 60 * 1000) {
+              console.log('📦 Utilisation du cache localStorage pour les assignations');
+              setAssignments(cachedAssignments || []);
+              setRooms(cachedRooms || []);
+              return;
+            }
+          } catch (e) {
+            console.error('Erreur parsing cache:', e);
+          }
+        }
         // Fallback: afficher toutes les chambres en attente
         loadAllPendingRooms();
       } else {
@@ -378,6 +412,18 @@ export const HousekeeperWorkSimple: React.FC = () => {
         }, []);
         
         setRooms(uniqueRooms);
+        
+        // Persister en localStorage pour la reconnexion
+        try {
+          localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
+            assignments: assignmentsData,
+            rooms: uniqueRooms,
+            timestamp: Date.now()
+          }));
+          console.log('💾 Assignations sauvegardées en cache');
+        } catch (e) {
+          console.error('Erreur sauvegarde cache:', e);
+        }
       }
 
       // Charger les chambres disponibles (ready-to-clean non assignées)
@@ -553,11 +599,31 @@ export const HousekeeperWorkSimple: React.FC = () => {
       }
 
       // Mettre à jour l'état local
-      setRooms(prev => prev.map(room => 
-        room.id === roomId 
-          ? { ...room, status: newStatus }
-          : room
-      ));
+      setRooms(prev => {
+        const updatedRooms = prev.map(room => 
+          room.id === roomId 
+            ? { ...room, status: newStatus }
+            : room
+        );
+        
+        // Si chambre terminée, mettre à jour le cache sans cette chambre
+        if (newStatus === 'clean') {
+          const remainingRooms = updatedRooms.filter(r => r.id !== roomId);
+          const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
+          try {
+            const updatedAssignments = assignments.filter(a => a.rooms?.id !== roomId);
+            localStorage.setItem(cachedKey, JSON.stringify({
+              assignments: updatedAssignments,
+              rooms: remainingRooms,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            console.error('Erreur mise à jour cache:', e);
+          }
+        }
+        
+        return updatedRooms;
+      });
 
       // Log d'activité
       await supabase
@@ -597,6 +663,10 @@ export const HousekeeperWorkSimple: React.FC = () => {
     localStorage.removeItem('selectedHotelId');
     localStorage.removeItem('selectedHotelName');
     localStorage.removeItem('selectedHotelCode');
+    
+    // Nettoyer le cache des assignations
+    const cacheKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
+    localStorage.removeItem(cacheKey);
     
     // Rediriger vers la page appropriée
     if (isAuthenticatedHousekeeper) {
