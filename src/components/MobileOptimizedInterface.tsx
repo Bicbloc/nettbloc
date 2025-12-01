@@ -121,7 +121,7 @@ export const MobileOptimizedInterface: React.FC<MobileOptimizedInterfaceProps> =
           </div>
           
           <div className="flex items-center gap-2">
-            <NotificationBell hotelId={hotelId} className="text-primary-foreground border-primary-foreground" />
+            <NotificationBell className="text-primary-foreground border-primary-foreground" />
             
             {/* Status indicators */}
             <div className="flex items-center gap-1">

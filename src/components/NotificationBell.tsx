@@ -2,18 +2,17 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bell, BellOff } from 'lucide-react';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { ActionLogPanel } from './ActionLogPanel';
 import { useNotificationSound } from '@/hooks/use-notification-sound';
 
 interface NotificationBellProps {
-  hotelId?: string;
   className?: string;
 }
 
-export const NotificationBell = ({ hotelId, className }: NotificationBellProps) => {
+export const NotificationBell = ({ className }: NotificationBellProps) => {
   const [isActionLogOpen, setIsActionLogOpen] = useState(false);
-  const { notifications, hasUnread } = useNotifications(hotelId);
+  const { notifications, hasUnread, markAsRead, markAllAsRead, clearNotifications } = useNotificationContext();
   const { playInfo } = useNotificationSound();
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -49,9 +48,13 @@ export const NotificationBell = ({ hotelId, className }: NotificationBellProps) 
       </Button>
 
       <ActionLogPanel
-        hotelId={hotelId}
         isOpen={isActionLogOpen}
         onClose={() => setIsActionLogOpen(false)}
+        notifications={notifications}
+        hasUnread={hasUnread}
+        markAsRead={markAsRead}
+        markAllAsRead={markAllAsRead}
+        clearNotifications={clearNotifications}
       />
     </>
   );

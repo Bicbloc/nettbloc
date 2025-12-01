@@ -6,16 +6,27 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bell, BellOff, Trash2, Check, Clock, AlertCircle, User, Bed, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useNotifications, type Notification } from '@/hooks/use-notifications';
+import { type Notification } from '@/hooks/use-notifications';
 
 interface ActionLogPanelProps {
-  hotelId?: string;
   isOpen: boolean;
   onClose: () => void;
+  notifications: Notification[];
+  hasUnread: boolean;
+  markAsRead: (notificationId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  clearNotifications: () => Promise<void>;
 }
 
-export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({ hotelId, isOpen, onClose }) => {
-  const { notifications, hasUnread, markAsRead, markAllAsRead, clearNotifications } = useNotifications(hotelId);
+export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({ 
+  isOpen, 
+  onClose, 
+  notifications, 
+  hasUnread, 
+  markAsRead, 
+  markAllAsRead, 
+  clearNotifications 
+}) => {
 
   if (!isOpen) return null;
 

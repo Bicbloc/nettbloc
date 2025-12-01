@@ -1,13 +1,9 @@
 import React, { useEffect } from 'react';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useNotificationSound } from '@/hooks/use-notification-sound';
 
-interface NotificationSoundProps {
-  hotelId?: string;
-}
-
-export const NotificationSound: React.FC<NotificationSoundProps> = ({ hotelId }) => {
-  const { notifications, hasUnread } = useNotifications(hotelId);
+export const NotificationSound: React.FC = () => {
+  const { notifications, hasUnread } = useNotificationContext();
   const { playInfo, playWarning } = useNotificationSound();
 
   // Play sound when new notifications arrive

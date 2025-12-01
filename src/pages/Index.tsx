@@ -48,6 +48,10 @@ import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { IncidentList } from "@/components/incident/IncidentList";
+import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
+import { HotelSetupFix } from "@/components/HotelSetupFix";
+import { SetupStatusSimple } from "@/components/SetupStatusSimple";
+import { NotificationProvider, useNotificationContext } from "@/contexts/NotificationContext";
 import { LinenTypeManager } from "@/components/linen/LinenTypeManager";
 import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
 import { LinenTaskAssignment } from "@/components/linen/LinenTaskAssignment";
@@ -60,18 +64,14 @@ import { IncidentReportPrint } from "@/components/incident/IncidentReportPrint";
 
 
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
-import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
 import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
-import { SetupStatusSimple } from "@/components/SetupStatusSimple";
 import { SupabaseService } from "@/services/supabaseService";
 import { CodeGenerationService } from "@/services/codeGenerationService";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
-import { useNotifications } from "@/hooks/use-notifications";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
-import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
@@ -171,7 +171,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     setupComplete: isSetupComplete
   });
   
-  const { addNotification } = useNotifications(currentHotelId);
+  // Utiliser le contexte de notifications
+  const { addNotification } = useNotificationContext();
 
   // Gestion temps réel des mises à jour depuis les housekeepers
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
@@ -1555,7 +1556,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   // Plus de blocage complet de l'interface
 
   return (
-    <>
+    <NotificationProvider hotelId={currentHotelId}>
       <div className="flex min-h-screen flex-col bg-background">
       <div className="container mx-auto py-6 px-4 md:px-6">
          {/* Modern Header */}
@@ -1639,24 +1640,15 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       window.location.reload();
                     }}
                   />
-                  <NotificationBell hotelId={hotel?.id} />
-                 <UserMenu />
+                  <NotificationBell />
+                  <UserMenu />
                </>
              )}
           </div>
         </div>
 
         {/* Notification Sound Component - silent background component */}
-        <NotificationSound hotelId={hotel?.id} />
-
-
-        {/* Panneau de notifications global */}
-        <div className="fixed top-4 right-4 z-50">
-                <NotificationBell 
-                  hotelId={currentHotelId && isValidUUID(currentHotelId) ? currentHotelId : undefined}
-                  className="ml-2"
-                />
-        </div>
+        <NotificationSound />
 
         {/* Hero Header */}
         <HeroHeader hotelName={hotel?.name} isPremium={isPremium} />
@@ -2331,7 +2323,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             ) : (
               <>
                 <div className="flex items-center justify-between mb-4">
-                  <NotificationBell hotelId={currentHotelId} />
+                  <NotificationBell />
                   <Badge variant="premium" className="gap-1">
                     <Smartphone className="h-3 w-3" />
                     Accès Mobile Premium
@@ -2633,7 +2625,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
       </div>
-    </>
+    </NotificationProvider>
   );
 };
 
