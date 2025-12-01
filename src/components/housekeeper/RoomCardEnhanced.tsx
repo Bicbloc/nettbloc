@@ -235,7 +235,7 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
                     }`}
                   >
                     <Sparkles className="h-3.5 w-3.5 mr-1" />
-                    {room.cleaning_type === 'full' ? 'Départ' : 'Recouche'}
+                    {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
                   </Badge>
                 )}
 
