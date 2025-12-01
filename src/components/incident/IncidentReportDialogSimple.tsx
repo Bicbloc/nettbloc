@@ -199,24 +199,36 @@ export function IncidentReportDialogSimple({
       // Upload images if any
       if (selectedImages.length > 0) {
         for (const image of selectedImages) {
-          const fileExt = image.name.split(".").pop();
-          const fileName = `${incident.id}/${Date.now()}.${fileExt}`;
+          try {
+            const fileExt = image.name.split(".").pop();
+            const fileName = `${incident.id}/${Date.now()}.${fileExt}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("incident-images")
-            .upload(fileName, image);
+            const { error: uploadError } = await supabase.storage
+              .from("incident-images")
+              .upload(fileName, image);
 
-          if (uploadError) throw uploadError;
+            if (uploadError) {
+              console.error("❌ Erreur upload image:", uploadError);
+              throw uploadError;
+            }
 
-          const { data: { publicUrl } } = supabase.storage
-            .from("incident-images")
-            .getPublicUrl(fileName);
+            const { data: { publicUrl } } = supabase.storage
+              .from("incident-images")
+              .getPublicUrl(fileName);
 
-          await supabase.from("incident_images").insert({
-            incident_id: incident.id,
-            image_url: publicUrl,
-            uploaded_by: reportedById || housekeeperProfile?.id,
-          });
+            const { error: insertError } = await supabase.from("incident_images").insert({
+              incident_id: incident.id,
+              image_url: publicUrl,
+              uploaded_by: reportedById || housekeeperProfile?.id || null,
+            });
+
+            if (insertError) {
+              console.error("❌ Erreur insertion image:", insertError);
+            }
+          } catch (imageError) {
+            console.error("❌ Erreur traitement image:", imageError);
+            // Continue avec les autres images même si une échoue
+          }
         }
       }
 
