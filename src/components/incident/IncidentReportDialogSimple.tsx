@@ -207,12 +207,30 @@ export function IncidentReportDialogSimple({
 
       return incident;
     },
-    onSuccess: () => {
+    onSuccess: async (incident) => {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       toast({
         title: "✅ Incident signalé",
         description: "L'incident a été enregistré avec succès",
       });
+      
+      // Ajouter notification pour l'admin
+      const { useNotificationContext } = await import('@/contexts/NotificationContext');
+      try {
+        const notificationContext = useNotificationContext();
+        if (notificationContext?.addNotification) {
+          await notificationContext.addNotification({
+            title: `Incident signalé - CH ${incident.location_reference}`,
+            description: `${userType === 'housekeeper' ? 'Femme de chambre' : 'Admin'} - ${incident.title}`,
+            type: 'incident',
+            room_number: incident.location_reference,
+            user_type: 'admin'
+          });
+        }
+      } catch (error) {
+        console.log('Notification non disponible dans ce contexte');
+      }
+      
       form.reset();
       setSelectedImages([]);
       setIsOpen(false);
