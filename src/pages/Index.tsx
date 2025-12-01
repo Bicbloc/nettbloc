@@ -1841,7 +1841,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   </a>
                 </Button>
                 <Button asChild>
-                  <a href="/housekeeper/login">
+                  <a href="/housekeeper/auth">
                     <UserIcon className="mr-2 h-4 w-4" />
                     Espace Personnel Femme de Chambre
                   </a>
@@ -1864,12 +1864,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                     <div className={`h-2 w-2 rounded-full ${realtimeSync.isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
                     {realtimeSync.isConnected ? 'Temps réel actif' : 'Déconnecté'}
                   </Badge>
-                  <Button asChild>
-                    <a href="/housekeeper/login">
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      Espace Personnel Femme de Chambre
-                    </a>
-                    </Button>
+                   <Button asChild>
+                     <a href="/housekeeper/auth">
+                       <UserIcon className="mr-2 h-4 w-4" />
+                       Espace Personnel Femme de Chambre
+                     </a>
+                     </Button>
                    <DailyReportCloseButton 
                      hotelId={currentHotelId || hotel?.id || ''} 
                      onReportClosed={() => {

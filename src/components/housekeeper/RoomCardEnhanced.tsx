@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, X, Sparkles, Send, AlertCircle } from 'lucide-react';
+import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight } from 'lucide-react';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -29,6 +29,7 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
   const [notes, setNotes] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
   const [swipeStartTime, setSwipeStartTime] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
   const touchStartX = useRef(0);
   const touchCurrentX = useRef(0);
 
@@ -46,7 +47,6 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
     touchCurrentX.current = e.touches[0].clientX;
     const diff = touchCurrentX.current - touchStartX.current;
     
-    // Only allow swipe to the right (positive values), max 200px
     if (diff > 0) {
       setSwipeOffset(Math.min(diff, 200));
     }
@@ -62,22 +62,20 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
     setIsSwiping(false);
     const swipeDuration = Date.now() - swipeStartTime;
 
-    // Haptic feedback on mobile
     if ('vibrate' in navigator) {
       navigator.vibrate(50);
     }
 
-    // For in_progress rooms: swipe right to mark as clean
     if (room.status === 'in_progress' && swipeOffset > 120) {
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 1500);
       await onUpdateStatus(room.id, 'clean', notes || undefined);
-    }
-    // For dirty rooms: swipe to start, long swipe to complete
-    else if (room.status === 'dirty') {
+    } else if (room.status === 'dirty') {
       if (swipeOffset > 130 && swipeDuration > 500) {
-        // Long swipe = mark as clean directly
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 1500);
         await onUpdateStatus(room.id, 'clean', notes || undefined);
       } else if (swipeOffset > 80) {
-        // Normal swipe = start cleaning
         await onUpdateStatus(room.id, 'in_progress');
       }
     }
@@ -90,19 +88,13 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
     
     setIsSendingNote(true);
     try {
-      console.log('🔄 Envoi commentaire pour chambre:', room.room_number);
-      
-      // Update room notes in assignments table
       const { data: assignment, error: assignmentError } = await supabase
         .from('assignments')
         .select('id')
         .eq('room_id', room.id)
         .single();
 
-      if (assignmentError) {
-        console.error('❌ Erreur récupération assignment:', assignmentError);
-        throw assignmentError;
-      }
+      if (assignmentError) throw assignmentError;
 
       if (assignment) {
         const { error: updateError } = await supabase
@@ -110,25 +102,18 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
           .update({ notes: notes.trim() })
           .eq('id', assignment.id);
 
-        if (updateError) {
-          console.error('❌ Erreur mise à jour assignment:', updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
 
-        // Create notification for admin
         const { data: hotel, error: hotelError } = await supabase
           .from('hotels')
           .select('user_id, name')
           .eq('id', hotelId)
           .single();
 
-        if (hotelError) {
-          console.error('❌ Erreur récupération hotel:', hotelError);
-          throw hotelError;
-        }
+        if (hotelError) throw hotelError;
 
         if (hotel?.user_id) {
-          const { error: notifError } = await supabase.from('notifications').insert({
+          await supabase.from('notifications').insert({
             user_id: hotel.user_id,
             user_type: 'admin',
             hotel_id: hotelId,
@@ -138,27 +123,21 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
             room_number: room.room_number,
             is_read: false
           });
-
-          if (notifError) {
-            console.error('❌ Erreur création notification:', notifError);
-            throw notifError;
-          }
         }
 
-        console.log('✅ Commentaire envoyé avec succès');
         toast({
           title: "Commentaire envoyé",
-          description: `Le commentaire pour la chambre ${room.room_number} a été envoyé à l'administrateur`,
+          description: `Le commentaire pour la chambre ${room.room_number} a été envoyé`,
         });
         
         setNotes('');
       }
     } catch (error) {
-      console.error('❌ Erreur générale envoi commentaire:', error);
+      console.error('Erreur envoi commentaire:', error);
       toast({
         variant: "destructive",
-        title: "Erreur d'envoi",
-        description: error instanceof Error ? error.message : "Impossible d'envoyer le commentaire"
+        title: "Erreur",
+        description: "Impossible d'envoyer le commentaire"
       });
     } finally {
       setIsSendingNote(false);
@@ -167,102 +146,117 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
 
   const isCompleting = swipeOffset > 120;
   const swipeProgress = Math.min((swipeOffset / 120) * 100, 100);
+  const isUrgent = room.cleaning_priority && room.cleaning_priority >= 3;
 
   return (
     <div
-      className={`relative overflow-hidden transition-all duration-200 rounded-xl ${
-        room.status === 'clean' 
-          ? 'bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 shadow-sm'
+      className={`relative overflow-hidden transition-all duration-300 rounded-2xl ${
+        showSuccess 
+          ? 'bg-gradient-to-br from-green-400 to-emerald-500 scale-95'
+          : room.status === 'clean' 
+          ? 'bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-400'
           : room.status === 'in_progress'
-          ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 shadow-md'
-          : 'bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-300 shadow-sm'
+          ? 'bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-400 shadow-lg shadow-blue-200/50'
+          : isUrgent 
+          ? 'bg-gradient-to-br from-red-50 to-orange-100 border-2 border-red-400 shadow-lg shadow-red-200/50 animate-pulse'
+          : 'bg-gradient-to-br from-slate-50 to-gray-100 border-2 border-slate-300'
       }`}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       style={{
         transform: (room.status === 'in_progress' || room.status === 'dirty') ? `translateX(${swipeOffset}px)` : 'none',
-        transition: isSwiping ? 'none' : 'transform 0.3s ease-out'
+        transition: isSwiping ? 'none' : 'transform 0.3s ease-out, background 0.3s ease'
       }}
     >
+      {/* Success animation overlay */}
+      {showSuccess && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-green-500/90">
+          <div className="text-white text-center animate-scale-in">
+            <CheckCircle className="h-16 w-16 mx-auto mb-2" />
+            <p className="text-xl font-bold">Terminé !</p>
+          </div>
+        </div>
+      )}
+
       {/* Swipe background indicator */}
       {(room.status === 'in_progress' || room.status === 'dirty') && swipeOffset > 0 && (
         <div 
-          className="absolute inset-0 flex items-center justify-start px-8"
+          className="absolute inset-0 flex items-center justify-start px-6"
           style={{
             background: `linear-gradient(to right, ${
-              isCompleting ? 'rgb(34 197 94)' : 'rgb(147 197 253)'
+              isCompleting ? 'rgb(34 197 94)' : 'rgb(96 165 250)'
             } ${swipeProgress}%, transparent ${swipeProgress}%)`
           }}
         >
           <div className="flex flex-col items-center gap-1">
-            <CheckCircle className={`h-10 w-10 transition-all duration-200 ${
-              isCompleting ? 'text-white scale-110' : 'text-green-600 scale-100'
+            <CheckCircle className={`h-12 w-12 transition-all duration-200 ${
+              isCompleting ? 'text-white scale-125' : 'text-white/80 scale-100'
             }`} />
             {isCompleting && (
-              <span className="text-xs font-bold text-white">Relâchez!</span>
+              <span className="text-sm font-bold text-white animate-pulse">Relâchez !</span>
             )}
           </div>
         </div>
       )}
       
       {/* Card content */}
-      <div className="relative p-4 bg-inherit" style={{ zIndex: 1 }}>
-        <div className="space-y-3">
+      <div className="relative p-5" style={{ zIndex: 1 }}>
+        <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-                  Chambre {room.room_number}
+                <span className="text-3xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                  {room.room_number}
                 </span>
                 
                 {/* Priority badge */}
                 {room.cleaning_priority && room.cleaning_priority > 1 && (
-                  <Badge className={
+                  <Badge className={`text-sm font-semibold ${
                     room.cleaning_priority === 3 
-                      ? 'bg-red-500 hover:bg-red-600 text-white' 
-                      : 'bg-orange-500 hover:bg-orange-600 text-white'
-                  }>
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {room.cleaning_priority === 3 ? 'Urgent' : 'Prioritaire'}
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg' 
+                      : 'bg-gradient-to-r from-amber-400 to-orange-400 text-white'
+                  }`}>
+                    <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                    {room.cleaning_priority === 3 ? 'URGENT' : 'Prioritaire'}
                   </Badge>
                 )}
                 
                 {/* Cleaning type badge */}
                 {room.cleaning_type && (
                   <Badge 
-                    className={room.cleaning_type === 'full' 
-                      ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-sm' 
-                      : 'bg-blue-500 hover:bg-blue-600 text-white shadow-sm'
-                    }
+                    className={`text-sm font-medium ${room.cleaning_type === 'full' 
+                      ? 'bg-gradient-to-r from-purple-500 to-violet-500 text-white' 
+                      : 'bg-gradient-to-r from-sky-400 to-blue-500 text-white'
+                    }`}
                   >
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    {room.cleaning_type === 'full' ? '🚪 Départ' : '🛏️ Recouche'}
+                    <Sparkles className="h-3.5 w-3.5 mr-1" />
+                    {room.cleaning_type === 'full' ? 'Départ' : 'Recouche'}
                   </Badge>
                 )}
 
                 {/* Status badge */}
                 <Badge 
                   variant="outline" 
-                  className={
+                  className={`text-sm font-medium ${
                     room.status === 'clean'
-                      ? 'bg-green-100 text-green-800 border-green-300'
+                      ? 'bg-green-100 text-green-700 border-green-400'
                       : room.status === 'in_progress'
-                      ? 'bg-blue-100 text-blue-800 border-blue-300'
-                      : 'bg-gray-100 text-gray-800 border-gray-300'
-                  }
+                      ? 'bg-blue-100 text-blue-700 border-blue-400'
+                      : 'bg-slate-100 text-slate-600 border-slate-400'
+                  }`}
                 >
                   {room.status === 'clean' ? '✓ Terminée' : 
-                   room.status === 'in_progress' ? '⏳ En cours' : '🚪 En attente'}
+                   room.status === 'in_progress' ? '⏳ En cours' : 'En attente'}
                 </Badge>
               </div>
               
               {/* Admin notes */}
               {room.notes && (
-                <div className="bg-white/70 rounded-lg p-2 border border-primary/20">
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-semibold text-primary">📝 Note:</span> {room.notes}
+                <div className="bg-white/80 rounded-xl p-3 border border-primary/20 shadow-sm">
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold text-primary">📝</span> {room.notes}
                   </p>
                 </div>
               )}
@@ -283,50 +277,44 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
             <div className="space-y-2">
               <div className="relative">
                 <Textarea
-                  placeholder="💬 Ajouter un commentaire pour l'admin..."
+                  placeholder="Ajouter un commentaire pour l'admin..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  className="text-sm resize-none bg-white/80 border-primary/30 focus:border-primary pr-12"
+                  className="text-sm resize-none bg-white/90 border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary pr-14 rounded-xl"
                 />
                 {notes.trim() && (
                   <Button
                     size="sm"
                     onClick={handleSendNote}
                     disabled={isSendingNote}
-                    className="absolute bottom-2 right-2 h-8 w-8 p-0 rounded-full bg-primary hover:bg-primary/90"
+                    className="absolute bottom-2 right-2 h-9 w-9 p-0 rounded-full bg-primary hover:bg-primary/90 shadow-lg"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
                 )}
               </div>
-              {notes.trim() && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  Cliquez sur <Send className="h-3 w-3 inline" /> pour envoyer à l'admin
-                </p>
-              )}
             </div>
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-1">
             {room.status === 'dirty' && (
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'in_progress')}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
-                  size="sm"
+                  className="flex-1 h-14 text-lg font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-xl shadow-blue-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  ▶ Commencer
+                  <Play className="h-6 w-6 mr-2 fill-current" />
+                  COMMENCER
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  variant="outline"
+                  size="icon"
+                  className="h-14 w-14 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-6 w-6" />
                 </Button>
               </>
             )}
@@ -334,40 +322,49 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'clean', notes || undefined)}
-                  className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-md"
-                  size="sm"
+                  className="flex-1 h-14 text-lg font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-xl shadow-green-300/50 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Terminer
+                  <CheckCircle className="h-6 w-6 mr-2" />
+                  TERMINER
                 </Button>
                 <Button 
                   onClick={() => onUnassign(room.id, room.room_number)}
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  variant="outline"
+                  size="icon"
+                  className="h-14 w-14 rounded-xl border-2 border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-6 w-6" />
                 </Button>
               </>
             )}
             {room.status === 'clean' && (
-              <div className="flex items-center justify-center w-full text-green-700 py-2 bg-green-50/80 rounded-lg">
-                <CheckCircle className="h-5 w-5 mr-2" />
-                <span className="font-semibold">Chambre terminée ✨</span>
+              <div className="flex items-center justify-center w-full py-4 bg-green-100/80 rounded-xl">
+                <CheckCircle className="h-6 w-6 mr-2 text-green-600" />
+                <span className="font-bold text-green-700 text-lg">Chambre terminée</span>
+                <Sparkles className="h-5 w-5 ml-2 text-green-500" />
               </div>
             )}
           </div>
 
-          {/* Swipe hints */}
+          {/* Swipe hints with animation */}
           {room.status === 'in_progress' && (
-            <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 pt-1">
-              👉 Glissez vers la droite pour terminer rapidement
-            </p>
+            <div className="flex items-center justify-center gap-2 pt-2 text-blue-600">
+              <div className="flex items-center animate-pulse">
+                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 -ml-2" />
+                <ChevronRight className="h-4 w-4 -ml-2" />
+              </div>
+              <span className="text-sm font-medium">Glissez pour terminer</span>
+            </div>
           )}
           {room.status === 'dirty' && (
-            <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 pt-1">
-              💡 Glissez court pour commencer, glissez long pour terminer
-            </p>
+            <div className="flex items-center justify-center gap-2 pt-2 text-slate-500">
+              <div className="flex items-center">
+                <ChevronRight className="h-4 w-4 animate-pulse" />
+                <ChevronRight className="h-4 w-4 -ml-2 animate-pulse delay-75" />
+              </div>
+              <span className="text-sm">Glissez court = commencer | long = terminer</span>
+            </div>
           )}
         </div>
       </div>
