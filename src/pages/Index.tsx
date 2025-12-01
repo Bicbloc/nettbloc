@@ -67,6 +67,7 @@ import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
 import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
 import { SupabaseService } from "@/services/supabaseService";
 import { CodeGenerationService } from "@/services/codeGenerationService";
+import { AssignmentService } from "@/services/assignmentService";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
@@ -753,6 +754,30 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         });
         setRooms(updatedRooms);
         setIsDistributed(true);
+        
+        // Phase 1: Persister les assignations dans Supabase
+        if (currentHotelId) {
+          for (const room of updatedRooms) {
+            if (room.assignedTo) {
+              const hk = housekeepers.find(h => h.name === room.assignedTo);
+              const { data: roomData } = await supabase
+                .from('rooms')
+                .select('id')
+                .eq('hotel_id', currentHotelId)
+                .eq('room_number', room.number)
+                .single();
+              
+              if (roomData?.id && hk) {
+                await AssignmentService.assignRoom(
+                  currentHotelId,
+                  roomData.id,
+                  hk.user_id || hk.id,
+                  room.assignedTo
+                );
+              }
+            }
+          }
+        }
       } else {
         setRooms(sortedData);
         setIsDistributed(false);
@@ -773,13 +798,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     }
   };
 
-  const distributeRooms = (
+  const distributeRooms = async (
     roomsList: Room[], 
-    housekeepers: string[], 
+    housekeepersParam: string[], 
     floorPreferences: Record<string, number[]> = {},
     maxRoomsOverrides: Record<string, number> = {}
   ) => {
-    if (housekeepers.length === 0) return;
+    if (housekeepersParam.length === 0) return;
     
     const sortedRooms = [...roomsList].sort((a, b) => {
       if (a.priority === 'high' && b.priority !== 'high') return -1;
@@ -804,15 +829,15 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     }
     
     const assignments: Record<string, Room[]> = {};
-    housekeepers.forEach(name => {
+    housekeepersParam.forEach(name => {
       assignments[name] = [];
     });
     
     const findMinLoadHousekeeper = (preferredFloor?: number) => {
-      let candidates = housekeepers;
+      let candidates = housekeepersParam;
       if (preferredFloor !== undefined) {
         // Only assign to housekeepers with this floor preference or no preference
-        const housekeepersForFloor = housekeepers.filter(name => {
+        const housekeepersForFloor = housekeepersParam.filter(name => {
           const preferences = floorPreferences[name] || [];
           return preferences.length === 0 || preferences.includes(preferredFloor);
         });
@@ -892,6 +917,30 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     }
     
     setRooms(updatedRooms);
+    
+    // Phase 2: Persister les assignations dans Supabase
+    if (currentHotelId) {
+      for (const room of updatedRooms) {
+        if (room.assignedTo) {
+          const hk = housekeepers.find(h => h.name === room.assignedTo);
+          const { data: roomData } = await supabase
+            .from('rooms')
+            .select('id')
+            .eq('hotel_id', currentHotelId)
+            .eq('room_number', room.number)
+            .single();
+          
+          if (roomData?.id && hk) {
+            await AssignmentService.assignRoom(
+              currentHotelId,
+              roomData.id,
+              hk.user_id || hk.id,
+              room.assignedTo
+            );
+          }
+        }
+      }
+    }
     
     // Notify user about unassigned rooms
     const unassignedRooms = getUnassignedRooms();

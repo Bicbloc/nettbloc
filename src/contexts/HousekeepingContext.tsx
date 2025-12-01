@@ -96,8 +96,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           SessionPersistenceService.saveSessionData({
             sessionToken: HotelSessionService.getSessionToken() || '',
             hotelId: session.hotel_id || '',
-            lastActiveDate: new Date().toISOString(),
-            housekeeper_assignments: session.housekeeper_assignments
+            lastActiveDate: new Date().toISOString()
           });
 
           // Mettre à jour les données si elles ont changé
@@ -279,12 +278,13 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   };
 
-  // Sauvegarder les données complètes des chambres localement
+  // Phase 3: Les rooms sont maintenant dans Supabase uniquement - plus de sauvegarde localStorage
+  // Seules les assignations sont sauvegardées dans la table assignments
   useEffect(() => {
     if (!hotelId || rooms.length === 0) return;
 
-    const saveRoomData = async () => {
-      // Sauvegarder les assignations
+    const saveAssignments = async () => {
+      // Sauvegarder uniquement les assignations dans la session pour compatibilité
       const assignments = rooms
         .filter(room => room.assignedTo)
         .reduce((acc, room) => ({
@@ -293,23 +293,9 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         }), {});
 
       await HotelSessionService.updateHousekeeperAssignments(assignments, hotelId);
-
-      // Sauvegarder les données complètes des chambres localement
-      const roomData = rooms.map(room => ({
-        number: room.number,
-        status: room.status,
-        cleaningType: room.cleaningType,
-        assignedTo: room.assignedTo,
-        notes: room.notes,
-        isUrgent: room.isUrgent,
-        notUrgent: room.notUrgent,
-        isTwin: room.isTwin
-      }));
-
-      HotelSessionService.updateRoomDataLocal(roomData, hotelId);
     };
 
-    const debounceTimeout = setTimeout(saveRoomData, 1000);
+    const debounceTimeout = setTimeout(saveAssignments, 1000);
     return () => clearTimeout(debounceTimeout);
   }, [rooms, hotelId]);
 
@@ -587,11 +573,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         if (sessionData?.hotel_id) {
           const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
           SessionPersistenceService.updateSessionData({
-            housekeeper_assignments: data.map(hk => ({
-              housekeeper_id: hk.id,
-              housekeeper_name: hk.name,
-              access_code: hk.access_code
-            }))
+            hotelId: sessionData.hotel_id,
+            lastActiveDate: new Date().toISOString()
           });
         }
       }
