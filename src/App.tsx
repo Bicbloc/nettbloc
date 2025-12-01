@@ -22,6 +22,7 @@ import HousekeeperSignup from "./pages/HousekeeperSignup";
 import HousekeeperHotels from "./pages/HousekeeperHotels";
 import GuestMode from "./pages/GuestMode";
 import HousekeeperProfile from "./pages/HousekeeperProfile";
+import HousekeeperMobile from "./pages/HousekeeperMobile";
 import TechnicianLogin from "./pages/TechnicianLogin";
 import TechnicianSignup from "./pages/TechnicianSignup";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
@@ -60,6 +61,7 @@ const App = () => (
                     <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
                     <Route path="/housekeeper/hotels" element={<HousekeeperHotels />} />
                     <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
+                    <Route path="/housekeeper/mobile" element={<HousekeeperMobile />} />
                     <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
                     <Route path="/technician/signup" element={<TechnicianSignup />} />
                     <Route path="/technician/login" element={<TechnicianLogin />} />

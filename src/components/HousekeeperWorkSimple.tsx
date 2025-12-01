@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle, Wifi, WifiOff, Smartphone } from 'lucide-react';
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import { GamificationService } from '@/services/gamificationService';
 import { BadgeUnlockNotification } from './gamification/BadgeUnlockNotification';
@@ -688,6 +688,16 @@ export const HousekeeperWorkSimple: React.FC = () => {
               title="Actualiser les données"
             >
               <Clock className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate(`/housekeeper/mobile?hotel=${hotelId}&name=${housekeeperName}`)}
+              className="flex-1 sm:flex-initial"
+              title="Vue mobile optimisée"
+            >
+              <Smartphone className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Vue Mobile</span>
             </Button>
             {isAuthenticatedHousekeeper && (
               <Button
