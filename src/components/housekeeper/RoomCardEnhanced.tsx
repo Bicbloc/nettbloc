@@ -33,8 +33,11 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
   const touchStartX = useRef(0);
   const touchCurrentX = useRef(0);
 
+  const isActionable = ['dirty', 'needs-cleaning', 'ready-to-clean', 'assigned'].includes(room.status);
+  const isStartable = isActionable;
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (room.status === 'in_progress' || room.status === 'dirty') {
+    if (room.status === 'in_progress' || isActionable) {
       touchStartX.current = e.touches[0].clientX;
       setSwipeStartTime(Date.now());
       setIsSwiping(true);
@@ -70,7 +73,7 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 1500);
       await onUpdateStatus(room.id, 'clean', notes || undefined);
-    } else if (room.status === 'dirty') {
+    } else if (isActionable) {
       if (swipeOffset > 130 && swipeDuration > 500) {
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 1500);
@@ -165,7 +168,7 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       style={{
-        transform: (room.status === 'in_progress' || room.status === 'dirty') ? `translateX(${swipeOffset}px)` : 'none',
+        transform: (room.status === 'in_progress' || isActionable) ? `translateX(${swipeOffset}px)` : 'none',
         transition: isSwiping ? 'none' : 'transform 0.3s ease-out, background 0.3s ease'
       }}
     >
@@ -180,7 +183,7 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
       )}
 
       {/* Swipe background indicator */}
-      {(room.status === 'in_progress' || room.status === 'dirty') && swipeOffset > 0 && (
+      {(room.status === 'in_progress' || isActionable) && swipeOffset > 0 && (
         <div 
           className="absolute inset-0 flex items-center justify-start px-6"
           style={{
@@ -299,7 +302,7 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
 
           {/* Action buttons */}
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            {room.status === 'dirty' && (
+            {isStartable && (
               <>
                 <Button 
                   onClick={() => onUpdateStatus(room.id, 'in_progress')}
@@ -357,7 +360,7 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
               <span className="text-sm font-medium">Glissez pour terminer</span>
             </div>
           )}
-          {room.status === 'dirty' && (
+          {isActionable && room.status !== 'in_progress' && (
             <div className="flex items-center justify-center gap-2 pt-2 text-slate-500">
               <div className="flex items-center">
                 <ChevronRight className="h-4 w-4 animate-pulse" />

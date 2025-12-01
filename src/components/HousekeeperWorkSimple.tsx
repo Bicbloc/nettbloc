@@ -377,7 +377,16 @@ export const HousekeeperWorkSimple: React.FC = () => {
         const roomsList = (assignmentsData || [])
           .map(a => a.rooms)
           .filter(Boolean);
-        setRooms(roomsList);
+        
+        // Dédoublonner par room_id pour éviter les doublons
+        const uniqueRooms = roomsList.reduce((acc: typeof roomsList, room) => {
+          if (!acc.find(r => r.id === room.id)) {
+            acc.push(room);
+          }
+          return acc;
+        }, []);
+        
+        setRooms(uniqueRooms);
       }
 
       // Charger les chambres disponibles (ready-to-clean non assignées)
