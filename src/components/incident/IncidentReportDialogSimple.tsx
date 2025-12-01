@@ -147,8 +147,23 @@ export function IncidentReportDialogSimple({
 
   const createIncidentMutation = useMutation({
     mutationFn: async (values: z.infer<typeof incidentSchema>) => {
+      // Essayer d'abord Supabase auth, sinon utiliser localStorage
       const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error("Non authentifié");
+      
+      // Récupérer les données de la femme de chambre depuis localStorage si pas auth
+      const housekeeperData = localStorage.getItem('housekeeper') 
+        ? JSON.parse(localStorage.getItem('housekeeper')!) 
+        : null;
+      const housekeeperProfile = localStorage.getItem('housekeeperProfile')
+        ? JSON.parse(localStorage.getItem('housekeeperProfile')!)
+        : null;
+      
+      // Déterminer qui rapporte l'incident
+      const reportedById = user?.user?.id || housekeeperProfile?.id || null;
+      const reportedByName = user?.user?.email 
+        || housekeeperProfile?.name 
+        || housekeeperData?.name 
+        || 'Femme de chambre';
 
       // Get item details to extract category
       const { data: item } = await supabase
@@ -171,8 +186,8 @@ export function IncidentReportDialogSimple({
           priority: "medium",
           location_type: "room",
           location_reference: values.location_reference,
-          reported_by: user.user.id,
-          reported_by_name: user.user.email || "Utilisateur",
+          reported_by: reportedById,
+          reported_by_name: reportedByName,
           reported_by_type: userType,
           status: "new",
         })
@@ -200,7 +215,7 @@ export function IncidentReportDialogSimple({
           await supabase.from("incident_images").insert({
             incident_id: incident.id,
             image_url: publicUrl,
-            uploaded_by: user.user.id,
+            uploaded_by: reportedById || housekeeperProfile?.id,
           });
         }
       }
