@@ -28,17 +28,20 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
   const [isSwiping, setIsSwiping] = useState(false);
   const [notes, setNotes] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
+  const [swipeStartTime, setSwipeStartTime] = useState(0);
   const touchStartX = useRef(0);
   const touchCurrentX = useRef(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (room.status !== 'in_progress') return;
-    touchStartX.current = e.touches[0].clientX;
-    setIsSwiping(true);
+    if (room.status === 'in_progress' || room.status === 'dirty') {
+      touchStartX.current = e.touches[0].clientX;
+      setSwipeStartTime(Date.now());
+      setIsSwiping(true);
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSwiping || room.status !== 'in_progress') return;
+    if (!isSwiping) return;
     
     touchCurrentX.current = e.touches[0].clientX;
     const diff = touchCurrentX.current - touchStartX.current;
@@ -50,15 +53,35 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
   };
 
   const handleTouchEnd = async () => {
-    if (!isSwiping) return;
-    
-    // If swiped more than 120px, mark as complete
-    if (swipeOffset > 120) {
+    if (!isSwiping) {
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      return;
+    }
+
+    setIsSwiping(false);
+    const swipeDuration = Date.now() - swipeStartTime;
+
+    // Haptic feedback on mobile
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
+
+    // For in_progress rooms: swipe right to mark as clean
+    if (room.status === 'in_progress' && swipeOffset > 120) {
       await onUpdateStatus(room.id, 'clean', notes || undefined);
     }
+    // For dirty rooms: swipe to start, long swipe to complete
+    else if (room.status === 'dirty') {
+      if (swipeOffset > 130 && swipeDuration > 500) {
+        // Long swipe = mark as clean directly
+        await onUpdateStatus(room.id, 'clean', notes || undefined);
+      } else if (swipeOffset > 80) {
+        // Normal swipe = start cleaning
+        await onUpdateStatus(room.id, 'in_progress');
+      }
+    }
     
-    // Reset swipe
-    setIsSwiping(false);
     setSwipeOffset(0);
   };
 
@@ -158,12 +181,12 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       style={{
-        transform: room.status === 'in_progress' ? `translateX(${swipeOffset}px)` : 'none',
+        transform: (room.status === 'in_progress' || room.status === 'dirty') ? `translateX(${swipeOffset}px)` : 'none',
         transition: isSwiping ? 'none' : 'transform 0.3s ease-out'
       }}
     >
       {/* Swipe background indicator */}
-      {room.status === 'in_progress' && swipeOffset > 0 && (
+      {(room.status === 'in_progress' || room.status === 'dirty') && swipeOffset > 0 && (
         <div 
           className="absolute inset-0 flex items-center justify-start px-8"
           style={{
@@ -209,11 +232,13 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
                 {/* Cleaning type badge */}
                 {room.cleaning_type && (
                   <Badge 
-                    variant={room.cleaning_type === 'full' ? 'default' : 'secondary'}
-                    className="shadow-sm"
+                    className={room.cleaning_type === 'full' 
+                      ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-sm' 
+                      : 'bg-blue-500 hover:bg-blue-600 text-white shadow-sm'
+                    }
                   >
                     <Sparkles className="h-3 w-3 mr-1" />
-                    {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
+                    {room.cleaning_type === 'full' ? '🚪 Départ' : '🛏️ Recouche'}
                   </Badge>
                 )}
 
@@ -333,10 +358,15 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
             )}
           </div>
 
-          {/* Swipe hint */}
+          {/* Swipe hints */}
           {room.status === 'in_progress' && (
             <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 pt-1">
               👉 Glissez vers la droite pour terminer rapidement
+            </p>
+          )}
+          {room.status === 'dirty' && (
+            <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 pt-1">
+              💡 Glissez court pour commencer, glissez long pour terminer
             </p>
           )}
         </div>
