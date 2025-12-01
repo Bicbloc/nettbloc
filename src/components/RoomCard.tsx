@@ -99,9 +99,9 @@ export function RoomCard({
   const getCleaningTypeBadge = (type: string) => {
     switch (type) {
       case 'full':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">À Blanc</Badge>;
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800">🚪 Départ</Badge>;
       case 'quick':
-        return <Badge variant="outline" className="bg-red-100 text-red-800">À blanc</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">🛏️ Recouche</Badge>;
       case 'none':
         return null;
       default:
@@ -148,7 +148,7 @@ export function RoomCard({
     });
     
     toast({
-      description: `Chambre ${room.number} : ${type === 'full' ? '🧼 À blanc' : '🛏️ Recouche'}`
+      description: `Chambre ${room.number} : ${type === 'full' ? '🚪 Départ' : '🛏️ Recouche'}`
     });
   };
 
@@ -414,7 +414,7 @@ export function RoomCard({
               htmlFor={`full-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
             >
-              🧼 À blanc
+              🚪 Départ
             </Label>
           </div>
           <div className="flex items-center space-x-1">

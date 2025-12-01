@@ -98,7 +98,9 @@ const Index = () => {
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('admin_active_tab') || 'overview';
+  });
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   const [showHousekeeperManagement, setShowHousekeeperManagement] = useState(false);
   
@@ -232,6 +234,11 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   useEffect(() => {
     cleanupInvalidHotelIds();
   }, []);
+  
+  // Persister l'onglet actif
+  useEffect(() => {
+    localStorage.setItem('admin_active_tab', activeTab);
+  }, [activeTab]);
   
   // Charger les femmes de chambre existantes
   useEffect(() => {
@@ -377,6 +384,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           });
 
           console.log('✅ Phase 4: Chambres restaurées depuis Supabase:', mergedRooms.length);
+          
+          // Sauvegarder les noms de housekeepers dans localStorage en backup
+          const uniqueHousekeepers = Array.from(new Set(dbAssignments?.map(a => a.housekeeper_name).filter(Boolean) || []));
+          if (uniqueHousekeepers.length > 0) {
+            localStorage.setItem('housekeeper_names', JSON.stringify(uniqueHousekeepers));
+          }
         }
       } catch (error) {
         console.error('❌ Phase 4: Erreur chargement chambres:', error);
