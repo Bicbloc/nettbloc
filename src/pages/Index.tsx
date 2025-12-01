@@ -302,6 +302,80 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
 
+  // PHASE 4: Restaurer les données à la reconnexion (charger rooms depuis Supabase)
+  useEffect(() => {
+    const loadRoomsFromDatabase = async () => {
+      if (!currentHotelId) return;
+
+      try {
+        console.log('🔄 Phase 4: Chargement des chambres depuis Supabase...');
+        
+        // Charger les chambres depuis la table rooms
+        const { data: dbRooms, error: roomsError } = await supabase
+          .from('rooms')
+          .select('*')
+          .eq('hotel_id', currentHotelId);
+
+        if (roomsError) throw roomsError;
+
+        // Charger les assignations actives
+        const { data: dbAssignments, error: assignmentsError } = await supabase
+          .from('assignments')
+          .select('room_id, housekeeper_name')
+          .eq('hotel_id', currentHotelId)
+          .in('status', ['assigned', 'in_progress']);
+
+        if (assignmentsError) throw assignmentsError;
+
+        // Fusionner les données
+        if (dbRooms && dbRooms.length > 0) {
+          const mergedRooms: Room[] = dbRooms.map(r => {
+            const assignment = dbAssignments?.find(a => a.room_id === r.id);
+            const cleaningType = r.room_type === 'full' ? 'full' : (r.room_type === 'quick' ? 'quick' : 'none');
+            return {
+              number: r.room_number,
+              status: r.status,
+              cleaningType: cleaningType as 'full' | 'quick' | 'none',
+              assignedTo: assignment?.housekeeper_name,
+              floor: r.floor || undefined,
+              notes: r.notes || undefined,
+              isUrgent: r.cleaning_priority === 10,
+              notUrgent: r.cleaning_priority === 1,
+              isTwin: false,
+              priority: r.cleaning_priority === 10 ? 'high' as const : undefined
+            };
+          });
+
+          // Fusionner avec données locales (Supabase a priorité pour status et cleaningType)
+          setRooms(prevRooms => {
+            if (prevRooms.length === 0) return mergedRooms;
+            
+            return mergedRooms.map(dbRoom => {
+              const localRoom = prevRooms.find(r => r.number === dbRoom.number);
+              return {
+                ...localRoom,
+                ...dbRoom,
+                // Garder certains flags locaux non persistés
+                isTwin: localRoom?.isTwin || false
+              };
+            });
+          });
+
+          console.log('✅ Phase 4: Chambres restaurées depuis Supabase:', mergedRooms.length);
+        }
+      } catch (error) {
+        console.error('❌ Phase 4: Erreur chargement chambres:', error);
+      }
+    };
+
+    // Charger au montage et à chaque changement d'hôtel
+    loadRoomsFromDatabase();
+
+    // Recharger toutes les 30 secondes pour synchronisation continue
+    const interval = setInterval(loadRoomsFromDatabase, 30000);
+    return () => clearInterval(interval);
+  }, [currentHotelId]);
+
   // Synchroniser hotel code quand l'hotel est chargé
   useEffect(() => {
     if (hotel?.hotel_code) {
@@ -647,6 +721,26 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         setHousekeeperNames(housekeepers);
       }
 
+      // PHASE 1: Synchroniser CHAQUE chambre PDF vers Supabase
+      if (currentHotelId) {
+        console.log('🔄 Phase 1: Synchronisation des chambres PDF vers Supabase...');
+        for (const room of sortedData) {
+          await supabase.from('rooms').upsert({
+            hotel_id: currentHotelId,
+            room_number: room.number,
+            floor: room.floor || null,
+            status: room.status || 'needs-cleaning',
+            room_type: room.cleaningType === 'full' ? 'full' : (room.cleaningType === 'quick' ? 'quick' : null),
+            cleaning_priority: room.isUrgent ? 10 : (room.notUrgent ? 1 : 5),
+            notes: room.notes || null
+          }, { 
+            onConflict: 'hotel_id,room_number',
+            ignoreDuplicates: false 
+          });
+        }
+        console.log('✅ Phase 1: Toutes les chambres synchronisées vers Supabase');
+      }
+
       // Auto-distribute if method specified
       if (distributionMethod && housekeepers && housekeepers.length > 0) {
         console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
@@ -921,7 +1015,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   };
 
   // Fonction pour gérer la redistribution des chambres
-  const handleRedistribute = (method: RedistributionMethod) => {
+  const handleRedistribute = async (method: RedistributionMethod) => {
     console.log(`🔄 Redistribution via ${method}`);
     
     if (housekeeperNames.length === 0) {
@@ -946,6 +1040,17 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       return;
     }
 
+    // PHASE 5: Nettoyer les anciennes assignations avant redistribution
+    if (currentHotelId) {
+      console.log('🧹 Phase 5: Nettoyage des anciennes assignations...');
+      await supabase
+        .from('assignments')
+        .delete()
+        .eq('hotel_id', currentHotelId)
+        .in('status', ['assigned']);
+      console.log('✅ Phase 5: Anciennes assignations supprimées');
+    }
+
     try {
       const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
       setRooms(redistributedRooms);
@@ -958,6 +1063,35 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       const assignedCount = redistributedRooms.filter(r => 
         r.assignedTo && r.cleaningType !== 'none' && r.status !== 'maintenance'
       ).length;
+
+      // PHASE 2: Créer les assignations dans Supabase
+      if (currentHotelId) {
+        console.log('💾 Phase 2: Persistance des assignations...');
+        const { AssignmentService } = await import('@/services/assignmentService');
+        
+        for (const room of redistributedRooms) {
+          if (room.assignedTo && room.cleaningType !== 'none' && room.status !== 'maintenance') {
+            const hk = housekeepers.find(h => h.name === room.assignedTo);
+            
+            const { data: roomData } = await supabase
+              .from('rooms')
+              .select('id')
+              .eq('hotel_id', currentHotelId)
+              .eq('room_number', room.number)
+              .single();
+            
+            if (roomData?.id && hk) {
+              await AssignmentService.assignRoom(
+                currentHotelId,
+                roomData.id,
+                hk.user_id || hk.id,
+                room.assignedTo
+              );
+            }
+          }
+        }
+        console.log('✅ Phase 2: Assignations persistées');
+      }
 
       toast({
         title: "Redistribution terminée",
@@ -1093,9 +1227,47 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const handleRedistributeWithMethod = async (method: RedistributionMethod) => {
     console.log(`🔄 Redistribution avec méthode: ${method}`);
     
+    // PHASE 5: Nettoyer les anciennes assignations
+    if (currentHotelId) {
+      await supabase
+        .from('assignments')
+        .delete()
+        .eq('hotel_id', currentHotelId)
+        .in('status', ['assigned']);
+    }
+    
     const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
     setRooms(redistributedRooms);
     setIsDistributed(true);
+    
+    // PHASE 2: Persister les assignations dans Supabase
+    if (currentHotelId) {
+      console.log('💾 Phase 2: Persistance des assignations...');
+      const { AssignmentService } = await import('@/services/assignmentService');
+      
+      for (const room of redistributedRooms) {
+        if (room.assignedTo && room.cleaningType !== 'none' && room.status !== 'maintenance') {
+          const hk = housekeepers.find(h => h.name === room.assignedTo);
+          
+          const { data: roomData } = await supabase
+            .from('rooms')
+            .select('id')
+            .eq('hotel_id', currentHotelId)
+            .eq('room_number', room.number)
+            .single();
+          
+          if (roomData?.id && hk) {
+            await AssignmentService.assignRoom(
+              currentHotelId,
+              roomData.id,
+              hk.user_id || hk.id,
+              room.assignedTo
+            );
+          }
+        }
+      }
+      console.log('✅ Phase 2: Assignations persistées');
+    }
     
     // Auto-générer les codes d'accès lors de la distribution
     await generateAccessCodesForDistribution();
