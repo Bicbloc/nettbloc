@@ -104,6 +104,11 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   }, [accessCode, hotelId, isAuthenticatedHousekeeper]);
 
+  // Normaliser un nom pour comparaison (trim + lowercase)
+  const normalizeName = (name: string | null | undefined): string => {
+    return (name || '').trim().toLowerCase();
+  };
+
   // Gestion intelligente des mises à jour temps réel
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
     console.log(`📡 Mise à jour temps réel ${table}:`, payload);
@@ -119,10 +124,13 @@ export const HousekeeperWorkSimple: React.FC = () => {
           housekeeper?.user_id
         ].filter(Boolean);
         
-        // Vérifier par ID OU par nom
+        // Normaliser les noms pour comparaison
+        const normalizedMyName = normalizeName(housekeeperName);
+        const normalizedRecordName = normalizeName(newRecord.housekeeper_name);
+        
+        // Vérifier par ID OU par nom normalisé
         const isForMe = possibleIds.includes(newRecord.housekeeper_id) || 
-                        newRecord.housekeeper_name === housekeeperName ||
-                        newRecord.housekeeper_name?.toLowerCase() === housekeeperName?.toLowerCase();
+                        normalizedRecordName === normalizedMyName;
         
         // Vérifier que c'est pour le bon hôtel
         const isCorrectHotel = newRecord.hotel_id === hotelId;
@@ -131,39 +139,29 @@ export const HousekeeperWorkSimple: React.FC = () => {
           possibleIds,
           recordHousekeeperId: newRecord.housekeeper_id,
           recordHousekeeperName: newRecord.housekeeper_name,
+          normalizedRecordName,
           housekeeperName,
+          normalizedMyName,
           isForMe,
           isCorrectHotel
         });
         
         if (isForMe && isCorrectHotel) {
-          console.log('🆕 Nouvelle assignation reçue pour moi!');
+          console.log('🆕 Nouvelle assignation reçue pour moi! Rechargement complet...');
           
-          // Charger la chambre complète
-          supabase
-            .from('rooms')
-            .select('*')
-            .eq('id', newRecord.room_id)
-            .single()
-            .then(({ data: roomData }) => {
-              if (roomData) {
-                // Ajouter la chambre à la liste
-                setRooms(prev => {
-                  // Vérifier si la chambre n'existe pas déjà
-                  if (!prev.find(r => r.id === roomData.id)) {
-                    return [...prev, roomData];
-                  }
-                  return prev;
-                });
-                
-                // Ajouter l'assignation
-                setAssignments(prev => [...prev, { ...newRecord, rooms: roomData }]);
-                
-                // Incrémenter le compteur de nouvelles chambres (sans notification)
-                setNewRoomsCount(prev => prev + 1);
-                setTimeout(() => setNewRoomsCount(0), 5000);
-              }
-            });
+          // Recharger TOUTES les données pour être sûr de la synchronisation
+          loadWorkData();
+          
+          // Notification visuelle
+          toast({
+            title: "🆕 Nouvelle chambre",
+            description: `Une nouvelle chambre vous a été assignée`,
+            duration: 4000
+          });
+          
+          // Incrémenter le compteur
+          setNewRoomsCount(prev => prev + 1);
+          setTimeout(() => setNewRoomsCount(0), 5000);
         }
       } else if (eventType === 'UPDATE') {
         // Mise à jour d'une assignation existante
@@ -229,14 +227,14 @@ export const HousekeeperWorkSimple: React.FC = () => {
     onUpdate: handleRealtimeUpdate
   });
 
-  // Polling de secours si le realtime échoue
+  // Polling de secours si le realtime échoue (toutes les 10 secondes au lieu de 30)
   useEffect(() => {
     const pollInterval = setInterval(() => {
       if (!isConnected && hotelId) {
         console.log('⏰ Polling de secours - realtime non connecté');
         loadWorkData();
       }
-    }, 30000);
+    }, 10000); // 10 secondes au lieu de 30
 
     return () => clearInterval(pollInterval);
   }, [isConnected, hotelId]);

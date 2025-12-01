@@ -23,6 +23,7 @@ export interface Assignment {
 export class AssignmentService {
   /**
    * Créer une nouvelle assignation de chambre à une femme de chambre
+   * Utilise le nom exact de la base de données pour assurer la cohérence
    */
   static async assignRoom(
     hotelId: string,
@@ -34,17 +35,22 @@ export class AssignmentService {
     try {
       console.log('🔄 Assignation chambre:', { hotelId, roomId, housekeeperId, housekeeperName });
 
-      // Récupérer le housekeeper_profile_id si disponible
+      // Récupérer le nom EXACT depuis la base de données pour cohérence
+      let exactHousekeeperName = housekeeperName.trim();
       let housekeeperProfileId: string | null = null;
+      
       if (housekeeperId) {
         const { data: hkData } = await supabase
           .from('housekeepers')
-          .select('user_id')
+          .select('name, user_id')
           .eq('id', housekeeperId)
           .single();
         
-        if (hkData?.user_id) {
+        if (hkData) {
+          // Utiliser le nom exact de la base de données
+          exactHousekeeperName = hkData.name;
           housekeeperProfileId = hkData.user_id;
+          console.log('✅ Nom exact récupéré:', exactHousekeeperName);
         }
       }
 
@@ -54,7 +60,7 @@ export class AssignmentService {
           hotel_id: hotelId,
           room_id: roomId,
           housekeeper_id: housekeeperId,
-          housekeeper_name: housekeeperName,
+          housekeeper_name: exactHousekeeperName, // Nom exact de la DB
           status: 'assigned',
           notes: notes,
           estimated_duration: 30

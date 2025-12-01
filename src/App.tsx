@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import EstablishmentAuth from "./pages/EstablishmentAuth";
 import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
@@ -49,6 +50,7 @@ const App = () => (
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/auth/establishment" element={<EstablishmentAuth />} />
                     <Route path="/guest" element={<GuestMode />} />
                     <Route path="/plan-selection" element={<PlanSelection />} />
                     <Route path="/success" element={<Success />} />

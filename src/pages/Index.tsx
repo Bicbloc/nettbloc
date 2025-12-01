@@ -240,6 +240,23 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     localStorage.setItem('admin_active_tab', activeTab);
   }, [activeTab]);
   
+  // Persister les assignations complètes (rooms + housekeeperNames)
+  useEffect(() => {
+    if (!currentHotelId || rooms.length === 0) return;
+    
+    const assignmentState = {
+      rooms: rooms.map(r => ({
+        number: r.number,
+        assignedTo: r.assignedTo,
+        cleaningType: r.cleaningType,
+        status: r.status
+      })),
+      housekeeperNames,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(`assignments_${currentHotelId}`, JSON.stringify(assignmentState));
+  }, [rooms, housekeeperNames, currentHotelId]);
+  
   // Charger les femmes de chambre existantes
   useEffect(() => {
     const loadExistingHousekeepers = async () => {
@@ -389,6 +406,27 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           const uniqueHousekeepers = Array.from(new Set(dbAssignments?.map(a => a.housekeeper_name).filter(Boolean) || []));
           if (uniqueHousekeepers.length > 0) {
             localStorage.setItem('housekeeper_names', JSON.stringify(uniqueHousekeepers));
+            // Restaurer les housekeeperNames si vides
+            if (housekeeperNames.length === 0) {
+              setHousekeeperNames(uniqueHousekeepers);
+            }
+          }
+          
+          // Restaurer depuis le localStorage si disponible
+          const savedState = localStorage.getItem(`assignments_${currentHotelId}`);
+          if (savedState) {
+            try {
+              const { housekeeperNames: savedNames, timestamp } = JSON.parse(savedState);
+              // Utiliser les données sauvegardées si moins de 24h
+              if (savedNames && timestamp && (Date.now() - timestamp < 24 * 60 * 60 * 1000)) {
+                if (housekeeperNames.length === 0 && savedNames.length > 0) {
+                  setHousekeeperNames(savedNames);
+                  console.log('✅ HousekeeperNames restaurés depuis localStorage:', savedNames);
+                }
+              }
+            } catch (e) {
+              console.warn('Erreur parsing savedState:', e);
+            }
           }
         }
       } catch (error) {
