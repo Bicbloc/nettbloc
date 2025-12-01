@@ -1811,6 +1811,7 @@ export type Database = {
       rooms: {
         Row: {
           cleaning_priority: number | null
+          cleaning_type: string | null
           created_at: string
           estimated_time: number | null
           floor: number | null
@@ -1825,6 +1826,7 @@ export type Database = {
         }
         Insert: {
           cleaning_priority?: number | null
+          cleaning_type?: string | null
           created_at?: string
           estimated_time?: number | null
           floor?: number | null
@@ -1839,6 +1841,7 @@ export type Database = {
         }
         Update: {
           cleaning_priority?: number | null
+          cleaning_type?: string | null
           created_at?: string
           estimated_time?: number | null
           floor?: number | null
