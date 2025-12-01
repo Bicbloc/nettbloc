@@ -1211,7 +1211,7 @@ export type Database = {
           location_reference: string | null
           location_type: string | null
           priority: string | null
-          reported_by: string
+          reported_by: string | null
           reported_by_name: string
           reported_by_type: string
           resolution_notes: string | null
@@ -1236,7 +1236,7 @@ export type Database = {
           location_reference?: string | null
           location_type?: string | null
           priority?: string | null
-          reported_by: string
+          reported_by?: string | null
           reported_by_name: string
           reported_by_type: string
           resolution_notes?: string | null
@@ -1261,7 +1261,7 @@ export type Database = {
           location_reference?: string | null
           location_type?: string | null
           priority?: string | null
-          reported_by?: string
+          reported_by?: string | null
           reported_by_name?: string
           reported_by_type?: string
           resolution_notes?: string | null
