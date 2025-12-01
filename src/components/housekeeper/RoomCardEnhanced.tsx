@@ -67,28 +67,45 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
     
     setIsSendingNote(true);
     try {
+      console.log('🔄 Envoi commentaire pour chambre:', room.room_number);
+      
       // Update room notes in assignments table
-      const { data: assignment } = await supabase
+      const { data: assignment, error: assignmentError } = await supabase
         .from('assignments')
         .select('id')
         .eq('room_id', room.id)
         .single();
 
+      if (assignmentError) {
+        console.error('❌ Erreur récupération assignment:', assignmentError);
+        throw assignmentError;
+      }
+
       if (assignment) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('assignments')
           .update({ notes: notes.trim() })
           .eq('id', assignment.id);
 
+        if (updateError) {
+          console.error('❌ Erreur mise à jour assignment:', updateError);
+          throw updateError;
+        }
+
         // Create notification for admin
-        const { data: hotel } = await supabase
+        const { data: hotel, error: hotelError } = await supabase
           .from('hotels')
           .select('user_id, name')
           .eq('id', hotelId)
           .single();
 
+        if (hotelError) {
+          console.error('❌ Erreur récupération hotel:', hotelError);
+          throw hotelError;
+        }
+
         if (hotel?.user_id) {
-          await supabase.from('notifications').insert({
+          const { error: notifError } = await supabase.from('notifications').insert({
             user_id: hotel.user_id,
             user_type: 'admin',
             hotel_id: hotelId,
@@ -98,8 +115,14 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
             room_number: room.room_number,
             is_read: false
           });
+
+          if (notifError) {
+            console.error('❌ Erreur création notification:', notifError);
+            throw notifError;
+          }
         }
 
+        console.log('✅ Commentaire envoyé avec succès');
         toast({
           title: "Commentaire envoyé",
           description: `Le commentaire pour la chambre ${room.room_number} a été envoyé à l'administrateur`,
@@ -108,11 +131,11 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
         setNotes('');
       }
     } catch (error) {
-      console.error('Erreur envoi commentaire:', error);
+      console.error('❌ Erreur générale envoi commentaire:', error);
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "Impossible d'envoyer le commentaire"
+        title: "Erreur d'envoi",
+        description: error instanceof Error ? error.message : "Impossible d'envoyer le commentaire"
       });
     } finally {
       setIsSendingNote(false);
