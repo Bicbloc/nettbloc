@@ -1258,11 +1258,23 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     
     // PHASE 5: Nettoyer les anciennes assignations
     if (currentHotelId) {
-      await supabase
+      const { data: deleted, error: deleteError } = await supabase
         .from('assignments')
         .delete()
         .eq('hotel_id', currentHotelId)
-        .in('status', ['assigned', 'in_progress']);
+        .in('status', ['assigned', 'in_progress'])
+        .select();
+
+      if (deleteError) {
+        console.error('❌ Erreur suppression assignations:', deleteError);
+        toast({
+          variant: 'destructive',
+          title: 'Erreur',
+          description: 'Impossible de nettoyer les anciennes assignations'
+        });
+        return;
+      }
+      console.log(`✅ ${deleted?.length || 0} assignations supprimées`);
     }
     
     const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
