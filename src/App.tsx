@@ -27,6 +27,7 @@ import TechnicianSignup from "./pages/TechnicianSignup";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
 import { TechnicianAuthProvider } from "./contexts/TechnicianAuthContext";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
+import { NotificationProvider } from "./contexts/NotificationContext";
 
 // Components supprimés - plus de header space
 const queryClient = new QueryClient();
@@ -37,12 +38,13 @@ const App = () => (
       <HousekeeperAuthProvider>
         <TechnicianAuthProvider>
           <HousekeepingProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <div className="flex flex-col min-h-screen">
-              <div className="flex-grow">
-                <BrowserRouter>
+            <NotificationProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <div className="flex flex-col min-h-screen">
+                  <div className="flex-grow">
+                    <BrowserRouter>
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/auth" element={<Auth />} />
@@ -65,10 +67,11 @@ const App = () => (
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
-                </BrowserRouter>
-              </div>
-            </div>
-          </TooltipProvider>
+                    </BrowserRouter>
+                  </div>
+                </div>
+              </TooltipProvider>
+            </NotificationProvider>
           </HousekeepingProvider>
         </TechnicianAuthProvider>
       </HousekeeperAuthProvider>
