@@ -35,31 +35,31 @@ export const HousekeeperAccessRequests = () => {
   const [suspensionDialogOpen, setSuspensionDialogOpen] = useState(false);
   const { user } = useAuth();
 
-  // Écouter les nouvelles demandes en temps réel
-  useEffect(() => {
-    if (!user) return;
+  // Notifications en temps réel désactivées temporairement
+  // useEffect(() => {
+  //   if (!user) return;
 
-    const channel = supabase
-      .channel('access_requests_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'housekeeper_access_requests'
-        },
-        (payload) => {
-          console.log('Nouvelle demande reçue:', payload);
-          toast.success('📨 Nouvelle demande d\'accès reçue !');
-          loadRequests();
-        }
-      )
-      .subscribe();
+  //   const channel = supabase
+  //     .channel('access_requests_changes')
+  //     .on(
+  //       'postgres_changes',
+  //       {
+  //         event: 'INSERT',
+  //         schema: 'public',
+  //         table: 'housekeeper_access_requests'
+  //       },
+  //       (payload) => {
+  //         console.log('Nouvelle demande reçue:', payload);
+  //         toast.success('📨 Nouvelle demande d\'accès reçue !');
+  //         loadRequests();
+  //       }
+  //     )
+  //     .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
+  //   return () => {
+  //     supabase.removeChannel(channel);
+  //   };
+  // }, [user]);
 
   const loadRequests = async () => {
     if (!user) return;
