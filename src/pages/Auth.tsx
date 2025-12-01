@@ -452,12 +452,19 @@ const Auth = () => {
                     </Button>
                   </div>
                 )}
-                <Tabs defaultValue="signin" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="signin">Connexion</TabsTrigger>
-                <TabsTrigger value="signup">Inscription</TabsTrigger>
-                <TabsTrigger value="housekeeper">Femme de chambre</TabsTrigger>
-              </TabsList>
+                
+                {/* Section Établissement */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Building className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold">Connexion Établissement</h3>
+                  </div>
+                  
+                  <Tabs defaultValue="signin" className="space-y-4">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="signin">Connexion</TabsTrigger>
+                      <TabsTrigger value="signup">Inscription</TabsTrigger>
+                    </TabsList>
               
               <TabsContent value="signin" className="space-y-4">
                 <form onSubmit={handleSignIn} className="space-y-4">
@@ -551,115 +558,51 @@ const Auth = () => {
                   </Button>
                 </form>
               </TabsContent>
-
-              <TabsContent value="housekeeper" className="space-y-4">
-                <Tabs defaultValue="hk-signin" className="space-y-4">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="hk-signin">Connexion</TabsTrigger>
-                    <TabsTrigger value="hk-signup">Inscription</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="hk-signin" className="space-y-4">
-                    <form onSubmit={handleHousekeeperSignIn} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signin-email">Email</Label>
-                        <Input
-                          id="hk-signin-email"
-                          type="email"
-                          placeholder="votre@email.com"
-                          value={formData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signin-password">Mot de passe</Label>
-                        <Input
-                          id="hk-signin-password"
-                          type="password"
-                          value={formData.password}
-                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
-                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Se connecter
-                      </Button>
-                      <div className="text-center pt-4 border-t">
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Vous avez un code d'accès unique ?
-                        </p>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          onClick={() => navigate('/housekeeper/login')}
-                          className="text-purple-600 hover:text-purple-700"
-                        >
-                          Connexion avec code d'accès
-                        </Button>
-                      </div>
-                    </form>
-                  </TabsContent>
-                  
-                  <TabsContent value="hk-signup" className="space-y-4">
-                    <form onSubmit={handleHousekeeperSignUp} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-name">Nom complet *</Label>
-                        <Input
-                          id="hk-signup-name"
-                          placeholder="Marie Dupont"
-                          value={formData.housekeeperName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, housekeeperName: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-email">Email</Label>
-                        <Input
-                          id="hk-signup-email"
-                          type="email"
-                          placeholder="marie@example.com"
-                          value={formData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-password">Mot de passe</Label>
-                        <Input
-                          id="hk-signup-password"
-                          type="password"
-                          placeholder="Minimum 6 caractères"
-                          value={formData.password}
-                          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hk-signup-confirm">Confirmer le mot de passe</Label>
-                        <Input
-                          id="hk-signup-confirm"
-                          type="password"
-                          placeholder="Répétez le mot de passe"
-                          value={formData.confirmPassword}
-                          onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                      <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={isLoading}>
-                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        S'inscrire
-                      </Button>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              </TabsContent>
             </Tabs>
+          </div>
 
-            <div className="mt-6 pt-6 border-t space-y-4">
+          {/* Séparateur */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-card text-muted-foreground font-medium">OU</span>
+            </div>
+          </div>
+
+          {/* Section Femme de Chambre */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Accès Femme de Chambre</h3>
+            </div>
+            
+            <div className="p-4 border rounded-lg bg-muted/50 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Vous êtes une femme de chambre ? Connectez-vous avec votre code d'accès personnel.
+              </p>
+              <Button 
+                onClick={() => navigate('/housekeeper-login')}
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <UserCheck className="h-4 w-4" />
+                Connexion avec code d'accès
+              </Button>
+              <div className="text-center">
+                <Button
+                  variant="link"
+                  onClick={() => navigate('/housekeeper/login')}
+                  className="text-sm"
+                >
+                  Créer un espace personnel (optionnel)
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Shield className="h-4 w-4" />
