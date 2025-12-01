@@ -440,15 +440,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           roomNumber,
           user_type: 'admin' as const,
         };
-      } else if (newStatus === 'in-progress') {
-        notification = {
-          title: `Femme de chambre (${housekeeperName}) - CH ${roomNumber} - En cours`,
-          description: `${housekeeperName} a commencé le nettoyage de la chambre ${roomNumber}`,
-          type: 'cleaning-start' as const,
-          housekeeperName,
-          roomNumber,
-          user_type: 'admin' as const,
-        };
       } else if (newStatus === 'needs-attention') {
         notification = {
           title: `Remarque de la femme de chambre (${housekeeperName}) - CH ${roomNumber} - Problème signalé`,

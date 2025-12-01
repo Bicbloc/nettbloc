@@ -47,6 +47,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [activeLinenTask, setActiveLinenTask] = useState<string | null>(null);
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   
   const { playInfo } = useNotificationSound();
 
@@ -172,6 +173,24 @@ export const HousekeeperWorkSimple: React.FC = () => {
     
     if (table === 'rooms') {
       if (eventType === 'UPDATE' || eventType === 'INSERT') {
+        // Vérifier si une chambre devient ready-to-clean
+        if (newRecord.status === 'ready-to-clean' && oldRecord?.status !== 'ready-to-clean') {
+          console.log('🚪 Nouvelle chambre disponible:', newRecord.room_number);
+          toast({
+            title: "🚪 Chambre disponible",
+            description: `Chambre ${newRecord.room_number} - Client sorti`,
+            duration: 5000
+          });
+          
+          // Ajouter à la liste des chambres disponibles
+          setAvailableRooms(prev => {
+            if (!prev.find(r => r.id === newRecord.id)) {
+              return [...prev, newRecord];
+            }
+            return prev;
+          });
+        }
+        
         // Mettre à jour le statut de la chambre localement
         setRooms(prev => {
           const exists = prev.find(r => r.id === newRecord.id);
@@ -183,11 +202,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
                 oldType: exists.cleaning_type,
                 newType: newRecord.cleaning_type
               });
-            }
-            
-            // Log status changes (sans notification)
-            if (newRecord.status === 'ready-to-clean' && exists.status !== 'ready-to-clean') {
-              console.log('🔔 Client sorti:', newRecord.room_number);
             }
             
             return prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r);
@@ -356,6 +370,23 @@ export const HousekeeperWorkSimple: React.FC = () => {
           .map(a => a.rooms)
           .filter(Boolean);
         setRooms(roomsList);
+      }
+
+      // Charger les chambres disponibles (ready-to-clean non assignées)
+      const { data: availableRoomsData } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('status', 'ready-to-clean')
+        .order('room_number');
+      
+      if (availableRoomsData) {
+        // Filtrer celles qui ne sont pas déjà assignées
+        const assignedRoomIds = (assignmentsData || []).map(a => a.room_id);
+        const unassignedAvailable = availableRoomsData.filter(
+          room => !assignedRoomIds.includes(room.id)
+        );
+        setAvailableRooms(unassignedAvailable);
       }
 
     } catch (error) {
@@ -592,6 +623,56 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const handleRefresh = async () => {
     console.log('🔄 Rafraîchissement manuel déclenché');
     await loadWorkData();
+  };
+
+  const takeAvailableRoom = async (roomId: string) => {
+    try {
+      // Déterminer l'ID du housekeeper
+      const housekeeperId = isAuthenticatedHousekeeper 
+        ? housekeeperProfile.id 
+        : (housekeeper?.id || housekeeper?.access_code);
+      
+      // Créer une assignation
+      const { error } = await supabase
+        .from('assignments')
+        .insert({
+          hotel_id: hotelId,
+          room_id: roomId,
+          housekeeper_id: housekeeperId,
+          housekeeper_name: housekeeperName,
+          status: 'assigned'
+        });
+      
+      if (error) throw error;
+      
+      // Mettre à jour le statut de la chambre à dirty
+      await supabase
+        .from('rooms')
+        .update({ status: 'dirty' })
+        .eq('id', roomId);
+      
+      // Retirer de la liste des chambres disponibles
+      const room = availableRooms.find(r => r.id === roomId);
+      setAvailableRooms(prev => prev.filter(r => r.id !== roomId));
+      
+      // Ajouter à mes chambres
+      if (room) {
+        setRooms(prev => [...prev, { ...room, status: 'dirty' }]);
+      }
+      
+      toast({
+        title: "✅ Chambre assignée",
+        description: `Chambre ${room?.room_number} ajoutée à votre liste`,
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('Erreur auto-assignation:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de prendre cette chambre",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleOpenLinenInventory = async () => {
@@ -877,6 +958,62 @@ export const HousekeeperWorkSimple: React.FC = () => {
           hotelId={hotelId!} 
           housekeeperId={housekeeper.id}
         />
+      )}
+
+      {/* Available Rooms Section */}
+      {availableRooms.length > 0 && (
+        <Card className="mb-4 sm:mb-6 border-blue-200 bg-blue-50/50">
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Badge variant="default" className="bg-blue-600">
+                {availableRooms.length}
+              </Badge>
+              Chambres prêtes à nettoyer
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3">
+              {availableRooms.map(room => (
+                <div
+                  key={room.id}
+                  className="p-3 sm:p-4 rounded-lg border-2 border-blue-300 bg-white"
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                          🚪 Client sorti
+                        </Badge>
+                        
+                        {/* Badge type de nettoyage */}
+                        {room.cleaning_type && (
+                          <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="text-xs">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
+                          </Badge>
+                        )}
+                      </div>
+                      {room.notes && (
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
+                          📝 {room.notes}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <Button 
+                      onClick={() => takeAvailableRoom(room.id)}
+                      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                      size="sm"
+                    >
+                      Prendre cette chambre
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Room List */}

@@ -1135,15 +1135,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         description: `${assignedCount} chambres redistribuées avec la méthode ${methodName}.`
       });
 
-      // Ajouter une notification seulement si on a un hotel valide
-      if (currentHotelId && isValidUUID(currentHotelId) && addNotification) {
-        addNotification({
-          type: 'assignment',
-          title: 'Redistribution des chambres',
-          description: `${assignedCount} chambres redistribuées (méthode: ${methodName})`,
-          user_type: 'admin'
-        });
-      }
+      // Notifications admin désactivées
 
     } catch (error) {
       console.error('Erreur lors de la redistribution:', error);
@@ -1328,24 +1320,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     const notificationHotelId = hotelCode ? generateHotelId(hotelCode) : 
       (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
     
-    console.log("📨 Tentative création notification redistribution avec ID:", notificationHotelId);
-    
-    if (notificationHotelId && addNotification) {
-      const notificationResult = await addNotification({
-        title: "Redistribution effectuée",
-        description: `Admin - Redistribution ${methodName} de ${redistributedRooms.filter(r => r.assignedTo).length} chambres`,
-        type: 'assignment',
-        user_type: 'admin'
-      });
-      
-      if (notificationResult) {
-        console.log("✅ Notification redistribution créée:", notificationResult.id);
-      } else {
-        console.log("❌ Échec création notification redistribution");
-      }
-    } else {
-      console.log("❌ Pas d'ID hôtel valide pour notification:", { notificationHotelId, hasAddNotification: !!addNotification });
-    }
+    console.log("📨 Notification redistribution désactivée (admin)");
     
     console.log('📊 Statistiques de distribution:', stats);
   };
@@ -1646,24 +1621,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       selectedHotel: selectedHotel?.id
     });
     
-    if (notificationHotelId) {
-      console.log('✅ Création notification assignation pour hotel:', notificationHotelId);
-      addNotification({
-        title: `Assignation chambre ${roomNumber}`,
-        description: `Admin - CH ${roomNumber} assignée à ${housekeeperName}`,
-        type: 'assignment',
-        housekeeper_name: housekeeperName,
-        room_number: roomNumber,
-        user_type: 'admin'
-      });
-    } else {
-      console.warn('❌ Hotel ID invalide pour notification:', currentHotelId);
-      toast({
-        variant: "destructive",
-        title: "Erreur notification",
-        description: "ID hôtel non valide - vérifiez la configuration"
-      });
-    }
+    // Notification d'assignation désactivée (admin)
   };
   
   const handleEmailConfirm = (confirmedEmail: string) => {
@@ -1947,27 +1905,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                     onHousekeeperNamesChange={handleHousekeeperNamesChange}
                     isPremium={isPremium}
                   />
+                  {/* Test notification désactivé */}
                   <Button 
                     onClick={() => {
-                      // Test notification
-                      const currentHotelId = selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId");
-                      if (currentHotelId && isValidUUID(currentHotelId)) {
-                        addNotification({
-                          title: "Test notification",
-                          description: "Ceci est un test de notification système",
-                          type: 'assignment',
-                          user_type: 'admin'
-                        });
-                        toast({ title: "Test envoyé", description: "Notification de test créée" });
-                      } else {
-                        toast({ 
-                          variant: "destructive", 
-                          title: "Erreur", 
-                          description: "Aucun hôtel configuré pour les notifications" 
-                        });
-                      }
+                      toast({ 
+                        title: "Test désactivé", 
+                        description: "Les notifications de test sont désactivées" 
+                      });
                     }}
                     className="w-full mb-2"
+                    disabled
                     variant="outline"
                   >
                     🧪 Tester les notifications
