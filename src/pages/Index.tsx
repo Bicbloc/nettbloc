@@ -175,9 +175,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   // Utiliser le contexte de notifications
   const { addNotification } = useNotificationContext();
 
-  // Gestion temps réel des mises à jour depuis les housekeepers
+  // Phase 3: Gestion temps réel des mises à jour depuis les housekeepers
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
-    console.log(`📡 Temps réel ${table}:`, payload);
+    console.log(`📡 Temps réel [${table}] ${payload.eventType}:`, {
+      roomNumber: payload.new?.room_number,
+      status: payload.new?.status,
+      assignedTo: payload.new?.housekeeper_name,
+      id: payload.new?.id,
+      fullPayload: payload
+    });
+    
     const { eventType, new: newRecord } = payload;
     
     if (table === 'rooms' && (eventType === 'UPDATE' || eventType === 'INSERT')) {
@@ -200,15 +207,22 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       });
 
       toast({
-        title: "🔄 Mise à jour",
-        description: `Chambre ${newRecord.room_number} mise à jour en temps réel`,
+        title: "🔄 Mise à jour temps réel",
+        description: `Chambre ${newRecord.room_number} → ${newRecord.status}`,
         duration: 3000
+      });
+    }
+    
+    if (table === 'assignments' && (eventType === 'INSERT' || eventType === 'UPDATE')) {
+      console.log('✅ Assignment temps réel:', {
+        housekeeper: newRecord.housekeeper_name,
+        roomId: newRecord.room_id
       });
     }
   }, [toast]);
 
-  // Ajouter des listeners temps réel
-  useRealtimeSync({
+  // Phase 5: Ajouter des listeners temps réel avec indicateur de connexion
+  const realtimeSync = useRealtimeSync({
     hotelId: currentHotelId || undefined,
     tables: ['rooms', 'assignments'],
     onUpdate: handleRealtimeUpdate
@@ -596,27 +610,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     const updatedRooms = [...rooms, newRoom];
     setRooms(updatedRooms);
     
-    // Sauvegarder dans la session pour persistance
-    try {
-      const { HotelSessionService } = await import('@/services/hotelSessionService');
-      if (currentHotelId) {
-        HotelSessionService.updateRoomDataLocal(updatedRooms, currentHotelId);
-      }
-      console.log('✅ Chambre ajoutée et sauvegardée:', newRoom.number);
-      
-      // Afficher un toast de confirmation
-      toast({
-        title: "Chambre ajoutée",
-        description: `La chambre ${newRoom.number} a été ajoutée avec succès`,
-      });
-    } catch (error) {
-      console.error('❌ Erreur sauvegarde chambre:', error);
-      toast({
-        title: "Erreur",
-        description: "Erreur lors de l'ajout de la chambre",
-        variant: "destructive",
-      });
-    }
+    console.log('✅ Chambre ajoutée:', newRoom.number);
+    
+    // Afficher un toast de confirmation
+    toast({
+      title: "Chambre ajoutée",
+      description: `La chambre ${newRoom.number} a été ajoutée avec succès`,
+    });
   };
 
   const handleDeleteRoom = async (roomNumber: string) => {
@@ -633,26 +633,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
 
     setRooms(updatedRooms);
     
-    // Sauvegarder dans la session
-    try {
-      const { HotelSessionService } = await import('@/services/hotelSessionService');
-      if (currentHotelId) {
-        HotelSessionService.updateRoomDataLocal(updatedRooms, currentHotelId);
-      }
-      console.log('✅ Chambre supprimée et sauvegardée:', roomNumber);
-      
-      toast({
-        title: "Chambre supprimée",
-        description: `La chambre ${roomNumber} a été supprimée avec succès`,
-      });
-    } catch (error) {
-      console.error('❌ Erreur suppression chambre:', error);
-      toast({
-        title: "Erreur",
-        description: "Erreur lors de la suppression de la chambre",
-        variant: "destructive",
-      });
-    }
+    console.log('✅ Chambre supprimée:', roomNumber);
+    
+    toast({
+      title: "Chambre supprimée",
+      description: `La chambre ${roomNumber} a été supprimée avec succès`,
+    });
   };
 
   const handleLinkRooms = async (roomNumber: string, linkedRoomNumbers: string[]) => {
@@ -686,17 +672,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     });
 
     setRooms(updatedRooms);
-    
-    // Sauvegarder dans la session
-    try {
-      const { HotelSessionService } = await import('@/services/hotelSessionService');
-      if (currentHotelId) {
-        HotelSessionService.updateRoomDataLocal(updatedRooms, currentHotelId);
-      }
-      console.log('✅ Liaisons de chambres sauvegardées:', roomNumber, linkedRoomNumbers);
-    } catch (error) {
-      console.error('❌ Erreur sauvegarde liaisons:', error);
-    }
+    console.log('✅ Liaisons de chambres sauvegardées:', roomNumber, linkedRoomNumbers);
   };
   
   const handlePdfProcessed = async (data: Room[], housekeeperNames?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
@@ -755,7 +731,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         setRooms(updatedRooms);
         setIsDistributed(true);
         
-        // Phase 1: Persister les assignations dans Supabase
+        // Phase 1: Persister les assignations dans Supabase avec validation UUID
         if (currentHotelId && housekeepers.length > 0) {
           for (const room of updatedRooms) {
             if (room.assignedTo) {
@@ -767,13 +743,19 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 .eq('room_number', room.number)
                 .single();
               
-              if (roomData?.id && hk) {
+              // Phase 1: Valider que housekeeper_id n'est pas "null" string
+              const housekeeperId = hk?.user_id && hk.user_id !== 'null' ? hk.user_id : 
+                                    hk?.id && hk.id !== 'null' ? hk.id : null;
+              
+              if (roomData?.id && housekeeperId) {
                 await AssignmentService.assignRoom(
                   currentHotelId,
                   roomData.id,
-                  hk.user_id || hk.id,
+                  housekeeperId,
                   room.assignedTo
                 );
+              } else {
+                console.warn(`⚠️ Assignment ignorée pour ${room.number} - ID invalide:`, { hk, housekeeperId });
               }
             }
           }
@@ -918,7 +900,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     
     setRooms(updatedRooms);
     
-    // Phase 2: Persister les assignations dans Supabase
+    // Phase 2: Persister les assignations dans Supabase avec validation UUID
     if (currentHotelId) {
       for (const room of updatedRooms) {
         if (room.assignedTo) {
@@ -930,13 +912,19 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             .eq('room_number', room.number)
             .single();
           
-          if (roomData?.id && hk) {
+          // Phase 1: Valider que housekeeper_id n'est pas "null" string
+          const housekeeperId = hk?.user_id && hk.user_id !== 'null' ? hk.user_id : 
+                                hk?.id && hk.id !== 'null' ? hk.id : null;
+          
+          if (roomData?.id && housekeeperId) {
             await AssignmentService.assignRoom(
               currentHotelId,
               roomData.id,
-              hk.user_id || hk.id,
+              housekeeperId,
               room.assignedTo
             );
+          } else {
+            console.warn(`⚠️ Assignment ignorée pour ${room.number} - ID invalide:`, { hk, housekeeperId });
           }
         }
       }
@@ -1844,26 +1832,34 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                    </a>
                  </Button>
                </>
-             )}
-            {isAuthenticated && (
-              <>
-                 <Button asChild>
-                   <a href="/housekeeper/login">
-                     <UserIcon className="mr-2 h-4 w-4" />
-                     Espace Personnel Femme de Chambre
-                   </a>
-                   </Button>
-                  <DailyReportCloseButton 
-                    hotelId={currentHotelId || hotel?.id || ''} 
-                    onReportClosed={() => {
-                      console.log('Rapport clôturé, rafraîchissement...');
-                      window.location.reload();
-                    }}
-                  />
-                  <NotificationBell />
-                  <UserMenu />
-               </>
-             )}
+              )}
+             {isAuthenticated && (
+               <>
+                  {/* Phase 5: Indicateur de connexion temps réel */}
+                  <Badge 
+                    variant={realtimeSync.isConnected ? "default" : "destructive"}
+                    className="h-8 gap-2 animate-in fade-in"
+                  >
+                    <div className={`h-2 w-2 rounded-full ${realtimeSync.isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                    {realtimeSync.isConnected ? 'Temps réel actif' : 'Déconnecté'}
+                  </Badge>
+                  <Button asChild>
+                    <a href="/housekeeper/login">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      Espace Personnel Femme de Chambre
+                    </a>
+                    </Button>
+                   <DailyReportCloseButton 
+                     hotelId={currentHotelId || hotel?.id || ''} 
+                     onReportClosed={() => {
+                       console.log('Rapport clôturé, rafraîchissement...');
+                       window.location.reload();
+                     }}
+                   />
+                   <NotificationBell />
+                   <UserMenu />
+                </>
+              )}
           </div>
         </div>
 
