@@ -120,13 +120,6 @@ const Index = () => {
   // Utiliser l'hotel du hook useAutoSetup comme source unique de vérité
   const currentHotelId = hotel?.id || null;
   
-  // Phase 1: Debug - Vérifier la synchronisation de l'hotel ID
-  useEffect(() => {
-    console.log('🔍 DEBUG currentHotelId:', currentHotelId);
-    console.log('🔍 DEBUG localStorage.selectedHotelId:', localStorage.getItem('selectedHotelId'));
-    console.log('🔍 DEBUG hotel:', hotel);
-  }, [currentHotelId, hotel]);
-  
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
@@ -1142,6 +1135,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         description: `${assignedCount} chambres redistribuées avec la méthode ${methodName}.`
       });
 
+      // Ajouter une notification seulement si on a un hotel valide
+      if (currentHotelId && isValidUUID(currentHotelId) && addNotification) {
+        addNotification({
+          type: 'assignment',
+          title: 'Redistribution des chambres',
+          description: `${assignedCount} chambres redistribuées (méthode: ${methodName})`,
+          user_type: 'admin'
+        });
+      }
+
     } catch (error) {
       console.error('Erreur lors de la redistribution:', error);
       toast({
@@ -1320,6 +1323,29 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       title: `Redistribution ${methodName} terminée`,
       description: `${redistributedRooms.filter(r => r.assignedTo).length} chambres redistribuées entre ${housekeeperNames.length} femmes de chambre`,
     });
+    
+    // Notification de redistribution avec ID déterministe
+    const notificationHotelId = hotelCode ? generateHotelId(hotelCode) : 
+      (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
+    
+    console.log("📨 Tentative création notification redistribution avec ID:", notificationHotelId);
+    
+    if (notificationHotelId && addNotification) {
+      const notificationResult = await addNotification({
+        title: "Redistribution effectuée",
+        description: `Admin - Redistribution ${methodName} de ${redistributedRooms.filter(r => r.assignedTo).length} chambres`,
+        type: 'assignment',
+        user_type: 'admin'
+      });
+      
+      if (notificationResult) {
+        console.log("✅ Notification redistribution créée:", notificationResult.id);
+      } else {
+        console.log("❌ Échec création notification redistribution");
+      }
+    } else {
+      console.log("❌ Pas d'ID hôtel valide pour notification:", { notificationHotelId, hasAddNotification: !!addNotification });
+    }
     
     console.log('📊 Statistiques de distribution:', stats);
   };
@@ -1608,6 +1634,36 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       title: "Chambre assignée",
       description: `Chambre ${roomNumber} assignée à ${housekeeperName}.`
     });
+
+    // Test de création de notification avec l'hotel ID déterministe
+    const notificationHotelId = hotelCode ? generateHotelId(hotelCode) : 
+      (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
+    
+    console.log('🧪 Test notification - Hotel ID:', {
+      hotelCode,
+      notificationHotelId,
+      generatedId: hotelCode ? generateHotelId(hotelCode) : null,
+      selectedHotel: selectedHotel?.id
+    });
+    
+    if (notificationHotelId) {
+      console.log('✅ Création notification assignation pour hotel:', notificationHotelId);
+      addNotification({
+        title: `Assignation chambre ${roomNumber}`,
+        description: `Admin - CH ${roomNumber} assignée à ${housekeeperName}`,
+        type: 'assignment',
+        housekeeper_name: housekeeperName,
+        room_number: roomNumber,
+        user_type: 'admin'
+      });
+    } else {
+      console.warn('❌ Hotel ID invalide pour notification:', currentHotelId);
+      toast({
+        variant: "destructive",
+        title: "Erreur notification",
+        description: "ID hôtel non valide - vérifiez la configuration"
+      });
+    }
   };
   
   const handleEmailConfirm = (confirmedEmail: string) => {

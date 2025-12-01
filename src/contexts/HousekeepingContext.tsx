@@ -425,7 +425,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       console.error('Erreur mise à jour statut chambre:', error);
     }
 
-    // Phase 4: Notifications uniquement pour chambre terminée (clean) ou problème signalé (needs-attention)
+    // Ajouter notification pour l'admin - FORMAT AMÉLIORÉ (avec sécurité)
     if (housekeeperName && hotelId && addNotificationFn) {
       console.log('🔔 Création notification avec hotelId:', hotelId);
       
@@ -440,6 +440,15 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           roomNumber,
           user_type: 'admin' as const,
         };
+      } else if (newStatus === 'in-progress') {
+        notification = {
+          title: `Femme de chambre (${housekeeperName}) - CH ${roomNumber} - En cours`,
+          description: `${housekeeperName} a commencé le nettoyage de la chambre ${roomNumber}`,
+          type: 'cleaning-start' as const,
+          housekeeperName,
+          roomNumber,
+          user_type: 'admin' as const,
+        };
       } else if (newStatus === 'needs-attention') {
         notification = {
           title: `Remarque de la femme de chambre (${housekeeperName}) - CH ${roomNumber} - Problème signalé`,
@@ -449,15 +458,23 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           roomNumber,
           user_type: 'admin' as const,
         };
+      } else {
+        notification = {
+          title: `Femme de chambre (${housekeeperName}) - CH ${roomNumber}`,
+          description: `${housekeeperName} a mis à jour le statut de la chambre ${roomNumber}`,
+          type: 'room-status' as const,
+          housekeeperName,
+          roomNumber,
+          user_type: 'admin' as const,
+        };
       }
 
-      // Envoyer uniquement si une notification a été créée
-      if (notification) {
-        console.log('📝 Envoi notification:', notification);
+      console.log('📝 Envoi notification:', notification);
+      if (addNotificationFn) {
         await addNotificationFn(notification);
       }
-    } else if ((newStatus === 'clean' || newStatus === 'needs-attention') && housekeeperName) {
-      console.warn('⚠️ Notification non créée - manque hotelId:', { housekeeperName, hotelId });
+    } else {
+      console.warn('⚠️ Notification non créée - manque housekeeperName ou hotelId:', { housekeeperName, hotelId });
     }
   };
 

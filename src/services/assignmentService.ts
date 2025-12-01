@@ -74,6 +74,24 @@ export class AssignmentService {
 
       console.log('✅ Assignation créée:', data.id);
 
+      // Récupérer le numéro de chambre pour la notification
+      const { data: roomData } = await supabase
+        .from('rooms')
+        .select('room_number')
+        .eq('id', roomId)
+        .single();
+
+      // Créer une notification pour la femme de chambre
+      await supabase.from('notifications').insert({
+        hotel_id: hotelId,
+        title: '🆕 Nouvelle chambre assignée',
+        description: `La chambre ${roomData?.room_number || 'N/A'} vous a été assignée`,
+        type: 'room_assigned',
+        housekeeper_name: housekeeperName,
+        room_number: roomData?.room_number,
+        user_type: 'housekeeper'
+      });
+
       return { success: true, assignmentId: data.id };
     } catch (error: any) {
       console.error('❌ Erreur assignation:', error);

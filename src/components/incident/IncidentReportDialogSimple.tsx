@@ -207,26 +207,12 @@ export function IncidentReportDialogSimple({
 
       return incident;
     },
-    onSuccess: async (incident) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       toast({
         title: "✅ Incident signalé",
         description: "L'incident a été enregistré avec succès",
       });
-      
-      // Phase 5: Créer une notification pour l'admin
-      if (userType === 'housekeeper') {
-        const { data: user } = await supabase.auth.getUser();
-        await supabase.from('notifications').insert({
-          hotel_id: hotelId,
-          title: '🚨 Incident signalé',
-          description: `Incident "${incident.title}" signalé en chambre ${incident.location_reference}`,
-          type: 'incident',
-          room_number: incident.location_reference,
-          user_type: 'admin'
-        });
-      }
-      
       form.reset();
       setSelectedImages([]);
       setIsOpen(false);
