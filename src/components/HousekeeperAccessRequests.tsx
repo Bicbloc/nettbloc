@@ -7,15 +7,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Bell, Check, X, Clock, Ban } from 'lucide-react';
+import { Bell, Check, X, Clock, Ban, Trash2 } from 'lucide-react';
+import { SuspensionDialog } from '@/components/SuspensionDialog';
 
 interface AccessRequest {
   id: string;
   housekeeper_profile_id: string;
   hotel_id: string;
   hotel_code: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'suspended' | 'deactivated';
   requested_at: string;
+  suspension_reason?: string | null;
   housekeeper_profiles: {
     name: string;
     email: string;
@@ -29,6 +31,8 @@ interface AccessRequest {
 export const HousekeeperAccessRequests = () => {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState<AccessRequest | null>(null);
+  const [suspensionDialogOpen, setSuspensionDialogOpen] = useState(false);
   const { user } = useAuth();
 
   // Écouter les nouvelles demandes en temps réel
@@ -85,6 +89,7 @@ export const HousekeeperAccessRequests = () => {
           hotel_code,
           status,
           requested_at,
+          suspension_reason,
           housekeeper_profiles!inner(
             name,
             email,
@@ -154,7 +159,8 @@ export const HousekeeperAccessRequests = () => {
         .update({ 
           status: 'rejected',
           reviewed_at: new Date().toISOString(),
-          reviewed_by: user?.id 
+          reviewed_by: user?.id,
+          suspension_reason: null
         })
         .eq('id', requestId);
 
@@ -165,6 +171,77 @@ export const HousekeeperAccessRequests = () => {
     } catch (error) {
       console.error('Error rejecting request:', error);
       toast.error('Erreur lors du rejet');
+    }
+  };
+
+  const handleOpenSuspend = (request: AccessRequest) => {
+    setSelectedRequest(request);
+    setSuspensionDialogOpen(true);
+  };
+
+  const handleConfirmSuspend = async (reason: string) => {
+    if (!selectedRequest) return;
+
+    try {
+      const nextStatus: AccessRequest['status'] = selectedRequest.status === 'suspended' ? 'approved' : 'suspended';
+      const { error } = await supabase
+        .from('housekeeper_access_requests')
+        .update({
+          status: nextStatus,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+          suspension_reason: nextStatus === 'suspended' ? reason : null
+        })
+        .eq('id', selectedRequest.id);
+
+      if (error) throw error;
+
+      toast.success(nextStatus === 'suspended' ? 'Accès suspendu' : 'Accès réactivé');
+      setSuspensionDialogOpen(false);
+      setSelectedRequest(null);
+      loadRequests();
+    } catch (error) {
+      console.error('Error updating suspension:', error);
+      toast.error('Erreur lors de la mise à jour du statut');
+    }
+  };
+
+  const handleDeactivateRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('housekeeper_access_requests')
+        .update({
+          status: 'deactivated',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id,
+          suspension_reason: null
+        })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast.success('Accès désactivé');
+      loadRequests();
+    } catch (error) {
+      console.error('Error deactivating request:', error);
+      toast.error('Erreur lors de la désactivation');
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('housekeeper_access_requests')
+        .delete()
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast.success('Demande supprimée');
+      setRequests(prev => prev.filter(r => r.id !== requestId));
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast.error('Erreur lors de la suppression');
     }
   };
 
@@ -180,6 +257,10 @@ export const HousekeeperAccessRequests = () => {
         return <Check className="h-4 w-4" />;
       case 'rejected':
         return <X className="h-4 w-4" />;
+      case 'suspended':
+        return <Ban className="h-4 w-4" />;
+      case 'deactivated':
+        return <Ban className="h-4 w-4" />;
       default:
         return <Bell className="h-4 w-4" />;
     }
@@ -193,6 +274,10 @@ export const HousekeeperAccessRequests = () => {
         return 'default';
       case 'rejected':
         return 'destructive';
+      case 'suspended':
+        return 'secondary';
+      case 'deactivated':
+        return 'outline';
       default:
         return 'secondary';
     }
@@ -255,8 +340,11 @@ export const HousekeeperAccessRequests = () => {
                     <h3 className="font-medium text-lg">{request.housekeeper_profiles.name}</h3>
                     <Badge variant={getStatusVariant(request.status)} className="gap-1">
                       {getStatusIcon(request.status)}
-                      {request.status === 'pending' ? '🔔 En attente' : 
-                       request.status === 'approved' ? '✅ Validée' : '❌ Suspendue'}
+                      {request.status === 'pending' && '🔔 En attente'}
+                      {request.status === 'approved' && '✅ Validée'}
+                      {request.status === 'rejected' && '❌ Rejetée'}
+                      {request.status === 'suspended' && '⏸️ Suspendue'}
+                      {request.status === 'deactivated' && '🚫 Désactivée'}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -268,6 +356,11 @@ export const HousekeeperAccessRequests = () => {
                   <p className="text-xs text-muted-foreground">
                     Demandé le {new Date(request.requested_at).toLocaleDateString()}
                   </p>
+                  {request.suspension_reason && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Motif: {request.suspension_reason}
+                    </p>
+                  )}
                 </div>
 
                 {request.status === 'pending' && (
@@ -279,7 +372,7 @@ export const HousekeeperAccessRequests = () => {
                       className="gap-1"
                     >
                       <Ban className="h-4 w-4" />
-                      Suspendre
+                      Refuser
                     </Button>
                     <Button
                       size="sm"
@@ -291,10 +384,98 @@ export const HousekeeperAccessRequests = () => {
                     </Button>
                   </div>
                 )}
+
+                {request.status === 'approved' && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenSuspend(request)}
+                      className="gap-1"
+                    >
+                      <Ban className="h-4 w-4" />
+                      Suspendre
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleDeactivateRequest(request.id)}
+                      className="gap-1"
+                    >
+                      <Ban className="h-4 w-4" />
+                      Désactiver
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteRequest(request.id)}
+                      className="gap-1 text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Supprimer
+                    </Button>
+                  </div>
+                )}
+
+                {request.status === 'suspended' && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenSuspend(request)}
+                      className="gap-1"
+                    >
+                      <Check className="h-4 w-4" />
+                      Réactiver
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteRequest(request.id)}
+                      className="gap-1 text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Supprimer
+                    </Button>
+                  </div>
+                )}
+
+                {request.status === 'deactivated' && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeactivateRequest(request.id)}
+                      className="gap-1"
+                    >
+                      <Check className="h-4 w-4" />
+                      Réactiver
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteRequest(request.id)}
+                      className="gap-1 text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Supprimer
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
+        <SuspensionDialog
+          open={suspensionDialogOpen}
+          onClose={() => {
+            setSuspensionDialogOpen(false);
+            setSelectedRequest(null);
+          }}
+          onConfirm={handleConfirmSuspend}
+          userEmail={selectedRequest?.housekeeper_profiles.email ?? ''}
+          isSuspended={selectedRequest?.status === 'suspended'}
+        />
       </div>
     </Card>
   );
