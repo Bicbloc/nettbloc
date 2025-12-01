@@ -828,41 +828,16 @@ export const HousekeeperWorkSimple: React.FC = () => {
             <Button
               variant="default"
               size="sm"
-              onClick={() => navigate(`/housekeeper/mobile?hotel=${hotelId}&name=${housekeeperName}`)}
-              className="flex-1 sm:flex-initial"
-              title="Vue mobile optimisée"
-            >
-              <Smartphone className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Vue Mobile</span>
-            </Button>
-            {isAuthenticatedHousekeeper && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/housekeeper/hotels')}
-                className="flex-1 sm:flex-initial"
-              >
-                <Building2 className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Mes Hôtels</span>
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/housekeeper/profile')}
+              onClick={handleLogout}
               className="flex-1 sm:flex-initial"
             >
-              <User className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Profil</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleLogout} className="flex-1 sm:flex-initial">
               <LogOut className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Déconnexion</span>
             </Button>
           </div>
         </div>
 
-        {/* Barre de progression du niveau */}
+         {/* Barre de progression du niveau */}
         {levelData && (
           <div className="mb-4">
             <div className="flex items-center justify-between gap-3 mb-2">
@@ -905,6 +880,39 @@ export const HousekeeperWorkSimple: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* Statistics Section */}
+        <Card className="mb-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              📊 Mes statistiques
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-background/60 rounded-lg p-3">
+                <div className="text-2xl font-bold text-primary">{assignments.length}</div>
+                <div className="text-xs text-muted-foreground">Assignées</div>
+              </div>
+              <div className="bg-background/60 rounded-lg p-3">
+                <div className="text-2xl font-bold text-orange-500">
+                  {assignments.filter(a => a.status === 'in_progress').length}
+                </div>
+                <div className="text-xs text-muted-foreground">En cours</div>
+              </div>
+              <div className="bg-background/60 rounded-lg p-3">
+                <div className="text-2xl font-bold text-green-500">
+                  {assignments.filter(a => a.status === 'completed').length}
+                </div>
+                <div className="text-xs text-muted-foreground">Terminées</div>
+              </div>
+              <div className="bg-background/60 rounded-lg p-3">
+                <div className="text-2xl font-bold text-blue-500">{availableRooms.length}</div>
+                <div className="text-xs text-muted-foreground">Client sorti</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
          {/* Session Info */}
          <Card className="p-3 sm:p-4 bg-blue-50 border-blue-200">

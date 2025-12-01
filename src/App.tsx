@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -61,7 +61,7 @@ const App = () => (
                     <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
                     <Route path="/housekeeper/hotels" element={<HousekeeperHotels />} />
                     <Route path="/housekeeper/work" element={<HousekeeperWorkSimple />} />
-                    <Route path="/housekeeper/mobile" element={<HousekeeperMobile />} />
+                    <Route path="/housekeeper/mobile" element={<Navigate to="/housekeeper/work" replace />} />
                     <Route path="/housekeeper/profile" element={<HousekeeperProfile />} />
                     <Route path="/technician/signup" element={<TechnicianSignup />} />
                     <Route path="/technician/login" element={<TechnicianLogin />} />
