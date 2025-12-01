@@ -16,12 +16,12 @@ const NotificationContext = createContext<NotificationContextValue | undefined>(
 
 interface NotificationProviderProps {
   children: ReactNode;
-  hotelId?: string;
 }
 
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children, hotelId }) => {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   // UN SEUL appel au hook useNotifications - toute l'app utilisera cette instance
-  const notificationState = useNotifications(hotelId);
+  // Le hook récupère automatiquement le hotelId depuis localStorage/sessionStorage
+  const notificationState = useNotifications();
 
   return (
     <NotificationContext.Provider value={notificationState}>
