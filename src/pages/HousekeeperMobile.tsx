@@ -162,6 +162,7 @@ export default function HousekeeperMobile() {
   const markRoomComplete = async (assignment: Assignment) => {
     try {
       const roomComment = comment[assignment.id] || '';
+      const hasComment = roomComment.trim().length > 0;
       
       // Update assignment status
       const { error: assignmentError } = await supabase
@@ -177,7 +178,7 @@ export default function HousekeeperMobile() {
 
       // Update room status
       const updateData: any = { status: 'clean' };
-      if (roomComment) {
+      if (hasComment) {
         updateData.notes = roomComment;
       }
       
@@ -196,11 +197,21 @@ export default function HousekeeperMobile() {
         return newComments;
       });
 
+      // Notification pour chambre terminée
       toast({
         title: "✅ Chambre terminée",
         description: `Chambre ${assignment.room?.room_number} marquée comme propre`,
         duration: 3000
       });
+      
+      // Notification séparée pour commentaire si présent
+      if (hasComment) {
+        toast({
+          title: "💬 Commentaire ajouté",
+          description: `Commentaire enregistré pour la chambre ${assignment.room?.room_number}`,
+          duration: 3000
+        });
+      }
 
     } catch (error: any) {
       console.error('Error marking complete:', error);
@@ -225,10 +236,8 @@ export default function HousekeeperMobile() {
       // Remove from list
       setAssignments(prev => prev.filter(a => a.id !== assignment.id));
 
-      toast({
-        title: "Chambre désassignée",
-        description: `Chambre ${assignment.room?.room_number} retirée de votre liste`
-      });
+      // Pas de notification pour désassignation
+      console.log(`Chambre ${assignment.room?.room_number} désassignée`);
 
     } catch (error: any) {
       console.error('Error unassigning:', error);
@@ -258,11 +267,8 @@ export default function HousekeeperMobile() {
           : a
       ));
 
-      toast({
-        title: "🧹 Nettoyage commencé",
-        description: `Chambre ${assignment.room?.room_number}`,
-        duration: 2000
-      });
+      // Pas de notification au démarrage
+      console.log(`Nettoyage commencé pour chambre ${assignment.room?.room_number}`);
 
     } catch (error: any) {
       console.error('Error starting:', error);

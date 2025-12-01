@@ -152,16 +152,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
                 // Ajouter l'assignation
                 setAssignments(prev => [...prev, { ...newRecord, rooms: roomData }]);
                 
-                // Notification visuelle et sonore
-                toast({
-                  title: "🆕 Nouvelle chambre assignée !",
-                  description: `Chambre ${roomData.room_number} ajoutée à votre liste`,
-                  duration: 5000,
-                });
-                
-                playInfo();
-                
-                // Incrémenter le compteur de nouvelles chambres
+                // Incrémenter le compteur de nouvelles chambres (sans notification)
                 setNewRoomsCount(prev => prev + 1);
                 setTimeout(() => setNewRoomsCount(0), 5000);
               }
@@ -185,29 +176,18 @@ export const HousekeeperWorkSimple: React.FC = () => {
         setRooms(prev => {
           const exists = prev.find(r => r.id === newRecord.id);
           if (exists) {
-            // Log cleaning_type changes
+            // Log cleaning_type changes (sans notification)
             if (newRecord.cleaning_type && newRecord.cleaning_type !== exists.cleaning_type) {
               console.log('🔄 Type de nettoyage mis à jour:', {
                 room: newRecord.room_number,
                 oldType: exists.cleaning_type,
                 newType: newRecord.cleaning_type
               });
-              toast({
-                title: "Mode de nettoyage mis à jour",
-                description: `Chambre ${newRecord.room_number}: ${newRecord.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}`,
-                duration: 3000
-              });
             }
             
-            // Log status changes
+            // Log status changes (sans notification)
             if (newRecord.status === 'ready-to-clean' && exists.status !== 'ready-to-clean') {
               console.log('🔔 Client sorti:', newRecord.room_number);
-              toast({
-                title: "Client sorti",
-                description: `Chambre ${newRecord.room_number} prête à nettoyer`,
-                duration: 5000
-              });
-              playInfo();
             }
             
             return prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r);
@@ -391,14 +371,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
-  const handleRefresh = async () => {
-    console.log('🔄 Rafraîchissement manuel déclenché');
-    await loadWorkData();
-    toast({
-      title: "✅ Données actualisées",
-      description: "La liste des chambres a été mise à jour"
-    });
-  };
 
   const loadAllPendingRooms = async () => {
     // Fallback: charger toutes les chambres à nettoyer
@@ -440,6 +412,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
     const startTime = Date.now();
     
     try {
+      const room = rooms.find(r => r.id === roomId);
+      
       // Mettre à jour le statut de la chambre
       const updateData: any = { 
         status: newStatus,
@@ -447,7 +421,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
       };
       
       // Ajouter les notes si disponibles
-      if (roomNotes[roomId]) {
+      const hasComment = roomNotes[roomId] && roomNotes[roomId].trim().length > 0;
+      if (hasComment) {
         updateData.notes = roomNotes[roomId];
       }
       
@@ -463,6 +438,24 @@ export const HousekeeperWorkSimple: React.FC = () => {
           variant: "destructive"
         });
         return;
+      }
+      
+      // Notification uniquement pour chambre terminée
+      if (newStatus === 'clean') {
+        toast({
+          title: "✅ Chambre terminée",
+          description: `Chambre ${room?.room_number} marquée comme propre`,
+          duration: 3000
+        });
+      }
+      
+      // Notification séparée si un commentaire a été ajouté
+      if (hasComment) {
+        toast({
+          title: "💬 Commentaire ajouté",
+          description: `Commentaire enregistré pour la chambre ${room?.room_number}`,
+          duration: 3000
+        });
       }
 
       // Calculer la durée si la chambre est terminée
@@ -596,6 +589,11 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    console.log('🔄 Rafraîchissement manuel déclenché');
+    await loadWorkData();
+  };
+
   const handleOpenLinenInventory = async () => {
     if (!hotelId) return;
     
@@ -664,10 +662,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
       setRooms(prev => prev.filter(r => r.id !== roomId));
       setAssignments(prev => prev.filter(a => a.id !== assignment.id));
 
-      toast({
-        title: "Chambre désassignée",
-        description: `Chambre ${roomNumber} retirée de votre liste`
-      });
+      // Pas de notification pour désassignation
+      console.log(`Chambre ${roomNumber} désassignée`);
 
     } catch (error) {
       console.error('Erreur désassignation:', error);
