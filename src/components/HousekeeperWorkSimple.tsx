@@ -5,20 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle, Wifi, WifiOff, Smartphone, X, Sparkles } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X } from 'lucide-react';
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
-import { GamificationService } from '@/services/gamificationService';
-import { BadgeUnlockNotification } from './gamification/BadgeUnlockNotification';
-import { LevelUpNotification } from './gamification/LevelUpNotification';
-import { LevelProgressBar } from './gamification/LevelProgressBar';
 import { IncidentReportDialogSimple } from './incident/IncidentReportDialogSimple';
-import { Textarea } from './ui/textarea';
-import { AlertTriangle, MessageSquare, Package } from 'lucide-react';
-import { LinenInventorySection } from './linen/LinenInventorySection';
+import { Package } from 'lucide-react';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
-import { useNotificationSound } from '@/hooks/use-notification-sound';
 
 interface Room {
   id: string;
@@ -27,6 +20,13 @@ interface Room {
   notes?: string;
   cleaning_priority: number;
   cleaning_type?: string;
+}
+
+interface ActivityLogEntry {
+  id: string;
+  time: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
 }
 
 export const HousekeeperWorkSimple: React.FC = () => {
@@ -39,9 +39,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [levelData, setLevelData] = useState<any>(null);
-  const [newBadges, setNewBadges] = useState<any[]>([]);
-  const [levelUpData, setLevelUpData] = useState<number | null>(null);
   const [roomNotes, setRoomNotes] = useState<Record<string, string>>({});
   const [showGeneralIncidentDialog, setShowGeneralIncidentDialog] = useState(false);
   const [showLinenInventory, setShowLinenInventory] = useState(false);
@@ -49,13 +46,21 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
-  const [swipingCard, setSwipingCard] = useState<string | null>(null);
-  const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
-  const touchStartX = useRef<number>(0);
-  const touchCurrentX = useRef<number>(0);
   const [activeTab, setActiveTab] = useState<'rooms' | 'inventory'>('rooms');
   
-  const { playInfo } = useNotificationSound();
+  // Journal d'activité local
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const [showActivityLog, setShowActivityLog] = useState(false);
+
+  // Fonction pour ajouter au journal d'activité
+  const addToActivityLog = useCallback((message: string, type: ActivityLogEntry['type'] = 'info') => {
+    setActivityLog(prev => [{
+      id: Date.now().toString(),
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      message,
+      type
+    }, ...prev].slice(0, 50)); // Garder max 50 entrées
+  }, []);
 
   // Essayer d'abord les query params, puis le localStorage
   const accessCodeFromUrl = searchParams.get('access_code');
@@ -152,12 +157,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
           // Recharger TOUTES les données pour être sûr de la synchronisation
           loadWorkData();
           
-          // Notification visuelle
-          toast({
-            title: "🆕 Nouvelle chambre",
-            description: `Une nouvelle chambre vous a été assignée`,
-            duration: 4000
-          });
+          // Ajouter au journal d'activité
+          addToActivityLog('🆕 Nouvelle chambre assignée', 'info');
           
           // Incrémenter le compteur
           setNewRoomsCount(prev => prev + 1);
@@ -180,11 +181,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         // Vérifier si une chambre devient ready-to-clean
         if (newRecord.status === 'ready-to-clean' && oldRecord?.status !== 'ready-to-clean') {
           console.log('🚪 Nouvelle chambre disponible:', newRecord.room_number);
-          toast({
-            title: "🚪 Chambre disponible",
-            description: `Chambre ${newRecord.room_number} - Client sorti`,
-            duration: 5000
-          });
+          addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
           
           // Ajouter à la liste des chambres disponibles
           setAvailableRooms(prev => {
@@ -218,7 +215,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         setRooms(prev => prev.filter(r => r.id !== oldRecord.id));
       }
     }
-  }, [hotelId, housekeeperName, isAuthenticatedHousekeeper, housekeeperProfile, housekeeper, toast, playInfo]);
+  }, [hotelId, housekeeperName, isAuthenticatedHousekeeper, housekeeperProfile, housekeeper, addToActivityLog]);
 
   // Synchronisation en temps réel des assignations et chambres
   const { isConnected } = useRealtimeSync({
@@ -290,13 +287,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
       setHotel(authResult.hotel);
       setHousekeeper(authResult.user);
 
-      // Charger les données de niveau
-      const level = await GamificationService.getHousekeeperLevel(
-        authResult.user?.id || authResult.user?.access_code,
-        hotelId!
-      );
-      setLevelData(level);
-
       // Charger les assignations de cette femme de chambre
       // Utiliser l'ID du profil pour les femmes de chambre authentifiées
       const housekeeperId = isAuthenticatedHousekeeper 
@@ -356,7 +346,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
             room_number,
             status,
             notes,
-            cleaning_priority
+            cleaning_priority,
+            cleaning_type
           )
         `)
         .eq('hotel_id', hotelId)
@@ -552,45 +543,13 @@ export const HousekeeperWorkSimple: React.FC = () => {
         }
       }
 
-      // Si la chambre est terminée, ajouter de l'XP
-      if (newStatus === 'clean' && housekeeper && hotelId) {
-        const gamificationResult = await GamificationService.addXpForRoomCleaned(
-          housekeeper.id || housekeeper.access_code,
-          hotelId,
-          duration
-        );
-
-        if (gamificationResult) {
-          // Recharger les données de niveau
-          const updatedLevel = await GamificationService.getHousekeeperLevel(
-            housekeeper.id || housekeeper.access_code,
-            hotelId
-          );
-          setLevelData(updatedLevel);
-
-          // Afficher les notifications de nouveaux badges
-          if (gamificationResult.new_badges && gamificationResult.new_badges.length > 0) {
-            for (const badgeCode of gamificationResult.new_badges) {
-              const badgeData = await GamificationService.getBadgeByCode(badgeCode);
-              if (badgeData) {
-                setNewBadges(prev => [...prev, badgeData]);
-              }
-            }
-          }
-
-          // Afficher la notification de level up
-          if (gamificationResult.level_up) {
-            setLevelUpData(gamificationResult.current_level);
-          }
-
-          // Toast avec XP gagné
-          toast({
-            title: "🎉 Chambre terminée !",
-            description: `+${duration <= 20 ? 80 : duration <= 30 ? 65 : 50} XP${
-              duration <= 20 ? ' (Bonus vitesse !)' : ''
-            }`,
-          });
-        }
+      // Si la chambre est terminée, ajouter au journal
+      if (newStatus === 'clean') {
+        const roomNumber = rooms.find(r => r.id === roomId)?.room_number || roomId;
+        addToActivityLog(`✅ Chambre ${roomNumber} terminée`, 'success');
+      } else if (newStatus === 'in_progress') {
+        const roomNumber = rooms.find(r => r.id === roomId)?.room_number || roomId;
+        addToActivityLog(`🔄 Chambre ${roomNumber} en cours`, 'info');
       }
 
       // Mettre à jour l'état local
@@ -618,11 +577,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         });
 
       if (newStatus !== 'clean') {
-        const statusText = newStatus === 'in_progress' ? 'en cours' : 'à nettoyer';
-        toast({
-          title: "Statut mis à jour",
-          description: `Chambre ${rooms.find(r => r.id === roomId)?.room_number} : ${statusText}`
-        });
+        // Log entry already added above
       }
 
     } catch (error) {
@@ -765,41 +720,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
-  // Swipe gesture handlers
-  const handleTouchStart = (e: React.TouchEvent, roomId: string) => {
-    touchStartX.current = e.touches[0].clientX;
-    setSwipingCard(roomId);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent, roomId: string) => {
-    if (swipingCard !== roomId) return;
-    
-    touchCurrentX.current = e.touches[0].clientX;
-    const diff = touchCurrentX.current - touchStartX.current;
-    
-    // Only allow swipe to the right (positive values)
-    if (diff > 0) {
-      setSwipeOffset(prev => ({ ...prev, [roomId]: diff }));
-    }
-  };
-
-  const handleTouchEnd = async (roomId: string) => {
-    const offset = swipeOffset[roomId] || 0;
-    
-    // If swiped more than 100px, mark as complete
-    if (offset > 100) {
-      await updateRoomStatus(roomId, 'clean');
-    }
-    
-    // Reset swipe
-    setSwipingCard(null);
-    setSwipeOffset(prev => {
-      const newOffsets = { ...prev };
-      delete newOffsets[roomId];
-      return newOffsets;
-    });
-  };
-
   const unassignRoom = async (roomId: string, roomNumber: string) => {
     try {
       // Find assignment for this room
@@ -846,20 +766,47 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 lg:p-6">
-      {/* Notifications de badges et level up */}
-      {newBadges.map((badge, index) => (
-        <BadgeUnlockNotification
-          key={badge.code + index}
-          badge={badge}
-          onClose={() => setNewBadges(prev => prev.filter((_, i) => i !== index))}
-        />
-      ))}
-      
-      {levelUpData && (
-        <LevelUpNotification
-          newLevel={levelUpData}
-          onClose={() => setLevelUpData(null)}
-        />
+      {/* Journal d'activité (panneau latéral) */}
+      {showActivityLog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
+          <div className="bg-background w-80 max-w-full h-full shadow-xl flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2">
+                <ScrollText className="h-5 w-5" />
+                Journal d'activité
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowActivityLog(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3">
+              {activityLog.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Aucune activité récente
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {activityLog.map(entry => (
+                    <div 
+                      key={entry.id}
+                      className={`p-2 rounded-lg text-sm ${
+                        entry.type === 'success' ? 'bg-green-50 border-green-200 border' :
+                        entry.type === 'warning' ? 'bg-orange-50 border-orange-200 border' :
+                        entry.type === 'error' ? 'bg-red-50 border-red-200 border' :
+                        'bg-blue-50 border-blue-200 border'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <span>{entry.message}</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{entry.time}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Header */}
@@ -890,6 +837,21 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Bouton journal d'activité */}
+            <Button
+              onClick={() => setShowActivityLog(true)}
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-primary relative"
+              title="Journal d'activité"
+            >
+              <ScrollText className="h-4 w-4" />
+              {activityLog.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  {activityLog.length > 9 ? '9+' : activityLog.length}
+                </span>
+              )}
+            </Button>
             <Button
               onClick={handleRefresh}
               variant="ghost"
@@ -912,49 +874,36 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </div>
         </div>
 
-         {/* Barre de progression du niveau */}
-        {levelData && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <div className="flex-1">
-                <LevelProgressBar
-                  currentLevel={levelData.current_level}
-                  totalXp={levelData.total_xp}
-                  currentStreak={levelData.current_streak}
-                />
-              </div>
-              {/* Indicateur de connexion temps réel */}
-              <Badge 
-                variant={isConnected ? "default" : "destructive"} 
-                className="flex items-center gap-1.5 shrink-0"
-              >
-                {isConnected ? (
-                  <>
-                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                    <Wifi className="h-3 w-3" />
-                    <span className="hidden sm:inline">En direct</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 rounded-full bg-red-400" />
-                    <WifiOff className="h-3 w-3" />
-                    <span className="hidden sm:inline">Déconnecté</span>
-                  </>
-                )}
-              </Badge>
-            </div>
-            
-            {/* Badge de nouvelles chambres */}
-            {newRoomsCount > 0 && (
-              <Badge 
-                variant="secondary" 
-                className="bg-blue-500 text-white animate-bounce inline-flex items-center gap-1"
-              >
-                +{newRoomsCount} nouvelle{newRoomsCount > 1 ? 's' : ''}
-              </Badge>
+        {/* Indicateur de connexion et nouvelles chambres */}
+        <div className="flex items-center gap-3 mb-4">
+          <Badge 
+            variant={isConnected ? "default" : "destructive"} 
+            className="flex items-center gap-1.5"
+          >
+            {isConnected ? (
+              <>
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <Wifi className="h-3 w-3" />
+                <span className="hidden sm:inline">En direct</span>
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <WifiOff className="h-3 w-3" />
+                <span className="hidden sm:inline">Déconnecté</span>
+              </>
             )}
-          </div>
-        )}
+          </Badge>
+          
+          {newRoomsCount > 0 && (
+            <Badge 
+              variant="secondary" 
+              className="bg-blue-500 text-white animate-bounce inline-flex items-center gap-1"
+            >
+              +{newRoomsCount} nouvelle{newRoomsCount > 1 ? 's' : ''}
+            </Badge>
+          )}
+        </div>
 
         {/* Statistics Section */}
         <Card className="mb-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
