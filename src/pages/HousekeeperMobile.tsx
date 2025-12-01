@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -13,7 +14,9 @@ import {
   ChevronRight,
   Home,
   AlertCircle,
-  Loader2
+  Loader2,
+  X,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +26,7 @@ interface Room {
   status: string;
   floor: number;
   cleaning_priority: number;
+  cleaning_type?: string;
   notes?: string;
 }
 
@@ -33,6 +37,7 @@ interface Assignment {
   status: string;
   assigned_at: string;
   started_at?: string;
+  notes?: string;
   room?: Room;
 }
 
@@ -47,6 +52,7 @@ export default function HousekeeperMobile() {
   const [housekeeperName, setHousekeeperName] = useState('');
   const [swipingCard, setSwipingCard] = useState<string | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
+  const [comment, setComment] = useState<Record<string, string>>({});
   
   const touchStartX = useRef<number>(0);
   const touchCurrentX = useRef<number>(0);
@@ -155,27 +161,40 @@ export default function HousekeeperMobile() {
 
   const markRoomComplete = async (assignment: Assignment) => {
     try {
+      const roomComment = comment[assignment.id] || '';
+      
       // Update assignment status
       const { error: assignmentError } = await supabase
         .from('assignments')
         .update({
           status: 'completed',
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
+          notes: roomComment || assignment.notes
         })
         .eq('id', assignment.id);
 
       if (assignmentError) throw assignmentError;
 
       // Update room status
+      const updateData: any = { status: 'clean' };
+      if (roomComment) {
+        updateData.notes = roomComment;
+      }
+      
       const { error: roomError } = await supabase
         .from('rooms')
-        .update({ status: 'clean' })
+        .update(updateData)
         .eq('id', assignment.room_id);
 
       if (roomError) throw roomError;
 
       // Remove from list
       setAssignments(prev => prev.filter(a => a.id !== assignment.id));
+      setComment(prev => {
+        const newComments = { ...prev };
+        delete newComments[assignment.id];
+        return newComments;
+      });
 
       toast({
         title: "✅ Chambre terminée",
@@ -189,6 +208,34 @@ export default function HousekeeperMobile() {
         variant: "destructive",
         title: "Erreur",
         description: "Impossible de marquer la chambre comme terminée"
+      });
+    }
+  };
+
+  const unassignRoom = async (assignment: Assignment) => {
+    try {
+      // Delete assignment
+      const { error: assignmentError } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('id', assignment.id);
+
+      if (assignmentError) throw assignmentError;
+
+      // Remove from list
+      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
+
+      toast({
+        title: "Chambre désassignée",
+        description: `Chambre ${assignment.room?.room_number} retirée de votre liste`
+      });
+
+    } catch (error: any) {
+      console.error('Error unassigning:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de désassigner la chambre"
       });
     }
   };
@@ -398,6 +445,14 @@ export default function HousekeeperMobile() {
                       )}
                     </div>
 
+                    {/* Cleaning Type Badge */}
+                    {room.cleaning_type && (
+                      <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="mb-2">
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        {room.cleaning_type === 'full' ? 'Nettoyage complet' : 'Recouche'}
+                      </Badge>
+                    )}
+
                     {room.notes && (
                       <div className="mb-3 p-2 bg-muted/50 rounded text-sm">
                         <p className="text-muted-foreground">{room.notes}</p>
@@ -405,26 +460,52 @@ export default function HousekeeperMobile() {
                     )}
 
                     {!isInProgress && (
-                      <Button 
-                        className="w-full"
-                        size="lg"
-                        onClick={() => startCleaning(assignment)}
-                      >
-                        <Clock className="h-4 w-4 mr-2" />
-                        Commencer le nettoyage
-                      </Button>
+                      <div className="space-y-2">
+                        <Button 
+                          className="w-full"
+                          size="lg"
+                          onClick={() => startCleaning(assignment)}
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          Commencer le nettoyage
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          className="w-full"
+                          size="sm"
+                          onClick={() => unassignRoom(assignment)}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Désassigner
+                        </Button>
+                      </div>
                     )}
 
                     {isInProgress && (
-                      <div className="flex gap-2">
-                        <Button 
-                          className="flex-1 bg-green-600 hover:bg-green-700"
-                          size="lg"
-                          onClick={() => markRoomComplete(assignment)}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Terminer
-                        </Button>
+                      <div className="space-y-2">
+                        <Textarea
+                          placeholder="Commentaire (optionnel)..."
+                          value={comment[assignment.id] || ''}
+                          onChange={(e) => setComment(prev => ({ ...prev, [assignment.id]: e.target.value }))}
+                          className="min-h-[60px]"
+                        />
+                        <div className="flex gap-2">
+                          <Button 
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            size="lg"
+                            onClick={() => markRoomComplete(assignment)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Terminer
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            size="lg"
+                            onClick={() => unassignRoom(assignment)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     )}
 

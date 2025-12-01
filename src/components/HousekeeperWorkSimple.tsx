@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle, Wifi, WifiOff, Smartphone } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, User, AlertCircle, Wifi, WifiOff, Smartphone, X, Sparkles } from 'lucide-react';
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import { GamificationService } from '@/services/gamificationService';
 import { BadgeUnlockNotification } from './gamification/BadgeUnlockNotification';
@@ -25,6 +25,7 @@ interface Room {
   status: string;
   notes?: string;
   cleaning_priority: number;
+  cleaning_type?: string;
 }
 
 export const HousekeeperWorkSimple: React.FC = () => {
@@ -184,6 +185,31 @@ export const HousekeeperWorkSimple: React.FC = () => {
         setRooms(prev => {
           const exists = prev.find(r => r.id === newRecord.id);
           if (exists) {
+            // Log cleaning_type changes
+            if (newRecord.cleaning_type && newRecord.cleaning_type !== exists.cleaning_type) {
+              console.log('🔄 Type de nettoyage mis à jour:', {
+                room: newRecord.room_number,
+                oldType: exists.cleaning_type,
+                newType: newRecord.cleaning_type
+              });
+              toast({
+                title: "Mode de nettoyage mis à jour",
+                description: `Chambre ${newRecord.room_number}: ${newRecord.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}`,
+                duration: 3000
+              });
+            }
+            
+            // Log status changes
+            if (newRecord.status === 'ready-to-clean' && exists.status !== 'ready-to-clean') {
+              console.log('🔔 Client sorti:', newRecord.room_number);
+              toast({
+                title: "Client sorti",
+                description: `Chambre ${newRecord.room_number} prête à nettoyer`,
+                duration: 5000
+              });
+              playInfo();
+            }
+            
             return prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r);
           } else if (eventType === 'INSERT') {
             return [...prev, newRecord];
@@ -620,6 +646,39 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
+  const unassignRoom = async (roomId: string, roomNumber: string) => {
+    try {
+      // Find assignment for this room
+      const assignment = assignments.find(a => a.rooms?.id === roomId);
+      if (!assignment) return;
+
+      // Delete assignment
+      const { error } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('id', assignment.id);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
+
+      toast({
+        title: "Chambre désassignée",
+        description: `Chambre ${roomNumber} retirée de votre liste`
+      });
+
+    } catch (error) {
+      console.error('Erreur désassignation:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de désassigner la chambre"
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -859,7 +918,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                  <div className="flex-1 min-w-0 w-full sm:w-auto">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
                          <Badge className={
@@ -870,15 +929,14 @@ export const HousekeeperWorkSimple: React.FC = () => {
                            {room.cleaning_priority === 3 ? 'Urgent' : 
                             room.cleaning_priority === 2 ? 'Prioritaire' : 'Normal'}
                          </Badge>
-                         <Badge variant="outline" className={
-                           room.status === 'to_clean' || room.status === 'dirty' 
-                             ? 'bg-blue-100 text-blue-800 border-blue-300 text-xs' 
-                             : 'bg-gray-100 text-gray-800 text-xs'
-                         }>
-                           {room.status === 'to_clean' || room.status === 'dirty' 
-                             ? '🧹 À blanc' 
-                             : '🛏️ Recouche'}
-                         </Badge>
+                         
+                         {/* Badge type de nettoyage */}
+                         {room.cleaning_type && (
+                           <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="text-xs">
+                             <Sparkles className="h-3 w-3 mr-1" />
+                             {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
+                           </Badge>
+                         )}
                       </div>
                       {room.notes && (
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
@@ -911,24 +969,45 @@ export const HousekeeperWorkSimple: React.FC = () => {
                       )}
                       
                       {room.status === 'dirty' && (
-                        <Button 
-                          onClick={() => updateRoomStatus(room.id, 'in_progress')}
-                          variant="outline"
-                          size="sm"
-                          className="w-full sm:w-auto"
-                        >
-                          Commencer
-                        </Button>
+                        <>
+                          <Button 
+                            onClick={() => updateRoomStatus(room.id, 'in_progress')}
+                            variant="outline"
+                            size="sm"
+                            className="w-full sm:w-auto"
+                          >
+                            Commencer
+                          </Button>
+                          <Button 
+                            onClick={() => unassignRoom(room.id, room.room_number)}
+                            variant="ghost"
+                            size="sm"
+                            className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Désassigner
+                          </Button>
+                        </>
                       )}
                       {room.status === 'in_progress' && (
-                        <Button 
-                          onClick={() => updateRoomStatus(room.id, 'clean')}
-                          className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
-                          size="sm"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Terminer
-                        </Button>
+                        <>
+                          <Button 
+                            onClick={() => updateRoomStatus(room.id, 'clean')}
+                            className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                            size="sm"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Terminer
+                          </Button>
+                          <Button 
+                            onClick={() => unassignRoom(room.id, room.room_number)}
+                            variant="ghost"
+                            size="sm"
+                            className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
                       {room.status === 'clean' && (
                         <div className="flex items-center text-green-600 w-full sm:w-auto justify-center">

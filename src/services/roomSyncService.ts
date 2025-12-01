@@ -35,11 +35,11 @@ export class RoomSyncService {
         updated_at: new Date().toISOString()
       };
 
-      // Ajouter room_type selon cleaningType
+      // Ajouter cleaning_type selon cleaningType
       if (room.cleaningType === 'full') {
-        updateData.room_type = 'full';
+        updateData.cleaning_type = 'full';
       } else if (room.cleaningType === 'quick') {
-        updateData.room_type = 'quick';
+        updateData.cleaning_type = 'quick';
       }
 
       // Mettre à jour last_cleaned_at si la chambre est propre
@@ -131,7 +131,7 @@ export class RoomSyncService {
       const { error } = await supabase
         .from('rooms')
         .update({
-          room_type: cleaningType,
+          cleaning_type: cleaningType,
           status: 'needs-cleaning',
           updated_at: new Date().toISOString()
         })
