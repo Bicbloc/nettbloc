@@ -435,83 +435,11 @@ export const HousekeeperManagement = () => {
         </Card>
       )}
 
-      {/* Section des codes d'accès - TOUJOURS VISIBLE */}
-      {assignedHousekeepers.length > 0 && (
-        <Card className="border-primary/50 shadow-lg">
-          <CardHeader className="bg-primary/5">
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5 text-primary" />
-              Codes d'accès mobiles
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Partagez ces codes avec vos femmes de chambre pour qu'elles puissent se connecter sur mobile
-            </p>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid gap-3">
-              {assignedHousekeepers.map((housekeeper) => (
-                <div 
-                  key={housekeeper.id} 
-                  className="flex items-center justify-between p-4 border-2 border-primary/20 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors"
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <UserIcon className="h-5 w-5 text-primary" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground">{housekeeper.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="bg-background px-3 py-2 rounded-md border-2 border-primary/30 flex items-center gap-2">
-                          <Key className="h-4 w-4 text-primary" />
-                          <span className="font-mono font-bold text-primary text-lg tracking-wider">
-                            {housekeeper.access_code}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(housekeeper.access_code);
-                      toast({
-                        title: "Code copié !",
-                        description: `Le code de ${housekeeper.name} a été copié dans le presse-papiers.`
-                      });
-                    }}
-                    className="shrink-0"
-                  >
-                    📋 Copier
-                  </Button>
-                </div>
-              ))}
-            </div>
-            
-            <Button
-              variant="secondary"
-              className="w-full mt-4"
-              onClick={async () => {
-                const allCodes = assignedHousekeepers
-                  .map(h => `${h.name}: ${h.access_code}`)
-                  .join('\n');
-                await navigator.clipboard.writeText(allCodes);
-                toast({
-                  title: "Tous les codes copiés !",
-                  description: "La liste complète a été copiée dans le presse-papiers."
-                });
-              }}
-            >
-              📋 Copier tous les codes
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Femmes de chambre assignées aux chambres */}
       {assignedHousekeepers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Personnel actif ({assignedHousekeepers.length})</CardTitle>
+            <CardTitle>Femmes de chambre assignées ({assignedHousekeepers.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -521,24 +449,35 @@ export const HousekeeperManagement = () => {
                     <UserIcon className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium">{housekeeper.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3" />
-                          Active
-                        </Badge>
+                      <div className="flex items-center gap-2">
+                        <div className="bg-primary/10 px-2 py-1 rounded border border-primary/20 flex items-center gap-2">
+                          <Key className="h-4 w-4 text-primary" />
+                          <span className="font-mono font-bold text-primary text-base md:text-sm">
+                            {housekeeper.access_code}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground md:hidden">
+                          Mobile
+                        </span>
                       </div>
                     </div>
                   </div>
                   
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleToggleHousekeeper(housekeeper.id, housekeeper.name, true)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Désactiver
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      Active
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleHousekeeper(housekeeper.id, housekeeper.name, true)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Désactiver
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
