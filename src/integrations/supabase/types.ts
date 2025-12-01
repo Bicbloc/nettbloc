@@ -2128,6 +2128,10 @@ export type Database = {
       }
       cleanup_expired_hotel_sessions: { Args: never; Returns: undefined }
       cleanup_inactive_sessions: { Args: never; Returns: undefined }
+      cleanup_user_old_sessions: {
+        Args: { p_current_session_id?: string; p_user_id: string }
+        Returns: undefined
+      }
       create_hotel_incident_defaults: {
         Args: { p_hotel_id: string }
         Returns: undefined
