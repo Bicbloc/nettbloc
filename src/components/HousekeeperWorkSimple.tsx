@@ -345,6 +345,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
         orFilter += `,housekeeper_name.eq.${housekeeperName}`;
       }
 
+      // Filtrer uniquement les assignations d'aujourd'hui
+      const today = new Date().toISOString().split('T')[0];
+      
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -360,6 +363,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         .eq('hotel_id', hotelId)
         .or(orFilter)
         .in('status', ['assigned', 'in_progress'])
+        .gte('assigned_at', `${today}T00:00:00`)
         .order('created_at', { ascending: false });
 
       console.log('📋 Assignations trouvées:', assignmentsData);
