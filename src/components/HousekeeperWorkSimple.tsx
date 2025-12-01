@@ -16,6 +16,7 @@ import { Textarea } from './ui/textarea';
 import { AlertTriangle, MessageSquare, Package } from 'lucide-react';
 import { LinenInventorySection } from './linen/LinenInventorySection';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
+import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { useNotificationSound } from '@/hooks/use-notification-sound';
 
@@ -1147,149 +1148,17 @@ export const HousekeeperWorkSimple: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:gap-4">
-              {rooms.map(room => {
-                const offset = swipeOffset[room.id] || 0;
-                const isCompleting = offset > 100;
-                
-                return (
-                  <div
-                    key={room.id}
-                    className={`relative overflow-hidden transition-all duration-200 rounded-lg border-2 ${
-                      room.status === 'clean' 
-                        ? 'bg-green-100 text-green-800 border-green-200'
-                        : room.status === 'in_progress'
-                        ? 'bg-blue-100 text-blue-800 border-blue-200'
-                        : 'bg-gray-100 text-gray-800 border-gray-200'
-                    }`}
-                    onTouchStart={(e) => room.status === 'in_progress' && handleTouchStart(e, room.id)}
-                    onTouchMove={(e) => room.status === 'in_progress' && handleTouchMove(e, room.id)}
-                    onTouchEnd={() => room.status === 'in_progress' && handleTouchEnd(room.id)}
-                    style={{
-                      transform: room.status === 'in_progress' ? `translateX(${offset}px)` : 'none',
-                      transition: swipingCard === room.id ? 'none' : 'transform 0.3s ease-out'
-                    }}
-                  >
-                    {/* Background indicator when swiping */}
-                    {room.status === 'in_progress' && offset > 0 && (
-                      <div 
-                        className={`absolute inset-0 flex items-center px-6 ${
-                          isCompleting ? 'bg-green-500' : 'bg-green-300'
-                        } transition-colors duration-200`}
-                        style={{ zIndex: 0 }}
-                      >
-                        <CheckCircle className={`h-8 w-8 ${
-                          isCompleting ? 'text-white' : 'text-green-600'
-                        }`} />
-                      </div>
-                    )}
-                    
-                    <div className="relative p-3 sm:p-4 bg-inherit" style={{ zIndex: 1 }}>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0 w-full sm:w-auto">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
-                         <Badge className={
-                           room.cleaning_priority === 3 ? 'bg-red-100 text-red-800 text-xs' :
-                           room.cleaning_priority === 2 ? 'bg-orange-100 text-orange-800 text-xs' :
-                           'bg-gray-100 text-gray-800 text-xs'
-                         }>
-                           {room.cleaning_priority === 3 ? 'Urgent' : 
-                            room.cleaning_priority === 2 ? 'Prioritaire' : 'Normal'}
-                         </Badge>
-                         
-                         {/* Badge type de nettoyage */}
-                         {room.cleaning_type && (
-                           <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="text-xs">
-                             <Sparkles className="h-3 w-3 mr-1" />
-                             {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
-                           </Badge>
-                         )}
-                      </div>
-                      {room.notes && (
-                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                          📝 {room.notes}
-                        </p>
-                      )}
-                      
-                      {/* Champ de commentaires */}
-                      {room.status !== 'clean' && (
-                        <div className="mt-2 space-y-2">
-                          <Textarea
-                            placeholder="Ajouter un commentaire (optionnel)..."
-                            value={roomNotes[room.id] || ''}
-                            onChange={(e) => setRoomNotes({ ...roomNotes, [room.id]: e.target.value })}
-                            rows={2}
-                            className="text-xs sm:text-sm resize-none"
-                          />
-                        </div>
-                      )}
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                      {/* Bouton signaler incident */}
-                      {room.status !== 'clean' && (
-                        <IncidentReportDialogSimple 
-                          hotelId={hotelId!} 
-                          userType="housekeeper"
-                          defaultLocation={room.room_number}
-                        />
-                      )}
-                      
-                      {room.status === 'dirty' && (
-                        <>
-                          <Button 
-                            onClick={() => updateRoomStatus(room.id, 'in_progress')}
-                            variant="outline"
-                            size="sm"
-                            className="w-full sm:w-auto"
-                          >
-                            Commencer
-                          </Button>
-                          <Button 
-                            onClick={() => unassignRoom(room.id, room.room_number)}
-                            variant="ghost"
-                            size="sm"
-                            className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Désassigner
-                          </Button>
-                        </>
-                      )}
-                      {room.status === 'in_progress' && (
-                        <>
-                          <Button 
-                            onClick={() => updateRoomStatus(room.id, 'clean')}
-                            className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
-                            size="sm"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Terminer
-                          </Button>
-                          <Button 
-                            onClick={() => unassignRoom(room.id, room.room_number)}
-                            variant="ghost"
-                            size="sm"
-                            className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                      {room.status === 'clean' && (
-                        <div className="flex items-center text-green-600 w-full sm:w-auto justify-center">
-                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                          <span className="text-sm sm:text-base">Terminée</span>
-                        </div>
-                        )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="grid gap-4">
+              {rooms.map(room => (
+                <RoomCardEnhanced
+                  key={room.id}
+                  room={room}
+                  hotelId={hotelId!}
+                  onUpdateStatus={updateRoomStatus}
+                  onUnassign={unassignRoom}
+                />
+              ))}
+            </div>
             )}
           </CardContent>
         </Card>
