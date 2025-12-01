@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { HotelStorageService } from '@/services/hotelStorageService';
 
@@ -7,8 +7,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, companyName?: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, companyName?: string) => Promise<{ error: AuthError | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -27,79 +27,96 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(true);
+  const initAttemptsRef = useRef(0);
+  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    // Timeout de sécurité - max 5 secondes de loading
-    const safetyTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn('⚠️ Auth timeout - forcing loading to false');
+  const initializeSession = useCallback(async () => {
+    console.log('🚀 Starting session initialization...');
+    const startTime = Date.now();
+    
+    try {
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+
+      console.log('🚀 Session result:', {
+        duration: Date.now() - startTime,
+        session_exists: !!currentSession,
+        user_id: currentSession?.user?.id,
+        error: error?.message
+      });
+
+      if (!isMountedRef.current) return;
+
+      if (error) {
+        console.error('❌ Session error:', error);
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      setLoading(false);
+    } catch (error) {
+      console.error('❌ Session init failed after', Date.now() - startTime, 'ms:', error);
+      if (isMountedRef.current) {
+        setSession(null);
+        setUser(null);
         setLoading(false);
       }
-    }, 5000);
+    }
+  }, []);
 
-    // Set up auth state listener FIRST
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    // Set up auth state listener FIRST (before checking session)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
+      (event, currentSession) => {
+        if (!isMountedRef.current) return;
 
-        console.log('🔐 Auth state changed:', { event, session_exists: !!session, user_id: session?.user?.id });
+        console.log('🔐 Auth state changed:', { 
+          event, 
+          session_exists: !!currentSession, 
+          user_id: currentSession?.user?.id 
+        });
 
         // Keep this callback lightweight and synchronous
-        setSession(session);
-        setUser(session?.user ?? null);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         setLoading(false);
+
+        // Clear storage on sign out
+        if (event === 'SIGNED_OUT') {
+          HotelStorageService.clear();
+        }
       }
     );
 
-    // Get initial session
-    const initializeSession = async () => {
-      console.log('🚀 Starting session initialization...');
-      const startTime = Date.now();
-      
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+    // THEN get initial session
+    initializeSession();
 
-        console.log('🚀 Session result:', {
-          duration: Date.now() - startTime,
-          session_exists: !!session,
-          user_id: session?.user?.id,
-          error: error?.message
-        });
-
-        if (error) {
-          console.error('❌ Session error:', error);
-          if (isMounted) {
-            setSession(null);
-            setUser(null);
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (isMounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('❌ Session init failed after', Date.now() - startTime, 'ms:', error);
-        if (isMounted) {
-          setSession(null);
-          setUser(null);
+    // Safety timeout - 15 seconds with retry
+    const safetyTimeout = setTimeout(() => {
+      if (isMountedRef.current && loading) {
+        initAttemptsRef.current += 1;
+        
+        if (initAttemptsRef.current < 3) {
+          console.warn(`⚠️ Auth timeout - retry attempt ${initAttemptsRef.current}`);
+          initializeSession();
+        } else {
+          console.error('❌ Auth initialization failed after 3 attempts');
           setLoading(false);
         }
       }
-    };
-
-    initializeSession();
+    }, 15000);
 
     return () => {
+      isMountedRef.current = false;
       clearTimeout(safetyTimeout);
-      setIsMounted(false);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [initializeSession]);
 
   const signUp = async (email: string, password: string, companyName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
@@ -115,14 +132,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
     
-    // Si pas d'erreur, connexion automatique (Supabase gère ça automatiquement maintenant)
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
-    // Ne PAS nettoyer le localStorage - garder les données de session
-    // pour permettre la restauration rapide
-    console.log('🔐 Connexion sans nettoyage localStorage pour persistance');
+    console.log('🔐 Signing in...');
     
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -134,6 +148,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     HotelStorageService.clear();
+    localStorage.removeItem('nettobloc_session_id');
     await supabase.auth.signOut();
   };
 
@@ -144,7 +159,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp,
     signIn,
     signOut,
-    isAuthenticated: !!user
+    isAuthenticated: !!user && !!session
   };
 
   return (
