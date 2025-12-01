@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell } from "lucide-react";
+import { UserIcon, FileDown, AlertTriangle, Check, Bed, Building, LogIn, Archive, Link, Trash2, AlertCircle, Plus, FileText, Calendar, Layers, Key, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,9 +52,6 @@ import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashbo
 import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { SetupStatusSimple } from "@/components/SetupStatusSimple";
 import { NotificationProvider, useNotificationContext } from "@/contexts/NotificationContext";
-import { LinenTypeManager } from "@/components/linen/LinenTypeManager";
-import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
-import { LinenTaskAssignment } from "@/components/linen/LinenTaskAssignment";
 import { StaffManagement } from "@/components/incident/StaffManagement";
 import { IncidentInventoryManager } from "@/components/incident/IncidentInventoryManager";
 import { IncidentReportDialogSimple } from "@/components/incident/IncidentReportDialogSimple";
@@ -110,11 +107,14 @@ const Index = () => {
     setHousekeeperNames,
     rooms,
     setRooms,
-    isDistributed,
-    setIsDistributed,
     housekeepers,
     refreshHousekeepers
   } = useHousekeeping();
+  
+  // Persister l'état de distribution jusqu'à clôture
+  const [isDistributed, setIsDistributed] = useState(() => {
+    return localStorage.getItem('is_distributed') === 'true';
+  });
   
   // Auto-setup automatique de l'hôtel et génération des codes
   const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
@@ -235,10 +235,14 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     cleanupInvalidHotelIds();
   }, []);
   
-  // Persister l'onglet actif
+  // Persister l'onglet actif et l'état de distribution
   useEffect(() => {
     localStorage.setItem('admin_active_tab', activeTab);
   }, [activeTab]);
+  
+  useEffect(() => {
+    localStorage.setItem('is_distributed', String(isDistributed));
+  }, [isDistributed]);
   
   // Charger les femmes de chambre existantes
   useEffect(() => {
@@ -389,6 +393,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           const uniqueHousekeepers = Array.from(new Set(dbAssignments?.map(a => a.housekeeper_name).filter(Boolean) || []));
           if (uniqueHousekeepers.length > 0) {
             localStorage.setItem('housekeeper_names', JSON.stringify(uniqueHousekeepers));
+            localStorage.setItem('housekeeper_assignments', JSON.stringify(uniqueHousekeepers));
           }
         }
       } catch (error) {
@@ -1854,7 +1859,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full grid-cols-8 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
+            <TabsList className="grid w-full grid-cols-4 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
               <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Layers className="h-4 w-4" />
                 Vue d'ensemble
@@ -1867,28 +1872,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 <UserIcon className="h-4 w-4" />
                 Affectation
               </TabsTrigger>
-              <TabsTrigger value="access-codes" className="flex items-center gap-2 relative">
-                <Key className="h-4 w-4" />
-                Codes d'accès
-                <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
-                  !
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="linen" className="flex items-center gap-2">
-                🧺
-                Inventaire Linge
-              </TabsTrigger>
               <TabsTrigger value="incidents" className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
                 Incidents
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Rapports
-              </TabsTrigger>
-              <TabsTrigger value="mobile" className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4" />
-                Mobile
               </TabsTrigger>
             </TabsList>
             <div className="flex gap-2">
@@ -2219,7 +2205,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   </p>
                   <div className="flex flex-col gap-3 items-center">
                     <Button 
-                      onClick={() => setActiveTab('access-codes')}
+                      onClick={() => setActiveTab('overview')}
                       className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2"
                     >
                       <UserIcon className="mr-2 h-4 w-4" />
@@ -2294,7 +2280,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                             <Button onClick={() => setShowInviteDialog(true)}>
                               Inviter / Ajouter
                             </Button>
-                            <Button variant="outline" onClick={() => setActiveTab('access-codes')}>
+                            <Button variant="outline" onClick={() => setActiveTab('overview')}>
                               Gérer l'équipe
                             </Button>
                           </div>
@@ -2367,262 +2353,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 </div>
               )}
             </TabsContent>
-
-          <TabsContent value="reports" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Rapports</h2>
-              <Button
-                onClick={handleGenerateAllReports}
-                disabled={!isDistributed || housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0).length === 0}
-              >
-                <FileDown className="mr-2 h-4 w-4" />
-                Générer tous les rapports
-              </Button>
-            </div>
-
-            {!isDistributed ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Distribution requise</AlertTitle>
-                <AlertDescription>
-                  Vous devez d'abord distribuer les chambres pour générer des rapports.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {housekeeperNames.map((name) => {
-                  const housekeeperRooms = getHousekeeperRooms(name);
-                  if (housekeeperRooms.length === 0) return null;
-                  
-                  return (
-                    <Card key={name}>
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          <span>{name}</span>
-                          <Badge variant="secondary">
-                            {housekeeperRooms.length} chambres
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 mb-4">
-                          <div className="text-sm">
-                            <span className="font-medium">Nettoyage complet:</span>{" "}
-                            {housekeeperRooms.filter(r => r.cleaningType === 'full').length}
-                          </div>
-                          <div className="text-sm">
-                            <span className="font-medium">Recouches:</span>{" "}
-                            {housekeeperRooms.filter(r => r.cleaningType === 'quick').length}
-                          </div>
-                          <div className="text-sm">
-                            <span className="font-medium">Temps estimé:</span>{" "}
-                            {Math.round(calculateHousekeeperLoad(housekeeperRooms, cleaningConfig) / 60)}h
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleGenerateReport(name, housekeeperRooms)}
-                          className="w-full"
-                          size="sm"
-                        >
-                          <FileDown className="mr-2 h-4 w-4" />
-                          Générer rapport
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="access-codes" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  Gestion des codes d'accès
-                </CardTitle>
-                <CardDescription>
-                  Codes d'accès des femmes de chambre et demandes en attente
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="requests" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="requests" className="relative">
-                      Demandes d'accès
-                      <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
-                        !
-                      </Badge>
-                    </TabsTrigger>
-                    <TabsTrigger value="codes">
-                      Codes existants
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="requests" className="space-y-4">
-                    <Alert className="bg-blue-50 border-blue-200">
-                      <Bell className="h-4 w-4 text-blue-600" />
-                      <AlertDescription className="text-blue-800">
-                        <strong>📋 Comment ça marche ?</strong> Les femmes de chambre s'inscrivent et soumettent une demande avec votre code d'hôtel. 
-                        Vous recevez une notification ici et pouvez <strong>valider</strong> ou <strong>suspendre</strong> leur accès.
-                      </AlertDescription>
-                    </Alert>
-                    
-                    <HousekeeperAccessRequests />
-                  </TabsContent>
-                  
-                  <TabsContent value="codes" className="space-y-4">
-                    <p className="text-muted-foreground">
-                      Codes d'accès des femmes de chambre déjà validées. 
-                      Gérez le personnel complet depuis l'onglet "Vue d'ensemble".
-                    </p>
-                    <div className="mt-4">
-                      <HousekeeperManagement />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="mobile" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Accès mobile</h2>
-            </div>
-
-            {!canAccessFeature('mobile_access') ? (
-              <Alert className="border-premium">
-                <Lock className="h-4 w-4" />
-                <AlertTitle>Fonctionnalité Premium</AlertTitle>
-                <AlertDescription className="flex flex-col gap-4">
-                  <p>L'accès mobile aux codes d'accès pour les femmes de chambre est réservé aux utilisateurs Premium.</p>
-                  <UpgradeButton />
-                </AlertDescription>
-              </Alert>
-            ) : !isDistributed ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Distribution requise</AlertTitle>
-                <AlertDescription>
-                  Vous devez d'abord distribuer les chambres pour générer les codes d'accès mobile.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <NotificationBell />
-                  <Badge variant="premium" className="gap-1">
-                    <Smartphone className="h-3 w-3" />
-                    Accès Mobile Premium
-                  </Badge>
-                </div>
-                
-                {/* Affichage des femmes de chambre avec leurs codes d'accès */}
-                {housekeeperNames.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-4">Accès femmes de chambre</h3>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {housekeeperNames.map((name) => {
-                        const housekeeperRooms = getHousekeeperRooms(name);
-                        const housekeeper = housekeepers.find(h => h.name === name);
-                        
-                        return (
-                          <Card key={name}>
-                            <CardHeader>
-                              <CardTitle className="flex items-center justify-between">
-                                <span>{name}</span>
-                                <Badge variant="secondary">
-                                  {housekeeperRooms.length} chambres
-                                </Badge>
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="space-y-4">
-                                {/* Code d'accès affiché en premier */}
-                                {housekeeper?.access_code && (
-                                  <div className="text-center">
-                                    <div className="bg-primary/10 px-3 py-2 rounded-lg border">
-                                      <div className="text-xs text-muted-foreground mb-1">Code d'accès</div>
-                                      <div className="font-mono font-bold text-lg text-primary">
-                                        {housekeeper.access_code}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                <div className="text-sm text-muted-foreground">
-                                  Chambres assignées: {housekeeperRooms.map(r => r.number).join(', ')}
-                                </div>
-                                
-                                <div className="text-center">
-                                  <Button
-                                    onClick={() => window.open(`/housekeeper/login`, '_blank')}
-                                    className="w-full"
-                                    size="sm"
-                                  >
-                                    <Smartphone className="mr-2 h-4 w-4" />
-                                    Ouvrir interface femme de chambre
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="linen" className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">🧺 Inventaire du linge</h2>
-                <p className="text-muted-foreground">Gérer les types de linge, entraîner l'IA et assigner les tâches</p>
-              </div>
-            </div>
-
-            <Tabs defaultValue="types" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="types">Types de linge</TabsTrigger>
-                <TabsTrigger value="training">Entraînement IA</TabsTrigger>
-                <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="types" className="space-y-4">
-                {currentHotelId ? (
-                  <LinenTypeManager hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="training" className="space-y-4">
-                {currentHotelId ? (
-                  <LinenTrainingManager hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="tasks" className="space-y-4">
-                {currentHotelId ? (
-                  <LinenTaskAssignment hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
 
           <TabsContent value="incidents" className="space-y-6">
             <div className="flex items-center justify-between mb-6">
