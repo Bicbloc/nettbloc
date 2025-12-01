@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +48,10 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+  const [swipingCard, setSwipingCard] = useState<string | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
+  const touchStartX = useRef<number>(0);
+  const touchCurrentX = useRef<number>(0);
   
   const { playInfo } = useNotificationSound();
 
@@ -725,6 +729,41 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
+  // Swipe gesture handlers
+  const handleTouchStart = (e: React.TouchEvent, roomId: string) => {
+    touchStartX.current = e.touches[0].clientX;
+    setSwipingCard(roomId);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, roomId: string) => {
+    if (swipingCard !== roomId) return;
+    
+    touchCurrentX.current = e.touches[0].clientX;
+    const diff = touchCurrentX.current - touchStartX.current;
+    
+    // Only allow swipe to the right (positive values)
+    if (diff > 0) {
+      setSwipeOffset(prev => ({ ...prev, [roomId]: diff }));
+    }
+  };
+
+  const handleTouchEnd = async (roomId: string) => {
+    const offset = swipeOffset[roomId] || 0;
+    
+    // If swiped more than 100px, mark as complete
+    if (offset > 100) {
+      await updateRoomStatus(roomId, 'clean');
+    }
+    
+    // Reset swipe
+    setSwipingCard(null);
+    setSwipeOffset(prev => {
+      const newOffsets = { ...prev };
+      delete newOffsets[roomId];
+      return newOffsets;
+    });
+  };
+
   const unassignRoom = async (roomId: string, roomNumber: string) => {
     try {
       // Find assignment for this room
@@ -1047,19 +1086,45 @@ export const HousekeeperWorkSimple: React.FC = () => {
             </div>
           ) : (
             <div className="grid gap-3 sm:gap-4">
-              {rooms.map(room => (
-                <div
-                  key={room.id}
-                  className={`p-3 sm:p-4 rounded-lg border-2 ${
-                    room.status === 'clean' 
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : room.status === 'in_progress'
-                      ? 'bg-blue-100 text-blue-800 border-blue-200'
-                      : 'bg-gray-100 text-gray-800 border-gray-200'
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0 w-full sm:w-auto">
+              {rooms.map(room => {
+                const offset = swipeOffset[room.id] || 0;
+                const isCompleting = offset > 100;
+                
+                return (
+                  <div
+                    key={room.id}
+                    className={`relative overflow-hidden transition-all duration-200 rounded-lg border-2 ${
+                      room.status === 'clean' 
+                        ? 'bg-green-100 text-green-800 border-green-200'
+                        : room.status === 'in_progress'
+                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                        : 'bg-gray-100 text-gray-800 border-gray-200'
+                    }`}
+                    onTouchStart={(e) => room.status === 'in_progress' && handleTouchStart(e, room.id)}
+                    onTouchMove={(e) => room.status === 'in_progress' && handleTouchMove(e, room.id)}
+                    onTouchEnd={() => room.status === 'in_progress' && handleTouchEnd(room.id)}
+                    style={{
+                      transform: room.status === 'in_progress' ? `translateX(${offset}px)` : 'none',
+                      transition: swipingCard === room.id ? 'none' : 'transform 0.3s ease-out'
+                    }}
+                  >
+                    {/* Background indicator when swiping */}
+                    {room.status === 'in_progress' && offset > 0 && (
+                      <div 
+                        className={`absolute inset-0 flex items-center px-6 ${
+                          isCompleting ? 'bg-green-500' : 'bg-green-300'
+                        } transition-colors duration-200`}
+                        style={{ zIndex: 0 }}
+                      >
+                        <CheckCircle className={`h-8 w-8 ${
+                          isCompleting ? 'text-white' : 'text-green-600'
+                        }`} />
+                      </div>
+                    )}
+                    
+                    <div className="relative p-3 sm:p-4 bg-inherit" style={{ zIndex: 1 }}>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0 w-full sm:w-auto">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
                          <Badge className={
@@ -1097,9 +1162,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
                           />
                         </div>
                       )}
-                    </div>
+                        </div>
 
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                       {/* Bouton signaler incident */}
                       {room.status !== 'clean' && (
                         <IncidentReportDialogSimple 
@@ -1156,10 +1221,12 @@ export const HousekeeperWorkSimple: React.FC = () => {
                           <span className="text-sm sm:text-base">Terminée</span>
                         </div>
                       )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
