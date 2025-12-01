@@ -1262,7 +1262,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         .from('assignments')
         .delete()
         .eq('hotel_id', currentHotelId)
-        .in('status', ['assigned']);
+        .in('status', ['assigned', 'in_progress']);
     }
     
     const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
