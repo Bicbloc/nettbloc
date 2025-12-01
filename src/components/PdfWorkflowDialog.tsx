@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { UnifiedHousekeeperService, HousekeeperWithCode } from "@/services/unifiedHousekeeperService";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -28,7 +29,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'upload' | 'housekeepers' | 'distribution'>('upload');
+  const [step, setStep] = useState<'upload' | 'housekeepers' | 'distribution' | 'linen-inventory'>('upload');
   const [pdfData, setPdfData] = useState<any>(null);
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
@@ -40,6 +41,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [showAllExisting, setShowAllExisting] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [linenInventoryHousekeeper, setLinenInventoryHousekeeper] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -318,6 +320,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setExistingHousekeepers([]);
     setSearchQuery('');
     setShowAllExisting(false);
+    setLinenInventoryHousekeeper(null);
   };
 
   const triggerFileInput = () => {
@@ -645,7 +648,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           onClick={() => setStep('distribution')}
           disabled={selectedExisting.length === 0 && housekeepers.length === 0}
         >
-          Choisir la distribution
+          Continuer
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </DialogFooter>
@@ -656,11 +659,11 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs">Étape 3/3</Badge>
+          <Badge variant="secondary" className="text-xs">Étape 3/4</Badge>
           Méthode de distribution
         </DialogTitle>
         <DialogDescription>
-          Comment souhaitez-vous distribuer les {pdfData?.length} chambres aux {housekeepers.length} femmes de chambre ?
+          Comment souhaitez-vous distribuer les {pdfData?.length} chambres aux {selectedExisting.length + housekeepers.length} femmes de chambre ?
         </DialogDescription>
       </DialogHeader>
       
@@ -686,12 +689,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           <Button
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
-            onClick={() => {
-              const allHousekeepers = [...selectedExisting, ...housekeepers];
-              onWorkflowComplete(pdfData, allHousekeepers, 'random');
-              setOpen(false);
-              resetDialog();
-            }}
+            onClick={() => setStep('linen-inventory')}
           >
             <div className="font-medium">🎲 Distribution aléatoire</div>
             <div className="text-sm text-muted-foreground">Répartition équitable et aléatoire des chambres</div>
@@ -700,12 +698,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           <Button
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
-            onClick={() => {
-              const allHousekeepers = [...selectedExisting, ...housekeepers];
-              onWorkflowComplete(pdfData, allHousekeepers, 'floor');
-              setOpen(false);
-              resetDialog();
-            }}
+            onClick={() => setStep('linen-inventory')}
           >
             <div className="font-medium">🏢 Distribution par étage</div>
             <div className="text-sm text-muted-foreground">Chambres d'étages proches pour la même femme de chambre</div>
@@ -714,12 +707,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           <Button
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
-            onClick={() => {
-              const allHousekeepers = [...selectedExisting, ...housekeepers];
-              onWorkflowComplete(pdfData, allHousekeepers, 'cleaning-type');
-              setOpen(false);
-              resetDialog();
-            }}
+            onClick={() => setStep('linen-inventory')}
           >
             <div className="font-medium">🔴⚪ Distribution par type de nettoyage</div>
             <div className="text-sm text-muted-foreground">Séparer les chambres à blanc et les recouches</div>
@@ -728,15 +716,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           <Button
             variant="outline"
             className="w-full h-auto flex flex-col items-start p-4"
-            onClick={() => {
-              const allHousekeepers = [...selectedExisting, ...housekeepers];
-              onWorkflowComplete(pdfData, allHousekeepers);
-              setOpen(false);
-              resetDialog();
-            }}
+            onClick={() => setStep('linen-inventory')}
           >
-            <div className="font-medium">⚡ Terminer sans distribution automatique</div>
-            <div className="text-sm text-muted-foreground">Vous pourrez distribuer manuellement les chambres plus tard</div>
+            <div className="font-medium">⚡ Sans distribution automatique</div>
+            <div className="text-sm text-muted-foreground">Distribuer manuellement plus tard</div>
           </Button>
         </div>
       </div>
@@ -748,6 +731,152 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       </DialogFooter>
     </>
   );
+
+  const renderLinenInventoryStep = () => {
+    const allHousekeepers = [...selectedExisting, ...housekeepers];
+    
+    return (
+      <>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">Étape 4/4</Badge>
+            Inventaire du linge
+          </DialogTitle>
+          <DialogDescription>
+            Sélectionnez une femme de chambre pour effectuer l'inventaire du linge aujourd'hui.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          {/* Résumé */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-blue-800">
+              <CheckCircle className="h-4 w-4" />
+              <span className="font-medium">Distribution configurée</span>
+            </div>
+            <p className="text-blue-700 text-sm mt-1">
+              {pdfData?.length} chambres • {allHousekeepers.length} femme{allHousekeepers.length > 1 ? 's' : ''} de chambre
+            </p>
+          </div>
+
+          {/* Sélection pour l'inventaire */}
+          <div className="space-y-3">
+            <div className="text-sm font-medium">📦 Qui va faire l'inventaire du linge ?</div>
+            
+            {allHousekeepers.map((name) => (
+              <div
+                key={name}
+                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                  linenInventoryHousekeeper === name 
+                    ? 'bg-primary/10 border-primary' 
+                    : 'bg-muted/50 hover:bg-muted'
+                }`}
+                onClick={() => setLinenInventoryHousekeeper(name)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    linenInventoryHousekeeper === name ? 'bg-primary border-primary' : 'border-muted-foreground'
+                  }`}>
+                    {linenInventoryHousekeeper === name && (
+                      <div className="w-2 h-2 bg-white rounded-full" />
+                    )}
+                  </div>
+                  <div className="font-medium">{name}</div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Option pour passer */}
+            <div
+              className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                linenInventoryHousekeeper === 'none' 
+                  ? 'bg-gray-100 border-gray-400' 
+                  : 'bg-muted/50 hover:bg-muted'
+              }`}
+              onClick={() => setLinenInventoryHousekeeper('none')}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                  linenInventoryHousekeeper === 'none' ? 'bg-gray-400 border-gray-400' : 'border-muted-foreground'
+                }`}>
+                  {linenInventoryHousekeeper === 'none' && (
+                    <div className="w-2 h-2 bg-white rounded-full" />
+                  )}
+                </div>
+                <div>
+                  <div className="font-medium">Pas d'inventaire aujourd'hui</div>
+                  <div className="text-sm text-muted-foreground">Je le ferai manuellement plus tard</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setStep('distribution')}>
+            Retour
+          </Button>
+          <Button
+            onClick={async () => {
+              // Créer la tâche d'inventaire si une femme de chambre est sélectionnée
+              if (linenInventoryHousekeeper && linenInventoryHousekeeper !== 'none') {
+                await createLinenInventoryTask(linenInventoryHousekeeper);
+              }
+              
+              // Terminer le workflow
+              const distributionMethod = step === 'linen-inventory' ? 'random' : undefined;
+              onWorkflowComplete(pdfData, allHousekeepers, distributionMethod as any);
+              setOpen(false);
+              resetDialog();
+            }}
+            disabled={!linenInventoryHousekeeper}
+          >
+            Terminer
+            <CheckCircle className="ml-2 h-4 w-4" />
+          </Button>
+        </DialogFooter>
+      </>
+    );
+  };
+
+  const createLinenInventoryTask = async (housekeeperName: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Trouver l'ID du housekeeper
+      const housekeeper = existingHousekeepers.find(h => h.name === housekeeperName);
+      
+      if (!housekeeper || !hotelId) {
+        console.warn('Housekeeper ou hotelId manquant pour créer la tâche d\'inventaire');
+        return;
+      }
+      
+      const { error } = await supabase.from('linen_inventory_tasks').insert({
+        hotel_id: hotelId,
+        assigned_to: housekeeper.id,
+        assigned_by: user?.id,
+        task_date: new Date().toISOString().split('T')[0],
+        status: 'pending',
+        notes: 'Créé automatiquement lors de l\'import du rapport PDF'
+      });
+      
+      if (error) {
+        console.error('Erreur création tâche inventaire:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Erreur',
+          description: 'Impossible de créer la tâche d\'inventaire'
+        });
+      } else {
+        toast({
+          title: '📦 Tâche créée',
+          description: `Inventaire assigné à ${housekeeperName}`
+        });
+      }
+    } catch (error) {
+      console.error('Erreur:', error);
+    }
+  };
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
@@ -768,6 +897,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         {step === 'upload' && renderUploadStep()}
         {step === 'housekeepers' && renderHousekeepersStep()}
         {step === 'distribution' && renderDistributionStep()}
+        {step === 'linen-inventory' && renderLinenInventoryStep()}
       </DialogContent>
     </Dialog>
   );

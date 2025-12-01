@@ -52,6 +52,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
   const touchStartX = useRef<number>(0);
   const touchCurrentX = useRef<number>(0);
+  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory'>('rooms');
   
   const { playInfo } = useNotificationSound();
 
@@ -391,6 +392,20 @@ export const HousekeeperWorkSimple: React.FC = () => {
           room => !assignedRoomIds.includes(room.id)
         );
         setAvailableRooms(unassignedAvailable);
+      }
+
+      // Charger les tâches d'inventaire du linge
+      const { data: linenTask } = await supabase
+        .from('linen_inventory_tasks')
+        .select('*')
+        .eq('assigned_to', housekeeperId)
+        .in('status', ['pending', 'in_progress'])
+        .order('task_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (linenTask) {
+        setActiveLinenTask(linenTask.id);
       }
 
     } catch (error) {
@@ -953,6 +968,27 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-4">
+          <Button 
+            variant={activeTab === 'rooms' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('rooms')}
+            className="flex-1"
+          >
+            🛏️ Chambres ({rooms.length})
+          </Button>
+          <Button 
+            variant={activeTab === 'inventory' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('inventory')}
+            className="flex-1 relative"
+          >
+            📦 Inventaire
+            {activeLinenTask && (
+              <Badge className="ml-1 bg-red-500 text-white">1</Badge>
+            )}
+          </Button>
+        </div>
+
          {/* Session Info */}
          <Card className="p-3 sm:p-4 bg-blue-50 border-blue-200">
            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1000,75 +1036,97 @@ export const HousekeeperWorkSimple: React.FC = () => {
       </Card>
 
       {/* Linen Inventory Section - Only shows if task assigned */}
-      {housekeeper?.id && (
-        <LinenInventorySection 
-          hotelId={hotelId!} 
-          housekeeperId={housekeeper.id}
-        />
+      {activeTab === 'inventory' && (
+        <>
+          {activeLinenTask && housekeeper?.id ? (
+            <LinenInventorySection 
+              hotelId={hotelId!} 
+              housekeeperId={housekeeper.id}
+            />
+          ) : (
+            <Card className="mb-4 sm:mb-6">
+              <CardContent className="pt-6 pb-6 text-center">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                  Aucune tâche d'inventaire
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Aucune tâche d'inventaire ne vous est assignée aujourd'hui
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
-      {/* Available Rooms Section */}
-      {availableRooms.length > 0 && (
-        <Card className="mb-4 sm:mb-6 border-blue-200 bg-blue-50/50">
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-              <Badge variant="default" className="bg-blue-600">
-                {availableRooms.length}
-              </Badge>
-              Chambres prêtes à nettoyer
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3">
-              {availableRooms.map(room => (
-                <div
-                  key={room.id}
-                  className="p-3 sm:p-4 rounded-lg border-2 border-blue-300 bg-white"
-                >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0 w-full sm:w-auto">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
-                          🚪 Client sorti
-                        </Badge>
-                        
-                        {/* Badge type de nettoyage */}
-                        {room.cleaning_type && (
-                          <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="text-xs">
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
-                          </Badge>
-                        )}
-                      </div>
-                      {room.notes && (
-                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                          📝 {room.notes}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <Button 
-                      onClick={() => takeAvailableRoom(room.id)}
-                      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
-                      size="sm"
+      {/* Rooms Tab Content */}
+      {activeTab === 'rooms' && (
+        <>
+          {/* Available Rooms Section */}
+          {availableRooms.length > 0 && (
+            <Card className="mb-4 sm:mb-6 border-blue-200 bg-blue-50/50">
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <Badge variant="default" className="bg-blue-600">
+                    {availableRooms.length}
+                  </Badge>
+                  Chambres prêtes à nettoyer
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3">
+                  {availableRooms.map(room => (
+                    <div
+                      key={room.id}
+                      className="p-3 sm:p-4 rounded-lg border-2 border-blue-300 bg-white"
                     >
-                      Prendre cette chambre
-                    </Button>
-                  </div>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0 w-full sm:w-auto">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
+                            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                              🚪 Client sorti
+                            </Badge>
+                            
+                            {/* Badge type de nettoyage */}
+                            {room.cleaning_type && (
+                              <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="text-xs">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
+                              </Badge>
+                            )}
+                          </div>
+                          {room.notes && (
+                            <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
+                              📝 {room.notes}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <Button 
+                          onClick={() => takeAvailableRoom(room.id)}
+                          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                          size="sm"
+                        >
+                          Prendre cette chambre
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Room List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Mes chambres assignées</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {activeTab === 'rooms' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">Mes chambres assignées</CardTitle>
+          </CardHeader>
+          <CardContent>
           {rooms.length === 0 ? (
             <div className="text-center py-8">
               <Home className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
@@ -1220,17 +1278,18 @@ export const HousekeeperWorkSimple: React.FC = () => {
                           <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                           <span className="text-sm sm:text-base">Terminée</span>
                         </div>
-                      )}
+                        )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Floating Linen Inventory Button */}
       <div className="fixed bottom-24 right-6 z-50">
