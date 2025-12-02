@@ -182,46 +182,60 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     console.log(`📡 Temps réel [${table}] ${payload.eventType}:`, {
       roomNumber: payload.new?.room_number,
       status: payload.new?.status,
+      notes: payload.new?.notes,
       assignedTo: payload.new?.housekeeper_name,
-      id: payload.new?.id,
-      fullPayload: payload
+      id: payload.new?.id
     });
     
-    const { eventType, new: newRecord } = payload;
+    const { eventType, new: newRecord, old: oldRecord } = payload;
     
     if (table === 'rooms' && (eventType === 'UPDATE' || eventType === 'INSERT')) {
       // Mettre à jour l'état local quand un housekeeper change le statut
       setRooms(prev => {
         const existingIndex = prev.findIndex(r => r.number === newRecord.room_number);
         if (existingIndex !== -1) {
+          console.log(`✅ Chambre ${newRecord.room_number} trouvée, mise à jour: ${oldRecord?.status} → ${newRecord.status}`);
           return prev.map((r, i) => 
             i === existingIndex 
               ? { 
                   ...r, 
                   status: newRecord.status,
-                  cleaningType: newRecord.room_type === 'full' ? 'full' : (newRecord.room_type === 'quick' ? 'quick' : r.cleaningType),
-                  notes: newRecord.notes
+                  cleaningType: newRecord.cleaning_type === 'full' ? 'full' : (newRecord.cleaning_type === 'quick' ? 'quick' : r.cleaningType),
+                  notes: newRecord.notes || r.notes
                 } 
               : r
           );
         }
+        console.log(`⚠️ Chambre ${newRecord.room_number} non trouvée dans la liste locale`);
         return prev;
       });
 
-      toast({
-        title: "🔄 Mise à jour temps réel",
-        description: `Chambre ${newRecord.room_number} → ${newRecord.status}`,
-        duration: 3000
-      });
+      // Notification seulement si statut change à clean
+      if (newRecord.status === 'clean') {
+        toast({
+          title: "✅ Chambre nettoyée",
+          description: `Chambre ${newRecord.room_number} marquée propre${newRecord.notes ? ` - ${newRecord.notes}` : ''}`,
+          duration: 4000
+        });
+      }
     }
     
     if (table === 'assignments' && (eventType === 'INSERT' || eventType === 'UPDATE')) {
       console.log('✅ Assignment temps réel:', {
         housekeeper: newRecord.housekeeper_name,
-        roomId: newRecord.room_id
+        roomId: newRecord.room_id,
+        status: newRecord.status
       });
+      
+      // Recharger les données si une assignation est complétée
+      if (newRecord.status === 'completed' && currentHotelId) {
+        // Déclencher un refresh des données pour mettre à jour les sections
+        setTimeout(() => {
+          refreshHousekeepers?.();
+        }, 500);
+      }
     }
-  }, [toast]);
+  }, [toast, currentHotelId, refreshHousekeepers]);
 
   // Phase 5: Ajouter des listeners temps réel avec indicateur de connexion
   const realtimeSync = useRealtimeSync({
