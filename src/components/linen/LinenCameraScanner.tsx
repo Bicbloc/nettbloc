@@ -151,11 +151,15 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     if (!result || !capturedImage) return;
 
     try {
+      // Convertir base64 en Blob pour l'upload
+      const response = await fetch(capturedImage);
+      const blob = await response.blob();
+      
       // Upload photo to storage
       const fileName = `linen-${Date.now()}.jpg`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('linen-images')
-        .upload(fileName, capturedImage, {
+        .upload(fileName, blob, {
           contentType: 'image/jpeg',
           upsert: false
         });
