@@ -160,12 +160,13 @@ export function RoomCard({
     return (
       <div 
         ref={cardRef}
-        className={`px-3 py-2 text-xs border rounded-xl bg-card shadow-modern flex items-center gap-2 transition-all duration-300 ${
+        className={`px-3 py-2 text-xs border rounded-xl bg-card shadow-modern flex flex-col gap-1 transition-all duration-300 ${
           dragging ? 'opacity-50' : ''
         } ${
           isSelected ? 'bg-gradient-primary text-primary-foreground border-2' :
           room.isUrgent ? 'border-destructive border-2 bg-destructive/5' : 
-          room.notUrgent ? 'border-green-500 bg-green-50' : 'border-border hover:shadow-modern-md'
+          room.notUrgent ? 'border-green-500 bg-green-50' : 
+          room.status === 'clean' ? 'border-green-400 bg-green-50/50' : 'border-border hover:shadow-modern-md'
         } ${
           selectable ? 'cursor-pointer hover:scale-[1.02]' : ''
         } animate-fade-in`}
@@ -185,6 +186,11 @@ export function RoomCard({
               {room.cleaningType === 'full' ? 'B' : 'R'}
             </span>
           )}
+          {room.status === 'clean' && (
+            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
+              <Check className="h-2 w-2" /> Propre
+            </span>
+          )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
           {room.status === 'needs-attention' && room.remark && (
             <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
@@ -196,8 +202,15 @@ export function RoomCard({
               🚪
             </span>
           )}
+          <span className="text-xs text-muted-foreground font-medium flex-shrink-0 ml-auto">{floorDisplay}</span>
         </div>
-        <span className="text-xs text-muted-foreground font-medium flex-shrink-0">{floorDisplay}</span>
+        
+        {/* Afficher les notes/commentaires de la femme de chambre */}
+        {room.notes && (
+          <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md truncate" title={room.notes}>
+            💬 {room.notes}
+          </div>
+        )}
         
         {/* Boutons de changement rapide et menu réassignation */}
         {showActions && (
