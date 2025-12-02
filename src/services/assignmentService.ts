@@ -35,32 +35,64 @@ export class AssignmentService {
     try {
       console.log('🔄 Assignation chambre:', { hotelId, roomId, housekeeperId, housekeeperName });
 
+      // 1. Vérifier si une assignation active existe déjà pour cette chambre
+      const { data: existingAssignment } = await supabase
+        .from('assignments')
+        .select('id, housekeeper_name, status')
+        .eq('hotel_id', hotelId)
+        .eq('room_id', roomId)
+        .in('status', ['assigned', 'in_progress'])
+        .maybeSingle();
+
       // Récupérer le nom EXACT depuis la base de données pour cohérence
       let exactHousekeeperName = housekeeperName.trim();
-      let housekeeperProfileId: string | null = null;
       
       if (housekeeperId) {
         const { data: hkData } = await supabase
           .from('housekeepers')
           .select('name, user_id')
           .eq('id', housekeeperId)
-          .single();
+          .maybeSingle();
         
         if (hkData) {
-          // Utiliser le nom exact de la base de données
           exactHousekeeperName = hkData.name;
-          housekeeperProfileId = hkData.user_id;
           console.log('✅ Nom exact récupéré:', exactHousekeeperName);
         }
       }
 
+      // 2. Si une assignation existe, la mettre à jour (réassigner)
+      if (existingAssignment) {
+        console.log('📝 Assignation existante trouvée, mise à jour:', existingAssignment.id);
+        
+        const { data, error } = await supabase
+          .from('assignments')
+          .update({
+            housekeeper_id: housekeeperId,
+            housekeeper_name: exactHousekeeperName,
+            assigned_at: new Date().toISOString(),
+            notes: notes
+          })
+          .eq('id', existingAssignment.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Erreur mise à jour assignation:', error);
+          return { success: false, error: error.message };
+        }
+
+        console.log('✅ Assignation mise à jour:', data.id);
+        return { success: true, assignmentId: data.id };
+      }
+
+      // 3. Sinon, créer une nouvelle assignation
       const { data, error } = await supabase
         .from('assignments')
         .insert({
           hotel_id: hotelId,
           room_id: roomId,
           housekeeper_id: housekeeperId,
-          housekeeper_name: exactHousekeeperName, // Nom exact de la DB
+          housekeeper_name: exactHousekeeperName,
           status: 'assigned',
           notes: notes,
           estimated_duration: 30
@@ -85,7 +117,7 @@ export class AssignmentService {
         .from('rooms')
         .select('room_number')
         .eq('id', roomId)
-        .single();
+        .maybeSingle();
 
       // Créer une notification pour la femme de chambre
       await supabase.from('notifications').insert({
