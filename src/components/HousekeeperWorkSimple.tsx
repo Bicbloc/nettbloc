@@ -368,7 +368,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         `)
         .eq('hotel_id', hotelId)
         .or(orFilter)
-        .in('status', ['assigned', 'in_progress'])
+        .in('status', ['assigned', 'in_progress', 'completed'])
         .order('created_at', { ascending: false });
 
       console.log('📋 Assignations trouvées:', assignmentsData);
@@ -595,7 +595,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         addToActivityLog(`🔄 Chambre ${roomNumber} en cours`, 'info');
       }
 
-      // Mettre à jour l'état local
+      // Mettre à jour l'état local - garder la chambre dans la liste même si propre
       setRooms(prev => {
         const updatedRooms = prev.map(room => 
           room.id === roomId 
@@ -603,20 +603,21 @@ export const HousekeeperWorkSimple: React.FC = () => {
             : room
         );
         
-        // Si chambre terminée, mettre à jour le cache sans cette chambre
-        if (newStatus === 'clean') {
-          const remainingRooms = updatedRooms.filter(r => r.id !== roomId);
-          const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
-          try {
-            const updatedAssignments = assignments.filter(a => a.rooms?.id !== roomId);
-            localStorage.setItem(cachedKey, JSON.stringify({
-              assignments: updatedAssignments,
-              rooms: remainingRooms,
-              timestamp: Date.now()
-            }));
-          } catch (e) {
-            console.error('Erreur mise à jour cache:', e);
-          }
+        // Mettre à jour le cache avec les chambres mises à jour (ne pas supprimer les chambres propres)
+        const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
+        try {
+          const updatedAssignments = assignments.map(a => 
+            a.rooms?.id === roomId 
+              ? { ...a, status: newStatus === 'clean' ? 'completed' : 'in_progress', rooms: { ...a.rooms, status: newStatus } }
+              : a
+          );
+          localStorage.setItem(cachedKey, JSON.stringify({
+            assignments: updatedAssignments,
+            rooms: updatedRooms,
+            timestamp: Date.now()
+          }));
+        } catch (e) {
+          console.error('Erreur mise à jour cache:', e);
         }
         
         return updatedRooms;
@@ -654,16 +655,16 @@ export const HousekeeperWorkSimple: React.FC = () => {
   };
 
   const handleLogout = () => {
-    // Nettoyer le localStorage
+    // Nettoyer le localStorage - MAIS garder le cache des assignations pour la persistance
     localStorage.removeItem('housekeeper');
     localStorage.removeItem('housekeeperProfile');
     localStorage.removeItem('selectedHotelId');
     localStorage.removeItem('selectedHotelName');
     localStorage.removeItem('selectedHotelCode');
     
-    // Nettoyer le cache des assignations
-    const cacheKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
-    localStorage.removeItem(cacheKey);
+    // NE PAS nettoyer le cache des assignations - le garder pour la prochaine connexion
+    // const cacheKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
+    // localStorage.removeItem(cacheKey);
     
     // Rediriger vers la page appropriée
     if (isAuthenticatedHousekeeper) {

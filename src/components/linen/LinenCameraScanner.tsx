@@ -37,24 +37,63 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      });
+      // Essayer d'abord avec la caméra arrière
+      let stream: MediaStream | null = null;
       
-      if (videoRef.current) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        });
+      } catch (envError) {
+        console.log('Caméra arrière non disponible, essai avec caméra frontale...');
+        // Fallback: essayer n'importe quelle caméra disponible
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+      }
+      
+      if (videoRef.current && stream) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
+        
+        // Attendre que la vidéo soit prête
+        await new Promise<void>((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current?.play();
+              resolve();
+            };
+          }
+        });
+        
         setIsStreaming(true);
+        console.log('✅ Caméra démarrée avec succès');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur accès caméra:', error);
+      
+      let errorMessage = "Impossible d'accéder à la caméra.";
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Accès à la caméra refusé. Veuillez autoriser l'accès dans les paramètres du navigateur.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "Aucune caméra détectée sur cet appareil.";
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = "La caméra est déjà utilisée par une autre application.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = "La caméra ne supporte pas les paramètres demandés.";
+      }
+      
       toast({
         title: "Erreur caméra",
-        description: "Impossible d'accéder à la caméra. Vérifiez les permissions.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -69,10 +108,28 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   };
 
   const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      toast({
+        title: "Erreur",
+        description: "Caméra non initialisée",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    // Vérifier que la vidéo a des dimensions valides
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast({
+        title: "Erreur",
+        description: "La vidéo n'est pas encore prête. Veuillez patienter.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
