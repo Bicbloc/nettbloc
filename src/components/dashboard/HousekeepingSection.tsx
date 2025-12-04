@@ -48,7 +48,7 @@ export function HousekeepingSection({
   onRename,
   onGenerateAccessCode
 }: HousekeepingSectionProps) {
-  const unassignedRooms = rooms.filter(r => !r.assignedTo && r.status !== 'Propre');
+  const unassignedRooms = rooms.filter(r => !r.assignedTo && r.status !== 'clean');
 
   return (
     <div className="space-y-4">

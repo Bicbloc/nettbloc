@@ -193,7 +193,7 @@ export default function HousekeeperAuth() {
                   <Button
                     variant="link"
                     size="sm"
-                    onClick={() => navigate('/housekeeper/login')}
+                    onClick={() => navigate('/housekeeper/hotels')}
                     className="text-primary hover:text-primary/80 font-medium"
                   >
                     Connexion rapide avec code

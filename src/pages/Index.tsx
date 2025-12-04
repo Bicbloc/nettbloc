@@ -376,7 +376,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
           .from('assignments')
           .select('room_id, housekeeper_name')
           .eq('hotel_id', currentHotelId)
-          .in('status', ['assigned', 'in_progress']);
+          .in('status', ['assigned', 'in_progress', 'completed']);
 
         if (assignmentsError) throw assignmentsError;
 
@@ -384,7 +384,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         if (dbRooms && dbRooms.length > 0) {
           const mergedRooms: Room[] = dbRooms.map(r => {
             const assignment = dbAssignments?.find(a => a.room_id === r.id);
-            const cleaningType = r.room_type === 'full' ? 'full' : (r.room_type === 'quick' ? 'quick' : 'none');
+            const cleaningType = r.cleaning_type === 'full' ? 'full' : (r.cleaning_type === 'quick' ? 'quick' : 'none');
             return {
               number: r.room_number,
               status: r.status,
