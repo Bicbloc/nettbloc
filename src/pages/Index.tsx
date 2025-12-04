@@ -442,6 +442,21 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               console.warn('Erreur parsing savedState:', e);
             }
           }
+          
+          // Si toujours pas de housekeepers, charger depuis la base de données
+          if (housekeeperNames.length === 0) {
+            const { data: dbHousekeepers } = await supabase
+              .from('housekeepers')
+              .select('name')
+              .eq('hotel_id', currentHotelId)
+              .eq('is_active', true);
+              
+            if (dbHousekeepers && dbHousekeepers.length > 0) {
+              const names = dbHousekeepers.map(h => h.name);
+              setHousekeeperNames(names);
+              console.log('✅ Housekeepers restaurés depuis Supabase:', names);
+            }
+          }
         }
       } catch (error) {
         console.error('❌ Phase 4: Erreur chargement chambres:', error);

@@ -221,7 +221,23 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           upsert: false
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Erreur upload photo:', uploadError);
+        // Continuer sans la photo si l'upload échoue
+        toast({
+          title: "⚠️ Photo non sauvegardée",
+          description: "Comptage enregistré mais photo non uploadée. Vérifiez la configuration du stockage.",
+          variant: "default"
+        });
+        
+        onCountComplete({
+          count: result.count,
+          confidence: result.confidence,
+          photoUrl: '', // Pas de photo
+          notes: result.notes
+        });
+        return;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('linen-images')
@@ -241,10 +257,18 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
     } catch (error) {
       console.error('Erreur upload photo:', error);
+      // Fallback: enregistrer sans photo
       toast({
-        title: "Erreur",
-        description: "Impossible d'enregistrer la photo",
-        variant: "destructive"
+        title: "⚠️ Erreur upload",
+        description: "Comptage enregistré sans photo",
+        variant: "default"
+      });
+      
+      onCountComplete({
+        count: result.count,
+        confidence: result.confidence,
+        photoUrl: '',
+        notes: result.notes
       });
     }
   };
