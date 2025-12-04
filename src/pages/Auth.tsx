@@ -561,16 +561,16 @@ const Auth = () => {
                   <span className="font-semibold text-emerald-800">Vous êtes femme de chambre ?</span>
                 </div>
                 <p className="text-sm text-emerald-700 mb-3">
-                  Accédez à l'interface mobile dédiée avec votre code d'accès
+                  Connectez-vous avec votre email et mot de passe pour accéder à l'interface mobile dédiée
                 </p>
                 <Button 
                   variant="outline" 
                   className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-100" 
-                  onClick={() => navigate('/housekeeper/login')}
+                  onClick={() => navigate('/housekeeper/auth')}
                   type="button"
                 >
                   <UserCheck className="mr-2 h-4 w-4" />
-                  Connexion Femme de chambre
+                  Espace Femme de chambre
                 </Button>
               </div>
               
