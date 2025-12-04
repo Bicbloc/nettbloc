@@ -87,7 +87,24 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
       }
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Non authentifié");
+      if (!user) throw new Error("Non authentifié - veuillez vous reconnecter");
+
+      // Vérifier que l'hôtel appartient à l'utilisateur
+      const { data: hotel, error: hotelError } = await supabase
+        .from('hotels')
+        .select('id')
+        .eq('id', hotelId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (hotelError) {
+        console.error('Erreur vérification hôtel:', hotelError);
+        throw new Error("Erreur de vérification de l'hôtel");
+      }
+      
+      if (!hotel) {
+        throw new Error("Vous n'avez pas accès à cet hôtel");
+      }
 
       const { error } = await supabase.from("linen_inventory_tasks").insert({
         hotel_id: hotelId,
@@ -95,10 +112,13 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
         assigned_by: user.id,
         task_date: taskDate,
         status: "pending",
-        notes,
+        notes: notes || null,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erreur insertion tâche:', error);
+        throw new Error(error.message || "Erreur lors de la création");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["linen-tasks"] });
@@ -106,7 +126,10 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
       setSelectedHousekeeper("");
       setNotes("");
     },
-    onError: (error: any) => toast.error(error.message),
+    onError: (error: any) => {
+      console.error('Erreur création tâche:', error);
+      toast.error(error.message || "Impossible de créer la tâche");
+    },
   });
 
   const getStatusBadge = (status: string) => {

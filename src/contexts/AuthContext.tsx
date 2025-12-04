@@ -147,8 +147,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    // Préserver l'ID de l'hôtel pour restaurer les données après reconnexion
+    const hotelId = localStorage.getItem('selectedHotelId');
+    const lastHotelSession = localStorage.getItem('hotel_session');
+    
     HotelStorageService.clear();
     localStorage.removeItem('nettobloc_session_id');
+    
+    // Restaurer l'ID de l'hôtel pour permettre la restauration des sections
+    if (hotelId) {
+      localStorage.setItem('selectedHotelId', hotelId);
+      localStorage.setItem('lastHotelId', hotelId);
+    }
+    if (lastHotelSession) {
+      localStorage.setItem('hotel_session', lastHotelSession);
+    }
+    
     await supabase.auth.signOut();
   };
 
