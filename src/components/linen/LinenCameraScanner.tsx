@@ -37,10 +37,21 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   const startCamera = async () => {
     try {
+      // Vérifier si navigator.mediaDevices est disponible (nécessite HTTPS)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast({
+          title: "Caméra non disponible",
+          description: "La caméra nécessite une connexion sécurisée (HTTPS). Utilisez un navigateur moderne.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Essayer d'abord avec la caméra arrière
       let stream: MediaStream | null = null;
       
       try {
+        console.log('📷 Tentative caméra arrière...');
         stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'environment',
@@ -49,7 +60,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           }
         });
       } catch (envError) {
-        console.log('Caméra arrière non disponible, essai avec caméra frontale...');
+        console.log('📷 Caméra arrière non disponible, essai avec caméra frontale...', envError);
         // Fallback: essayer n'importe quelle caméra disponible
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -63,21 +74,26 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         
-        // Attendre que la vidéo soit prête
-        await new Promise<void>((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = () => {
-              videoRef.current?.play();
-              resolve();
-            };
-          }
-        });
+        // Attendre que la vidéo soit prête avec timeout
+        await Promise.race([
+          new Promise<void>((resolve) => {
+            if (videoRef.current) {
+              videoRef.current.onloadedmetadata = () => {
+                videoRef.current?.play().catch(console.error);
+                resolve();
+              };
+            }
+          }),
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+        ]);
         
         setIsStreaming(true);
         console.log('✅ Caméra démarrée avec succès');
+      } else {
+        throw new Error('Impossible d\'initialiser le flux vidéo');
       }
     } catch (error: any) {
-      console.error('Erreur accès caméra:', error);
+      console.error('❌ Erreur accès caméra:', error);
       
       let errorMessage = "Impossible d'accéder à la caméra.";
       
@@ -89,6 +105,10 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         errorMessage = "La caméra est déjà utilisée par une autre application.";
       } else if (error.name === 'OverconstrainedError') {
         errorMessage = "La caméra ne supporte pas les paramètres demandés.";
+      } else if (error.message === 'Timeout') {
+        errorMessage = "La caméra met trop de temps à répondre. Réessayez.";
+      } else if (!window.isSecureContext) {
+        errorMessage = "La caméra nécessite HTTPS. Utilisez un serveur sécurisé.";
       }
       
       toast({
