@@ -147,21 +147,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    // Préserver l'ID de l'hôtel pour restaurer les données après reconnexion
+    // IMPORTANT: Préserver TOUTES les données d'assignation pour restauration après reconnexion
+    // Ces données ne doivent être effacées que lors de la clôture de journée
     const hotelId = localStorage.getItem('selectedHotelId');
     const lastHotelSession = localStorage.getItem('hotel_session');
+    const hotelSessionPersistence = localStorage.getItem('hotel_session_persistence');
+    const housekeeperNames = localStorage.getItem('housekeeper_names');
     
-    HotelStorageService.clear();
+    // Sauvegarder les clés assignments_* avant clear
+    const assignmentKeys: Record<string, string> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('assignments_')) {
+        assignmentKeys[key] = localStorage.getItem(key) || '';
+      }
+    }
+    
+    // Clear uniquement les données de session, pas les assignations
     localStorage.removeItem('nettobloc_session_id');
     
-    // Restaurer l'ID de l'hôtel pour permettre la restauration des sections
+    // Restaurer TOUTES les données nécessaires pour la persistance des sections
     if (hotelId) {
       localStorage.setItem('selectedHotelId', hotelId);
       localStorage.setItem('lastHotelId', hotelId);
+      localStorage.setItem('currentHotelId', hotelId);
     }
     if (lastHotelSession) {
       localStorage.setItem('hotel_session', lastHotelSession);
     }
+    if (hotelSessionPersistence) {
+      localStorage.setItem('hotel_session_persistence', hotelSessionPersistence);
+    }
+    if (housekeeperNames) {
+      localStorage.setItem('housekeeper_names', housekeeperNames);
+    }
+    
+    // Restaurer toutes les clés d'assignation
+    Object.entries(assignmentKeys).forEach(([key, value]) => {
+      if (value) localStorage.setItem(key, value);
+    });
     
     await supabase.auth.signOut();
   };

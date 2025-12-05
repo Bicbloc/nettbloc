@@ -89,45 +89,44 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non authentifié - veuillez vous reconnecter");
 
-      // Vérifier que l'hôtel appartient à l'utilisateur
-      const { data: hotel, error: hotelError } = await supabase
-        .from('hotels')
-        .select('id')
-        .eq('id', hotelId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      if (hotelError) {
-        console.error('Erreur vérification hôtel:', hotelError);
-        throw new Error("Erreur de vérification de l'hôtel");
-      }
-      
-      if (!hotel) {
-        throw new Error("Vous n'avez pas accès à cet hôtel");
-      }
+      console.log('🔄 Création tâche inventaire:', {
+        hotelId,
+        assignedTo: selectedHousekeeper,
+        assignedBy: user.id,
+        taskDate
+      });
 
-      const { error } = await supabase.from("linen_inventory_tasks").insert({
+      const { data, error } = await supabase.from("linen_inventory_tasks").insert({
         hotel_id: hotelId,
         assigned_to: selectedHousekeeper,
         assigned_by: user.id,
         task_date: taskDate,
         status: "pending",
         notes: notes || null,
-      });
+      }).select();
 
       if (error) {
-        console.error('Erreur insertion tâche:', error);
-        throw new Error(error.message || "Erreur lors de la création");
+        console.error('❌ Erreur insertion tâche:', error);
+        // Message d'erreur plus explicite selon le type
+        if (error.code === '42501') {
+          throw new Error("Vous n'avez pas les permissions pour créer cette tâche");
+        } else if (error.code === '23503') {
+          throw new Error("La femme de chambre sélectionnée n'existe plus");
+        } else {
+          throw new Error(error.message || "Erreur lors de la création");
+        }
       }
+
+      console.log('✅ Tâche créée:', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["linen-tasks"] });
-      toast.success("Tâche d'inventaire créée");
+      toast.success("Tâche d'inventaire créée avec succès");
       setSelectedHousekeeper("");
       setNotes("");
     },
     onError: (error: any) => {
-      console.error('Erreur création tâche:', error);
+      console.error('❌ Erreur création tâche:', error);
       toast.error(error.message || "Impossible de créer la tâche");
     },
   });
