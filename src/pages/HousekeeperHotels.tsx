@@ -91,11 +91,12 @@ export default function HousekeeperHotels() {
               setTimeout(() => reject(new Error('Timeout')), 10000)
             );
 
+            // Chercher par housekeeper_id OU housekeeper_name pour couvrir tous les cas
             const queryPromise = supabase
               .from('assignments')
               .select('*', { count: 'exact', head: true })
               .eq('hotel_id', hotel.id)
-              .eq('housekeeper_id', profileData.id)
+              .or(`housekeeper_id.eq.${profileData.id},housekeeper_name.eq.${profileData.name}`)
               .in('status', ['assigned', 'in_progress']);
 
             const { count } = await Promise.race([queryPromise, timeoutPromise]);
@@ -197,25 +198,25 @@ export default function HousekeeperHotels() {
     console.log('🏨 Sélection hôtel:', hotel);
     
     try {
-      // 1. Nettoyer TOUT le localStorage lié à l'hôtel
-      HotelStorageService.clear();
-      localStorage.removeItem('housekeeper');
-      localStorage.removeItem('housekeeperProfile');
-      
-      // 2. Sauvegarder de manière synchrone (throws error if fails)
+      // 1. SAUVEGARDER D'ABORD le nouvel hôtel (avant de nettoyer)
       HotelStorageService.save({
         id: hotel.id,
         name: hotel.name,
         code: hotel.hotel_code,
       });
       
-      // 3. Sauvegarder le profil housekeeper
+      // 2. Sauvegarder le profil housekeeper avec les infos hôtel
       localStorage.setItem('housekeeperProfile', JSON.stringify({
         id: profile.id,
         name: profile.name,
         email: profile.email,
-        isAuthenticated: true
+        isAuthenticated: true,
+        currentHotelId: hotel.id // Backup additionnel
       }));
+
+      // 3. Sauvegarde redondante pour récupération
+      localStorage.setItem('lastSelectedHotelId', hotel.id);
+      localStorage.setItem('lastSelectedHotelName', hotel.name);
 
       // 4. Vérifier que les données sont bien sauvegardées
       const savedId = localStorage.getItem('selectedHotelId');

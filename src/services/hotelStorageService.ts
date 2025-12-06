@@ -87,6 +87,7 @@ export class HotelStorageService {
       localStorage.removeItem('selectedHotelId');
       localStorage.removeItem('currentHotelId');
       localStorage.removeItem('hotelId');
+      // Ne PAS effacer lastSelectedHotelId (backup de récupération)
     } catch (error) {
       console.error('Failed to clear hotel session:', error);
     }
@@ -95,5 +96,39 @@ export class HotelStorageService {
   static getId(): string | null {
     const session = this.get();
     return session?.id || null;
+  }
+
+  // Méthode de récupération en cas de perte
+  static recover(): string | null {
+    // 1. Essayer la méthode standard
+    const standard = this.getId();
+    if (standard) return standard;
+    
+    // 2. Essayer le backup
+    const backup = localStorage.getItem('lastSelectedHotelId');
+    if (backup && backup.length >= 30) {
+      console.log('🔄 Récupération depuis lastSelectedHotelId');
+      // Restaurer les données
+      localStorage.setItem('selectedHotelId', backup);
+      localStorage.setItem('currentHotelId', backup);
+      return backup;
+    }
+    
+    // 3. Essayer le profil
+    try {
+      const profile = localStorage.getItem('housekeeperProfile');
+      if (profile) {
+        const parsed = JSON.parse(profile);
+        if (parsed.currentHotelId && parsed.currentHotelId.length >= 30) {
+          console.log('🔄 Récupération depuis housekeeperProfile');
+          localStorage.setItem('selectedHotelId', parsed.currentHotelId);
+          return parsed.currentHotelId;
+        }
+      }
+    } catch (e) {
+      console.error('Erreur récupération profil:', e);
+    }
+    
+    return null;
   }
 }
