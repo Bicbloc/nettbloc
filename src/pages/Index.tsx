@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +38,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import EmailReportDialog from "@/components/EmailReportDialog";
 import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
+import { CreateColumnDialog } from "@/components/CreateColumnDialog";
 import { SyncHousekeepersButton } from "@/components/SyncHousekeepersButton";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
@@ -168,6 +169,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showActionLogPanel, setShowActionLogPanel] = useState(false);
+  const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
   
   const [existingHousekeepers, setExistingHousekeepers] = useState<string[]>([]);
   
@@ -2490,20 +2492,37 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                     
                     {/* Bouton pour créer une nouvelle colonne femme de chambre */}
                     <div className="min-w-0 w-full">
-                      <Card className="border-2 border-dashed border-muted-foreground/30 bg-muted/10 hover:border-primary/50 hover:bg-muted/20 transition-all cursor-pointer h-full min-h-[200px] flex items-center justify-center">
+                      <Card 
+                        className="border-2 border-dashed border-muted-foreground/30 bg-muted/10 hover:border-primary/50 hover:bg-muted/20 transition-all cursor-pointer h-full min-h-[200px] flex items-center justify-center"
+                        onClick={() => setShowCreateColumnDialog(true)}
+                      >
                         <CardContent className="flex flex-col items-center justify-center p-8 text-center">
-                          <div className="mb-4">
-                            <QuickAddHousekeeperButton 
-                              className="h-auto py-6 px-8 text-lg flex-col gap-3"
-                            />
+                          <div className="p-4 rounded-full bg-primary/10 mb-4">
+                            <UserPlus className="h-8 w-8 text-primary" />
                           </div>
+                          <h3 className="font-semibold text-lg mb-2">Créer une colonne</h3>
                           <p className="text-sm text-muted-foreground max-w-xs">
-                            Ajoutez une femme de chambre pour créer une nouvelle colonne et lui assigner des chambres
+                            Sélectionnez une femme de chambre existante ou ajoutez-en une nouvelle
                           </p>
                         </CardContent>
                       </Card>
                     </div>
                   </div>
+                  
+                  {/* Dialog de création de colonne */}
+                  <CreateColumnDialog
+                    open={showCreateColumnDialog}
+                    onOpenChange={setShowCreateColumnDialog}
+                    hotelId={currentHotelId || ''}
+                    assignedHousekeeperNames={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
+                    onSelectExisting={(name) => {
+                      // La femme de chambre existe déjà, on la garde dans la liste
+                      // Elle apparaîtra quand on lui assignera des chambres
+                      toast({
+                        description: `${name} est prêt(e). Glissez-déposez des chambres dans sa colonne.`
+                      });
+                    }}
+                  />
                 </div>
               )}
             </TabsContent>
