@@ -121,35 +121,39 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-left">
+      <DialogContent className="w-[95vw] max-w-lg max-h-[85vh] flex flex-col p-4 sm:p-6">
+        <DialogHeader className="flex-shrink-0 space-y-1">
+          <DialogTitle className="text-left text-base sm:text-lg">
             {housekeeperName 
               ? `Rapport de ${housekeeperName}`
               : 'Téléchargement des rapports'}
           </DialogTitle>
-          <DialogDescription className="text-left">
+          <DialogDescription className="text-left text-sm">
             Configurez les instructions pour le rapport PDF
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4 pb-4">
-              <div className="grid gap-4 py-2">
-                <div className="mt-2">
-                  <Label className="font-medium mb-2 block text-left">Instructions générales (pour tous les rapports)</Label>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 mt-2">
+          <ScrollArea className="flex-1 pr-2 sm:pr-4">
+            <div className="space-y-3 sm:space-y-4 pb-4">
+              <div className="space-y-3 sm:space-y-4">
+                <div>
+                  <Label className="font-medium mb-1.5 block text-left text-sm">
+                    Instructions générales
+                  </Label>
                   <Textarea
                     id="generalInstructions"
-                    placeholder="Instructions générales qui s'appliqueront à tous les rapports..."
+                    placeholder="Instructions générales pour tous les rapports..."
                     value={customFields.generalInstructions || ''}
                     onChange={handleGeneralInstructionsChange}
-                    className="min-h-[80px]"
+                    className="min-h-[70px] sm:min-h-[80px] text-sm"
                   />
                 </div>
                 
-                <div className="mt-2">
-                  <Label className="font-medium mb-2 block text-left">À faire et à savoir (par rapport)</Label>
+                <div>
+                  <Label className="font-medium mb-1.5 block text-left text-sm">
+                    À faire et à savoir
+                  </Label>
                   <ReportCustomFields onChange={(fields) => {
                     setCustomFields(prev => ({
                       ...prev,
@@ -161,8 +165,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                 
                 {/* Single housekeeper mode */}
                 {housekeeperName && (
-                  <div className="mt-2">
-                    <Label htmlFor={`instructions-${housekeeperName}`} className="font-medium mb-2 block text-left">
+                  <div>
+                    <Label htmlFor={`instructions-${housekeeperName}`} className="font-medium mb-1.5 block text-left text-sm">
                       Instructions spécifiques pour {housekeeperName}
                     </Label>
                     <Textarea
@@ -170,38 +174,47 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                       placeholder={`Instructions spécifiques pour ${housekeeperName}...`}
                       value={(customFields.housekeeperInstructions && customFields.housekeeperInstructions[housekeeperName]) || ''}
                       onChange={handleInstructionsChange}
-                      className="min-h-[80px]"
+                      className="min-h-[70px] sm:min-h-[80px] text-sm"
                     />
                   </div>
                 )}
                 
-                {/* Multiple housekeepers mode - show instructions fields for each housekeeper */}
+                {/* Multiple housekeepers mode */}
                 {!housekeeperName && allHousekeepers && allHousekeepers.length > 0 && (
-                  <div className="mt-2">
-                    <Label className="font-medium mb-2 block text-left">Instructions spécifiques par femme de chambre</Label>
-                    {allHousekeepers.map(name => (
-                      <div key={name} className="mb-3 border-b pb-3">
-                        <Label htmlFor={`instructions-${name}`} className="mb-1 block text-sm text-left">
-                          {name}
-                        </Label>
-                        <Textarea
-                          id={`instructions-${name}`}
-                          placeholder={`Instructions spécifiques pour ${name}...`}
-                          value={(customFields.housekeeperInstructions && customFields.housekeeperInstructions[name]) || ''}
-                          onChange={(e) => handleHousekeeperInstructionChange(name, e.target.value)}
-                          className="min-h-[80px]"
-                        />
-                      </div>
-                    ))}
+                  <div>
+                    <Label className="font-medium mb-1.5 block text-left text-sm">
+                      Instructions spécifiques par femme de chambre
+                    </Label>
+                    <div className="space-y-3">
+                      {allHousekeepers.map(name => (
+                        <div key={name} className="border-b pb-3 last:border-b-0">
+                          <Label htmlFor={`instructions-${name}`} className="mb-1 block text-sm text-muted-foreground">
+                            {name}
+                          </Label>
+                          <Textarea
+                            id={`instructions-${name}`}
+                            placeholder={`Instructions pour ${name}...`}
+                            value={(customFields.housekeeperInstructions && customFields.housekeeperInstructions[name]) || ''}
+                            onChange={(e) => handleHousekeeperInstructionChange(name, e.target.value)}
+                            className="min-h-[60px] sm:min-h-[70px] text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           </ScrollArea>
           
-          <DialogFooter className="sticky bottom-0 pt-4 bg-background border-t mt-4">
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Traitement en cours..." : housekeeperName ? `Télécharger le rapport de ${housekeeperName}` : "Télécharger tous les rapports"}
+          <DialogFooter className="flex-shrink-0 pt-3 sm:pt-4 border-t mt-3">
+            <Button type="submit" disabled={isSubmitting} className="w-full text-sm sm:text-base py-2.5">
+              {isSubmitting 
+                ? "Traitement en cours..." 
+                : housekeeperName 
+                  ? `Télécharger le rapport de ${housekeeperName}` 
+                  : "Télécharger tous les rapports"
+              }
             </Button>
           </DialogFooter>
         </form>

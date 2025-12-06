@@ -510,10 +510,7 @@ function generateReportHTML(data: ReportData): string {
       </div>
       
       <div class="footer">
-        <a href="https://bicbloc.eu" style="text-decoration: none; color: inherit;">
-          <span class="company">bicbloc.eu</span> - Commander un extra en trois clics<br>
-          <span class="phone">+33 (0)1 89 70 69 50</span>
-        </a>
+        <span class="company">NettoBloc</span>
       </div>
     </body>
     </html>
