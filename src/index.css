@@ -292,3 +292,33 @@
     transform: scale(1);
   }
 }
+
+/* Animation clignotement pour chambres en cours de nettoyage */
+@keyframes pulse-cleaning {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(217 91% 60% / 0.4);
+    border-color: hsl(217 91% 60% / 0.6);
+  }
+  50% {
+    box-shadow: 0 0 12px 4px hsl(217 91% 60% / 0.3);
+    border-color: hsl(217 91% 60%);
+  }
+}
+
+.animate-pulse-cleaning {
+  animation: pulse-cleaning 1.5s ease-in-out infinite;
+}
+
+/* Badge animé pour "En cours" */
+@keyframes badge-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-badge-pulse {
+  animation: badge-pulse 1s ease-in-out infinite;
+}

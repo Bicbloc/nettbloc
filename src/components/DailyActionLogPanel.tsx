@@ -105,6 +105,7 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
       case 'incident':
         return <AlertTriangle className={iconClasses} />;
       case 'comment':
+      case 'room_remark':
         return <MessageSquare className={iconClasses} />;
       default:
         return <FileText className={iconClasses} />;
@@ -114,17 +115,19 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
   const getActionLabel = (actionType: string) => {
     switch (actionType) {
       case 'cleaning_start':
-        return 'Début nettoyage';
+        return '🔄 Début nettoyage';
       case 'cleaning_end':
-        return 'Fin nettoyage';
+        return '✅ Chambre propre';
       case 'assignment':
         return 'Assignation';
       case 'unassignment':
         return 'Désassignation';
       case 'incident':
-        return 'Incident';
+        return '⚠️ Incident';
       case 'comment':
         return 'Commentaire';
+      case 'room_remark':
+        return '💬 Remarque';
       default:
         return 'Action';
     }
@@ -133,9 +136,9 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
   const getActionColor = (actionType: string) => {
     switch (actionType) {
       case 'cleaning_start':
-        return 'bg-blue-500/10 text-blue-500';
+        return 'bg-blue-500/10 text-blue-500 border border-blue-200';
       case 'cleaning_end':
-        return 'bg-green-500/10 text-green-500';
+        return 'bg-green-500/10 text-green-600 border border-green-200';
       case 'assignment':
         return 'bg-primary/10 text-primary';
       case 'unassignment':
@@ -143,7 +146,8 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
       case 'incident':
         return 'bg-destructive/10 text-destructive';
       case 'comment':
-        return 'bg-purple-500/10 text-purple-500';
+      case 'room_remark':
+        return 'bg-purple-500/10 text-purple-500 border border-purple-200';
       default:
         return 'bg-muted/10 text-muted-foreground';
     }
@@ -223,12 +227,13 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes les actions</SelectItem>
-                <SelectItem value="cleaning_start">Début nettoyage</SelectItem>
-                <SelectItem value="cleaning_end">Fin nettoyage</SelectItem>
+                <SelectItem value="cleaning_start">🔄 Début nettoyage</SelectItem>
+                <SelectItem value="cleaning_end">✅ Fin nettoyage</SelectItem>
                 <SelectItem value="assignment">Assignation</SelectItem>
                 <SelectItem value="unassignment">Désassignation</SelectItem>
-                <SelectItem value="incident">Incident</SelectItem>
+                <SelectItem value="incident">⚠️ Incident</SelectItem>
                 <SelectItem value="comment">Commentaire</SelectItem>
+                <SelectItem value="room_remark">💬 Remarque</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -270,21 +275,35 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
                       
                       <div className="flex items-center gap-2 flex-wrap">
                         {log.actor_name && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs font-medium">
                             <User className="h-3 w-3 mr-1" />
                             {log.actor_name}
                           </Badge>
                         )}
                         {log.room_number && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs font-medium">
                             <Bed className="h-3 w-3 mr-1" />
                             CH {log.room_number}
                           </Badge>
                         )}
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge className={`text-xs ${getActionColor(log.action_type)}`}>
                           {getActionLabel(log.action_type)}
                         </Badge>
                       </div>
+                      
+                      {/* Afficher les détails supplémentaires (remarques, durée, etc.) */}
+                      {log.details && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {log.details.remark && (
+                            <div className="bg-muted/50 px-2 py-1 rounded mt-1 italic">
+                              💬 "{log.details.remark}"
+                            </div>
+                          )}
+                          {log.details.duration && (
+                            <span className="text-xs">Durée: {log.details.duration} min</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
