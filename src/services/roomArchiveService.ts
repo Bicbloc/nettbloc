@@ -72,6 +72,7 @@ export class RoomArchiveService {
       }
       
       // 4. Réinitialiser le statut de toutes les chambres à 'needs-cleaning'
+      // NOTE: Le registre des chambres (hotel_rooms_registry) est préservé
       const { error: resetError } = await supabase
         .from('rooms')
         .update({ 
@@ -123,7 +124,7 @@ export class RoomArchiveService {
         .delete()
         .eq('hotel_id', hotelId);
       
-      // 3. Supprimer toutes les chambres existantes
+      // 3. Supprimer toutes les chambres existantes (mais PAS le registre)
       const { error: deleteRoomsError } = await supabase
         .from('rooms')
         .delete()
@@ -131,13 +132,10 @@ export class RoomArchiveService {
       
       if (deleteRoomsError) throw deleteRoomsError;
       
-      // 4. Supprimer du registre également
-      await supabase
-        .from('hotel_rooms_registry')
-        .delete()
-        .eq('hotel_id', hotelId);
+      // NOTE: Le registre des chambres (hotel_rooms_registry) est PRÉSERVÉ
+      // Il sert de référence permanente des chambres de l'hôtel
       
-      console.log(`🗑️ ${existingCount || 0} anciennes chambres supprimées`);
+      console.log(`🗑️ ${existingCount || 0} anciennes chambres supprimées (registre préservé)`);
       
       // 5. Insérer les nouvelles chambres dans rooms
       const roomsForInsert = newRooms.map((room: any) => {
@@ -159,7 +157,7 @@ export class RoomArchiveService {
       
       if (insertRoomsError) throw insertRoomsError;
       
-      // 6. Insérer dans le registre
+      // 6. Mettre à jour le registre (upsert - ajouter les nouvelles, préserver les existantes)
       const registryData = newRooms.map((room: any) => {
         const roomNumber = room.roomNumber || room.room_number || room.number;
         return {
@@ -171,15 +169,20 @@ export class RoomArchiveService {
           zone: room.zone || null,
           source: 'pdf_import',
           imported_from: sourceName,
+          last_seen_at: new Date().toISOString(),
           metadata: { status: room.status, raw_data: room }
         };
       }).filter(r => !!r.room_number);
       
+      // Upsert pour préserver le registre existant
       await supabase
         .from('hotel_rooms_registry')
-        .insert(registryData);
+        .upsert(registryData, { 
+          onConflict: 'hotel_id,room_number',
+          ignoreDuplicates: false 
+        });
       
-      console.log(`✅ ${roomsForInsert.length} nouvelles chambres insérées`);
+      console.log(`✅ ${roomsForInsert.length} nouvelles chambres insérées, registre mis à jour`);
       
       return {
         deleted: existingCount || 0,
