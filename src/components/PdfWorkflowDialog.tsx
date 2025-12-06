@@ -111,25 +111,42 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setPdfData(data);
       setSavedPdfData(data); // Sauvegarder pour retry
       
-      // Étape 3: Vérifier les chambres existantes
+      // Étape 3: Vérifier les chambres existantes avec timeout
       setUploadStatus('🔍 Vérification des chambres existantes...');
       setUploadProgress(50);
       
       if (hotelId) {
-        const { count } = await supabase
-          .from('rooms')
-          .select('*', { count: 'exact', head: true })
-          .eq('hotel_id', hotelId);
-        
-        setExistingRoomsCount(count || 0);
-        
-        // Si des chambres existent, demander le mode d'import
-        if (count && count > 0) {
-          setIsUploading(false);
-          setUploadProgress(0);
-          setUploadStatus('');
-          setStep('import-mode');
-          return;
+        try {
+          // Timeout de 10 secondes pour la vérification
+          const checkExistingRooms = async () => {
+            const { count, error } = await supabase
+              .from('rooms')
+              .select('*', { count: 'exact', head: true })
+              .eq('hotel_id', hotelId);
+            
+            if (error) throw error;
+            return count || 0;
+          };
+          
+          const timeoutPromise = new Promise<number>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 10000)
+          );
+          
+          const roomCount = await Promise.race([checkExistingRooms(), timeoutPromise]);
+          setExistingRoomsCount(roomCount);
+          
+          // Si des chambres existent, demander le mode d'import
+          if (roomCount > 0) {
+            setIsUploading(false);
+            setUploadProgress(0);
+            setUploadStatus('');
+            setStep('import-mode');
+            return;
+          }
+        } catch (checkError) {
+          console.warn('Impossible de vérifier les chambres existantes, on continue:', checkError);
+          // En cas d'erreur/timeout, on continue avec le mode update par défaut
+          setExistingRoomsCount(0);
         }
       }
       
