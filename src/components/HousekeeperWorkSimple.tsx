@@ -813,11 +813,22 @@ export const HousekeeperWorkSimple: React.FC = () => {
       
       setActiveLinenTask(taskId);
       setShowLinenInventory(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur création tâche inventaire:', error);
+      
+      // Message d'erreur plus explicite selon le type d'erreur
+      let errorMessage = "Impossible de créer la tâche d'inventaire";
+      
+      if (error?.message?.includes('row-level security') || error?.code === '42501') {
+        errorMessage = "Permission refusée. Veuillez vous reconnecter ou contacter l'administrateur.";
+        console.error('Erreur RLS - vérifier les politiques pour linen_inventory_tasks');
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
-        title: "Erreur",
-        description: "Impossible de créer la tâche d'inventaire",
+        title: "Erreur inventaire",
+        description: errorMessage,
         variant: "destructive"
       });
     }
