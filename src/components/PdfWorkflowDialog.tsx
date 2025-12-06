@@ -111,43 +111,42 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setPdfData(data);
       setSavedPdfData(data); // Sauvegarder pour retry
       
-      // Étape 3: Vérifier les chambres existantes avec timeout
-      setUploadStatus('🔍 Vérification des chambres existantes...');
+      // Étape 3: Vérifier les chambres existantes avec timeout court
+      setUploadStatus('🔍 Vérification rapide...');
       setUploadProgress(50);
       
+      let existingCount = 0;
       if (hotelId) {
         try {
-          // Timeout de 10 secondes pour la vérification
-          const checkExistingRooms = async () => {
-            const { count, error } = await supabase
-              .from('rooms')
-              .select('*', { count: 'exact', head: true })
-              .eq('hotel_id', hotelId);
-            
-            if (error) throw error;
-            return count || 0;
-          };
+          // Timeout de 5 secondes max
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
           
-          const timeoutPromise = new Promise<number>((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 10000)
-          );
+          const { count, error } = await supabase
+            .from('rooms')
+            .select('*', { count: 'exact', head: true })
+            .eq('hotel_id', hotelId)
+            .abortSignal(controller.signal);
           
-          const roomCount = await Promise.race([checkExistingRooms(), timeoutPromise]);
-          setExistingRoomsCount(roomCount);
+          clearTimeout(timeoutId);
           
-          // Si des chambres existent, demander le mode d'import
-          if (roomCount > 0) {
-            setIsUploading(false);
-            setUploadProgress(0);
-            setUploadStatus('');
-            setStep('import-mode');
-            return;
+          if (!error) {
+            existingCount = count || 0;
+            setExistingRoomsCount(existingCount);
           }
-        } catch (checkError) {
-          console.warn('Impossible de vérifier les chambres existantes, on continue:', checkError);
-          // En cas d'erreur/timeout, on continue avec le mode update par défaut
-          setExistingRoomsCount(0);
+        } catch (checkError: any) {
+          console.warn('Vérification ignorée:', checkError.message);
+          // Continuer sans bloquer
         }
+      }
+      
+      // Si des chambres existent, demander le mode d'import
+      if (existingCount > 0) {
+        setIsUploading(false);
+        setUploadProgress(0);
+        setUploadStatus('');
+        setStep('import-mode');
+        return;
       }
       
       // Pas de chambres existantes, continuer directement
