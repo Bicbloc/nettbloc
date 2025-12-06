@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -162,6 +162,9 @@ export function RoomCard({
   const floor = room.floor !== undefined ? room.floor : (room.number ? parseInt(room.number[0]) : 0);
   const floorDisplay = floor === 0 ? "RDC" : `${floor}`;
 
+  // Détecte si la chambre est en cours de nettoyage
+  const isInProgress = room.status === 'in_progress' || room.status === 'in-progress';
+
   if (compact) {
     return (
       <div 
@@ -169,6 +172,7 @@ export function RoomCard({
         className={`px-3 py-2 text-xs border rounded-xl bg-card shadow-modern flex flex-col gap-1 transition-all duration-300 ${
           dragging ? 'opacity-50' : ''
         } ${
+          isInProgress ? 'border-blue-500 border-2 bg-blue-50/50 animate-pulse-cleaning' :
           isSelected ? 'bg-gradient-primary text-primary-foreground border-2' :
           room.isUrgent ? 'border-destructive border-2 bg-destructive/5' : 
           room.notUrgent ? 'border-green-500 bg-green-50' : 
@@ -195,6 +199,11 @@ export function RoomCard({
           {room.status === 'clean' && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
               <Check className="h-2 w-2" /> Propre
+            </span>
+          )}
+          {isInProgress && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 animate-badge-pulse">
+              <Loader2 className="h-2 w-2 animate-spin" /> En cours
             </span>
           )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
