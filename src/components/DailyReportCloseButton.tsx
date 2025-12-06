@@ -5,6 +5,7 @@ import { Calendar, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { SessionPersistenceService } from '@/services/sessionPersistenceService';
+import { ActionLogService } from '@/services/actionLogService';
 
 interface DailyReportCloseButtonProps {
   hotelId: string;
@@ -35,7 +36,14 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         return;
       }
 
-      // 2. Archiver le rapport de la journée
+      // 2. Archiver le journal d'actions du jour
+      console.log('📦 Archivage du journal d\'actions...');
+      const logsArchived = await ActionLogService.archiveDailyLogs(hotelId);
+      if (logsArchived) {
+        console.log('✅ Journal d\'actions archivé');
+      }
+
+      // 3. Archiver le rapport de la journée
       console.log('📦 Archivage du rapport en cours...');
       const archived = await SessionPersistenceService.archiveOldReport(currentToken, hotelId);
 
@@ -45,16 +53,16 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         return;
       }
 
-      // 3. Désactiver la session actuelle
+      // 4. Désactiver la session actuelle
       console.log('🔒 Désactivation de la session actuelle...');
       await HotelSessionService.deactivateSession(currentToken);
 
-      // 4. Nettoyer le stockage local
+      // 5. Nettoyer le stockage local
       SessionPersistenceService.clearSavedSession();
       localStorage.removeItem('sessionToken');
       localStorage.removeItem('hotelSessionToken');
 
-      // 5. Créer une nouvelle session pour le lendemain
+      // 6. Créer une nouvelle session pour le lendemain
       console.log('🆕 Création de la nouvelle session...');
       const newToken = await HotelSessionService.createSession(hotelId);
 
@@ -64,22 +72,22 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         return;
       }
 
-      // 6. Sauvegarder la nouvelle session
+      // 7. Sauvegarder la nouvelle session
       SessionPersistenceService.saveSessionData({
         sessionToken: newToken,
         hotelId: hotelId,
         lastActiveDate: new Date().toISOString()
       });
 
-      toast.success('Journée clôturée ! Nouvelle session créée pour demain.');
+      toast.success('Journée clôturée ! Rapport et journal archivés.');
       console.log('✅ Clôture terminée, nouveau token:', newToken);
 
-      // 7. Notifier le parent pour rafraîchir l'interface
+      // 8. Notifier le parent pour rafraîchir l'interface
       if (onReportClosed) {
         onReportClosed();
       }
 
-      // 8. Rafraîchir la page pour afficher la nouvelle session
+      // 9. Rafraîchir la page pour afficher la nouvelle session
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -115,9 +123,10 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
           <AlertDialogDescription>
             Cette action va :
             <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Archiver le journal d'actions du jour</li>
               <li>Archiver le rapport de la journée actuelle</li>
+              <li>Archiver les chambres et affectations</li>
               <li>Créer une nouvelle session vierge pour demain</li>
-              <li>Réinitialiser l'interface pour toutes les femmes de chambre</li>
             </ul>
             <p className="mt-4 font-semibold">Cette action est irréversible.</p>
           </AlertDialogDescription>
