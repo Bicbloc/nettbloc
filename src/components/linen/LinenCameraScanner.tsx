@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Camera, X, RotateCcw, CheckCircle, AlertCircle } from 'lucide-react';
+import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -23,11 +23,13 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCounting, setIsCounting] = useState(false);
   const [result, setResult] = useState<{ count: number; confidence: number; notes?: string } | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [cameraFailed, setCameraFailed] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -94,27 +96,24 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       }
     } catch (error: any) {
       console.error('❌ Erreur accès caméra:', error);
+      setCameraFailed(true);
       
-      let errorMessage = "Impossible d'accéder à la caméra.";
+      let errorMessage = "Impossible d'accéder à la caméra. Vous pouvez sélectionner une photo depuis votre galerie.";
       
       if (error.name === 'NotAllowedError') {
-        errorMessage = "Accès à la caméra refusé. Veuillez autoriser l'accès dans les paramètres du navigateur.";
+        errorMessage = "Accès à la caméra refusé. Utilisez le bouton pour sélectionner une photo.";
       } else if (error.name === 'NotFoundError') {
-        errorMessage = "Aucune caméra détectée sur cet appareil.";
+        errorMessage = "Aucune caméra détectée. Sélectionnez une photo depuis votre galerie.";
       } else if (error.name === 'NotReadableError') {
-        errorMessage = "La caméra est déjà utilisée par une autre application.";
-      } else if (error.name === 'OverconstrainedError') {
-        errorMessage = "La caméra ne supporte pas les paramètres demandés.";
-      } else if (error.message === 'Timeout') {
-        errorMessage = "La caméra met trop de temps à répondre. Réessayez.";
+        errorMessage = "La caméra est utilisée ailleurs. Sélectionnez une photo.";
       } else if (!window.isSecureContext) {
-        errorMessage = "La caméra nécessite HTTPS. Utilisez un serveur sécurisé.";
+        errorMessage = "HTTPS requis pour la caméra. Utilisez la galerie photo.";
       }
       
       toast({
-        title: "Erreur caméra",
+        title: "Caméra non disponible",
         description: errorMessage,
-        variant: "destructive"
+        variant: "default"
       });
     }
   };
@@ -221,7 +220,27 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const handleRetake = () => {
     setCapturedImage(null);
     setResult(null);
+    setCameraFailed(false);
     startCamera();
+  };
+
+  // Fallback: sélection d'image depuis la galerie
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageData = e.target?.result as string;
+      setCapturedImage(imageData);
+      stopCamera();
+      handleCount(imageData);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
   };
 
   const handleConfirm = async () => {
@@ -326,6 +345,16 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           </div>
         </div>
 
+        {/* Input fichier caché pour fallback */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
         {/* Video or Captured Image */}
         <div className="flex-1 relative flex items-center justify-center bg-black">
           {isStreaming && !capturedImage && (
@@ -335,6 +364,15 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               playsInline
               className="w-full h-full object-contain"
             />
+          )}
+          
+          {/* Message si la caméra a échoué et pas d'image capturée */}
+          {cameraFailed && !capturedImage && !isStreaming && (
+            <div className="flex flex-col items-center justify-center text-white p-8 text-center">
+              <Camera className="h-16 w-16 mb-4 opacity-50" />
+              <p className="text-lg mb-2">Caméra non disponible</p>
+              <p className="text-sm opacity-70 mb-6">Utilisez le bouton ci-dessous pour sélectionner une photo</p>
+            </div>
           )}
           
           {capturedImage && (
@@ -388,15 +426,31 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
         {/* Controls */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
-          {isStreaming && !capturedImage && (
-            <Button
-              onClick={capturePhoto}
-              size="lg"
-              className="w-full h-16 text-lg rounded-full"
-            >
-              <Camera className="h-6 w-6 mr-2" />
-              Capturer la photo
-            </Button>
+          {/* Boutons caméra OU sélection fichier */}
+          {!capturedImage && (
+            <div className="flex flex-col gap-3">
+              {isStreaming && (
+                <Button
+                  onClick={capturePhoto}
+                  size="lg"
+                  className="w-full h-16 text-lg rounded-full"
+                >
+                  <Camera className="h-6 w-6 mr-2" />
+                  Capturer la photo
+                </Button>
+              )}
+              
+              {/* Bouton pour sélectionner depuis la galerie (toujours visible comme fallback) */}
+              <Button
+                onClick={openFilePicker}
+                size="lg"
+                variant={cameraFailed ? "default" : "outline"}
+                className={`w-full h-14 ${cameraFailed ? 'rounded-full' : ''}`}
+              >
+                <ImagePlus className="h-5 w-5 mr-2" />
+                {cameraFailed ? 'Sélectionner une photo' : 'Choisir depuis la galerie'}
+              </Button>
+            </div>
           )}
 
           {capturedImage && result && (
