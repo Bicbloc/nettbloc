@@ -33,12 +33,17 @@ export const NotificationPanel = ({ notifications, hasUnread }: NotificationPane
         return '⚠️';
       case 'assignment':
         return '📋';
+      case 'room_note':
+        return '💬';
       default:
         return '🔔';
     }
   };
 
-  const getStatusColor = (description: string) => {
+  const getStatusColor = (description: string, type?: string) => {
+    if (type === 'room_note') {
+      return 'bg-purple-100 text-purple-800';
+    }
     if (description.includes('terminé') || description.includes('nettoyage de la chambre')) {
       return 'bg-green-100 text-green-800';
     } else if (description.includes('commencé')) {
@@ -111,9 +116,10 @@ export const NotificationPanel = ({ notifications, hasUnread }: NotificationPane
                           </p>
                           <Badge 
                             variant="outline" 
-                            className={`text-xs ${getStatusColor(notification.description)}`}
+                            className={`text-xs ${getStatusColor(notification.description, notification.type)}`}
                           >
-                            {notification.type === 'room-status' ? 'Status' : 'Info'}
+                            {notification.type === 'room-status' ? 'Status' : 
+                             notification.type === 'room_note' ? 'Commentaire' : 'Info'}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mb-2">

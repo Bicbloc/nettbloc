@@ -220,10 +220,10 @@ export function RoomCard({
           <span className="text-xs text-muted-foreground font-medium flex-shrink-0 ml-auto">{floorDisplay}</span>
         </div>
         
-        {/* Afficher les notes/commentaires de la femme de chambre */}
+        {/* Afficher les notes/commentaires de la femme de chambre - bien visible pour l'admin */}
         {room.notes && (
-          <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md truncate" title={room.notes}>
-            💬 {room.notes}
+          <div className="text-xs bg-purple-100 text-purple-800 border border-purple-300 px-2 py-1.5 rounded-lg" title={room.notes}>
+            <span className="font-semibold">💬 Commentaire:</span> {room.notes}
           </div>
         )}
         
@@ -446,6 +446,19 @@ export function RoomCard({
           {getCleaningTypeBadge(room.cleaningType)}
         </div>
       </div>
+      
+      {/* Afficher les notes/commentaires de la femme de chambre */}
+      {room.notes && (
+        <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-md">
+          <div className="flex items-start gap-2">
+            <span className="text-lg">💬</span>
+            <div>
+              <p className="text-sm font-medium text-purple-800">Commentaire femme de chambre :</p>
+              <p className="text-sm text-purple-700 mt-1">{room.notes}</p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Afficher la remarque si présente */}
       {room.status === 'needs-attention' && room.remark && (
