@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,8 @@ import { Progress } from "@/components/ui/progress";
 import { UnifiedHousekeeperService, HousekeeperWithCode } from "@/services/unifiedHousekeeperService";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { RoomArchiveService } from "@/services/roomArchiveService";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -29,7 +31,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'upload' | 'housekeepers' | 'distribution' | 'linen-inventory'>('upload');
+  const [step, setStep] = useState<'upload' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('upload');
   const [pdfData, setPdfData] = useState<any>(null);
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
@@ -42,6 +44,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
   const [linenInventoryHousekeeper, setLinenInventoryHousekeeper] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'update' | 'replace'>('update');
+  const [existingRoomsCount, setExistingRoomsCount] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [savedPdfData, setSavedPdfData] = useState<any>(null); // Sauvegarde locale pour retry
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -91,6 +97,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     try {
       setIsUploading(true);
       setUploadProgress(0);
+      setRetryCount(0);
       
       // Étape 1: Lecture du PDF
       setUploadStatus('📄 Lecture du PDF...');
@@ -102,21 +109,109 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setUploadProgress(40);
       const data = await processPdf(selectedFile);
       setPdfData(data);
+      setSavedPdfData(data); // Sauvegarder pour retry
       
-      // Étape 3: Enregistrement des chambres
-      setUploadStatus('💾 Enregistrement des chambres...');
-      setUploadProgress(60);
+      // Étape 3: Vérifier les chambres existantes
+      setUploadStatus('🔍 Vérification des chambres existantes...');
+      setUploadProgress(50);
       
+      if (hotelId) {
+        const { count } = await supabase
+          .from('rooms')
+          .select('*', { count: 'exact', head: true })
+          .eq('hotel_id', hotelId);
+        
+        setExistingRoomsCount(count || 0);
+        
+        // Si des chambres existent, demander le mode d'import
+        if (count && count > 0) {
+          setIsUploading(false);
+          setUploadProgress(0);
+          setUploadStatus('');
+          setStep('import-mode');
+          return;
+        }
+      }
+      
+      // Pas de chambres existantes, continuer directement
+      await saveRoomsToDatabase(data, 'update');
+      
+    } catch (error) {
+      console.error("Erreur traitement PDF:", error);
+      handleUploadError(error);
+    }
+  };
+
+  const handleUploadError = (error: any, canRetry = true) => {
+    setIsUploading(false);
+    setUploadProgress(0);
+    setUploadStatus('');
+    
+    if (canRetry && retryCount < 3) {
+      toast({
+        variant: "destructive",
+        title: "Erreur de connexion",
+        description: "Problème de connexion au serveur. Cliquez sur Réessayer.",
+        action: (
+          <Button variant="outline" size="sm" onClick={() => retrySave()}>
+            <RotateCcw className="h-4 w-4 mr-1" /> Réessayer
+          </Button>
+        ),
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Échec du traitement",
+        description: error?.message || "Une erreur s'est produite lors du traitement du fichier PDF.",
+      });
+      setOpen(false);
+      resetDialog();
+    }
+  };
+
+  const retrySave = async () => {
+    if (!savedPdfData) return;
+    
+    setRetryCount(prev => prev + 1);
+    setIsUploading(true);
+    setUploadProgress(60);
+    setUploadStatus(`🔄 Nouvelle tentative (${retryCount + 1}/3)...`);
+    
+    try {
+      await saveRoomsToDatabase(savedPdfData, importMode);
+    } catch (error) {
+      handleUploadError(error, retryCount < 2);
+    }
+  };
+
+  const saveRoomsToDatabase = async (data: any[], mode: 'update' | 'replace') => {
+    if (!hotelId || data.length === 0) {
+      proceedToHousekeepers(data);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus(mode === 'replace' ? '🗑️ Suppression des anciennes chambres...' : '💾 Enregistrement des chambres...');
+    setUploadProgress(60);
+
+    try {
       let insertedCount = 0;
-      let updatedCount = 0;
-      
-      if (hotelId && data.length > 0) {
+
+      if (mode === 'replace') {
+        // Remplacer toutes les chambres
+        const result = await RoomArchiveService.replaceAllRooms(hotelId, data, selectedFile?.name || 'pdf_import');
+        insertedCount = result.inserted;
+        
+        toast({
+          title: "✅ Chambres remplacées",
+          description: `${result.deleted} anciennes chambres supprimées, ${result.inserted} nouvelles chambres ajoutées.`,
+        });
+      } else {
+        // Mode update (upsert)
         console.log('🔄 Début enregistrement dans hotel_rooms_registry pour', data.length, 'chambres');
         
-        // Formater les données pour le registre des chambres (hotel_rooms_registry)
         const roomsData = data.map((room: any) => {
           const roomNumber = room.roomNumber || room.room_number || room.number;
-
           return {
             hotel_id: hotelId,
             room_number: roomNumber,
@@ -125,122 +220,92 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             building: room.building || null,
             zone: room.zone || null,
             source: 'pdf_import',
-            imported_from: selectedFile.name,
-            metadata: {
-              status: room.status,
-              raw_data: room,
-            },
+            imported_from: selectedFile?.name || 'pdf_import',
+            metadata: { status: room.status, raw_data: room },
           };
         }).filter(r => !!r.room_number);
 
-        console.log('📝 Données formatées:', roomsData.length, 'chambres valides');
+        // Retry automatique avec timeout
+        const maxRetries = 3;
+        let lastError = null;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const upsertPromise = supabase
+              .from('hotel_rooms_registry')
+              .upsert(roomsData, { onConflict: 'hotel_id,room_number' });
 
-        try {
-          // Timeout augmenté pour éviter des échecs inutiles sur les gros imports
-          const upsertPromise = supabase
-            .from('hotel_rooms_registry')
-            .upsert(roomsData, { onConflict: 'hotel_id,room_number' });
+            const result = await Promise.race([
+              upsertPromise,
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error(`Timeout (tentative ${attempt}/${maxRetries})`)), 45000)
+              ),
+            ]) as any;
 
-          const result = await Promise.race([
-            upsertPromise,
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error('Timeout enregistrement (30s) - le serveur est peut-être lent, réessayez dans un instant.')),
-                30000
-              )
-            ),
-          ]);
-
-          const { error } = result as any;
-
-          if (error) {
-            console.error('❌ Erreur enregistrement chambres (registre):', error);
-            throw error;
+            if (result.error) throw result.error;
+            
+            insertedCount = roomsData.length;
+            lastError = null;
+            break;
+          } catch (err: any) {
+            lastError = err;
+            console.warn(`⚠️ Tentative ${attempt}/${maxRetries} échouée:`, err.message);
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+            }
           }
-
-          console.log('✅ Chambres enregistrées dans le registre:', roomsData.length);
-          insertedCount = roomsData.length;
-          
-          // Également enregistrer dans la table rooms pour la synchronisation temps réel
-          setUploadStatus('💾 Synchronisation avec les assignations...');
-          setUploadProgress(80);
-          
-          const roomsForSync = data.map((room: any) => {
-            const roomNumber = room.roomNumber || room.room_number || room.number;
-            return {
-              hotel_id: hotelId,
-              room_number: roomNumber,
-              floor: room.floor ?? null,
-              status: room.status || 'dirty',
-              room_type: room.type || room.room_type || null,
-              cleaning_priority: room.priority === 'high' ? 2 : 1,
-              notes: room.notes || null
-            };
-          }).filter(r => !!r.room_number);
-          
-          const { error: roomsError } = await supabase
-            .from('rooms')
-            .upsert(roomsForSync, { 
-              onConflict: 'hotel_id,room_number',
-              ignoreDuplicates: false 
-            });
-          
-          if (roomsError) {
-            console.warn('⚠️ Erreur synchronisation rooms:', roomsError);
-            // Ne pas bloquer si erreur, c'est juste pour la sync temps réel
-          } else {
-            console.log('✅ Chambres synchronisées dans rooms pour temps réel');
-          }
-          
-        } catch (err: any) {
-          console.error('❌ Erreur lors de la mise à jour du registre des chambres:', err);
-          // Ne pas bloquer l'UI, continuer malgré l'erreur
-          insertedCount = 0;
-          toast({
-            variant: "destructive",
-            title: "Erreur d'enregistrement",
-            description: err.message || "Impossible d'enregistrer les chambres dans le registre",
-          });
         }
+
+        if (lastError) throw lastError;
+
+        // Sync avec la table rooms
+        setUploadStatus('💾 Synchronisation...');
+        setUploadProgress(80);
+        
+        const roomsForSync = data.map((room: any) => {
+          const roomNumber = room.roomNumber || room.room_number || room.number;
+          return {
+            hotel_id: hotelId,
+            room_number: roomNumber,
+            floor: room.floor ?? null,
+            status: room.status || 'dirty',
+            room_type: room.type || room.room_type || null,
+            cleaning_priority: room.priority === 'high' ? 2 : 1,
+            notes: room.notes || null
+          };
+        }).filter(r => !!r.room_number);
+        
+        await supabase
+          .from('rooms')
+          .upsert(roomsForSync, { onConflict: 'hotel_id,room_number', ignoreDuplicates: false });
+
+        toast({
+          title: "✅ Analyse terminée",
+          description: `${insertedCount} chambres enregistrées.`,
+        });
       }
-      
-      // Message détaillé avec nombre de chambres ajoutées et mises à jour
-      const message = insertedCount > 0 
-        ? `${insertedCount} chambres enregistrées dans le registre.`
-        : `${data.length} chambres extraites (non enregistrées - voir erreur ci-dessus).`;
-      
-      setUploadProgress(100);
-      setUploadStatus('✅ Terminé !');
-      
-      toast({
-        title: "✅ Analyse terminée",
-        description: message,
-      });
-      
-      // Passer à l'étape 2 immédiatement et charger les housekeepers en arrière-plan
+
+      proceedToHousekeepers(data);
+
+    } catch (err: any) {
+      console.error('❌ Erreur enregistrement:', err);
+      throw err;
+    }
+  };
+
+  const proceedToHousekeepers = (data: any[]) => {
+    setUploadProgress(100);
+    setUploadStatus('✅ Terminé !');
+    
+    setTimeout(() => {
       setIsUploading(false);
       setUploadProgress(0);
       setUploadStatus('');
       setStep('housekeepers');
-      
-      // Charger les housekeepers en arrière-plan (non-bloquant)
       loadExistingHousekeepers();
-      
-    } catch (error) {
-      console.error("Erreur traitement PDF:", error);
-      setIsUploading(false);
-      setUploadProgress(0);
-      setUploadStatus('');
-      toast({
-        variant: "destructive",
-        title: "Échec du traitement",
-        description: "Une erreur s'est produite lors du traitement du fichier PDF.",
-      });
-      // Fermer le dialogue même en cas d'erreur pour éviter l'impression de blocage
-      setOpen(false);
-      resetDialog();
-    }
-   };
+    }, 500);
+  };
+
   const addHousekeeper = () => {
     if (newHousekeeperName.trim() && !housekeepers.includes(newHousekeeperName.trim())) {
       setHousekeepers([...housekeepers, newHousekeeperName.trim()]);
@@ -313,6 +378,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const resetDialog = () => {
     setSelectedFile(null);
     setPdfData(null);
+    setSavedPdfData(null);
     setStep('upload');
     setHousekeepers([]);
     setNewHousekeeperName('');
@@ -321,6 +387,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setSearchQuery('');
     setShowAllExisting(false);
     setLinenInventoryHousekeeper(null);
+    setImportMode('update');
+    setExistingRoomsCount(0);
+    setRetryCount(0);
   };
 
   const triggerFileInput = () => {
@@ -405,6 +474,93 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           disabled={!selectedFile || isUploading}
         >
           {isUploading ? "Analyse en cours..." : "Analyser le PDF"}
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  const renderImportModeStep = () => (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">Mode d'import</Badge>
+          Chambres existantes détectées
+        </DialogTitle>
+        <DialogDescription>
+          {existingRoomsCount} chambres existent déjà. Comment souhaitez-vous procéder avec les {pdfData?.length} nouvelles chambres ?
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div className="space-y-4 py-4">
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>{existingRoomsCount}</strong> chambres sont déjà enregistrées pour cet hôtel.
+          </AlertDescription>
+        </Alert>
+
+        <div className="space-y-3">
+          <Card 
+            className={`p-4 cursor-pointer transition-all ${importMode === 'update' ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+            onClick={() => setImportMode('update')}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${importMode === 'update' ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
+                {importMode === 'update' && <CheckCircle className="h-3 w-3 text-primary-foreground" />}
+              </div>
+              <div className="flex-1">
+                <div className="font-medium flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Mettre à jour les chambres existantes
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Les chambres avec le même numéro seront mises à jour. Les nouvelles chambres seront ajoutées.
+                </p>
+                <Badge variant="outline" className="mt-2">Recommandé</Badge>
+              </div>
+            </div>
+          </Card>
+
+          <Card 
+            className={`p-4 cursor-pointer transition-all ${importMode === 'replace' ? 'ring-2 ring-destructive bg-destructive/5' : 'hover:bg-muted/50'}`}
+            onClick={() => setImportMode('replace')}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${importMode === 'replace' ? 'border-destructive bg-destructive' : 'border-muted-foreground'}`}>
+                {importMode === 'replace' && <CheckCircle className="h-3 w-3 text-destructive-foreground" />}
+              </div>
+              <div className="flex-1">
+                <div className="font-medium flex items-center gap-2 text-destructive">
+                  <Replace className="h-4 w-4" />
+                  Remplacer toutes les chambres
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  <strong className="text-destructive">Attention :</strong> Supprime les {existingRoomsCount} chambres existantes et toutes les affectations. 
+                  Insère uniquement les nouvelles chambres du PDF.
+                </p>
+                <Badge variant="destructive" className="mt-2">Irréversible</Badge>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+      
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setStep('upload')}>
+          Retour
+        </Button>
+        <Button
+          onClick={async () => {
+            try {
+              await saveRoomsToDatabase(pdfData, importMode);
+            } catch (error) {
+              handleUploadError(error);
+            }
+          }}
+          variant={importMode === 'replace' ? 'destructive' : 'default'}
+        >
+          {importMode === 'replace' ? 'Remplacer les chambres' : 'Mettre à jour'}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </DialogFooter>
@@ -895,6 +1051,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
         {step === 'upload' && renderUploadStep()}
+        {step === 'import-mode' && renderImportModeStep()}
         {step === 'housekeepers' && renderHousekeepersStep()}
         {step === 'distribution' && renderDistributionStep()}
         {step === 'linen-inventory' && renderLinenInventoryStep()}

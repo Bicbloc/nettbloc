@@ -132,7 +132,7 @@ class RealtimeManager {
         console.log('⏰ RealtimeManager: Timeout de connexion');
         this.isConnecting = false;
         resolve(false);
-      }, 10000); // 10 secondes max
+      }, 15000); // 15 secondes max (augmenté pour connexions lentes)
 
       this.channel!.subscribe((status) => {
         console.log('📡 RealtimeManager statut:', status);
@@ -191,8 +191,8 @@ class RealtimeManager {
       return;
     }
 
-    // Backoff exponentiel avec max 10 secondes (au lieu de 30)
-    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 10000);
+    // Backoff exponentiel avec max 15 secondes
+    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 15000);
     this.reconnectAttempts++;
 
     console.log(`🔄 RealtimeManager: Reconnexion dans ${delay}ms (tentative ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
@@ -288,7 +288,7 @@ class RealtimeManager {
         console.log('💔 Heartbeat: Exception');
         this.scheduleReconnect();
       }
-    }, 20000); // Toutes les 20 secondes
+    }, 30000); // Toutes les 30 secondes (réduit pour éviter faux positifs)
   }
 
   /**
@@ -301,11 +301,16 @@ class RealtimeManager {
       if (!this.isOnline) return;
       
       const timeSinceLastPing = Date.now() - this.lastSuccessfulPing;
-      if (timeSinceLastPing > 60000) { // Plus de 60s sans ping réussi
+      if (timeSinceLastPing > 90000) { // Plus de 90s sans ping réussi (augmenté)
         console.log('⚠️ Ping: Connexion potentiellement perdue');
-        this.forceReconnect();
+        // Debounce: attendre 3s avant reconnexion pour éviter les faux positifs
+        setTimeout(() => {
+          if (Date.now() - this.lastSuccessfulPing > 90000) {
+            this.forceReconnect();
+          }
+        }, 3000);
       }
-    }, 15000); // Check toutes les 15 secondes
+    }, 30000); // Check toutes les 30 secondes (réduit la fréquence)
   }
 
   private stopPing() {
