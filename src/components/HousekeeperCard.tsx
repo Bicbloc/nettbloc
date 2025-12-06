@@ -679,6 +679,8 @@ export function HousekeeperCard({
                                   compact 
                                   draggable={draggable}
                                   showActions={true}
+                                  hotelId={hotelId}
+                                  incidentCount={incidentCounts?.[room.number] || 0}
                                 />
                               </div>
                             ))}
@@ -724,6 +726,8 @@ export function HousekeeperCard({
                                 compact 
                                 draggable={draggable}
                                 showActions={true}
+                                hotelId={hotelId}
+                                incidentCount={incidentCounts?.[room.number] || 0}
                               />
                            </div>
                          ))}

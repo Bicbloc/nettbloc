@@ -2379,6 +2379,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       forceHide={false}
                       housekeeperNames={housekeeperNames}
                       onDirectAssign={handleDirectRoomAssignment}
+                      hotelId={currentHotelId || undefined}
                     />
 
                     <HousekeeperInviteDialog
@@ -2426,6 +2427,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                             accessCode={housekeeper?.access_code || ''}
                             housekeeperNames={housekeeperNames}
                             onGenerateAccessCode={handleGenerateAccessCode}
+                            hotelId={currentHotelId || undefined}
                           />
                         </div>
                       );
