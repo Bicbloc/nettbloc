@@ -62,29 +62,70 @@ export default function HousekeeperMobile() {
   const hotelId = searchParams.get('hotel') || localStorage.getItem('selectedHotelId');
   const nameFromUrl = searchParams.get('name');
 
+  // Récupérer le nom du housekeeper au chargement initial
   useEffect(() => {
     const housekeeperData = localStorage.getItem('housekeeper');
     const housekeeperProfile = localStorage.getItem('housekeeperProfile');
     
+    let name = nameFromUrl || '';
+    
     if (housekeeperProfile) {
-      const profile = JSON.parse(housekeeperProfile);
-      setHousekeeperName(profile.name || nameFromUrl || 'Femme de chambre');
+      try {
+        const profile = JSON.parse(housekeeperProfile);
+        name = profile.name || name;
+      } catch (e) {
+        console.error('Error parsing housekeeperProfile:', e);
+      }
     } else if (housekeeperData) {
-      const data = JSON.parse(housekeeperData);
-      setHousekeeperName(data.name || nameFromUrl || 'Femme de chambre');
-    } else if (nameFromUrl) {
-      setHousekeeperName(nameFromUrl);
+      try {
+        const data = JSON.parse(housekeeperData);
+        name = data.name || name;
+      } catch (e) {
+        console.error('Error parsing housekeeper:', e);
+      }
+    }
+    
+    if (name) {
+      setHousekeeperName(name);
     }
   }, [nameFromUrl]);
 
+  // Charger les données quand hotelId ET housekeeperName sont disponibles
   useEffect(() => {
-    if (hotelId) {
+    if (hotelId && housekeeperName) {
       loadData();
     }
-  }, [hotelId]);
+  }, [hotelId, housekeeperName]);
+
+  // Écouter les changements en temps réel sur les assignments
+  useEffect(() => {
+    if (!hotelId || !housekeeperName) return;
+
+    const channel = supabase
+      .channel('housekeeper-assignments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'assignments',
+          filter: `hotel_id=eq.${hotelId}`
+        },
+        (payload) => {
+          console.log('Assignment change detected:', payload);
+          // Recharger les données quand il y a un changement
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [hotelId, housekeeperName]);
 
   const loadData = async () => {
-    if (!hotelId) return;
+    if (!hotelId || !housekeeperName) return;
     
     setIsLoading(true);
     try {
@@ -299,10 +340,21 @@ export default function HousekeeperMobile() {
     return 'Bas';
   };
 
+  // Afficher un loader si le nom n'est pas encore disponible
+  if (!housekeeperName) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Chargement du profil...</p>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background flex flex-col items-center justify-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Chargement des chambres...</p>
       </div>
     );
   }
