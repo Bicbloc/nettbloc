@@ -69,17 +69,37 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   const [profile, setProfile] = useState<HousekeeperProfile | null>(null);
   const [currentHotelSession, setCurrentHotelSession] = useState<HotelSession | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const profileLoadTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Charger le profil housekeeper quand l'utilisateur change
   useEffect(() => {
+    // Clear any pending timeout
+    if (profileLoadTimeoutRef.current) {
+      clearTimeout(profileLoadTimeoutRef.current);
+    }
+
     if (user && !authLoading) {
       console.log('🔐 Loading housekeeper profile for user:', user.id);
       loadHousekeeperProfile(user);
-    } else if (!user) {
+      
+      // Safety timeout - don't block forever if profile load fails
+      profileLoadTimeoutRef.current = setTimeout(() => {
+        if (profileLoading) {
+          console.warn('⚠️ Profile loading timeout, forcing completion');
+          setProfileLoading(false);
+        }
+      }, 5000);
+    } else if (!user && !authLoading) {
       console.log('🔐 No user, clearing housekeeper data');
       setProfile(null);
       setCurrentHotelSession(null);
     }
+
+    return () => {
+      if (profileLoadTimeoutRef.current) {
+        clearTimeout(profileLoadTimeoutRef.current);
+      }
+    };
   }, [user, authLoading]);
 
   const loadHousekeeperProfile = async (user: User) => {

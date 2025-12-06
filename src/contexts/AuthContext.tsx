@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, companyName?: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  clearCorruptedSession: () => void;
   isAuthenticated: boolean;
 }
 
@@ -23,12 +24,33 @@ export const useAuth = () => {
   return context;
 };
 
+// Helper to clear corrupted auth data
+const clearAuthStorage = () => {
+  console.log('🧹 Clearing corrupted auth storage...');
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.includes('supabase') || key.includes('sb-'))) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+  console.log('🧹 Cleared', keysToRemove.length, 'auth keys');
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const initAttemptsRef = useRef(0);
   const isMountedRef = useRef(true);
+
+  const clearCorruptedSession = useCallback(() => {
+    clearAuthStorage();
+    setSession(null);
+    setUser(null);
+    setLoading(false);
+  }, []);
 
   const initializeSession = useCallback(async () => {
     console.log('🚀 Starting session initialization...');
@@ -48,6 +70,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) {
         console.error('❌ Session error:', error);
+        // Check for refresh token errors
+        if (error.message?.includes('refresh_token') || error.message?.includes('Refresh Token')) {
+          console.warn('🔄 Detected corrupted refresh token, clearing storage...');
+          clearAuthStorage();
+        }
         setSession(null);
         setUser(null);
         setLoading(false);
@@ -57,8 +84,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Session init failed after', Date.now() - startTime, 'ms:', error);
+      // Check for refresh token errors in catch block too
+      if (error?.message?.includes('refresh_token') || error?.message?.includes('Refresh Token')) {
+        console.warn('🔄 Detected corrupted refresh token in catch, clearing storage...');
+        clearAuthStorage();
+      }
       if (isMountedRef.current) {
         setSession(null);
         setUser(null);
@@ -81,6 +113,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           user_id: currentSession?.user?.id 
         });
 
+        // Handle token refresh errors
+        if (event === 'TOKEN_REFRESHED' && !currentSession) {
+          console.warn('🔄 Token refresh failed, clearing storage...');
+          clearAuthStorage();
+        }
+
         // Keep this callback lightweight and synchronous
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
@@ -96,20 +134,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // THEN get initial session
     initializeSession();
 
-    // Safety timeout - 15 seconds with retry
+    // Safety timeout - 8 seconds (reduced from 15)
     const safetyTimeout = setTimeout(() => {
       if (isMountedRef.current && loading) {
         initAttemptsRef.current += 1;
         
-        if (initAttemptsRef.current < 3) {
+        if (initAttemptsRef.current < 2) {
           console.warn(`⚠️ Auth timeout - retry attempt ${initAttemptsRef.current}`);
           initializeSession();
         } else {
-          console.error('❌ Auth initialization failed after 3 attempts');
+          console.error('❌ Auth initialization failed after retries, forcing completion');
           setLoading(false);
         }
       }
-    }, 15000);
+    }, 8000);
 
     return () => {
       isMountedRef.current = false;
@@ -197,6 +235,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp,
     signIn,
     signOut,
+    clearCorruptedSession,
     isAuthenticated: !!user && !!session
   };
 
