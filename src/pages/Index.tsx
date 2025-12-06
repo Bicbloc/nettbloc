@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
+import { CleanRoomsSection } from "@/components/CleanRoomsSection";
 import { generateReport, generateCombinedReport } from "@/services/reportService";
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
@@ -1152,7 +1153,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     return rooms.filter(room => 
       !room.assignedTo && 
       room.cleaningType !== 'none' && 
-      room.status !== 'maintenance'
+      room.status !== 'maintenance' &&
+      room.status !== 'clean' // Exclure les chambres déjà propres
+    );
+  };
+
+  // Chambres propres (nettoyées)
+  const getCleanRooms = () => {
+    return rooms.filter(room => 
+      room.status === 'clean' &&
+      room.cleaningType !== 'none'
     );
   };
 
@@ -2405,7 +2415,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   )}
 
                   {/* Chambres non assignées en haut - toujours visible */}
-                  <div className="w-full">
+                  <div className="w-full space-y-4">
                     <UnassignedRoomsColumn
                       rooms={getUnassignedRooms()}
                       onRoomUpdate={handleRoomUpdate}
@@ -2413,6 +2423,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                       forceHide={false}
                       housekeeperNames={housekeeperNames}
                       onDirectAssign={handleDirectRoomAssignment}
+                      hotelId={currentHotelId || undefined}
+                    />
+
+                    {/* Section Chambres propres */}
+                    <CleanRoomsSection
+                      rooms={getCleanRooms()}
+                      onRoomUpdate={handleRoomUpdate}
                       hotelId={currentHotelId || undefined}
                     />
 
