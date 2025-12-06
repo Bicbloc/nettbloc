@@ -102,6 +102,75 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     };
   }, [user, authLoading]);
 
+  // Auto-refresh on visibility change and online status
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user && !authLoading) {
+        console.log('🔄 Page visible, refreshing housekeeper data...');
+        loadHousekeeperProfile(user);
+      }
+    };
+
+    const handleOnline = () => {
+      if (user && !authLoading) {
+        console.log('🔄 Back online, refreshing housekeeper data...');
+        loadHousekeeperProfile(user);
+      }
+    };
+
+    const handleFocus = () => {
+      if (user && !authLoading && !profile) {
+        console.log('🔄 Window focused without profile, refreshing...');
+        loadHousekeeperProfile(user);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user, authLoading, profile]);
+
+  // Subscribe to realtime session updates
+  useEffect(() => {
+    if (!profile) return;
+
+    const channel = supabase
+      .channel('housekeeper-session-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'hotel_access_sessions',
+          filter: `housekeeper_profile_id=eq.${profile.id}`
+        },
+        (payload) => {
+          console.log('🔔 Session update received:', payload);
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            const data = payload.new as any;
+            if (data.is_active && new Date(data.expires_at) > new Date()) {
+              // Reload session data
+              loadHousekeeperProfile({ id: profile.id, email: profile.email } as User);
+            } else if (!data.is_active && currentHotelSession?.id === data.id) {
+              // Session ended
+              setCurrentHotelSession(null);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
+
   const loadHousekeeperProfile = async (user: User) => {
     setProfileLoading(true);
     try {
