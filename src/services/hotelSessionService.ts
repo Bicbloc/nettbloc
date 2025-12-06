@@ -92,6 +92,27 @@ export class HotelSessionService {
         return null;
       }
 
+      // PHASE FIX: Récupérer les assignations de la session active AVANT de la désactiver
+      let previousAssignments: Record<string, string> = {};
+      let previousHousekeeperNames: string[] = [];
+      
+      const { data: activeSession } = await supabase
+        .from('hotel_sessions')
+        .select('housekeeper_assignments, housekeeper_names')
+        .eq('hotel_id', effectiveHotelId)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (activeSession) {
+        previousAssignments = typeof activeSession.housekeeper_assignments === 'object' && activeSession.housekeeper_assignments 
+          ? activeSession.housekeeper_assignments as Record<string, string> 
+          : {};
+        previousHousekeeperNames = Array.isArray(activeSession.housekeeper_names) 
+          ? activeSession.housekeeper_names as string[] 
+          : [];
+        console.log('✅ Assignations récupérées de l\'ancienne session:', Object.keys(previousAssignments).length, 'chambres');
+      }
+
       // Phase 2: ALWAYS deactivate all previous active sessions for this hotel
       console.log('🔄 Désactivation TOUTES anciennes sessions pour hôtel:', effectiveHotelId);
       const { error: deactivateError } = await supabase
@@ -107,7 +128,7 @@ export class HotelSessionService {
       // 4. Générer un token unique
       const sessionToken = this.generateSessionToken();
 
-      // 5. Créer la NOUVELLE session unique
+      // 5. Créer la NOUVELLE session unique avec les assignations de l'ancienne
       const { data, error } = await supabase
         .from('hotel_sessions')
         .insert({
@@ -115,8 +136,8 @@ export class HotelSessionService {
           user_id: user.id,
           session_token: sessionToken,
           is_active: true,
-          housekeeper_assignments: {},
-          housekeeper_names: [],
+          housekeeper_assignments: previousAssignments,
+          housekeeper_names: previousHousekeeperNames,
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 jours
         })
         .select()

@@ -363,6 +363,20 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       try {
         console.log('🔄 Phase 4: Chargement des chambres depuis Supabase...');
         
+        // Nettoyer les données localStorage obsolètes (> 24h)
+        const savedState = localStorage.getItem(`assignments_${currentHotelId}`);
+        if (savedState) {
+          try {
+            const { timestamp } = JSON.parse(savedState);
+            if (timestamp && (Date.now() - timestamp > 24 * 60 * 60 * 1000)) {
+              console.log('🧹 Nettoyage données localStorage obsolètes');
+              localStorage.removeItem(`assignments_${currentHotelId}`);
+            }
+          } catch (e) {
+            localStorage.removeItem(`assignments_${currentHotelId}`);
+          }
+        }
+        
         // Charger les chambres depuis la table rooms
         const { data: dbRooms, error: roomsError } = await supabase
           .from('rooms')
@@ -371,25 +385,52 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
 
         if (roomsError) throw roomsError;
 
-        // Charger les assignations actives
+        // Charger les assignations actives depuis la table assignments
         const { data: dbAssignments, error: assignmentsError } = await supabase
           .from('assignments')
           .select('room_id, housekeeper_name')
           .eq('hotel_id', currentHotelId)
-          .in('status', ['assigned', 'in_progress', 'completed']);
+          .in('status', ['assigned', 'in_progress']);
 
         if (assignmentsError) throw assignmentsError;
+
+        // Charger aussi les assignations depuis hotel_sessions comme fallback
+        const { data: hotelSession } = await supabase
+          .from('hotel_sessions')
+          .select('housekeeper_assignments, housekeeper_names')
+          .eq('hotel_id', currentHotelId)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        const sessionAssignments: Record<string, string> = 
+          hotelSession?.housekeeper_assignments && typeof hotelSession.housekeeper_assignments === 'object'
+            ? hotelSession.housekeeper_assignments as Record<string, string>
+            : {};
+        const sessionHousekeeperNames: string[] = 
+          hotelSession?.housekeeper_names && Array.isArray(hotelSession.housekeeper_names)
+            ? hotelSession.housekeeper_names as string[]
+            : [];
+
+        console.log('📊 Données de session:', { 
+          sessionAssignments: Object.keys(sessionAssignments).length,
+          sessionHousekeeperNames: sessionHousekeeperNames.length,
+          dbAssignments: dbAssignments?.length || 0
+        });
 
         // Fusionner les données
         if (dbRooms && dbRooms.length > 0) {
           const mergedRooms: Room[] = dbRooms.map(r => {
+            // Priorité : assignments table > hotel_sessions > rien
             const assignment = dbAssignments?.find(a => a.room_id === r.id);
+            const sessionAssigned = sessionAssignments[r.room_number];
+            const assignedTo = assignment?.housekeeper_name || sessionAssigned || undefined;
+            
             const cleaningType = r.cleaning_type === 'full' ? 'full' : (r.cleaning_type === 'quick' ? 'quick' : 'none');
             return {
               number: r.room_number,
               status: r.status,
               cleaningType: cleaningType as 'full' | 'quick' | 'none',
-              assignedTo: assignment?.housekeeper_name,
+              assignedTo,
               floor: r.floor || undefined,
               notes: r.notes || undefined,
               isUrgent: r.cleaning_priority === 10,
@@ -399,52 +440,26 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             };
           });
 
-          // Fusionner avec données locales (Supabase a priorité pour status et cleaningType)
-          setRooms(prevRooms => {
-            if (prevRooms.length === 0) return mergedRooms;
-            
-            return mergedRooms.map(dbRoom => {
-              const localRoom = prevRooms.find(r => r.number === dbRoom.number);
-              return {
-                ...localRoom,
-                ...dbRoom,
-                // Garder certains flags locaux non persistés
-                isTwin: localRoom?.isTwin || false
-              };
-            });
-          });
+          // Appliquer les chambres restaurées
+          setRooms(mergedRooms);
 
           console.log('✅ Phase 4: Chambres restaurées depuis Supabase:', mergedRooms.length);
           
-          // Sauvegarder les noms de housekeepers dans localStorage en backup
-          const uniqueHousekeepers = Array.from(new Set(dbAssignments?.map(a => a.housekeeper_name).filter(Boolean) || []));
-          if (uniqueHousekeepers.length > 0) {
-            localStorage.setItem('housekeeper_names', JSON.stringify(uniqueHousekeepers));
-            // Restaurer les housekeeperNames si vides
-            if (housekeeperNames.length === 0) {
-              setHousekeeperNames(uniqueHousekeepers);
-            }
-          }
+          // Restaurer les housekeeperNames depuis la session ou la base
+          const assignedHousekeepers = Array.from(new Set(
+            mergedRooms.map(r => r.assignedTo).filter(Boolean) as string[]
+          ));
           
-          // Restaurer depuis le localStorage si disponible
-          const savedState = localStorage.getItem(`assignments_${currentHotelId}`);
-          if (savedState) {
-            try {
-              const { housekeeperNames: savedNames, timestamp } = JSON.parse(savedState);
-              // Utiliser les données sauvegardées si moins de 24h
-              if (savedNames && timestamp && (Date.now() - timestamp < 24 * 60 * 60 * 1000)) {
-                if (housekeeperNames.length === 0 && savedNames.length > 0) {
-                  setHousekeeperNames(savedNames);
-                  console.log('✅ HousekeeperNames restaurés depuis localStorage:', savedNames);
-                }
-              }
-            } catch (e) {
-              console.warn('Erreur parsing savedState:', e);
-            }
-          }
+          // Priorité: session > assignations > base de données
+          let housekeepersToSet: string[] = [];
           
-          // Si toujours pas de housekeepers, charger depuis la base de données
-          if (housekeeperNames.length === 0) {
+          if (sessionHousekeeperNames.length > 0) {
+            housekeepersToSet = sessionHousekeeperNames;
+            console.log('✅ Housekeepers restaurés depuis hotel_sessions:', housekeepersToSet);
+          } else if (assignedHousekeepers.length > 0) {
+            housekeepersToSet = assignedHousekeepers;
+            console.log('✅ Housekeepers restaurés depuis assignments:', housekeepersToSet);
+          } else {
             const { data: dbHousekeepers } = await supabase
               .from('housekeepers')
               .select('name')
@@ -452,10 +467,18 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               .eq('is_active', true);
               
             if (dbHousekeepers && dbHousekeepers.length > 0) {
-              const names = dbHousekeepers.map(h => h.name);
-              setHousekeeperNames(names);
-              console.log('✅ Housekeepers restaurés depuis Supabase:', names);
+              housekeepersToSet = dbHousekeepers.map(h => h.name);
+              console.log('✅ Housekeepers restaurés depuis table housekeepers:', housekeepersToSet);
             }
+          }
+          
+          if (housekeepersToSet.length > 0 && housekeeperNames.length === 0) {
+            setHousekeeperNames(housekeepersToSet);
+          }
+          
+          // Marquer comme distribué si des assignations existent
+          if (mergedRooms.some(r => r.assignedTo)) {
+            setIsDistributed(true);
           }
         }
       } catch (error) {
