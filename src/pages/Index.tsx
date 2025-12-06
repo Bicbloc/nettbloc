@@ -43,6 +43,7 @@ import { ReportFields as CustomReportFields } from "@/components/ReportCustomFie
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
+import { DailyActionLogPanel } from "@/components/DailyActionLogPanel";
 import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperSetup } from "@/components/HousekeeperSetup";
@@ -165,6 +166,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showActionLogPanel, setShowActionLogPanel] = useState(false);
   
   const [existingHousekeepers, setExistingHousekeepers] = useState<string[]>([]);
   
@@ -1985,6 +1987,15 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <Button
                 variant="outline" 
                 size="sm"
+                onClick={() => setShowActionLogPanel(true)}
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Journal d'actions
+              </Button>
+              <Button
+                variant="outline" 
+                size="sm"
                 onClick={() => navigate('/reports')}
                 className="flex items-center gap-2"
               >
@@ -2903,6 +2914,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         onRedistribute={handleRedistribute}
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
+      />
+
+      {/* Journal d'actions quotidien */}
+      <DailyActionLogPanel
+        isOpen={showActionLogPanel}
+        onClose={() => setShowActionLogPanel(false)}
+        hotelId={currentHotelId || ''}
       />
       </div>
   );

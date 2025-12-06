@@ -130,6 +130,41 @@ export type Database = {
         }
         Relationships: []
       }
+      archived_daily_logs: {
+        Row: {
+          archive_date: string
+          created_at: string
+          hotel_id: string
+          id: string
+          logs_data: Json
+          summary: Json | null
+        }
+        Insert: {
+          archive_date: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          logs_data?: Json
+          summary?: Json | null
+        }
+        Update: {
+          archive_date?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          logs_data?: Json
+          summary?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archived_daily_logs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignments: {
         Row: {
           actual_duration: number | null
@@ -242,6 +277,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "connected_room_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_action_logs: {
+        Row: {
+          action_type: string
+          actor_name: string | null
+          actor_type: string | null
+          created_at: string
+          description: string
+          details: Json | null
+          hotel_id: string
+          id: string
+          log_date: string
+          room_number: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_name?: string | null
+          actor_type?: string | null
+          created_at?: string
+          description: string
+          details?: Json | null
+          hotel_id: string
+          id?: string
+          log_date?: string
+          room_number?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_name?: string | null
+          actor_type?: string | null
+          created_at?: string
+          description?: string
+          details?: Json | null
+          hotel_id?: string
+          id?: string
+          log_date?: string
+          room_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_action_logs_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"

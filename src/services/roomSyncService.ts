@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Room } from "@/services/pdfService";
 import { toast } from "@/hooks/use-toast";
+import { ActionLogService } from "@/services/actionLogService";
 
 /**
  * Service centralisé pour toutes les synchronisations de chambres vers Supabase
@@ -10,14 +11,14 @@ export class RoomSyncService {
   /**
    * Synchroniser une chambre complète vers Supabase
    */
-  static async syncRoom(hotelId: string, room: Room): Promise<boolean> {
+  static async syncRoom(hotelId: string, room: Room, actorName?: string): Promise<boolean> {
     try {
       console.log('🔄 Synchronisation chambre:', { hotelId, roomNumber: room.number, status: room.status });
 
       // Trouver l'ID de la chambre dans la base
       const { data: existingRoom } = await supabase
         .from('rooms')
-        .select('id')
+        .select('id, status')
         .eq('hotel_id', hotelId)
         .eq('room_number', room.number)
         .single();
@@ -26,6 +27,8 @@ export class RoomSyncService {
         console.warn('⚠️ Chambre non trouvée en base:', room.number);
         return false;
       }
+
+      const previousStatus = existingRoom.status;
 
       // Construire l'objet de mise à jour avec tous les champs pertinents
       const updateData: any = {
@@ -55,6 +58,15 @@ export class RoomSyncService {
       if (error) {
         console.error('❌ Erreur synchronisation chambre:', error);
         return false;
+      }
+
+      // Logger le changement de statut si pertinent
+      if (previousStatus !== room.status && actorName) {
+        if (room.status === 'clean') {
+          await ActionLogService.logCleaningEnd(hotelId, room.number, actorName);
+        } else if (room.status === 'needs-cleaning' && previousStatus !== 'needs-cleaning') {
+          // Potentiel début de nettoyage
+        }
       }
 
       console.log('✅ Chambre synchronisée:', room.number);

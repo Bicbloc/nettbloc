@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { ActionLogService } from "@/services/actionLogService";
 
 export interface Assignment {
   id: string;
@@ -118,6 +119,15 @@ export class AssignmentService {
         .select('room_number')
         .eq('id', roomId)
         .maybeSingle();
+
+      // Logger l'assignation
+      if (roomData?.room_number) {
+        await ActionLogService.logAssignment(
+          hotelId, 
+          roomData.room_number, 
+          exactHousekeeperName
+        );
+      }
 
       // Créer une notification pour la femme de chambre
       await supabase.from('notifications').insert({
