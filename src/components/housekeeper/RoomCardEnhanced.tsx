@@ -6,6 +6,7 @@ import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight } from 
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { ActionLogService } from '@/services/actionLogService';
 
 interface Room {
   id: string;
@@ -146,6 +147,20 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
           is_read: false
         });
       }
+
+      // Récupérer le nom de la femme de chambre depuis le localStorage
+      const housekeeperProfile = localStorage.getItem('housekeeperProfile');
+      const housekeeperName = housekeeperProfile 
+        ? JSON.parse(housekeeperProfile).name 
+        : 'Femme de chambre';
+
+      // Enregistrer dans le journal des actions
+      await ActionLogService.logRoomRemark(
+        hotelId, 
+        room.room_number, 
+        housekeeperName, 
+        notes.trim()
+      );
 
       toast({
         title: "Commentaire envoyé",
