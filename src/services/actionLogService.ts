@@ -215,4 +215,19 @@ export class ActionLogService {
       details: { incidentId }
     });
   }
+
+  /**
+   * Helper pour loguer une remarque de chambre (visible pour admin)
+   */
+  static async logRoomRemark(hotelId: string, roomNumber: string, housekeeperName: string, remark: string): Promise<boolean> {
+    return this.logAction({
+      hotelId,
+      actionType: 'comment',
+      actorName: housekeeperName,
+      actorType: 'housekeeper',
+      roomNumber,
+      description: `Remarque de ${housekeeperName} pour CH ${roomNumber}: "${remark}"`,
+      details: { remark, type: 'room_remark' }
+    });
+  }
 }
