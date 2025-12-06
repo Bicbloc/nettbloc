@@ -12,6 +12,7 @@ export interface ReportData extends CustomReportFields {
   rooms: Room[];
   currentDate: string;
   config: CleaningConfig;
+  startTime?: string; // Heure de début (premier téléchargement)
 }
 
 // Store email in Supabase
@@ -84,6 +85,16 @@ export async function generateReport(
     const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     const currentDate = today.toLocaleDateString('fr-FR', dateOptions as any);
     
+    // Get or set start time (first download of the day)
+    const todayKey = today.toISOString().split('T')[0];
+    const startTimeKey = `report_start_time_${todayKey}`;
+    let startTime = localStorage.getItem(startTimeKey);
+    
+    if (!startTime) {
+      startTime = today.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      localStorage.setItem(startTimeKey, startTime);
+    }
+    
     // Sort rooms by floor and then room number
     const sortedRooms = [...rooms].sort((a, b) => {
       // Extract floor and room numbers
@@ -106,6 +117,7 @@ export async function generateReport(
       rooms: sortedRooms,
       currentDate: currentDate,
       config: config,
+      startTime: startTime,
       // Include custom fields if provided
       toDoItems: customFields?.toDoItems || [],
       toKnowItems: customFields?.toKnowItems || [],
@@ -232,6 +244,23 @@ function generateReportHTML(data: ReportData): string {
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
                        quickCleanCount * data.config.quickCleaningTime;
   
+  // Time tracking table (Pointage)
+  const timeTrackingHtml = `
+    <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:15px; border:1px solid #000;">
+      <tr>
+        <th colspan="2" style="background-color:#e3e3e3; border:1px solid #000; text-align:center; font-weight:bold;">Pointage</th>
+      </tr>
+      <tr>
+        <td style="border:1px solid #000; width:50%;">Heure de début</td>
+        <td style="border:1px solid #000; font-weight:bold;">${data.startTime || '___:___'}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #000;">Heure de fin</td>
+        <td style="border:1px solid #000; height:25px;"></td>
+      </tr>
+    </table>
+  `;
+
   // Summary table with improved styling - removed title "Résumé des chambres"
   const summaryTableHtml = `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:20px; border:1px solid #000;">
@@ -519,14 +548,15 @@ function generateReportHTML(data: ReportData): string {
         <div class="housekeeperName">${data.housekeeperName}</div>
       </div>
       
+      <div class="summary-table" style="margin-top: 15px;">
+        ${timeTrackingHtml}
+        ${summaryTableHtml}
+      </div>
+      
       <div class="content-section">
         ${instructionsHtml}
         ${todoHtml}
         ${toknowHtml}
-      </div>
-      
-      <div class="summary-table">
-        ${summaryTableHtml}
       </div>
       
       <h2>Liste des chambres à nettoyer</h2>
