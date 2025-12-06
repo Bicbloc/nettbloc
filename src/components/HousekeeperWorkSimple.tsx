@@ -48,6 +48,10 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [activeTab, setActiveTab] = useState<'rooms' | 'inventory'>('rooms');
   
+  // Pointage
+  const [startTime, setStartTime] = useState<string | null>(null);
+  const [endTime, setEndTime] = useState<string | null>(null);
+  
   // Journal d'activité local
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -99,6 +103,31 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const hotelId = getHotelId();
   const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
 
+  // Charger/sauvegarder le pointage depuis localStorage
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const savedStart = localStorage.getItem(`pointage_start_${today}_${housekeeperName}`);
+    const savedEnd = localStorage.getItem(`pointage_end_${today}_${housekeeperName}`);
+    
+    if (savedStart) setStartTime(savedStart);
+    if (savedEnd) setEndTime(savedEnd);
+  }, [housekeeperName]);
+
+  const handleStartPointage = () => {
+    const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const today = new Date().toISOString().split('T')[0];
+    setStartTime(now);
+    localStorage.setItem(`pointage_start_${today}_${housekeeperName}`, now);
+    addToActivityLog(`⏰ Pointage début: ${now}`, 'success');
+  };
+
+  const handleEndPointage = () => {
+    const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const today = new Date().toISOString().split('T')[0];
+    setEndTime(now);
+    localStorage.setItem(`pointage_end_${today}_${housekeeperName}`, now);
+    addToActivityLog(`⏰ Pointage fin: ${now}`, 'success');
+  };
   useEffect(() => {
     // Vérification renforcée de l'hotelId
     const storedHotelId = localStorage.getItem('selectedHotelId');
@@ -1073,25 +1102,73 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </Button>
         </div>
 
-         {/* Session Info */}
+         {/* Session Info avec Pointage */}
          <Card className="p-3 sm:p-4 bg-blue-50 border-blue-200">
-           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-               <div>
-                 <p className="text-xs sm:text-sm font-medium text-blue-800">Connecté en tant que</p>
-                 <p className="text-sm sm:text-base text-blue-600 truncate">{housekeeperName}</p>
-               </div>
-               {!isAuthenticatedHousekeeper && (
+           <div className="flex flex-col gap-3">
+             {/* Info utilisateur */}
+             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
                  <div>
-                   <p className="text-xs sm:text-sm font-medium text-blue-800">Code d'accès</p>
-                   <p className="text-sm font-mono text-blue-600">{accessCode}</p>
+                   <p className="text-xs sm:text-sm font-medium text-blue-800">Connecté en tant que</p>
+                   <p className="text-sm sm:text-base text-blue-600 truncate">{housekeeperName}</p>
                  </div>
-               )}
+                 {!isAuthenticatedHousekeeper && (
+                   <div>
+                     <p className="text-xs sm:text-sm font-medium text-blue-800">Code d'accès</p>
+                     <p className="text-sm font-mono text-blue-600">{accessCode}</p>
+                   </div>
+                 )}
+               </div>
+               <Badge variant="default" className="bg-green-100 text-green-800 whitespace-nowrap">
+                 <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                 Connecté
+               </Badge>
              </div>
-             <Badge variant="default" className="bg-green-100 text-green-800 whitespace-nowrap">
-               <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-               Connecté
-             </Badge>
+             
+             {/* Pointage */}
+             <div className="border-t border-blue-200 pt-3">
+               <p className="text-xs sm:text-sm font-medium text-blue-800 mb-2 flex items-center gap-1">
+                 <Clock className="h-3.5 w-3.5" />
+                 Pointage du jour
+               </p>
+               <div className="flex flex-wrap items-center gap-2">
+                 {!startTime ? (
+                   <Button 
+                     size="sm" 
+                     onClick={handleStartPointage}
+                     className="bg-green-600 hover:bg-green-700 text-white"
+                   >
+                     <Clock className="h-3.5 w-3.5 mr-1" />
+                     Pointer arrivée
+                   </Button>
+                 ) : (
+                   <Badge variant="outline" className="bg-green-50 border-green-300 text-green-700 px-3 py-1">
+                     Début: {startTime}
+                   </Badge>
+                 )}
+                 
+                 {startTime && !endTime ? (
+                   <Button 
+                     size="sm" 
+                     onClick={handleEndPointage}
+                     className="bg-orange-600 hover:bg-orange-700 text-white"
+                   >
+                     <Clock className="h-3.5 w-3.5 mr-1" />
+                     Pointer départ
+                   </Button>
+                 ) : endTime ? (
+                   <Badge variant="outline" className="bg-orange-50 border-orange-300 text-orange-700 px-3 py-1">
+                     Fin: {endTime}
+                   </Badge>
+                 ) : null}
+                 
+                 {startTime && endTime && (
+                   <Badge variant="default" className="bg-blue-100 text-blue-800 px-3 py-1">
+                     ✓ Journée complète
+                   </Badge>
+                 )}
+               </div>
+             </div>
            </div>
          </Card>
       </div>
