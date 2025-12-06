@@ -13,7 +13,7 @@ import { Loader2, Building, Users, Shield, UserCheck, KeyRound, User } from 'luc
 import { supabase } from '@/integrations/supabase/client';
 
 const Auth = () => {
-  const { signIn, signUp, isAuthenticated, loading } = useAuth();
+  const { signIn, signUp, isAuthenticated, loading, clearCorruptedSession } = useAuth();
   const { signIn: housekeeperSignIn, signUp: housekeeperSignUp } = useHousekeeperAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
@@ -30,14 +30,23 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Afficher le bouton de retry après 3 secondes de loading
+  // Afficher le bouton de retry après 2 secondes de loading (réduit de 3s)
   useEffect(() => {
     if (loading) {
-      const timer = setTimeout(() => setShowRetry(true), 3000);
+      const timer = setTimeout(() => setShowRetry(true), 2000);
       return () => clearTimeout(timer);
     }
     setShowRetry(false);
   }, [loading]);
+
+  const handleClearAndRetry = () => {
+    clearCorruptedSession();
+    toast({
+      title: "Cache effacé",
+      description: "Les données de session ont été réinitialisées."
+    });
+    setTimeout(() => window.location.reload(), 500);
+  };
 
   // Handle password reset from URL and hash
   useEffect(() => {
@@ -345,9 +354,14 @@ const Auth = () => {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground">Vérification de l'authentification...</p>
         {showRetry && (
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Rafraîchir la page
-          </Button>
+          <div className="flex flex-col gap-2 items-center">
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Rafraîchir la page
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleClearAndRetry} className="text-xs text-muted-foreground">
+              Problème persistant ? Réinitialiser la session
+            </Button>
+          </div>
         )}
       </div>
     );
