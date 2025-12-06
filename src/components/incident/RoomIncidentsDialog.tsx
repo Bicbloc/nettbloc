@@ -84,14 +84,40 @@ export function RoomIncidentsDialog({ open, onOpenChange, hotelId, roomNumber }:
     mutationFn: async ({ incidentId, comment }: { incidentId: string; comment: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Récupérer les informations depuis localStorage pour les femmes de chambre
+      const storedHousekeeperName = localStorage.getItem('housekeeper_name');
+      const storedHousekeeperId = localStorage.getItem('housekeeper_id');
+      
+      // Déterminer le user_id, user_name et user_type
+      let userId: string;
+      let userName: string;
+      let userType: string;
+      
+      if (user?.id) {
+        // Utilisateur authentifié (admin)
+        userId = user.id;
+        userName = user.email || "Admin";
+        userType = "admin";
+      } else if (storedHousekeeperId) {
+        // Femme de chambre (non authentifiée via Supabase Auth)
+        userId = storedHousekeeperId;
+        userName = storedHousekeeperName || "Femme de chambre";
+        userType = "housekeeper";
+      } else {
+        // Fallback
+        userId = crypto.randomUUID();
+        userName = "Anonyme";
+        userType = "guest";
+      }
+      
       const { error } = await supabase
         .from("incident_comments")
         .insert({
           incident_id: incidentId,
           comment,
-          user_id: user?.id || "",
-          user_name: user?.email || "Anonyme",
-          user_type: "admin"
+          user_id: userId,
+          user_name: userName,
+          user_type: userType
         });
       
       if (error) throw error;
