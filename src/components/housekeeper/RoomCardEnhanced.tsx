@@ -91,50 +91,68 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
     
     setIsSendingNote(true);
     try {
+      // Chercher l'assignation liée à cette chambre
       const { data: assignment, error: assignmentError } = await supabase
         .from('assignments')
         .select('id')
         .eq('room_id', room.id)
+        .in('status', ['assigned', 'in_progress'])
+        .maybeSingle();
+
+      // Récupérer les infos de l'hôtel pour la notification
+      const { data: hotel, error: hotelError } = await supabase
+        .from('hotels')
+        .select('user_id, name')
+        .eq('id', hotelId)
         .single();
 
-      if (assignmentError) throw assignmentError;
+      if (hotelError) {
+        console.error('Erreur récupération hôtel:', hotelError);
+        throw hotelError;
+      }
 
-      if (assignment) {
+      // Mettre à jour l'assignation si elle existe
+      if (assignment && !assignmentError) {
         const { error: updateError } = await supabase
           .from('assignments')
           .update({ notes: notes.trim() })
           .eq('id', assignment.id);
 
-        if (updateError) throw updateError;
-
-        const { data: hotel, error: hotelError } = await supabase
-          .from('hotels')
-          .select('user_id, name')
-          .eq('id', hotelId)
-          .single();
-
-        if (hotelError) throw hotelError;
-
-        if (hotel?.user_id) {
-          await supabase.from('notifications').insert({
-            user_id: hotel.user_id,
-            user_type: 'admin',
-            hotel_id: hotelId,
-            type: 'room_note',
-            title: `Commentaire - Chambre ${room.room_number}`,
-            description: notes.trim(),
-            room_number: room.room_number,
-            is_read: false
-          });
+        if (updateError) {
+          console.error('Erreur mise à jour assignation:', updateError);
         }
-
-        toast({
-          title: "Commentaire envoyé",
-          description: `Le commentaire pour la chambre ${room.room_number} a été envoyé`,
-        });
-        
-        setNotes('');
       }
+
+      // Toujours mettre à jour les notes de la chambre directement
+      const { error: roomUpdateError } = await supabase
+        .from('rooms')
+        .update({ notes: notes.trim() })
+        .eq('id', room.id);
+
+      if (roomUpdateError) {
+        console.error('Erreur mise à jour chambre:', roomUpdateError);
+      }
+
+      // Créer une notification pour l'admin
+      if (hotel?.user_id) {
+        await supabase.from('notifications').insert({
+          user_id: hotel.user_id,
+          user_type: 'admin',
+          hotel_id: hotelId,
+          type: 'room_note',
+          title: `Commentaire - Chambre ${room.room_number}`,
+          description: notes.trim(),
+          room_number: room.room_number,
+          is_read: false
+        });
+      }
+
+      toast({
+        title: "Commentaire envoyé",
+        description: `Le commentaire pour la chambre ${room.room_number} a été envoyé`,
+      });
+      
+      setNotes('');
     } catch (error) {
       console.error('Erreur envoi commentaire:', error);
       toast({
