@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
+import { RoomIncidentsDialog } from "@/components/incident/RoomIncidentsDialog";
 
 interface RoomCardProps {
   room: Room;
@@ -27,6 +28,8 @@ interface RoomCardProps {
   isSelected?: boolean;
   onSelect?: (room: Room) => void;
   showActions?: boolean;
+  hotelId?: string;
+  incidentCount?: number;
 }
 
 export function RoomCard({ 
@@ -44,11 +47,14 @@ export function RoomCard({
   selectable = false,
   isSelected = false,
   onSelect,
-  showActions = false
+  showActions = false,
+  hotelId,
+  incidentCount = 0
 }: RoomCardProps) {
   const [dragging, setDragging] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showIncidentsDialog, setShowIncidentsDialog] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Add animation effect when dragging
@@ -268,6 +274,29 @@ export function RoomCard({
               🚪
             </button>
             
+            {/* Bouton incidents en mode compact */}
+            {hotelId && (
+              <button
+                className={`h-6 w-6 flex items-center justify-center rounded-lg transition-colors relative ${
+                  incidentCount > 0 
+                    ? 'hover:bg-orange-100 text-orange-600' 
+                    : 'hover:bg-muted text-muted-foreground'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowIncidentsDialog(true);
+                }}
+                title={incidentCount > 0 ? `${incidentCount} incident(s)` : "Voir les incidents"}
+              >
+                <Wrench className="h-3 w-3" />
+                {incidentCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[9px] rounded-full h-3.5 w-3.5 flex items-center justify-center font-bold">
+                    {incidentCount}
+                  </span>
+                )}
+              </button>
+            )}
+            
             {/* Boutons de gestion des chambres en mode compact */}
             {onLinkRooms && (
               <button
@@ -359,6 +388,15 @@ export function RoomCard({
             room={room}
             allRooms={allRooms}
             onLinkRooms={onLinkRooms}
+          />
+        )}
+
+        {showIncidentsDialog && hotelId && (
+          <RoomIncidentsDialog
+            open={showIncidentsDialog}
+            onOpenChange={setShowIncidentsDialog}
+            hotelId={hotelId}
+            roomNumber={room.number}
           />
         )}
       </div>
@@ -501,7 +539,33 @@ export function RoomCard({
           </div>
         )}
         
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
+          {/* Bouton incidents en mode non-compact */}
+          {hotelId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowIncidentsDialog(true);
+              }}
+              className={`flex items-center gap-1 relative ${
+                incidentCount > 0 
+                  ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300' 
+                  : ''
+              }`}
+              title={incidentCount > 0 ? `${incidentCount} incident(s)` : "Voir les incidents"}
+            >
+              <Wrench className="h-3 w-3" />
+              Incidents
+              {incidentCount > 0 && (
+                <Badge className="ml-1 bg-orange-500 text-white text-[10px] px-1.5 py-0">
+                  {incidentCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+
           {onLinkRooms && (
             <Button
               variant="outline"
@@ -553,6 +617,15 @@ export function RoomCard({
           room={room}
           allRooms={allRooms}
           onLinkRooms={onLinkRooms}
+        />
+      )}
+
+      {showIncidentsDialog && hotelId && (
+        <RoomIncidentsDialog
+          open={showIncidentsDialog}
+          onOpenChange={setShowIncidentsDialog}
+          hotelId={hotelId}
+          roomNumber={room.number}
         />
       )}
     </div>

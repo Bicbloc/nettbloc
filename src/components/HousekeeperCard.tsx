@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getRoomFloor } from "@/utils/roomUtils";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HousekeeperCardProps {
   name: string;
@@ -45,6 +47,7 @@ interface HousekeeperCardProps {
   accessCode?: string;
   housekeeperNames?: string[];
   onGenerateAccessCode?: (housekeeperName: string) => void;
+  hotelId?: string;
 }
 
 export function HousekeeperCard({ 
@@ -69,7 +72,8 @@ export function HousekeeperCard({
   onRename,
   accessCode,
   housekeeperNames = [],
-  onGenerateAccessCode
+  onGenerateAccessCode,
+  hotelId
 }: HousekeeperCardProps) {
   const [isOverloaded, setIsOverloaded] = useState(false);
   const [isUnderloaded, setIsUnderloaded] = useState(false);
@@ -83,8 +87,31 @@ export function HousekeeperCard({
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
   
-  const effectiveMaxRooms = maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper;
+  // Récupérer le nombre d'incidents actifs par chambre
+  const { data: incidentCounts } = useQuery({
+    queryKey: ['room-incident-counts', hotelId],
+    queryFn: async () => {
+      if (!hotelId) return {};
+      const { data, error } = await supabase
+        .from('incidents')
+        .select('location_reference')
+        .eq('hotel_id', hotelId)
+        .neq('status', 'resolved');
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      data?.forEach((incident) => {
+        if (incident.location_reference) {
+          counts[incident.location_reference] = (counts[incident.location_reference] || 0) + 1;
+        }
+      });
+      return counts;
+    },
+    enabled: !!hotelId,
+    staleTime: 30000
+  });
   
+  const effectiveMaxRooms = maxRoomsOverride || cleaningConfig.maxRoomsPerHousekeeper;
+
   // Modification: Filter rooms to show only those from preferred floors when preferredFloors is not empty
   const visibleRooms = preferredFloors.length > 0
     ? rooms.filter(room => preferredFloors.includes(getRoomFloor(room.number)))
