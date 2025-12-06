@@ -5,6 +5,8 @@ import { RoomCard } from '@/components/RoomCard';
 import { RoomFilters } from '@/components/RoomFilters';
 import { Room } from '@/services/pdfService';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RoomsGridSectionProps {
   rooms: Room[];
@@ -12,6 +14,7 @@ interface RoomsGridSectionProps {
   onAddRoom: () => void;
   onRoomUpdate: (room: Room) => void;
   onFilterChange: (filtered: Room[] | null) => void;
+  hotelId?: string;
 }
 
 export function RoomsGridSection({
@@ -19,10 +22,39 @@ export function RoomsGridSection({
   filteredRooms,
   onAddRoom,
   onRoomUpdate,
-  onFilterChange
+  onFilterChange,
+  hotelId
 }: RoomsGridSectionProps) {
   const [showFilters, setShowFilters] = useState(false);
   const displayRooms = filteredRooms || rooms;
+
+  // Récupérer le nombre d'incidents actifs par chambre
+  const { data: incidentCounts } = useQuery({
+    queryKey: ['room-incident-counts', hotelId],
+    queryFn: async () => {
+      if (!hotelId) return {};
+      
+      const { data, error } = await supabase
+        .from('incidents')
+        .select('location_reference')
+        .eq('hotel_id', hotelId)
+        .neq('status', 'resolved');
+      
+      if (error) throw error;
+      
+      // Compter les incidents par numéro de chambre
+      const counts: Record<string, number> = {};
+      data?.forEach((incident) => {
+        if (incident.location_reference) {
+          counts[incident.location_reference] = (counts[incident.location_reference] || 0) + 1;
+        }
+      });
+      
+      return counts;
+    },
+    enabled: !!hotelId,
+    staleTime: 30000 // Refresh toutes les 30 secondes
+  });
 
   return (
     <div className="space-y-4">
@@ -73,6 +105,8 @@ export function RoomsGridSection({
               key={room.number}
               room={room}
               onUpdate={onRoomUpdate}
+              hotelId={hotelId}
+              incidentCount={incidentCounts?.[room.number] || 0}
             />
           ))}
         </div>

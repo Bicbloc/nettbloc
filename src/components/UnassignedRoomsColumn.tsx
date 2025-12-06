@@ -5,6 +5,8 @@ import { RoomCard } from "./RoomCard";
 import { RoomAssignmentButton } from "./RoomAssignmentButton";
 import { AlertTriangle, Layers } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UnassignedRoomsColumnProps {
   rooms: Room[];
@@ -14,6 +16,7 @@ interface UnassignedRoomsColumnProps {
   forceHide?: boolean; // New prop to force hide the component
   housekeeperNames?: string[]; // Noms des femmes de chambre pour assignation directe
   onDirectAssign?: (roomNumber: string, housekeeperName: string) => void; // Callback pour assignation directe
+  hotelId?: string;
 }
 
 export function UnassignedRoomsColumn({ 
@@ -23,8 +26,36 @@ export function UnassignedRoomsColumn({
   allRooms = [], // Par défaut, c'est un tableau vide
   forceHide = false, // Default is false, so the component will show
   housekeeperNames = [], // Noms des femmes de chambre
-  onDirectAssign // Callback pour assignation directe
+  onDirectAssign, // Callback pour assignation directe
+  hotelId
 }: UnassignedRoomsColumnProps) {
+  
+  // Récupérer le nombre d'incidents actifs par chambre
+  const { data: incidentCounts } = useQuery({
+    queryKey: ['room-incident-counts', hotelId],
+    queryFn: async () => {
+      if (!hotelId) return {};
+      
+      const { data, error } = await supabase
+        .from('incidents')
+        .select('location_reference')
+        .eq('hotel_id', hotelId)
+        .neq('status', 'resolved');
+      
+      if (error) throw error;
+      
+      const counts: Record<string, number> = {};
+      data?.forEach((incident) => {
+        if (incident.location_reference) {
+          counts[incident.location_reference] = (counts[incident.location_reference] || 0) + 1;
+        }
+      });
+      
+      return counts;
+    },
+    enabled: !!hotelId,
+    staleTime: 30000
+  });
   
   // If forceHide is true, don't render the component
   if (forceHide) {
@@ -83,6 +114,8 @@ export function UnassignedRoomsColumn({
                         compact 
                         draggable={draggable}
                         showActions={true}
+                        hotelId={hotelId}
+                        incidentCount={incidentCounts?.[room.number] || 0}
                       />
                       {housekeeperNames.length > 0 && onDirectAssign && (
                         <RoomAssignmentButton
