@@ -64,6 +64,7 @@ import { IncidentReportDialogSimple } from "@/components/incident/IncidentReport
 import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
 import { RolePermissionsManager } from "@/components/incident/RolePermissionsManager";
 import { IncidentReportPrint } from "@/components/incident/IncidentReportPrint";
+import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicator";
 
 
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
