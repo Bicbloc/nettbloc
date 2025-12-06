@@ -1,16 +1,12 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ReportFields } from "@/components/ReportCustomFields"; // Updated import path
+import { ReportFields } from "@/components/ReportCustomFields";
 import ReportCustomFields from "@/components/ReportCustomFields";
-import { getReportEmail, saveReportEmail } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { saveEmailToSupabase } from "@/lib/supabase";
 
 interface EmailReportDialogProps {
   isOpen: boolean;
@@ -25,14 +21,9 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  initialEmail = "",
   housekeeperName = "",
   allHousekeepers = []
 }) => {
-  // Get saved email or use initialEmail
-  const savedEmail = getReportEmail();
-  const [localEmail, setLocalEmail] = useState(savedEmail || initialEmail);
-  const [hotelName, setHotelName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customFields, setCustomFields] = useState<ReportFields>({ 
     toDoItems: [], 
@@ -111,36 +102,10 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isValidEmail = emailRegex.test(localEmail);
-    
-    if (!isValidEmail) {
-      toast({
-        variant: "destructive",
-        title: "Email invalide",
-        description: "Veuillez saisir une adresse email valide."
-      });
-      return;
-    }
-    
-    if (!hotelName.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Nom d'hôtel requis",
-        description: "Veuillez saisir le nom de votre hôtel."
-      });
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      saveReportEmail(localEmail); // Save for future use
-      
-      // Save email to Supabase
-      await saveEmailToSupabase(localEmail);
-      
-      // Pass the complete customFields object and hotel name to onConfirm
-      await onConfirm(localEmail, customFields, hotelName);
+      // Pass empty email and hotel name since they're no longer needed
+      await onConfirm('', customFields, '');
       onClose();
     } catch (error) {
       console.error("Erreur lors de la génération du rapport:", error);
@@ -164,7 +129,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
               : 'Téléchargement des rapports'}
           </DialogTitle>
           <DialogDescription className="text-left">
-            Saisissez votre email pour recevoir le rapport PDF
+            Configurez les instructions pour le rapport PDF
           </DialogDescription>
         </DialogHeader>
         
@@ -172,40 +137,6 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-4 pb-4">
               <div className="grid gap-4 py-2">
-                <div className="grid grid-cols-1 items-start gap-2">
-                  <Label htmlFor="email" className="text-left">
-                    Email <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="votre@email.com"
-                    value={localEmail}
-                    onChange={(e) => setLocalEmail(e.target.value)}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground text-left">
-                    Un email valide est requis pour télécharger le rapport
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 items-start gap-2">
-                  <Label htmlFor="hotelName" className="text-left">
-                    Nom de l'hôtel <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="hotelName"
-                    type="text"
-                    placeholder="Nom de votre hôtel"
-                    value={hotelName}
-                    onChange={(e) => setHotelName(e.target.value)}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground text-left">
-                    Le nom de l'hôtel apparaîtra sur tous les rapports
-                  </p>
-                </div>
-                
                 <div className="mt-2">
                   <Label className="font-medium mb-2 block text-left">Instructions générales (pour tous les rapports)</Label>
                   <Textarea
