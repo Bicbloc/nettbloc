@@ -326,8 +326,7 @@ function generateReportHTML(data: ReportData): string {
     `;
   });
   
-  // Complete HTML with improved styling and encadré for housekeeper name with bold text
-  // Added more padding for housekeeper name and increased space between it and tables
+  // Complete HTML with improved styling optimized for printing
   return `
     <!DOCTYPE html>
     <html lang="fr">
@@ -339,41 +338,40 @@ function generateReportHTML(data: ReportData): string {
       <style>
         body { 
           font-family: Arial, sans-serif; 
-          margin: 20px;
-          font-size: 12px;
-          line-height: 1.5;
+          margin: 15px;
+          font-size: 11px;
+          line-height: 1.4;
         }
         .header-content {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 20px;
+          margin-bottom: 10px;
         }
         .logo-section {
           text-align: left;
         }
         h1 { 
           font-family: 'Poppins', sans-serif;
-          font-size: 22px; 
+          font-size: 18px; 
           margin: 0;
           font-weight: bold;
           text-align: left;
-          padding: 5px 0;
-          letter-spacing: 0.5px;
+          padding: 3px 0;
         }
         h2 { 
-          font-size: 16px; 
-          margin-top: 20px; 
-          margin-bottom: 10px;
+          font-size: 13px; 
+          margin-top: 12px; 
+          margin-bottom: 8px;
           font-weight: bold;
           border-bottom: 1px solid #ddd;
-          padding-bottom: 5px;
+          padding-bottom: 4px;
           text-align: left;
         }
         h3 {
-          font-size: 14px;
-          margin-top: 15px;
-          margin-bottom: 5px;
+          font-size: 12px;
+          margin-top: 10px;
+          margin-bottom: 4px;
           font-weight: bold;
           text-align: left;
         }
@@ -381,100 +379,128 @@ function generateReportHTML(data: ReportData): string {
           margin: 0;
           font-style: italic;
           text-align: right;
+          font-size: 10px;
         }
-        .housekeeper-column {
-          width: 100%;
-          padding: 90px 0;  /* Further increased padding */
-          text-align: center;
-          margin: 90px 0;  /* Further increased margin */
+        .housekeeper-row {
+          display: flex;
+          align-items: center;
+          margin: 15px 0;
+          padding: 8px 0;
         }
         .housekeeperName {
-          border: 3px solid #000;
-          padding: 25px 30px;  /* Increased padding inside box */
+          border: 2px solid #000;
+          padding: 8px 15px;
           font-weight: bold;
           display: inline-block;
-          font-size: 22px;  /* Increased font size */
-          text-transform: uppercase;
+          font-size: 13px;
           background-color: #f9f9f9;
-          letter-spacing: 1px;
         }
+        
+        /* Critical: Prevent table breaks */
         table { 
           width: 100%; 
           border-collapse: collapse; 
-          margin-bottom: 20px;
-          page-break-inside: avoid;
+          margin-bottom: 12px;
         }
+        
+        /* Prevent row breaks */
+        tr {
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+        
         th, td { 
           border: 1px solid #000;
-          padding: 6px; 
+          padding: 4px 6px; 
           text-align: left;
+          font-size: 10px;
         }
         th { 
           background-color: #f2f2f2; 
           font-weight: bold;
         }
+        
+        /* Floor sections - keep together */
+        .floor-section {
+          page-break-inside: avoid;
+          break-inside: avoid;
+          margin-top: 12px;
+        }
+        
+        .floor-heading {
+          font-weight: bold;
+          background-color: #eee;
+          padding: 4px 8px;
+          margin-bottom: 4px;
+          font-size: 11px;
+        }
+        
         .signature { 
-          margin-top: 30px; 
+          margin-top: 20px; 
           border-top: 1px solid #000; 
-          width: 200px; 
+          width: 150px; 
           text-align: center; 
-          padding-top: 10px; 
+          padding-top: 8px;
+          font-size: 10px;
         }
         .footer { 
           text-align: center;
-          margin-top: 40px;
-          font-size: 11px;
-          padding-top: 10px;
+          margin-top: 20px;
+          font-size: 10px;
+          padding-top: 8px;
           border-top: 1px solid #ddd;
-          position: fixed;
-          bottom: 10px;
-          left: 0;
-          right: 0;
         }
         .footer .company {
           font-family: 'Poppins', sans-serif;
           font-weight: bold;
-          font-size: 12px;
-        }
-        .footer .phone {
-          font-weight: bold;
+          font-size: 11px;
         }
         ul {
-          margin: 5px 0 10px 20px;
+          margin: 4px 0 8px 15px;
           padding-left: 0;
           text-align: left;
         }
         li {
-          margin-bottom: 3px;
+          margin-bottom: 2px;
           text-align: left;
+          font-size: 10px;
         }
         .instructions-section,
         .todo-section,
         .toknow-section { 
-          margin-top: 15px;
-          margin-bottom: 15px;
-          padding: 10px;
+          margin-top: 8px;
+          margin-bottom: 8px;
+          padding: 8px;
           background-color: #f9f9f9;
-          border-radius: 4px;
+          border-radius: 3px;
           text-align: left;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         .content-section {
-          margin-bottom: 100px;  /* Further increased space */
+          margin-bottom: 15px;
           text-align: left;
         }
         .summary-table {
-          margin-top: 100px;  /* Further increased space */
+          margin-top: 10px;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
+        
         @media print {
-          .footer {
-            position: fixed;
-            bottom: 10px;
-            left: 0;
-            right: 0;
+          body {
+            margin: 10px;
           }
-          .content {
-            margin-bottom: 100px;  /* Further increased space */
+          .floor-section {
+            page-break-inside: avoid;
           }
+          tr {
+            page-break-inside: avoid;
+          }
+        }
+        
+        @page {
+          margin: 10mm;
         }
       </style>
     </head>
@@ -488,7 +514,8 @@ function generateReportHTML(data: ReportData): string {
       
       <h2>Rapport de Nettoyage</h2>
       
-      <div class="housekeeper-column">
+      <div class="housekeeper-row">
+        <span style="margin-right: 8px;">Nom:</span>
         <div class="housekeeperName">${data.housekeeperName}</div>
       </div>
       
