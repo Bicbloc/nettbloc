@@ -67,16 +67,37 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const hotelIdFromUrl = searchParams.get('hotel');
   const housekeeperNameFromUrl = searchParams.get('name');
 
-  // Récupérer depuis localStorage
+  // Récupérer depuis localStorage avec fallbacks multiples
   const housekeeperData = localStorage.getItem('housekeeper') ? JSON.parse(localStorage.getItem('housekeeper')!) : null;
   const housekeeperProfile = localStorage.getItem('housekeeperProfile') ? JSON.parse(localStorage.getItem('housekeeperProfile')!) : null;
   
-   const isAuthenticatedHousekeeper = housekeeperProfile?.isAuthenticated;
-   const accessCode = isAuthenticatedHousekeeper 
-     ? null 
-     : (accessCodeFromUrl || housekeeperData?.accessCode);
-   const hotelId = hotelIdFromUrl || localStorage.getItem('selectedHotelId');
-   const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
+  const isAuthenticatedHousekeeper = housekeeperProfile?.isAuthenticated;
+  const accessCode = isAuthenticatedHousekeeper 
+    ? null 
+    : (accessCodeFromUrl || housekeeperData?.accessCode);
+  
+  // Récupération robuste du hotelId avec plusieurs fallbacks
+  const getHotelId = (): string | null => {
+    // 1. URL en priorité
+    if (hotelIdFromUrl && hotelIdFromUrl.length >= 30) return hotelIdFromUrl;
+    // 2. localStorage standard
+    const storedId = localStorage.getItem('selectedHotelId');
+    if (storedId && storedId.length >= 30) return storedId;
+    // 3. Clé de backup
+    const backupId = localStorage.getItem('lastSelectedHotelId');
+    if (backupId && backupId.length >= 30) return backupId;
+    // 4. currentHotelId legacy
+    const legacyId = localStorage.getItem('currentHotelId');
+    if (legacyId && legacyId.length >= 30) return legacyId;
+    // 5. Dans le profil
+    if (housekeeperProfile?.currentHotelId && housekeeperProfile.currentHotelId.length >= 30) {
+      return housekeeperProfile.currentHotelId;
+    }
+    return null;
+  };
+  
+  const hotelId = getHotelId();
+  const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
 
   useEffect(() => {
     // Vérification renforcée de l'hotelId
@@ -224,17 +245,31 @@ export const HousekeeperWorkSimple: React.FC = () => {
     onUpdate: handleRealtimeUpdate
   });
 
-  // Polling de secours si le realtime échoue (toutes les 10 secondes au lieu de 30)
+  // Polling de secours si le realtime échoue (toutes les 15 secondes)
+  // NE PAS effacer les données existantes pendant le polling
   useEffect(() => {
     const pollInterval = setInterval(() => {
-      if (!isConnected && hotelId) {
+      // Vérifier que hotelId existe toujours
+      const currentHotelId = getHotelId();
+      if (!currentHotelId) {
+        console.warn('⚠️ HotelId disparu pendant le polling!');
+        // Tenter de récupérer depuis le backup
+        const backupId = localStorage.getItem('lastSelectedHotelId');
+        if (backupId && backupId.length >= 30) {
+          console.log('🔄 Récupération hotelId depuis backup');
+          localStorage.setItem('selectedHotelId', backupId);
+        }
+        return;
+      }
+      
+      if (!isConnected && currentHotelId) {
         console.log('⏰ Polling de secours - realtime non connecté');
         loadWorkData();
       }
-    }, 10000); // 10 secondes au lieu de 30
+    }, 15000); // 15 secondes
 
     return () => clearInterval(pollInterval);
-  }, [isConnected, hotelId]);
+  }, [isConnected]);
 
   const loadWorkData = async () => {
     try {
