@@ -30,18 +30,16 @@ export const NotificationPanel = ({ notifications, hasUnread }: NotificationPane
       case 'room-status':
         return '🧹';
       case 'remark':
-        return '⚠️';
+        return '💬';
       case 'assignment':
         return '📋';
-      case 'room_note':
-        return '💬';
       default:
         return '🔔';
     }
   };
 
   const getStatusColor = (description: string, type?: string) => {
-    if (type === 'room_note') {
+    if (type === 'remark') {
       return 'bg-purple-100 text-purple-800';
     }
     if (description.includes('terminé') || description.includes('nettoyage de la chambre')) {
@@ -119,7 +117,7 @@ export const NotificationPanel = ({ notifications, hasUnread }: NotificationPane
                             className={`text-xs ${getStatusColor(notification.description, notification.type)}`}
                           >
                             {notification.type === 'room-status' ? 'Status' : 
-                             notification.type === 'room_note' ? 'Commentaire' : 'Info'}
+                             notification.type === 'remark' ? 'Commentaire' : 'Info'}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mb-2">

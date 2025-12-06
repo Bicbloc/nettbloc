@@ -134,18 +134,22 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
         console.error('Erreur mise à jour chambre:', roomUpdateError);
       }
 
-      // Créer une notification pour l'admin
+      // Créer une notification pour l'admin (type 'remark' est valide dans la contrainte CHECK)
       if (hotel?.user_id) {
-        await supabase.from('notifications').insert({
+        const { error: notifError } = await supabase.from('notifications').insert({
           user_id: hotel.user_id,
           user_type: 'admin',
           hotel_id: hotelId,
-          type: 'room_note',
-          title: `Commentaire - Chambre ${room.room_number}`,
+          type: 'remark',
+          title: `💬 Commentaire - Chambre ${room.room_number}`,
           description: notes.trim(),
           room_number: room.room_number,
           is_read: false
         });
+        
+        if (notifError) {
+          console.error('Erreur création notification:', notifError);
+        }
       }
 
       // Récupérer le nom de la femme de chambre depuis le localStorage
