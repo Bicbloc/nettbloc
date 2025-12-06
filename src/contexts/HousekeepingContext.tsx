@@ -425,6 +425,47 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       console.error('Erreur mise à jour statut chambre:', error);
     }
 
+    // JOURNAL D'ACTIONS: Logger les changements de statut importants
+    if (hotelId && housekeeperName) {
+      try {
+        const { ActionLogService } = await import('@/services/actionLogService');
+        
+        if (newStatus === 'clean') {
+          // Logger la fin de nettoyage
+          await ActionLogService.logCleaningEnd(hotelId, roomNumber, housekeeperName);
+          
+          // Si un commentaire/remarque est fourni, le logger aussi
+          if (remark && remark.trim()) {
+            await ActionLogService.logAction({
+              hotelId,
+              actionType: 'comment',
+              actorName: housekeeperName,
+              actorType: 'housekeeper',
+              roomNumber,
+              description: `Commentaire de ${housekeeperName} pour CH ${roomNumber}: "${remark}"`,
+              details: { comment: remark, roomStatus: 'clean' }
+            });
+          }
+        } else if (newStatus === 'in_progress') {
+          // Logger le début de nettoyage
+          await ActionLogService.logCleaningStart(hotelId, roomNumber, housekeeperName);
+        } else if (newStatus === 'needs-attention' && remark) {
+          // Logger un signalement de problème
+          await ActionLogService.logAction({
+            hotelId,
+            actionType: 'comment',
+            actorName: housekeeperName,
+            actorType: 'housekeeper',
+            roomNumber,
+            description: `Problème signalé par ${housekeeperName} pour CH ${roomNumber}: "${remark}"`,
+            details: { comment: remark, roomStatus: 'needs-attention' }
+          });
+        }
+      } catch (error) {
+        console.error('❌ Erreur logging action:', error);
+      }
+    }
+
     // Ajouter notification pour l'admin - FORMAT AMÉLIORÉ (avec sécurité)
     if (housekeeperName && hotelId && addNotificationFn) {
       console.log('🔔 Création notification avec hotelId:', hotelId);
@@ -434,7 +475,9 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       if (newStatus === 'clean') {
         notification = {
           title: `Femme de chambre (${housekeeperName}) - CH ${roomNumber} - Propre`,
-          description: `${housekeeperName} a terminé le nettoyage de la chambre ${roomNumber}`,
+          description: remark 
+            ? `${housekeeperName} a terminé le nettoyage de la chambre ${roomNumber}. Remarque: "${remark}"`
+            : `${housekeeperName} a terminé le nettoyage de la chambre ${roomNumber}`,
           type: 'cleaning-end' as const,
           housekeeperName,
           roomNumber,
