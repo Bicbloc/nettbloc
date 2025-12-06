@@ -2442,7 +2442,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   </div>
                   
                   {/* Grid responsive pour 2 sections en largeur avec codes d'accès */}
-                  {housekeeperNames.length > 0 && (
+                  {housekeeperNames.length > 0 && housekeeperNames.some(name => getHousekeeperRooms(name).length > 0) && (
                     <div className="mb-4">
                       <Alert className="bg-blue-50 border-blue-200">
                         <Key className="h-4 w-4 text-blue-600" />
@@ -2455,8 +2455,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   )}
                   
                   <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-2">
+                    {/* Afficher uniquement les colonnes avec des chambres assignées */}
                     {housekeeperNames.map((name) => {
                       const housekeeperRooms = getHousekeeperRooms(name);
+                      // Ne pas afficher les colonnes vides
+                      if (housekeeperRooms.length === 0) return null;
+                      
                       const housekeeper = housekeepers.find(h => h.name === name);
                       return (
                         <div key={name} className="min-w-0 w-full">
@@ -2483,6 +2487,22 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                         </div>
                       );
                     })}
+                    
+                    {/* Bouton pour créer une nouvelle colonne femme de chambre */}
+                    <div className="min-w-0 w-full">
+                      <Card className="border-2 border-dashed border-muted-foreground/30 bg-muted/10 hover:border-primary/50 hover:bg-muted/20 transition-all cursor-pointer h-full min-h-[200px] flex items-center justify-center">
+                        <CardContent className="flex flex-col items-center justify-center p-8 text-center">
+                          <div className="mb-4">
+                            <QuickAddHousekeeperButton 
+                              className="h-auto py-6 px-8 text-lg flex-col gap-3"
+                            />
+                          </div>
+                          <p className="text-sm text-muted-foreground max-w-xs">
+                            Ajoutez une femme de chambre pour créer une nouvelle colonne et lui assigner des chambres
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
                   </div>
                 </div>
               )}

@@ -115,16 +115,26 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
     }
   };
 
+  // Déterminer si c'est un grand bouton (pour la création de colonne)
+  const isLargeButton = className?.includes('h-auto');
+
   return (
     <>
       <Button
         onClick={() => setIsOpen(true)}
-        size="sm"
+        size={isLargeButton ? "lg" : "sm"}
         className={className}
-        variant="outline"
+        variant={isLargeButton ? "default" : "outline"}
       >
-        <UserPlus className="h-4 w-4 mr-2" />
-        Ajout rapide
+        <UserPlus className={isLargeButton ? "h-8 w-8" : "h-4 w-4 mr-2"} />
+        {isLargeButton ? (
+          <span className="flex flex-col items-center">
+            <span className="font-semibold">Créer une colonne</span>
+            <span className="text-xs opacity-80">+ Femme de chambre</span>
+          </span>
+        ) : (
+          "Ajout rapide"
+        )}
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
