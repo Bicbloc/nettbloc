@@ -41,18 +41,22 @@ interface Assignment {
   room?: Room;
 }
 
+type TabType = 'assigned' | 'checkout';
+
 export default function HousekeeperMobile() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [checkoutRooms, setCheckoutRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hotel, setHotel] = useState<any>(null);
   const [housekeeperName, setHousekeeperName] = useState('');
   const [swipingCard, setSwipingCard] = useState<string | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
   const [comment, setComment] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState<TabType>('assigned');
   
   const touchStartX = useRef<number>(0);
   const touchCurrentX = useRef<number>(0);
@@ -153,6 +157,19 @@ export default function HousekeeperMobile() {
       if (error) throw error;
 
       setAssignments(assignmentsData || []);
+
+      // Load checkout rooms (dirty rooms with cleaning_type = 'full' or priority high = client sorti)
+      const { data: checkoutData, error: checkoutError } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('status', 'dirty')
+        .eq('cleaning_type', 'full')
+        .order('cleaning_priority', { ascending: false });
+
+      if (!checkoutError && checkoutData) {
+        setCheckoutRooms(checkoutData);
+      }
       
     } catch (error: any) {
       console.error('Error loading data:', error);
@@ -393,8 +410,28 @@ export default function HousekeeperMobile() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="px-4 pt-4 pb-2">
+        <div className="flex gap-2">
+          <Button
+            variant={activeTab === 'assigned' ? 'default' : 'outline'}
+            className="flex-1"
+            onClick={() => setActiveTab('assigned')}
+          >
+            Mes chambres ({assignments.length})
+          </Button>
+          <Button
+            variant={activeTab === 'checkout' ? 'default' : 'outline'}
+            className="flex-1"
+            onClick={() => setActiveTab('checkout')}
+          >
+            À blanc ({checkoutRooms.length})
+          </Button>
+        </div>
+      </div>
+
       {/* Stats */}
-      <div className="px-4 py-6">
+      <div className="px-4 py-4">
         <Card className="bg-card/50 backdrop-blur">
           <CardContent className="p-4">
             <div className="flex justify-between items-center">
@@ -415,7 +452,7 @@ export default function HousekeeperMobile() {
       </div>
 
       {/* Instructions */}
-      {assignments.length > 0 && (
+      {activeTab === 'assigned' && assignments.length > 0 && (
         <div className="px-4 pb-4">
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
@@ -428,156 +465,224 @@ export default function HousekeeperMobile() {
         </div>
       )}
 
-      {/* Rooms List */}
-      <div className="px-4 space-y-3">
-        {assignments.length === 0 ? (
-          <Card className="border-2 border-dashed">
-            <CardContent className="p-8 text-center">
-              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
-              <h3 className="text-xl font-semibold mb-2">Tout est terminé !</h3>
-              <p className="text-muted-foreground">
-                Vous n'avez plus de chambres assignées
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          assignments.map((assignment) => {
-            const room = assignment.room;
-            if (!room) return null;
+      {/* Assigned Rooms Tab */}
+      {activeTab === 'assigned' && (
+        <div className="px-4 space-y-3">
+          {assignments.length === 0 ? (
+            <Card className="border-2 border-dashed">
+              <CardContent className="p-8 text-center">
+                <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
+                <h3 className="text-xl font-semibold mb-2">Tout est terminé !</h3>
+                <p className="text-muted-foreground">
+                  Vous n'avez plus de chambres assignées
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            assignments.map((assignment) => {
+              const room = assignment.room;
+              if (!room) return null;
 
-            const offset = swipeOffset[assignment.id] || 0;
-            const isInProgress = assignment.status === 'in_progress';
+              const offset = swipeOffset[assignment.id] || 0;
+              const isInProgress = assignment.status === 'in_progress';
+              const isRecouche = room.cleaning_type !== 'full';
 
-            return (
-              <div 
-                key={assignment.id}
-                className="relative overflow-hidden"
-              >
-                {/* Swipe background */}
+              return (
                 <div 
-                  className={cn(
-                    "absolute inset-0 bg-green-500 rounded-lg flex items-center justify-end px-6 transition-opacity",
-                    offset > 50 ? "opacity-100" : "opacity-0"
-                  )}
+                  key={assignment.id}
+                  className="relative overflow-hidden"
                 >
-                  <CheckCircle className="h-8 w-8 text-white" />
-                </div>
+                  {/* Swipe background */}
+                  <div 
+                    className={cn(
+                      "absolute inset-0 bg-green-500 rounded-lg flex items-center justify-end px-6 transition-opacity",
+                      offset > 50 ? "opacity-100" : "opacity-0"
+                    )}
+                  >
+                    <CheckCircle className="h-8 w-8 text-white" />
+                  </div>
 
-                {/* Swipeable Card */}
-                <Card
-                  className={cn(
-                    "relative cursor-grab active:cursor-grabbing transition-all",
-                    isInProgress && "border-2 border-primary shadow-lg"
-                  )}
-                  style={{
-                    transform: `translateX(${offset}px)`,
-                    transition: swipingCard === assignment.id ? 'none' : 'transform 0.3s ease-out'
-                  }}
-                  onTouchStart={(e) => handleTouchStart(e, assignment.id)}
-                  onTouchMove={(e) => handleTouchMove(e, assignment.id)}
-                  onTouchEnd={() => handleTouchEnd(assignment.id, assignment)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-3xl font-bold text-primary">
-                          {room.room_number}
+                  {/* Swipeable Card */}
+                  <Card
+                    className={cn(
+                      "relative cursor-grab active:cursor-grabbing transition-all",
+                      isInProgress && "border-2 border-primary shadow-lg",
+                      !isRecouche && "border-l-4 border-l-orange-500"
+                    )}
+                    style={{
+                      transform: `translateX(${offset}px)`,
+                      transition: swipingCard === assignment.id ? 'none' : 'transform 0.3s ease-out'
+                    }}
+                    onTouchStart={(e) => handleTouchStart(e, assignment.id)}
+                    onTouchMove={(e) => handleTouchMove(e, assignment.id)}
+                    onTouchEnd={() => handleTouchEnd(assignment.id, assignment)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="text-3xl font-bold text-primary">
+                            {room.room_number}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {/* Type de nettoyage bien visible */}
+                            <Badge 
+                              className={cn(
+                                "text-xs font-semibold",
+                                isRecouche 
+                                  ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                                  : "bg-orange-500 hover:bg-orange-600 text-white"
+                              )}
+                            >
+                              {isRecouche ? '🛏️ RECOUCHE' : '✨ À BLANC'}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Étage {room.floor}
+                            </Badge>
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 items-end">
                           <Badge 
                             variant="outline" 
                             className={cn("text-xs", getPriorityColor(room.cleaning_priority), "text-white")}
                           >
                             {getPriorityLabel(room.cleaning_priority)}
                           </Badge>
-                          <Badge variant="secondary" className="text-xs">
-                            Étage {room.floor}
-                          </Badge>
+                          {isInProgress && (
+                            <Badge className="bg-primary">
+                              <Clock className="h-3 w-3 mr-1" />
+                              En cours
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                      {isInProgress && (
-                        <Badge className="bg-primary">
-                          <Clock className="h-3 w-3 mr-1" />
-                          En cours
-                        </Badge>
+
+                      {room.notes && (
+                        <div className="mb-3 p-2 bg-muted/50 rounded text-sm">
+                          <p className="text-muted-foreground">{room.notes}</p>
+                        </div>
                       )}
-                    </div>
 
-                    {/* Cleaning Type Badge */}
-                    {room.cleaning_type && (
-                      <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="mb-2">
-                        <Sparkles className="h-3 w-3 mr-1" />
-                        {room.cleaning_type === 'full' ? 'Nettoyage complet' : 'Recouche'}
-                      </Badge>
-                    )}
-
-                    {room.notes && (
-                      <div className="mb-3 p-2 bg-muted/50 rounded text-sm">
-                        <p className="text-muted-foreground">{room.notes}</p>
-                      </div>
-                    )}
-
-                    {!isInProgress && (
-                      <div className="space-y-2">
-                        <Button 
-                          className="w-full"
-                          size="lg"
-                          onClick={() => startCleaning(assignment)}
-                        >
-                          <Clock className="h-4 w-4 mr-2" />
-                          Commencer le nettoyage
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          className="w-full"
-                          size="sm"
-                          onClick={() => unassignRoom(assignment)}
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Désassigner
-                        </Button>
-                      </div>
-                    )}
-
-                    {isInProgress && (
-                      <div className="space-y-2">
-                        <Textarea
-                          placeholder="Commentaire (optionnel)..."
-                          value={comment[assignment.id] || ''}
-                          onChange={(e) => setComment(prev => ({ ...prev, [assignment.id]: e.target.value }))}
-                          className="min-h-[60px]"
-                        />
-                        <div className="flex gap-2">
+                      {!isInProgress && (
+                        <div className="space-y-2">
                           <Button 
-                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            className="w-full"
                             size="lg"
-                            onClick={() => markRoomComplete(assignment)}
+                            onClick={() => startCleaning(assignment)}
                           >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Terminer
+                            <Clock className="h-4 w-4 mr-2" />
+                            Commencer le nettoyage
                           </Button>
                           <Button 
                             variant="outline"
-                            size="lg"
+                            className="w-full"
+                            size="sm"
                             onClick={() => unassignRoom(assignment)}
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4 mr-2" />
+                            Désassigner
                           </Button>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    <div className="mt-3 flex items-center justify-center text-xs text-muted-foreground gap-2">
-                      <ChevronRight className="h-3 w-3" />
-                      <span>Glissez pour terminer</span>
+                      {isInProgress && (
+                        <div className="space-y-2">
+                          <Textarea
+                            placeholder="Commentaire (optionnel)..."
+                            value={comment[assignment.id] || ''}
+                            onChange={(e) => setComment(prev => ({ ...prev, [assignment.id]: e.target.value }))}
+                            className="min-h-[60px]"
+                          />
+                          <div className="flex gap-2">
+                            <Button 
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                              size="lg"
+                              onClick={() => markRoomComplete(assignment)}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Terminer
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              size="lg"
+                              onClick={() => unassignRoom(assignment)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-3 flex items-center justify-center text-xs text-muted-foreground gap-2">
+                        <ChevronRight className="h-3 w-3" />
+                        <span>Glissez pour terminer</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Checkout Rooms Tab (À blanc / Client sorti) */}
+      {activeTab === 'checkout' && (
+        <div className="px-4 space-y-3">
+          <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 mb-4">
+            <p className="text-sm text-orange-900 dark:text-orange-100">
+              <span className="font-semibold">Chambres "À blanc"</span> - Client sorti, nettoyage complet requis
+            </p>
+          </div>
+          
+          {checkoutRooms.length === 0 ? (
+            <Card className="border-2 border-dashed">
+              <CardContent className="p-8 text-center">
+                <Home className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-semibold mb-2">Aucune chambre à blanc</h3>
+                <p className="text-muted-foreground">
+                  Toutes les chambres client sorti ont été attribuées
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            checkoutRooms.map((room) => (
+              <Card 
+                key={room.id}
+                className="border-l-4 border-l-orange-500"
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-3xl font-bold text-primary">
+                        {room.room_number}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold">
+                          ✨ À BLANC
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          Étage {room.floor}
+                        </Badge>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            );
-          })
-        )}
-      </div>
+                    <Badge 
+                      variant="outline" 
+                      className={cn("text-xs", getPriorityColor(room.cleaning_priority), "text-white")}
+                    >
+                      {getPriorityLabel(room.cleaning_priority)}
+                    </Badge>
+                  </div>
+                  {room.notes && (
+                    <div className="mt-3 p-2 bg-muted/50 rounded text-sm">
+                      <p className="text-muted-foreground">{room.notes}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
