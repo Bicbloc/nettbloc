@@ -12,8 +12,11 @@ export interface ReservationBlock {
   arrivalTime: string | null;
   status: string | null;
   guestName: string | null;
+  hasGuest: boolean;
+  guestCount: number;
   checkInDate: string | null;
   checkOutDate: string | null;
+  isOutOfOrder: boolean;
 }
 
 export interface DetectionRule {
@@ -21,15 +24,17 @@ export interface DetectionRule {
   hotel_id: string;
   created_by: string;
   rule_name: string;
-  rule_type: 'reservation_block' | 'night_info' | 'status_keyword' | 'time_pattern' | 'date_pattern';
+  rule_type: 'reservation_block' | 'night_info' | 'status_keyword' | 'time_pattern' | 'date_pattern' | 'combined';
   condition: {
     pattern?: string;
     field?: string;
     operator?: 'equals' | 'contains' | 'greater_than' | 'less_than' | 'regex_match';
     value?: string | number;
+    hasGuest?: boolean;
+    statusPattern?: string;
   };
   result: {
-    cleaning_type: CleaningType;
+    cleaning_type: CleaningType | 'none';
     status?: string;
   };
   priority: number;
@@ -37,46 +42,107 @@ export interface DetectionRule {
   description?: string;
 }
 
-// Règles par défaut pour Mews
+// Règles par défaut pour Mews - AMÉLIORÉES avec logique INS sans client
 const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[] = [
+  // PRIORITÉ MAXIMALE: Out of order
+  {
+    rule_name: "Out of order = Aucun nettoyage",
+    rule_type: "status_keyword",
+    condition: { pattern: "\\b(Out of order|OOO|HS|Hors service)\\b", operator: "regex_match" },
+    result: { cleaning_type: "none", status: "out_of_order" },
+    priority: 20,
+    is_active: true,
+    description: "Chambre hors service - pas de nettoyage"
+  },
+  // NOUVELLE RÈGLE: INS/SAL sans client = Propre (pas de nettoyage)
+  {
+    rule_name: "INS/SAL sans client = Propre",
+    rule_type: "combined",
+    condition: { 
+      statusPattern: "\\b(INS|SAL)\\b", 
+      hasGuest: false 
+    },
+    result: { cleaning_type: "none", status: "clean" },
+    priority: 15,
+    is_active: true,
+    description: "Chambre vide et propre - aucun nettoyage nécessaire"
+  },
+  // DIR sans client = À Blanc (chambre vide après départ)
+  {
+    rule_name: "DIR sans client = À Blanc",
+    rule_type: "combined",
+    condition: { 
+      statusPattern: "\\b(DIR|DEP|DEPART)\\b", 
+      hasGuest: false 
+    },
+    result: { cleaning_type: "a_blanc", status: "checkout" },
+    priority: 14,
+    is_active: true,
+    description: "Départ sans nouveau client = À Blanc"
+  },
+  // Règle Nuit X/Y (X > 1) = Recouche
   {
     rule_name: "Nuit 2+ = Recouche",
     rule_type: "night_info",
     condition: { field: "nightInfo.current", operator: "greater_than", value: 1 },
     result: { cleaning_type: "recouche", status: "stayover" },
-    priority: 10,
+    priority: 12,
     is_active: true,
     description: "Si 'Nuit X/Y' avec X > 1, le client reste → Recouche"
   },
+  // Nuit 1 = À Blanc (arrivée)
   {
     rule_name: "Nuit 1 = À Blanc (arrivée)",
     rule_type: "night_info",
     condition: { field: "nightInfo.current", operator: "equals", value: 1 },
     result: { cleaning_type: "a_blanc", status: "arrival" },
-    priority: 9,
+    priority: 11,
     is_active: true,
     description: "Si 'Nuit 1/N', premier jour du client → À Blanc"
   },
+  // Arrivée seule (15:00) = À Blanc
+  {
+    rule_name: "Arrivée seule = À Blanc",
+    rule_type: "reservation_block",
+    condition: { field: "blocks", operator: "equals", value: "arrival_only" },
+    result: { cleaning_type: "a_blanc", status: "arrival" },
+    priority: 10,
+    is_active: true,
+    description: "Heure d'arrivée seule (14:00-19:00) = À Blanc préparation"
+  },
+  // Départ + Arrivée même ligne = À Blanc
   {
     rule_name: "Départ + Arrivée même ligne = À Blanc",
     rule_type: "reservation_block",
     condition: { field: "blocks", operator: "equals", value: "departure_and_arrival" },
     result: { cleaning_type: "a_blanc", status: "checkout_checkin" },
-    priority: 8,
+    priority: 9,
     is_active: true,
-    description: "2 blocs de réservation (départ 11:00 + arrivée 15:00) = À Blanc"
+    description: "2 blocs de réservation (départ + arrivée) = À Blanc"
   },
+  // Départ seul = À Blanc
   {
     rule_name: "Départ seul = À Blanc",
     rule_type: "reservation_block",
     condition: { field: "blocks", operator: "equals", value: "departure_only" },
     result: { cleaning_type: "a_blanc", status: "checkout" },
-    priority: 7,
+    priority: 8,
     is_active: true,
     description: "Bloc de départ sans arrivée suivante = À Blanc"
   },
+  // INS avec client = Recouche
   {
-    rule_name: "Statut SAL = Recouche",
+    rule_name: "INS avec client = Recouche",
+    rule_type: "status_keyword",
+    condition: { pattern: "\\bINS\\b", operator: "regex_match" },
+    result: { cleaning_type: "recouche", status: "stayover" },
+    priority: 6,
+    is_active: true,
+    description: "Statut INS (In Stay) avec client = Recouche"
+  },
+  // Statut SAL avec client = Recouche
+  {
+    rule_name: "SAL avec client = Recouche",
     rule_type: "status_keyword",
     condition: { pattern: "\\bSAL\\b", operator: "regex_match" },
     result: { cleaning_type: "recouche", status: "stayover" },
@@ -84,23 +150,15 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     is_active: true,
     description: "Statut SAL (Sale) = Client reste → Recouche"
   },
+  // Statut DIR/DEP = À Blanc
   {
     rule_name: "Statut DIR/DEP = À Blanc",
     rule_type: "status_keyword",
     condition: { pattern: "\\b(DIR|DEP|DEPART)\\b", operator: "regex_match" },
     result: { cleaning_type: "a_blanc", status: "checkout" },
-    priority: 5,
+    priority: 4,
     is_active: true,
     description: "Statut DIR/DEP/DEPART = À Blanc"
-  },
-  {
-    rule_name: "Statut INS = Recouche",
-    rule_type: "status_keyword",
-    condition: { pattern: "\\bINS\\b", operator: "regex_match" },
-    result: { cleaning_type: "recouche", status: "stayover" },
-    priority: 5,
-    is_active: true,
-    description: "Statut INS (In Stay) = Client reste → Recouche"
   }
 ];
 
@@ -156,21 +214,65 @@ class MewsDetectionService {
   }
 
   /**
+   * Détecter la présence d'un client dans une ligne
+   */
+  detectGuestPresence(line: string): { hasGuest: boolean; guestName: string | null; guestCount: number } {
+    // Pattern pour détecter "X × Adultes" ou "X Adults" suivi d'un nom
+    const adultCountMatch = line.match(/(\d+)\s*[×x]\s*(?:Adultes?|Adults?)/i);
+    const guestCount = adultCountMatch ? parseInt(adultCountMatch[1]) : 0;
+
+    // Chercher les noms propres (format Prénom NOM ou NOM Prénom)
+    // Pattern amélioré pour noms avec majuscules
+    const namePatterns = [
+      // "Prénom NOM" ou "NOM Prénom" après Adultes
+      /(?:Adultes?|Adults?)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*(?:\s+[A-ZÀ-Ÿ]{2,})?)/i,
+      // Noms en MAJUSCULES
+      /\b([A-ZÀ-Ÿ]{2,}\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)\b/,
+      // Pattern mixte "Jean DUPONT"
+      /\b([A-ZÀ-Ÿ][a-zà-ÿ]+\s+[A-ZÀ-Ÿ]{2,})\b/,
+      // Deux noms consécutifs (ex: "Joy VanDeMortel")
+      /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zA-Zà-ÿ]+){1,3})\b/
+    ];
+
+    let guestName: string | null = null;
+    
+    for (const pattern of namePatterns) {
+      const match = line.match(pattern);
+      if (match && match[1]) {
+        // Vérifier que ce n'est pas un mot-clé courant
+        const excludedWords = ['Out', 'Nuit', 'Night', 'Room', 'Chambre', 'Cleaning', 'SAL', 'DIR', 'INS', 'DEP', 'ARR'];
+        if (!excludedWords.some(w => match[1].includes(w))) {
+          guestName = match[1].trim();
+          break;
+        }
+      }
+    }
+
+    // Déterminer s'il y a un client
+    const hasGuest = guestCount > 0 || guestName !== null;
+
+    return { hasGuest, guestName, guestCount };
+  }
+
+  /**
    * Détecter les blocs de réservation Mews dans une ligne
    */
   detectReservationBlocks(line: string): ReservationBlock {
     // Chercher "Nuit X/Y" ou "Night X/Y"
     const nightMatch = line.match(/(?:Nuit|Night)\s+(\d+)\/(\d+)/i);
     
-    // Chercher les heures de départ (10:00, 11:00, 12:00) et arrivée (14:00, 15:00, 16:00)
-    const departureTimeMatch = line.match(/\b(0?[89]|1[0-2]):00\b/);
-    const arrivalTimeMatch = line.match(/\b(1[4-8]|19):00\b/);
+    // Chercher les heures de départ (08:00-12:00) et arrivée (14:00-19:00)
+    const departureTimeMatch = line.match(/\b(0?[5-9]|1[0-2]):\d{2}\b/);
+    const arrivalTimeMatch = line.match(/\b(1[4-9]):\d{2}\b/);
     
     // Chercher les statuts
     const statusMatch = line.match(/\b(SAL|DIR|DEP|INS|ARR|DEPART|ARRIVEE|STAYOVER|CHECKOUT|CHECKIN)\b/i);
     
-    // Chercher les noms (après le nombre d'adultes)
-    const guestMatch = line.match(/(?:Adultes?|Adults?)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)/i);
+    // Détecter Out of order
+    const isOutOfOrder = /\b(Out of order|OOO|HS|Hors service)\b/i.test(line);
+    
+    // Détecter présence client
+    const guestPresence = this.detectGuestPresence(line);
     
     // Chercher les dates (format DD/MM/YYYY ou YYYY-MM-DD)
     const dates = line.match(/\b(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/g) || [];
@@ -185,9 +287,12 @@ class MewsDetectionService {
       departureTime: departureTimeMatch ? departureTimeMatch[0] : null,
       arrivalTime: arrivalTimeMatch ? arrivalTimeMatch[0] : null,
       status: statusMatch ? statusMatch[1].toUpperCase() : null,
-      guestName: guestMatch ? guestMatch[1] : null,
+      guestName: guestPresence.guestName,
+      hasGuest: guestPresence.hasGuest,
+      guestCount: guestPresence.guestCount,
       checkInDate: dates.length > 0 ? dates[0] : null,
-      checkOutDate: dates.length > 1 ? dates[1] : null
+      checkOutDate: dates.length > 1 ? dates[1] : null,
+      isOutOfOrder
     };
   }
 
@@ -195,21 +300,35 @@ class MewsDetectionService {
    * Déterminer le type de nettoyage à partir des blocs détectés
    */
   determineCleaningType(blocks: ReservationBlock, line: string): { 
-    cleaningType: CleaningType; 
+    cleaningType: CleaningType | 'none'; 
     confidence: number;
     matchedRule: string | null;
     status: string | null;
+    detailedReason: string;
   } {
     const rules = this.getAllRules();
     
     for (const rule of rules) {
       const match = this.evaluateRule(rule, blocks, line);
       if (match) {
+        // Construire la raison détaillée
+        let detailedReason = rule.rule_name;
+        if (blocks.nightInfo) {
+          detailedReason += ` (Nuit ${blocks.nightInfo.current}/${blocks.nightInfo.total})`;
+        }
+        if (blocks.status) {
+          detailedReason += ` [${blocks.status}]`;
+        }
+        if (!blocks.hasGuest && (blocks.status === 'INS' || blocks.status === 'SAL')) {
+          detailedReason += ' - Chambre vide';
+        }
+
         return {
-          cleaningType: normalizeCleaningType(rule.result.cleaning_type),
-          confidence: 0.9 - (0.1 * (10 - rule.priority) / 10), // Confiance basée sur priorité
+          cleaningType: rule.result.cleaning_type === 'none' ? 'none' : normalizeCleaningType(rule.result.cleaning_type),
+          confidence: 0.9 - (0.1 * (20 - rule.priority) / 20),
           matchedRule: rule.rule_name,
-          status: rule.result.status || null
+          status: rule.result.status || null,
+          detailedReason
         };
       }
     }
@@ -229,6 +348,23 @@ class MewsDetectionService {
     const { condition } = rule;
 
     switch (rule.rule_type) {
+      case 'combined':
+        // Règle combinée : vérifie statut ET présence client
+        if (condition.statusPattern) {
+          try {
+            const regex = new RegExp(condition.statusPattern, 'i');
+            const statusMatches = regex.test(line);
+            if (!statusMatches) return false;
+          } catch {
+            return false;
+          }
+        }
+        // Vérifier la condition hasGuest
+        if (condition.hasGuest !== undefined) {
+          if (condition.hasGuest !== blocks.hasGuest) return false;
+        }
+        return true;
+
       case 'night_info':
         if (!blocks.nightInfo) return false;
         const nightValue = condition.field === 'nightInfo.current' 
@@ -286,18 +422,42 @@ class MewsDetectionService {
    * Détermination de secours si aucune règle ne correspond
    */
   private fallbackDetermination(blocks: ReservationBlock): {
-    cleaningType: CleaningType;
+    cleaningType: CleaningType | 'none';
     confidence: number;
     matchedRule: string | null;
     status: string | null;
+    detailedReason: string;
   } {
+    // Out of order = Aucun nettoyage
+    if (blocks.isOutOfOrder) {
+      return { 
+        cleaningType: 'none', 
+        confidence: 0.95, 
+        matchedRule: 'Fallback: Out of order',
+        status: 'out_of_order',
+        detailedReason: 'Chambre hors service - aucun nettoyage'
+      };
+    }
+
+    // INS/SAL sans client = Propre (aucun nettoyage)
+    if ((blocks.status === 'INS' || blocks.status === 'SAL') && !blocks.hasGuest) {
+      return { 
+        cleaningType: 'none', 
+        confidence: 0.85, 
+        matchedRule: 'Fallback: INS/SAL sans client',
+        status: 'clean',
+        detailedReason: `${blocks.status} sans client = Chambre propre, pas de nettoyage`
+      };
+    }
+
     // Client reste (Nuit 2+)
     if (blocks.nightInfo && blocks.nightInfo.current > 1) {
       return { 
         cleaningType: 'recouche', 
         confidence: 0.8, 
         matchedRule: 'Fallback: Nuit > 1',
-        status: 'stayover'
+        status: 'stayover',
+        detailedReason: `Nuit ${blocks.nightInfo.current}/${blocks.nightInfo.total} = Client reste → Recouche`
       };
     }
     
@@ -307,7 +467,8 @@ class MewsDetectionService {
         cleaningType: 'a_blanc', 
         confidence: 0.85, 
         matchedRule: 'Fallback: Départ + Arrivée',
-        status: 'checkout_checkin'
+        status: 'checkout_checkin',
+        detailedReason: `Départ ${blocks.departureTime} + Arrivée ${blocks.arrivalTime} = À Blanc`
       };
     }
     
@@ -317,17 +478,21 @@ class MewsDetectionService {
         cleaningType: 'a_blanc', 
         confidence: 0.7, 
         matchedRule: 'Fallback: Premier jour ou départ',
-        status: 'checkout'
+        status: 'checkout',
+        detailedReason: blocks.nightInfo?.current === 1 
+          ? 'Nuit 1 = Premier jour client → À Blanc' 
+          : `Départ ${blocks.departureTime} = À Blanc`
       };
     }
     
-    // Status SAL/INS = Recouche
-    if (blocks.status && ['SAL', 'INS', 'STAYOVER'].includes(blocks.status)) {
+    // Status SAL/INS avec client = Recouche
+    if (blocks.status && ['SAL', 'INS', 'STAYOVER'].includes(blocks.status) && blocks.hasGuest) {
       return { 
         cleaningType: 'recouche', 
         confidence: 0.75, 
-        matchedRule: 'Fallback: Statut SAL/INS',
-        status: 'stayover'
+        matchedRule: 'Fallback: Statut SAL/INS avec client',
+        status: 'stayover',
+        detailedReason: `${blocks.status} avec client ${blocks.guestName || ''} = Recouche`
       };
     }
 
@@ -336,7 +501,8 @@ class MewsDetectionService {
       cleaningType: 'a_blanc', 
       confidence: 0.5, 
       matchedRule: null,
-      status: null
+      status: null,
+      detailedReason: 'Règle par défaut = À Blanc (plus sûr)'
     };
   }
 
@@ -345,17 +511,22 @@ class MewsDetectionService {
    */
   analyzeLine(line: string): {
     blocks: ReservationBlock;
-    cleaningType: CleaningType;
+    cleaningType: CleaningType | 'none';
     confidence: number;
     matchedRule: string | null;
     status: string | null;
+    detailedReason: string;
+    hasGuest: boolean;
+    rawStatus: string | null;
   } {
     const blocks = this.detectReservationBlocks(line);
     const result = this.determineCleaningType(blocks, line);
     
     return {
       blocks,
-      ...result
+      ...result,
+      hasGuest: blocks.hasGuest,
+      rawStatus: blocks.status
     };
   }
 

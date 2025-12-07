@@ -5,31 +5,45 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Règles métier spécifiques Mews pour la détection du type de nettoyage
+// Règles métier AMÉLIORÉES pour la détection du type de nettoyage
 const MEWS_CLEANING_RULES = `
 LOGIQUE MÉTIER POUR DÉTECTION DU TYPE DE NETTOYAGE:
 
-RÈGLE 1 - Nuit X/Y (Pattern le plus fiable):
+RÈGLE 0 - Out of order (priorité maximale):
+- Si "Out of order", "OOO", "HS", "Hors service" → AUCUN nettoyage
+- cleaningType = "none", status = "out_of_order"
+
+RÈGLE 1 - INS/SAL sans client = Chambre propre:
+- Si statut "INS" ou "SAL" ET pas de nom de client → AUCUN nettoyage (chambre vide et propre)
+- cleaningType = "none", status = "clean"
+- Ex: "101 INS" sans nom = chambre propre, pas besoin de nettoyer
+
+RÈGLE 2 - DIR sans client = À Blanc:
+- Si statut "DIR" ou "DEP" ET pas de nom de client → À BLANC (départ effectué)
+- cleaningType = "full" ou "a_blanc"
+
+RÈGLE 3 - Nuit X/Y (Pattern le plus fiable quand client présent):
 - Si "Nuit 2/3", "Nuit 3/5", "Night 2/4" → X > 1 = RECOUCHE (client reste)
 - Si "Nuit 1/3", "Night 1/2" → X = 1 = À BLANC (premier jour, arrivée)
 - Si pas de "Nuit X/Y" → vérifier les autres règles
 
-RÈGLE 2 - Blocs de réservation (heures):
+RÈGLE 4 - Blocs de réservation (heures):
 - Si 2 heures dans la ligne (ex: "11:00" et "15:00") → départ + arrivée même jour = À BLANC
-- Si heure départ seule (10:00, 11:00, 12:00) sans heure arrivée → départ = À BLANC
-- Si heure arrivée seule (14:00, 15:00, 16:00) sans heure départ → arrivée = À BLANC
+- Si heure départ seule (08:00-12:00) sans heure arrivée → départ = À BLANC
+- Si heure arrivée seule (14:00-19:00) sans heure départ → arrivée = À BLANC
 
-RÈGLE 3 - Mots-clés de statut:
-- SAL, DIR, DEP, DEPART, CHECKOUT, OUT → À BLANC
-- INS, STAYOVER, OCC, OCCUPIED → RECOUCHE
+RÈGLE 5 - Mots-clés de statut avec client:
+- SAL + nom client → RECOUCHE
+- DIR, DEP, DEPART, CHECKOUT, OUT + nom client → À BLANC
+- INS, STAYOVER, OCC, OCCUPIED + nom client → RECOUCHE
 - ARR, ARRIVAL, CHECKIN, IN → À BLANC (arrivée)
 
-RÈGLE 4 - Contexte des dates:
-- Si date de départ = date du jour → À BLANC
-- Si date d'arrivée = date du jour et pas de départ → À BLANC
-- Si aucune date ne correspond au jour → probablement RECOUCHE
+PRIORITÉ: Règle 0 > Règle 1 > Règle 2 > Règle 3 > Règle 4 > Règle 5
 
-PRIORITÉ: Règle 1 > Règle 2 > Règle 3 > Règle 4
+DÉTECTION DE PRÉSENCE CLIENT:
+- Un client est présent si: nom propre visible (ex: "Jean DUPONT", "Lucy NORTHEAST")
+- Ou pattern "X × Adultes" avec X > 0
+- Pas de client si: ligne ne contient que numéro + statut sans nom
 `;
 
 serve(async (req) => {
@@ -58,25 +72,34 @@ Applique ces patterns au texte complet suivant et extrait TOUTES les chambres av
 Texte complet:
 ${fullText}
 
-IMPORTANT pour le type de nettoyage:
-- Analyse chaque ligne selon les règles métier ci-dessus
-- "Nuit X/Y" avec X > 1 = TOUJOURS recouche (quick)
-- 2 blocs d'heures (départ + arrivée) = TOUJOURS à blanc (full)
-- En cas de doute, mets "full" (à blanc) car c'est plus sûr
+IMPORTANT - NOUVELLE LOGIQUE:
+1. D'abord vérifie si "Out of order" → cleaningType = "none"
+2. Puis vérifie si statut (INS/SAL/DIR) SANS nom de client → si INS/SAL sans client = "none" (propre)
+3. Si DIR sans client = "full" (à blanc)
+4. Si client présent, applique les règles Nuit X/Y ou heures
+5. "Nuit X/Y" avec X > 1 = TOUJOURS "quick" (recouche)
+6. 2 blocs d'heures (départ + arrivée) = TOUJOURS "full" (à blanc)
+
+Pour chaque chambre, indique:
+- hasGuest: true/false (y a-t-il un nom de client visible?)
+- rawStatus: le statut brut détecté (INS, DIR, SAL, etc.)
+- detectionReason: explication complète de la décision
 
 Retourne un JSON avec la structure:
 {
   "rooms": [
     {
       "roomNumber": "101",
-      "status": "dirty|clean|occupied|checkout|arrival|stayover",
+      "status": "clean|dirty|occupied|checkout|arrival|stayover|out_of_order",
       "cleaningType": "full|quick|none",
       "arrivalDate": "DD/MM/YYYY ou vide",
       "departureDate": "DD/MM/YYYY ou vide",
-      "guestName": "nom du client si disponible",
+      "guestName": "nom du client ou null si pas de client",
       "nightInfo": "Nuit X/Y si disponible",
       "confidence": 0.0-1.0,
-      "detectionReason": "Règle utilisée pour déterminer le type"
+      "hasGuest": true|false,
+      "rawStatus": "INS|DIR|SAL|etc",
+      "detectionReason": "Règle utilisée avec explication détaillée"
     }
   ],
   "totalFound": nombre_total_chambres
@@ -147,7 +170,8 @@ IMPORTANT:
 - Les patterns doivent être SPÉCIFIQUES à ce format de rapport
 - Utilise les annotations comme exemples pour comprendre le format
 - Extrait TOUTES les chambres du texte, pas seulement celles annotées
-- Applique STRICTEMENT les règles métier pour le type de nettoyage`;
+- Applique STRICTEMENT les règles métier pour le type de nettoyage
+- DÉTECTE si chaque chambre a un client (nom visible) ou non`;
 
     const userPrompt = `Voici le texte COMPLET du rapport:
 ${textSample}
@@ -157,11 +181,15 @@ ${JSON.stringify(annotations, null, 2)}
 
 À partir de ces ${annotations?.length || 0} annotations exemples, identifie les patterns et extrait TOUTES les chambres du texte.
 
-Pour CHAQUE chambre, applique les règles métier de nettoyage:
-- Vérifie d'abord "Nuit X/Y" → X > 1 = recouche (quick)
-- Sinon vérifie les blocs d'heures → 2 heures = à blanc (full)
-- Sinon vérifie les mots-clés → SAL/DIR = à blanc, INS = recouche
-- En cas de doute → à blanc (full)
+Pour CHAQUE chambre:
+1. Détermine d'abord s'il y a un client (nom visible dans la ligne)
+2. Vérifie le statut brut (INS, DIR, SAL, etc.)
+3. Applique les règles métier:
+   - Out of order → none
+   - INS/SAL sans client → none (propre)
+   - DIR sans client → full (à blanc)
+   - Nuit X/Y avec X > 1 → quick (recouche)
+   - 2 heures (départ + arrivée) → full (à blanc)
 
 Réponds en JSON:
 {
@@ -174,6 +202,7 @@ Réponds en JSON:
     "dateFormat": "format de date détecté",
     "lineFormat": "description du format de ligne",
     "nightInfoPattern": "pattern pour Nuit X/Y si détecté",
+    "guestDetectionPattern": "pattern pour détecter les noms de clients",
     "timePatterns": {
       "departure": "pattern pour heures de départ",
       "arrival": "pattern pour heures d'arrivée"
@@ -182,14 +211,16 @@ Réponds en JSON:
   "rooms": [
     {
       "roomNumber": "101",
-      "status": "checkout",
-      "cleaningType": "full",
+      "status": "clean",
+      "cleaningType": "none",
       "arrivalDate": "",
-      "departureDate": "15/05/2025",
-      "guestName": "Nom Client",
+      "departureDate": "",
+      "guestName": null,
       "nightInfo": "",
       "confidence": 0.95,
-      "detectionReason": "Règle utilisée",
+      "hasGuest": false,
+      "rawStatus": "INS",
+      "detectionReason": "INS sans client = Chambre propre, pas de nettoyage",
       "originalLine": "ligne du texte original"
     }
   ],
