@@ -58,6 +58,7 @@ import { NotificationProvider, useNotificationContext } from "@/contexts/Notific
 import { LinenTypeManager } from "@/components/linen/LinenTypeManager";
 import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
 import { LinenTaskAssignment } from "@/components/linen/LinenTaskAssignment";
+import { AdminLinenInventory } from "@/components/linen/AdminLinenInventory";
 import { StaffManagement } from "@/components/incident/StaffManagement";
 import { IncidentInventoryManager } from "@/components/incident/IncidentInventoryManager";
 import { IncidentReportDialogSimple } from "@/components/incident/IncidentReportDialogSimple";
@@ -2799,8 +2800,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             <Tabs defaultValue="types" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="types">Types de linge</TabsTrigger>
-                <TabsTrigger value="training">Entraînement IA</TabsTrigger>
+                <TabsTrigger value="inventory">Saisie & Validation</TabsTrigger>
                 <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
+                <TabsTrigger value="training">Entraînement IA</TabsTrigger>
               </TabsList>
 
               <TabsContent value="types" className="space-y-4">
@@ -2813,9 +2815,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 )}
               </TabsContent>
 
-              <TabsContent value="training" className="space-y-4">
+              <TabsContent value="inventory" className="space-y-4">
                 {currentHotelId ? (
-                  <LinenTrainingManager hotelId={currentHotelId} />
+                  <AdminLinenInventory hotelId={currentHotelId} />
                 ) : (
                   <Alert>
                     <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
@@ -2826,6 +2828,16 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               <TabsContent value="tasks" className="space-y-4">
                 {currentHotelId ? (
                   <LinenTaskAssignment hotelId={currentHotelId} />
+                ) : (
+                  <Alert>
+                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              <TabsContent value="training" className="space-y-4">
+                {currentHotelId ? (
+                  <LinenTrainingManager hotelId={currentHotelId} />
                 ) : (
                   <Alert>
                     <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
