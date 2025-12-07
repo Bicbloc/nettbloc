@@ -146,40 +146,96 @@ const Reports = () => {
     if (!selectedReportForDownload) return;
     
     try {
-      // Générer un PDF du rapport (fonctionnalité simplifiée)
-      const reportContent = {
-        date: format(parseISO(selectedReportForDownload.report_date), 'PPP', { locale: fr }),
-        hotel: selectedReportForDownload.hotel_id,
-        housekeepers: selectedReportForDownload.housekeeper_names,
-        rooms: selectedReportForDownload.room_data,
-        assignments: selectedReportForDownload.housekeeper_assignments,
-        actions: selectedReportForDownload.action_log,
-        downloaded_by: email
-      };
-
-      const jsonContent = JSON.stringify(reportContent, null, 2);
-      const blob = new Blob([jsonContent], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const report = selectedReportForDownload;
+      const dateStr = format(parseISO(report.report_date), 'PPP', { locale: fr });
       
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `rapport-${selectedReportForDownload.report_date}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Créer le contenu HTML pour le PDF
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+          <h1 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
+            📋 Rapport du ${dateStr}
+          </h1>
+          
+          <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <h2 style="margin-top: 0;">📊 Résumé</h2>
+            <p><strong>Chambres:</strong> ${report.room_data?.length || 0}</p>
+            <p><strong>Femmes de chambre:</strong> ${report.housekeeper_names?.join(', ') || 'N/A'}</p>
+            <p><strong>Nettoyées:</strong> ${report.room_data?.filter((r: any) => r.status === 'clean').length || 0}</p>
+          </div>
+          
+          ${report.housekeeper_names?.length > 0 ? `
+          <div style="margin: 20px 0;">
+            <h2>👥 Assignations par femme de chambre</h2>
+            ${Object.entries(report.housekeeper_assignments || {}).map(([name, rooms]: [string, any]) => `
+              <div style="margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 4px;">
+                <strong>${name}:</strong> ${Array.isArray(rooms) ? rooms.map((r: any) => r.room_number).join(', ') : 'N/A'}
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+          
+          ${report.action_log?.length > 0 ? `
+          <div style="margin: 20px 0;">
+            <h2>📝 Journal des actions</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: #007bff; color: white;">
+                  <th style="padding: 8px; text-align: left;">Heure</th>
+                  <th style="padding: 8px; text-align: left;">Action</th>
+                  <th style="padding: 8px; text-align: left;">Chambre</th>
+                  <th style="padding: 8px; text-align: left;">Par</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${report.action_log.map((log: any) => `
+                  <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 8px;">${log.created_at ? format(parseISO(log.created_at), 'HH:mm', { locale: fr }) : '-'}</td>
+                    <td style="padding: 8px;">${log.description || log.action_type || '-'}</td>
+                    <td style="padding: 8px;">${log.room_number || '-'}</td>
+                    <td style="padding: 8px;">${log.actor_name || log.housekeeper_name || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+          
+          <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+            <p>Généré le ${format(new Date(), 'PPPp', { locale: fr })} pour ${email}</p>
+          </div>
+        </div>
+      `;
       
-      URL.revokeObjectURL(url);
+      // Créer un élément temporaire
+      const container = document.createElement('div');
+      container.innerHTML = htmlContent;
+      document.body.appendChild(container);
+      
+      // Générer le PDF avec html2pdf
+      const html2pdf = (await import('html2pdf.js')).default;
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: `rapport-${report.report_date}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        })
+        .from(container)
+        .save();
+      
+      document.body.removeChild(container);
 
       toast({
-        title: "Rapport téléchargé",
-        description: `Le rapport a été téléchargé au format JSON et envoyé à ${email}`
+        title: "PDF téléchargé",
+        description: `Le rapport a été téléchargé en PDF`
       });
     } catch (error) {
-      console.error('Erreur téléchargement:', error);
+      console.error('Erreur téléchargement PDF:', error);
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de télécharger le rapport"
+        description: "Impossible de générer le PDF"
       });
     }
   };

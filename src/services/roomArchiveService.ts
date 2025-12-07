@@ -134,24 +134,33 @@ export class RoomArchiveService {
         console.log(`🗑️ ${assignmentsCleared} assignations supprimées`);
       }
       
-      // 4. Réinitialiser le statut de toutes les chambres à 'needs-cleaning'
-      // NOTE: Le registre des chambres (hotel_rooms_registry) est préservé
-      const { error: resetError } = await supabase
+      // 4. SUPPRIMER les chambres pour vider la page (registre préservé)
+      const { error: deleteError } = await supabase
         .from('rooms')
-        .update({ 
-          status: 'needs-cleaning',
-          cleaning_type: null,
-          notes: null,
-          updated_at: new Date().toISOString()
-        })
+        .delete()
         .eq('hotel_id', hotelId);
       
-      if (resetError) {
-        console.error('❌ Erreur réinitialisation chambres:', resetError);
-        throw resetError;
+      if (deleteError) {
+        console.error('❌ Erreur suppression chambres:', deleteError);
+        throw deleteError;
       }
       
-      console.log(`✅ ${roomsCount} chambres réinitialisées à 'needs-cleaning'`);
+      // 5. Supprimer les notifications du jour
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('hotel_id', hotelId)
+        .gte('created_at', today + 'T00:00:00')
+        .lte('created_at', today + 'T23:59:59');
+      
+      // 6. Supprimer le journal d'actions du jour
+      await supabase
+        .from('daily_action_logs')
+        .delete()
+        .eq('hotel_id', hotelId)
+        .eq('log_date', today);
+      
+      console.log(`✅ ${roomsCount} chambres supprimées, page vidée`);
       
       return {
         archived: roomsCount,
