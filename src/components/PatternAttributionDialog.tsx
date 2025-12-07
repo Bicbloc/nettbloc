@@ -32,10 +32,12 @@ type AttributionType = 'client' | 'default' | 'discard';
 
 const PMS_TYPES = [
   { value: 'mews', label: 'Mews', keywords: ['Nuit', 'Night', 'INS', 'SAL', 'DIR', 'DEP'] },
+  { value: 'apaleo', label: 'Apaleo', keywords: ['Apaleo', 'apaleo', 'APALEO'] },
   { value: 'opera', label: 'Opera', keywords: ['Opera', 'PMS Opera', 'OPERA'] },
   { value: 'cloudbeds', label: 'Cloudbeds', keywords: ['Cloudbeds', 'Cloud Beds'] },
   { value: 'booking', label: 'Booking.com', keywords: ['Booking', 'booking.com'] },
   { value: 'protel', label: 'Protel', keywords: ['Protel', 'protel'] },
+  { value: 'fols', label: 'Fols', keywords: ['Fols', 'FOLS'] },
   { value: 'custom', label: 'Autre / Personnalisé', keywords: [] }
 ];
 
@@ -46,6 +48,11 @@ function detectPmsType(text: string): string {
   if (!text) return 'custom';
   
   const normalizedText = text.toLowerCase();
+  
+  // Apaleo
+  if (normalizedText.includes('apaleo')) {
+    return 'apaleo';
+  }
   
   // Mews - patterns spécifiques
   if (/nuit\s+\d+\/\d+/i.test(text) || /night\s+\d+\/\d+/i.test(text)) {
@@ -73,6 +80,11 @@ function detectPmsType(text: string): string {
   // Protel
   if (normalizedText.includes('protel')) {
     return 'protel';
+  }
+  
+  // Fols
+  if (normalizedText.includes('fols')) {
+    return 'fols';
   }
   
   return 'custom';
