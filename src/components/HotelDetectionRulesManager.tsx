@@ -39,6 +39,7 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
     pattern: '',
     operator: 'regex_match',
     value: '',
+    status: '', // Statut de la chambre (ex: OCC, VAC, DEP)
     cleaning_type: 'a_blanc',
     priority: 5,
     description: ''
@@ -93,6 +94,9 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
     if (newRule.value) {
       condition.value = isNaN(Number(newRule.value)) ? newRule.value : Number(newRule.value);
     }
+    if (newRule.status) {
+      condition.statusPattern = `\\b${newRule.status}\\b`;
+    }
     if (newRule.rule_type === 'night_info') {
       condition.field = 'nightInfo.current';
     }
@@ -116,6 +120,7 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
         pattern: '',
         operator: 'regex_match',
         value: '',
+        status: '',
         cleaning_type: 'a_blanc',
         priority: 5,
         description: ''
@@ -257,6 +262,33 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
                       </Select>
                     </div>
                   )}
+
+                  <div>
+                    <Label>Statut de la chambre (optionnel)</Label>
+                    <Select
+                      value={newRule.status}
+                      onValueChange={v => setNewRule({ ...newRule, status: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Aucun statut spécifique" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Aucun (ignorer le statut)</SelectItem>
+                        <SelectItem value="OCC">OCC - Occupée</SelectItem>
+                        <SelectItem value="VAC">VAC - Vacante</SelectItem>
+                        <SelectItem value="DEP">DEP - Départ</SelectItem>
+                        <SelectItem value="ARR">ARR - Arrivée</SelectItem>
+                        <SelectItem value="INS">INS - In Stay (séjour)</SelectItem>
+                        <SelectItem value="OUT">OUT - Départ confirmé</SelectItem>
+                        <SelectItem value="DND">DND - Ne pas déranger</SelectItem>
+                        <SelectItem value="OOO">OOO - Hors service</SelectItem>
+                        <SelectItem value="OOS">OOS - Hors stock</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      La règle s'applique uniquement si ce statut est détecté
+                    </p>
+                  </div>
 
                   <div>
                     <Label>Type de nettoyage résultant</Label>
