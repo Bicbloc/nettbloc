@@ -234,9 +234,17 @@ export function PatternAttributionDialog({
             <Label className="flex items-center gap-2">
               <Monitor className="h-4 w-4 text-muted-foreground" />
               Type de PMS
+              <Badge variant="outline" className="text-xs font-normal">
+                Modifiable
+              </Badge>
             </Label>
-            <Select value={pmsType} onValueChange={setPmsType}>
-              <SelectTrigger>
+            <Select value={pmsType} onValueChange={(value) => {
+              setPmsType(value);
+              // Mettre à jour le nom du pattern avec le nouveau PMS
+              const pmsLabel = PMS_TYPES.find(p => p.value === value)?.label || 'Personnalisé';
+              setPatternName(`Format ${pmsLabel} - ${reportName || 'Rapport'}`);
+            }}>
+              <SelectTrigger className="bg-background">
                 <SelectValue placeholder="Sélectionner le type de PMS" />
               </SelectTrigger>
               <SelectContent>
@@ -248,7 +256,7 @@ export function PatternAttributionDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Détecté automatiquement : {PMS_TYPES.find(p => p.value === pmsType)?.label}
+              Cliquez pour modifier si la détection est incorrecte
             </p>
           </div>
 
