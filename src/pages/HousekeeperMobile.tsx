@@ -16,9 +16,18 @@ import {
   AlertCircle,
   Loader2,
   X,
-  Sparkles
+  Sparkles,
+  Filter,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Room {
   id: string;
@@ -27,6 +36,7 @@ interface Room {
   floor: number;
   cleaning_priority: number;
   cleaning_type?: string;
+  room_type?: string;
   notes?: string;
 }
 
@@ -43,6 +53,13 @@ interface Assignment {
 
 type TabType = 'assigned' | 'checkout';
 
+interface Filters {
+  floor: string;
+  cleaningType: string;
+  priority: string;
+  roomType: string;
+}
+
 export default function HousekeeperMobile() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -57,6 +74,13 @@ export default function HousekeeperMobile() {
   const [swipeOffset, setSwipeOffset] = useState<Record<string, number>>({});
   const [comment, setComment] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<TabType>('assigned');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    floor: 'all',
+    cleaningType: 'all',
+    priority: 'all',
+    roomType: 'all'
+  });
   
   const touchStartX = useRef<number>(0);
   const touchCurrentX = useRef<number>(0);
@@ -357,6 +381,41 @@ export default function HousekeeperMobile() {
     return 'Bas';
   };
 
+  const isTwin = (roomType?: string) => {
+    if (!roomType) return false;
+    return roomType.toLowerCase().includes('twin');
+  };
+
+  // Get unique floors for filter
+  const uniqueFloors = [...new Set(assignments.map(a => a.room?.floor).filter(Boolean))].sort((a, b) => (a || 0) - (b || 0));
+
+  // Filter assignments
+  const filteredAssignments = assignments.filter(assignment => {
+    const room = assignment.room;
+    if (!room) return false;
+
+    if (filters.floor !== 'all' && room.floor !== parseInt(filters.floor)) return false;
+    if (filters.cleaningType !== 'all') {
+      const isRecouche = room.cleaning_type !== 'full';
+      if (filters.cleaningType === 'recouche' && !isRecouche) return false;
+      if (filters.cleaningType === 'full' && isRecouche) return false;
+    }
+    if (filters.priority !== 'all') {
+      if (filters.priority === 'urgent' && room.cleaning_priority < 8) return false;
+      if (filters.priority === 'normal' && (room.cleaning_priority >= 8 || room.cleaning_priority < 5)) return false;
+      if (filters.priority === 'low' && room.cleaning_priority >= 5) return false;
+    }
+    if (filters.roomType !== 'all') {
+      const roomIsTwin = isTwin(room.room_type);
+      if (filters.roomType === 'twin' && !roomIsTwin) return false;
+      if (filters.roomType === 'other' && roomIsTwin) return false;
+    }
+
+    return true;
+  });
+
+  const activeFiltersCount = Object.values(filters).filter(v => v !== 'all').length;
+
   // Afficher un loader si le nom n'est pas encore disponible
   if (!housekeeperName) {
     return (
@@ -451,41 +510,128 @@ export default function HousekeeperMobile() {
         </Card>
       </div>
 
-      {/* Instructions */}
+      {/* Filters */}
       {activeTab === 'assigned' && assignments.length > 0 && (
         <div className="px-4 pb-4">
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-900 dark:text-blue-100">
-              <p className="font-medium mb-1">Comment utiliser :</p>
-              <p>• Glissez vers la droite pour terminer</p>
-              <p>• Appuyez pour commencer le nettoyage</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              <span>Filtres</span>
+              {activeFiltersCount > 0 && (
+                <Badge className="bg-primary text-primary-foreground text-xs">
+                  {activeFiltersCount}
+                </Badge>
+              )}
             </div>
-          </div>
+            <ChevronDown className={cn("h-4 w-4 transition-transform", showFilters && "rotate-180")} />
+          </Button>
+
+          {showFilters && (
+            <Card className="mt-2">
+              <CardContent className="p-3 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Étage</label>
+                    <Select value={filters.floor} onValueChange={(v) => setFilters(prev => ({ ...prev, floor: v }))}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Tous" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous</SelectItem>
+                        {uniqueFloors.map(floor => (
+                          <SelectItem key={floor} value={String(floor)}>Étage {floor}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Type nettoyage</label>
+                    <Select value={filters.cleaningType} onValueChange={(v) => setFilters(prev => ({ ...prev, cleaningType: v }))}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Tous" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous</SelectItem>
+                        <SelectItem value="recouche">Recouche</SelectItem>
+                        <SelectItem value="full">À blanc</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Urgence</label>
+                    <Select value={filters.priority} onValueChange={(v) => setFilters(prev => ({ ...prev, priority: v }))}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Tous" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="low">Bas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Type chambre</label>
+                    <Select value={filters.roomType} onValueChange={(v) => setFilters(prev => ({ ...prev, roomType: v }))}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Tous" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous</SelectItem>
+                        <SelectItem value="twin">Twin</SelectItem>
+                        <SelectItem value="other">Autre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {activeFiltersCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => setFilters({ floor: 'all', cleaningType: 'all', priority: 'all', roomType: 'all' })}
+                  >
+                    Réinitialiser les filtres
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
       {/* Assigned Rooms Tab */}
       {activeTab === 'assigned' && (
         <div className="px-4 space-y-3">
-          {assignments.length === 0 ? (
+          {filteredAssignments.length === 0 ? (
             <Card className="border-2 border-dashed">
               <CardContent className="p-8 text-center">
                 <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
-                <h3 className="text-xl font-semibold mb-2">Tout est terminé !</h3>
+                <h3 className="text-xl font-semibold mb-2">
+                  {assignments.length === 0 ? 'Tout est terminé !' : 'Aucun résultat'}
+                </h3>
                 <p className="text-muted-foreground">
-                  Vous n'avez plus de chambres assignées
+                  {assignments.length === 0 
+                    ? "Vous n'avez plus de chambres assignées"
+                    : "Aucune chambre ne correspond aux filtres"}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            assignments.map((assignment) => {
+            filteredAssignments.map((assignment) => {
               const room = assignment.room;
               if (!room) return null;
 
               const offset = swipeOffset[assignment.id] || 0;
               const isInProgress = assignment.status === 'in_progress';
               const isRecouche = room.cleaning_type !== 'full';
+              const roomIsTwin = isTwin(room.room_type);
 
               return (
                 <div 
@@ -518,35 +664,43 @@ export default function HousekeeperMobile() {
                     onTouchEnd={() => handleTouchEnd(assignment.id, assignment)}
                   >
                     <CardContent className="p-4">
+                      {/* Type de nettoyage EN HAUT */}
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge 
+                          className={cn(
+                            "text-xs font-semibold",
+                            isRecouche 
+                              ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                              : "bg-orange-500 hover:bg-orange-600 text-white"
+                          )}
+                        >
+                          {isRecouche ? '🛏️ RECOUCHE' : '✨ À BLANC'}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={cn("text-xs", getPriorityColor(room.cleaning_priority), "text-white")}
+                        >
+                          {getPriorityLabel(room.cleaning_priority)}
+                        </Badge>
+                      </div>
+
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="text-3xl font-bold text-primary">
                             {room.room_number}
                           </div>
                           <div className="flex flex-col gap-1">
-                            {/* Type de nettoyage bien visible */}
-                            <Badge 
-                              className={cn(
-                                "text-xs font-semibold",
-                                isRecouche 
-                                  ? "bg-blue-500 hover:bg-blue-600 text-white" 
-                                  : "bg-orange-500 hover:bg-orange-600 text-white"
-                              )}
-                            >
-                              {isRecouche ? '🛏️ RECOUCHE' : '✨ À BLANC'}
-                            </Badge>
                             <Badge variant="secondary" className="text-xs">
                               Étage {room.floor}
                             </Badge>
+                            {roomIsTwin && (
+                              <Badge variant="outline" className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 border-purple-300">
+                                👥 TWIN
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-col gap-1 items-end">
-                          <Badge 
-                            variant="outline" 
-                            className={cn("text-xs", getPriorityColor(room.cleaning_priority), "text-white")}
-                          >
-                            {getPriorityLabel(room.cleaning_priority)}
-                          </Badge>
                           {isInProgress && (
                             <Badge className="bg-primary">
                               <Clock className="h-3 w-3 mr-1" />
