@@ -37,7 +37,7 @@ import { toast } from "@/hooks/use-toast";
 const formSchema = z.object({
   number: z.string().min(1, "Le numéro de chambre est requis"),
   status: z.string().min(1, "Le statut est requis"),
-  cleaningType: z.enum(['full', 'quick', 'none'], {
+  cleaningType: z.enum(['a_blanc', 'recouche', 'none', 'full', 'quick'], {
     required_error: "Le type de nettoyage est requis",
   }),
   priority: z.enum(['high', 'medium', 'low'], {
@@ -66,7 +66,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
     defaultValues: {
       number: '',
       status: '',
-      cleaningType: 'full',
+      cleaningType: 'a_blanc',
       priority: 'medium',
       floor: '',
       isTwin: false,
@@ -211,8 +211,8 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="full">Nettoyage complet</SelectItem>
-                        <SelectItem value="quick">Nettoyage rapide</SelectItem>
+                        <SelectItem value="a_blanc">À Blanc (départ)</SelectItem>
+                        <SelectItem value="recouche">Recouche (client reste)</SelectItem>
                         <SelectItem value="none">Aucun nettoyage</SelectItem>
                       </SelectContent>
                     </Select>

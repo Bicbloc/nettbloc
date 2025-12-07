@@ -7,16 +7,16 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 export interface Room {
   number: string;
   status: string;
-  cleaningType: 'full' | 'quick' | 'none';
-  priority: 'high' | 'medium' | 'low';
+  cleaningType?: 'a_blanc' | 'recouche' | 'none' | 'full' | 'quick'; // Support both old and new formats
+  priority?: 'high' | 'medium' | 'low';
   assignedTo?: string;
   isTwin?: boolean;
   isUrgent?: boolean;
   notUrgent?: boolean;
   floor?: number;
-  notes?: string; // Added notes property
-  remark?: string; // Added remark property for housekeeper remarks
-  linkedRooms?: string[]; // Array of room numbers that are connected to this room
+  notes?: string;
+  remark?: string;
+  linkedRooms?: string[];
 }
 
 export interface CleaningConfig {
@@ -541,7 +541,7 @@ function determinePriority(context: string): 'high' | 'medium' | 'low' {
 // Helper function to generate mock room data
 function generateMockRoomData(): Room[] {
   const statuses = ['needs-cleaning', 'clean', 'occupied', 'maintenance'];
-  const cleaningTypes = ['full', 'quick', 'none'] as const;
+  const cleaningTypes = ['a_blanc', 'recouche', 'none'] as const;
   const priorities = ['high', 'medium', 'low'] as const;
   
   return Array.from({ length: 50 }, (_, i) => {
@@ -559,7 +559,7 @@ function generateMockRoomData(): Room[] {
       isTwin,
       isUrgent: priority === 'high',
       notUrgent: priority === 'low',
-      floor // Ajout du numéro d'étage
+      floor
     };
   });
 }
