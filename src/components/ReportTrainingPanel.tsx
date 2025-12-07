@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle } from "lucide-react";
 import { SimplePatternLearning } from "./SimplePatternLearning";
+import { EnhancedPatternLearning } from "./EnhancedPatternLearning";
 import { PatternValidation } from "./PatternValidation";
 import { ErrorAnalysisDashboard } from "./ErrorAnalysisDashboard";
 import { ConnectedRoomRulesManager } from "./ConnectedRoomRulesManager";
@@ -38,9 +39,13 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [activeTab, setActiveTab] = useState<string>("validation");
   const [learnedPatterns, setLearnedPatterns] = useState<any>(null);
   const [manualAnnotations, setManualAnnotations] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
   useEffect(() => {
     smartExtractionService.loadLearnedPatterns(hotelId);
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserId(data.user.id);
+    });
   }, [hotelId]);
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
@@ -664,16 +669,17 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
           </TabsContent>
 
           <TabsContent value="learn">
-            <SimplePatternLearning
+            <EnhancedPatternLearning
               rawText={selectedReport.rawText}
               hotelId={hotelId}
+              userId={currentUserId}
               reportName={selectedReport.name}
               onRoomsExtracted={(rooms) => {
                 // Mettre à jour les chambres extraites avec les résultats de l'IA
                 const updatedRooms = rooms.map(room => ({
                   roomNumber: room.roomNumber,
                   status: room.status,
-                  cleaningType: room.cleaningType as 'full' | 'quick' | 'none',
+                  cleaningType: (room.cleaningType === 'a_blanc' ? 'full' : room.cleaningType === 'recouche' ? 'quick' : room.cleaningType) as 'full' | 'quick' | 'none',
                   arrivalDate: room.arrivalDate || '',
                   departureDate: room.departureDate || '',
                   validated: false,
@@ -691,7 +697,6 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                   description: `${updatedRooms.length} chambres extraites par l'IA`
                 });
               }}
-              onPatternsLearned={handlePatternsLearned}
             />
           </TabsContent>
 
