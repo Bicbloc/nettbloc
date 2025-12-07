@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -30,9 +30,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Camera, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, Camera, X, Sparkles, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
+import { ImageRecognitionButton } from "./ImageRecognitionButton";
 
 const incidentSchema = z.object({
   title: z.string().min(3, "Le titre doit contenir au moins 3 caractères"),
@@ -58,8 +60,15 @@ export function IncidentReportDialogSimple({
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    category: string;
+    item: string;
+    problem_type: string;
+    severity: string;
+    suggested_title: string;
+    confidence: number;
+  } | null>(null);
   
-  // Initialiser les données par défaut si nécessaire
   useIncidentDefaults(hotelId);
 
   const form = useForm<z.infer<typeof incidentSchema>>({
@@ -69,7 +78,13 @@ export function IncidentReportDialogSimple({
     },
   });
 
-  // Fetch registered rooms
+  // Reset AI suggestion when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAiSuggestion(null);
+    }
+  }, [isOpen]);
+
   const { data: registeredRooms } = useQuery({
     queryKey: ["registered-rooms", hotelId],
     queryFn: async () => {
@@ -84,7 +99,6 @@ export function IncidentReportDialogSimple({
     },
   });
 
-  // Fetch categories with items
   const { data: categoriesWithItems } = useQuery({
     queryKey: ["categories-with-items", hotelId],
     queryFn: async () => {
@@ -97,7 +111,6 @@ export function IncidentReportDialogSimple({
       
       if (catError) throw catError;
 
-      // Fetch all items for this hotel
       const { data: items, error: itemError } = await supabase
         .from("incident_items")
         .select("*")
@@ -107,7 +120,6 @@ export function IncidentReportDialogSimple({
       
       if (itemError) throw itemError;
 
-      // Group items by category
       return categories.map(cat => ({
         ...cat,
         items: items.filter(item => item.category_id === cat.id)
@@ -115,7 +127,6 @@ export function IncidentReportDialogSimple({
     },
   });
 
-  // Fetch types
   const { data: types } = useQuery({
     queryKey: ["incident-types", hotelId],
     queryFn: async () => {
@@ -130,7 +141,6 @@ export function IncidentReportDialogSimple({
     },
   });
 
-  // Fetch staff roles for this hotel
   const { data: staffRoles } = useQuery({
     queryKey: ["staff-roles", hotelId],
     queryFn: async () => {
@@ -145,12 +155,45 @@ export function IncidentReportDialogSimple({
     },
   });
 
+  // Handle AI recognition result
+  const handleAiResult = (result: any) => {
+    setAiSuggestion(result);
+    
+    // Try to find matching item
+    if (categoriesWithItems && result.item) {
+      for (const category of categoriesWithItems) {
+        const matchingItem = category.items.find((item: any) => 
+          item.name.toLowerCase().includes(result.item.toLowerCase()) ||
+          result.item.toLowerCase().includes(item.name.toLowerCase())
+        );
+        if (matchingItem) {
+          form.setValue('item_id', matchingItem.id);
+          break;
+        }
+      }
+    }
+
+    // Try to find matching type
+    if (types && result.problem_type) {
+      const matchingType = types.find((type: any) =>
+        type.name.toLowerCase().includes(result.problem_type.toLowerCase()) ||
+        result.problem_type.toLowerCase().includes(type.name.toLowerCase())
+      );
+      if (matchingType) {
+        form.setValue('type_id', matchingType.id);
+      }
+    }
+
+    // Set suggested title
+    if (result.suggested_title && !form.getValues('title')) {
+      form.setValue('title', result.suggested_title);
+    }
+  };
+
   const createIncidentMutation = useMutation({
     mutationFn: async (values: z.infer<typeof incidentSchema>) => {
-      // Essayer d'abord Supabase auth, sinon utiliser localStorage
       const { data: user } = await supabase.auth.getUser();
       
-      // Récupérer les données de la femme de chambre depuis localStorage si pas auth
       const housekeeperData = localStorage.getItem('housekeeper') 
         ? JSON.parse(localStorage.getItem('housekeeper')!) 
         : null;
@@ -158,21 +201,21 @@ export function IncidentReportDialogSimple({
         ? JSON.parse(localStorage.getItem('housekeeperProfile')!)
         : null;
       
-      // Déterminer qui rapporte l'incident
       const reportedById = user?.user?.id || housekeeperProfile?.id || null;
       const reportedByName = user?.user?.email 
         || housekeeperProfile?.name 
         || housekeeperData?.name 
         || 'Femme de chambre';
 
-      // Get item details to extract category
       const { data: item } = await supabase
         .from("incident_items")
         .select("category_id")
         .eq("id", values.item_id)
         .single();
 
-      // Create incident
+      // Determine priority from AI suggestion or default
+      const priority = aiSuggestion?.severity || "medium";
+
       const { data: incident, error: incidentError } = await supabase
         .from("incidents")
         .insert({
@@ -183,7 +226,7 @@ export function IncidentReportDialogSimple({
           item_id: values.item_id,
           type_id: values.type_id,
           assigned_to_role_id: values.assigned_to_role_id || null,
-          priority: "medium",
+          priority,
           location_type: "room",
           location_reference: values.location_reference,
           reported_by: reportedById,
@@ -196,7 +239,6 @@ export function IncidentReportDialogSimple({
 
       if (incidentError) throw incidentError;
 
-      // Upload images if any
       if (selectedImages.length > 0) {
         for (const image of selectedImages) {
           try {
@@ -227,7 +269,6 @@ export function IncidentReportDialogSimple({
             }
           } catch (imageError) {
             console.error("❌ Erreur traitement image:", imageError);
-            // Continue avec les autres images même si une échoue
           }
         }
       }
@@ -241,25 +282,9 @@ export function IncidentReportDialogSimple({
         description: "L'incident a été enregistré avec succès",
       });
       
-      // Ajouter notification pour l'admin
-      const { useNotificationContext } = await import('@/contexts/NotificationContext');
-      try {
-        const notificationContext = useNotificationContext();
-        if (notificationContext?.addNotification) {
-          await notificationContext.addNotification({
-            title: `Incident signalé - CH ${incident.location_reference}`,
-            description: `${userType === 'housekeeper' ? 'Femme de chambre' : 'Admin'} - ${incident.title}`,
-            type: 'incident',
-            room_number: incident.location_reference,
-            user_type: 'admin'
-          });
-        }
-      } catch (error) {
-        console.log('Notification non disponible dans ce contexte');
-      }
-      
       form.reset();
       setSelectedImages([]);
+      setAiSuggestion(null);
       setIsOpen(false);
     },
     onError: (error) => {
@@ -305,6 +330,94 @@ export function IncidentReportDialogSimple({
               )}
               className="space-y-4"
             >
+              {/* Photos with AI Recognition */}
+              <div className="space-y-3">
+                <FormLabel className="flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Photos (optionnel)
+                </FormLabel>
+                <div className="flex flex-wrap gap-2">
+                  {selectedImages.map((image, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Preview ${index}`}
+                        className="w-24 h-24 object-cover rounded-lg border-2 border-border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeImage(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <label className="w-24 h-24 flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent hover:border-primary transition-all">
+                    <div className="text-center">
+                      <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Ajouter</span>
+                    </div>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      capture="environment"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                  </label>
+                </div>
+
+                {/* AI Recognition Button */}
+                {selectedImages.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <ImageRecognitionButton
+                      imageFile={selectedImages[0]}
+                      onResult={handleAiResult}
+                    />
+                    {aiSuggestion && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        {Math.round(aiSuggestion.confidence * 100)}% confiance
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                {/* AI Suggestion Display */}
+                {aiSuggestion && (
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <Sparkles className="h-4 w-4" />
+                      Suggestion IA
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Catégorie:</span>{" "}
+                        <span className="font-medium">{aiSuggestion.category}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Élément:</span>{" "}
+                        <span className="font-medium">{aiSuggestion.item}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Problème:</span>{" "}
+                        <span className="font-medium">{aiSuggestion.problem_type}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Gravité:</span>{" "}
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1">
+                          {aiSuggestion.severity}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Title */}
               <FormField
                 control={form.control}
@@ -463,50 +576,19 @@ export function IncidentReportDialogSimple({
                 )}
               />
 
-              {/* Photos */}
-              <div className="space-y-2">
-                <FormLabel>Photos (optionnel)</FormLabel>
-                <div className="flex flex-wrap gap-2">
-                  {selectedImages.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={URL.createObjectURL(image)}
-                        alt={`Preview ${index}`}
-                        className="w-20 h-20 object-cover rounded border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute -top-2 -right-2 h-6 w-6"
-                        onClick={() => removeImage(index)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                  <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-accent">
-                    <div className="text-center">
-                      <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Ajouter</span>
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleImageSelect}
-                    />
-                  </label>
-                </div>
-              </div>
-
               <Button
                 type="submit"
                 className="w-full"
                 disabled={createIncidentMutation.isPending}
               >
-                {createIncidentMutation.isPending ? "Envoi..." : "Envoyer le signalement"}
+                {createIncidentMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Envoi...
+                  </>
+                ) : (
+                  "Signaler l'incident"
+                )}
               </Button>
             </form>
           </Form>

@@ -34,3 +34,6 @@ verify_jwt = true
 
 [functions.count-linen]
 verify_jwt = false
+
+[functions.recognize-incident-item]
+verify_jwt = false
