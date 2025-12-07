@@ -2,20 +2,18 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { 
-  Brain, Sparkles, Check, AlertCircle, Loader2, 
-  MousePointer, Eye, Zap, ChevronRight, RotateCcw,
-  Target, CheckCircle2, HelpCircle, Lightbulb
+  Brain, Sparkles, Check, Loader2, 
+  MousePointer, Eye, Zap, RotateCcw,
+  Target, CheckCircle2, Lightbulb, User, UserX
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { mewsDetectionService, ReservationBlock } from "@/services/mewsDetectionService";
+import { mewsDetectionService } from "@/services/mewsDetectionService";
 import { getCleaningTypeLabel, normalizeCleaningType } from "@/utils/cleaningTypeUtils";
 import { HotelDetectionRulesManager } from "./HotelDetectionRulesManager";
+import { PatternAttributionDialog } from "./PatternAttributionDialog";
 
 interface Annotation {
   id: string;
@@ -36,6 +34,8 @@ interface ExtractedRoom {
   confidence: number;
   detectionReason?: string;
   originalLine?: string;
+  hasGuest?: boolean;
+  rawStatus?: string;
 }
 
 interface EnhancedPatternLearningProps {
@@ -65,9 +65,10 @@ export const EnhancedPatternLearning = ({
   const [selectedField, setSelectedField] = useState<string>('roomNumber');
   const [isLearning, setIsLearning] = useState(false);
   const [extractedRooms, setExtractedRooms] = useState<ExtractedRoom[]>([]);
-  const [previewResults, setPreviewResults] = useState<Map<number, { cleaningType: string; reason: string; confidence: number }>>(new Map());
+  const [previewResults, setPreviewResults] = useState<Map<number, { cleaningType: string; reason: string; confidence: number; hasGuest: boolean; rawStatus: string | null }>>(new Map());
   const [existingPatterns, setExistingPatterns] = useState<any[]>([]);
-  const [showRulesManager, setShowRulesManager] = useState(false);
+  const [showAttributionDialog, setShowAttributionDialog] = useState(false);
+  const [savedPatternId, setSavedPatternId] = useState<string | null>(null);
   
   // Diviser le texte en lignes pour affichage
   const lines = rawText.split('\n').filter(l => l.trim().length > 5);
@@ -125,15 +126,17 @@ export const EnhancedPatternLearning = ({
   };
 
   const analyzePreviewLines = useCallback(() => {
-    const results = new Map<number, { cleaningType: string; reason: string; confidence: number }>();
+    const results = new Map<number, { cleaningType: string; reason: string; confidence: number; hasGuest: boolean; rawStatus: string | null }>();
     
     previewLines.forEach((line, index) => {
       const analysis = mewsDetectionService.analyzeLine(line);
-      if (analysis.cleaningType !== 'none' || analysis.blocks.nightInfo || analysis.blocks.status) {
+      if (analysis.cleaningType !== 'none' || analysis.blocks.nightInfo || analysis.blocks.status || analysis.blocks.isOutOfOrder) {
         results.set(index, {
           cleaningType: analysis.cleaningType,
-          reason: analysis.matchedRule || 'Analyse automatique',
-          confidence: analysis.confidence
+          reason: analysis.detailedReason || analysis.matchedRule || 'Analyse automatique',
+          confidence: analysis.confidence,
+          hasGuest: analysis.hasGuest,
+          rawStatus: analysis.rawStatus
         });
       }
     });
@@ -265,7 +268,7 @@ export const EnhancedPatternLearning = ({
 
   const savePattern = async (patterns: any, rooms: ExtractedRoom[]) => {
     try {
-      await supabase.from('report_training_patterns').insert({
+      const { data, error } = await supabase.from('report_training_patterns').insert({
         hotel_id: hotelId,
         report_name: reportName,
         pms_type: 'learned',
@@ -274,8 +277,15 @@ export const EnhancedPatternLearning = ({
         detection_rules: patterns as any,
         validated: true,
         created_by: userId,
-        accuracy_score: rooms.reduce((acc, r) => acc + r.confidence, 0) / rooms.length
-      });
+        accuracy_score: rooms.reduce((acc, r) => acc + r.confidence, 0) / rooms.length,
+        pattern_name: reportName,
+        assigned_to_hotel_id: hotelId
+      }).select().single();
+      
+      if (data) {
+        setSavedPatternId(data.id);
+        setShowAttributionDialog(true);
+      }
     } catch (error) {
       console.error('Erreur sauvegarde:', error);
     }
@@ -292,7 +302,18 @@ export const EnhancedPatternLearning = ({
     switch (normalized) {
       case 'a_blanc': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
       case 'recouche': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300';
+      case 'none': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getCleaningLabel = (type: string) => {
+    const normalized = normalizeCleaningType(type);
+    switch (normalized) {
+      case 'a_blanc': return 'À Blanc';
+      case 'recouche': return 'Recouche';
+      case 'none': return 'Aucun';
+      default: return getCleaningTypeLabel(type);
     }
   };
 
@@ -367,7 +388,7 @@ export const EnhancedPatternLearning = ({
             <Eye className="h-4 w-4 mr-2" />
             Aperçu IA
           </TabsTrigger>
-          <TabsTrigger value="rules" onClick={() => setShowRulesManager(true)}>
+          <TabsTrigger value="rules">
             <Target className="h-4 w-4 mr-2" />
             Règles
           </TabsTrigger>
@@ -508,30 +529,39 @@ export const EnhancedPatternLearning = ({
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                L'IA analyse chaque ligne en temps réel selon les règles configurées
+                L'IA analyse chaque ligne en temps réel selon les règles configurées (INS/SAL sans client = Propre)
               </p>
               
               <div className="space-y-2 max-h-[400px] overflow-auto">
-                {previewLines.slice(0, 20).map((line, index) => {
+                {previewLines.slice(0, 25).map((line, index) => {
                   const analysis = mewsDetectionService.analyzeLine(line);
                   const hasInfo = analysis.blocks.nightInfo || analysis.blocks.status || 
-                                  analysis.blocks.hasDepartureBlock || analysis.blocks.hasArrivalBlock;
+                                  analysis.blocks.hasDepartureBlock || analysis.blocks.hasArrivalBlock ||
+                                  analysis.blocks.isOutOfOrder;
                   
                   if (!hasInfo) return null;
                   
                   return (
                     <div key={index} className="p-3 rounded-lg border bg-card">
                       <p className="font-mono text-xs truncate mb-2">{line}</p>
-                      <div className="flex flex-wrap gap-2 text-xs">
+                      <div className="flex flex-wrap gap-2 text-xs items-center">
                         <Badge className={getCleaningBadgeStyle(analysis.cleaningType)}>
-                          {getCleaningTypeLabel(analysis.cleaningType)}
+                          {getCleaningLabel(analysis.cleaningType)}
                         </Badge>
-                        <span className="text-muted-foreground">
-                          Confiance: {Math.round(analysis.confidence * 100)}%
-                        </span>
-                        {analysis.matchedRule && (
-                          <span className="text-muted-foreground">
-                            | {analysis.matchedRule}
+                        {analysis.rawStatus && (
+                          <Badge variant="secondary" className="text-xs">
+                            {analysis.rawStatus}
+                          </Badge>
+                        )}
+                        {analysis.hasGuest ? (
+                          <span className="flex items-center gap-1 text-green-600">
+                            <User className="h-3 w-3" />
+                            {analysis.blocks.guestName || 'Client'}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <UserX className="h-3 w-3" />
+                            Vide
                           </span>
                         )}
                         {analysis.blocks.nightInfo && (
@@ -539,6 +569,9 @@ export const EnhancedPatternLearning = ({
                             Nuit {analysis.blocks.nightInfo.current}/{analysis.blocks.nightInfo.total}
                           </Badge>
                         )}
+                        <span className="text-muted-foreground ml-auto">
+                          {analysis.detailedReason}
+                        </span>
                       </div>
                     </div>
                   );
@@ -563,29 +596,51 @@ export const EnhancedPatternLearning = ({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-[300px] overflow-auto">
+            <div className="max-h-[400px] overflow-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-card">
+                <thead className="sticky top-0 bg-card z-10">
                   <tr className="border-b">
                     <th className="text-left p-2">Chambre</th>
                     <th className="text-left p-2">Nettoyage</th>
-                    <th className="text-left p-2">Client</th>
+                    <th className="text-left p-2">Statut</th>
+                    <th className="text-left p-2">Client?</th>
                     <th className="text-left p-2">Nuit</th>
                     <th className="text-left p-2">Raison</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {extractedRooms.slice(0, 50).map((room, index) => (
+                  {extractedRooms.slice(0, 60).map((room, index) => (
                     <tr key={index} className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">{room.roomNumber}</td>
                       <td className="p-2">
                         <Badge className={getCleaningBadgeStyle(room.cleaningType)}>
-                          {getCleaningTypeLabel(room.cleaningType)}
+                          {getCleaningLabel(room.cleaningType)}
                         </Badge>
                       </td>
-                      <td className="p-2 text-muted-foreground">{room.guestName || '-'}</td>
+                      <td className="p-2">
+                        {room.rawStatus && (
+                          <Badge variant="secondary" className="text-xs">
+                            {room.rawStatus}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {room.hasGuest ? (
+                          <span className="flex items-center gap-1 text-green-600">
+                            <User className="h-3 w-3" />
+                            {room.guestName || 'Oui'}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <UserX className="h-3 w-3" />
+                            Non
+                          </span>
+                        )}
+                      </td>
                       <td className="p-2">{room.nightInfo || '-'}</td>
-                      <td className="p-2 text-xs text-muted-foreground">{room.detectionReason || '-'}</td>
+                      <td className="p-2 text-xs text-muted-foreground max-w-[200px] truncate" title={room.detectionReason}>
+                        {room.detectionReason || '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -594,6 +649,21 @@ export const EnhancedPatternLearning = ({
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog d'attribution */}
+      <PatternAttributionDialog
+        open={showAttributionDialog}
+        onOpenChange={setShowAttributionDialog}
+        hotelId={hotelId}
+        patternId={savedPatternId || undefined}
+        extractedRoomsCount={extractedRooms.length}
+        averageConfidence={extractedRooms.length > 0 
+          ? extractedRooms.reduce((acc, r) => acc + r.confidence, 0) / extractedRooms.length 
+          : 0
+        }
+        reportName={reportName}
+        onSave={() => loadExistingPatterns()}
+      />
     </div>
   );
 };

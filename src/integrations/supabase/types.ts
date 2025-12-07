@@ -1849,12 +1849,16 @@ export type Database = {
       report_training_patterns: {
         Row: {
           accuracy_score: number | null
+          assigned_to_hotel_id: string | null
+          attribution_reason: string | null
           created_at: string
           created_by: string
           detection_rules: Json | null
           extracted_data: Json
           hotel_id: string
           id: string
+          is_default: boolean | null
+          pattern_name: string | null
           pms_type: string | null
           raw_text: string
           report_name: string
@@ -1864,12 +1868,16 @@ export type Database = {
         }
         Insert: {
           accuracy_score?: number | null
+          assigned_to_hotel_id?: string | null
+          attribution_reason?: string | null
           created_at?: string
           created_by: string
           detection_rules?: Json | null
           extracted_data?: Json
           hotel_id: string
           id?: string
+          is_default?: boolean | null
+          pattern_name?: string | null
           pms_type?: string | null
           raw_text: string
           report_name: string
@@ -1879,12 +1887,16 @@ export type Database = {
         }
         Update: {
           accuracy_score?: number | null
+          assigned_to_hotel_id?: string | null
+          attribution_reason?: string | null
           created_at?: string
           created_by?: string
           detection_rules?: Json | null
           extracted_data?: Json
           hotel_id?: string
           id?: string
+          is_default?: boolean | null
+          pattern_name?: string | null
           pms_type?: string | null
           raw_text?: string
           report_name?: string
@@ -1893,6 +1905,13 @@ export type Database = {
           validation_notes?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "report_training_patterns_assigned_to_hotel_id_fkey"
+            columns: ["assigned_to_hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "report_training_patterns_hotel_id_fkey"
             columns: ["hotel_id"]
