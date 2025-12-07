@@ -72,9 +72,29 @@ const Reports = () => {
 
     setIsLoading(true);
     try {
-      // Temporairement désactivé en attendant la régénération des types TypeScript
-      console.log('Reports loading disabled temporarily until types regenerate');
-      setReports([]);
+      // Charger les rapports depuis daily_reports
+      const { data: reportsData, error } = await supabase
+        .from('daily_reports')
+        .select('*')
+        .order('report_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Transformer les données pour correspondre à l'interface
+      const transformedReports: DailyReport[] = (reportsData || []).map(report => ({
+        id: report.id,
+        hotel_id: report.hotel_id || '',
+        user_id: report.housekeeper_id || '',
+        report_date: report.report_date,
+        created_at: report.created_at || report.report_date,
+        room_data: Array.isArray(report.room_data) ? report.room_data : [],
+        housekeeper_assignments: (report.summary as any)?.assignments || {},
+        housekeeper_names: (report.summary as any)?.housekeepers || [],
+        action_log: (report.summary as any)?.action_log || (report.summary as any)?.remarks || []
+      }));
+      
+      setReports(transformedReports);
+      console.log(`✅ ${transformedReports.length} rapports chargés`);
     } catch (error) {
       console.error('Erreur:', error);
       toast({
