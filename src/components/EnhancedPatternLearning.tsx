@@ -590,10 +590,19 @@ export const EnhancedPatternLearning = ({
       {extractedRooms.length > 0 && (
         <Card className="border-green-500/30">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2 text-green-600 dark:text-green-400">
-              <CheckCircle2 className="h-5 w-5" />
-              {extractedRooms.length} chambres extraites
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2 text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-5 w-5" />
+                {extractedRooms.length} chambres extraites
+              </CardTitle>
+              <Button 
+                onClick={() => setShowAttributionDialog(true)}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Valider et attribuer le pattern
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="max-h-[400px] overflow-auto">
