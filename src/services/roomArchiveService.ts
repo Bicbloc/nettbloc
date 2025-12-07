@@ -28,7 +28,18 @@ export class RoomArchiveService {
       const roomsCount = currentRooms?.length || 0;
       console.log(`📊 ${roomsCount} chambres à archiver`);
       
-      // 2. Archiver dans daily_reports si des chambres existent
+      // 2. Récupérer les notifications/remarques du jour pour archivage
+      const { data: todayNotifications } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .gte('created_at', today + 'T00:00:00')
+        .lte('created_at', today + 'T23:59:59');
+      
+      const remarks = todayNotifications?.filter(n => n.type === 'remark') || [];
+      console.log(`💬 ${remarks.length} commentaires à archiver`);
+      
+      // 3. Archiver dans daily_reports si des chambres existent
       if (currentRooms && currentRooms.length > 0) {
         const archiveData = {
           hotel_id: hotelId,
@@ -39,9 +50,16 @@ export class RoomArchiveService {
             clean_rooms: currentRooms.filter(r => r.status === 'clean').length,
             dirty_rooms: currentRooms.filter(r => r.status === 'dirty').length,
             in_progress_rooms: currentRooms.filter(r => r.status === 'in-progress').length,
-            archived_at: new Date().toISOString()
+            archived_at: new Date().toISOString(),
+            remarks: remarks.map(r => ({
+              room_number: r.room_number,
+              description: r.description,
+              housekeeper_name: r.housekeeper_name,
+              created_at: r.created_at
+            }))
           },
-          total_rooms_cleaned: currentRooms.filter(r => r.status === 'clean').length
+          total_rooms_cleaned: currentRooms.filter(r => r.status === 'clean').length,
+          notes: remarks.length > 0 ? `${remarks.length} commentaire(s) archivé(s)` : null
         };
         
         const { error: archiveError } = await supabase
@@ -52,7 +70,7 @@ export class RoomArchiveService {
           console.warn('⚠️ Erreur archivage daily_reports:', archiveError);
           // Continuer malgré l'erreur
         } else {
-          console.log('✅ Rapport archivé dans daily_reports');
+          console.log('✅ Rapport archivé dans daily_reports avec commentaires');
         }
       }
       
