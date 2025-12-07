@@ -13,6 +13,7 @@ interface Room {
   status: 'to_clean' | 'in_progress' | 'completed';
   priority: 'normal' | 'high' | 'urgent';
   notes?: string;
+  cleaningType?: 'recouche' | 'full';
 }
 
 interface GuestModeProps {
@@ -143,7 +144,8 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
                   room.status === 'clean' ? 'completed' : 'to_clean',
           priority: room.cleaning_priority === 3 ? 'urgent' : 
                    room.cleaning_priority === 2 ? 'high' : 'normal',
-          notes: room.notes || undefined
+          notes: room.notes || undefined,
+          cleaningType: room.cleaning_type === 'full' ? 'full' : 'recouche'
         }));
         
         console.log('✅ Chambres chargées en mode invité:', formattedRooms.length);
@@ -353,10 +355,17 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
                   key={room.number}
                   className={`p-4 rounded-lg border-2 ${getRoomStatusColor(room.status)}`}
                 >
-                  <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xl font-bold">Chambre {room.number}</span>
+                        <Badge 
+                          className={room.cleaningType === 'full' 
+                            ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                            : 'bg-blue-500 hover:bg-blue-600 text-white'}
+                        >
+                          {room.cleaningType === 'full' ? '✨ À BLANC' : '🛏️ RECOUCHE'}
+                        </Badge>
                         <Badge className={getPriorityColor(room.priority)}>
                           {room.priority === 'urgent' ? 'Urgent' : 
                            room.priority === 'high' ? 'Prioritaire' : 'Normal'}
