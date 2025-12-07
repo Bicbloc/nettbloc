@@ -5,11 +5,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Règles métier spécifiques Mews pour la détection du type de nettoyage
+const MEWS_CLEANING_RULES = `
+LOGIQUE MÉTIER POUR DÉTECTION DU TYPE DE NETTOYAGE:
+
+RÈGLE 1 - Nuit X/Y (Pattern le plus fiable):
+- Si "Nuit 2/3", "Nuit 3/5", "Night 2/4" → X > 1 = RECOUCHE (client reste)
+- Si "Nuit 1/3", "Night 1/2" → X = 1 = À BLANC (premier jour, arrivée)
+- Si pas de "Nuit X/Y" → vérifier les autres règles
+
+RÈGLE 2 - Blocs de réservation (heures):
+- Si 2 heures dans la ligne (ex: "11:00" et "15:00") → départ + arrivée même jour = À BLANC
+- Si heure départ seule (10:00, 11:00, 12:00) sans heure arrivée → départ = À BLANC
+- Si heure arrivée seule (14:00, 15:00, 16:00) sans heure départ → arrivée = À BLANC
+
+RÈGLE 3 - Mots-clés de statut:
+- SAL, DIR, DEP, DEPART, CHECKOUT, OUT → À BLANC
+- INS, STAYOVER, OCC, OCCUPIED → RECOUCHE
+- ARR, ARRIVAL, CHECKIN, IN → À BLANC (arrivée)
+
+RÈGLE 4 - Contexte des dates:
+- Si date de départ = date du jour → À BLANC
+- Si date d'arrivée = date du jour et pas de départ → À BLANC
+- Si aucune date ne correspond au jour → probablement RECOUCHE
+
+PRIORITÉ: Règle 1 > Règle 2 > Règle 3 > Règle 4
+`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { textSample, annotations, context, mode } = await req.json();
+    const body = await req.json();
+    const { textSample, annotations, context, mode, learnedPatterns, fullText } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -18,17 +46,23 @@ serve(async (req) => {
 
     // Mode "apply" : appliquer les patterns appris à tout le texte
     if (mode === 'apply') {
-      const { learnedPatterns, fullText } = await req.json();
-      
       const applyPrompt = `Tu es un expert en extraction de données de rapports PDF d'hôtel.
 
 Voici des patterns qui ont été appris à partir d'annotations manuelles:
 ${JSON.stringify(learnedPatterns, null, 2)}
 
+${MEWS_CLEANING_RULES}
+
 Applique ces patterns au texte complet suivant et extrait TOUTES les chambres avec leurs informations.
 
 Texte complet:
 ${fullText}
+
+IMPORTANT pour le type de nettoyage:
+- Analyse chaque ligne selon les règles métier ci-dessus
+- "Nuit X/Y" avec X > 1 = TOUJOURS recouche (quick)
+- 2 blocs d'heures (départ + arrivée) = TOUJOURS à blanc (full)
+- En cas de doute, mets "full" (à blanc) car c'est plus sûr
 
 Retourne un JSON avec la structure:
 {
@@ -41,7 +75,8 @@ Retourne un JSON avec la structure:
       "departureDate": "DD/MM/YYYY ou vide",
       "guestName": "nom du client si disponible",
       "nightInfo": "Nuit X/Y si disponible",
-      "confidence": 0.0-1.0
+      "confidence": 0.0-1.0,
+      "detectionReason": "Règle utilisée pour déterminer le type"
     }
   ],
   "totalFound": nombre_total_chambres
@@ -58,13 +93,25 @@ Retourne un JSON avec la structure:
           messages: [
             { role: "user", content: applyPrompt },
           ],
-          temperature: 0.1,
         }),
       });
 
       if (!applyResponse.ok) {
         const errorText = await applyResponse.text();
         console.error("AI gateway error:", applyResponse.status, errorText);
+        
+        if (applyResponse.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "Limite de requêtes dépassée. Réessayez plus tard." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (applyResponse.status === 402) {
+          return new Response(
+            JSON.stringify({ error: "Crédits insuffisants. Ajoutez des crédits à votre workspace." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         throw new Error(`AI gateway error: ${applyResponse.status}`);
       }
 
@@ -90,29 +137,17 @@ Retourne un JSON avec la structure:
 3. Appliquer ces patterns à TOUT le texte pour extraire toutes les chambres
 
 Contexte:
-- Type PMS: ${context.pmsType || 'inconnu'}
-- Nom du rapport: ${context.reportName || 'inconnu'}
-- Hotel ID: ${context.hotelId || 'inconnu'}
+- Type PMS: ${context?.pmsType || 'inconnu'}
+- Nom du rapport: ${context?.reportName || 'inconnu'}
+- Hotel ID: ${context?.hotelId || 'inconnu'}
+
+${MEWS_CLEANING_RULES}
 
 IMPORTANT: 
 - Les patterns doivent être SPÉCIFIQUES à ce format de rapport
 - Utilise les annotations comme exemples pour comprendre le format
 - Extrait TOUTES les chambres du texte, pas seulement celles annotées
-
-Pour déterminer le type de nettoyage:
-- "full" (À blanc) = départ, nouveau client arrive, changement complet
-- "quick" (Recouche) = client reste (Nuit X/Y où X > 1), juste rafraîchissement
-- "none" = pas de nettoyage nécessaire
-
-Indices pour "quick" (recouche):
-- "Nuit 2/3", "Nuit 3/5" = client reste
-- Pas de date de départ aujourd'hui
-- Mot-clé "recouche", "stay", "stayover"
-
-Indices pour "full" (à blanc):
-- Date de départ = aujourd'hui
-- "DIR", "SAL", "DIRTY", "départ", "checkout"
-- Nouvelle arrivée le même jour`;
+- Applique STRICTEMENT les règles métier pour le type de nettoyage`;
 
     const userPrompt = `Voici le texte COMPLET du rapport:
 ${textSample}
@@ -120,7 +155,13 @@ ${textSample}
 Annotations manuelles (exemples fournis par l'utilisateur):
 ${JSON.stringify(annotations, null, 2)}
 
-À partir de ces ${annotations.length} annotations exemples, identifie les patterns et extrait TOUTES les chambres du texte.
+À partir de ces ${annotations?.length || 0} annotations exemples, identifie les patterns et extrait TOUTES les chambres du texte.
+
+Pour CHAQUE chambre, applique les règles métier de nettoyage:
+- Vérifie d'abord "Nuit X/Y" → X > 1 = recouche (quick)
+- Sinon vérifie les blocs d'heures → 2 heures = à blanc (full)
+- Sinon vérifie les mots-clés → SAL/DIR = à blanc, INS = recouche
+- En cas de doute → à blanc (full)
 
 Réponds en JSON:
 {
@@ -131,7 +172,12 @@ Réponds en JSON:
       "MOT_CLE": { "status": "dirty|clean|occupied|checkout|arrival|stayover", "cleaning": "full|quick|none" }
     },
     "dateFormat": "format de date détecté",
-    "lineFormat": "description du format de ligne"
+    "lineFormat": "description du format de ligne",
+    "nightInfoPattern": "pattern pour Nuit X/Y si détecté",
+    "timePatterns": {
+      "departure": "pattern pour heures de départ",
+      "arrival": "pattern pour heures d'arrivée"
+    }
   },
   "rooms": [
     {
@@ -143,6 +189,7 @@ Réponds en JSON:
       "guestName": "Nom Client",
       "nightInfo": "",
       "confidence": 0.95,
+      "detectionReason": "Règle utilisée",
       "originalLine": "ligne du texte original"
     }
   ],
@@ -162,7 +209,6 @@ Réponds en JSON:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.2,
       }),
     });
 
@@ -187,6 +233,8 @@ Réponds en JSON:
 
     const data = await response.json();
     const aiResponse = data.choices[0]?.message?.content || "";
+
+    console.log("AI Response received, length:", aiResponse.length);
 
     // Extraire le JSON de la réponse
     const result = parseJsonFromResponse(aiResponse);
@@ -227,15 +275,24 @@ function parseJsonFromResponse(text: string): any {
     // Essayer d'extraire le JSON d'un bloc de code
     const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[1]);
+      try {
+        return JSON.parse(jsonMatch[1]);
+      } catch (e) {
+        console.error("Failed to parse JSON from code block:", e);
+      }
     }
     
     // Essayer de trouver un objet JSON dans le texte
     const objectMatch = text.match(/\{[\s\S]*\}/);
     if (objectMatch) {
-      return JSON.parse(objectMatch[0]);
+      try {
+        return JSON.parse(objectMatch[0]);
+      } catch (e) {
+        console.error("Failed to parse JSON object:", e);
+      }
     }
     
+    console.error("Could not extract JSON from response:", text.substring(0, 500));
     throw new Error("Impossible d'extraire le JSON de la réponse IA");
   }
 }

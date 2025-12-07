@@ -447,6 +447,59 @@ export type Database = {
           },
         ]
       }
+      hotel_detection_rules: {
+        Row: {
+          condition: Json
+          created_at: string | null
+          created_by: string
+          description: string | null
+          hotel_id: string
+          id: string
+          is_active: boolean | null
+          priority: number | null
+          result: Json
+          rule_name: string
+          rule_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          condition: Json
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          result: Json
+          rule_name: string
+          rule_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          condition?: Json
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean | null
+          priority?: number | null
+          result?: Json
+          rule_name?: string
+          rule_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_detection_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_rooms_registry: {
         Row: {
           building: string | null
