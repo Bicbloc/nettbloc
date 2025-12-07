@@ -671,6 +671,7 @@ export const EnhancedPatternLearning = ({
           : 0
         }
         reportName={reportName}
+        rawText={rawText}
         onSave={() => loadExistingPatterns()}
       />
     </div>
