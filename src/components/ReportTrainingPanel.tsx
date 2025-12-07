@@ -9,8 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle } from "lucide-react";
-import { TextAnnotationTool } from "./TextAnnotationTool";
+import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle } from "lucide-react";
+import { SimplePatternLearning } from "./SimplePatternLearning";
 import { PatternValidation } from "./PatternValidation";
 import { ErrorAnalysisDashboard } from "./ErrorAnalysisDashboard";
 import { ConnectedRoomRulesManager } from "./ConnectedRoomRulesManager";
@@ -664,23 +664,35 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
           </TabsContent>
 
           <TabsContent value="learn">
-            <TextAnnotationTool
+            <SimplePatternLearning
               rawText={selectedReport.rawText}
               hotelId={hotelId}
               reportName={selectedReport.name}
-              pmsType={detectedPmsType || selectedPmsType}
+              onRoomsExtracted={(rooms) => {
+                // Mettre à jour les chambres extraites avec les résultats de l'IA
+                const updatedRooms = rooms.map(room => ({
+                  roomNumber: room.roomNumber,
+                  status: room.status,
+                  cleaningType: room.cleaningType as 'full' | 'quick' | 'none',
+                  arrivalDate: room.arrivalDate || '',
+                  departureDate: room.departureDate || '',
+                  validated: false,
+                  confidence: room.confidence,
+                  originalText: room.originalLine
+                }));
+                
+                setSelectedReport({
+                  ...selectedReport,
+                  extractedRooms: updatedRooms
+                });
+                
+                toast({
+                  title: "Chambres mises à jour",
+                  description: `${updatedRooms.length} chambres extraites par l'IA`
+                });
+              }}
               onPatternsLearned={handlePatternsLearned}
-              onAnnotationsChanged={setManualAnnotations}
             />
-            
-            {learnedPatterns && (
-              <Card className="p-4 mt-4">
-                <h4 className="font-semibold mb-2">Patterns appris</h4>
-                <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-60">
-                  {JSON.stringify(learnedPatterns, null, 2)}
-                </pre>
-              </Card>
-            )}
           </TabsContent>
 
           <TabsContent value="metrics">
