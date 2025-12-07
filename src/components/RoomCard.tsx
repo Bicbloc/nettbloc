@@ -187,13 +187,14 @@ export function RoomCard({
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="font-semibold text-sm whitespace-nowrap">{room.number}</span>
-          {room.cleaningType !== 'none' && (
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
-              room.cleaningType === 'full' 
-                ? 'bg-purple-100 text-purple-700' 
-                : 'bg-blue-100 text-blue-700'
-            }`}>
-              {room.cleaningType === 'full' ? 'B' : 'R'}
+          {room.cleaningType === 'full' && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-purple-100 text-purple-700 border border-purple-200">
+              À BLANC
+            </span>
+          )}
+          {room.cleaningType === 'quick' && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-blue-100 text-blue-700 border border-blue-200">
+              RECOUCHE
             </span>
           )}
           {room.status === 'clean' && (

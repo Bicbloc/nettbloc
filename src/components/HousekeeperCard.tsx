@@ -595,6 +595,16 @@ export function HousekeeperCard({
                 <span>{rooms.length} chambres</span>
                 <span>Max: {effectiveMaxRooms} chambres</span>
               </div>
+              
+              {/* Totaux par type de nettoyage */}
+              <div className="flex gap-2 mt-2">
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
+                  🚪 À Blanc: {rooms.filter(r => r.cleaningType === 'full').length}
+                </span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                  🛏️ Recouche: {rooms.filter(r => r.cleaningType === 'quick').length}
+                </span>
+              </div>
             </div>
           )}
         </CardHeader>
