@@ -23,7 +23,9 @@ import {
   RefreshCw,
   AlertCircle,
   ArrowLeft,
-  MessageCircle
+  ClipboardList,
+  Clock,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -31,9 +33,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { NotificationBell } from '@/components/NotificationBell';
-import { EmailDialogWithLimit } from '@/components/EmailDialogWithLimit';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface ActionLog {
+  id?: string;
+  action_type: string;
+  actor_name?: string;
+  actor_type?: string;
+  room_number?: string;
+  description: string;
+  created_at?: string;
+  details?: any;
+}
 
 interface DailyReport {
   id: string;
@@ -44,7 +58,7 @@ interface DailyReport {
   room_data: any;
   housekeeper_assignments: any;
   housekeeper_names: any;
-  action_log: any;
+  action_log: ActionLog[];
 }
 
 const Reports = () => {
@@ -56,8 +70,7 @@ const Reports = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
-  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [selectedReportForDownload, setSelectedReportForDownload] = useState<DailyReport | null>(null);
+  const [selectedTab, setSelectedTab] = useState('summary');
 
   useEffect(() => {
     loadReports();
@@ -79,19 +92,39 @@ const Reports = () => {
         .order('report_date', { ascending: false });
       
       if (error) throw error;
+
+      // Charger aussi les logs archivés
+      const { data: archivedLogs } = await supabase
+        .from('archived_daily_logs')
+        .select('*')
+        .order('archive_date', { ascending: false });
+
+      // Créer un map des logs archivés par date
+      const logsMap = new Map<string, any[]>();
+      (archivedLogs || []).forEach(log => {
+        const dateKey = log.archive_date;
+        const existingLogs = logsMap.get(dateKey) || [];
+        const logData = Array.isArray(log.logs_data) ? log.logs_data : [];
+        logsMap.set(dateKey, [...existingLogs, ...logData]);
+      });
       
       // Transformer les données pour correspondre à l'interface
-      const transformedReports: DailyReport[] = (reportsData || []).map(report => ({
-        id: report.id,
-        hotel_id: report.hotel_id || '',
-        user_id: report.housekeeper_id || '',
-        report_date: report.report_date,
-        created_at: report.created_at || report.report_date,
-        room_data: Array.isArray(report.room_data) ? report.room_data : [],
-        housekeeper_assignments: (report.summary as any)?.assignments || {},
-        housekeeper_names: (report.summary as any)?.housekeepers || [],
-        action_log: (report.summary as any)?.action_log || (report.summary as any)?.remarks || []
-      }));
+      const transformedReports: DailyReport[] = (reportsData || []).map(report => {
+        const summaryActionLog = (report.summary as any)?.action_log || (report.summary as any)?.remarks || [];
+        const archivedActionLog = logsMap.get(report.report_date) || [];
+        
+        return {
+          id: report.id,
+          hotel_id: report.hotel_id || '',
+          user_id: report.housekeeper_id || '',
+          report_date: report.report_date,
+          created_at: report.created_at || report.report_date,
+          room_data: Array.isArray(report.room_data) ? report.room_data : [],
+          housekeeper_assignments: (report.summary as any)?.assignments || {},
+          housekeeper_names: (report.summary as any)?.housekeepers || [],
+          action_log: archivedActionLog.length > 0 ? archivedActionLog : summaryActionLog
+        };
+      });
       
       setReports(transformedReports);
       console.log(`✅ ${transformedReports.length} rapports chargés`);
@@ -119,7 +152,7 @@ const Reports = () => {
       
       return (
         reportDate.toLowerCase().includes(searchLower) ||
-        report.housekeeper_names.some(name => 
+        report.housekeeper_names.some((name: string) => 
           name.toLowerCase().includes(searchLower)
         ) ||
         report.room_data.some((room: any) => 
@@ -133,20 +166,12 @@ const Reports = () => {
 
   const handleViewReport = (report: DailyReport) => {
     setSelectedReport(report);
+    setSelectedTab('summary');
     setIsReportDialogOpen(true);
   };
 
   const handleDownloadReport = async (report: DailyReport) => {
-    const roomCount = getTotalRooms(report.room_data);
-    setSelectedReportForDownload(report);
-    setEmailDialogOpen(true);
-  };
-
-  const performDownload = async (email: string) => {
-    if (!selectedReportForDownload) return;
-    
     try {
-      const report = selectedReportForDownload;
       const dateStr = format(parseISO(report.report_date), 'PPP', { locale: fr });
       
       // Créer le contenu HTML pour le PDF
@@ -168,9 +193,35 @@ const Reports = () => {
             <h2>👥 Assignations par femme de chambre</h2>
             ${Object.entries(report.housekeeper_assignments || {}).map(([name, rooms]: [string, any]) => `
               <div style="margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 4px;">
-                <strong>${name}:</strong> ${Array.isArray(rooms) ? rooms.map((r: any) => r.room_number).join(', ') : 'N/A'}
+                <strong>${name}:</strong> ${Array.isArray(rooms) ? rooms.map((r: any) => r.room_number || r.number || r).join(', ') : 'N/A'}
               </div>
             `).join('')}
+          </div>
+          ` : ''}
+
+          ${report.room_data?.length > 0 ? `
+          <div style="margin: 20px 0;">
+            <h2>🛏️ Détail des chambres nettoyées</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: #28a745; color: white;">
+                  <th style="padding: 8px; text-align: left;">Chambre</th>
+                  <th style="padding: 8px; text-align: left;">Type</th>
+                  <th style="padding: 8px; text-align: left;">Statut</th>
+                  <th style="padding: 8px; text-align: left;">Nettoyée par</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${report.room_data.map((room: any) => `
+                  <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 8px; font-weight: bold;">${room.number || room.room_number || '-'}</td>
+                    <td style="padding: 8px;">${room.cleaning_type || room.cleaningType || '-'}</td>
+                    <td style="padding: 8px;">${room.status === 'clean' ? '✅ Propre' : room.status === 'in_progress' ? '🔄 En cours' : '⏳ En attente'}</td>
+                    <td style="padding: 8px;">${room.cleaned_by || room.assignedTo || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           </div>
           ` : ''}
           
@@ -201,7 +252,7 @@ const Reports = () => {
           ` : ''}
           
           <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
-            <p>Généré le ${format(new Date(), 'PPPp', { locale: fr })} pour ${email}</p>
+            <p>Généré le ${format(new Date(), 'PPPp', { locale: fr })}</p>
           </div>
         </div>
       `;
@@ -273,6 +324,32 @@ const Reports = () => {
 
   const getCompletedRooms = (roomData: any[]) => {
     return roomData?.filter(room => room.status === 'clean' || room.status === 'completed')?.length || 0;
+  };
+
+  const getActionTypeLabel = (actionType: string) => {
+    const labels: Record<string, string> = {
+      'cleaning_start': '🔄 Début nettoyage',
+      'cleaning_end': '✅ Fin nettoyage',
+      'assignment': '📋 Assignation',
+      'unassignment': '🔓 Désassignation',
+      'incident': '⚠️ Incident',
+      'comment': '💬 Remarque',
+      'status_change': '🔄 Changement statut'
+    };
+    return labels[actionType] || actionType;
+  };
+
+  const getActionTypeColor = (actionType: string) => {
+    const colors: Record<string, string> = {
+      'cleaning_start': 'bg-blue-100 text-blue-800',
+      'cleaning_end': 'bg-green-100 text-green-800',
+      'assignment': 'bg-purple-100 text-purple-800',
+      'unassignment': 'bg-orange-100 text-orange-800',
+      'incident': 'bg-red-100 text-red-800',
+      'comment': 'bg-yellow-100 text-yellow-800',
+      'status_change': 'bg-gray-100 text-gray-800'
+    };
+    return colors[actionType] || 'bg-gray-100 text-gray-800';
   };
 
   if (isLoading) {
@@ -363,8 +440,8 @@ const Reports = () => {
                       <TableHead>Date du rapport</TableHead>
                       <TableHead>Femmes de chambre</TableHead>
                       <TableHead>Chambres</TableHead>
+                      <TableHead>Actions journal</TableHead>
                       <TableHead>Progrès</TableHead>
-                      <TableHead>Date de création</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -385,7 +462,7 @@ const Reports = () => {
                           
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {report.housekeeper_names.slice(0, 2).map((name, index) => (
+                              {report.housekeeper_names.slice(0, 2).map((name: string, index: number) => (
                                 <Badge key={index} variant="secondary" className="text-xs">
                                   {name}
                                 </Badge>
@@ -403,6 +480,13 @@ const Reports = () => {
                               {totalRooms} chambre{totalRooms > 1 ? 's' : ''}
                             </span>
                           </TableCell>
+
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              <ClipboardList className="h-3 w-3 mr-1" />
+                              {report.action_log?.length || 0} actions
+                            </Badge>
+                          </TableCell>
                           
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -417,18 +501,13 @@ const Reports = () => {
                           </TableCell>
                           
                           <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {format(parseISO(report.created_at), 'PPp', { locale: fr })}
-                            </span>
-                          </TableCell>
-                          
-                          <TableCell>
                             <div className="flex items-center gap-1">
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleViewReport(report)}
                                 className="flex items-center gap-1"
+                                title="Voir le rapport"
                               >
                                 <Eye className="h-3 w-3" />
                               </Button>
@@ -437,6 +516,7 @@ const Reports = () => {
                                 variant="outline"
                                 onClick={() => handleDownloadReport(report)}
                                 className="flex items-center gap-1"
+                                title="Télécharger PDF"
                               >
                                 <Download className="h-3 w-3" />
                               </Button>
@@ -445,6 +525,7 @@ const Reports = () => {
                                 variant="outline"
                                 onClick={() => handleDeleteReport(report.id)}
                                 className="flex items-center gap-1 text-destructive hover:text-destructive"
+                                title="Supprimer"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </Button>
@@ -490,7 +571,7 @@ const Reports = () => {
 
         {/* Dialog pour visualiser un rapport */}
         <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
@@ -499,83 +580,193 @@ const Reports = () => {
             </DialogHeader>
             
             {selectedReport && (
-              <div className="space-y-6">
-                {/* Informations générales */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-primary">
-                          {selectedReport.housekeeper_names.length}
-                        </div>
-                        <p className="text-sm text-muted-foreground">Femmes de chambre</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-primary">
-                          {getTotalRooms(selectedReport.room_data)}
-                        </div>
-                        <p className="text-sm text-muted-foreground">Chambres totales</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {getCompletedRooms(selectedReport.room_data)}
-                        </div>
-                        <p className="text-sm text-muted-foreground">Chambres terminées</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+              <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="summary">Résumé</TabsTrigger>
+                  <TabsTrigger value="rooms">
+                    Chambres ({getTotalRooms(selectedReport.room_data)})
+                  </TabsTrigger>
+                  <TabsTrigger value="journal">
+                    Journal ({selectedReport.action_log?.length || 0})
+                  </TabsTrigger>
+                </TabsList>
 
-                {/* Détail des assignments */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Répartition des chambres</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {Object.entries(selectedReport.housekeeper_assignments).map(([housekeeper, rooms]: [string, any]) => (
-                        <div key={housekeeper} className="border rounded p-3">
-                          <h4 className="font-medium mb-2">{housekeeper}</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {Array.isArray(rooms) ? rooms.map((room: any, index: number) => (
-                              <Badge key={index} variant="outline">
-                                {room.number || room}
-                              </Badge>
-                            )) : (
-                              <span className="text-muted-foreground">Aucune chambre assignée</span>
-                            )}
+                <ScrollArea className="flex-1 mt-4">
+                  <TabsContent value="summary" className="m-0 space-y-6">
+                    {/* Informations générales */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card>
+                        <CardContent className="pt-4">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-primary">
+                              {selectedReport.housekeeper_names.length}
+                            </div>
+                            <p className="text-sm text-muted-foreground">Femmes de chambre</p>
                           </div>
-                        </div>
-                      ))}
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-primary">
+                              {getTotalRooms(selectedReport.room_data)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">Chambres totales</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">
+                              {getCompletedRooms(selectedReport.room_data)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">Chambres terminées</p>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+
+                    {/* Détail des assignments */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Répartition des chambres</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {Object.entries(selectedReport.housekeeper_assignments).length > 0 ? (
+                            Object.entries(selectedReport.housekeeper_assignments).map(([housekeeper, rooms]: [string, any]) => (
+                              <div key={housekeeper} className="border rounded p-3">
+                                <h4 className="font-medium mb-2 flex items-center gap-2">
+                                  <User className="h-4 w-4" />
+                                  {housekeeper}
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {Array.isArray(rooms) ? rooms.map((room: any, index: number) => (
+                                    <Badge key={index} variant="outline">
+                                      {room.room_number || room.number || room}
+                                    </Badge>
+                                  )) : (
+                                    <span className="text-muted-foreground">Aucune chambre assignée</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-muted-foreground text-center py-4">Aucune assignation enregistrée</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="rooms" className="m-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Détail des chambres nettoyées</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {selectedReport.room_data?.length > 0 ? (
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Chambre</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Statut</TableHead>
+                                  <TableHead>Nettoyée par</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {selectedReport.room_data.map((room: any, index: number) => (
+                                  <TableRow key={index}>
+                                    <TableCell className="font-medium">
+                                      {room.number || room.room_number || '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={room.cleaning_type === 'checkout' ? 'default' : 'secondary'}>
+                                        {room.cleaning_type === 'checkout' ? 'À blanc' : 'Recouche'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {room.status === 'clean' ? (
+                                        <Badge className="bg-green-100 text-green-800">✅ Propre</Badge>
+                                      ) : room.status === 'in_progress' ? (
+                                        <Badge className="bg-blue-100 text-blue-800">🔄 En cours</Badge>
+                                      ) : (
+                                        <Badge variant="outline">⏳ En attente</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      {room.cleaned_by || room.assignedTo || '-'}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-center py-8">Aucune donnée de chambre</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="journal" className="m-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <ClipboardList className="h-5 w-5" />
+                          Journal des actions
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {selectedReport.action_log?.length > 0 ? (
+                          <div className="space-y-3">
+                            {selectedReport.action_log.map((log: ActionLog, index: number) => (
+                              <div key={log.id || index} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                                <div className="flex-shrink-0">
+                                  <Badge className={getActionTypeColor(log.action_type)}>
+                                    {getActionTypeLabel(log.action_type)}
+                                  </Badge>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm">{log.description}</p>
+                                  <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                                    {log.created_at && (
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {format(parseISO(log.created_at), 'HH:mm', { locale: fr })}
+                                      </span>
+                                    )}
+                                    {log.actor_name && (
+                                      <span className="flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                        {log.actor_name}
+                                      </span>
+                                    )}
+                                    {log.room_number && (
+                                      <span className="font-medium">CH {log.room_number}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-muted-foreground">Aucune action enregistrée pour ce jour</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </ScrollArea>
+              </Tabs>
             )}
           </DialogContent>
         </Dialog>
-
-        {/* Email Dialog with Premium Limits */}
-        <EmailDialogWithLimit
-          isOpen={emailDialogOpen}
-          onClose={() => {
-            setEmailDialogOpen(false);
-            setSelectedReportForDownload(null);
-          }}
-          onSubmit={performDownload}
-          title="Téléchargement de rapport"
-          description="Entrez votre email pour recevoir le rapport."
-          roomCount={selectedReportForDownload ? getTotalRooms(selectedReportForDownload.room_data) : 0}
-          maxFreeRooms={50}
-        />
       </div>
     </div>
   );
