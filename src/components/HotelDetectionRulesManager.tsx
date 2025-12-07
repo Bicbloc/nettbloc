@@ -266,14 +266,14 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
                   <div>
                     <Label>Statut de la chambre (optionnel)</Label>
                     <Select
-                      value={newRule.status}
-                      onValueChange={v => setNewRule({ ...newRule, status: v })}
+                      value={newRule.status || 'none'}
+                      onValueChange={v => setNewRule({ ...newRule, status: v === 'none' ? '' : v })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Aucun statut spécifique" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Aucun (ignorer le statut)</SelectItem>
+                        <SelectItem value="none">Aucun (ignorer le statut)</SelectItem>
                         <SelectItem value="OCC">OCC - Occupée</SelectItem>
                         <SelectItem value="VAC">VAC - Vacante</SelectItem>
                         <SelectItem value="DEP">DEP - Départ</SelectItem>
