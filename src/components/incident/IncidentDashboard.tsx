@@ -2,13 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { 
   AlertTriangle, 
   CheckCircle2, 
   Clock, 
   TrendingUp,
-  Calendar,
-  Users
+  Target,
+  Zap,
+  Timer,
+  Award
 } from "lucide-react";
 import { 
   LineChart, 
@@ -25,9 +28,10 @@ import {
   Legend, 
   ResponsiveContainer 
 } from "recharts";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, differenceInHours } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
+import { cn } from "@/lib/utils";
 
 interface IncidentDashboardProps {
   hotelId: string;
@@ -48,7 +52,6 @@ const PRIORITY_COLORS = {
 };
 
 export function IncidentDashboard({ hotelId }: IncidentDashboardProps) {
-  // Initialiser les données par défaut si nécessaire
   useIncidentDefaults(hotelId);
   
   const { data: stats } = useQuery({
@@ -74,7 +77,49 @@ export function IncidentDashboard({ hotelId }: IncidentDashboardProps) {
         urgent: data.filter(i => i.priority === "urgent").length,
       };
 
-      return { total, byStatus, byPriority, incidents: data };
+      // Calculate resolution metrics
+      const resolvedIncidents = data.filter(i => i.status === "resolved" && i.resolved_at);
+      const avgResolutionTime = resolvedIncidents.length > 0
+        ? resolvedIncidents.reduce((acc, i) => {
+            const hours = differenceInHours(new Date(i.resolved_at), new Date(i.created_at));
+            return acc + hours;
+          }, 0) / resolvedIncidents.length
+        : 0;
+
+      const resolutionRate = total > 0 ? (byStatus.resolved / total) * 100 : 0;
+
+      // Top reported items
+      const itemCounts: Record<string, number> = {};
+      data.forEach(i => {
+        if (i.item_id) {
+          itemCounts[i.item_id] = (itemCounts[i.item_id] || 0) + 1;
+        }
+      });
+
+      // Top reporters
+      const reporterCounts: Record<string, { count: number; type: string }> = {};
+      data.forEach(i => {
+        const key = i.reported_by_name;
+        if (!reporterCounts[key]) {
+          reporterCounts[key] = { count: 0, type: i.reported_by_type };
+        }
+        reporterCounts[key].count += 1;
+      });
+
+      const topReporters = Object.entries(reporterCounts)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 5)
+        .map(([name, data]) => ({ name, ...data }));
+
+      return { 
+        total, 
+        byStatus, 
+        byPriority, 
+        incidents: data,
+        avgResolutionTime: Math.round(avgResolutionTime),
+        resolutionRate: Math.round(resolutionRate),
+        topReporters
+      };
     },
   });
 
@@ -157,45 +202,108 @@ export function IncidentDashboard({ hotelId }: IncidentDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
+      {/* Enhanced KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total incidents</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
+            <div className="text-3xl font-bold">{stats?.total || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tous statuts confondus
+            </p>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="relative overflow-hidden border-l-4 border-l-red-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Nouveaux</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-sm font-medium">À traiter</CardTitle>
+            <Zap className="h-5 w-5 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">{stats?.byStatus.new || 0}</div>
+            <div className="text-3xl font-bold text-red-500">
+              {(stats?.byStatus.new || 0) + (stats?.byStatus.in_progress || 0)}
+            </div>
+            <div className="flex gap-2 mt-1">
+              <Badge variant="secondary" className="text-xs">
+                {stats?.byStatus.new || 0} nouveaux
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {stats?.byStatus.in_progress || 0} en cours
+              </Badge>
+            </div>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="relative overflow-hidden border-l-4 border-l-green-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En cours</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
+            <CardTitle className="text-sm font-medium">Taux de résolution</CardTitle>
+            <Target className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">{stats?.byStatus.in_progress || 0}</div>
+            <div className="text-3xl font-bold text-green-500">
+              {stats?.resolutionRate || 0}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats?.byStatus.resolved || 0} résolus sur {stats?.total || 0}
+            </p>
           </CardContent>
         </Card>
-        <Card>
+
+        <Card className="relative overflow-hidden border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Résolus</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium">Temps moyen</CardTitle>
+            <Timer className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{stats?.byStatus.resolved || 0}</div>
+            <div className="text-3xl font-bold text-blue-500">
+              {stats?.avgResolutionTime || 0}h
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Délai de résolution moyen
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Top Reporters */}
+      {stats?.topReporters && stats.topReporters.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Award className="h-5 w-5 text-primary" />
+              Top signalements
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {stats.topReporters.map((reporter, index) => (
+                <div 
+                  key={reporter.name}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg",
+                    "bg-muted/50 border",
+                    index === 0 && "border-primary bg-primary/5"
+                  )}
+                >
+                  <span className="text-lg font-bold text-muted-foreground">
+                    #{index + 1}
+                  </span>
+                  <div>
+                    <div className="font-medium text-sm">{reporter.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {reporter.count} incidents • {reporter.type === 'housekeeper' ? 'Femme de chambre' : 'Admin'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts */}
       <Tabs defaultValue="daily" className="space-y-4">
@@ -214,12 +322,18 @@ export function IncidentDashboard({ hotelId }: IncidentDashboardProps) {
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={dailyStats}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
                   <Legend />
-                  <Line type="monotone" dataKey="total" stroke="#8884d8" name="Total" />
+                  <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" name="Total" strokeWidth={2} />
                   <Line type="monotone" dataKey="new" stroke={COLORS.new} name="Nouveau" />
                   <Line type="monotone" dataKey="in_progress" stroke={COLORS.in_progress} name="En cours" />
                   <Line type="monotone" dataKey="resolved" stroke={COLORS.resolved} name="Résolu" />
@@ -237,14 +351,20 @@ export function IncidentDashboard({ hotelId }: IncidentDashboardProps) {
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={monthlyStats}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
                   <Legend />
-                  <Bar dataKey="total" fill="#8884d8" name="Total" />
-                  <Bar dataKey="new" fill={COLORS.new} name="Nouveau" />
-                  <Bar dataKey="resolved" fill={COLORS.resolved} name="Résolu" />
+                  <Bar dataKey="total" fill="hsl(var(--primary))" name="Total" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="new" fill={COLORS.new} name="Nouveau" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="resolved" fill={COLORS.resolved} name="Résolu" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

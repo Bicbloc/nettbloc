@@ -1,17 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, Clock, MessageSquare, Image as ImageIcon, X, Camera } from "lucide-react";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { LayoutGrid, List, X, Camera, Filter } from "lucide-react";
+import { IncidentCardModern } from "./IncidentCardModern";
+import { IncidentKanbanView } from "./IncidentKanbanView";
 
 interface IncidentListProps {
   hotelId: string;
@@ -25,6 +24,7 @@ export function IncidentList({ hotelId }: IncidentListProps) {
   const [commentImages, setCommentImages] = useState<File[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
   const { data: incidents, isLoading } = useQuery({
     queryKey: ["incidents", hotelId, filterStatus, filterPriority],
@@ -67,7 +67,6 @@ export function IncidentList({ hotelId }: IncidentListProps) {
     },
   });
 
-  // Récupérer les membres du personnel spécifiques de cet hôtel
   const { data: staffMembers } = useQuery({
     queryKey: ["staff-members", hotelId],
     queryFn: async () => {
@@ -135,7 +134,6 @@ export function IncidentList({ hotelId }: IncidentListProps) {
     mutationFn: async ({ incidentId, comment, images }: { incidentId: string; comment: string; images: File[] }) => {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Insérer le commentaire
       const { data: commentData, error: commentError } = await supabase
         .from("incident_comments")
         .insert({
@@ -150,7 +148,6 @@ export function IncidentList({ hotelId }: IncidentListProps) {
       
       if (commentError) throw commentError;
 
-      // Uploader les images si présentes
       if (images.length > 0) {
         for (const image of images) {
           const fileExt = image.name.split(".").pop();
@@ -182,191 +179,103 @@ export function IncidentList({ hotelId }: IncidentListProps) {
     },
   });
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "new": return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case "in_progress": return <Clock className="h-4 w-4 text-yellow-500" />;
-      case "resolved": return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      default: return null;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "new": return "Nouveau";
-      case "in_progress": return "En cours";
-      case "resolved": return "Résolu";
-      default: return status;
-    }
-  };
-
   if (isLoading) {
-    return <div className="text-center py-8">Chargement...</div>;
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+      {/* Header with filters and view toggle */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold">Incidents</h2>
-        <div className="flex gap-2">
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrer par statut" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
-              <SelectItem value="new">Nouveau</SelectItem>
-              <SelectItem value="in_progress">En cours</SelectItem>
-              <SelectItem value="resolved">Résolu</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrer par priorité" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes les priorités</SelectItem>
-              <SelectItem value="low">Faible</SelectItem>
-              <SelectItem value="medium">Moyen</SelectItem>
-              <SelectItem value="high">Élevé</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View Mode Toggle */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "list" | "kanban")}>
+            <TabsList className="h-9">
+              <TabsTrigger value="list" className="gap-1.5 px-3">
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline">Liste</span>
+              </TabsTrigger>
+              <TabsTrigger value="kanban" className="gap-1.5 px-3">
+                <LayoutGrid className="h-4 w-4" />
+                <span className="hidden sm:inline">Kanban</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Filters */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous statuts</SelectItem>
+                <SelectItem value="new">📌 Nouveau</SelectItem>
+                <SelectItem value="in_progress">⏳ En cours</SelectItem>
+                <SelectItem value="resolved">✅ Résolu</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterPriority} onValueChange={setFilterPriority}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Priorité" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes priorités</SelectItem>
+                <SelectItem value="low">🔵 Faible</SelectItem>
+                <SelectItem value="medium">🟡 Moyen</SelectItem>
+                <SelectItem value="high">🟠 Élevé</SelectItem>
+                <SelectItem value="urgent">🔴 Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {incidents?.map((incident) => (
-          <Card key={incident.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(incident.status)}
-                    <CardTitle className="text-lg">{incident.title}</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {incident.incident_categories && (
-                      <Badge variant="outline">
-                        {incident.incident_categories.icon} {incident.incident_categories.name}
-                      </Badge>
-                    )}
-                    {incident.incident_items && (
-                      <Badge variant="secondary">
-                        {incident.incident_items.name}
-                      </Badge>
-                    )}
-                    {incident.incident_types && (
-                      <Badge style={{ backgroundColor: incident.incident_types.color, color: '#fff' }}>
-                        {incident.incident_types.name}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    📍 Chambre {incident.location_reference}
-                  </div>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Select
-                    value={incident.status}
-                    onValueChange={(status) => updateStatusMutation.mutate({ incidentId: incident.id, status })}
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">📌 Nouveau</SelectItem>
-                      <SelectItem value="in_progress">⏳ En cours</SelectItem>
-                      <SelectItem value="resolved">✅ Résolu</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {incident.description && (
-                <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
-                  {incident.description}
-                </p>
-              )}
+      {/* Content */}
+      {viewMode === "kanban" ? (
+        <IncidentKanbanView
+          incidents={incidents || []}
+          onIncidentClick={(incident) => setSelectedIncident(incident.id)}
+          onStatusChange={(incidentId, status) => 
+            updateStatusMutation.mutate({ incidentId, status })
+          }
+        />
+      ) : (
+        <div className="grid gap-4">
+          {incidents?.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              Aucun incident trouvé
+            </div>
+          ) : (
+            incidents?.map((incident) => (
+              <IncidentCardModern
+                key={incident.id}
+                incident={incident}
+                staffMembers={staffMembers}
+                onStatusChange={(status) => 
+                  updateStatusMutation.mutate({ incidentId: incident.id, status })
+                }
+                onPriorityChange={(priority) =>
+                  updatePriorityMutation.mutate({ incidentId: incident.id, priority })
+                }
+                onAssign={(staffId) =>
+                  assignStaffMutation.mutate({ incidentId: incident.id, staffId })
+                }
+                onAddComment={() => setSelectedIncident(incident.id)}
+              />
+            ))
+          )}
+        </div>
+      )}
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">Assigné à:</span>
-                <Select
-                  value={incident.assigned_to_user_id || "unassigned"}
-                  onValueChange={(staffId) => {
-                    if (staffId === "unassigned") return;
-                    assignStaffMutation.mutate({ incidentId: incident.id, staffId });
-                  }}
-                >
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder="Non assigné" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">❌ Non assigné</SelectItem>
-                    {staffMembers?.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        👤 {member.name} {member.staff_roles ? `(${(member.staff_roles as any).name})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="text-xs text-muted-foreground border-t pt-2">
-                Signalé par {incident.reported_by_name} le{" "}
-                {format(new Date(incident.created_at), "dd/MM/yyyy à HH:mm", { locale: fr })}
-              </div>
-
-              {incident.incident_images && incident.incident_images.length > 0 && (
-                <div className="flex gap-2 flex-wrap">
-                  {incident.incident_images.map((img: any) => (
-                    <a
-                      key={img.id}
-                      href={img.image_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="relative w-24 h-24 rounded border overflow-hidden hover:opacity-80 transition-opacity"
-                    >
-                      <img src={img.image_url} alt="Incident" className="w-full h-full object-cover" />
-                    </a>
-                  ))}
-                </div>
-              )}
-
-              {incident.incident_comments && incident.incident_comments.length > 0 && (
-                <div className="space-y-2 border-t pt-4">
-                  <h4 className="font-semibold text-sm flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Commentaires ({incident.incident_comments.length})
-                  </h4>
-                  {incident.incident_comments.slice(-3).map((comment: any) => (
-                    <div key={comment.id} className="bg-muted p-3 rounded text-sm">
-                      <div className="font-semibold">{comment.user_name}</div>
-                      <div className="text-muted-foreground mt-1">{comment.comment}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(comment.created_at), "dd/MM à HH:mm", { locale: fr })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedIncident(incident.id)}
-                className="w-full"
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Ajouter un commentaire
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
+      {/* Comment Dialog */}
       <Dialog open={!!selectedIncident} onOpenChange={() => {
         setSelectedIncident(null);
         setComment("");
@@ -384,7 +293,6 @@ export function IncidentList({ hotelId }: IncidentListProps) {
               rows={4}
             />
             
-            {/* Image upload section */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Photos (optionnel)</label>
               <div className="flex flex-wrap gap-2">
@@ -406,7 +314,7 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                     </Button>
                   </div>
                 ))}
-                <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-accent">
+                <label className="w-20 h-20 flex items-center justify-center border-2 border-dashed rounded cursor-pointer hover:bg-accent transition-colors">
                   <div className="text-center">
                     <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">Ajouter</span>
@@ -438,8 +346,9 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                 }
               }}
               disabled={!comment.trim() || addCommentMutation.isPending}
+              className="w-full"
             >
-              {addCommentMutation.isPending ? "Envoi..." : "Ajouter"}
+              {addCommentMutation.isPending ? "Envoi..." : "Ajouter le commentaire"}
             </Button>
           </div>
         </DialogContent>
