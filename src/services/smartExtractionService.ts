@@ -22,32 +22,6 @@ export interface ExtractedRoom {
   originalText?: string;
 }
 
-// Mots-clés français enrichis pour une meilleure détection
-const FRENCH_CLEANING_KEYWORDS = {
-  // Types de nettoyage complet (À blanc)
-  full: [
-    'À BLANC', 'A BLANC', 'BLANC', 'DÉPART', 'DEPART', 'SORTIE', 'SORTANT',
-    'CHECKOUT', 'CHECK-OUT', 'CHECK OUT', 'VACATING', 'DUE OUT', 'DEPARTED',
-    'DIRTY', 'SALE', 'DIR', 'DRT', 'DRAPS', 'CHANGEMENT DRAPS',
-    'NETTOYAGE COMPLET', 'GRAND MENAGE', 'ARRIVEE', 'ARRIVÉE', 'EN ARRIVEE',
-    'VACANT DIRTY', 'VD', 'ARRIVAL', 'ARR'
-  ],
-  // Types de nettoyage rapide (Recouche)
-  quick: [
-    'RECOUCHE', 'REC', 'COUCHER', 'SÉJOUR', 'SEJOUR', 'STAYOVER', 'STAY OVER',
-    'STAY-OVER', 'PICKUP', 'PICK UP', 'PICK-UP', 'REFRESH', 'OCCUPIED DIRTY',
-    'OD', 'CONTINUE', 'EN COURS', 'CLIENT RESTE', 'MÊME CLIENT', 'MEME CLIENT',
-    'Night', 'NIGHT'
-  ],
-  // Pas de nettoyage
-  none: [
-    'PROPRE', 'CLEAN', 'CLN', 'INSPECTED', 'INS', 'INSPECTÉ', 'INSPECTE',
-    'CONTRÔLÉ', 'CONTROLE', 'OK', 'PRÊT', 'PRET', 'READY', 'VACANT CLEAN',
-    'VC', 'OCC', 'OCCUPIED', 'OCCUPÉ', 'OCCUPE', 'NE PAS NETTOYER',
-    'DO NOT DISTURB', 'DND', 'OUT OF ORDER', 'OOO', 'HS', 'HORS SERVICE'
-  ]
-};
-
 const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
   apaleo: {
     pms_type: 'apaleo',
@@ -69,17 +43,7 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'SALE': { status: 'dirty', cleaning: 'full' },
       'EN ARRIVEE': { status: 'arrival', cleaning: 'full' },
       'ARRIVAL': { status: 'arrival', cleaning: 'full' },
-      'ARRIVEE': { status: 'arrival', cleaning: 'full' },
-      // Mots-clés français ajoutés
-      'À BLANC': { status: 'dirty', cleaning: 'full' },
-      'A BLANC': { status: 'dirty', cleaning: 'full' },
-      'BLANC': { status: 'dirty', cleaning: 'full' },
-      'DÉPART': { status: 'checkout', cleaning: 'full' },
-      'SORTIE': { status: 'checkout', cleaning: 'full' },
-      'COUCHER': { status: 'stayover', cleaning: 'quick' },
-      'SÉJOUR': { status: 'stayover', cleaning: 'quick' },
-      'SEJOUR': { status: 'stayover', cleaning: 'quick' },
-      'Night': { status: 'stayover', cleaning: 'quick' }
+      'ARRIVEE': { status: 'arrival', cleaning: 'full' }
     },
     date_formats: ['dd/MM/yyyy', 'dd/MM/yy', 'dd.MM.yyyy', 'dd-MM-yyyy'],
     context_window: 300,
@@ -89,23 +53,21 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
     pms_type: 'mews',
     room_number_regex: '\\b([1-9]\\d{2,4})\\b',
     status_keywords: {
+      // English keywords
       'Dirty': { status: 'dirty', cleaning: 'full' },
       'Clean': { status: 'clean', cleaning: 'none' },
       'Inspected': { status: 'inspected', cleaning: 'none' },
       'Out of Service': { status: 'out-of-order', cleaning: 'none' },
       'Occupied Clean': { status: 'occupied', cleaning: 'none' },
       'Occupied Dirty': { status: 'occupied', cleaning: 'quick' },
+      // French keywords (common in Mews reports)
       'SAL': { status: 'dirty', cleaning: 'full' },
       'INS': { status: 'inspected', cleaning: 'none' },
       'COC': { status: 'occupied', cleaning: 'none' },
       'CLA': { status: 'clean', cleaning: 'none' },
       'DLX': { status: 'clean', cleaning: 'none' },
       'SUP': { status: 'clean', cleaning: 'none' },
-      'FAM': { status: 'clean', cleaning: 'none' },
-      // Mots-clés français
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
-      'À BLANC': { status: 'dirty', cleaning: 'full' },
-      'DÉPART': { status: 'checkout', cleaning: 'full' }
+      'FAM': { status: 'clean', cleaning: 'none' }
     },
     date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd.MM.yyyy'],
     context_window: 300,
@@ -119,13 +81,9 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
       'BLANC': { status: 'dirty', cleaning: 'full' },
       'À BLANC': { status: 'dirty', cleaning: 'full' },
-      'A BLANC': { status: 'dirty', cleaning: 'full' },
       'NE PAS NETTOYER': { status: 'occupied', cleaning: 'none' },
       'DEPART': { status: 'checkout', cleaning: 'full' },
-      'DÉPART': { status: 'checkout', cleaning: 'full' },
-      'SORTIE': { status: 'checkout', cleaning: 'full' },
-      'COUCHER': { status: 'stayover', cleaning: 'quick' },
-      'SÉJOUR': { status: 'stayover', cleaning: 'quick' }
+      'DÉPART': { status: 'checkout', cleaning: 'full' }
     },
     date_formats: ['dd/MM/yyyy', 'dd/MM/yy'],
     context_window: 250,
@@ -144,9 +102,7 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'VACANT': { status: 'vacant', cleaning: 'full' },
       'OCCUPIED': { status: 'occupied', cleaning: 'none' },
       'DUE OUT': { status: 'checkout', cleaning: 'full' },
-      'CHECKOUT': { status: 'checkout', cleaning: 'full' },
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
-      'À BLANC': { status: 'dirty', cleaning: 'full' }
+      'CHECKOUT': { status: 'checkout', cleaning: 'full' }
     },
     date_formats: ['dd-MMM-yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd', 'dd MMM yyyy'],
     context_window: 300,
@@ -162,9 +118,7 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'OCCUPIED': { status: 'occupied', cleaning: 'none' },
       'VACANT': { status: 'vacant', cleaning: 'full' },
       'OUT OF ORDER': { status: 'out-of-order', cleaning: 'none' },
-      'BLOCKED': { status: 'blocked', cleaning: 'none' },
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
-      'À BLANC': { status: 'dirty', cleaning: 'full' }
+      'BLOCKED': { status: 'blocked', cleaning: 'none' }
     },
     date_formats: ['dd.MM.yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'],
     context_window: 300,
@@ -180,9 +134,7 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'OOO': { status: 'out-of-order', cleaning: 'none' },
       'OCC': { status: 'occupied', cleaning: 'none' },
       'VAC': { status: 'vacant', cleaning: 'full' },
-      'DEP': { status: 'checkout', cleaning: 'full' },
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
-      'REC': { status: 'stayover', cleaning: 'quick' }
+      'DEP': { status: 'checkout', cleaning: 'full' }
     },
     date_formats: ['dd-MMM-yy', 'dd/MM/yy', 'ddMMMyy'],
     context_window: 250,
@@ -201,10 +153,7 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'OCCUPE': { status: 'occupied', cleaning: 'none' },
       'LIBRE': { status: 'vacant', cleaning: 'full' },
       'DÉPART': { status: 'checkout', cleaning: 'full' },
-      'DEPART': { status: 'checkout', cleaning: 'full' },
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
-      'À BLANC': { status: 'dirty', cleaning: 'full' },
-      'A BLANC': { status: 'dirty', cleaning: 'full' }
+      'DEPART': { status: 'checkout', cleaning: 'full' }
     },
     date_formats: ['dd/MM/yyyy', 'dd/MM/yy'],
     context_window: 300,
@@ -220,70 +169,13 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'Out of Order': { status: 'out-of-order', cleaning: 'none' },
       'Occupied': { status: 'occupied', cleaning: 'none' },
       'Vacant': { status: 'vacant', cleaning: 'full' },
-      'Checkout': { status: 'checkout', cleaning: 'full' },
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
-      'À BLANC': { status: 'dirty', cleaning: 'full' }
+      'Checkout': { status: 'checkout', cleaning: 'full' }
     },
     date_formats: ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd.MM.yyyy'],
     context_window: 300,
     priority: 3
-  },
-  // Pattern générique français
-  generic_french: {
-    pms_type: 'generic_french',
-    room_number_regex: '\\b([1-9]\\d{1,4})\\b',
-    status_keywords: {
-      // Nettoyage complet
-      'À BLANC': { status: 'dirty', cleaning: 'full' },
-      'A BLANC': { status: 'dirty', cleaning: 'full' },
-      'BLANC': { status: 'dirty', cleaning: 'full' },
-      'DÉPART': { status: 'checkout', cleaning: 'full' },
-      'DEPART': { status: 'checkout', cleaning: 'full' },
-      'SORTIE': { status: 'checkout', cleaning: 'full' },
-      'SORTANT': { status: 'checkout', cleaning: 'full' },
-      'ARRIVÉE': { status: 'arrival', cleaning: 'full' },
-      'ARRIVEE': { status: 'arrival', cleaning: 'full' },
-      'EN ARRIVEE': { status: 'arrival', cleaning: 'full' },
-      'DRAPS': { status: 'change-sheets', cleaning: 'full' },
-      'CHANGEMENT DRAPS': { status: 'change-sheets', cleaning: 'full' },
-      'SALE': { status: 'dirty', cleaning: 'full' },
-      'DIRTY': { status: 'dirty', cleaning: 'full' },
-      'DIR': { status: 'dirty', cleaning: 'full' },
-      // Recouche
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick' },
-      'REC': { status: 'stayover', cleaning: 'quick' },
-      'COUCHER': { status: 'stayover', cleaning: 'quick' },
-      'SÉJOUR': { status: 'stayover', cleaning: 'quick' },
-      'SEJOUR': { status: 'stayover', cleaning: 'quick' },
-      'CONTINUE': { status: 'stayover', cleaning: 'quick' },
-      'EN COURS': { status: 'stayover', cleaning: 'quick' },
-      'CLIENT RESTE': { status: 'stayover', cleaning: 'quick' },
-      'MÊME CLIENT': { status: 'stayover', cleaning: 'quick' },
-      'Night': { status: 'stayover', cleaning: 'quick' },
-      'STAYOVER': { status: 'stayover', cleaning: 'quick' },
-      // Pas de nettoyage
-      'PROPRE': { status: 'clean', cleaning: 'none' },
-      'CLEAN': { status: 'clean', cleaning: 'none' },
-      'INS': { status: 'inspected', cleaning: 'none' },
-      'INSPECTÉ': { status: 'inspected', cleaning: 'none' },
-      'CONTRÔLÉ': { status: 'inspected', cleaning: 'none' },
-      'OK': { status: 'ready', cleaning: 'none' },
-      'PRÊT': { status: 'ready', cleaning: 'none' },
-      'PRET': { status: 'ready', cleaning: 'none' },
-      'OCC': { status: 'occupied', cleaning: 'none' },
-      'OCCUPÉ': { status: 'occupied', cleaning: 'none' },
-      'NE PAS NETTOYER': { status: 'do-not-disturb', cleaning: 'none' },
-      'HS': { status: 'out-of-order', cleaning: 'none' },
-      'HORS SERVICE': { status: 'out-of-order', cleaning: 'none' }
-    },
-    date_formats: ['dd/MM/yyyy', 'dd/MM/yy', 'dd.MM.yyyy'],
-    context_window: 300,
-    priority: 0
   }
 };
-
-// Export pour utilisation dans pdfService
-export { FRENCH_CLEANING_KEYWORDS };
 
 export class SmartExtractionService {
   private patterns: Map<string, PmsPattern> = new Map();
@@ -663,92 +555,47 @@ export class SmartExtractionService {
   private guessStatus(line: string): string {
     const lineUpper = line.toUpperCase();
     
-    // Utiliser les mots-clés français enrichis
-    // 1. Vérifier d'abord les mots-clés de recouche (priorité car plus spécifiques)
-    for (const keyword of FRENCH_CLEANING_KEYWORDS.quick) {
-      if (lineUpper.includes(keyword.toUpperCase())) {
-        console.log(`✅ Mot-clé recouche détecté: "${keyword}"`);
-        return 'stayover';
-      }
+    // Chambre sale / à nettoyer
+    if (lineUpper.match(/\b(DIRTY|SALE|DIR|DRAPS?|BLANC|À\s*BLANC|DRT)\b/)) {
+      return 'dirty';
     }
     
-    // 2. Vérifier les mots-clés de nettoyage complet
-    for (const keyword of FRENCH_CLEANING_KEYWORDS.full) {
-      if (lineUpper.includes(keyword.toUpperCase())) {
-        console.log(`✅ Mot-clé à blanc détecté: "${keyword}"`);
-        return 'dirty';
-      }
+    // Chambre propre
+    if (lineUpper.match(/\b(CLEAN|PROPRE|CLN|INSPEC|INS)\b/)) {
+      return 'clean';
     }
     
-    // 3. Vérifier les mots-clés sans nettoyage
-    for (const keyword of FRENCH_CLEANING_KEYWORDS.none) {
-      if (lineUpper.includes(keyword.toUpperCase())) {
-        console.log(`✅ Mot-clé propre/occupé détecté: "${keyword}"`);
-        if (keyword.toUpperCase().includes('OCC') || keyword.toUpperCase().includes('OCCUPÉ')) {
-          return 'occupied';
-        }
-        if (keyword.toUpperCase().includes('OOO') || keyword.toUpperCase().includes('HS') || keyword.toUpperCase().includes('HORS')) {
-          return 'out-of-order';
-        }
-        return 'clean';
-      }
+    // Départ / checkout
+    if (lineUpper.match(/\b(CHECKOUT|CHECK-OUT|D[ÉE]PART|DEPARTED?|DEP|VACATING|DUE\s*OUT)\b/)) {
+      return 'checkout';
+    }
+    
+    // Occupée
+    if (lineUpper.match(/\b(OCCUPIED?|OCCUP[ÉE]E?|OCC|STAY)\b/)) {
+      return 'occupied';
+    }
+    
+    // Recouche / stayover
+    if (lineUpper.match(/\b(RECOUCHE|STAY\s*OVER|PICK\s*UP|REFRESH)\b/)) {
+      return 'stayover';
+    }
+    
+    // Arrivée
+    if (lineUpper.match(/\b(ARRIVAL|ARRIV[ÉE]E?|ARR|CHECKING\s*IN|DUE\s*IN)\b/)) {
+      return 'arrival';
+    }
+    
+    // Hors service
+    if (lineUpper.match(/\b(OUT\s*OF\s*ORDER|OOO|OUT\s*OF\s*SERVICE|H\.?S\.?|BLOCKED?)\b/)) {
+      return 'out-of-order';
+    }
+    
+    // Vacant / libre
+    if (lineUpper.match(/\b(VACANT|LIBRE|VAC|EMPTY|AVAILABLE)\b/)) {
+      return 'vacant';
     }
     
     return '';
-  }
-  
-  // Nouvelle méthode pour détecter le type de nettoyage à partir du contexte
-  detectCleaningTypeFromContext(context: string): 'full' | 'quick' | 'none' {
-    const contextUpper = context.toUpperCase();
-    
-    console.log(`🔍 Analyse contexte pour type nettoyage...`);
-    
-    // Priorité 1: Mots-clés explicites de recouche
-    for (const keyword of FRENCH_CLEANING_KEYWORDS.quick) {
-      if (contextUpper.includes(keyword.toUpperCase())) {
-        console.log(`→ Recouche détectée (mot-clé: ${keyword})`);
-        return 'quick';
-      }
-    }
-    
-    // Priorité 2: Mots-clés explicites de nettoyage complet
-    for (const keyword of FRENCH_CLEANING_KEYWORDS.full) {
-      if (contextUpper.includes(keyword.toUpperCase())) {
-        console.log(`→ À blanc détecté (mot-clé: ${keyword})`);
-        return 'full';
-      }
-    }
-    
-    // Priorité 3: Mots-clés de chambre propre/occupée
-    for (const keyword of FRENCH_CLEANING_KEYWORDS.none) {
-      if (contextUpper.includes(keyword.toUpperCase())) {
-        console.log(`→ Pas de nettoyage (mot-clé: ${keyword})`);
-        return 'none';
-      }
-    }
-    
-    // Priorité 4: Analyse par structure de réservation
-    const hasNightPattern = /Night\s+\d+\/\d+/i.test(context);
-    const hasTwoBlocks = /Adults.*\d{2}\/\d{2}\/\d{4}.*Adults.*\d{2}\/\d{2}\/\d{4}/i.test(context);
-    const hasTimeOnly = /\b\d{1,2}:\d{2}\b/.test(context) && !/\d{2}\/\d{2}\/\d{4}/.test(context);
-    
-    if (hasNightPattern) {
-      console.log(`→ Recouche détectée (pattern Night X/Y)`);
-      return 'quick';
-    }
-    
-    if (hasTwoBlocks) {
-      console.log(`→ À blanc détecté (deux blocs de réservation)`);
-      return 'full';
-    }
-    
-    if (hasTimeOnly) {
-      console.log(`→ À blanc détecté (heure seule sans dates)`);
-      return 'full';
-    }
-    
-    console.log(`→ Type non déterminé, défaut: full`);
-    return 'full';
   }
 
   async savePattern(hotelId: string, pmsType: string, patternData: any): Promise<void> {
