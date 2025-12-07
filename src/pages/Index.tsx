@@ -1581,9 +1581,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const handleManualAssign = async (housekeeperName: string, selectedRooms: Room[]) => {
     console.log('🔄 Assignation manuelle:', { housekeeperName, roomCount: selectedRooms.length, currentHotelId });
     
-    // Trouver l'ID de la femme de chambre
-    const housekeeper = housekeepers.find(h => h.name === housekeeperName);
-    
     if (!currentHotelId) {
       console.error('❌ currentHotelId est null dans handleManualAssign!');
       toast({
@@ -1594,11 +1591,41 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       return;
     }
     
+    // Trouver l'ID de la femme de chambre (recherche insensible à la casse)
+    let housekeeper = housekeepers.find(h => h.name.toLowerCase() === housekeeperName.toLowerCase());
+    
+    // Si non trouvée, créer automatiquement la femme de chambre
     if (!housekeeper) {
-      console.error('❌ Femme de chambre introuvable dans handleManualAssign:', housekeeperName);
-      toast({ variant: "destructive", title: "Erreur", description: "Femme de chambre introuvable" });
-      return;
+      console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const tempCode = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+          const { data: newHousekeeper, error } = await supabase
+            .from('housekeepers')
+            .insert({
+              hotel_id: currentHotelId,
+              name: housekeeperName,
+              user_id: user.id,
+              is_active: true,
+              access_code: tempCode
+            })
+            .select('id, name, access_code, user_id')
+            .single();
+          
+          if (!error && newHousekeeper) {
+            housekeeper = newHousekeeper;
+            console.log('✅ Femme de chambre créée:', newHousekeeper);
+            refreshHousekeepers();
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erreur création femme de chambre:', error);
+      }
     }
+    
+    // Même si housekeeper n'existe pas en base, on assigne localement
+    const housekeeperId = housekeeper?.user_id || housekeeper?.id || null;
     
     // Persister dans Supabase pour synchronisation temps réel
     if (currentHotelId && housekeeper) {
@@ -1666,23 +1693,47 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const handleDirectRoomAssignment = async (roomNumber: string, housekeeperName: string) => {
     console.log('🔄 Tentative assignation directe:', { roomNumber, housekeeperName, currentHotelId });
     
-    // Trouver l'ID de la femme de chambre
-    const housekeeper = housekeepers.find(h => h.name === housekeeperName);
-    
     if (!currentHotelId) {
       console.error('❌ currentHotelId est null!');
       toast({ variant: "destructive", title: "Erreur", description: "Hôtel non configuré" });
       return;
     }
     
+    // Trouver l'ID de la femme de chambre (recherche insensible à la casse)
+    let housekeeper = housekeepers.find(h => h.name.toLowerCase() === housekeeperName.toLowerCase());
+    
+    // Si non trouvée, créer automatiquement la femme de chambre
     if (!housekeeper) {
-      console.error('❌ Femme de chambre introuvable:', housekeeperName);
-      toast({ variant: "destructive", title: "Erreur", description: "Femme de chambre introuvable" });
-      return;
+      console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const tempCode = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+          const { data: newHousekeeper, error } = await supabase
+            .from('housekeepers')
+            .insert({
+              hotel_id: currentHotelId,
+              name: housekeeperName,
+              user_id: user.id,
+              is_active: true,
+              access_code: tempCode
+            })
+            .select('id, name, access_code, user_id')
+            .single();
+          
+          if (!error && newHousekeeper) {
+            housekeeper = newHousekeeper;
+            console.log('✅ Femme de chambre créée:', newHousekeeper);
+            refreshHousekeepers();
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erreur création femme de chambre:', error);
+      }
     }
     
     // Persister dans Supabase pour synchronisation temps réel
-    if (currentHotelId && housekeeper) {
+    if (currentHotelId) {
       // Trouver ou créer la room dans Supabase
       const { data: existingRoom } = await supabase
         .from('rooms')
@@ -1712,8 +1763,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         roomId = newRoom?.id;
       }
       
-      // Créer l'assignation dans Supabase
-      if (roomId) {
+      // Créer l'assignation dans Supabase (si housekeeper existe)
+      if (roomId && housekeeper) {
         console.log('✅ Création assignation directe:', { housekeeperId: housekeeper.user_id || housekeeper.id, housekeeperName, roomId });
         const { AssignmentService } = await import('@/services/assignmentService');
         await AssignmentService.assignRoom(
