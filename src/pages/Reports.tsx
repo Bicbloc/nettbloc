@@ -21,7 +21,9 @@ import {
   Eye,
   Trash2,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft,
+  MessageCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -213,11 +215,21 @@ const Reports = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Rapports Archivés</h1>
-            <p className="text-muted-foreground">
-              Consultez et téléchargez vos rapports quotidiens
-            </p>
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={() => window.history.back()}
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Rapports Archivés</h1>
+              <p className="text-muted-foreground">
+                Consultez et téléchargez vos rapports quotidiens
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell />
