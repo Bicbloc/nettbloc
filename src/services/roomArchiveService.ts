@@ -36,10 +36,31 @@ export class RoomArchiveService {
         .gte('created_at', today + 'T00:00:00')
         .lte('created_at', today + 'T23:59:59');
       
-      const remarks = todayNotifications?.filter(n => n.type === 'remark') || [];
-      console.log(`💬 ${remarks.length} commentaires à archiver`);
+      const allNotifications = todayNotifications || [];
+      const remarks = allNotifications.filter(n => n.type === 'remark');
+      console.log(`💬 ${remarks.length} commentaires et ${allNotifications.length} notifications à archiver`);
       
-      // 3. Archiver dans daily_reports si des chambres existent
+      // 3. Récupérer les assignations actuelles pour archivage
+      const { data: currentAssignments } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('hotel_id', hotelId);
+      
+      const assignments = currentAssignments || [];
+      const housekeeperNames = [...new Set(assignments.map(a => a.housekeeper_name))];
+      console.log(`👥 ${housekeeperNames.length} femmes de chambre, ${assignments.length} assignations`);
+      
+      // 4. Récupérer le journal d'actions du jour
+      const { data: todayLogs } = await supabase
+        .from('daily_action_logs')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('log_date', today);
+      
+      const actionLogs = todayLogs || [];
+      console.log(`📝 ${actionLogs.length} actions du jour`);
+      
+      // 5. Archiver dans daily_reports
       if (currentRooms && currentRooms.length > 0) {
         const archiveData = {
           hotel_id: hotelId,
@@ -51,15 +72,40 @@ export class RoomArchiveService {
             dirty_rooms: currentRooms.filter(r => r.status === 'dirty').length,
             in_progress_rooms: currentRooms.filter(r => r.status === 'in-progress').length,
             archived_at: new Date().toISOString(),
+            housekeepers: housekeeperNames,
+            assignments: assignments.reduce((acc, a) => {
+              if (!acc[a.housekeeper_name]) acc[a.housekeeper_name] = [];
+              const room = currentRooms.find(r => r.id === a.room_id);
+              acc[a.housekeeper_name].push({
+                room_number: room?.room_number || 'N/A',
+                status: a.status,
+                completed_at: a.completed_at
+              });
+              return acc;
+            }, {} as Record<string, any[]>),
             remarks: remarks.map(r => ({
               room_number: r.room_number,
               description: r.description,
               housekeeper_name: r.housekeeper_name,
               created_at: r.created_at
+            })),
+            notifications: allNotifications.map(n => ({
+              type: n.type,
+              title: n.title,
+              description: n.description,
+              room_number: n.room_number,
+              created_at: n.created_at
+            })),
+            action_log: actionLogs.map(log => ({
+              action_type: log.action_type,
+              actor_name: log.actor_name,
+              room_number: log.room_number,
+              description: log.description,
+              created_at: log.created_at
             }))
           },
           total_rooms_cleaned: currentRooms.filter(r => r.status === 'clean').length,
-          notes: remarks.length > 0 ? `${remarks.length} commentaire(s) archivé(s)` : null
+          notes: `${housekeeperNames.length} femme(s) de chambre, ${remarks.length} commentaire(s), ${actionLogs.length} action(s)`
         };
         
         const { error: archiveError } = await supabase
@@ -68,9 +114,8 @@ export class RoomArchiveService {
         
         if (archiveError) {
           console.warn('⚠️ Erreur archivage daily_reports:', archiveError);
-          // Continuer malgré l'erreur
         } else {
-          console.log('✅ Rapport archivé dans daily_reports avec commentaires');
+          console.log('✅ Rapport complet archivé dans daily_reports');
         }
       }
       
