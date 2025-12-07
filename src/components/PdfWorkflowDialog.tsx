@@ -111,33 +111,18 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setPdfData(data);
       setSavedPdfData(data); // Sauvegarder pour retry
       
-      // Étape 3: Vérifier les chambres existantes avec timeout court
-      setUploadStatus('🔍 Vérification rapide...');
-      setUploadProgress(50);
+      // Étape 3: Vérification rapide (estimation)
+      setUploadProgress(55);
       
       let existingCount = 0;
       if (hotelId) {
-        try {
-          // Timeout de 5 secondes max
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
-          
-          const { count, error } = await supabase
-            .from('rooms')
-            .select('*', { count: 'exact', head: true })
-            .eq('hotel_id', hotelId)
-            .abortSignal(controller.signal);
-          
-          clearTimeout(timeoutId);
-          
-          if (!error) {
-            existingCount = count || 0;
-            setExistingRoomsCount(existingCount);
-          }
-        } catch (checkError: any) {
-          console.warn('Vérification ignorée:', checkError.message);
-          // Continuer sans bloquer
-        }
+        // Estimation rapide sans bloquer
+        const { count } = await supabase
+          .from('rooms')
+          .select('id', { count: 'estimated', head: true })
+          .eq('hotel_id', hotelId);
+        existingCount = count || 0;
+        setExistingRoomsCount(existingCount);
       }
       
       // Si des chambres existent, demander le mode d'import
@@ -241,43 +226,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           };
         }).filter(r => !!r.room_number);
 
-        // Retry automatique avec timeout
-        const maxRetries = 3;
-        let lastError = null;
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            const upsertPromise = supabase
-              .from('hotel_rooms_registry')
-              .upsert(roomsData, { onConflict: 'hotel_id,room_number' });
-
-            const result = await Promise.race([
-              upsertPromise,
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error(`Timeout (tentative ${attempt}/${maxRetries})`)), 45000)
-              ),
-            ]) as any;
-
-            if (result.error) throw result.error;
-            
-            insertedCount = roomsData.length;
-            lastError = null;
-            break;
-          } catch (err: any) {
-            lastError = err;
-            console.warn(`⚠️ Tentative ${attempt}/${maxRetries} échouée:`, err.message);
-            if (attempt < maxRetries) {
-              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-            }
-          }
-        }
-
-        if (lastError) throw lastError;
-
-        // Sync avec la table rooms
-        setUploadStatus('💾 Synchronisation...');
-        setUploadProgress(80);
-        
+        // Préparer les données pour la table rooms
         const roomsForSync = data.map((room: any) => {
           const roomNumber = room.roomNumber || room.room_number || room.number;
           return {
@@ -290,10 +239,28 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             notes: room.notes || null
           };
         }).filter(r => !!r.room_number);
+
+        // Exécuter les deux upserts EN PARALLÈLE avec timeout court
+        setUploadStatus(`💾 Enregistrement de ${roomsData.length} chambres...`);
         
-        await supabase
-          .from('rooms')
-          .upsert(roomsForSync, { onConflict: 'hotel_id,room_number', ignoreDuplicates: false });
+        const timeout = 15000; // 15s au lieu de 45s
+        
+        const [registryResult, roomsResult] = await Promise.all([
+          Promise.race([
+            supabase.from('hotel_rooms_registry').upsert(roomsData, { onConflict: 'hotel_id,room_number' }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout registry')), timeout))
+          ]),
+          Promise.race([
+            supabase.from('rooms').upsert(roomsForSync, { onConflict: 'hotel_id,room_number', ignoreDuplicates: false }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout rooms')), timeout))
+          ])
+        ]) as any[];
+
+        if (registryResult.error) throw registryResult.error;
+        if (roomsResult.error) throw roomsResult.error;
+        
+        insertedCount = roomsData.length;
+        setUploadProgress(90);
 
         toast({
           title: "✅ Analyse terminée",
