@@ -178,7 +178,7 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     result: { cleaning_type: "recouche", status: "stayover" },
     priority: 6,
     is_active: true,
-    description: "Statut INS (In Stay) avec client = Recouche"
+    description: "Statut INS (Inspectée) avec client = Recouche"
   },
   // Statut SAL avec client = Recouche
   {
