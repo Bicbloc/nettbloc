@@ -29,7 +29,13 @@ interface TrainingReport {
   validated: boolean;
 }
 
-export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
+interface Hotel {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: string }) => {
   const { toast } = useToast();
   const [reports, setReports] = useState<TrainingReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<TrainingReport | null>(null);
@@ -42,13 +48,48 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [learnedPatterns, setLearnedPatterns] = useState<any>(null);
   const [manualAnnotations, setManualAnnotations] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [selectedHotelId, setSelectedHotelId] = useState<string>(initialHotelId);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Charger la liste des hôtels pour les super admins
+  useEffect(() => {
+    const loadHotelsAndCheckAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      setCurrentUserId(user.id);
+      
+      // Vérifier si super admin
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'super_admin')
+        .maybeSingle();
+      
+      const isAdmin = !!roleData;
+      setIsSuperAdmin(isAdmin);
+      
+      if (isAdmin) {
+        // Charger tous les hôtels pour les super admins
+        const { data: hotelsData } = await supabase
+          .from('hotels')
+          .select('id, name, email')
+          .order('name');
+        
+        if (hotelsData) {
+          setHotels(hotelsData);
+        }
+      }
+    };
+    
+    loadHotelsAndCheckAdmin();
+  }, []);
 
   useEffect(() => {
-    smartExtractionService.loadLearnedPatterns(hotelId);
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setCurrentUserId(data.user.id);
-    });
-  }, [hotelId]);
+    smartExtractionService.loadLearnedPatterns(selectedHotelId);
+  }, [selectedHotelId]);
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -265,7 +306,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
     }
 
     const { error } = await supabase.from('report_training_patterns').insert([{
-      hotel_id: hotelId,
+      hotel_id: selectedHotelId,
       report_name: selectedReport?.name || 'rapport',
       pms_type: detectedPmsType || selectedPmsType,
       raw_text: selectedReport?.rawText || '',
@@ -292,7 +333,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         title: "Succès",
         description: "Pattern d'entraînement sauvegardé"
       });
-      await smartExtractionService.loadLearnedPatterns(hotelId);
+      await smartExtractionService.loadLearnedPatterns(selectedHotelId);
     }
   };
 
@@ -425,6 +466,33 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
   return (
     <div className="space-y-6">
+      {/* Sélecteur d'hôtel pour super admins */}
+      {isSuperAdmin && hotels.length > 0 && (
+        <Card className="p-4 bg-primary/5 border-primary/20">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              <Label className="font-semibold">Hôtel actif :</Label>
+            </div>
+            <Select value={selectedHotelId} onValueChange={setSelectedHotelId}>
+              <SelectTrigger className="w-[300px]">
+                <SelectValue placeholder="Sélectionner un hôtel" />
+              </SelectTrigger>
+              <SelectContent>
+                {hotels.map((hotel) => (
+                  <SelectItem key={hotel.id} value={hotel.id}>
+                    {hotel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Badge variant="outline" className="ml-auto">
+              Super Admin
+            </Badge>
+          </div>
+        </Card>
+      )}
+
       {/* Onglets principaux - toujours visibles */}
       <Tabs defaultValue="global" className="w-full">
         <TabsList className="mb-4 flex-wrap">
@@ -452,12 +520,12 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
         {/* Onglet Gestion globale - établissements et modèles */}
         <TabsContent value="global">
-          <GlobalPatternManager hotelId={hotelId} />
+          <GlobalPatternManager hotelId={selectedHotelId} />
         </TabsContent>
 
         {/* Onglet Modèles PMS */}
         <TabsContent value="models">
-          <PmsPatternManager hotelId={hotelId} />
+          <PmsPatternManager hotelId={selectedHotelId} />
         </TabsContent>
 
         {/* Onglet Entraînement - upload et validation */}
@@ -702,7 +770,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
           <TabsContent value="learn">
             <EnhancedPatternLearning
               rawText={selectedReport.rawText}
-              hotelId={hotelId}
+              hotelId={selectedHotelId}
               userId={currentUserId}
               reportName={selectedReport.name}
               onRoomsExtracted={(rooms) => {
@@ -736,7 +804,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 annotations={manualAnnotations}
                 extractedRooms={selectedReport.extractedRooms}
                 patterns={learnedPatterns}
-                hotelId={hotelId}
+                hotelId={selectedHotelId}
                 reportName={selectedReport.name}
                 pmsType={detectedPmsType || selectedPmsType}
               />
@@ -748,12 +816,12 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
         {/* Onglet Analyse erreurs */}
         <TabsContent value="analysis">
-          <ErrorAnalysisDashboard hotelId={hotelId} />
+          <ErrorAnalysisDashboard hotelId={selectedHotelId} />
         </TabsContent>
 
         {/* Onglet Règles connexion */}
         <TabsContent value="rules">
-          <ConnectedRoomRulesManager hotelId={hotelId} />
+          <ConnectedRoomRulesManager hotelId={selectedHotelId} />
         </TabsContent>
       </Tabs>
     </div>
