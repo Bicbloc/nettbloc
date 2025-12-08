@@ -424,119 +424,135 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
   return (
     <div className="space-y-6">
-      <Card className="p-6">
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-              <Brain className="w-5 h-5" />
-              Entraînement de l'IA
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Uploadez vos rapports PDF pour entraîner l'IA à reconnaître le format spécifique de votre PMS
-            </p>
-          </div>
+      {/* Onglets principaux - toujours visibles */}
+      <Tabs defaultValue="models" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="models" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Modèles PMS
+          </TabsTrigger>
+          <TabsTrigger value="training" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Entraînement
+          </TabsTrigger>
+          <TabsTrigger value="analysis" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Analyse erreurs
+          </TabsTrigger>
+          <TabsTrigger value="rules" className="flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
+            Règles connexion
+          </TabsTrigger>
+        </TabsList>
 
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label>Type de PMS</Label>
-              <Select value={selectedPmsType} onValueChange={setSelectedPmsType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto-détection</SelectItem>
-                  {availablePmsTypes.map(type => (
-                    <SelectItem key={type} value={type}>
-                      {type.toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Onglet Modèles PMS - directement accessible */}
+        <TabsContent value="models">
+          <PmsPatternManager hotelId={hotelId} />
+        </TabsContent>
 
-            <div className="flex-1">
-              <Label htmlFor="pdf-upload">Upload PDF</Label>
-              <div className="relative">
-                <Input
-                  id="pdf-upload"
-                  type="file"
-                  accept=".pdf"
-                  multiple
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                />
-                {uploading && (
-                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-md">
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                      <span>Analyse en cours...</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {detectedPmsType && (
-            <Badge variant="secondary" className="flex items-center gap-2 w-fit">
-              <Sparkles className="w-3 h-3" />
-              PMS détecté: {detectedPmsType.toUpperCase()}
-            </Badge>
-          )}
-        </div>
-      </Card>
-
-      {reports.length > 0 && (
-        <Card className="p-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Rapports uploadés</h3>
-            <div className="grid gap-2">
-              {reports.map((report, index) => (
-                <Button
-                  key={index}
-                  variant={selectedReport?.name === report.name ? "default" : "outline"}
-                  className="justify-start"
-                  onClick={() => setSelectedReport(report)}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  {report.name} ({report.extractedRooms.length} chambres)
-                </Button>
-              ))}
-            </div>
-          </div>
-        </Card>
-      )}
-
-        {selectedReport && (
+        {/* Onglet Entraînement - upload et validation */}
+        <TabsContent value="training" className="space-y-6">
           <Card className="p-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-6 mb-4">
-                <TabsTrigger value="validation">Validation</TabsTrigger>
-                <TabsTrigger value="preview">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Prévisualisation
-                </TabsTrigger>
-                <TabsTrigger value="learn">
-                  <Wand2 className="h-4 w-4 mr-2" />
-                  Apprentissage
-                </TabsTrigger>
-                <TabsTrigger value="metrics">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Métriques
-                </TabsTrigger>
-                <TabsTrigger value="analysis">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  Analyse
-                </TabsTrigger>
-                <TabsTrigger value="rules">
-                  <Link2 className="h-4 w-4 mr-2" />
-                  Règles
-                </TabsTrigger>
-                <TabsTrigger value="models">
-                  <Database className="h-4 w-4 mr-2" />
-                  Modèles PMS
-                </TabsTrigger>
-              </TabsList>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <Brain className="w-5 h-5" />
+                  Entraînement de l'IA
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Uploadez vos rapports PDF pour entraîner l'IA à reconnaître le format spécifique de votre PMS
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <Label>Type de PMS</Label>
+                  <Select value={selectedPmsType} onValueChange={setSelectedPmsType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto-détection</SelectItem>
+                      {availablePmsTypes.map(type => (
+                        <SelectItem key={type} value={type}>
+                          {type.toUpperCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex-1">
+                  <Label htmlFor="pdf-upload">Upload PDF</Label>
+                  <div className="relative">
+                    <Input
+                      id="pdf-upload"
+                      type="file"
+                      accept=".pdf"
+                      multiple
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                    />
+                    {uploading && (
+                      <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-md">
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                          <span>Analyse en cours...</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {detectedPmsType && (
+                <Badge variant="secondary" className="flex items-center gap-2 w-fit">
+                  <Sparkles className="w-3 h-3" />
+                  PMS détecté: {detectedPmsType.toUpperCase()}
+                </Badge>
+              )}
+            </div>
+          </Card>
+
+          {reports.length > 0 && (
+            <Card className="p-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Rapports uploadés</h3>
+                <div className="grid gap-2">
+                  {reports.map((report, index) => (
+                    <Button
+                      key={index}
+                      variant={selectedReport?.name === report.name ? "default" : "outline"}
+                      className="justify-start"
+                      onClick={() => setSelectedReport(report)}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      {report.name} ({report.extractedRooms.length} chambres)
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {selectedReport && (
+            <Card className="p-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-4 mb-4">
+                  <TabsTrigger value="validation">Validation</TabsTrigger>
+                  <TabsTrigger value="preview">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Prévisualisation
+                  </TabsTrigger>
+                  <TabsTrigger value="learn">
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    Apprentissage
+                  </TabsTrigger>
+                  <TabsTrigger value="metrics">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Métriques
+                  </TabsTrigger>
+                </TabsList>
 
             <TabsContent value="validation" className="space-y-4">
               <div className="flex items-center justify-between">
@@ -703,33 +719,33 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                 });
               }}
             />
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="metrics">
-            <PatternValidation
-              annotations={manualAnnotations}
-              extractedRooms={selectedReport.extractedRooms}
-              patterns={learnedPatterns}
-              hotelId={hotelId}
-              reportName={selectedReport.name}
-              pmsType={detectedPmsType || selectedPmsType}
-            />
-          </TabsContent>
+            <TabsContent value="metrics">
+              <PatternValidation
+                annotations={manualAnnotations}
+                extractedRooms={selectedReport.extractedRooms}
+                patterns={learnedPatterns}
+                hotelId={hotelId}
+                reportName={selectedReport.name}
+                pmsType={detectedPmsType || selectedPmsType}
+              />
+            </TabsContent>
+          </Tabs>
+          </Card>
+        )}
+        </TabsContent>
 
-          <TabsContent value="analysis">
-            <ErrorAnalysisDashboard hotelId={hotelId} />
-          </TabsContent>
+        {/* Onglet Analyse erreurs */}
+        <TabsContent value="analysis">
+          <ErrorAnalysisDashboard hotelId={hotelId} />
+        </TabsContent>
 
-          <TabsContent value="rules">
-            <ConnectedRoomRulesManager hotelId={hotelId} />
-          </TabsContent>
-
-          <TabsContent value="models">
-            <PmsPatternManager hotelId={hotelId} />
-          </TabsContent>
-        </Tabs>
-        </Card>
-      )}
+        {/* Onglet Règles connexion */}
+        <TabsContent value="rules">
+          <ConnectedRoomRulesManager hotelId={hotelId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
