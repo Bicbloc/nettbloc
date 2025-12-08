@@ -88,7 +88,7 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
     loadPatterns();
     loadHotelInfo();
     loadPatternsUsage();
-  }, [hotelId]);
+  }, [hotelId, isSuperAdmin]);
 
   useEffect(() => {
     if (isSuperAdmin && activeTab === 'establishments') {
@@ -98,14 +98,22 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
 
   const loadPatterns = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Si super admin, charger tous les patterns, sinon seulement ceux de l'hôtel
+    let query = supabase
       .from('report_training_patterns')
       .select('*')
-      .eq('hotel_id', hotelId)
       .order('updated_at', { ascending: false });
+    
+    if (!isSuperAdmin) {
+      query = query.eq('hotel_id', hotelId);
+    }
+    
+    const { data, error } = await query;
 
     if (error) {
       toast({ title: "Erreur", description: "Impossible de charger les patterns", variant: "destructive" });
+      setLoading(false);
       return;
     }
 
@@ -125,17 +133,28 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
       setCurrentHotel(currentHotelData);
     }
 
-    // Charger tous les hôtels de l'utilisateur
-    const user = await supabase.auth.getUser();
-    if (user.data.user) {
-      const { data: hotelsData } = await supabase
+    // Si super admin, charger tous les hôtels, sinon seulement ceux de l'utilisateur
+    if (isSuperAdmin) {
+      const { data: allHotelsData } = await supabase
         .from('hotels')
         .select('id, name, hotel_code')
-        .eq('user_id', user.data.user.id)
         .order('name');
 
-      if (hotelsData) {
-        setUserHotels(hotelsData);
+      if (allHotelsData) {
+        setUserHotels(allHotelsData);
+      }
+    } else {
+      const user = await supabase.auth.getUser();
+      if (user.data.user) {
+        const { data: hotelsData } = await supabase
+          .from('hotels')
+          .select('id, name, hotel_code')
+          .eq('user_id', user.data.user.id)
+          .order('name');
+
+        if (hotelsData) {
+          setUserHotels(hotelsData);
+        }
       }
     }
   };
@@ -154,23 +173,29 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
 
       if (hotelsError) throw hotelsError;
 
-      // Charger tous les patterns validés
+      // Charger tous les patterns (validés et non validés)
       const { data: patternsData, error: patternsError } = await supabase
         .from('report_training_patterns')
         .select('*')
-        .eq('validated', true)
         .order('pattern_name');
 
       if (patternsError) throw patternsError;
 
-      setAllValidatedPatterns(patternsData || []);
+      // Filtrer seulement les patterns validés pour la sélection
+      setAllValidatedPatterns((patternsData || []).filter(p => p.validated));
 
       // Associer chaque établissement à son pattern assigné
       const establishmentsWithPatterns: EstablishmentWithPattern[] = (hotelsData || []).map(hotel => {
-        // Trouver le pattern assigné à cet établissement
-        const assignedPattern = patternsData?.find(p => p.assigned_to_hotel_id === hotel.id) || null;
+        // Trouver le pattern explicitement assigné à cet établissement
+        let assignedPattern = patternsData?.find(p => p.assigned_to_hotel_id === hotel.id) || null;
+        
         // Trouver tous les patterns créés par cet établissement
         const hotelPatterns = patternsData?.filter(p => p.hotel_id === hotel.id) || [];
+        
+        // Si pas de pattern assigné explicitement, prendre le premier pattern validé de l'établissement
+        if (!assignedPattern && hotelPatterns.length > 0) {
+          assignedPattern = hotelPatterns.find(p => p.validated) || hotelPatterns[0];
+        }
         
         return {
           ...hotel,
@@ -904,6 +929,7 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                 const assignedHotel = pattern.assigned_to_hotel_id 
                   ? userHotels.find(h => h.id === pattern.assigned_to_hotel_id)
                   : null;
+                const sourceHotel = userHotels.find(h => h.id === pattern.hotel_id);
                 
                 return (
                   <Card key={pattern.id} className={`p-4 ${pattern.validated ? 'border-green-500/50' : ''} ${pattern.is_default ? 'border-primary' : ''}`}>
@@ -924,6 +950,12 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                             <span className="font-medium">{pattern.pattern_name || pattern.report_name}</span>
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {isSuperAdmin && sourceHotel && (
+                              <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 text-blue-700 border-blue-200">
+                                <Building className="h-3 w-3" />
+                                Créé par: {sourceHotel.name}
+                              </Badge>
+                            )}
                             {pattern.validated && (
                               <Badge variant="secondary" className="text-green-600">
                                 <Check className="h-3 w-3 mr-1" /> Actif
@@ -932,7 +964,7 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                             {assignedHotel && (
                               <Badge variant="outline" className="text-xs flex items-center gap-1">
                                 <Building2 className="h-3 w-3" />
-                                Utilisé par: {assignedHotel.name}
+                                Assigné à: {assignedHotel.name}
                               </Badge>
                             )}
                             {pattern.attribution_reason && !assignedHotel && (
