@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Edit, Save, Database, Brain, Copy, Play, Check, X, RefreshCw, FileText, Settings } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Database, Brain, Copy, Play, Check, X, RefreshCw, FileText, Settings, Upload, Building, MapPin } from "lucide-react";
 import { smartExtractionService, PmsPattern } from "@/services/smartExtractionService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
@@ -26,6 +27,12 @@ interface CleaningRule {
   };
 }
 
+interface HotelInfo {
+  id: string;
+  name: string;
+  hotel_code: string | null;
+}
+
 export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
   const { toast } = useToast();
   const [patterns, setPatterns] = useState<any[]>([]);
@@ -38,9 +45,19 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
   const [testText, setTestText] = useState('');
   const [testResults, setTestResults] = useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
+  
+  // Nouveau: infos hôtel et export
+  const [currentHotel, setCurrentHotel] = useState<HotelInfo | null>(null);
+  const [userHotels, setUserHotels] = useState<HotelInfo[]>([]);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [patternToExport, setPatternToExport] = useState<any>(null);
+  const [exportTargetHotelId, setExportTargetHotelId] = useState<string>('');
+  const [exportAutoValidate, setExportAutoValidate] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     loadPatterns();
+    loadHotelInfo();
   }, [hotelId]);
 
   const loadPatterns = async () => {
@@ -58,6 +75,91 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
 
     setPatterns(data || []);
     setLoading(false);
+  };
+
+  const loadHotelInfo = async () => {
+    // Charger les infos de l'hôtel actuel
+    const { data: currentHotelData } = await supabase
+      .from('hotels')
+      .select('id, name, hotel_code')
+      .eq('id', hotelId)
+      .single();
+
+    if (currentHotelData) {
+      setCurrentHotel(currentHotelData);
+    }
+
+    // Charger tous les hôtels de l'utilisateur
+    const user = await supabase.auth.getUser();
+    if (user.data.user) {
+      const { data: hotelsData } = await supabase
+        .from('hotels')
+        .select('id, name, hotel_code')
+        .eq('user_id', user.data.user.id)
+        .order('name');
+
+      if (hotelsData) {
+        setUserHotels(hotelsData);
+      }
+    }
+  };
+
+  const openExportDialog = (pattern: any) => {
+    setPatternToExport(pattern);
+    setExportTargetHotelId('');
+    setExportAutoValidate(false);
+    setShowExportDialog(true);
+  };
+
+  const exportPatternToHotel = async () => {
+    if (!patternToExport || !exportTargetHotelId) {
+      toast({ title: "Erreur", description: "Sélectionnez un établissement", variant: "destructive" });
+      return;
+    }
+
+    if (exportTargetHotelId === hotelId) {
+      toast({ title: "Erreur", description: "Sélectionnez un établissement différent", variant: "destructive" });
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const user = await supabase.auth.getUser();
+      const targetHotel = userHotels.find(h => h.id === exportTargetHotelId);
+
+      const newPattern = {
+        hotel_id: exportTargetHotelId,
+        assigned_to_hotel_id: exportTargetHotelId,
+        created_by: user.data.user?.id,
+        pms_type: patternToExport.pms_type,
+        report_name: `${patternToExport.report_name} (depuis ${currentHotel?.name || 'autre'})`,
+        pattern_name: `${patternToExport.pattern_name || patternToExport.report_name} (adapté)`,
+        raw_text: patternToExport.raw_text || '',
+        extracted_data: patternToExport.extracted_data || [],
+        detection_rules: patternToExport.detection_rules,
+        validated: exportAutoValidate,
+        accuracy_score: patternToExport.accuracy_score,
+        attribution_reason: `Exporté depuis ${currentHotel?.name || hotelId}`,
+      };
+
+      const { error } = await supabase
+        .from('report_training_patterns')
+        .insert(newPattern);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Succès", 
+        description: `Modèle exporté vers ${targetHotel?.name || 'l\'établissement'}` 
+      });
+      setShowExportDialog(false);
+    } catch (error) {
+      console.error('Erreur export:', error);
+      toast({ title: "Erreur", description: "Impossible d'exporter le modèle", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const getPatternStats = () => {
@@ -322,9 +424,21 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
 
   return (
     <div className="space-y-6">
+      {/* Header avec nom établissement */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Gestion des Modèles d'Extraction</h2>
+          <div className="flex items-center gap-3 mb-1">
+            <h2 className="text-2xl font-bold">Gestion des Modèles d'Extraction</h2>
+            {currentHotel && (
+              <Badge variant="secondary" className="flex items-center gap-1.5 py-1 px-3">
+                <MapPin className="h-3.5 w-3.5" />
+                {currentHotel.name}
+                {currentHotel.hotel_code && (
+                  <span className="text-muted-foreground ml-1">({currentHotel.hotel_code})</span>
+                )}
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">Gérez, modifiez et réutilisez vos modèles appris</p>
         </div>
         <Button onClick={() => createNewPattern('custom')}>
@@ -572,6 +686,16 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                      {userHotels.length > 1 && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => openExportDialog(pattern)}
+                          title="Exporter vers un autre établissement"
+                        >
+                          <Upload className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -738,6 +862,95 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
             <Button onClick={saveRules}>
               <Save className="h-4 w-4 mr-2" />
               Sauvegarder les règles
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog pour exporter vers un autre établissement */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Exporter le modèle
+            </DialogTitle>
+            <DialogDescription>
+              Copier ce modèle vers un autre établissement
+            </DialogDescription>
+          </DialogHeader>
+
+          {patternToExport && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted/30 rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge>{patternToExport.pms_type}</Badge>
+                  <span className="font-medium">
+                    {patternToExport.pattern_name || patternToExport.report_name}
+                  </span>
+                </div>
+                <div className="text-sm text-muted-foreground flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Depuis : {currentHotel?.name || 'Établissement actuel'}
+                </div>
+              </div>
+
+              <div>
+                <Label>Vers quel établissement ?</Label>
+                <Select value={exportTargetHotelId} onValueChange={setExportTargetHotelId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Sélectionner un établissement" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {userHotels
+                      .filter(h => h.id !== hotelId)
+                      .map(hotel => (
+                        <SelectItem key={hotel.id} value={hotel.id}>
+                          <div className="flex items-center gap-2">
+                            <Building className="h-4 w-4 text-muted-foreground" />
+                            {hotel.name}
+                            {hotel.hotel_code && (
+                              <span className="text-muted-foreground">({hotel.hotel_code})</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="auto-validate"
+                  checked={exportAutoValidate}
+                  onCheckedChange={(checked) => setExportAutoValidate(checked === true)}
+                />
+                <Label htmlFor="auto-validate" className="text-sm cursor-pointer">
+                  Valider automatiquement le modèle après export
+                </Label>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExportDialog(false)}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={exportPatternToHotel} 
+              disabled={!exportTargetHotelId || isExporting}
+            >
+              {isExporting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Export...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Exporter le modèle
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
