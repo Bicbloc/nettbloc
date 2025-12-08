@@ -9,8 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle, Database } from "lucide-react";
-import { PmsPatternManager } from "./PmsPatternManager";
+import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle } from "lucide-react";
 import { SimplePatternLearning } from "./SimplePatternLearning";
 import { EnhancedPatternLearning } from "./EnhancedPatternLearning";
 import { PatternValidation } from "./PatternValidation";
@@ -532,10 +531,6 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                   <Link2 className="h-4 w-4 mr-2" />
                   Règles
                 </TabsTrigger>
-                <TabsTrigger value="models">
-                  <Database className="h-4 w-4 mr-2" />
-                  Modèles PMS
-                </TabsTrigger>
               </TabsList>
 
             <TabsContent value="validation" className="space-y-4">
@@ -724,9 +719,6 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
             <ConnectedRoomRulesManager hotelId={hotelId} />
           </TabsContent>
 
-          <TabsContent value="models">
-            <PmsPatternManager hotelId={hotelId} />
-          </TabsContent>
         </Tabs>
         </Card>
       )}
