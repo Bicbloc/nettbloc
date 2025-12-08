@@ -171,7 +171,8 @@ export function PatternAttributionDialog({
         attribution_reason: attributionReason,
         pms_type: pmsType,
         is_default: attributionType === 'default',
-        assigned_to_hotel_id: attributionType === 'client' ? selectedHotelId : null
+        assigned_to_hotel_id: attributionType === 'client' ? selectedHotelId : null,
+        validated: true // IMPORTANT: Marquer le pattern comme validé
       };
 
       if (patternId) {
