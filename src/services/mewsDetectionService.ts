@@ -596,11 +596,18 @@ class MewsDetectionService {
   /**
    * Sauvegarder une nouvelle règle personnalisée
    */
-  async saveRule(hotelId: string, userId: string, rule: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>): Promise<{ rule: DetectionRule | null; error: string | null }> {
+  async saveRule(hotelId: string, rule: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>): Promise<{ rule: DetectionRule | null; error: string | null }> {
     try {
+      // Récupérer l'utilisateur authentifié directement
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (!user || authError) {
+        return { rule: null, error: 'Utilisateur non authentifié' };
+      }
+
       // Valider les données requises
-      if (!hotelId || !userId) {
-        return { rule: null, error: 'Identifiants hôtel ou utilisateur manquants' };
+      if (!hotelId) {
+        return { rule: null, error: 'Identifiant hôtel manquant' };
       }
 
       if (!rule.rule_name?.trim()) {
@@ -611,7 +618,7 @@ class MewsDetectionService {
         .from('hotel_detection_rules')
         .insert({
           hotel_id: hotelId,
-          created_by: userId,
+          created_by: user.id,
           rule_name: rule.rule_name,
           rule_type: rule.rule_type,
           condition: rule.condition || {},
