@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { 
   Brain, Sparkles, Check, Loader2, 
   MousePointer, Eye, Zap, RotateCcw,
-  Target, CheckCircle2, Lightbulb, User, UserX
+  Target, CheckCircle2, Lightbulb, User, UserX, Ban, Plus, X
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { mewsDetectionService } from "@/services/mewsDetectionService";
@@ -21,6 +22,12 @@ interface Annotation {
   field: 'roomNumber' | 'status' | 'cleaningType' | 'nightInfo' | 'guestName';
   lineIndex: number;
   confidence?: number;
+}
+
+interface Exclusion {
+  id: string;
+  text: string;
+  reason: string;
 }
 
 interface ExtractedRoom {
@@ -62,6 +69,8 @@ export const EnhancedPatternLearning = ({
 }: EnhancedPatternLearningProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [exclusions, setExclusions] = useState<Exclusion[]>([]);
+  const [newExclusionText, setNewExclusionText] = useState('');
   const [selectedField, setSelectedField] = useState<string>('roomNumber');
   const [isLearning, setIsLearning] = useState(false);
   const [extractedRooms, setExtractedRooms] = useState<ExtractedRoom[]>([]);
@@ -182,6 +191,60 @@ export const EnhancedPatternLearning = ({
     setAnnotations(prev => prev.filter(a => a.id !== id));
   };
 
+  const addExclusion = (text: string, reason: string = 'Exclusion manuelle') => {
+    if (!text.trim()) return;
+    
+    const isDuplicate = exclusions.some(e => e.text.toLowerCase() === text.toLowerCase());
+    if (isDuplicate) {
+      toast.error("Cette exclusion existe déjà");
+      return;
+    }
+
+    const newExclusion: Exclusion = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: text.trim(),
+      reason
+    };
+    
+    setExclusions(prev => [...prev, newExclusion]);
+    setNewExclusionText('');
+    toast.success(`"${text}" sera ignoré lors de l'extraction`);
+  };
+
+  const removeExclusion = (id: string) => {
+    setExclusions(prev => prev.filter(e => e.id !== id));
+  };
+
+  // Détecter automatiquement les éléments répétitifs potentiels à exclure
+  const detectPotentialExclusions = useCallback(() => {
+    const wordCounts = new Map<string, number>();
+    const supervisorPatterns = /\b(superviseur|supervisor|chef|manager|responsable)\b/i;
+    
+    lines.forEach(line => {
+      // Chercher des noms suivis de rôles (ex: "Farid - Superviseur")
+      const matches = line.match(/([A-Z][a-z]+)\s*[-–]\s*(superviseur|supervisor|chef|manager|responsable)/gi);
+      if (matches) {
+        matches.forEach(match => {
+          const name = match.split(/[-–]/)[0].trim();
+          wordCounts.set(name, (wordCounts.get(name) || 0) + 1);
+        });
+      }
+      
+      // Chercher des patterns qui se répètent beaucoup
+      const words = line.split(/\s+/);
+      words.forEach(word => {
+        if (word.length > 3 && /^[A-Z][a-z]+$/.test(word)) {
+          wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
+        }
+      });
+    });
+    
+    // Retourner les mots qui apparaissent très souvent (potentiels superviseurs/roles)
+    return Array.from(wordCounts.entries())
+      .filter(([word, count]) => count > 5)
+      .map(([word]) => word);
+  }, [lines]);
+
   const learnAndExtract = async () => {
     if (annotations.length < 2) {
       toast.error("Annotez au moins 2 éléments (ex: 1 numéro + 1 statut ou Nuit X/Y)");
@@ -199,6 +262,10 @@ export const EnhancedPatternLearning = ({
             text: a.text,
             field: a.field,
             lineIndex: a.lineIndex
+          })),
+          exclusions: exclusions.map(e => ({
+            text: e.text,
+            reason: e.reason
           })),
           context: { hotelId, reportName, pmsType: 'mews' },
           mode: 'learn'
@@ -293,9 +360,12 @@ export const EnhancedPatternLearning = ({
 
   const resetLearning = () => {
     setAnnotations([]);
+    setExclusions([]);
     setExtractedRooms([]);
     setCurrentStep(1);
   };
+
+  const potentialExclusions = detectPotentialExclusions();
 
   const getCleaningBadgeStyle = (type: string) => {
     const normalized = normalizeCleaningType(type);
@@ -490,6 +560,85 @@ export const EnhancedPatternLearning = ({
               </CardContent>
             </Card>
           )}
+
+          {/* Section Exclusions */}
+          <Card className="border-orange-500/30 bg-orange-50/50 dark:bg-orange-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                <Ban className="h-5 w-5" />
+                Éléments à ignorer
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Ajoutez des noms ou termes à exclure de l'extraction (ex: superviseurs, responsables qui apparaissent dans le rapport mais ne sont pas des chambres)
+              </p>
+              
+              {/* Suggestions automatiques */}
+              {potentialExclusions.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-orange-700 dark:text-orange-400">
+                    Suggestions (termes répétitifs détectés) :
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {potentialExclusions.filter(p => !exclusions.some(e => e.text.toLowerCase() === p.toLowerCase())).slice(0, 5).map(suggestion => (
+                      <Badge
+                        key={suggestion}
+                        variant="outline"
+                        className="cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 text-xs"
+                        onClick={() => addExclusion(suggestion, 'Suggestion automatique - terme répétitif')}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        {suggestion}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Ajout manuel */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Ex: Farid (superviseur)"
+                  value={newExclusionText}
+                  onChange={(e) => setNewExclusionText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      addExclusion(newExclusionText, 'Exclusion manuelle');
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => addExclusion(newExclusionText, 'Exclusion manuelle')}
+                  disabled={!newExclusionText.trim()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Liste des exclusions */}
+              {exclusions.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t">
+                  {exclusions.map(exclusion => (
+                    <Badge
+                      key={exclusion.id}
+                      variant="outline"
+                      className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-300 py-1 px-3 cursor-pointer hover:opacity-70"
+                      onClick={() => removeExclusion(exclusion.id)}
+                      title={exclusion.reason}
+                    >
+                      <Ban className="h-3 w-3 mr-1" />
+                      "{exclusion.text}"
+                      <X className="h-3 w-3 ml-2" />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Actions */}
           <div className="flex gap-3">

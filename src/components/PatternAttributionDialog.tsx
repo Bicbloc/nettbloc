@@ -131,13 +131,10 @@ export function PatternAttributionDialog({
   const loadAvailableHotels = async () => {
     setIsLoadingHotels(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-
+      // Charger TOUS les établissements existants (pas seulement ceux de l'utilisateur)
       const { data: hotels, error } = await supabase
         .from('hotels')
         .select('id, name')
-        .eq('user_id', userData.user.id)
         .order('name');
 
       if (error) {
@@ -145,7 +142,15 @@ export function PatternAttributionDialog({
         return;
       }
 
-      setAvailableHotels(hotels || []);
+      // Filtrer les doublons et les noms génériques
+      const uniqueHotels = (hotels || []).filter((hotel, index, self) => 
+        hotel.name && 
+        hotel.name.trim() !== '' &&
+        !hotel.name.includes('@') && // Exclure les noms avec email
+        self.findIndex(h => h.name === hotel.name) === index
+      );
+
+      setAvailableHotels(uniqueHotels);
     } catch (error) {
       console.error('Erreur:', error);
     } finally {
