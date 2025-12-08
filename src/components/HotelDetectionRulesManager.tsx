@@ -283,7 +283,7 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
                         <SelectItem value="VAC">VAC - Vacante</SelectItem>
                         <SelectItem value="DEP">DEP - Départ</SelectItem>
                         <SelectItem value="ARR">ARR - Arrivée</SelectItem>
-                        <SelectItem value="INS">INS - In Stay / Inspectée</SelectItem>
+                        <SelectItem value="INS">INS - Inspectée</SelectItem>
                         <SelectItem value="OUT">OUT - Départ confirmé</SelectItem>
                         <SelectItem value="DND">DND - Ne pas déranger</SelectItem>
                         <SelectItem value="OOO">OOO - Hors service</SelectItem>
