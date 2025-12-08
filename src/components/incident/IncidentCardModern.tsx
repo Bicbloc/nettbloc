@@ -21,12 +21,18 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  Send
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { IncidentTimeline } from "./IncidentTimeline";
+import { Textarea } from "@/components/ui/textarea";
 
 interface IncidentCardModernProps {
   incident: any;
@@ -35,6 +41,8 @@ interface IncidentCardModernProps {
   onPriorityChange: (priority: string) => void;
   onAssign: (staffId: string) => void;
   onAddComment: () => void;
+  onEditComment?: (commentId: string, newText: string) => void;
+  onDeleteComment?: (commentId: string) => void;
 }
 
 const PRIORITY_CONFIG = {
@@ -92,8 +100,13 @@ export function IncidentCardModern({
   onPriorityChange,
   onAssign,
   onAddComment,
+  onEditComment,
+  onDeleteComment,
 }: IncidentCardModernProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+  const [inlineComment, setInlineComment] = useState("");
   
   const priority = incident.priority || "medium";
   const status = incident.status || "new";
@@ -333,26 +346,118 @@ export function IncidentCardModern({
                   <MessageSquare className="h-4 w-4" />
                   Commentaires
                 </h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {incident.incident_comments.map((comment: any) => (
-                    <div key={comment.id} className="bg-muted/50 p-3 rounded-lg text-sm">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-[10px]">
-                            {getInitials(comment.user_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-semibold">{comment.user_name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(comment.created_at), { 
-                            addSuffix: true, 
-                            locale: fr 
-                          })}
-                        </span>
+                
+                {/* Liste des commentaires */}
+                {incident.incident_comments && incident.incident_comments.length > 0 && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {incident.incident_comments.map((comment: any) => (
+                      <div key={comment.id} className="bg-muted/50 p-3 rounded-lg text-sm group">
+                        {editingCommentId === comment.id ? (
+                          <div className="flex gap-2">
+                            <Textarea
+                              value={editingCommentText}
+                              onChange={(e) => setEditingCommentText(e.target.value)}
+                              rows={2}
+                              className="flex-1 text-sm"
+                            />
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                onClick={() => {
+                                  if (editingCommentText.trim() && onEditComment) {
+                                    onEditComment(comment.id, editingCommentText);
+                                    setEditingCommentId(null);
+                                    setEditingCommentText("");
+                                  }
+                                }}
+                                disabled={!editingCommentText.trim()}
+                              >
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                onClick={() => {
+                                  setEditingCommentId(null);
+                                  setEditingCommentText("");
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-[10px]">
+                                    {getInitials(comment.user_name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="font-semibold">{comment.user_name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(new Date(comment.created_at), { 
+                                    addSuffix: true, 
+                                    locale: fr 
+                                  })}
+                                </span>
+                              </div>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => {
+                                    setEditingCommentId(comment.id);
+                                    setEditingCommentText(comment.comment);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                  onClick={() => onDeleteComment && onDeleteComment(comment.id)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-muted-foreground pl-8">{comment.comment}</p>
+                          </>
+                        )}
                       </div>
-                      <p className="text-muted-foreground pl-8">{comment.comment}</p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+
+                {/* Formulaire d'ajout de commentaire inline */}
+                <div className="flex gap-2 mt-2">
+                  <Textarea
+                    value={inlineComment}
+                    onChange={(e) => setInlineComment(e.target.value)}
+                    placeholder="Ajouter un commentaire..."
+                    rows={2}
+                    className="flex-1 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (inlineComment.trim()) {
+                        onAddComment();
+                        setInlineComment("");
+                      }
+                    }}
+                    disabled={!inlineComment.trim()}
+                    className="self-end"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             )}

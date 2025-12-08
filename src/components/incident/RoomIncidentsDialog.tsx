@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle2, Clock, MessageSquare, Send } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, MessageSquare, Send, Pencil, Trash2, X, Check } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -23,6 +23,8 @@ export function RoomIncidentsDialog({ open, onOpenChange, hotelId, roomNumber }:
   const queryClient = useQueryClient();
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
 
   const { data: incidents, isLoading } = useQuery({
     queryKey: ["room-incidents", hotelId, roomNumber],
@@ -132,6 +134,48 @@ export function RoomIncidentsDialog({ open, onOpenChange, hotelId, roomNumber }:
     onError: (error) => {
       console.error("Error adding comment:", error);
       toast({ title: "Erreur lors de l'ajout du commentaire", variant: "destructive" });
+    }
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: async ({ commentId, comment }: { commentId: string; comment: string }) => {
+      const { error } = await supabase
+        .from("incident_comments")
+        .update({ comment })
+        .eq("id", commentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["room-incidents", hotelId, roomNumber] });
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      setEditingCommentId(null);
+      setEditingCommentText("");
+      toast({ title: "Commentaire modifié" });
+    },
+    onError: (error) => {
+      console.error("Error updating comment:", error);
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    }
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const { error } = await supabase
+        .from("incident_comments")
+        .delete()
+        .eq("id", commentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["room-incidents", hotelId, roomNumber] });
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      toast({ title: "Commentaire supprimé" });
+    },
+    onError: (error) => {
+      console.error("Error deleting comment:", error);
+      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
     }
   });
 
@@ -250,11 +294,73 @@ export function RoomIncidentsDialog({ open, onOpenChange, hotelId, roomNumber }:
                       Commentaires ({(incident.incident_comments as any[]).length})
                     </span>
                     {(incident.incident_comments as any[]).map((c) => (
-                      <div key={c.id} className="bg-muted p-2 rounded text-xs">
-                        <span className="font-semibold">{c.user_name}:</span> {c.comment}
-                        <span className="text-muted-foreground ml-2">
-                          {format(new Date(c.created_at), "dd/MM HH:mm", { locale: fr })}
-                        </span>
+                      <div key={c.id} className="bg-muted p-2 rounded text-xs group">
+                        {editingCommentId === c.id ? (
+                          <div className="flex gap-2">
+                            <Textarea
+                              value={editingCommentText}
+                              onChange={(e) => setEditingCommentText(e.target.value)}
+                              rows={2}
+                              className="flex-1 text-xs"
+                            />
+                            <div className="flex flex-col gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  if (editingCommentText.trim()) {
+                                    updateCommentMutation.mutate({ commentId: c.id, comment: editingCommentText });
+                                  }
+                                }}
+                                disabled={!editingCommentText.trim() || updateCommentMutation.isPending}
+                              >
+                                <Check className="h-3 w-3 text-green-600" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  setEditingCommentId(null);
+                                  setEditingCommentText("");
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <span className="font-semibold">{c.user_name}:</span> {c.comment}
+                              <span className="text-muted-foreground ml-2">
+                                {format(new Date(c.created_at), "dd/MM HH:mm", { locale: fr })}
+                              </span>
+                            </div>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-5 w-5 p-0"
+                                onClick={() => {
+                                  setEditingCommentId(c.id);
+                                  setEditingCommentText(c.comment);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                                onClick={() => deleteCommentMutation.mutate(c.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
