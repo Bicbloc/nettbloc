@@ -1230,55 +1230,154 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                 </p>
               </div>
 
+              {/* Formulaire d'ajout de nouvelle règle */}
+              <div className="p-4 border-2 border-dashed rounded-lg space-y-3">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Ajouter une règle
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm">Mot-clé</Label>
+                    <Input
+                      value={newKeyword.keyword}
+                      onChange={(e) => setNewKeyword({ ...newKeyword, keyword: e.target.value })}
+                      placeholder="Ex: DIRTY, DUE OUT..."
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Statut affiché</Label>
+                    <Input
+                      value={newKeyword.status}
+                      onChange={(e) => setNewKeyword({ ...newKeyword, status: e.target.value })}
+                      placeholder="Ex: Sale, À nettoyer..."
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Type de nettoyage</Label>
+                    <Select 
+                      value={newKeyword.cleaning}
+                      onValueChange={(v) => setNewKeyword({ ...newKeyword, cleaning: v })}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="full">À blanc</SelectItem>
+                        <SelectItem value="quick">Recouche</SelectItem>
+                        <SelectItem value="none">Aucun</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Priorité</Label>
+                    <Input
+                      type="number"
+                      value={newKeyword.priority}
+                      onChange={(e) => setNewKeyword({ ...newKeyword, priority: parseInt(e.target.value) || 10 })}
+                      placeholder="10"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => {
+                    if (!newKeyword.keyword || !newKeyword.status) {
+                      toast({ title: "Erreur", description: "Remplissez le mot-clé et le statut", variant: "destructive" });
+                      return;
+                    }
+                    const rules = selectedPatternForRules.detection_rules || {};
+                    const keywords = { ...(rules.status_keywords || {}) };
+                    keywords[newKeyword.keyword.toUpperCase()] = {
+                      status: newKeyword.status,
+                      cleaning: newKeyword.cleaning,
+                      priority: newKeyword.priority
+                    };
+                    setSelectedPatternForRules({
+                      ...selectedPatternForRules,
+                      detection_rules: { ...rules, status_keywords: keywords }
+                    });
+                    setNewKeyword({ keyword: '', status: '', cleaning: 'full', priority: 10 });
+                    toast({ title: "Règle ajoutée", description: "N'oubliez pas de sauvegarder" });
+                  }}
+                  variant="secondary"
+                  className="w-full"
+                  disabled={!newKeyword.keyword || !newKeyword.status}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter cette règle
+                </Button>
+              </div>
+
+              {/* Liste des règles existantes */}
               <div className="space-y-2">
-                {Object.entries(selectedPatternForRules.detection_rules?.status_keywords || {})
-                  .sort((a: any, b: any) => (a[1].priority || 10) - (b[1].priority || 10))
-                  .map(([keyword, mapping]: [string, any]) => (
-                    <div key={keyword} className="flex items-center gap-2 p-3 border rounded">
-                      <Badge variant="outline" className="font-mono text-base">{keyword}</Badge>
-                      <span className="mx-2">→</span>
-                      <div className="flex-1">
+                <h4 className="font-medium">Règles actuelles</h4>
+                {Object.entries(selectedPatternForRules.detection_rules?.status_keywords || {}).length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Aucune règle configurée</p>
+                ) : (
+                  Object.entries(selectedPatternForRules.detection_rules?.status_keywords || {})
+                    .sort((a: any, b: any) => (a[1].priority || 10) - (b[1].priority || 10))
+                    .map(([keyword, mapping]: [string, any]) => (
+                      <div key={keyword} className="flex items-center gap-2 p-3 border rounded">
+                        <Badge variant="outline" className="font-mono text-base">{keyword}</Badge>
+                        <span className="mx-2">→</span>
+                        <div className="flex-1">
+                          <Input
+                            value={mapping.status}
+                            onChange={(e) => {
+                              const newRules = { ...selectedPatternForRules.detection_rules };
+                              newRules.status_keywords[keyword].status = e.target.value;
+                              setSelectedPatternForRules({ ...selectedPatternForRules, detection_rules: newRules });
+                            }}
+                            className="h-8 w-32 inline-block mr-2"
+                            placeholder="Statut"
+                          />
+                          <Select 
+                            value={mapping.cleaning}
+                            onValueChange={(v) => {
+                              const newRules = { ...selectedPatternForRules.detection_rules };
+                              newRules.status_keywords[keyword].cleaning = v;
+                              setSelectedPatternForRules({ ...selectedPatternForRules, detection_rules: newRules });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-28 inline-flex">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="full">À blanc</SelectItem>
+                              <SelectItem value="quick">Recouche</SelectItem>
+                              <SelectItem value="none">Aucun</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Input
-                          value={mapping.status}
+                          type="number"
+                          value={mapping.priority || 10}
                           onChange={(e) => {
                             const newRules = { ...selectedPatternForRules.detection_rules };
-                            newRules.status_keywords[keyword].status = e.target.value;
+                            newRules.status_keywords[keyword].priority = parseInt(e.target.value) || 10;
                             setSelectedPatternForRules({ ...selectedPatternForRules, detection_rules: newRules });
                           }}
-                          className="h-8 w-32 inline-block mr-2"
-                          placeholder="Statut"
+                          className="h-8 w-16"
+                          placeholder="Priorité"
                         />
-                        <Select 
-                          value={mapping.cleaning}
-                          onValueChange={(v) => {
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => {
                             const newRules = { ...selectedPatternForRules.detection_rules };
-                            newRules.status_keywords[keyword].cleaning = v;
+                            delete newRules.status_keywords[keyword];
                             setSelectedPatternForRules({ ...selectedPatternForRules, detection_rules: newRules });
                           }}
                         >
-                          <SelectTrigger className="h-8 w-28 inline-flex">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="full">À blanc</SelectItem>
-                            <SelectItem value="quick">Recouche</SelectItem>
-                            <SelectItem value="none">Aucun</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Input
-                        type="number"
-                        value={mapping.priority || 10}
-                        onChange={(e) => {
-                          const newRules = { ...selectedPatternForRules.detection_rules };
-                          newRules.status_keywords[keyword].priority = parseInt(e.target.value) || 10;
-                          setSelectedPatternForRules({ ...selectedPatternForRules, detection_rules: newRules });
-                        }}
-                        className="h-8 w-16"
-                        placeholder="Priorité"
-                      />
-                    </div>
-                  ))}
+                    ))
+                )}
               </div>
             </div>
           )}
