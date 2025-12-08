@@ -353,14 +353,25 @@ class MewsDetectionService {
           for (const room of extractedData) {
             // On ne vérifie plus room.validated car le pattern entier est validé
             if (room.roomNumber) {
-              // Normaliser le numéro de chambre
-              const normalizedNumber = String(parseInt(room.roomNumber, 10)).padStart(3, '0');
-              this.validatedPatterns.set(normalizedNumber, {
-                roomNumber: normalizedNumber,
+              // Stocker avec PLUSIEURS formats de normalisation pour maximiser les correspondances
+              const numericValue = parseInt(room.roomNumber, 10);
+              const formats = [
+                room.roomNumber,                           // Format original
+                String(numericValue),                      // Sans leading zeros
+                String(numericValue).padStart(3, '0'),     // Padding 3 chiffres
+              ];
+              
+              const patternData: ValidatedRoomPattern = {
+                roomNumber: String(numericValue),
                 cleaningType: room.cleaningType || 'none',
                 status: room.status || 'clean'
-              });
-              console.log(`      ✅ Chambre ${normalizedNumber}: ${room.cleaningType || 'none'} / ${room.status || 'clean'}`);
+              };
+              
+              // Stocker sous tous les formats pour une correspondance maximale
+              for (const format of formats) {
+                this.validatedPatterns.set(format, patternData);
+              }
+              console.log(`      ✅ Chambre ${room.roomNumber}: ${room.cleaningType || 'none'} / ${room.status || 'clean'}`);
             }
           }
         }
@@ -377,10 +388,38 @@ class MewsDetectionService {
 
   /**
    * Vérifier si une chambre a un pattern validé (PRIORITÉ ABSOLUE)
+   * Essaie plusieurs formats de normalisation pour maximiser les correspondances
    */
   getValidatedPattern(roomNumber: string): ValidatedRoomPattern | null {
-    const normalizedNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
-    return this.validatedPatterns.get(normalizedNumber) || null;
+    // Essayer plusieurs formats de normalisation
+    const numericValue = parseInt(roomNumber, 10);
+    const formats = [
+      roomNumber,                                    // Format original
+      String(numericValue),                          // Sans leading zeros (101)
+      String(numericValue).padStart(3, '0'),         // Padding 3 chiffres (101)
+      String(numericValue).padStart(4, '0'),         // Padding 4 chiffres (0101)
+    ];
+    
+    for (const format of formats) {
+      const pattern = this.validatedPatterns.get(format);
+      if (pattern) {
+        console.log(`🎓 Pattern validé trouvé pour ${roomNumber} (format: ${format})`);
+        return pattern;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Forcer le rechargement des patterns validés (après validation d'un nouveau pattern)
+   */
+  async forceRefreshPatterns(hotelId?: string): Promise<void> {
+    const targetHotelId = hotelId || this.hotelId;
+    if (targetHotelId) {
+      this.validatedPatterns.clear();
+      await this.loadValidatedPatterns(targetHotelId);
+      console.log(`🔄 Patterns rafraîchis pour l'hôtel ${targetHotelId}: ${this.validatedPatterns.size} chambres`);
+    }
   }
 
   /**
