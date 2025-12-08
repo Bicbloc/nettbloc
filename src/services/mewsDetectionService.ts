@@ -94,6 +94,19 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     is_active: true,
     description: "Chambre vacante et propre - aucun nettoyage"
   },
+  // INS + ARR (arrivée prévue) = Propre (chambre prête pour arrivée)
+  {
+    rule_name: "INS + Arrivée = Chambre prête",
+    rule_type: "combined",
+    condition: { 
+      statusPattern: "\\b(INS)\\b.*\\b(ARR|ARRIVEE|ARRIVAL)\\b|\\b(ARR|ARRIVEE|ARRIVAL)\\b.*\\b(INS)\\b", 
+      hasGuest: false 
+    },
+    result: { cleaning_type: "none", status: "ready" },
+    priority: 16,
+    is_active: true,
+    description: "INS + Arrivée prévue = Chambre déjà prête, pas de nettoyage"
+  },
   // INS/SAL sans client = Propre (pas de nettoyage)
   {
     rule_name: "INS/SAL sans client = Propre",
@@ -583,8 +596,17 @@ class MewsDetectionService {
   /**
    * Sauvegarder une nouvelle règle personnalisée
    */
-  async saveRule(hotelId: string, userId: string, rule: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>): Promise<DetectionRule | null> {
+  async saveRule(hotelId: string, userId: string, rule: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>): Promise<{ rule: DetectionRule | null; error: string | null }> {
     try {
+      // Valider les données requises
+      if (!hotelId || !userId) {
+        return { rule: null, error: 'Identifiants hôtel ou utilisateur manquants' };
+      }
+
+      if (!rule.rule_name?.trim()) {
+        return { rule: null, error: 'Le nom de la règle est requis' };
+      }
+
       const { data, error } = await supabase
         .from('hotel_detection_rules')
         .insert({
@@ -592,18 +614,22 @@ class MewsDetectionService {
           created_by: userId,
           rule_name: rule.rule_name,
           rule_type: rule.rule_type,
-          condition: rule.condition,
-          result: rule.result,
-          priority: rule.priority,
-          is_active: rule.is_active,
-          description: rule.description
+          condition: rule.condition || {},
+          result: rule.result || { cleaning_type: 'a_blanc' },
+          priority: rule.priority ?? 5,
+          is_active: rule.is_active ?? true,
+          description: rule.description || null
         })
         .select()
         .single();
 
-      if (error || !data) {
+      if (error) {
         console.error('Erreur sauvegarde règle:', error);
-        return null;
+        return { rule: null, error: `Erreur base de données: ${error.message}` };
+      }
+
+      if (!data) {
+        return { rule: null, error: 'Aucune donnée retournée après insertion' };
       }
 
       const savedRule: DetectionRule = {
@@ -621,10 +647,10 @@ class MewsDetectionService {
 
       // Recharger les règles
       await this.loadCustomRules(hotelId);
-      return savedRule;
+      return { rule: savedRule, error: null };
     } catch (err) {
-      console.error('Erreur:', err);
-      return null;
+      console.error('Erreur inattendue:', err);
+      return { rule: null, error: err instanceof Error ? err.message : 'Erreur inconnue' };
     }
   }
 
