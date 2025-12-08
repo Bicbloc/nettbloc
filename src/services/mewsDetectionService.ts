@@ -110,6 +110,7 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     description: "INS + Arrivée prévue = Chambre déjà prête, pas de nettoyage"
   },
   // INS + Heure arrivée à gauche (MEWS) = Chambre prête, pas de nettoyage
+  // PRIORITÉ 19 pour primer sur toutes les autres règles sauf Out of order
   {
     rule_name: "INS + Heure arrivée (gauche) = Propre",
     rule_type: "combined",
@@ -118,7 +119,7 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
       timePosition: "left"
     },
     result: { cleaning_type: "none", status: "ready" },
-    priority: 15,
+    priority: 19,
     is_active: true,
     description: "INS avec heure d'arrivée à gauche (MEWS) = Chambre inspectée, prête pour le client"
   },
@@ -359,22 +360,40 @@ class MewsDetectionService {
     const dates = line.match(/\b(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/g) || [];
     
     // Déterminer la position de l'heure (MEWS spécifique)
-    // Si l'heure apparaît AVANT le nom du client = arrivée (gauche)
-    // Si l'heure apparaît APRÈS "Adults" ou le nom du client = départ (droite)
+    // LOGIQUE AMÉLIORÉE:
+    // - Utiliser "X × Adults" comme référence principale (plus fiable)
+    // - L'heure AVANT "Adults" = arrivée (gauche) → client qui arrive
+    // - L'heure APRÈS "Adults" = départ (droite) → client qui part
     let timePosition: 'left' | 'right' | null = null;
+    
     if (timeMatches.length > 0) {
-      const firstTimeIndex = timeMatches[0].index || 0;
-      const adultsMatch = line.match(/\d+\s*[×x]\s*(?:Adultes?|Adults?)/i);
+      // Trouver l'heure d'arrivée (14:00-19:00) spécifiquement
+      const arrivalTimePattern = /\b(1[4-9]:\d{2})\b/;
+      const arrivalMatch = line.match(arrivalTimePattern);
       
-      if (adultsMatch && adultsMatch.index !== undefined) {
-        // Si l'heure est avant "X Adults" = arrivée (gauche)
-        // Si l'heure est après "X Adults" = départ (droite)
-        timePosition = firstTimeIndex < adultsMatch.index ? 'left' : 'right';
-      } else if (guestPresence.guestName) {
-        // Chercher la position du nom dans la ligne
-        const nameIndex = line.toLowerCase().indexOf(guestPresence.guestName.toLowerCase().split(' ')[0]);
-        if (nameIndex !== -1) {
-          timePosition = firstTimeIndex < nameIndex ? 'left' : 'right';
+      if (arrivalMatch && arrivalMatch.index !== undefined) {
+        const arrivalTimeIndex = arrivalMatch.index;
+        
+        // Chercher "X × Adults" ou "X Adults" avec espaces multiples possibles
+        const adultsMatch = line.match(/\d+\s*[×x]\s+(?:Adultes?|Adults?)/i);
+        
+        if (adultsMatch && adultsMatch.index !== undefined) {
+          // Comparer la position de l'heure d'arrivée avec "Adults"
+          // Heure AVANT Adults = gauche (arrivée prévue)
+          // Heure APRÈS Adults = droite (départ prévu)  
+          timePosition = arrivalTimeIndex < adultsMatch.index ? 'left' : 'right';
+          
+          console.log(`🕐 TimePosition Debug: heure=${arrivalMatch[0]} (idx=${arrivalTimeIndex}), Adults (idx=${adultsMatch.index}) → ${timePosition}`);
+        }
+      }
+      
+      // Fallback: si pas d'heure d'arrivée spécifique, utiliser la première heure trouvée
+      if (timePosition === null) {
+        const firstTimeIndex = timeMatches[0].index || 0;
+        const adultsMatch = line.match(/\d+\s*[×x]\s+(?:Adultes?|Adults?)/i);
+        
+        if (adultsMatch && adultsMatch.index !== undefined) {
+          timePosition = firstTimeIndex < adultsMatch.index ? 'left' : 'right';
         }
       }
     }
