@@ -101,7 +101,7 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
       condition.field = 'nightInfo.current';
     }
 
-    const result = await mewsDetectionService.saveRule(hotelId, userId, {
+    const result = await mewsDetectionService.saveRule(hotelId, {
       rule_name: newRule.rule_name,
       rule_type: newRule.rule_type,
       condition,
