@@ -287,6 +287,9 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
                         <SelectItem value="OUT">OUT - Départ confirmé</SelectItem>
                         <SelectItem value="DND">DND - Ne pas déranger</SelectItem>
                         <SelectItem value="OOO">OOO - Hors service</SelectItem>
+                        <SelectItem value="DIR">DIR - Sale (Dirty)</SelectItem>
+                        <SelectItem value="CL">CL - Propre (Clean)</SelectItem>
+                        <SelectItem value="SAL">SAL - À nettoyer</SelectItem>
                         <SelectItem value="OOS">OOS - Hors stock</SelectItem>
                       </SelectContent>
                     </Select>
