@@ -320,24 +320,32 @@ class MewsDetectionService {
 
   /**
    * Charger les patterns validés pour cet hôtel (PRIORITÉ MAXIMALE)
+   * Charge les patterns où:
+   * 1. hotel_id = hotelId (créé depuis cet hôtel)
+   * 2. assigned_to_hotel_id = hotelId (attribué à cet hôtel)
    */
   private async loadValidatedPatterns(hotelId: string): Promise<void> {
     try {
+      // Charger les patterns créés par cet hôtel OU attribués à cet hôtel
       const { data, error } = await supabase
         .from('report_training_patterns')
-        .select('extracted_data')
-        .eq('hotel_id', hotelId)
+        .select('extracted_data, pattern_name, assigned_to_hotel_id, hotel_id')
+        .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId}`)
         .eq('validated', true)
         .order('updated_at', { ascending: false })
-        .limit(5); // Prendre les 5 derniers patterns validés
+        .limit(10);
 
       if (error) {
         console.error('Erreur chargement patterns validés:', error);
         return;
       }
 
+      console.log(`📚 Patterns trouvés pour hôtel ${hotelId}:`, data?.length || 0);
+
       // Extraire les chambres validées et les stocker dans la map
       for (const pattern of data || []) {
+        console.log(`   📋 Pattern: ${pattern.pattern_name}, assigned_to: ${pattern.assigned_to_hotel_id}, hotel_id: ${pattern.hotel_id}`);
+        
         const extractedData = pattern.extracted_data as any[];
         if (Array.isArray(extractedData)) {
           for (const room of extractedData) {
