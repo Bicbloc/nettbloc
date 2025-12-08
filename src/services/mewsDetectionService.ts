@@ -4,6 +4,25 @@
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeCleaningType, CleaningType } from "@/utils/cleaningTypeUtils";
 
+// Interface pour les règles de nettoyage personnalisées (nouvelle table)
+export interface HotelCleaningRule {
+  id: string;
+  hotel_id: string;
+  rule_name: string;
+  conditions: {
+    statusPattern?: string;
+    hasGuest?: boolean;
+    timePosition?: 'left' | 'right';
+    nightInfo?: { min?: number; max?: number };
+    keywords?: string[];
+  };
+  result_cleaning_type: 'full' | 'quick' | 'none';
+  result_status?: string | null;
+  priority: number;
+  is_active: boolean;
+  description?: string;
+}
+
 export interface ReservationBlock {
   hasArrivalBlock: boolean;
   hasDepartureBlock: boolean;
@@ -220,15 +239,17 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
 
 class MewsDetectionService {
   private customRules: DetectionRule[] = [];
+  private hotelCleaningRules: HotelCleaningRule[] = [];
   private hotelId: string | null = null;
 
   /**
-   * Charger les règles personnalisées d'un hôtel
+   * Charger les règles personnalisées d'un hôtel (hotel_detection_rules + hotel_cleaning_rules)
    */
   async loadCustomRules(hotelId: string): Promise<DetectionRule[]> {
     this.hotelId = hotelId;
     
     try {
+      // Charger hotel_detection_rules
       const { data, error } = await supabase
         .from('hotel_detection_rules')
         .select('*')
@@ -238,26 +259,58 @@ class MewsDetectionService {
 
       if (error) {
         console.error('Erreur chargement règles:', error);
-        return [];
+      } else {
+        this.customRules = (data || []).map(d => ({
+          id: d.id,
+          hotel_id: d.hotel_id,
+          created_by: d.created_by,
+          rule_name: d.rule_name,
+          rule_type: d.rule_type as DetectionRule['rule_type'],
+          condition: d.condition as DetectionRule['condition'],
+          result: d.result as DetectionRule['result'],
+          priority: d.priority ?? 1,
+          is_active: d.is_active ?? true,
+          description: d.description ?? undefined
+        }));
       }
 
-      this.customRules = (data || []).map(d => ({
-        id: d.id,
-        hotel_id: d.hotel_id,
-        created_by: d.created_by,
-        rule_name: d.rule_name,
-        rule_type: d.rule_type as DetectionRule['rule_type'],
-        condition: d.condition as DetectionRule['condition'],
-        result: d.result as DetectionRule['result'],
-        priority: d.priority ?? 1,
-        is_active: d.is_active ?? true,
-        description: d.description ?? undefined
-      }));
+      // Charger aussi hotel_cleaning_rules (nouvelle table)
+      const { data: cleaningRules, error: cleaningError } = await supabase
+        .from('hotel_cleaning_rules')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .order('priority', { ascending: false });
+
+      if (cleaningError) {
+        console.error('Erreur chargement hotel_cleaning_rules:', cleaningError);
+      } else {
+        this.hotelCleaningRules = (cleaningRules || []).map(d => ({
+          id: d.id,
+          hotel_id: d.hotel_id,
+          rule_name: d.rule_name,
+          conditions: d.conditions as HotelCleaningRule['conditions'],
+          result_cleaning_type: d.result_cleaning_type as HotelCleaningRule['result_cleaning_type'],
+          result_status: d.result_status,
+          priority: d.priority ?? 50,
+          is_active: d.is_active ?? true,
+          description: d.description ?? undefined
+        }));
+        console.log(`📋 Chargé ${this.hotelCleaningRules.length} règles hotel_cleaning_rules pour l'hôtel ${hotelId}`);
+      }
+
       return this.customRules;
     } catch (err) {
       console.error('Erreur:', err);
       return [];
     }
+  }
+
+  /**
+   * Obtenir les règles de nettoyage de l'hôtel
+   */
+  getHotelCleaningRules(): HotelCleaningRule[] {
+    return this.hotelCleaningRules;
   }
 
   /**
