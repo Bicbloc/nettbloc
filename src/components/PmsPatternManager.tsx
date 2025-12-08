@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Edit, Save, Database, Brain, Copy, Play, Check, X, RefreshCw, FileText, Settings, Upload, Building, MapPin } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Database, Brain, Copy, Play, Check, X, RefreshCw, FileText, Settings, Upload, Building, MapPin, Star, Building2, Send } from "lucide-react";
 import { smartExtractionService, PmsPattern } from "@/services/smartExtractionService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
@@ -54,10 +54,18 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
   const [exportTargetHotelId, setExportTargetHotelId] = useState<string>('');
   const [exportAutoValidate, setExportAutoValidate] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  
+  // Nouveau: attribution et défaut
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [patternToAssign, setPatternToAssign] = useState<any>(null);
+  const [assignTargetHotelId, setAssignTargetHotelId] = useState<string>('');
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [patternsUsage, setPatternsUsage] = useState<Map<string, HotelInfo[]>>(new Map());
 
   useEffect(() => {
     loadPatterns();
     loadHotelInfo();
+    loadPatternsUsage();
   }, [hotelId]);
 
   const loadPatterns = async () => {
@@ -101,6 +109,120 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
       if (hotelsData) {
         setUserHotels(hotelsData);
       }
+    }
+  };
+
+  const loadPatternsUsage = async () => {
+    // Charger quels établissements utilisent quels patterns (via assigned_to_hotel_id)
+    const { data: allPatterns } = await supabase
+      .from('report_training_patterns')
+      .select('id, assigned_to_hotel_id, hotel_id');
+
+    if (!allPatterns) return;
+
+    const user = await supabase.auth.getUser();
+    if (!user.data.user) return;
+
+    const { data: allHotels } = await supabase
+      .from('hotels')
+      .select('id, name, hotel_code')
+      .eq('user_id', user.data.user.id);
+
+    if (!allHotels) return;
+
+    const usageMap = new Map<string, HotelInfo[]>();
+    
+    allPatterns.forEach(p => {
+      const assignedHotelId = p.assigned_to_hotel_id;
+      if (assignedHotelId) {
+        const hotel = allHotels.find(h => h.id === assignedHotelId);
+        if (hotel) {
+          const patternId = p.id;
+          if (!usageMap.has(patternId)) {
+            usageMap.set(patternId, []);
+          }
+          usageMap.get(patternId)!.push(hotel);
+        }
+      }
+    });
+
+    setPatternsUsage(usageMap);
+  };
+
+  const openAssignDialog = (pattern: any) => {
+    setPatternToAssign(pattern);
+    setAssignTargetHotelId(pattern.assigned_to_hotel_id || '');
+    setShowAssignDialog(true);
+  };
+
+  const assignPatternToHotel = async () => {
+    if (!patternToAssign) return;
+
+    setIsAssigning(true);
+
+    try {
+      const { error } = await supabase
+        .from('report_training_patterns')
+        .update({ 
+          assigned_to_hotel_id: assignTargetHotelId || null,
+          attribution_reason: assignTargetHotelId 
+            ? `Attribué à ${userHotels.find(h => h.id === assignTargetHotelId)?.name || 'établissement'}`
+            : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', patternToAssign.id);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Succès", 
+        description: assignTargetHotelId 
+          ? `Modèle attribué à ${userHotels.find(h => h.id === assignTargetHotelId)?.name}`
+          : "Attribution supprimée"
+      });
+      setShowAssignDialog(false);
+      loadPatterns();
+      loadPatternsUsage();
+    } catch (error) {
+      console.error('Erreur attribution:', error);
+      toast({ title: "Erreur", description: "Impossible d'attribuer le modèle", variant: "destructive" });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const toggleDefaultPattern = async (pattern: any) => {
+    try {
+      // D'abord, retirer le défaut de tous les autres patterns du même type PMS
+      if (!pattern.is_default) {
+        await supabase
+          .from('report_training_patterns')
+          .update({ is_default: false })
+          .eq('hotel_id', hotelId)
+          .eq('pms_type', pattern.pms_type);
+      }
+
+      // Ensuite, toggle le pattern actuel
+      const { error } = await supabase
+        .from('report_training_patterns')
+        .update({ 
+          is_default: !pattern.is_default,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', pattern.id);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Succès", 
+        description: pattern.is_default 
+          ? "Ce modèle n'est plus le modèle par défaut" 
+          : `Ce modèle est maintenant le modèle par défaut pour ${pattern.pms_type}`
+      });
+      loadPatterns();
+    } catch (error) {
+      console.error('Erreur toggle défaut:', error);
+      toast({ title: "Erreur", description: "Impossible de modifier le modèle par défaut", variant: "destructive" });
     }
   };
 
@@ -627,87 +749,132 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                 </p>
               </Card>
             ) : (
-              patterns.map((pattern) => (
-                <Card key={pattern.id} className={`p-4 ${pattern.validated ? 'border-green-500/50' : ''}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
-                      <Badge variant={pattern.validated ? "default" : "outline"}>
-                        {pattern.pms_type}
-                      </Badge>
-                      <div className="flex-1">
-                        <span className="font-medium">{pattern.pattern_name || pattern.report_name}</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          {pattern.validated && (
-                            <Badge variant="secondary" className="text-green-600">
-                              <Check className="h-3 w-3 mr-1" /> Actif
+              patterns.map((pattern) => {
+                const assignedHotel = pattern.assigned_to_hotel_id 
+                  ? userHotels.find(h => h.id === pattern.assigned_to_hotel_id)
+                  : null;
+                
+                return (
+                  <Card key={pattern.id} className={`p-4 ${pattern.validated ? 'border-green-500/50' : ''} ${pattern.is_default ? 'border-primary' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={pattern.validated ? "default" : "outline"}>
+                            {pattern.pms_type}
+                          </Badge>
+                          {pattern.is_default && (
+                            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+                              <Star className="h-3 w-3 mr-1 fill-primary" /> Défaut
                             </Badge>
                           )}
-                          {pattern.accuracy_score > 0 && (
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{pattern.pattern_name || pattern.report_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {pattern.validated && (
+                              <Badge variant="secondary" className="text-green-600">
+                                <Check className="h-3 w-3 mr-1" /> Actif
+                              </Badge>
+                            )}
+                            {assignedHotel && (
+                              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />
+                                Utilisé par: {assignedHotel.name}
+                              </Badge>
+                            )}
+                            {pattern.attribution_reason && !assignedHotel && (
+                              <span className="text-xs text-muted-foreground italic">
+                                {pattern.attribution_reason}
+                              </span>
+                            )}
+                            {pattern.accuracy_score > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                Précision: {(pattern.accuracy_score * 100).toFixed(0)}%
+                              </span>
+                            )}
                             <span className="text-xs text-muted-foreground">
-                              Précision: {(pattern.accuracy_score * 100).toFixed(0)}%
+                              Modifié: {new Date(pattern.updated_at).toLocaleDateString()}
                             </span>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            Modifié: {new Date(pattern.updated_at).toLocaleDateString()}
-                          </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => toggleValidation(pattern)}
-                        title={pattern.validated ? "Désactiver" : "Activer"}
-                      >
-                        {pattern.validated ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => openRulesEditor(pattern)}
-                        title="Modifier les règles"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setEditingPattern(pattern)}
-                        title="Modifier"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => duplicatePattern(pattern)}
-                        title="Dupliquer"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      {userHotels.length > 1 && (
+                      <div className="flex items-center gap-1">
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => openExportDialog(pattern)}
-                          title="Exporter vers un autre établissement"
+                          onClick={() => toggleDefaultPattern(pattern)}
+                          title={pattern.is_default ? "Retirer comme défaut" : "Définir comme défaut"}
+                          className={pattern.is_default ? "text-primary" : ""}
                         >
-                          <Upload className="h-4 w-4" />
+                          <Star className={`h-4 w-4 ${pattern.is_default ? 'fill-primary' : ''}`} />
                         </Button>
-                      )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => deletePattern(pattern.id)}
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => toggleValidation(pattern)}
+                          title={pattern.validated ? "Désactiver" : "Activer"}
+                        >
+                          {pattern.validated ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                        </Button>
+                        {userHotels.length > 1 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => openAssignDialog(pattern)}
+                            title="Attribuer à un établissement"
+                          >
+                            <Building2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => openRulesEditor(pattern)}
+                          title="Modifier les règles"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditingPattern(pattern)}
+                          title="Modifier"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => duplicatePattern(pattern)}
+                          title="Dupliquer"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        {userHotels.length > 1 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => openExportDialog(pattern)}
+                            title="Exporter vers un autre établissement"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => deletePattern(pattern.id)}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))
+                  </Card>
+                );
+              })
             )}
           </div>
         </TabsContent>
@@ -949,6 +1116,88 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                 <>
                   <Upload className="h-4 w-4 mr-2" />
                   Exporter le modèle
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog pour attribuer à un établissement */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Attribuer le modèle
+            </DialogTitle>
+            <DialogDescription>
+              Définir quel établissement utilise ce modèle
+            </DialogDescription>
+          </DialogHeader>
+
+          {patternToAssign && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted/30 rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge>{patternToAssign.pms_type}</Badge>
+                  <span className="font-medium">
+                    {patternToAssign.pattern_name || patternToAssign.report_name}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <Label>Attribuer à quel établissement ?</Label>
+                <Select value={assignTargetHotelId} onValueChange={setAssignTargetHotelId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Sélectionner un établissement (ou aucun)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">
+                      <span className="text-muted-foreground">Aucune attribution</span>
+                    </SelectItem>
+                    {userHotels.map(hotel => (
+                      <SelectItem key={hotel.id} value={hotel.id}>
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-muted-foreground" />
+                          {hotel.name}
+                          {hotel.hotel_code && (
+                            <span className="text-muted-foreground">({hotel.hotel_code})</span>
+                          )}
+                          {hotel.id === hotelId && (
+                            <Badge variant="secondary" className="text-xs">Actuel</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                L'attribution permet d'identifier quel établissement utilise activement ce modèle.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={assignPatternToHotel} 
+              disabled={isAssigning}
+            >
+              {isAssigning ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Attribution...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Attribuer
                 </>
               )}
             </Button>
