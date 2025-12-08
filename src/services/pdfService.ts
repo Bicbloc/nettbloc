@@ -121,37 +121,58 @@ function parseRoomsFromText(text: string): Room[] {
       if (foundRooms.has(normalizedRoomNumber)) continue;
       foundRooms.add(normalizedRoomNumber);
       
-      // Utiliser mewsDetectionService pour analyser la ligne
-      const analysis = mewsDetectionService.analyzeLine(line);
+      // PRIORITÉ 1: Vérifier si la chambre a un pattern validé (apprentissage)
+      const validatedPattern = mewsDetectionService.getValidatedPattern(normalizedRoomNumber);
       
-      console.log(`🏠 Chambre ${normalizedRoomNumber}: cleaningType=${analysis.cleaningType}, rule=${analysis.matchedRule}`);
-      
-      // Convertir le cleaningType en format attendu
       let cleaningType: 'full' | 'quick' | 'none' = 'none';
       let roomStatus = 'clean';
+      let matchedRule: string | null = null;
       
-      // Le type retourné est 'a_blanc' | 'recouche' | 'none'
-      const detectedType = analysis.cleaningType;
-      
-      if (detectedType === 'a_blanc') {
-        cleaningType = 'full';
-        roomStatus = 'needs-cleaning';
-      } else if (detectedType === 'recouche') {
-        cleaningType = 'quick';
-        roomStatus = 'needs-cleaning';
-      } else {
-        // cleaningType === 'none'
-        cleaningType = 'none';
-        // Déterminer le statut basé sur les blocs détectés
-        if (analysis.blocks.isOutOfOrder) {
-          roomStatus = 'out-of-order';
-        } else if (analysis.blocks.status === 'INS') {
-          roomStatus = 'clean';
-        } else if (analysis.blocks.status === 'OCC') {
-          roomStatus = 'occupied';
+      if (validatedPattern) {
+        // Utiliser le pattern validé (PRIORITÉ ABSOLUE)
+        console.log(`🎓 Chambre ${normalizedRoomNumber}: Pattern validé trouvé → ${validatedPattern.cleaningType}`);
+        
+        if (validatedPattern.cleaningType === 'full' || validatedPattern.cleaningType === 'a_blanc') {
+          cleaningType = 'full';
+          roomStatus = 'needs-cleaning';
+        } else if (validatedPattern.cleaningType === 'quick' || validatedPattern.cleaningType === 'recouche') {
+          cleaningType = 'quick';
+          roomStatus = 'needs-cleaning';
         } else {
-          roomStatus = 'clean';
+          cleaningType = 'none';
+          roomStatus = validatedPattern.status === 'inspected' ? 'clean' : validatedPattern.status || 'clean';
         }
+        matchedRule = 'Pattern validé (apprentissage)';
+      } else {
+        // PRIORITÉ 2: Utiliser mewsDetectionService pour analyser la ligne
+        const analysis = mewsDetectionService.analyzeLine(line);
+        
+        console.log(`🏠 Chambre ${normalizedRoomNumber}: cleaningType=${analysis.cleaningType}, rule=${analysis.matchedRule}`);
+        
+        // Le type retourné est 'a_blanc' | 'recouche' | 'none'
+        const detectedType = analysis.cleaningType;
+        
+        if (detectedType === 'a_blanc') {
+          cleaningType = 'full';
+          roomStatus = 'needs-cleaning';
+        } else if (detectedType === 'recouche') {
+          cleaningType = 'quick';
+          roomStatus = 'needs-cleaning';
+        } else {
+          // cleaningType === 'none'
+          cleaningType = 'none';
+          // Déterminer le statut basé sur les blocs détectés
+          if (analysis.blocks.isOutOfOrder) {
+            roomStatus = 'out-of-order';
+          } else if (analysis.blocks.status === 'INS') {
+            roomStatus = 'clean';
+          } else if (analysis.blocks.status === 'OCC') {
+            roomStatus = 'occupied';
+          } else {
+            roomStatus = 'clean';
+          }
+        }
+        matchedRule = analysis.matchedRule;
       }
       
       // Déterminer si c'est une chambre twin
@@ -172,7 +193,7 @@ function parseRoomsFromText(text: string): Room[] {
         isUrgent: priority === 'high',
         notUrgent: priority === 'low',
         floor,
-        notes: analysis.matchedRule ? `Règle: ${analysis.matchedRule}` : undefined
+        notes: matchedRule ? `Règle: ${matchedRule}` : undefined
       });
     }
   }
