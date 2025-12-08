@@ -2178,7 +2178,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             <StatsOverview rooms={rooms} housekeeperCount={housekeeperNames.length} />
 
             {/* Grid responsive améliorée */}
-            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
               {/* Actions rapides */}
               <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1">
                 <CardHeader className="pb-3">
@@ -2264,12 +2264,10 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                   </div>
                 </CardContent>
               </Card>
-              
-              {/* Active Users Panel */}
-              <div className="lg:col-span-1">
-                <ActiveUsersPanel />
-              </div>
             </div>
+            
+            {/* Active Users Panel - sous les deux colonnes */}
+            <ActiveUsersPanel />
             
             {/* Section Personnel - Design amélioré */}
             <Card className="border-border/50 bg-gradient-to-br from-card to-card/80">
