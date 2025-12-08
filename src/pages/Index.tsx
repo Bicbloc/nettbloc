@@ -362,10 +362,19 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
 
+  // Flag pour éviter le rechargement pendant l'import PDF
+  const [isImporting, setIsImporting] = useState(false);
+
   // PHASE 4: Restaurer les données à la reconnexion (charger rooms depuis Supabase)
   useEffect(() => {
     const loadRoomsFromDatabase = async () => {
       if (!currentHotelId) return;
+      
+      // Ne pas recharger pendant un import PDF en cours
+      if (isImporting) {
+        console.log('⏳ Import en cours, rechargement différé');
+        return;
+      }
 
       try {
         console.log('🔄 Phase 4: Chargement des chambres depuis Supabase...');
@@ -432,6 +441,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             const sessionAssigned = sessionAssignments[r.room_number];
             const assignedTo = assignment?.housekeeper_name || sessionAssigned || undefined;
             
+            // Lire cleaning_type correctement
             const cleaningType = r.cleaning_type === 'full' ? 'full' : (r.cleaning_type === 'quick' ? 'quick' : 'none');
             return {
               number: r.room_number,
@@ -496,10 +506,10 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     // Charger au montage et à chaque changement d'hôtel
     loadRoomsFromDatabase();
 
-    // Recharger toutes les 30 secondes pour synchronisation continue
-    const interval = setInterval(loadRoomsFromDatabase, 30000);
+    // Recharger toutes les 2 minutes au lieu de 30 secondes (réduction des conflits)
+    const interval = setInterval(loadRoomsFromDatabase, 120000);
     return () => clearInterval(interval);
-  }, [currentHotelId]);
+  }, [currentHotelId, isImporting]);
 
   // Synchroniser hotel code quand l'hotel est chargé
   useEffect(() => {
@@ -788,6 +798,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const handlePdfProcessed = async (data: Room[], housekeeperNames?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
     console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeeperNames || []);
     
+    // Activer le flag pour bloquer le rechargement automatique
+    setIsImporting(true);
+    
     try {
       const floors = new Set<number>();
       data.forEach(room => {
@@ -808,16 +821,27 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         setHousekeeperNames(housekeeperNames);
       }
 
-      // PHASE 1: Synchroniser CHAQUE chambre PDF vers Supabase
+      // PHASE 1: Synchroniser CHAQUE chambre PDF vers Supabase avec CLEANING_TYPE correct
       if (currentHotelId) {
         console.log('🔄 Phase 1: Synchronisation des chambres PDF vers Supabase...');
         for (const room of sortedData) {
+          // Normaliser le cleaning_type : a_blanc → full, recouche → quick
+          let normalizedCleaningType: string | null = null;
+          if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
+            normalizedCleaningType = 'full';
+          } else if (room.cleaningType === 'quick' || room.cleaningType === 'recouche') {
+            normalizedCleaningType = 'quick';
+          } else if (room.cleaningType === 'none') {
+            normalizedCleaningType = 'none';
+          }
+          
           await supabase.from('rooms').upsert({
             hotel_id: currentHotelId,
             room_number: room.number,
             floor: room.floor || null,
             status: room.status || 'needs-cleaning',
-            room_type: room.cleaningType === 'full' ? 'full' : (room.cleaningType === 'quick' ? 'quick' : null),
+            // CORRECTION: Utiliser cleaning_type au lieu de room_type
+            cleaning_type: normalizedCleaningType,
             cleaning_priority: room.isUrgent ? 10 : (room.notUrgent ? 1 : 5),
             notes: room.notes || null
           }, { 
@@ -825,7 +849,7 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             ignoreDuplicates: false 
           });
         }
-        console.log('✅ Phase 1: Toutes les chambres synchronisées vers Supabase');
+        console.log('✅ Phase 1: Toutes les chambres synchronisées vers Supabase avec cleaning_type correct');
       }
 
       // Auto-distribute if method specified
@@ -887,6 +911,12 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         title: "Erreur",
         description: "Erreur lors du traitement du PDF"
       });
+    } finally {
+      // Désactiver le flag après un délai pour laisser le temps aux données de se propager
+      setTimeout(() => {
+        setIsImporting(false);
+        console.log('✅ Import terminé, rechargement automatique réactivé');
+      }, 5000);
     }
   };
 
