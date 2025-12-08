@@ -20,7 +20,7 @@ import { SubscriptionBadge } from './SubscriptionBadge';
 const UserMenu = () => {
   const { user, signOut, isAuthenticated } = useAuth();
   const { isSuperAdmin } = useAdminRole();
-  const { plan, subscribed, isPremium } = useSubscription();
+  const { plan, subscribed, isPremium, isInTrial, trialDaysRemaining } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -64,6 +64,7 @@ const UserMenu = () => {
             <SubscriptionBadge 
               plan={plan}
               subscribed={subscribed}
+              trialDaysRemaining={trialDaysRemaining}
               size="sm"
             />
           </div>

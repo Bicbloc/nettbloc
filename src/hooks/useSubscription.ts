@@ -1,80 +1,147 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { addMonths, differenceInDays } from 'date-fns';
 
 interface SubscriptionState {
-  plan: 'free' | 'premium';
+  plan: 'free' | 'premium' | 'trial';
   subscribed: boolean;
   loading: boolean;
   subscription_end?: string;
+  trialStartDate?: string;
+  trialEndDate?: string;
+  trialDaysRemaining?: number;
+  isInTrial: boolean;
+  maxRooms: number;
+  featuresEnabled: Record<string, boolean>;
 }
+
+const DEFAULT_FEATURES = {
+  pdf_analysis: true,
+  auto_distribution: true,
+  basic_report: true,
+  incidents: false,
+  linen: false,
+  access_codes: false,
+  ai_learning: false,
+  api_access: false
+};
 
 export function useSubscription() {
   const { user, isAuthenticated } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionState>({
     plan: 'free',
     subscribed: false,
-    loading: true
+    loading: true,
+    isInTrial: false,
+    maxRooms: 15,
+    featuresEnabled: DEFAULT_FEATURES
   });
 
   const checkSubscription = async () => {
     if (!isAuthenticated || !user) {
-      setSubscription({ plan: 'free', subscribed: false, loading: false });
+      setSubscription({ 
+        plan: 'free', 
+        subscribed: false, 
+        loading: false,
+        isInTrial: false,
+        maxRooms: 15,
+        featuresEnabled: DEFAULT_FEATURES
+      });
       return;
     }
 
     try {
-      // First check local profile data
+      // Fetch profile with new trial fields
       const { data: profile } = await supabase
         .from('profiles')
-        .select('plan, subscription_type')
+        .select('plan, subscription_type, trial_start_date, trial_duration_months, max_rooms, features_enabled, created_at')
         .eq('id', user.id)
         .single();
 
-      // Check both plan and subscription_type fields for premium status
+      // Check if user is in trial period
+      let isInTrial = false;
+      let trialEndDate: Date | undefined;
+      let trialDaysRemaining = 0;
+
+      if (profile?.trial_start_date) {
+        const trialStart = new Date(profile.trial_start_date);
+        const trialMonths = profile.trial_duration_months || 3;
+        trialEndDate = addMonths(trialStart, trialMonths);
+        
+        if (new Date() < trialEndDate) {
+          isInTrial = true;
+          trialDaysRemaining = differenceInDays(trialEndDate, new Date());
+        }
+      } else if (profile?.created_at && !profile?.subscription_type) {
+        // New user without trial_start_date - start trial now
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ 
+            trial_start_date: new Date().toISOString(),
+            trial_duration_months: 3,
+            subscription_type: 'trial'
+          })
+          .eq('id', user.id);
+
+        if (!updateError) {
+          isInTrial = true;
+          trialEndDate = addMonths(new Date(), 3);
+          trialDaysRemaining = 90;
+        }
+      }
+
+      // Check premium status
       const isPremiumInProfile = profile?.plan === 'premium' || profile?.subscription_type === 'premium';
+      const isTrialInProfile = profile?.subscription_type === 'trial';
+
+      // Determine features based on plan
+      const featuresEnabled = profile?.features_enabled && typeof profile.features_enabled === 'object'
+        ? profile.features_enabled as Record<string, boolean>
+        : DEFAULT_FEATURES;
 
       if (isPremiumInProfile) {
-        // If premium in profile, use it directly (skip Stripe check to avoid issues)
         setSubscription({
           plan: 'premium',
           subscribed: true,
-          loading: false
+          loading: false,
+          isInTrial: false,
+          maxRooms: profile?.max_rooms || 999999,
+          featuresEnabled: { ...DEFAULT_FEATURES, incidents: true, linen: true, access_codes: true, ai_learning: true }
+        });
+      } else if (isInTrial) {
+        // During trial: full premium access
+        setSubscription({
+          plan: 'trial',
+          subscribed: true,
+          loading: false,
+          isInTrial: true,
+          trialStartDate: profile?.trial_start_date,
+          trialEndDate: trialEndDate?.toISOString(),
+          trialDaysRemaining,
+          maxRooms: 999999, // Unlimited during trial
+          featuresEnabled: { ...DEFAULT_FEATURES, incidents: true, linen: true, access_codes: true, ai_learning: true }
         });
       } else {
-        // For free users, double-check with Stripe in case of database sync issues
-        try {
-          // Temporarily disable subscription check to avoid CHANNEL_ERROR
-          console.log('📡 Statut souscription: FALLBACK_MODE');
-          
-           if (false) { // Disable Stripe check temporarily
-             setSubscription({
-               plan: 'premium',
-               subscribed: true,
-               loading: false
-             });
-          } else {
-            setSubscription({
-              plan: 'free',
-              subscribed: false,
-              loading: false
-            });
-          }
-        } catch (stripeError) {
-          console.warn('Stripe check failed, using profile data:', stripeError);
-          setSubscription({
-            plan: 'free',
-            subscribed: false,
-            loading: false
-          });
-        }
+        // Free plan
+        setSubscription({
+          plan: 'free',
+          subscribed: false,
+          loading: false,
+          isInTrial: false,
+          maxRooms: profile?.max_rooms || 15,
+          featuresEnabled: DEFAULT_FEATURES
+        });
       }
     } catch (error) {
       console.error('Error checking subscription:', error);
       setSubscription({
         plan: 'free',
         subscribed: false,
-        loading: false
+        loading: false,
+        isInTrial: false,
+        maxRooms: 15,
+        featuresEnabled: DEFAULT_FEATURES
       });
     }
   };
@@ -91,33 +158,33 @@ export function useSubscription() {
   const canAccessFeature = (feature: string) => {
     if (!isAuthenticated) return false;
     
+    // During trial or premium: all features accessible
+    if (subscription.isInTrial || subscription.plan === 'premium') {
+      return true;
+    }
+    
     // Free features (always accessible)
     const freeFeatures = [
       'pdf_analysis',
       'auto_distribution', 
       'report_download',
-      'basic_management'
-    ];
-
-    // Premium features
-    const premiumFeatures = [
-      'mobile_access',        // Accès mobile réservé premium
-      'data_archiving',
-      'advanced_team_management',
-      'priority_support',
-      'custom_reports',
-      'bulk_operations'
+      'basic_management',
+      'basic_report'
     ];
 
     if (freeFeatures.includes(feature)) {
       return true;
     }
 
-    if (premiumFeatures.includes(feature)) {
-      return subscription.subscribed && subscription.plan === 'premium';
-    }
+    // Check specific feature in featuresEnabled
+    return subscription.featuresEnabled[feature] === true;
+  };
 
-    return false;
+  const hasFeature = (feature: keyof typeof DEFAULT_FEATURES) => {
+    if (subscription.isInTrial || subscription.plan === 'premium') {
+      return true;
+    }
+    return subscription.featuresEnabled[feature] === true;
   };
 
   return {
@@ -125,7 +192,9 @@ export function useSubscription() {
     checkSubscription,
     refreshSubscription,
     canAccessFeature,
+    hasFeature,
     isPremium: subscription.plan === 'premium' && subscription.subscribed,
-    isFree: subscription.plan === 'free' || !subscription.subscribed
+    isFree: subscription.plan === 'free' && !subscription.isInTrial,
+    isInTrial: subscription.isInTrial
   };
 }
