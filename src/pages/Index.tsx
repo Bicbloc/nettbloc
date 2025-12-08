@@ -20,7 +20,6 @@ import { generateReport, generateCombinedReport } from "@/services/reportService
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { EmailDialog } from "@/components/EmailDialog";
 import { useReportEmail } from "@/hooks/use-report-email";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -132,7 +131,6 @@ const Index = () => {
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
   const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportAction, setReportAction] = useState<"single" | "all">("single");
   const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
@@ -1128,8 +1126,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       }
     }
 
-    // Toujours demander l'email pour le téléchargement du rapport
-    setIsEmailDialogOpen(true);
+    // Ouvrir directement le dialog de rapport
+    setIsReportDialogOpen(true);
   };
   
   const handleGenerateAllReports = async () => {
@@ -1167,8 +1165,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       }
     }
 
-    // Toujours demander l'email pour le téléchargement du rapport
-    setIsEmailDialogOpen(true);
+    // Ouvrir directement le dialog de rapport
+    setIsReportDialogOpen(true);
   };
   
   const totalRooms = rooms.length;
@@ -1836,13 +1834,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     // Notification d'assignation désactivée (admin)
   };
   
-  const handleEmailConfirm = (confirmedEmail: string) => {
-    setEmail(confirmedEmail);
-    setIsEmailDialogOpen(false);
-    
-    // Ouvrir le dialog pour les champs personnalisés
-    setIsReportDialogOpen(true);
-  };
   
   const handleReportConfirm = async (
     confirmedEmail: string,
@@ -2971,11 +2962,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         housekeeperPreferredFloors={housekeeperFloorPreferences}
       />
       
-      <EmailDialog
-        isOpen={isEmailDialogOpen}
-        onClose={() => setIsEmailDialogOpen(false)}
-        onConfirm={handleEmailConfirm}
-      />
       
       <EmailReportDialog
         isOpen={isReportDialogOpen}
