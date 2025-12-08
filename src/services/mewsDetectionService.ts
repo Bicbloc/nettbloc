@@ -110,7 +110,7 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     description: "INS + Arrivée prévue = Chambre déjà prête, pas de nettoyage"
   },
   // INS + Heure arrivée à gauche (MEWS) = Chambre prête, pas de nettoyage
-  // PRIORITÉ 19 pour primer sur toutes les autres règles sauf Out of order
+  // PRIORITÉ MAXIMALE 21 pour primer sur TOUTES les autres règles
   {
     rule_name: "INS + Heure arrivée (gauche) = Propre",
     rule_type: "combined",
@@ -119,7 +119,7 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
       timePosition: "left"
     },
     result: { cleaning_type: "none", status: "ready" },
-    priority: 19,
+    priority: 21,
     is_active: true,
     description: "INS avec heure d'arrivée à gauche (MEWS) = Chambre inspectée, prête pour le client"
   },
@@ -433,6 +433,10 @@ class MewsDetectionService {
     for (const rule of rules) {
       const match = this.evaluateRule(rule, blocks, line);
       if (match) {
+        // Log pour debug
+        console.log(`✅ Règle matchée: "${rule.rule_name}" (priorité ${rule.priority}) → ${rule.result.cleaning_type}`);
+        console.log(`   Blocks: INS=${blocks.status === 'INS'}, timePosition=${blocks.timePosition}, hasGuest=${blocks.hasGuest}`);
+        
         // Construire la raison détaillée
         let detailedReason = rule.rule_name;
         if (blocks.nightInfo) {
