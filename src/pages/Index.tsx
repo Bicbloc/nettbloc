@@ -2095,15 +2095,24 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             {/* Stats Overview Component */}
             <StatsOverview rooms={rooms} housekeeperCount={housekeeperNames.length} />
 
-            <div className="grid gap-6 md:grid-cols-3">
-              <Card className="border-border/50 hover:shadow-modern-lg transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">Actions rapides</CardTitle>
-                  <CardDescription>
-                    Gérez votre planning de nettoyage
-                  </CardDescription>
+            {/* Grid responsive améliorée */}
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
+              {/* Actions rapides */}
+              <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-semibold">Actions rapides</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        Gérez votre planning
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 pt-0">
                   <PdfWorkflowDialog 
                     hotelId={currentHotelId}
                     onWorkflowComplete={(data, housekeepers, distributionMethod) => {
@@ -2117,56 +2126,50 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                     onHousekeeperNamesChange={handleHousekeeperNamesChange}
                     isPremium={isPremium}
                   />
-                  {/* Test notification désactivé */}
-                  <Button 
-                    onClick={() => {
-                      toast({ 
-                        title: "Test désactivé", 
-                        description: "Les notifications de test sont désactivées" 
-                      });
-                    }}
-                    className="w-full mb-2"
-                    disabled
-                    variant="outline"
-                  >
-                    🧪 Tester les notifications
-                  </Button>
                   <Button 
                     onClick={handleDistributeWithValidation}
-                    className="w-full"
+                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20"
                     disabled={housekeeperNames.length === 0 || rooms.length === 0}
                   >
                     <Calendar className="mr-2 h-4 w-4" />
-                    Distribuer
+                    Distribuer automatiquement
                   </Button>
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50 hover:shadow-modern-lg transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">Résumé du planning</CardTitle>
-                  <CardDescription>
-                    Aperçu des chambres et nettoyages
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Chambres doubles:</span>
-                      <span className="text-sm font-medium">{twinRooms}</span>
+              {/* Résumé du planning */}
+              <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-info/5 transition-all duration-300 hover:-translate-y-1">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-info/10 text-info group-hover:bg-info group-hover:text-white transition-colors duration-300">
+                      <Layers className="h-5 w-5" />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Temps total estimé:</span>
-                      <span className="text-sm font-medium">
+                    <div>
+                      <CardTitle className="text-lg font-semibold">Résumé planning</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        Aperçu des nettoyages
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                      <span className="text-sm text-muted-foreground">Chambres doubles</span>
+                      <span className="text-sm font-bold text-foreground">{twinRooms}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                      <span className="text-sm text-muted-foreground">Temps total estimé</span>
+                      <span className="text-sm font-bold text-foreground">
                         {Math.round(
                           (fullCleaningRooms * cleaningConfig.fullCleaningTime + 
                            quickCleaningRooms * cleaningConfig.quickCleaningTime) / 60
                         )}h
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Temps moyen/personne:</span>
-                      <span className="text-sm font-medium">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                      <span className="text-sm text-muted-foreground">Temps moyen/pers.</span>
+                      <span className="text-sm font-bold text-foreground">
                         {housekeeperNames.length > 0 ? 
                           Math.round(
                             (fullCleaningRooms * cleaningConfig.fullCleaningTime + 
@@ -2180,18 +2183,33 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
                 </CardContent>
               </Card>
               
-              <ActiveUsersPanel />
+              {/* Active Users Panel */}
+              <div className="lg:col-span-1">
+                <ActiveUsersPanel />
+              </div>
             </div>
             
-            {/* Section Gestion des femmes de chambre - Simplifiée */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Personnel</CardTitle>
-                <CardDescription>
-                  Gérez vos femmes de chambre et leurs codes d'accès
-                </CardDescription>
+            {/* Section Personnel - Design amélioré */}
+            <Card className="border-border/50 bg-gradient-to-br from-card to-card/80">
+              <CardHeader className="border-b border-border/50">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-success/10 text-success">
+                      <UserIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-semibold">Personnel</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        Gérez vos femmes de chambre et leurs codes d'accès
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="w-fit text-xs px-3 py-1">
+                    {housekeeperNames.length} membre{housekeeperNames.length > 1 ? 's' : ''}
+                  </Badge>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <HousekeeperManagement />
               </CardContent>
             </Card>
