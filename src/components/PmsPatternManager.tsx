@@ -1159,9 +1159,8 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                   <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 rounded-lg font-medium text-sm">
                     <div className="col-span-3">Établissement</div>
                     <div className="col-span-2">Code</div>
-                    <div className="col-span-4">Modèle assigné</div>
-                    <div className="col-span-2">Statut</div>
-                    <div className="col-span-1">Action</div>
+                    <div className="col-span-5">Modèle assigné</div>
+                    <div className="col-span-2">Action</div>
                   </div>
                   
                   {allEstablishments.map((establishment) => (
@@ -1176,33 +1175,22 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                             {establishment.hotel_code || '-'}
                           </Badge>
                         </div>
-                        <div className="col-span-4">
+                        <div className="col-span-5">
                           {establishment.assignedPattern ? (
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary">{establishment.assignedPattern.pms_type}</Badge>
                               <span className="text-sm truncate">
                                 {establishment.assignedPattern.pattern_name || establishment.assignedPattern.report_name}
                               </span>
-                              {establishment.assignedPattern.is_default && (
-                                <Star className="h-3 w-3 fill-primary text-primary" />
+                              {establishment.assignedPattern.validated && (
+                                <Check className="h-3 w-3 text-green-600" />
                               )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm italic">Aucun modèle assigné</span>
                           )}
                         </div>
-                        <div className="col-span-2">
-                          {establishment.allPatterns.length > 0 ? (
-                            <Badge variant="outline" className="text-green-600">
-                              {establishment.allPatterns.length} modèle(s)
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              0 modèle
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="col-span-1">
+                        <div className="col-span-2 flex gap-1">
                           <Button 
                             variant="ghost" 
                             size="sm"
