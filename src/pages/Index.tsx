@@ -2030,66 +2030,119 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
         {/* Hero Header */}
         <HeroHeader hotelName={hotel?.name} isPremium={isPremium} />
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full grid-cols-8 max-w-fit bg-card/50 backdrop-blur-sm border border-border/50">
-              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Layers className="h-4 w-4" />
-                Vue d'ensemble
-              </TabsTrigger>
-              <TabsTrigger value="rooms" className="flex items-center gap-2">
-                <Bed className="h-4 w-4" />
-                Chambres
-              </TabsTrigger>
-              <TabsTrigger value="assignment" className="flex items-center gap-2">
-                <UserIcon className="h-4 w-4" />
-                Affectation
-              </TabsTrigger>
-              <TabsTrigger value="access-codes" className="flex items-center gap-2 relative">
-                <Key className="h-4 w-4" />
-                Codes d'accès
-                <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
-                  !
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="linen" className="flex items-center gap-2">
-                🧺
-                Inventaire Linge
-              </TabsTrigger>
-              <TabsTrigger value="incidents" className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Incidents
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Rapports
-              </TabsTrigger>
-              <TabsTrigger value="mobile" className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4" />
-                Mobile
-              </TabsTrigger>
-            </TabsList>
-            <div className="flex gap-2">
-              <Button
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowActionLogPanel(true)}
-                className="flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                Journal d'actions
-              </Button>
-              <Button
-                variant="outline" 
-                size="sm"
-                onClick={() => navigate('/reports')}
-                className="flex items-center gap-2"
-              >
-                <Archive className="h-4 w-4" />
-                Archives
-              </Button>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" orientation="vertical">
+          <div className="flex gap-6">
+            {/* Sidebar verticale */}
+            <div className="hidden md:flex flex-col w-56 shrink-0">
+              <TabsList className="flex flex-col h-auto bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl p-2 sticky top-4 shadow-lg">
+                <TabsTrigger 
+                  value="overview" 
+                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                >
+                  <Layers className="h-5 w-5" />
+                  <span>Vue d'ensemble</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="rooms" 
+                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                >
+                  <Bed className="h-5 w-5" />
+                  <span>Chambres</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="assignment" 
+                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                >
+                  <UserIcon className="h-5 w-5" />
+                  <span>Affectation</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="access-codes" 
+                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all relative"
+                >
+                  <Key className="h-5 w-5" />
+                  <span>Codes d'accès</span>
+                  <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
+                    !
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="linen" 
+                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                >
+                  <span className="text-lg">🧺</span>
+                  <span>Inventaire Linge</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="incidents" 
+                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                >
+                  <AlertTriangle className="h-5 w-5" />
+                  <span>Incidents</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="reports" 
+                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
+                >
+                  <FileText className="h-5 w-5" />
+                  <span>Rapports</span>
+                </TabsTrigger>
+                
+                {/* Séparateur */}
+                <div className="my-2 border-t border-border/50" />
+                
+                {/* Actions secondaires */}
+                <Button
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowActionLogPanel(true)}
+                  className="w-full justify-start gap-3 px-4 py-3 text-muted-foreground hover:text-foreground"
+                >
+                  <FileText className="h-5 w-5" />
+                  <span>Journal d'actions</span>
+                </Button>
+                <Button
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => navigate('/reports')}
+                  className="w-full justify-start gap-3 px-4 py-3 text-muted-foreground hover:text-foreground"
+                >
+                  <Archive className="h-5 w-5" />
+                  <span>Archives</span>
+                </Button>
+              </TabsList>
             </div>
-          </div>
+
+            {/* Navigation mobile (horizontal) */}
+            <div className="md:hidden w-full mb-4 overflow-x-auto">
+              <TabsList className="inline-flex w-auto min-w-full bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl p-1">
+                <TabsTrigger value="overview" className="flex items-center gap-2 px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  <Layers className="h-4 w-4" />
+                  <span className="hidden sm:inline">Vue d'ensemble</span>
+                </TabsTrigger>
+                <TabsTrigger value="rooms" className="flex items-center gap-2 px-3 py-2">
+                  <Bed className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="assignment" className="flex items-center gap-2 px-3 py-2">
+                  <UserIcon className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="access-codes" className="flex items-center gap-2 px-3 py-2">
+                  <Key className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="linen" className="flex items-center gap-2 px-3 py-2">
+                  🧺
+                </TabsTrigger>
+                <TabsTrigger value="incidents" className="flex items-center gap-2 px-3 py-2">
+                  <AlertTriangle className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="reports" className="flex items-center gap-2 px-3 py-2">
+                  <FileText className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Contenu principal */}
+            <div className="flex-1 min-w-0">
 
           <TabsContent value="overview" className="space-y-6 animate-fade-in">
             {/* Stats Overview Component */}
@@ -2737,96 +2790,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
             </Card>
           </TabsContent>
 
-          <TabsContent value="mobile" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Accès mobile</h2>
-            </div>
-
-            {!canAccessFeature('mobile_access') ? (
-              <Alert className="border-premium">
-                <Lock className="h-4 w-4" />
-                <AlertTitle>Fonctionnalité Premium</AlertTitle>
-                <AlertDescription className="flex flex-col gap-4">
-                  <p>L'accès mobile aux codes d'accès pour les femmes de chambre est réservé aux utilisateurs Premium.</p>
-                  <UpgradeButton />
-                </AlertDescription>
-              </Alert>
-            ) : !isDistributed ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Distribution requise</AlertTitle>
-                <AlertDescription>
-                  Vous devez d'abord distribuer les chambres pour générer les codes d'accès mobile.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <NotificationBell />
-                  <Badge variant="premium" className="gap-1">
-                    <Smartphone className="h-3 w-3" />
-                    Accès Mobile Premium
-                  </Badge>
-                </div>
-                
-                {/* Affichage des femmes de chambre avec leurs codes d'accès */}
-                {housekeeperNames.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-4">Accès femmes de chambre</h3>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {housekeeperNames.map((name) => {
-                        const housekeeperRooms = getHousekeeperRooms(name);
-                        const housekeeper = housekeepers.find(h => h.name === name);
-                        
-                        return (
-                          <Card key={name}>
-                            <CardHeader>
-                              <CardTitle className="flex items-center justify-between">
-                                <span>{name}</span>
-                                <Badge variant="secondary">
-                                  {housekeeperRooms.length} chambres
-                                </Badge>
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="space-y-4">
-                                {/* Code d'accès affiché en premier */}
-                                {housekeeper?.access_code && (
-                                  <div className="text-center">
-                                    <div className="bg-primary/10 px-3 py-2 rounded-lg border">
-                                      <div className="text-xs text-muted-foreground mb-1">Code d'accès</div>
-                                      <div className="font-mono font-bold text-lg text-primary">
-                                        {housekeeper.access_code}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                <div className="text-sm text-muted-foreground">
-                                  Chambres assignées: {housekeeperRooms.map(r => r.number).join(', ')}
-                                </div>
-                                
-                                <div className="text-center">
-                                  <Button
-                                    onClick={() => window.open(`/housekeeper/login`, '_blank')}
-                                    className="w-full"
-                                    size="sm"
-                                  >
-                                    <Smartphone className="mr-2 h-4 w-4" />
-                                    Ouvrir interface femme de chambre
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </TabsContent>
 
           <TabsContent value="linen" className="space-y-6">
             <div className="flex items-center justify-between mb-6">
@@ -2968,6 +2931,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
               </TabsContent>
             </Tabs>
           </TabsContent>
+            </div>
+          </div>
         </Tabs>
       </div>
 
