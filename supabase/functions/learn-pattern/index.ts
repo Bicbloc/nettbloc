@@ -259,6 +259,7 @@ Réponds en JSON:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        max_tokens: 16000,
       }),
     });
 
@@ -329,6 +330,9 @@ function parseJsonFromResponse(text: string): any {
         return JSON.parse(jsonMatch[1]);
       } catch (e) {
         console.error("Failed to parse JSON from code block:", e);
+        // Essayer de réparer le JSON tronqué
+        const repaired = repairTruncatedJson(jsonMatch[1]);
+        if (repaired) return repaired;
       }
     }
     
@@ -339,10 +343,66 @@ function parseJsonFromResponse(text: string): any {
         return JSON.parse(objectMatch[0]);
       } catch (e) {
         console.error("Failed to parse JSON object:", e);
+        // Essayer de réparer le JSON tronqué
+        const repaired = repairTruncatedJson(objectMatch[0]);
+        if (repaired) return repaired;
       }
     }
     
     console.error("Could not extract JSON from response:", text.substring(0, 500));
     throw new Error("Impossible d'extraire le JSON de la réponse IA");
+  }
+}
+
+// Réparer un JSON tronqué en fermant les accolades/crochets manquants
+function repairTruncatedJson(jsonStr: string): any {
+  try {
+    // Compter les accolades et crochets ouverts
+    let braces = 0;
+    let brackets = 0;
+    let inString = false;
+    let escape = false;
+    
+    for (const char of jsonStr) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char === '\\') {
+        escape = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      
+      if (char === '{') braces++;
+      else if (char === '}') braces--;
+      else if (char === '[') brackets++;
+      else if (char === ']') brackets--;
+    }
+    
+    // Nettoyer la fin si elle est dans un état invalide
+    let cleaned = jsonStr.trim();
+    
+    // Si on est au milieu d'une string, la fermer
+    if (inString) {
+      cleaned += '"';
+    }
+    
+    // Supprimer une virgule ou deux-points trailing
+    cleaned = cleaned.replace(/[,:]?\s*$/, '');
+    
+    // Fermer les crochets et accolades manquants
+    cleaned += ']'.repeat(Math.max(0, brackets));
+    cleaned += '}'.repeat(Math.max(0, braces));
+    
+    console.log("Attempting to parse repaired JSON...");
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("Failed to repair JSON:", e);
+    return null;
   }
 }
