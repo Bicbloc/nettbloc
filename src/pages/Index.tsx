@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import UserMenu from "@/components/UserMenu";
@@ -65,8 +65,6 @@ import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
 import { RolePermissionsManager } from "@/components/incident/RolePermissionsManager";
 import { IncidentReportPrint } from "@/components/incident/IncidentReportPrint";
 import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicator";
-
-
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
 import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
 import { SupabaseService } from "@/services/supabaseService";
@@ -85,7 +83,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { StatsOverview } from "@/components/StatsOverview";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
-import { useCallback } from "react";
+import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -125,6 +123,22 @@ const Index = () => {
   
   // Utiliser l'hotel du hook useAutoSetup comme source unique de vérité
   const currentHotelId = hotel?.id || null;
+  
+  // Hook pour vérifier si c'est la première connexion et si le setup initial est requis
+  const { needsSetup, loading: setupCheckLoading } = useFirstTimeSetup(currentHotelId);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  
+  // Afficher le wizard si nécessaire
+  useEffect(() => {
+    if (!setupCheckLoading && needsSetup && isAuthenticated && currentHotelId) {
+      setShowSetupWizard(true);
+    }
+  }, [needsSetup, setupCheckLoading, isAuthenticated, currentHotelId]);
+  
+  const handleSetupComplete = (newConfig: CleaningConfig) => {
+    setCleaningConfig(newConfig);
+    setShowSetupWizard(false);
+  };
   
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
@@ -1927,6 +1941,17 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* First Time Setup Wizard */}
+      {hotel && (
+        <FirstTimeSetupWizard
+          isOpen={showSetupWizard}
+          onComplete={handleSetupComplete}
+          hotelCode={hotel.hotel_code || ''}
+          hotelId={hotel.id}
+          isPremium={isPremium}
+        />
+      )}
+      
       <div className="container mx-auto py-6 px-4 md:px-6">
          {/* Modern Header */}
          <div className="flex justify-between items-center mb-8">
