@@ -179,6 +179,42 @@ export function IncidentList({ hotelId }: IncidentListProps) {
     },
   });
 
+  const updateCommentMutation = useMutation({
+    mutationFn: async ({ commentId, comment }: { commentId: string; comment: string }) => {
+      const { error } = await supabase
+        .from("incident_comments")
+        .update({ comment })
+        .eq("id", commentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      toast({ title: "Commentaire modifié" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la modification", variant: "destructive" });
+    }
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const { error } = await supabase
+        .from("incident_comments")
+        .delete()
+        .eq("id", commentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
+      toast({ title: "Commentaire supprimé" });
+    },
+    onError: () => {
+      toast({ title: "Erreur lors de la suppression", variant: "destructive" });
+    }
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -269,6 +305,12 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                   assignStaffMutation.mutate({ incidentId: incident.id, staffId })
                 }
                 onAddComment={() => setSelectedIncident(incident.id)}
+                onEditComment={(commentId, newText) =>
+                  updateCommentMutation.mutate({ commentId, comment: newText })
+                }
+                onDeleteComment={(commentId) =>
+                  deleteCommentMutation.mutate(commentId)
+                }
               />
             ))
           )}
