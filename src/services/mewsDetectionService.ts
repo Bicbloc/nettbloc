@@ -32,6 +32,7 @@ export interface DetectionRule {
     value?: string | number;
     hasGuest?: boolean;
     statusPattern?: string;
+    timePosition?: 'left' | 'right'; // Position de l'heure: gauche = arrivée, droite = départ (MEWS)
   };
   result: {
     cleaning_type: CleaningType | 'none';
