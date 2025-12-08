@@ -109,6 +109,19 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     is_active: true,
     description: "INS + Arrivée prévue = Chambre déjà prête, pas de nettoyage"
   },
+  // INS + Heure arrivée à gauche (MEWS) = Chambre prête, pas de nettoyage
+  {
+    rule_name: "INS + Heure arrivée (gauche) = Propre",
+    rule_type: "combined",
+    condition: { 
+      statusPattern: "\\bINS\\b", 
+      timePosition: "left"
+    },
+    result: { cleaning_type: "none", status: "ready" },
+    priority: 15,
+    is_active: true,
+    description: "INS avec heure d'arrivée à gauche (MEWS) = Chambre inspectée, prête pour le client"
+  },
   // INS/SAL sans client = Propre (pas de nettoyage)
   {
     rule_name: "INS/SAL sans client = Propre",
