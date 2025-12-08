@@ -101,7 +101,7 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
       condition.field = 'nightInfo.current';
     }
 
-    const rule = await mewsDetectionService.saveRule(hotelId, userId, {
+    const result = await mewsDetectionService.saveRule(hotelId, userId, {
       rule_name: newRule.rule_name,
       rule_type: newRule.rule_type,
       condition,
@@ -111,8 +111,13 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
       description: newRule.description
     });
 
-    if (rule) {
-      toast.success('Règle ajoutée');
+    if (result.error) {
+      toast.error(`Erreur: ${result.error}`);
+      return;
+    }
+
+    if (result.rule) {
+      toast.success('Règle ajoutée avec succès');
       setIsAddDialogOpen(false);
       setNewRule({
         rule_name: '',
@@ -127,7 +132,7 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
       });
       loadRules();
     } else {
-      toast.error('Erreur lors de l\'ajout');
+      toast.error('Erreur lors de l\'ajout de la règle');
     }
   };
 
