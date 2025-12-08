@@ -343,13 +343,16 @@ class MewsDetectionService {
       console.log(`📚 Patterns trouvés pour hôtel ${hotelId}:`, data?.length || 0);
 
       // Extraire les chambres validées et les stocker dans la map
+      // NOTE: Le flag "validated" est au niveau du pattern (vérifié dans la requête SQL),
+      // pas au niveau de chaque chambre individuelle
       for (const pattern of data || []) {
         console.log(`   📋 Pattern: ${pattern.pattern_name}, assigned_to: ${pattern.assigned_to_hotel_id}, hotel_id: ${pattern.hotel_id}`);
         
         const extractedData = pattern.extracted_data as any[];
         if (Array.isArray(extractedData)) {
           for (const room of extractedData) {
-            if (room.roomNumber && room.validated) {
+            // On ne vérifie plus room.validated car le pattern entier est validé
+            if (room.roomNumber) {
               // Normaliser le numéro de chambre
               const normalizedNumber = String(parseInt(room.roomNumber, 10)).padStart(3, '0');
               this.validatedPatterns.set(normalizedNumber, {
@@ -357,6 +360,7 @@ class MewsDetectionService {
                 cleaningType: room.cleaningType || 'none',
                 status: room.status || 'clean'
               });
+              console.log(`      ✅ Chambre ${normalizedNumber}: ${room.cleaningType || 'none'} / ${room.status || 'clean'}`);
             }
           }
         }
