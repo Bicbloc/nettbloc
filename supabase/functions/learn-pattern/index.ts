@@ -19,38 +19,43 @@ RÈGLE 0 - Out of order (priorité maximale):
 - Si "Out of order", "OOO", "HS", "Hors service" → AUCUN nettoyage
 - cleaningType = "none", status = "out_of_order"
 
-RÈGLE 1 - Chambre vide (VAC/VACANT) = Propre OU À Blanc selon statut:
+RÈGLE 1 - CLIENT AVEC DATE ARRIVÉE + DATE DÉPART = RECOUCHE (TRÈS IMPORTANT):
+- Si la ligne contient un nom de client + 2 dates (arrivée et départ) → c'est un séjour en cours = RECOUCHE
+- Ex: "102 SGL DIR Farid GAOUTARA 04/05/2025 1× Adults Guoda 07/05/2025" = RECOUCHE
+- Le "DIR" ici indique le départ FUTUR, pas un départ aujourd'hui
+- cleaningType = "quick" (recouche), status = "stayover"
+
+RÈGLE 2 - Chambre vide (VAC/VACANT) = Propre OU À Blanc selon statut:
 - Si "VAC", "VACANT" ou chambre vide ET statut "INS" ou "SAL" → AUCUN nettoyage (déjà propre)
-- Si "VAC" + "DIR" ou "DEP" → À BLANC (départ, à nettoyer)
+- Si "VAC" + "DIR" ou "DEP" sans dates de séjour → À BLANC (départ effectué)
 - cleaningType = "none" si propre, "full" si départ
 
-RÈGLE 2 - DIR/DEP = TOUJOURS À BLANC (peu importe le statut):
-- Si statut "DIR", "DEP", "DEPART", "CHECKOUT", "OUT" → À BLANC
-- Que la chambre soit vide ou non, un départ = nettoyage complet
+RÈGLE 3 - DIR/DEP SANS CLIENT = À BLANC:
+- Si statut "DIR", "DEP", "DEPART", "CHECKOUT", "OUT" SANS nom de client → À BLANC
+- Chambre vide après départ = nettoyage complet
 - cleaningType = "full" ou "a_blanc"
 
-RÈGLE 3 - INS/SAL sans client = Chambre propre:
+RÈGLE 4 - INS/SAL sans client = Chambre propre:
 - Si statut "INS" ou "SAL" ET pas de nom de client → AUCUN nettoyage (chambre vide et propre)
 - cleaningType = "none", status = "clean"
 - Ex: "101 INS" sans nom = chambre propre, pas besoin de nettoyer
 
-RÈGLE 4 - Nuit X/Y (Pattern le plus fiable quand client présent):
+RÈGLE 5 - Nuit X/Y (Pattern très fiable quand client présent):
 - Si "Nuit 2/3", "Nuit 3/5", "Night 2/4" → X > 1 = RECOUCHE (client reste)
 - Si "Nuit 1/3", "Night 1/2" → X = 1 = À BLANC (premier jour, arrivée)
 - Si pas de "Nuit X/Y" → vérifier les autres règles
 
-RÈGLE 5 - Blocs de réservation (heures):
+RÈGLE 6 - Blocs de réservation (heures):
 - Si 2 heures dans la ligne (ex: "11:00" et "15:00") → départ + arrivée même jour = À BLANC
 - Si heure départ seule (08:00-12:00) sans heure arrivée → départ = À BLANC
 - Si heure arrivée seule (14:00-19:00) sans heure départ → arrivée = À BLANC
 
-RÈGLE 6 - Mots-clés de statut avec client:
+RÈGLE 7 - Mots-clés de statut avec client:
 - SAL + nom client → RECOUCHE
-- DIR, DEP, DEPART, CHECKOUT, OUT + nom client → À BLANC
 - INS, STAYOVER, OCC, OCCUPIED + nom client → RECOUCHE
 - ARR, ARRIVAL, CHECKIN, IN → À BLANC (arrivée)
 
-PRIORITÉ: Exclusion Staff > Règle 0 > Règle 2 > Règle 1 > Règle 3 > Règle 4 > Règle 5 > Règle 6
+PRIORITÉ: Exclusion Staff > Règle 0 > Règle 1 (dates) > Règle 3 (DIR sans client) > Règle 2 > Règle 4 > Règle 5 > Règle 6 > Règle 7
 
 DÉTECTION DE PRÉSENCE CLIENT (pas staff):
 - Un client est présent si: nom propre visible (ex: "Jean DUPONT", "Lucy NORTHEAST")

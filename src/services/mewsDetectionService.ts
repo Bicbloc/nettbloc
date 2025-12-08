@@ -54,18 +54,32 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     is_active: true,
     description: "Chambre hors service - pas de nettoyage"
   },
-  // PRIORITÉ HAUTE: DIR/DEP = TOUJOURS À Blanc (peu importe le statut ou client)
+  // PRIORITÉ TRÈS HAUTE: Client avec date arrivée ET départ = Recouche (séjour en cours)
+  // Ex: "102 SGL DIR Farid GAOUTARA 04/05/2025 1× Adults Guoda 07/05/2025" = Recouche car séjour du 04 au 07
   {
-    rule_name: "DIR/DEP = À Blanc (départ)",
-    rule_type: "status_keyword",
+    rule_name: "Client avec dates arrivée+départ = Recouche",
+    rule_type: "combined",
     condition: { 
-      pattern: "\\b(DIR|DEP|DEPART|CHECKOUT|OUT)\\b", 
-      operator: "regex_match" 
+      statusPattern: "\\d{1,2}[/\\-]\\d{1,2}[/\\-]\\d{4}.*\\d{1,2}[/\\-]\\d{1,2}[/\\-]\\d{4}", 
+      hasGuest: true 
+    },
+    result: { cleaning_type: "recouche", status: "stayover" },
+    priority: 18,
+    is_active: true,
+    description: "Client avec date d'arrivée ET date de départ = séjour en cours → Recouche"
+  },
+  // DIR/DEP SANS client ou chambre vide = À Blanc
+  {
+    rule_name: "DIR/DEP sans client = À Blanc",
+    rule_type: "combined",
+    condition: { 
+      statusPattern: "\\b(DIR|DEP|DEPART|CHECKOUT|OUT)\\b", 
+      hasGuest: false 
     },
     result: { cleaning_type: "a_blanc", status: "checkout" },
     priority: 17,
     is_active: true,
-    description: "Départ = TOUJOURS À Blanc, peu importe le statut"
+    description: "Départ sans client présent = À Blanc"
   },
   // Chambre vide (VAC) + INS = Propre (pas de nettoyage)
   {
