@@ -5,65 +5,70 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Règles métier AMÉLIORÉES pour la détection du type de nettoyage
-const MEWS_CLEANING_RULES = `
-LOGIQUE MÉTIER POUR DÉTECTION DU TYPE DE NETTOYAGE:
+// Règles métier simplifiées
+const CLEANING_RULES = `
+RÈGLES DE DÉTECTION:
+1. Out of order/OOO/HS → cleaningType="none"
+2. Client avec 2 dates (arrivée+départ) = séjour en cours → cleaningType="quick" (recouche)
+3. DIR/DEP SANS client → cleaningType="full" (à blanc)
+4. INS/SAL SANS client → cleaningType="none" (propre)
+5. Nuit X/Y avec X>1 → cleaningType="quick" (recouche)
+6. Nuit 1/Y → cleaningType="full" (arrivée)
+7. 2 heures (départ+arrivée) → cleaningType="full"
 
-⚠️ EXCLUSION STAFF - TRÈS IMPORTANT:
-- IGNORER les noms de staff/superviseurs: "Farid", "Superviseur", "Manager", "Directeur", "Chef", etc.
-- Ces personnes NE SONT PAS des clients et ne doivent pas être considérés comme "hasGuest"
-- Si le même nom apparaît plusieurs fois dans le rapport = probablement staff, pas client
-- Les vrais clients ont généralement format "Prénom NOM" ou "NOM Prénom"
-
-RÈGLE 0 - Out of order (priorité maximale):
-- Si "Out of order", "OOO", "HS", "Hors service" → AUCUN nettoyage
-- cleaningType = "none", status = "out_of_order"
-
-RÈGLE 1 - CLIENT AVEC DATE ARRIVÉE + DATE DÉPART = RECOUCHE (TRÈS IMPORTANT):
-- Si la ligne contient un nom de client + 2 dates (arrivée et départ) → c'est un séjour en cours = RECOUCHE
-- Ex: "102 SGL DIR Farid GAOUTARA 04/05/2025 1× Adults Guoda 07/05/2025" = RECOUCHE
-- Le "DIR" ici indique le départ FUTUR, pas un départ aujourd'hui
-- cleaningType = "quick" (recouche), status = "stayover"
-
-RÈGLE 2 - Chambre vide (VAC/VACANT) = Propre OU À Blanc selon statut:
-- Si "VAC", "VACANT" ou chambre vide ET statut "INS" ou "SAL" → AUCUN nettoyage (déjà propre)
-- Si "VAC" + "DIR" ou "DEP" sans dates de séjour → À BLANC (départ effectué)
-- cleaningType = "none" si propre, "full" si départ
-
-RÈGLE 3 - DIR/DEP SANS CLIENT = À BLANC:
-- Si statut "DIR", "DEP", "DEPART", "CHECKOUT", "OUT" SANS nom de client → À BLANC
-- Chambre vide après départ = nettoyage complet
-- cleaningType = "full" ou "a_blanc"
-
-RÈGLE 4 - INS/SAL sans client = Chambre propre:
-- Si statut "INS" ou "SAL" ET pas de nom de client → AUCUN nettoyage (chambre vide et propre)
-- cleaningType = "none", status = "clean"
-- Ex: "101 INS" sans nom = chambre propre, pas besoin de nettoyer
-
-RÈGLE 5 - Nuit X/Y (Pattern très fiable quand client présent):
-- Si "Nuit 2/3", "Nuit 3/5", "Night 2/4" → X > 1 = RECOUCHE (client reste)
-- Si "Nuit 1/3", "Night 1/2" → X = 1 = À BLANC (premier jour, arrivée)
-- Si pas de "Nuit X/Y" → vérifier les autres règles
-
-RÈGLE 6 - Blocs de réservation (heures):
-- Si 2 heures dans la ligne (ex: "11:00" et "15:00") → départ + arrivée même jour = À BLANC
-- Si heure départ seule (08:00-12:00) sans heure arrivée → départ = À BLANC
-- Si heure arrivée seule (14:00-19:00) sans heure départ → arrivée = À BLANC
-
-RÈGLE 7 - Mots-clés de statut avec client:
-- SAL + nom client → RECOUCHE
-- INS, STAYOVER, OCC, OCCUPIED + nom client → RECOUCHE
-- ARR, ARRIVAL, CHECKIN, IN → À BLANC (arrivée)
-
-PRIORITÉ: Exclusion Staff > Règle 0 > Règle 1 (dates) > Règle 3 (DIR sans client) > Règle 2 > Règle 4 > Règle 5 > Règle 6 > Règle 7
-
-DÉTECTION DE PRÉSENCE CLIENT (pas staff):
-- Un client est présent si: nom propre visible (ex: "Jean DUPONT", "Lucy NORTHEAST")
-- Ou pattern "X × Adultes" avec X > 0
-- EXCLURE: noms qui apparaissent plusieurs fois (= staff)
-- EXCLURE: mots-clés staff (Superviseur, Manager, Directeur, Chef, Farid, etc.)
-- Pas de client si: ligne ne contient que numéro + statut sans nom
+EXCLURE du comptage client: staff, superviseur, manager, farid (noms répétés)
 `;
+
+// Définition du tool pour extraction structurée
+const extractionTool = {
+  type: "function",
+  function: {
+    name: "extract_rooms",
+    description: "Extraire les chambres du rapport avec leur type de nettoyage",
+    parameters: {
+      type: "object",
+      properties: {
+        rooms: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              roomNumber: { type: "string", description: "Numéro de chambre" },
+              cleaningType: { 
+                type: "string", 
+                enum: ["full", "quick", "none"],
+                description: "full=à blanc, quick=recouche, none=pas de nettoyage" 
+              },
+              status: { 
+                type: "string",
+                enum: ["checkout", "stayover", "arrival", "clean", "out_of_order", "occupied"],
+                description: "Statut de la chambre"
+              },
+              hasGuest: { type: "boolean", description: "Client présent (nom visible)" },
+              guestName: { type: "string", description: "Nom du client si présent" },
+              rawStatus: { type: "string", description: "Statut brut du rapport (DIR/INS/SAL)" },
+              nightInfo: { type: "string", description: "Info Nuit X/Y si présente" },
+              arrivalDate: { type: "string", description: "Date arrivée DD/MM/YYYY" },
+              departureDate: { type: "string", description: "Date départ DD/MM/YYYY" },
+              reason: { type: "string", description: "Raison courte de la décision" }
+            },
+            required: ["roomNumber", "cleaningType", "status", "hasGuest", "reason"]
+          }
+        },
+        patterns: {
+          type: "object",
+          properties: {
+            roomFormat: { type: "string", description: "Format numéro chambre détecté" },
+            statusKeywords: { type: "array", items: { type: "string" }, description: "Mots-clés statut trouvés" },
+            hasNightInfo: { type: "boolean", description: "Présence de Nuit X/Y" }
+          },
+          required: ["roomFormat", "statusKeywords", "hasNightInfo"]
+        }
+      },
+      required: ["rooms", "patterns"]
+    }
+  }
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -77,175 +82,24 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Mode "apply" : appliquer les patterns appris à tout le texte
-    if (mode === 'apply') {
-      const applyPrompt = `Tu es un expert en extraction de données de rapports PDF d'hôtel.
+    const textToAnalyze = mode === 'apply' ? fullText : textSample;
+    const patternsInfo = learnedPatterns ? `\nPatterns appris: ${JSON.stringify(learnedPatterns)}` : '';
+    const annotationsInfo = annotations?.length ? `\nExemples annotés: ${JSON.stringify(annotations)}` : '';
 
-Voici des patterns qui ont été appris à partir d'annotations manuelles:
-${JSON.stringify(learnedPatterns, null, 2)}
+    const prompt = `Analyse ce rapport d'hôtel et extrais TOUTES les chambres.
 
-${MEWS_CLEANING_RULES}
+${CLEANING_RULES}
 
-Applique ces patterns au texte complet suivant et extrait TOUTES les chambres avec leurs informations.
+Contexte: PMS=${context?.pmsType || 'inconnu'}, Rapport=${context?.reportName || 'inconnu'}
+${patternsInfo}
+${annotationsInfo}
 
-Texte complet:
-${fullText}
+TEXTE DU RAPPORT:
+${textToAnalyze}
 
-IMPORTANT - NOUVELLE LOGIQUE:
-1. D'abord vérifie si "Out of order" → cleaningType = "none"
-2. Puis vérifie si statut (INS/SAL/DIR) SANS nom de client → si INS/SAL sans client = "none" (propre)
-3. Si DIR sans client = "full" (à blanc)
-4. Si client présent, applique les règles Nuit X/Y ou heures
-5. "Nuit X/Y" avec X > 1 = TOUJOURS "quick" (recouche)
-6. 2 blocs d'heures (départ + arrivée) = TOUJOURS "full" (à blanc)
+Extrais chaque chambre avec son type de nettoyage. Sois précis sur hasGuest (vrai seulement si nom de client visible).`;
 
-Pour chaque chambre, indique:
-- hasGuest: true/false (y a-t-il un nom de client visible?)
-- rawStatus: le statut brut détecté (INS, DIR, SAL, etc.)
-- detectionReason: explication complète de la décision
-
-Retourne un JSON avec la structure:
-{
-  "rooms": [
-    {
-      "roomNumber": "101",
-      "status": "clean|dirty|occupied|checkout|arrival|stayover|out_of_order",
-      "cleaningType": "full|quick|none",
-      "arrivalDate": "DD/MM/YYYY ou vide",
-      "departureDate": "DD/MM/YYYY ou vide",
-      "guestName": "nom du client ou null si pas de client",
-      "nightInfo": "Nuit X/Y si disponible",
-      "confidence": 0.0-1.0,
-      "hasGuest": true|false,
-      "rawStatus": "INS|DIR|SAL|etc",
-      "detectionReason": "Règle utilisée avec explication détaillée"
-    }
-  ],
-  "totalFound": nombre_total_chambres
-}`;
-
-      const applyResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "user", content: applyPrompt },
-          ],
-        }),
-      });
-
-      if (!applyResponse.ok) {
-        const errorText = await applyResponse.text();
-        console.error("AI gateway error:", applyResponse.status, errorText);
-        
-        if (applyResponse.status === 429) {
-          return new Response(
-            JSON.stringify({ error: "Limite de requêtes dépassée. Réessayez plus tard." }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        if (applyResponse.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Crédits insuffisants. Ajoutez des crédits à votre workspace." }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        throw new Error(`AI gateway error: ${applyResponse.status}`);
-      }
-
-      const applyData = await applyResponse.json();
-      const applyContent = applyData.choices[0]?.message?.content || "";
-      
-      const extractedRooms = parseJsonFromResponse(applyContent);
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          mode: 'apply',
-          extractedRooms: extractedRooms,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Mode "learn" : apprendre à partir de quelques annotations et appliquer au reste
-    const systemPrompt = `Tu es un expert en extraction de données de rapports PDF d'hôtel. Tu dois:
-1. Analyser les annotations fournies par l'utilisateur (quelques exemples)
-2. Identifier les patterns (format de chambre, mots-clés de statut, format de dates)
-3. Appliquer ces patterns à TOUT le texte pour extraire toutes les chambres
-
-Contexte:
-- Type PMS: ${context?.pmsType || 'inconnu'}
-- Nom du rapport: ${context?.reportName || 'inconnu'}
-- Hotel ID: ${context?.hotelId || 'inconnu'}
-
-${MEWS_CLEANING_RULES}
-
-IMPORTANT: 
-- Les patterns doivent être SPÉCIFIQUES à ce format de rapport
-- Utilise les annotations comme exemples pour comprendre le format
-- Extrait TOUTES les chambres du texte, pas seulement celles annotées
-- Applique STRICTEMENT les règles métier pour le type de nettoyage
-- DÉTECTE si chaque chambre a un client (nom visible) ou non`;
-
-    const userPrompt = `Voici le texte COMPLET du rapport:
-${textSample}
-
-Annotations manuelles (exemples fournis par l'utilisateur):
-${JSON.stringify(annotations, null, 2)}
-
-À partir de ces ${annotations?.length || 0} annotations exemples, identifie les patterns et extrait TOUTES les chambres du texte.
-
-Pour CHAQUE chambre:
-1. Détermine d'abord s'il y a un client (nom visible dans la ligne)
-2. Vérifie le statut brut (INS, DIR, SAL, etc.)
-3. Applique les règles métier:
-   - Out of order → none
-   - INS/SAL sans client → none (propre)
-   - DIR sans client → full (à blanc)
-   - Nuit X/Y avec X > 1 → quick (recouche)
-   - 2 heures (départ + arrivée) → full (à blanc)
-
-Réponds en JSON:
-{
-  "patterns": {
-    "roomNumberFormat": "description du format de numéro de chambre détecté",
-    "roomNumberRegex": "regex pour capturer les numéros",
-    "statusKeywords": {
-      "MOT_CLE": { "status": "dirty|clean|occupied|checkout|arrival|stayover", "cleaning": "full|quick|none" }
-    },
-    "dateFormat": "format de date détecté",
-    "lineFormat": "description du format de ligne",
-    "nightInfoPattern": "pattern pour Nuit X/Y si détecté",
-    "guestDetectionPattern": "pattern pour détecter les noms de clients",
-    "timePatterns": {
-      "departure": "pattern pour heures de départ",
-      "arrival": "pattern pour heures d'arrivée"
-    }
-  },
-  "rooms": [
-    {
-      "roomNumber": "101",
-      "status": "clean",
-      "cleaningType": "none",
-      "arrivalDate": "",
-      "departureDate": "",
-      "guestName": null,
-      "nightInfo": "",
-      "confidence": 0.95,
-      "hasGuest": false,
-      "rawStatus": "INS",
-      "detectionReason": "INS sans client = Chambre propre, pas de nettoyage",
-      "originalLine": "ligne du texte original"
-    }
-  ],
-  "totalFound": nombre_chambres,
-  "suggestions": ["suggestion 1", "suggestion 2"]
-}`;
+    console.log("Calling AI with tool calling, text length:", textToAnalyze?.length || 0);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -256,59 +110,80 @@ Réponds en JSON:
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: prompt }
         ],
-        max_tokens: 16000,
+        tools: [extractionTool],
+        tool_choice: { type: "function", function: { name: "extract_rooms" } }
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
+      const status = response.status;
+      console.error("AI gateway error:", status);
+      
+      if (status === 429) {
         return new Response(
           JSON.stringify({ error: "Limite de requêtes dépassée. Réessayez plus tard." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (status === 402) {
         return new Response(
-          JSON.stringify({ error: "Crédits insuffisants. Ajoutez des crédits à votre workspace." }),
+          JSON.stringify({ error: "Crédits insuffisants." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`AI gateway error: ${status}`);
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0]?.message?.content || "";
+    console.log("AI response received");
 
-    console.log("AI Response received, length:", aiResponse.length);
+    // Extraire les arguments du tool call
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (!toolCall?.function?.arguments) {
+      // Fallback: essayer de parser le content comme JSON
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        console.log("No tool call, trying content parse");
+        const parsed = parseJsonFromContent(content);
+        if (parsed) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              mode: mode || 'learn',
+              rooms: parsed.rooms || [],
+              patterns: parsed.patterns || {},
+              totalFound: parsed.rooms?.length || 0
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      throw new Error("Pas de réponse structurée de l'IA");
+    }
 
-    // Extraire le JSON de la réponse
-    const result = parseJsonFromResponse(aiResponse);
+    const result = JSON.parse(toolCall.function.arguments);
+    console.log("Extracted rooms:", result.rooms?.length || 0);
 
     return new Response(
       JSON.stringify({
         success: true,
-        mode: 'learn',
-        patterns: result.patterns || {},
+        mode: mode || 'learn',
         rooms: result.rooms || [],
-        totalFound: result.totalFound || result.rooms?.length || 0,
-        suggestions: result.suggestions || [],
-        rawResponse: aiResponse
+        patterns: result.patterns || {},
+        totalFound: result.rooms?.length || 0,
+        extractedRooms: mode === 'apply' ? result : undefined
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (error) {
-    console.error("Error in learn-pattern function:", error);
+    console.error("Error in learn-pattern:", error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Erreur inconnue",
       }),
       {
         status: 500,
@@ -318,91 +193,22 @@ Réponds en JSON:
   }
 });
 
-function parseJsonFromResponse(text: string): any {
+function parseJsonFromContent(text: string): any {
   try {
-    // Essayer de parser directement
     return JSON.parse(text);
   } catch {
-    // Essayer d'extraire le JSON d'un bloc de code
     const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[1]);
-      } catch (e) {
-        console.error("Failed to parse JSON from code block:", e);
-        // Essayer de réparer le JSON tronqué
-        const repaired = repairTruncatedJson(jsonMatch[1]);
-        if (repaired) return repaired;
-      }
+      } catch {}
     }
-    
-    // Essayer de trouver un objet JSON dans le texte
     const objectMatch = text.match(/\{[\s\S]*\}/);
     if (objectMatch) {
       try {
         return JSON.parse(objectMatch[0]);
-      } catch (e) {
-        console.error("Failed to parse JSON object:", e);
-        // Essayer de réparer le JSON tronqué
-        const repaired = repairTruncatedJson(objectMatch[0]);
-        if (repaired) return repaired;
-      }
+      } catch {}
     }
-    
-    console.error("Could not extract JSON from response:", text.substring(0, 500));
-    throw new Error("Impossible d'extraire le JSON de la réponse IA");
-  }
-}
-
-// Réparer un JSON tronqué en fermant les accolades/crochets manquants
-function repairTruncatedJson(jsonStr: string): any {
-  try {
-    // Compter les accolades et crochets ouverts
-    let braces = 0;
-    let brackets = 0;
-    let inString = false;
-    let escape = false;
-    
-    for (const char of jsonStr) {
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (char === '\\') {
-        escape = true;
-        continue;
-      }
-      if (char === '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) continue;
-      
-      if (char === '{') braces++;
-      else if (char === '}') braces--;
-      else if (char === '[') brackets++;
-      else if (char === ']') brackets--;
-    }
-    
-    // Nettoyer la fin si elle est dans un état invalide
-    let cleaned = jsonStr.trim();
-    
-    // Si on est au milieu d'une string, la fermer
-    if (inString) {
-      cleaned += '"';
-    }
-    
-    // Supprimer une virgule ou deux-points trailing
-    cleaned = cleaned.replace(/[,:]?\s*$/, '');
-    
-    // Fermer les crochets et accolades manquants
-    cleaned += ']'.repeat(Math.max(0, brackets));
-    cleaned += '}'.repeat(Math.max(0, braces));
-    
-    console.log("Attempting to parse repaired JSON...");
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("Failed to repair JSON:", e);
     return null;
   }
 }
