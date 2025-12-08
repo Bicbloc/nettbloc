@@ -9,8 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle, Database } from "lucide-react";
+import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle, Database, Building2 } from "lucide-react";
 import { PmsPatternManager } from "./PmsPatternManager";
+import { GlobalPatternManager } from "./GlobalPatternManager";
 import { SimplePatternLearning } from "./SimplePatternLearning";
 import { EnhancedPatternLearning } from "./EnhancedPatternLearning";
 import { PatternValidation } from "./PatternValidation";
@@ -425,15 +426,19 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   return (
     <div className="space-y-6">
       {/* Onglets principaux - toujours visibles */}
-      <Tabs defaultValue="models" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="models" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Modèles PMS
+      <Tabs defaultValue="global" className="w-full">
+        <TabsList className="mb-4 flex-wrap">
+          <TabsTrigger value="global" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Gestion globale
           </TabsTrigger>
           <TabsTrigger value="training" className="flex items-center gap-2">
             <Brain className="h-4 w-4" />
             Entraînement
+          </TabsTrigger>
+          <TabsTrigger value="models" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Modèles PMS
           </TabsTrigger>
           <TabsTrigger value="analysis" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -445,7 +450,12 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Onglet Modèles PMS - directement accessible */}
+        {/* Onglet Gestion globale - établissements et modèles */}
+        <TabsContent value="global">
+          <GlobalPatternManager hotelId={hotelId} />
+        </TabsContent>
+
+        {/* Onglet Modèles PMS */}
         <TabsContent value="models">
           <PmsPatternManager hotelId={hotelId} />
         </TabsContent>
