@@ -17,6 +17,7 @@ export interface ReservationBlock {
   checkInDate: string | null;
   checkOutDate: string | null;
   isOutOfOrder: boolean;
+  timePosition: 'left' | 'right' | null; // Position de l'heure détectée (MEWS)
 }
 
 export interface DetectionRule {
@@ -325,6 +326,9 @@ class MewsDetectionService {
     // Chercher "Nuit X/Y" ou "Night X/Y"
     const nightMatch = line.match(/(?:Nuit|Night)\s+(\d+)\/(\d+)/i);
     
+    // Chercher les heures (format HH:MM)
+    const timeMatches = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)];
+    
     // Chercher les heures de départ (08:00-12:00) et arrivée (14:00-19:00)
     const departureTimeMatch = line.match(/\b(0?[5-9]|1[0-2]):\d{2}\b/);
     const arrivalTimeMatch = line.match(/\b(1[4-9]):\d{2}\b/);
@@ -341,6 +345,27 @@ class MewsDetectionService {
     // Chercher les dates (format DD/MM/YYYY ou YYYY-MM-DD)
     const dates = line.match(/\b(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/g) || [];
     
+    // Déterminer la position de l'heure (MEWS spécifique)
+    // Si l'heure apparaît AVANT le nom du client = arrivée (gauche)
+    // Si l'heure apparaît APRÈS "Adults" ou le nom du client = départ (droite)
+    let timePosition: 'left' | 'right' | null = null;
+    if (timeMatches.length > 0) {
+      const firstTimeIndex = timeMatches[0].index || 0;
+      const adultsMatch = line.match(/\d+\s*[×x]\s*(?:Adultes?|Adults?)/i);
+      
+      if (adultsMatch && adultsMatch.index !== undefined) {
+        // Si l'heure est avant "X Adults" = arrivée (gauche)
+        // Si l'heure est après "X Adults" = départ (droite)
+        timePosition = firstTimeIndex < adultsMatch.index ? 'left' : 'right';
+      } else if (guestPresence.guestName) {
+        // Chercher la position du nom dans la ligne
+        const nameIndex = line.toLowerCase().indexOf(guestPresence.guestName.toLowerCase().split(' ')[0]);
+        if (nameIndex !== -1) {
+          timePosition = firstTimeIndex < nameIndex ? 'left' : 'right';
+        }
+      }
+    }
+    
     return {
       hasArrivalBlock: !!arrivalTimeMatch,
       hasDepartureBlock: !!departureTimeMatch,
@@ -356,7 +381,8 @@ class MewsDetectionService {
       guestCount: guestPresence.guestCount,
       checkInDate: dates.length > 0 ? dates[0] : null,
       checkOutDate: dates.length > 1 ? dates[1] : null,
-      isOutOfOrder
+      isOutOfOrder,
+      timePosition
     };
   }
 
@@ -413,7 +439,7 @@ class MewsDetectionService {
 
     switch (rule.rule_type) {
       case 'combined':
-        // Règle combinée : vérifie statut ET présence client
+        // Règle combinée : vérifie statut ET présence client ET position heure
         if (condition.statusPattern) {
           try {
             const regex = new RegExp(condition.statusPattern, 'i');
@@ -426,6 +452,10 @@ class MewsDetectionService {
         // Vérifier la condition hasGuest
         if (condition.hasGuest !== undefined) {
           if (condition.hasGuest !== blocks.hasGuest) return false;
+        }
+        // Vérifier la position de l'heure (MEWS spécifique)
+        if (condition.timePosition) {
+          if (blocks.timePosition !== condition.timePosition) return false;
         }
         return true;
 
