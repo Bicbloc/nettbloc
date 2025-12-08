@@ -5,18 +5,67 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Règles métier simplifiées
+// Règles métier avancées pour détection précise
 const CLEANING_RULES = `
-RÈGLES DE DÉTECTION:
-1. Out of order/OOO/HS → cleaningType="none"
-2. Client avec 2 dates (arrivée+départ) = séjour en cours → cleaningType="quick" (recouche)
-3. DIR/DEP SANS client → cleaningType="full" (à blanc)
-4. INS/SAL SANS client → cleaningType="none" (propre)
-5. Nuit X/Y avec X>1 → cleaningType="quick" (recouche)
-6. Nuit 1/Y → cleaningType="full" (arrivée)
-7. 2 heures (départ+arrivée) → cleaningType="full"
+### RÈGLES DE DÉTECTION DU TYPE DE NETTOYAGE ###
 
-EXCLURE du comptage client: staff, superviseur, manager, farid (noms répétés)
+## PRIORITÉ 1: HORS SERVICE (cleaningType="none", status="out_of_order")
+- Mots-clés: OOO, Out of order, HS, Hors service, Maintenance, Blocked
+- → Aucun nettoyage requis
+
+## PRIORITÉ 2: RECOUCHE - Client en séjour (cleaningType="quick", status="stayover")
+CONDITIONS pour RECOUCHE:
+- Client avec DATE ARRIVÉE + DATE DÉPART visibles = séjour en cours
+- "Nuit X/Y" où X > 1 (ex: Nuit 2/3, Nuit 3/5)
+- Statut "INS" ou "SALE" ou "DIRTY" AVEC un nom de client
+- "Stay" ou "Stayover" ou "Continue" dans le statut
+- Client présent + pas de départ imminent aujourd'hui
+
+EXEMPLES RECOUCHE:
+- "102 SGL DIR Farid GAOUTARA 04/05/2025 Adults Guoda Cirtautaite, Night 3/3 07/05/2025" → RECOUCHE (dates arrivée+départ = en séjour)
+- "205 DBL INS Martin DUPONT Night 2/4" → RECOUCHE (Nuit 2/4, X>1)
+- "301 SALE Jean MARTIN" → RECOUCHE (sale avec client)
+
+## PRIORITÉ 3: À BLANC - Départ sans arrivée (cleaningType="full", status="checkout")
+CONDITIONS pour À BLANC:
+- Statut "DIR" ou "DEP" ou "Departure" ou "Check-out" SANS nouveau client
+- Chambre vide après départ
+- "Nuit 1/1" = départ le jour même
+- Pas de nom de client OU client parti
+
+EXEMPLES À BLANC:
+- "102 DIR" → À BLANC (départ sans client)
+- "205 DEP" → À BLANC (departure)
+- "301 Check-out 10:00" → À BLANC
+
+## PRIORITÉ 4: ARRIVÉE (cleaningType="full", status="arrival")
+CONDITIONS:
+- "Nuit 1/Y" où Y > 1 (première nuit d'un séjour multi-nuits)
+- Statut "ARR" ou "Arrival" avec client prévu
+- Chambre propre + arrivée prévue
+
+## PRIORITÉ 5: PROPRE (cleaningType="none", status="clean")
+CONDITIONS:
+- Statut "INS" ou "Inspected" ou "Clean" SANS client
+- Chambre libre et propre
+- Pas de réservation
+
+### INDICES POUR DIFFÉRENCIER ###
+
+RECOUCHE si:
+✓ Deux dates visibles (arrivée ET départ) sur la même ligne
+✓ Nuit X/Y avec X > 1
+✓ Client présent + statut SALE/DIRTY/INS
+✓ Mot "Stay" ou "Continue"
+
+À BLANC si:
+✓ Statut DIR/DEP sans dates multiples
+✓ Pas de nom de client après DIR/DEP
+✓ Nuit 1/1 (départ jour même)
+✓ Chambre vide après checkout
+
+### NOMS À IGNORER (staff, pas clients) ###
+staff, superviseur, manager, farid, admin, maintenance, housekeeping
 `;
 
 // Définition du tool pour extraction structurée
@@ -86,18 +135,30 @@ serve(async (req) => {
     const patternsInfo = learnedPatterns ? `\nPatterns appris: ${JSON.stringify(learnedPatterns)}` : '';
     const annotationsInfo = annotations?.length ? `\nExemples annotés: ${JSON.stringify(annotations)}` : '';
 
-    const prompt = `Analyse ce rapport d'hôtel et extrais TOUTES les chambres.
+    const prompt = `Tu es un expert en analyse de rapports hôteliers. Analyse ce rapport et extrais TOUTES les chambres.
 
 ${CLEANING_RULES}
 
-Contexte: PMS=${context?.pmsType || 'inconnu'}, Rapport=${context?.reportName || 'inconnu'}
+### CONTEXTE ###
+PMS: ${context?.pmsType || 'inconnu'}
+Rapport: ${context?.reportName || 'inconnu'}
 ${patternsInfo}
 ${annotationsInfo}
 
-TEXTE DU RAPPORT:
+### ANALYSE REQUISE ###
+Pour CHAQUE chambre:
+1. Identifie le numéro de chambre
+2. Cherche les dates (arrivée ET départ) - si 2 dates = RECOUCHE
+3. Cherche "Nuit X/Y" - si X>1 = RECOUCHE
+4. Cherche le statut brut (DIR, INS, SALE, DEP, ARR, OOO)
+5. Cherche un nom de client (ignore les noms staff)
+6. Applique les règles de priorité ci-dessus
+7. Justifie ta décision dans "reason"
+
+### TEXTE DU RAPPORT ###
 ${textToAnalyze}
 
-Extrais chaque chambre avec son type de nettoyage. Sois précis sur hasGuest (vrai seulement si nom de client visible).`;
+IMPORTANT: Sois très attentif aux indices de RECOUCHE vs À BLANC. Une chambre avec un client ET deux dates = RECOUCHE.`;
 
     console.log("Calling AI with tool calling, text length:", textToAnalyze?.length || 0);
 
