@@ -80,8 +80,8 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
 
     try {
       setIsUploading(true);
-      console.log("Traitement du fichier:", selectedFile.name);
-      const data = await processPdf(selectedFile);
+      console.log("Traitement du fichier:", selectedFile.name, "hotelId:", hotelId);
+      const data = await processPdf(selectedFile, hotelId);
       console.log("Données traitées:", data.length, "chambres");
       
       setProcessedData(data);

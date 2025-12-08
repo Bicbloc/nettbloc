@@ -104,10 +104,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setUploadProgress(20);
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Étape 2: Extraction des données
+      // Étape 2: Extraction des données avec règles personnalisées
       setUploadStatus('🔍 Extraction des chambres...');
       setUploadProgress(40);
-      const data = await processPdf(selectedFile);
+      const data = await processPdf(selectedFile, hotelId);
       setPdfData(data);
       setSavedPdfData(data); // Sauvegarder pour retry
       

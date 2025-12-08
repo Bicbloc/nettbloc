@@ -38,9 +38,17 @@ export const getDefaultCleaningConfig = (isPremium: boolean = false): CleaningCo
 // Legacy export for backward compatibility
 export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(false);
 
-// Process PDF file
-export async function processPdf(file: File): Promise<Room[]> {
+// Process PDF file - now accepts optional hotelId to load custom rules
+export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
   try {
+    // Charger les règles personnalisées si un hotelId est fourni
+    if (hotelId) {
+      console.log(`📋 Chargement des règles personnalisées pour l'hôtel ${hotelId}...`);
+      await mewsDetectionService.loadCustomRules(hotelId);
+      const customRulesCount = mewsDetectionService.getHotelCleaningRules().length;
+      console.log(`✅ ${customRulesCount} règles personnalisées chargées`);
+    }
+
     // Convertir le fichier en ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     

@@ -447,6 +447,59 @@ export type Database = {
           },
         ]
       }
+      hotel_cleaning_rules: {
+        Row: {
+          conditions: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          hotel_id: string
+          id: string
+          is_active: boolean
+          priority: number
+          result_cleaning_type: string
+          result_status: string | null
+          rule_name: string
+          updated_at: string
+        }
+        Insert: {
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          result_cleaning_type: string
+          result_status?: string | null
+          rule_name: string
+          updated_at?: string
+        }
+        Update: {
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          result_cleaning_type?: string
+          result_status?: string | null
+          rule_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_cleaning_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_detection_rules: {
         Row: {
           condition: Json
