@@ -11,9 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Edit, Save, Database, Brain, Copy, Play, Check, X, RefreshCw, FileText, Settings, Upload, Building, MapPin, Star, Building2, Send } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Database, Brain, Copy, Play, Check, X, RefreshCw, FileText, Settings, Upload, Building, MapPin, Star, Building2, Send, Users } from "lucide-react";
 import { smartExtractionService, PmsPattern } from "@/services/smartExtractionService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useAdminRole } from "@/hooks/use-admin-role";
 
 interface CleaningRule {
   keyword: string;
@@ -33,8 +34,20 @@ interface HotelInfo {
   hotel_code: string | null;
 }
 
+interface EstablishmentWithPattern {
+  id: string;
+  name: string;
+  hotel_code: string | null;
+  email: string;
+  user_id: string | null;
+  status: string | null;
+  assignedPattern: any | null;
+  allPatterns: any[];
+}
+
 export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
   const { toast } = useToast();
+  const { isSuperAdmin } = useAdminRole();
   const [patterns, setPatterns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingPattern, setEditingPattern] = useState<any>(null);
@@ -61,12 +74,27 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
   const [assignTargetHotelId, setAssignTargetHotelId] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [patternsUsage, setPatternsUsage] = useState<Map<string, HotelInfo[]>>(new Map());
+  
+  // Nouveau: gestion des établissements (superadmin)
+  const [allEstablishments, setAllEstablishments] = useState<EstablishmentWithPattern[]>([]);
+  const [allValidatedPatterns, setAllValidatedPatterns] = useState<any[]>([]);
+  const [loadingEstablishments, setLoadingEstablishments] = useState(false);
+  const [showChangePatternDialog, setShowChangePatternDialog] = useState(false);
+  const [selectedEstablishment, setSelectedEstablishment] = useState<EstablishmentWithPattern | null>(null);
+  const [newPatternId, setNewPatternId] = useState<string>('');
+  const [isChangingPattern, setIsChangingPattern] = useState(false);
 
   useEffect(() => {
     loadPatterns();
     loadHotelInfo();
     loadPatternsUsage();
   }, [hotelId]);
+
+  useEffect(() => {
+    if (isSuperAdmin && activeTab === 'establishments') {
+      loadAllEstablishments();
+    }
+  }, [isSuperAdmin, activeTab]);
 
   const loadPatterns = async () => {
     setLoading(true);
@@ -109,6 +137,123 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
       if (hotelsData) {
         setUserHotels(hotelsData);
       }
+    }
+  };
+
+  const loadAllEstablishments = async () => {
+    if (!isSuperAdmin) return;
+    
+    setLoadingEstablishments(true);
+    try {
+      // Charger tous les établissements actifs
+      const { data: hotelsData, error: hotelsError } = await supabase
+        .from('hotels')
+        .select('id, name, hotel_code, email, user_id, status')
+        .eq('status', 'active')
+        .order('name');
+
+      if (hotelsError) throw hotelsError;
+
+      // Charger tous les patterns validés
+      const { data: patternsData, error: patternsError } = await supabase
+        .from('report_training_patterns')
+        .select('*')
+        .eq('validated', true)
+        .order('pattern_name');
+
+      if (patternsError) throw patternsError;
+
+      setAllValidatedPatterns(patternsData || []);
+
+      // Associer chaque établissement à son pattern assigné
+      const establishmentsWithPatterns: EstablishmentWithPattern[] = (hotelsData || []).map(hotel => {
+        // Trouver le pattern assigné à cet établissement
+        const assignedPattern = patternsData?.find(p => p.assigned_to_hotel_id === hotel.id) || null;
+        // Trouver tous les patterns créés par cet établissement
+        const hotelPatterns = patternsData?.filter(p => p.hotel_id === hotel.id) || [];
+        
+        return {
+          ...hotel,
+          assignedPattern,
+          allPatterns: hotelPatterns
+        };
+      });
+
+      setAllEstablishments(establishmentsWithPatterns);
+    } catch (error) {
+      console.error('Erreur chargement établissements:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les établissements", variant: "destructive" });
+    } finally {
+      setLoadingEstablishments(false);
+    }
+  };
+
+  const openChangePatternDialog = (establishment: EstablishmentWithPattern) => {
+    setSelectedEstablishment(establishment);
+    setNewPatternId(establishment.assignedPattern?.id || '');
+    setShowChangePatternDialog(true);
+  };
+
+  const changeEstablishmentPattern = async () => {
+    if (!selectedEstablishment) return;
+
+    setIsChangingPattern(true);
+    try {
+      // D'abord, retirer l'attribution de l'ancien pattern si existant
+      if (selectedEstablishment.assignedPattern) {
+        await supabase
+          .from('report_training_patterns')
+          .update({ 
+            assigned_to_hotel_id: null,
+            attribution_reason: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedEstablishment.assignedPattern.id);
+      }
+
+      // Ensuite, assigner le nouveau pattern si sélectionné
+      if (newPatternId) {
+        const pattern = allValidatedPatterns.find(p => p.id === newPatternId);
+        
+        // Retirer l'attribution de ce pattern d'un autre établissement
+        await supabase
+          .from('report_training_patterns')
+          .update({ 
+            assigned_to_hotel_id: null,
+            attribution_reason: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', newPatternId);
+
+        // Assigner à l'établissement sélectionné
+        await supabase
+          .from('report_training_patterns')
+          .update({ 
+            assigned_to_hotel_id: selectedEstablishment.id,
+            attribution_reason: `Attribué par super admin à ${selectedEstablishment.name}`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', newPatternId);
+
+        toast({ 
+          title: "Succès", 
+          description: `Modèle "${pattern?.pattern_name || pattern?.report_name}" attribué à ${selectedEstablishment.name}`
+        });
+      } else {
+        toast({ 
+          title: "Succès", 
+          description: `Attribution retirée pour ${selectedEstablishment.name}`
+        });
+      }
+
+      setShowChangePatternDialog(false);
+      loadAllEstablishments();
+      loadPatternsUsage();
+    } catch (error) {
+      console.error('Erreur changement pattern:', error);
+      toast({ title: "Erreur", description: "Impossible de modifier l'attribution", variant: "destructive" });
+    } finally {
+      setIsChangingPattern(false);
     }
   };
 
@@ -609,6 +754,12 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
         <TabsList>
           <TabsTrigger value="patterns">Modèles</TabsTrigger>
           <TabsTrigger value="test">Tester un modèle</TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="establishments" className="flex items-center gap-1.5">
+              <Users className="h-4 w-4" />
+              Établissements
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="patterns" className="space-y-4 mt-4">
@@ -947,6 +1098,96 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
             </div>
           </Card>
         </TabsContent>
+
+        {/* Onglet Établissements (superadmin uniquement) */}
+        {isSuperAdmin && (
+          <TabsContent value="establishments" className="space-y-4 mt-4">
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Établissements et leurs modèles assignés
+                </h3>
+                <Button variant="outline" size="sm" onClick={loadAllEstablishments} disabled={loadingEstablishments}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingEstablishments ? 'animate-spin' : ''}`} />
+                  Actualiser
+                </Button>
+              </div>
+
+              {loadingEstablishments ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Chargement des établissements...
+                </div>
+              ) : allEstablishments.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Aucun établissement actif trouvé
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 rounded-lg font-medium text-sm">
+                    <div className="col-span-3">Établissement</div>
+                    <div className="col-span-2">Code</div>
+                    <div className="col-span-4">Modèle assigné</div>
+                    <div className="col-span-2">Statut</div>
+                    <div className="col-span-1">Action</div>
+                  </div>
+                  
+                  {allEstablishments.map((establishment) => (
+                    <Card key={establishment.id} className="p-3">
+                      <div className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-3">
+                          <div className="font-medium">{establishment.name}</div>
+                          <div className="text-xs text-muted-foreground">{establishment.email}</div>
+                        </div>
+                        <div className="col-span-2">
+                          <Badge variant="outline" className="font-mono">
+                            {establishment.hotel_code || '-'}
+                          </Badge>
+                        </div>
+                        <div className="col-span-4">
+                          {establishment.assignedPattern ? (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{establishment.assignedPattern.pms_type}</Badge>
+                              <span className="text-sm truncate">
+                                {establishment.assignedPattern.pattern_name || establishment.assignedPattern.report_name}
+                              </span>
+                              {establishment.assignedPattern.is_default && (
+                                <Star className="h-3 w-3 fill-primary text-primary" />
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm italic">Aucun modèle assigné</span>
+                          )}
+                        </div>
+                        <div className="col-span-2">
+                          {establishment.allPatterns.length > 0 ? (
+                            <Badge variant="outline" className="text-green-600">
+                              {establishment.allPatterns.length} modèle(s)
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              0 modèle
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="col-span-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => openChangePatternDialog(establishment)}
+                            title="Modifier le modèle assigné"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Dialog pour éditer les règles avancées */}
@@ -1198,6 +1439,98 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                 <>
                   <Check className="h-4 w-4 mr-2" />
                   Attribuer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog pour changer le modèle d'un établissement (superadmin) */}
+      <Dialog open={showChangePatternDialog} onOpenChange={setShowChangePatternDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Modifier le modèle de l'établissement
+            </DialogTitle>
+            <DialogDescription>
+              Changer le modèle d'extraction assigné à cet établissement
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedEstablishment && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted/30 rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  <Building className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{selectedEstablishment.name}</span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Code: {selectedEstablishment.hotel_code || '-'} • Email: {selectedEstablishment.email}
+                </div>
+                {selectedEstablishment.assignedPattern && (
+                  <div className="text-sm mt-2">
+                    Modèle actuel: <Badge variant="secondary">{selectedEstablishment.assignedPattern.pms_type}</Badge>{' '}
+                    {selectedEstablishment.assignedPattern.pattern_name || selectedEstablishment.assignedPattern.report_name}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label>Nouveau modèle à assigner</Label>
+                <Select value={newPatternId} onValueChange={setNewPatternId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Sélectionner un modèle validé" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="">
+                      <span className="text-muted-foreground">Aucun modèle (retirer l'attribution)</span>
+                    </SelectItem>
+                    {allValidatedPatterns.map(pattern => {
+                      const assignedTo = allEstablishments.find(e => e.assignedPattern?.id === pattern.id);
+                      return (
+                        <SelectItem key={pattern.id} value={pattern.id}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">{pattern.pms_type}</Badge>
+                            <span>{pattern.pattern_name || pattern.report_name}</span>
+                            {pattern.is_default && <Star className="h-3 w-3 fill-primary text-primary" />}
+                            {assignedTo && assignedTo.id !== selectedEstablishment.id && (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                (utilisé par {assignedTo.name})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                Note: Si ce modèle est actuellement assigné à un autre établissement, il lui sera retiré.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowChangePatternDialog(false)}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={changeEstablishmentPattern} 
+              disabled={isChangingPattern}
+            >
+              {isChangingPattern ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Modification...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Enregistrer
                 </>
               )}
             </Button>
