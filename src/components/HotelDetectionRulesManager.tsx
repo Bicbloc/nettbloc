@@ -42,7 +42,8 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
     status: '', // Statut de la chambre (ex: OCC, VAC, DEP)
     cleaning_type: 'a_blanc',
     priority: 5,
-    description: ''
+    description: '',
+    time_position: '' as '' | 'left' | 'right' // Position de l'heure (MEWS)
   });
 
   useEffect(() => {
@@ -97,6 +98,9 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
     if (newRule.status) {
       condition.statusPattern = `\\b${newRule.status}\\b`;
     }
+    if (newRule.time_position) {
+      condition.timePosition = newRule.time_position;
+    }
     if (newRule.rule_type === 'night_info') {
       condition.field = 'nightInfo.current';
     }
@@ -128,7 +132,8 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
         status: '',
         cleaning_type: 'a_blanc',
         priority: 5,
-        description: ''
+        description: '',
+        time_position: ''
       });
       loadRules();
     } else {
@@ -295,6 +300,26 @@ export const HotelDetectionRulesManager: React.FC<HotelDetectionRulesManagerProp
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
                       La règle s'applique uniquement si ce statut est détecté
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Position de l'heure (MEWS)</Label>
+                    <Select
+                      value={newRule.time_position || 'none'}
+                      onValueChange={v => setNewRule({ ...newRule, time_position: v === 'none' ? '' : v as 'left' | 'right' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Ignorer la position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Ignorer (pas de condition)</SelectItem>
+                        <SelectItem value="left">Gauche = Heure d'arrivée</SelectItem>
+                        <SelectItem value="right">Droite = Heure de départ</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Spécifique à MEWS : l'heure à gauche = arrivée, à droite = départ
                     </p>
                   </div>
 
