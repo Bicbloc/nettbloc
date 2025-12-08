@@ -237,16 +237,25 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
   }
 ];
 
+// Interface pour les patterns de formation validés
+interface ValidatedRoomPattern {
+  roomNumber: string;
+  cleaningType: string;
+  status: string;
+}
+
 class MewsDetectionService {
   private customRules: DetectionRule[] = [];
   private hotelCleaningRules: HotelCleaningRule[] = [];
+  private validatedPatterns: Map<string, ValidatedRoomPattern> = new Map();
   private hotelId: string | null = null;
 
   /**
-   * Charger les règles personnalisées d'un hôtel (hotel_detection_rules + hotel_cleaning_rules)
+   * Charger les règles personnalisées d'un hôtel (hotel_detection_rules + hotel_cleaning_rules + patterns validés)
    */
   async loadCustomRules(hotelId: string): Promise<DetectionRule[]> {
     this.hotelId = hotelId;
+    this.validatedPatterns.clear();
     
     try {
       // Charger hotel_detection_rules
@@ -299,11 +308,67 @@ class MewsDetectionService {
         console.log(`📋 Chargé ${this.hotelCleaningRules.length} règles hotel_cleaning_rules pour l'hôtel ${hotelId}`);
       }
 
+      // IMPORTANT: Charger les patterns validés depuis report_training_patterns
+      await this.loadValidatedPatterns(hotelId);
+
       return this.customRules;
     } catch (err) {
       console.error('Erreur:', err);
       return [];
     }
+  }
+
+  /**
+   * Charger les patterns validés pour cet hôtel (PRIORITÉ MAXIMALE)
+   */
+  private async loadValidatedPatterns(hotelId: string): Promise<void> {
+    try {
+      const { data, error } = await supabase
+        .from('report_training_patterns')
+        .select('extracted_data')
+        .eq('hotel_id', hotelId)
+        .eq('validated', true)
+        .order('updated_at', { ascending: false })
+        .limit(5); // Prendre les 5 derniers patterns validés
+
+      if (error) {
+        console.error('Erreur chargement patterns validés:', error);
+        return;
+      }
+
+      // Extraire les chambres validées et les stocker dans la map
+      for (const pattern of data || []) {
+        const extractedData = pattern.extracted_data as any[];
+        if (Array.isArray(extractedData)) {
+          for (const room of extractedData) {
+            if (room.roomNumber && room.validated) {
+              // Normaliser le numéro de chambre
+              const normalizedNumber = String(parseInt(room.roomNumber, 10)).padStart(3, '0');
+              this.validatedPatterns.set(normalizedNumber, {
+                roomNumber: normalizedNumber,
+                cleaningType: room.cleaningType || 'none',
+                status: room.status || 'clean'
+              });
+            }
+          }
+        }
+      }
+
+      console.log(`🎓 Chargé ${this.validatedPatterns.size} chambres depuis les patterns validés`);
+      if (this.validatedPatterns.size > 0) {
+        console.log(`   Chambres:`, Array.from(this.validatedPatterns.keys()).join(', '));
+      }
+    } catch (err) {
+      console.error('Erreur chargement patterns validés:', err);
+    }
+  }
+
+  /**
+   * Vérifier si une chambre a un pattern validé (PRIORITÉ ABSOLUE)
+   */
+  getValidatedPattern(roomNumber: string): ValidatedRoomPattern | null {
+    const normalizedNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
+    return this.validatedPatterns.get(normalizedNumber) || null;
   }
 
   /**
