@@ -42,7 +42,7 @@ export interface DetectionRule {
   description?: string;
 }
 
-// Règles par défaut pour Mews - AMÉLIORÉES avec logique INS sans client
+// Règles par défaut pour Mews - AMÉLIORÉES avec logique départ = toujours à blanc
 const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[] = [
   // PRIORITÉ MAXIMALE: Out of order
   {
@@ -54,7 +54,33 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     is_active: true,
     description: "Chambre hors service - pas de nettoyage"
   },
-  // NOUVELLE RÈGLE: INS/SAL sans client = Propre (pas de nettoyage)
+  // PRIORITÉ HAUTE: DIR/DEP = TOUJOURS À Blanc (peu importe le statut ou client)
+  {
+    rule_name: "DIR/DEP = À Blanc (départ)",
+    rule_type: "status_keyword",
+    condition: { 
+      pattern: "\\b(DIR|DEP|DEPART|CHECKOUT|OUT)\\b", 
+      operator: "regex_match" 
+    },
+    result: { cleaning_type: "a_blanc", status: "checkout" },
+    priority: 17,
+    is_active: true,
+    description: "Départ = TOUJOURS À Blanc, peu importe le statut"
+  },
+  // Chambre vide (VAC) + INS = Propre (pas de nettoyage)
+  {
+    rule_name: "VAC + INS/SAL = Propre",
+    rule_type: "combined",
+    condition: { 
+      statusPattern: "\\b(VAC|VACANT)\\b.*\\b(INS|SAL)\\b|\\b(INS|SAL)\\b.*\\b(VAC|VACANT)\\b", 
+      hasGuest: false 
+    },
+    result: { cleaning_type: "none", status: "clean" },
+    priority: 16,
+    is_active: true,
+    description: "Chambre vacante et propre - aucun nettoyage"
+  },
+  // INS/SAL sans client = Propre (pas de nettoyage)
   {
     rule_name: "INS/SAL sans client = Propre",
     rule_type: "combined",
@@ -66,19 +92,6 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     priority: 15,
     is_active: true,
     description: "Chambre vide et propre - aucun nettoyage nécessaire"
-  },
-  // DIR sans client = À Blanc (chambre vide après départ)
-  {
-    rule_name: "DIR sans client = À Blanc",
-    rule_type: "combined",
-    condition: { 
-      statusPattern: "\\b(DIR|DEP|DEPART)\\b", 
-      hasGuest: false 
-    },
-    result: { cleaning_type: "a_blanc", status: "checkout" },
-    priority: 14,
-    is_active: true,
-    description: "Départ sans nouveau client = À Blanc"
   },
   // Règle Nuit X/Y (X > 1) = Recouche
   {
@@ -213,10 +226,24 @@ class MewsDetectionService {
       .sort((a, b) => b.priority - a.priority);
   }
 
+  // Liste de noms/mots de staff à exclure (pas des clients)
+  private static readonly STAFF_EXCLUSIONS = [
+    // Rôles
+    'superviseur', 'supervisor', 'manager', 'directeur', 'director', 'chef',
+    'gouvernante', 'housekeeper', 'réceptionniste', 'receptionist', 'concierge',
+    'technicien', 'technician', 'maintenance', 'équipier', 'agent',
+    // Noms connus de staff (à enrichir selon les hôtels)
+    'farid', 'admin', 'test', 'system', 'système',
+    // Mots-clés techniques
+    'out', 'nuit', 'night', 'room', 'chambre', 'cleaning', 'ménage',
+    'sal', 'dir', 'ins', 'dep', 'arr', 'ooo', 'oos', 'dnd', 'vac', 'occ'
+  ];
+
   /**
    * Détecter la présence d'un client dans une ligne
+   * Exclut les noms de staff/superviseurs
    */
-  detectGuestPresence(line: string): { hasGuest: boolean; guestName: string | null; guestCount: number } {
+  detectGuestPresence(line: string): { hasGuest: boolean; guestName: string | null; guestCount: number; isStaff: boolean } {
     // Pattern pour détecter "X × Adultes" ou "X Adults" suivi d'un nom
     const adultCountMatch = line.match(/(\d+)\s*[×x]\s*(?:Adultes?|Adults?)/i);
     const guestCount = adultCountMatch ? parseInt(adultCountMatch[1]) : 0;
@@ -235,23 +262,32 @@ class MewsDetectionService {
     ];
 
     let guestName: string | null = null;
+    let isStaff = false;
     
     for (const pattern of namePatterns) {
       const match = line.match(pattern);
       if (match && match[1]) {
-        // Vérifier que ce n'est pas un mot-clé courant
-        const excludedWords = ['Out', 'Nuit', 'Night', 'Room', 'Chambre', 'Cleaning', 'SAL', 'DIR', 'INS', 'DEP', 'ARR'];
-        if (!excludedWords.some(w => match[1].includes(w))) {
-          guestName = match[1].trim();
-          break;
+        const potentialName = match[1].trim().toLowerCase();
+        
+        // Vérifier si c'est un nom de staff à exclure
+        const isExcluded = MewsDetectionService.STAFF_EXCLUSIONS.some(exclusion => 
+          potentialName.includes(exclusion) || exclusion === potentialName.split(' ')[0]
+        );
+        
+        if (isExcluded) {
+          isStaff = true;
+          continue; // Passer au pattern suivant
         }
+        
+        guestName = match[1].trim();
+        break;
       }
     }
 
-    // Déterminer s'il y a un client
-    const hasGuest = guestCount > 0 || guestName !== null;
+    // Déterminer s'il y a un client (pas un staff)
+    const hasGuest = !isStaff && (guestCount > 0 || guestName !== null);
 
-    return { hasGuest, guestName, guestCount };
+    return { hasGuest, guestName, guestCount, isStaff };
   }
 
   /**
