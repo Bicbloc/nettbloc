@@ -1422,12 +1422,12 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
 
               <div>
                 <Label>Attribuer à quel établissement ?</Label>
-                <Select value={assignTargetHotelId} onValueChange={setAssignTargetHotelId}>
+                <Select value={assignTargetHotelId || "none"} onValueChange={(val) => setAssignTargetHotelId(val === "none" ? "" : val)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Sélectionner un établissement (ou aucun)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">
+                    <SelectItem value="none">
                       <span className="text-muted-foreground">Aucune attribution</span>
                     </SelectItem>
                     {userHotels.map(hotel => (
@@ -1511,12 +1511,12 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
 
               <div>
                 <Label>Nouveau modèle à assigner</Label>
-                <Select value={newPatternId} onValueChange={setNewPatternId}>
+                <Select value={newPatternId || "none"} onValueChange={(val) => setNewPatternId(val === "none" ? "" : val)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Sélectionner un modèle validé" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
-                    <SelectItem value="">
+                    <SelectItem value="none">
                       <span className="text-muted-foreground">Aucun modèle (retirer l'attribution)</span>
                     </SelectItem>
                     {allValidatedPatterns.map(pattern => {
