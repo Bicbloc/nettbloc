@@ -1641,22 +1641,24 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     if (!housekeeper) {
       console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const tempCode = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-          const { data: newHousekeeper, error } = await supabase
+        // Utiliser la fonction SQL pour générer le code et créer la femme de chambre
+        const { data: accessCode, error: codeError } = await supabase
+          .rpc('generate_and_insert_access_code', {
+            p_hotel_id: currentHotelId,
+            p_housekeeper_name: housekeeperName
+          });
+        
+        if (!codeError && accessCode) {
+          // Récupérer la femme de chambre créée
+          const { data: newHousekeeper } = await supabase
             .from('housekeepers')
-            .insert({
-              hotel_id: currentHotelId,
-              name: housekeeperName,
-              user_id: user.id,
-              is_active: true,
-              access_code: tempCode
-            })
             .select('id, name, access_code, user_id')
-            .single();
+            .eq('hotel_id', currentHotelId)
+            .eq('name', housekeeperName)
+            .eq('is_active', true)
+            .maybeSingle();
           
-          if (!error && newHousekeeper) {
+          if (newHousekeeper) {
             housekeeper = newHousekeeper;
             console.log('✅ Femme de chambre créée:', newHousekeeper);
             refreshHousekeepers();
@@ -1749,22 +1751,24 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     if (!housekeeper) {
       console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const tempCode = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-          const { data: newHousekeeper, error } = await supabase
+        // Utiliser la fonction SQL pour générer le code et créer la femme de chambre
+        const { data: accessCode, error: codeError } = await supabase
+          .rpc('generate_and_insert_access_code', {
+            p_hotel_id: currentHotelId,
+            p_housekeeper_name: housekeeperName
+          });
+        
+        if (!codeError && accessCode) {
+          // Récupérer la femme de chambre créée
+          const { data: newHousekeeper } = await supabase
             .from('housekeepers')
-            .insert({
-              hotel_id: currentHotelId,
-              name: housekeeperName,
-              user_id: user.id,
-              is_active: true,
-              access_code: tempCode
-            })
             .select('id, name, access_code, user_id')
-            .single();
+            .eq('hotel_id', currentHotelId)
+            .eq('name', housekeeperName)
+            .eq('is_active', true)
+            .maybeSingle();
           
-          if (!error && newHousekeeper) {
+          if (newHousekeeper) {
             housekeeper = newHousekeeper;
             console.log('✅ Femme de chambre créée:', newHousekeeper);
             refreshHousekeepers();

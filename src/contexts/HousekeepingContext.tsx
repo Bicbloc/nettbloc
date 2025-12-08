@@ -249,20 +249,20 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       const existingNames = existingHousekeepers?.map(h => h.name) || [];
       const newNames = housekeeperNames.filter(name => !existingNames.includes(name));
 
-      // Créer les nouvelles femmes de chambre avec des codes d'accès temporaires
+      // Créer les nouvelles femmes de chambre avec des codes d'accès via la fonction SQL
       for (const name of newNames) {
-        // Générer un code d'accès temporaire basique
-        const tempCode = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        
-        await supabase
-          .from('housekeepers')
-          .insert({
-            hotel_id: hotelId,
-            name: name,
-            user_id: user.id,
-            is_active: true,
-            access_code: tempCode
+        // Utiliser la fonction SQL pour générer un code valide
+        const { data: accessCode, error: codeError } = await supabase
+          .rpc('generate_and_insert_access_code', {
+            p_hotel_id: hotelId,
+            p_housekeeper_name: name
           });
+        
+        if (codeError) {
+          console.error('❌ Erreur génération code pour', name, ':', codeError);
+        } else {
+          console.log('✅ Code généré pour', name, ':', accessCode);
+        }
       }
 
       if (newNames.length > 0) {
