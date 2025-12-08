@@ -1,11 +1,12 @@
-import { Crown, Zap } from 'lucide-react';
+import { Crown, Zap, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface SubscriptionBadgeProps {
-  plan: 'free' | 'premium';
+  plan: 'free' | 'premium' | 'trial';
   subscribed?: boolean;
   subscriptionEnd?: string;
+  trialDaysRemaining?: number;
   size?: 'sm' | 'md' | 'lg';
   showExpiration?: boolean;
   className?: string;
@@ -15,11 +16,13 @@ export function SubscriptionBadge({
   plan, 
   subscribed = false, 
   subscriptionEnd,
+  trialDaysRemaining,
   size = 'md',
   showExpiration = false,
   className 
 }: SubscriptionBadgeProps) {
   const isPremium = plan === 'premium' && subscribed;
+  const isTrial = plan === 'trial';
   
   const sizeClasses = {
     sm: 'text-xs px-2 py-1',
@@ -49,6 +52,28 @@ export function SubscriptionBadge({
         {showExpiration && subscriptionEnd && (
           <span className="text-xs text-muted-foreground">
             Expire le {new Date(subscriptionEnd).toLocaleDateString('fr-FR')}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (isTrial) {
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <Badge 
+          className={cn(
+            'bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold border-amber-400/20 shadow-lg',
+            sizeClasses[size],
+            className
+          )}
+        >
+          <Clock className={cn('mr-1.5', iconSizes[size])} />
+          Essai Premium
+        </Badge>
+        {trialDaysRemaining !== undefined && (
+          <span className="text-xs text-muted-foreground">
+            {trialDaysRemaining} jours restants
           </span>
         )}
       </div>

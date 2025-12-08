@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 
 export function SubscriptionCard() {
-  const { plan, subscribed, subscription_end, isPremium, isFree, loading } = useSubscription();
+  const { plan, subscribed, subscription_end, isPremium, isFree, isInTrial, trialDaysRemaining, loading } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleManageSubscription = async () => {
@@ -69,13 +69,16 @@ export function SubscriptionCard() {
             plan={plan}
             subscribed={subscribed}
             subscriptionEnd={subscription_end}
-            showExpiration={isPremium}
+            trialDaysRemaining={trialDaysRemaining}
+            showExpiration={isPremium || isInTrial}
           />
         </div>
         <CardDescription>
           {isPremium ? 
             'Profitez de toutes les fonctionnalités premium' : 
-            'Découvrez les avantages du plan Premium'
+            isInTrial ?
+              `Essai gratuit - ${trialDaysRemaining} jours restants` :
+              'Découvrez les avantages du plan Premium'
           }
         </CardDescription>
       </CardHeader>

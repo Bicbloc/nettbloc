@@ -1837,22 +1837,62 @@ export type Database = {
           },
         ]
       }
+      pricing_config: {
+        Row: {
+          created_at: string | null
+          features: Json
+          id: string
+          is_active: boolean | null
+          max_rooms: number | null
+          plan_name: string
+          price_monthly: number
+          price_yearly: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean | null
+          max_rooms?: number | null
+          plan_name: string
+          price_monthly?: number
+          price_yearly?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean | null
+          max_rooms?: number | null
+          plan_name?: string
+          price_monthly?: number
+          price_yearly?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_name: string | null
           created_at: string
           current_hotel_id: string | null
           email: string
+          features_enabled: Json | null
           id: string
           is_suspended: boolean
+          max_rooms: number | null
           plan: string | null
           subscription_type: string | null
           suspension_reason: string | null
+          trial_duration_months: number | null
           trial_end_date: string | null
           trial_extension_days: number | null
           trial_extension_granted_at: string | null
           trial_extension_granted_by: string | null
           trial_extension_reason: string | null
+          trial_start_date: string | null
           updated_at: string
         }
         Insert: {
@@ -1860,16 +1900,20 @@ export type Database = {
           created_at?: string
           current_hotel_id?: string | null
           email: string
+          features_enabled?: Json | null
           id: string
           is_suspended?: boolean
+          max_rooms?: number | null
           plan?: string | null
           subscription_type?: string | null
           suspension_reason?: string | null
+          trial_duration_months?: number | null
           trial_end_date?: string | null
           trial_extension_days?: number | null
           trial_extension_granted_at?: string | null
           trial_extension_granted_by?: string | null
           trial_extension_reason?: string | null
+          trial_start_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -1877,16 +1921,20 @@ export type Database = {
           created_at?: string
           current_hotel_id?: string | null
           email?: string
+          features_enabled?: Json | null
           id?: string
           is_suspended?: boolean
+          max_rooms?: number | null
           plan?: string | null
           subscription_type?: string | null
           suspension_reason?: string | null
+          trial_duration_months?: number | null
           trial_end_date?: string | null
           trial_extension_days?: number | null
           trial_extension_granted_at?: string | null
           trial_extension_granted_by?: string | null
           trial_extension_reason?: string | null
+          trial_start_date?: string | null
           updated_at?: string
         }
         Relationships: [

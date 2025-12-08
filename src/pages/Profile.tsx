@@ -29,7 +29,7 @@ interface UserProfile {
 const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { plan, subscribed, canAccessFeature } = useSubscription();
+  const { plan, subscribed, canAccessFeature, isInTrial, trialDaysRemaining } = useSubscription();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedCompanyName, setEditedCompanyName] = useState('');
@@ -161,6 +161,7 @@ const Profile = () => {
             <SubscriptionBadge 
               plan={plan}
               subscribed={subscribed}
+              trialDaysRemaining={trialDaysRemaining}
               size="lg"
             />
           </div>
