@@ -84,6 +84,8 @@ const config = {
         'gradient-accent': 'var(--gradient-accent)',
         'gradient-premium': 'var(--gradient-premium)',
         'gradient-freemium': 'var(--gradient-freemium)',
+        'gradient-hero': 'var(--gradient-hero)',
+        'gradient-glass': 'var(--gradient-glass)',
       },
       boxShadow: {
         'modern-sm': 'var(--shadow-sm)',
@@ -91,6 +93,7 @@ const config = {
         'modern-md': 'var(--shadow-md)',
         'modern-lg': 'var(--shadow-lg)',
         'modern-xl': 'var(--shadow-xl)',
+        'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -7,9 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Building, Users, Shield, UserCheck, KeyRound, User } from 'lucide-react';
+import { Loader2, Building, Users, KeyRound, Zap, FileText, BarChart3, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const Auth = () => {
@@ -30,7 +29,6 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Afficher le bouton de retry après 2 secondes de loading (réduit de 3s)
   useEffect(() => {
     if (loading) {
       const timer = setTimeout(() => setShowRetry(true), 2000);
@@ -48,24 +46,20 @@ const Auth = () => {
     setTimeout(() => window.location.reload(), 500);
   };
 
-  // Handle password reset from URL and hash
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     
-    // Check for recovery tokens in the URL hash (from email link)
     const accessToken = hashParams.get('access_token');
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
     
     if (accessToken && refreshToken && type === 'recovery') {
-      // Set the session with the recovery tokens
       supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken
       }).then(({ error }) => {
         if (error) {
-          console.error('Error setting session:', error);
           toast({
             variant: "destructive",
             title: "Erreur",
@@ -73,7 +67,6 @@ const Auth = () => {
           });
         } else {
           setIsPasswordReset(true);
-          // Clear the hash to clean the URL
           window.history.replaceState({}, '', '/auth');
           toast({
             title: "Récupération activée",
@@ -83,7 +76,6 @@ const Auth = () => {
       });
     }
     
-    // Handle the old reset parameter for backward compatibility
     const isReset = urlParams.get('reset') === 'true';
     if (isReset && !accessToken) {
       window.history.replaceState({}, '', '/auth');
@@ -94,11 +86,9 @@ const Auth = () => {
     }
   }, []);
 
-  // Check for forced access parameter
   const urlParams = new URLSearchParams(window.location.search);
   const forceAuth = urlParams.get('force') === 'true';
 
-  // Redirect if already authenticated (unless forced)
   if (!loading && isAuthenticated && !forceAuth) {
     return <Navigate to="/" replace />;
   }
@@ -120,21 +110,7 @@ const Auth = () => {
         title: "Connexion réussie",
         description: "Vous êtes maintenant connecté."
       });
-      
-        // Vérifier si l'utilisateur a déjà un plan configuré
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('plan, subscription_type')
-            .eq('id', (await supabase.auth.getUser()).data.user?.id)
-            .single();
-          
-          // Toujours rediriger vers l'accueil - plus de sélection de plan forcée
-          navigate('/');
-        } catch (error) {
-          // En cas d'erreur, rediriger vers l'accueil aussi
-          navigate('/');
-        }
+      navigate('/');
     }
     
     setIsLoading(false);
@@ -176,8 +152,6 @@ const Auth = () => {
         title: "Compte créé avec succès",
         description: "Vous êtes maintenant connecté."
       });
-      
-      // Pour les nouveaux comptes, toujours rediriger vers la sélection de plan
       navigate('/plan-selection');
     }
     
@@ -258,12 +232,10 @@ const Auth = () => {
         title: "Inscription réussie ! 🎉",
         description: "Vous pouvez maintenant vous connecter"
       });
-      // Rester sur l'onglet de connexion femme de chambre
     }
     
     setIsLoading(false);
   };
-
 
   const handlePasswordReset = async () => {
     if (!formData.email.trim()) {
@@ -280,9 +252,7 @@ const Auth = () => {
         redirectTo: `${window.location.origin}/auth`
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       toast({
         title: "Email envoyé",
@@ -325,9 +295,7 @@ const Auth = () => {
         password: formData.newPassword
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       toast({
         title: "Mot de passe mis à jour",
@@ -350,7 +318,7 @@ const Auth = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground">Vérification de l'authentification...</p>
         {showRetry && (
@@ -367,250 +335,364 @@ const Auth = () => {
     );
   }
 
+  const features = [
+    { icon: Zap, text: "Distribution automatique des chambres" },
+    { icon: Users, text: "Équipe connectée en temps réel" },
+    { icon: FileText, text: "Rapports PDF générés en 1 clic" },
+    { icon: BarChart3, text: "Statistiques et suivi d'avancement" }
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4 relative">
-      <div className="absolute top-4 left-4">
-        <BackButton to="/" />
-      </div>
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <Building className="h-12 w-12 mx-auto text-primary" />
-          <h1 className="text-3xl font-bold">Nettobloc</h1>
-          <p className="text-muted-foreground">Gestion hôtelière simplifiée</p>
+    <div className="min-h-screen flex">
+      {/* Left Panel - Branding (desktop only) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-hero p-12 flex-col justify-between relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-12">
+            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl">
+              <Building className="h-10 w-10 text-white" />
+            </div>
+            <span className="text-3xl font-bold text-white font-display">Nettobloc</span>
+          </div>
+          
+          <h1 className="text-5xl font-bold text-white mb-6 leading-tight font-display">
+            Simplifiez votre gestion hôtelière
+          </h1>
+          <p className="text-xl text-white/80 mb-12 leading-relaxed max-w-md">
+            Assignation automatique • Suivi temps réel • Rapports détaillés
+          </p>
+        </div>
+        
+        {/* Features */}
+        <div className="relative z-10 space-y-4">
+          {features.map((feature, index) => (
+            <div 
+              key={index}
+              className="flex items-center gap-4 text-white/90 bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-all duration-300"
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div className="p-2 bg-white/20 rounded-lg">
+                <feature.icon className="h-5 w-5" />
+              </div>
+              <span className="font-medium">{feature.text}</span>
+            </div>
+          ))}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>
+        {/* Bottom decoration */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/20 to-transparent" />
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-background">
+        <div className="w-full max-w-md space-y-8">
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center space-y-4">
+            <div className="inline-flex items-center gap-3 p-4 bg-gradient-hero rounded-2xl">
+              <Building className="h-8 w-8 text-white" />
+              <span className="text-2xl font-bold text-white font-display">Nettobloc</span>
+            </div>
+            <p className="text-muted-foreground">Gestion hôtelière simplifiée</p>
+          </div>
+
+          <Card className="border-0 shadow-xl bg-card/80 backdrop-blur-sm">
+            <CardHeader className="space-y-1 pb-4">
+              <CardTitle className="text-2xl font-display">
+                {isPasswordReset ? (
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-6 w-6 text-primary" />
+                    Nouveau mot de passe
+                  </div>
+                ) : (
+                  "Bienvenue"
+                )}
+              </CardTitle>
+              <CardDescription className="text-base">
+                {isPasswordReset ? 
+                  "Définissez votre nouveau mot de passe" :
+                  "Connectez-vous ou créez un compte"
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               {isPasswordReset ? (
-                <div className="flex items-center gap-2">
-                  <KeyRound className="h-5 w-5" />
-                  Nouveau mot de passe
-                </div>
-              ) : (
-                "Bienvenue"
-              )}
-            </CardTitle>
-            <CardDescription>
-              {isPasswordReset ? 
-                "Définissez votre nouveau mot de passe" :
-                isAuthenticated && forceAuth ? 
-                  "Vous êtes déjà connecté. Vous pouvez vous déconnecter ou changer de compte." :
-                  "Connectez-vous ou créez un compte pour gérer vos hôtels"
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isPasswordReset ? (
-              // Interface de changement de mot de passe
-              <form onSubmit={handleNewPasswordSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">Nouveau mot de passe</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Minimum 6 caractères"
-                    value={formData.newPassword}
-                    onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-new-password">Confirmer le nouveau mot de passe</Label>
-                  <Input
-                    id="confirm-new-password"
-                    type="password"
-                    placeholder="Répétez le nouveau mot de passe"
-                    value={formData.confirmNewPassword}
-                    onChange={(e) => setFormData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Mettre à jour le mot de passe
-                </Button>
-                <div className="text-center">
+                <form onSubmit={handleNewPasswordSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">Nouveau mot de passe</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="Minimum 6 caractères"
+                      value={formData.newPassword}
+                      onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
+                      required
+                      minLength={6}
+                      className="h-12"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-new-password">Confirmer</Label>
+                    <Input
+                      id="confirm-new-password"
+                      type="password"
+                      placeholder="Répétez le nouveau mot de passe"
+                      value={formData.confirmNewPassword}
+                      onChange={(e) => setFormData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+                      required
+                      minLength={6}
+                      className="h-12"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Mettre à jour
+                  </Button>
                   <Button 
-                    variant="link" 
+                    variant="ghost" 
                     type="button"
-                    onClick={() => {
-                      setIsPasswordReset(false);
-                      setFormData(prev => ({ ...prev, newPassword: '', confirmNewPassword: '' }));
-                    }}
-                    className="text-sm text-muted-foreground"
+                    onClick={() => setIsPasswordReset(false)}
+                    className="w-full"
                   >
                     Annuler
                   </Button>
-                </div>
-              </form>
-            ) : (
-              <>
-                {isAuthenticated && forceAuth && (
-                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800 mb-2">Vous êtes déjà connecté.</p>
+                </form>
+              ) : (
+                <>
+                  {isAuthenticated && forceAuth && (
+                    <div className="mb-4 p-4 bg-info/10 border border-info/20 rounded-xl">
+                      <p className="text-sm text-foreground mb-2">Vous êtes déjà connecté.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          await supabase.auth.signOut();
+                          toast({
+                            title: "Déconnexion réussie",
+                            description: "Vous pouvez maintenant vous reconnecter."
+                          });
+                        }}
+                      >
+                        Se déconnecter
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <Tabs defaultValue="signin" className="space-y-6">
+                    <TabsList className="grid w-full grid-cols-2 h-12 p-1 bg-muted/50">
+                      <TabsTrigger value="signin" className="h-10 font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                        Connexion
+                      </TabsTrigger>
+                      <TabsTrigger value="signup" className="h-10 font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                        Inscription
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="signin" className="space-y-4 mt-6">
+                      <form onSubmit={handleSignIn} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="signin-email">Email</Label>
+                          <Input
+                            id="signin-email"
+                            type="email"
+                            placeholder="votre@email.com"
+                            value={formData.email}
+                            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                            required
+                            className="h-12"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="signin-password">Mot de passe</Label>
+                          <Input
+                            id="signin-password"
+                            type="password"
+                            value={formData.password}
+                            onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                            required
+                            className="h-12"
+                          />
+                        </div>
+                        <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
+                          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Se connecter
+                        </Button>
+                        <div className="text-center">
+                          <Button variant="link" type="button" onClick={handlePasswordReset} className="text-sm">
+                            Mot de passe oublié ?
+                          </Button>
+                        </div>
+                      </form>
+                    </TabsContent>
+                    
+                    <TabsContent value="signup" className="space-y-4 mt-6">
+                      <form onSubmit={handleSignUp} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="company-name">Nom de l'établissement</Label>
+                          <Input
+                            id="company-name"
+                            type="text"
+                            placeholder="Hôtel Exemple"
+                            value={formData.companyName}
+                            onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                            required
+                            className="h-12"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-email">Email</Label>
+                          <Input
+                            id="signup-email"
+                            type="email"
+                            placeholder="votre@email.com"
+                            value={formData.email}
+                            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                            required
+                            className="h-12"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-password">Mot de passe</Label>
+                          <Input
+                            id="signup-password"
+                            type="password"
+                            value={formData.password}
+                            onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                            required
+                            className="h-12"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirm-password">Confirmer</Label>
+                          <Input
+                            id="confirm-password"
+                            type="password"
+                            value={formData.confirmPassword}
+                            onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                            required
+                            className="h-12"
+                          />
+                        </div>
+                        <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={isLoading}>
+                          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Créer mon compte
+                        </Button>
+                      </form>
+                    </TabsContent>
+                  </Tabs>
+
+                  {/* Divider */}
+                  <div className="relative my-8">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">Ou</span>
+                    </div>
+                  </div>
+
+                  {/* Housekeeper Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-center text-muted-foreground">
+                      Espace Femme de chambre
+                    </h3>
+                    
+                    <Tabs defaultValue="hk-signin" className="space-y-4">
+                      <TabsList className="grid w-full grid-cols-2 h-10 bg-muted/30">
+                        <TabsTrigger value="hk-signin" className="text-sm">Connexion</TabsTrigger>
+                        <TabsTrigger value="hk-signup" className="text-sm">Inscription</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="hk-signin" className="space-y-3">
+                        <form onSubmit={handleHousekeeperSignIn} className="space-y-3">
+                          <Input
+                            type="email"
+                            placeholder="Email"
+                            value={formData.email}
+                            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                            required
+                            className="h-11"
+                          />
+                          <Input
+                            type="password"
+                            placeholder="Mot de passe"
+                            value={formData.password}
+                            onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                            required
+                            className="h-11"
+                          />
+                          <Button type="submit" variant="secondary" className="w-full h-11" disabled={isLoading}>
+                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            <Users className="mr-2 h-4 w-4" />
+                            Accéder à mon espace
+                          </Button>
+                        </form>
+                      </TabsContent>
+                      
+                      <TabsContent value="hk-signup" className="space-y-3">
+                        <form onSubmit={handleHousekeeperSignUp} className="space-y-3">
+                          <Input
+                            type="text"
+                            placeholder="Votre nom"
+                            value={formData.housekeeperName}
+                            onChange={(e) => setFormData(prev => ({ ...prev, housekeeperName: e.target.value }))}
+                            required
+                            className="h-11"
+                          />
+                          <Input
+                            type="email"
+                            placeholder="Email"
+                            value={formData.email}
+                            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                            required
+                            className="h-11"
+                          />
+                          <Input
+                            type="password"
+                            placeholder="Mot de passe"
+                            value={formData.password}
+                            onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                            required
+                            className="h-11"
+                          />
+                          <Input
+                            type="password"
+                            placeholder="Confirmer le mot de passe"
+                            value={formData.confirmPassword}
+                            onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                            required
+                            className="h-11"
+                          />
+                          <Button type="submit" variant="secondary" className="w-full h-11" disabled={isLoading}>
+                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Créer mon profil
+                          </Button>
+                        </form>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+
+                  {/* Guest Mode */}
+                  <div className="pt-4 border-t">
                     <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={async () => {
-                        await supabase.auth.signOut();
-                        toast({
-                          title: "Déconnexion réussie",
-                          description: "Vous pouvez maintenant vous reconnecter."
-                        });
-                      }}
+                      variant="ghost" 
+                      className="w-full text-muted-foreground hover:text-foreground"
+                      onClick={handleGuestMode}
                     >
-                      Se déconnecter
+                      <Shield className="mr-2 h-4 w-4" />
+                      Continuer en mode invité
                     </Button>
                   </div>
-                )}
-                <Tabs defaultValue="signin" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Connexion</TabsTrigger>
-                <TabsTrigger value="signup">Inscription</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="signin" className="space-y-4">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-password">Mot de passe</Label>
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Se connecter
-                  </Button>
-                  <div className="text-center">
-                    <Button 
-                      variant="link" 
-                      type="button"
-                      onClick={handlePasswordReset}
-                      className="text-sm text-muted-foreground"
-                    >
-                      Mot de passe oublié ?
-                    </Button>
-                  </div>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signup" className="space-y-4">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-company">Nom de l'entreprise *</Label>
-                    <Input
-                      id="signup-company"
-                      placeholder="Mon Hôtel"
-                      value={formData.companyName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Obligatoire pour créer votre hôtel et gérer votre compte
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Mot de passe</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm">Confirmer le mot de passe</Label>
-                    <Input
-                      id="signup-confirm"
-                      type="password"
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Créer un compte
-                  </Button>
-                </form>
-              </TabsContent>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-            </Tabs>
-
-            {/* Lien vers connexion femme de chambre */}
-            <div className="mt-6 pt-6 border-t space-y-4">
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="h-5 w-5 text-emerald-600" />
-                  <span className="font-semibold text-emerald-800">Vous êtes femme de chambre ?</span>
-                </div>
-                <p className="text-sm text-emerald-700 mb-3">
-                  Connectez-vous avec votre email et mot de passe pour accéder à l'interface mobile dédiée
-                </p>
-                <Button 
-                  variant="outline" 
-                  className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-100" 
-                  onClick={() => navigate('/housekeeper/auth')}
-                  type="button"
-                >
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  Espace Femme de chambre
-                </Button>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Shield className="h-4 w-4" />
-                  <span>Ou continuer sans compte :</span>
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  onClick={handleGuestMode}
-                  type="button"
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  Mode invité (pas de sauvegarde)
-                </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  En mode invité, vos données ne seront pas sauvegardées.
-                </p>
-              </div>
-            </div>
-            </>
-            )}
-          </CardContent>
-        </Card>
+          <p className="text-center text-xs text-muted-foreground">
+            En vous connectant, vous acceptez nos conditions d'utilisation
+          </p>
+        </div>
       </div>
     </div>
   );
