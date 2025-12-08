@@ -9,9 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle, Database, Building2 } from "lucide-react";
+import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle, Database } from "lucide-react";
 import { PmsPatternManager } from "./PmsPatternManager";
-import { GlobalPatternManager } from "./GlobalPatternManager";
 import { SimplePatternLearning } from "./SimplePatternLearning";
 import { EnhancedPatternLearning } from "./EnhancedPatternLearning";
 import { PatternValidation } from "./PatternValidation";
@@ -29,13 +28,7 @@ interface TrainingReport {
   validated: boolean;
 }
 
-interface Hotel {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: string }) => {
+export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const { toast } = useToast();
   const [reports, setReports] = useState<TrainingReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<TrainingReport | null>(null);
@@ -48,48 +41,13 @@ export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: stri
   const [learnedPatterns, setLearnedPatterns] = useState<any>(null);
   const [manualAnnotations, setManualAnnotations] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [hotels, setHotels] = useState<Hotel[]>([]);
-  const [selectedHotelId, setSelectedHotelId] = useState<string>(initialHotelId);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-
-  // Charger la liste des hôtels pour les super admins
-  useEffect(() => {
-    const loadHotelsAndCheckAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      setCurrentUserId(user.id);
-      
-      // Vérifier si super admin
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'super_admin')
-        .maybeSingle();
-      
-      const isAdmin = !!roleData;
-      setIsSuperAdmin(isAdmin);
-      
-      if (isAdmin) {
-        // Charger tous les hôtels pour les super admins
-        const { data: hotelsData } = await supabase
-          .from('hotels')
-          .select('id, name, email')
-          .order('name');
-        
-        if (hotelsData) {
-          setHotels(hotelsData);
-        }
-      }
-    };
-    
-    loadHotelsAndCheckAdmin();
-  }, []);
 
   useEffect(() => {
-    smartExtractionService.loadLearnedPatterns(selectedHotelId);
-  }, [selectedHotelId]);
+    smartExtractionService.loadLearnedPatterns(hotelId);
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUserId(data.user.id);
+    });
+  }, [hotelId]);
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -306,7 +264,7 @@ export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: stri
     }
 
     const { error } = await supabase.from('report_training_patterns').insert([{
-      hotel_id: selectedHotelId,
+      hotel_id: hotelId,
       report_name: selectedReport?.name || 'rapport',
       pms_type: detectedPmsType || selectedPmsType,
       raw_text: selectedReport?.rawText || '',
@@ -333,7 +291,7 @@ export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: stri
         title: "Succès",
         description: "Pattern d'entraînement sauvegardé"
       });
-      await smartExtractionService.loadLearnedPatterns(selectedHotelId);
+      await smartExtractionService.loadLearnedPatterns(hotelId);
     }
   };
 
@@ -466,171 +424,119 @@ export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: stri
 
   return (
     <div className="space-y-6">
-      {/* Sélecteur d'hôtel pour super admins */}
-      {isSuperAdmin && hotels.length > 0 && (
-        <Card className="p-4 bg-primary/5 border-primary/20">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              <Label className="font-semibold">Hôtel actif :</Label>
+      <Card className="p-6">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+              <Brain className="w-5 h-5" />
+              Entraînement de l'IA
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Uploadez vos rapports PDF pour entraîner l'IA à reconnaître le format spécifique de votre PMS
+            </p>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Label>Type de PMS</Label>
+              <Select value={selectedPmsType} onValueChange={setSelectedPmsType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-détection</SelectItem>
+                  {availablePmsTypes.map(type => (
+                    <SelectItem key={type} value={type}>
+                      {type.toUpperCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={selectedHotelId} onValueChange={setSelectedHotelId}>
-              <SelectTrigger className="w-[300px]">
-                <SelectValue placeholder="Sélectionner un hôtel" />
-              </SelectTrigger>
-              <SelectContent>
-                {hotels.map((hotel) => (
-                  <SelectItem key={hotel.id} value={hotel.id}>
-                    {hotel.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Badge variant="outline" className="ml-auto">
-              Super Admin
+
+            <div className="flex-1">
+              <Label htmlFor="pdf-upload">Upload PDF</Label>
+              <div className="relative">
+                <Input
+                  id="pdf-upload"
+                  type="file"
+                  accept=".pdf"
+                  multiple
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+                {uploading && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-md">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                      <span>Analyse en cours...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {detectedPmsType && (
+            <Badge variant="secondary" className="flex items-center gap-2 w-fit">
+              <Sparkles className="w-3 h-3" />
+              PMS détecté: {detectedPmsType.toUpperCase()}
             </Badge>
+          )}
+        </div>
+      </Card>
+
+      {reports.length > 0 && (
+        <Card className="p-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Rapports uploadés</h3>
+            <div className="grid gap-2">
+              {reports.map((report, index) => (
+                <Button
+                  key={index}
+                  variant={selectedReport?.name === report.name ? "default" : "outline"}
+                  className="justify-start"
+                  onClick={() => setSelectedReport(report)}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  {report.name} ({report.extractedRooms.length} chambres)
+                </Button>
+              ))}
+            </div>
           </div>
         </Card>
       )}
 
-      {/* Onglets principaux - toujours visibles */}
-      <Tabs defaultValue="global" className="w-full">
-        <TabsList className="mb-4 flex-wrap">
-          <TabsTrigger value="global" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Gestion globale
-          </TabsTrigger>
-          <TabsTrigger value="training" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Entraînement
-          </TabsTrigger>
-          <TabsTrigger value="models" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Modèles PMS
-          </TabsTrigger>
-          <TabsTrigger value="analysis" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Analyse erreurs
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="flex items-center gap-2">
-            <Link2 className="h-4 w-4" />
-            Règles connexion
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Onglet Gestion globale - établissements et modèles */}
-        <TabsContent value="global">
-          <GlobalPatternManager hotelId={selectedHotelId} />
-        </TabsContent>
-
-        {/* Onglet Modèles PMS */}
-        <TabsContent value="models">
-          <PmsPatternManager hotelId={selectedHotelId} />
-        </TabsContent>
-
-        {/* Onglet Entraînement - upload et validation */}
-        <TabsContent value="training" className="space-y-6">
+        {selectedReport && (
           <Card className="p-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                  <Brain className="w-5 h-5" />
-                  Entraînement de l'IA
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Uploadez vos rapports PDF pour entraîner l'IA à reconnaître le format spécifique de votre PMS
-                </p>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <Label>Type de PMS</Label>
-                  <Select value={selectedPmsType} onValueChange={setSelectedPmsType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">Auto-détection</SelectItem>
-                      {availablePmsTypes.map(type => (
-                        <SelectItem key={type} value={type}>
-                          {type.toUpperCase()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex-1">
-                  <Label htmlFor="pdf-upload">Upload PDF</Label>
-                  <div className="relative">
-                    <Input
-                      id="pdf-upload"
-                      type="file"
-                      accept=".pdf"
-                      multiple
-                      onChange={handleFileUpload}
-                      disabled={uploading}
-                    />
-                    {uploading && (
-                      <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-md">
-                        <div className="flex items-center gap-2 text-sm">
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                          <span>Analyse en cours...</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {detectedPmsType && (
-                <Badge variant="secondary" className="flex items-center gap-2 w-fit">
-                  <Sparkles className="w-3 h-3" />
-                  PMS détecté: {detectedPmsType.toUpperCase()}
-                </Badge>
-              )}
-            </div>
-          </Card>
-
-          {reports.length > 0 && (
-            <Card className="p-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Rapports uploadés</h3>
-                <div className="grid gap-2">
-                  {reports.map((report, index) => (
-                    <Button
-                      key={index}
-                      variant={selectedReport?.name === report.name ? "default" : "outline"}
-                      className="justify-start"
-                      onClick={() => setSelectedReport(report)}
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      {report.name} ({report.extractedRooms.length} chambres)
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {selectedReport && (
-            <Card className="p-6">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4 mb-4">
-                  <TabsTrigger value="validation">Validation</TabsTrigger>
-                  <TabsTrigger value="preview">
-                    <Eye className="h-4 w-4 mr-2" />
-                    Prévisualisation
-                  </TabsTrigger>
-                  <TabsTrigger value="learn">
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Apprentissage
-                  </TabsTrigger>
-                  <TabsTrigger value="metrics">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Métriques
-                  </TabsTrigger>
-                </TabsList>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-6 mb-4">
+                <TabsTrigger value="validation">Validation</TabsTrigger>
+                <TabsTrigger value="preview">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Prévisualisation
+                </TabsTrigger>
+                <TabsTrigger value="learn">
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Apprentissage
+                </TabsTrigger>
+                <TabsTrigger value="metrics">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Métriques
+                </TabsTrigger>
+                <TabsTrigger value="analysis">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Analyse
+                </TabsTrigger>
+                <TabsTrigger value="rules">
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Règles
+                </TabsTrigger>
+                <TabsTrigger value="models">
+                  <Database className="h-4 w-4 mr-2" />
+                  Modèles PMS
+                </TabsTrigger>
+              </TabsList>
 
             <TabsContent value="validation" className="space-y-4">
               <div className="flex items-center justify-between">
@@ -770,7 +676,7 @@ export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: stri
           <TabsContent value="learn">
             <EnhancedPatternLearning
               rawText={selectedReport.rawText}
-              hotelId={selectedHotelId}
+              hotelId={hotelId}
               userId={currentUserId}
               reportName={selectedReport.name}
               onRoomsExtracted={(rooms) => {
@@ -797,33 +703,33 @@ export const ReportTrainingPanel = ({ hotelId: initialHotelId }: { hotelId: stri
                 });
               }}
             />
-            </TabsContent>
+          </TabsContent>
 
-            <TabsContent value="metrics">
-              <PatternValidation
-                annotations={manualAnnotations}
-                extractedRooms={selectedReport.extractedRooms}
-                patterns={learnedPatterns}
-                hotelId={selectedHotelId}
-                reportName={selectedReport.name}
-                pmsType={detectedPmsType || selectedPmsType}
-              />
-            </TabsContent>
-          </Tabs>
-          </Card>
-        )}
-        </TabsContent>
+          <TabsContent value="metrics">
+            <PatternValidation
+              annotations={manualAnnotations}
+              extractedRooms={selectedReport.extractedRooms}
+              patterns={learnedPatterns}
+              hotelId={hotelId}
+              reportName={selectedReport.name}
+              pmsType={detectedPmsType || selectedPmsType}
+            />
+          </TabsContent>
 
-        {/* Onglet Analyse erreurs */}
-        <TabsContent value="analysis">
-          <ErrorAnalysisDashboard hotelId={selectedHotelId} />
-        </TabsContent>
+          <TabsContent value="analysis">
+            <ErrorAnalysisDashboard hotelId={hotelId} />
+          </TabsContent>
 
-        {/* Onglet Règles connexion */}
-        <TabsContent value="rules">
-          <ConnectedRoomRulesManager hotelId={selectedHotelId} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="rules">
+            <ConnectedRoomRulesManager hotelId={hotelId} />
+          </TabsContent>
+
+          <TabsContent value="models">
+            <PmsPatternManager hotelId={hotelId} />
+          </TabsContent>
+        </Tabs>
+        </Card>
+      )}
     </div>
   );
 };
