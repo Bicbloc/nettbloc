@@ -528,13 +528,9 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                   <AlertCircle className="h-4 w-4 mr-2" />
                   Analyse
                 </TabsTrigger>
-                <TabsTrigger value="rules">
+              <TabsTrigger value="rules">
                   <Link2 className="h-4 w-4 mr-2" />
                   Règles
-                </TabsTrigger>
-                <TabsTrigger value="models">
-                  <Database className="h-4 w-4 mr-2" />
-                  Modèles PMS
                 </TabsTrigger>
               </TabsList>
 
@@ -724,13 +720,23 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
             <ConnectedRoomRulesManager hotelId={hotelId} />
           </TabsContent>
 
-          <TabsContent value="models">
-            <PmsPatternManager hotelId={hotelId} />
-          </TabsContent>
-
         </Tabs>
         </Card>
       )}
+
+      {/* Section Modèles PMS en bas */}
+      <Card className="p-6">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold">Modèles PMS & Établissements</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Gérez les modèles de détection PMS et les établissements associés
+          </p>
+          <PmsPatternManager hotelId={hotelId} />
+        </div>
+      </Card>
     </div>
   );
 };
