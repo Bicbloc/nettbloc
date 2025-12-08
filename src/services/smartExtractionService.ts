@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface PmsPattern {
   pms_type: string;
   room_number_regex: string;
-  status_keywords: Record<string, { status: string; cleaning: 'full' | 'quick' | 'none' }>;
+  status_keywords: Record<string, { status: string; cleaning: 'full' | 'quick' | 'none'; priority?: number }>;
   date_formats: string[];
   context_window: number;
   priority: number;
