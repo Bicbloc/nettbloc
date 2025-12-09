@@ -22,6 +22,30 @@ export interface ExtractedRoom {
   originalText?: string;
 }
 
+// Règles de combinaison pour Apaleo (et autres PMS si nécessaire)
+interface CombinationRule {
+  conditions: string[];
+  result: { status: string; cleaning: 'full' | 'quick' | 'none' };
+}
+
+const APALEO_COMBINATION_RULES: CombinationRule[] = [
+  // Départ + Arrivée même chambre = À blanc (ménage complet)
+  { conditions: ['checkout', 'arrival'], result: { status: 'checkout_arrival', cleaning: 'full' } },
+  { conditions: ['PARTI', 'EN ARRIVEE'], result: { status: 'checkout_arrival', cleaning: 'full' } },
+  { conditions: ['DEPART', 'ARRIVEE'], result: { status: 'checkout_arrival', cleaning: 'full' } },
+  
+  // Arrivée + À contrôler = Propre (chambre déjà prête)
+  { conditions: ['arrival', 'to_inspect'], result: { status: 'clean', cleaning: 'none' } },
+  { conditions: ['EN ARRIVEE', 'A CONTROLER'], result: { status: 'clean', cleaning: 'none' } },
+  { conditions: ['ARRIVEE', 'CONTROLER'], result: { status: 'clean', cleaning: 'none' } },
+  
+  // Arrivé (client présent) + Sale = À blanc
+  { conditions: ['arrived', 'dirty'], result: { status: 'dirty', cleaning: 'full' } },
+  
+  // Recouche + Sale = Recouche prioritaire
+  { conditions: ['stayover', 'dirty'], result: { status: 'stayover', cleaning: 'quick' } },
+];
+
 const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
   apaleo: {
     pms_type: 'apaleo',
@@ -43,7 +67,15 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'SALE': { status: 'dirty', cleaning: 'full' },
       'EN ARRIVEE': { status: 'arrival', cleaning: 'full' },
       'ARRIVAL': { status: 'arrival', cleaning: 'full' },
-      'ARRIVEE': { status: 'arrival', cleaning: 'full' }
+      'ARRIVEE': { status: 'arrival', cleaning: 'full' },
+      // Nouveaux statuts Apaleo
+      'A CONTROLER': { status: 'to_inspect', cleaning: 'none' },
+      'CONTROLER': { status: 'to_inspect', cleaning: 'none' },
+      'CONTROLE': { status: 'to_inspect', cleaning: 'none' },
+      'ARRIVÉ': { status: 'arrived', cleaning: 'none' },
+      'ARRIVE': { status: 'arrived', cleaning: 'none' },
+      'PROPRE': { status: 'clean', cleaning: 'none' },
+      'CLEAN': { status: 'clean', cleaning: 'none' }
     },
     date_formats: ['dd/MM/yyyy', 'dd/MM/yy', 'dd.MM.yyyy', 'dd-MM-yyyy'],
     context_window: 300,
@@ -355,15 +387,149 @@ export class SmartExtractionService {
   }
 
   extractRooms(text: string, pmsType?: string): ExtractedRoom[] {
-    const selectedPattern = pmsType
-      ? this.patterns.get(pmsType)
-      : this.patterns.get(this.detectPmsType(text));
+    const detectedPmsType = pmsType || this.detectPmsType(text);
+    const selectedPattern = this.patterns.get(detectedPmsType);
 
     if (!selectedPattern) {
       return this.extractWithGenericPattern(text);
     }
 
-    return this.extractWithPattern(text, selectedPattern);
+    let rooms = this.extractWithPattern(text, selectedPattern);
+    
+    // Appliquer la logique de fusion des doublons pour Apaleo
+    if (detectedPmsType === 'apaleo') {
+      rooms = this.mergeApaleoRoomDuplicates(rooms);
+    }
+    
+    return rooms;
+  }
+
+  /**
+   * Fusionne les chambres en doublon pour Apaleo
+   * Ex: Si une chambre a Départ + Arrivée le même jour → fusionner en "À Blanc"
+   * Ex: Si une chambre a Arrivée + À contrôler → marquer comme "Propre"
+   */
+  private mergeApaleoRoomDuplicates(rooms: ExtractedRoom[]): ExtractedRoom[] {
+    // Grouper les chambres par numéro
+    const roomsByNumber = new Map<string, ExtractedRoom[]>();
+    
+    rooms.forEach(room => {
+      const existing = roomsByNumber.get(room.roomNumber) || [];
+      existing.push(room);
+      roomsByNumber.set(room.roomNumber, existing);
+    });
+    
+    const mergedRooms: ExtractedRoom[] = [];
+    
+    roomsByNumber.forEach((roomEntries, roomNumber) => {
+      if (roomEntries.length === 1) {
+        // Pas de doublon, garder tel quel
+        mergedRooms.push(roomEntries[0]);
+      } else {
+        // Chambres en doublon - appliquer les règles de combinaison
+        const mergedRoom = this.applyCombinationRules(roomEntries, roomNumber);
+        mergedRooms.push(mergedRoom);
+      }
+    });
+    
+    console.log(`🔀 Apaleo: ${rooms.length} entrées → ${mergedRooms.length} chambres après fusion`);
+    
+    return mergedRooms;
+  }
+  
+  /**
+   * Applique les règles de combinaison pour déterminer le statut final d'une chambre
+   */
+  private applyCombinationRules(roomEntries: ExtractedRoom[], roomNumber: string): ExtractedRoom {
+    const statuses = roomEntries.map(r => r.status.toLowerCase());
+    const statusesUpper = roomEntries.map(r => r.status.toUpperCase());
+    
+    console.log(`🔍 Chambre ${roomNumber}: combinaison de statuts [${statuses.join(', ')}]`);
+    
+    // Vérifier les règles de combinaison
+    for (const rule of APALEO_COMBINATION_RULES) {
+      const conditionsLower = rule.conditions.map(c => c.toLowerCase());
+      
+      // Vérifier si tous les statuts de la règle sont présents
+      const allConditionsMet = conditionsLower.every(condition => 
+        statuses.some(status => status.includes(condition) || condition.includes(status))
+      );
+      
+      if (allConditionsMet) {
+        console.log(`✅ Règle appliquée pour ${roomNumber}: [${rule.conditions.join(' + ')}] → ${rule.result.status}`);
+        
+        // Créer la chambre fusionnée
+        const baseRoom = roomEntries[0];
+        return {
+          ...baseRoom,
+          roomNumber,
+          status: rule.result.status,
+          cleaningType: rule.result.cleaning,
+          validated: false,
+          confidence: 0.9,
+          originalText: roomEntries.map(r => r.originalText).filter(Boolean).join(' | ')
+        };
+      }
+    }
+    
+    // Règles spécifiques par défaut
+    const hasCheckout = statuses.some(s => ['checkout', 'parti', 'depart', 'departure'].includes(s));
+    const hasArrival = statuses.some(s => ['arrival', 'arrivee', 'en arrivee'].includes(s));
+    const hasToInspect = statuses.some(s => ['to_inspect', 'a controler', 'controler'].includes(s));
+    const hasArrived = statuses.some(s => ['arrived', 'arrivé', 'arrive'].includes(s));
+    
+    // Départ + Arrivée = À Blanc
+    if (hasCheckout && hasArrival) {
+      console.log(`✅ Chambre ${roomNumber}: Départ + Arrivée = À Blanc`);
+      return {
+        ...roomEntries[0],
+        roomNumber,
+        status: 'checkout_arrival',
+        cleaningType: 'full',
+        validated: false,
+        confidence: 0.95,
+        originalText: roomEntries.map(r => r.originalText).filter(Boolean).join(' | ')
+      };
+    }
+    
+    // Arrivée + À contrôler = Propre (chambre déjà prête)
+    if (hasArrival && hasToInspect) {
+      console.log(`✅ Chambre ${roomNumber}: Arrivée + À contrôler = Propre`);
+      return {
+        ...roomEntries[0],
+        roomNumber,
+        status: 'clean',
+        cleaningType: 'none',
+        validated: false,
+        confidence: 0.9,
+        originalText: roomEntries.map(r => r.originalText).filter(Boolean).join(' | ')
+      };
+    }
+    
+    // Arrivé (client présent) + À contrôler = Propre
+    if (hasArrived && hasToInspect) {
+      console.log(`✅ Chambre ${roomNumber}: Arrivé + À contrôler = Propre`);
+      return {
+        ...roomEntries[0],
+        roomNumber,
+        status: 'clean',
+        cleaningType: 'none',
+        validated: false,
+        confidence: 0.9,
+        originalText: roomEntries.map(r => r.originalText).filter(Boolean).join(' | ')
+      };
+    }
+    
+    // Par défaut, prendre l'entrée avec le nettoyage le plus prioritaire
+    const priorityOrder: Record<string, number> = { 'full': 3, 'quick': 2, 'none': 1 };
+    roomEntries.sort((a, b) => (priorityOrder[b.cleaningType] || 0) - (priorityOrder[a.cleaningType] || 0));
+    
+    console.log(`⚠️ Chambre ${roomNumber}: pas de règle spécifique, utilisation du statut prioritaire: ${roomEntries[0].status}`);
+    
+    return {
+      ...roomEntries[0],
+      originalText: roomEntries.map(r => r.originalText).filter(Boolean).join(' | ')
+    };
   }
 
   private extractWithPattern(text: string, pattern: PmsPattern): ExtractedRoom[] {
