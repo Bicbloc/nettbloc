@@ -49,7 +49,8 @@ const APALEO_COMBINATION_RULES: CombinationRule[] = [
 const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
   apaleo: {
     pms_type: 'apaleo',
-    room_number_regex: '\\b([1-9]\\d{2,4})\\b',
+    // Regex corrigé: capture chambres 01, 02, 03... jusqu'à 99999
+    room_number_regex: '\\b(0?[1-9]\\d{0,4}|[1-9]\\d{1,4})\\b',
     status_keywords: {
       'DIR': { status: 'dirty', cleaning: 'full' },
       'DIRTY': { status: 'dirty', cleaning: 'full' },
@@ -68,7 +69,6 @@ const DEFAULT_PATTERNS: Record<string, PmsPattern> = {
       'EN ARRIVEE': { status: 'arrival', cleaning: 'full' },
       'ARRIVAL': { status: 'arrival', cleaning: 'full' },
       'ARRIVEE': { status: 'arrival', cleaning: 'full' },
-      // Nouveaux statuts Apaleo
       'A CONTROLER': { status: 'to_inspect', cleaning: 'none' },
       'CONTROLER': { status: 'to_inspect', cleaning: 'none' },
       'CONTROLE': { status: 'to_inspect', cleaning: 'none' },
@@ -292,6 +292,8 @@ export class SmartExtractionService {
   }
 
   private analyzeAndUpdatePatterns(): void {
+    console.log(`📊 Analyse de ${this.learnedPatterns.length} pattern(s) appris...`);
+    
     const pmsGroups = new Map<string, any[]>();
     
     this.learnedPatterns.forEach(pattern => {
@@ -303,12 +305,26 @@ export class SmartExtractionService {
     });
 
     pmsGroups.forEach((patterns, pmsType) => {
-      if (pmsType === 'unknown' || patterns.length < 3) return;
+      console.log(`   📋 PMS ${pmsType}: ${patterns.length} pattern(s)`);
+      
+      // Même avec 1 pattern, on l'applique si validé
+      if (pmsType === 'unknown') return;
 
       const statusCounts = new Map<string, { cleaning: string; count: number }>();
+      let detectedRoomFormat: string | null = null;
 
       patterns.forEach(p => {
-        const extractedData = Array.isArray(p.extracted_data) ? p.extracted_data : [];
+        // Extraire le format de chambre détecté par l'IA
+        const patternsData = p.extracted_data?.patterns || p.patterns;
+        if (patternsData?.roomFormat) {
+          detectedRoomFormat = patternsData.roomFormat;
+          console.log(`   🔢 Format chambre détecté: ${detectedRoomFormat}`);
+        }
+        
+        const extractedData = Array.isArray(p.extracted_data) 
+          ? p.extracted_data 
+          : (p.extracted_data?.rooms || []);
+          
         extractedData.forEach((room: any) => {
           const key = room.status;
           if (!statusCounts.has(key)) {
@@ -318,11 +334,28 @@ export class SmartExtractionService {
         });
       });
 
-      const existingPattern = this.patterns.get(pmsType);
+      let existingPattern = this.patterns.get(pmsType);
+      
+      // Si le pattern n'existe pas encore, le créer à partir du pattern par défaut ou d'un nouveau
+      if (!existingPattern && this.patterns.has('apaleo') && pmsType.toLowerCase().includes('apaleo')) {
+        existingPattern = { ...this.patterns.get('apaleo')! };
+        this.patterns.set(pmsType, existingPattern);
+      }
+      
       if (existingPattern) {
+        // Mettre à jour le regex si un format spécifique a été détecté
+        if (detectedRoomFormat) {
+          // Si format commence par 0 (ex: 01, 02), ajuster le regex
+          if (detectedRoomFormat.startsWith('0') || detectedRoomFormat.includes('01') || detectedRoomFormat.includes('02')) {
+            existingPattern.room_number_regex = '\\b(0?[1-9]\\d{0,4}|[1-9]\\d{0,4})\\b';
+            console.log(`   ✅ Regex mis à jour pour capturer les chambres à 2 chiffres commençant par 0`);
+          }
+        }
+        
         const newKeywords = { ...existingPattern.status_keywords };
         statusCounts.forEach((data, status) => {
-          if (data.count >= 2) {
+          // Appliquer même avec 1 occurrence si le pattern est validé
+          if (data.count >= 1) {
             newKeywords[status] = {
               status,
               cleaning: data.cleaning as 'full' | 'quick' | 'none'
@@ -330,6 +363,7 @@ export class SmartExtractionService {
           }
         });
         existingPattern.status_keywords = newKeywords;
+        console.log(`   ✅ Pattern ${pmsType} mis à jour avec ${Object.keys(newKeywords).length} mots-clés`);
       }
     });
   }
