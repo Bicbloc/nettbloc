@@ -37,3 +37,6 @@ verify_jwt = false
 
 [functions.recognize-incident-item]
 verify_jwt = false
+
+[functions.suggest-annotations]
+verify_jwt = true

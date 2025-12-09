@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { 
   Brain, Sparkles, Check, Loader2, 
   MousePointer, Eye, Zap, RotateCcw,
-  Target, CheckCircle2, Lightbulb, User, UserX, Ban, Plus, X
+  Target, CheckCircle2, Lightbulb, User, UserX, Ban, Plus, X, Wand2, CheckCheck, XCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { mewsDetectionService } from "@/services/mewsDetectionService";
@@ -22,6 +22,8 @@ interface Annotation {
   field: 'roomNumber' | 'status' | 'cleaningType' | 'nightInfo' | 'guestName';
   lineIndex: number;
   confidence?: number;
+  isAISuggestion?: boolean;
+  patternSource?: string;
 }
 
 interface Exclusion {
@@ -43,6 +45,13 @@ interface ExtractedRoom {
   originalLine?: string;
   hasGuest?: boolean;
   rawStatus?: string;
+}
+
+interface AISuggestionSummary {
+  roomNumber: number;
+  status: number;
+  nightInfo: number;
+  guestName: number;
 }
 
 interface EnhancedPatternLearningProps {
@@ -78,6 +87,12 @@ export const EnhancedPatternLearning = ({
   const [existingPatterns, setExistingPatterns] = useState<any[]>([]);
   const [showAttributionDialog, setShowAttributionDialog] = useState(false);
   const [savedPatternId, setSavedPatternId] = useState<string | null>(null);
+  
+  // États pour les suggestions IA
+  const [aiSuggestions, setAiSuggestions] = useState<Annotation[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [suggestionsSummary, setSuggestionsSummary] = useState<AISuggestionSummary | null>(null);
+  const [detectedPMS, setDetectedPMS] = useState<string>('');
   
   // Diviser le texte en lignes pour affichage
   const lines = rawText.split('\n').filter(l => l.trim().length > 5);
@@ -245,6 +260,88 @@ export const EnhancedPatternLearning = ({
       .map(([word]) => word);
   }, [lines]);
 
+  // Fonction pour récupérer les suggestions IA
+  const fetchAISuggestions = async () => {
+    setIsLoadingSuggestions(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('suggest-annotations', {
+        body: { rawText, hotelId, reportName }
+      });
+
+      if (error) throw error;
+
+      if (data?.suggestions?.length > 0) {
+        const suggestions: Annotation[] = data.suggestions.map((s: any) => ({
+          ...s,
+          isAISuggestion: true
+        }));
+        setAiSuggestions(suggestions);
+        setSuggestionsSummary(data.summary);
+        setDetectedPMS(data.detectedPMS || '');
+        toast.success(`${data.totalSuggestions} suggestions IA générées !`);
+      } else {
+        toast.info("Aucune suggestion trouvée. Annotez manuellement.");
+      }
+    } catch (error) {
+      console.error('Erreur suggestions IA:', error);
+      toast.error("Erreur lors de la génération des suggestions");
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  // Accepter une suggestion IA
+  const acceptSuggestion = (suggestion: Annotation) => {
+    const isDuplicate = annotations.some(a => 
+      a.text === suggestion.text && a.field === suggestion.field
+    );
+    
+    if (!isDuplicate) {
+      setAnnotations(prev => [...prev, { ...suggestion, isAISuggestion: false }]);
+    }
+    setAiSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+    
+    if (annotations.length >= 1) {
+      setCurrentStep(2);
+    }
+  };
+
+  // Rejeter une suggestion IA
+  const rejectSuggestion = (id: string) => {
+    setAiSuggestions(prev => prev.filter(s => s.id !== id));
+  };
+
+  // Accepter toutes les suggestions d'un type
+  const acceptAllOfType = (field: string) => {
+    const suggestionsOfType = aiSuggestions.filter(s => s.field === field);
+    suggestionsOfType.forEach(suggestion => {
+      const isDuplicate = annotations.some(a => 
+        a.text === suggestion.text && a.field === suggestion.field
+      );
+      if (!isDuplicate) {
+        setAnnotations(prev => [...prev, { ...suggestion, isAISuggestion: false }]);
+      }
+    });
+    setAiSuggestions(prev => prev.filter(s => s.field !== field));
+    setCurrentStep(2);
+    toast.success(`${suggestionsOfType.length} annotations acceptées`);
+  };
+
+  // Accepter toutes les suggestions
+  const acceptAllSuggestions = () => {
+    aiSuggestions.forEach(suggestion => {
+      const isDuplicate = annotations.some(a => 
+        a.text === suggestion.text && a.field === suggestion.field
+      );
+      if (!isDuplicate) {
+        setAnnotations(prev => [...prev, { ...suggestion, isAISuggestion: false }]);
+      }
+    });
+    setAiSuggestions([]);
+    setCurrentStep(2);
+    toast.success(`Toutes les suggestions acceptées !`);
+  };
+
   const learnAndExtract = async () => {
     if (annotations.length < 2) {
       toast.error("Annotez au moins 2 éléments (ex: 1 numéro + 1 statut ou Nuit X/Y)");
@@ -362,6 +459,8 @@ export const EnhancedPatternLearning = ({
     setAnnotations([]);
     setExclusions([]);
     setExtractedRooms([]);
+    setAiSuggestions([]);
+    setSuggestionsSummary(null);
     setCurrentStep(1);
   };
 
@@ -483,12 +582,154 @@ export const EnhancedPatternLearning = ({
                   </Button>
                 ))}
               </div>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                <Button
+                  onClick={fetchAISuggestions}
+                  disabled={isLoadingSuggestions}
+                  variant="outline"
+                  className="bg-violet-50 hover:bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-950/30 dark:hover:bg-violet-900/50 dark:border-violet-700 dark:text-violet-300"
+                >
+                  {isLoadingSuggestions ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyse IA...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      🤖 Annotation IA
+                    </>
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  L'IA analyse le rapport et propose des annotations automatiques
+                </span>
+              </div>
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                 <Lightbulb className="h-3 w-3" />
                 Sélectionnez du texte dans les lignes ci-dessous, puis il sera automatiquement annoté
               </p>
             </CardContent>
           </Card>
+
+          {/* Barre de suggestions IA */}
+          {(aiSuggestions.length > 0 || suggestionsSummary) && (
+            <Card className="border-violet-500/30 bg-violet-50/50 dark:bg-violet-950/20">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2 text-violet-700 dark:text-violet-400">
+                    <Wand2 className="h-5 w-5" />
+                    Suggestions IA ({aiSuggestions.length})
+                    {detectedPMS && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        PMS détecté: {detectedPMS}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={acceptAllSuggestions}
+                      disabled={aiSuggestions.length === 0}
+                      className="bg-violet-600 hover:bg-violet-700 text-white"
+                    >
+                      <CheckCheck className="h-4 w-4 mr-1" />
+                      Tout accepter
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAiSuggestions([])}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Tout rejeter
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {/* Résumé par type */}
+                {suggestionsSummary && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {suggestionsSummary.roomNumber > 0 && (
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                        onClick={() => acceptAllOfType('roomNumber')}
+                      >
+                        🚪 {aiSuggestions.filter(s => s.field === 'roomNumber').length} n° chambres
+                        <CheckCheck className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                    {suggestionsSummary.status > 0 && (
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30"
+                        onClick={() => acceptAllOfType('status')}
+                      >
+                        📊 {aiSuggestions.filter(s => s.field === 'status').length} statuts
+                        <CheckCheck className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                    {suggestionsSummary.nightInfo > 0 && (
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                        onClick={() => acceptAllOfType('nightInfo')}
+                      >
+                        🌙 {aiSuggestions.filter(s => s.field === 'nightInfo').length} nuits
+                        <CheckCheck className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                    {suggestionsSummary.guestName > 0 && (
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                        onClick={() => acceptAllOfType('guestName')}
+                      >
+                        👤 {aiSuggestions.filter(s => s.field === 'guestName').length} clients
+                        <CheckCheck className="h-3 w-3 ml-1" />
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                
+                {/* Liste des suggestions individuelles */}
+                <div className="flex flex-wrap gap-2 max-h-[150px] overflow-auto">
+                  {aiSuggestions.slice(0, 30).map(suggestion => (
+                    <Badge
+                      key={suggestion.id}
+                      variant="outline"
+                      className={`${fieldConfig[suggestion.field as keyof typeof fieldConfig]?.color} py-1 px-2 border-dashed`}
+                    >
+                      <span className="mr-1">{fieldConfig[suggestion.field as keyof typeof fieldConfig]?.icon}</span>
+                      "{suggestion.text}"
+                      <span className="ml-1 text-xs opacity-60">
+                        ({Math.round((suggestion.confidence || 0.7) * 100)}%)
+                      </span>
+                      <button 
+                        onClick={() => acceptSuggestion(suggestion)}
+                        className="ml-1 hover:text-green-600"
+                      >
+                        <Check className="h-3 w-3" />
+                      </button>
+                      <button 
+                        onClick={() => rejectSuggestion(suggestion.id)}
+                        className="ml-1 hover:text-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  {aiSuggestions.length > 30 && (
+                    <span className="text-xs text-muted-foreground">
+                      +{aiSuggestions.length - 30} autres...
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Zone d'annotation */}
           <Card>
