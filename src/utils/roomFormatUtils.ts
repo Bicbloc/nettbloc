@@ -1,24 +1,29 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export interface RoomFormatConfig {
-  format: string; // 'XXX', '0X', 'XXXX', etc.
+  format: string; // 'XXX', '0X', 'XXXX', 'NN', etc.
   regex: RegExp;
   minLength: number;
   maxLength: number;
+  statusKeywords?: string[]; // Apaleo keywords like "Recouche", "Parti"
 }
 
 /**
  * Load the learned room format for a hotel from report_training_patterns
+ * Loads patterns where:
+ * 1. hotel_id = hotelId (created by this hotel)
+ * 2. assigned_to_hotel_id = hotelId (assigned to this hotel)
  */
 export async function loadHotelRoomFormat(hotelId: string): Promise<RoomFormatConfig | null> {
   try {
     // Check report_training_patterns for learned format
+    // Look for patterns created by this hotel OR assigned to this hotel
     const { data: patterns } = await supabase
       .from('report_training_patterns')
-      .select('extracted_data, detection_rules')
-      .eq('hotel_id', hotelId)
+      .select('extracted_data, detection_rules, pms_type')
+      .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId}`)
       .eq('validated', true)
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(1);
     
     if (patterns && patterns.length > 0) {
@@ -26,6 +31,7 @@ export async function loadHotelRoomFormat(hotelId: string): Promise<RoomFormatCo
       
       // Try to get room format from detection_rules first, then extracted_data
       let roomFormat: string | null = null;
+      let statusKeywords: string[] | undefined = undefined;
       
       const detectionRules = pattern.detection_rules as Record<string, any> | null;
       const extractedData = pattern.extracted_data as Record<string, any> | null;
@@ -36,9 +42,17 @@ export async function loadHotelRoomFormat(hotelId: string): Promise<RoomFormatCo
         roomFormat = extractedData.patterns.roomFormat;
       }
       
+      // Load status keywords from detection_rules (for Apaleo)
+      if (detectionRules?.statusKeywords && Array.isArray(detectionRules.statusKeywords)) {
+        statusKeywords = detectionRules.statusKeywords;
+        console.log(`📝 Mots-clés de statut appris: ${statusKeywords.join(', ')}`);
+      }
+      
       if (roomFormat) {
-        console.log(`📐 Format de chambre appris pour hotel ${hotelId}: ${roomFormat}`);
-        return getRoomFormatConfig(roomFormat);
+        console.log(`📐 Format de chambre appris pour hotel ${hotelId}: ${roomFormat} (PMS: ${pattern.pms_type})`);
+        const config = getRoomFormatConfig(roomFormat);
+        config.statusKeywords = statusKeywords;
+        return config;
       }
     }
     
@@ -54,6 +68,16 @@ export async function loadHotelRoomFormat(hotelId: string): Promise<RoomFormatCo
  * Get the room format configuration based on the format string
  */
 export function getRoomFormatConfig(format: string): RoomFormatConfig {
+  // Format NN: all 2-digit numbers (01-99) - used by Apaleo
+  if (format === 'NN' || format === '00') {
+    return {
+      format: 'NN',
+      regex: /\b(0[1-9]|[1-9]\d?)\b/g,  // 01-09 AND 10-99
+      minLength: 1,
+      maxLength: 2
+    };
+  }
+  
   // Format 0X: 2 digits starting with 0 (01, 02, ..., 09)
   if (format === '0X' || format.match(/^0[1-9]$/)) {
     return {
