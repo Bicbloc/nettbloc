@@ -63,7 +63,7 @@ export interface DetectionRule {
   description?: string;
 }
 
-// Règles par défaut pour Mews - AMÉLIORÉES avec logique départ = toujours à blanc
+// Règles par défaut pour Mews et Apaleo - AMÉLIORÉES avec logique départ = toujours à blanc
 const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[] = [
   // PRIORITÉ MAXIMALE: Out of order
   {
@@ -74,6 +74,36 @@ const DEFAULT_MEWS_RULES: Omit<DetectionRule, 'id' | 'hotel_id' | 'created_by'>[
     priority: 20,
     is_active: true,
     description: "Chambre hors service - pas de nettoyage"
+  },
+  // APALEO: Recouche = Client reste → Recouche
+  {
+    rule_name: "Apaleo: Recouche = Recouche",
+    rule_type: "status_keyword",
+    condition: { pattern: "\\bRecouche\\b", operator: "regex_match" },
+    result: { cleaning_type: "recouche", status: "stayover" },
+    priority: 19,
+    is_active: true,
+    description: "Mot-clé Apaleo 'Recouche' = Client reste → Recouche"
+  },
+  // APALEO: Parti = Départ → À Blanc
+  {
+    rule_name: "Apaleo: Parti = À Blanc",
+    rule_type: "status_keyword",
+    condition: { pattern: "\\bParti\\b", operator: "regex_match" },
+    result: { cleaning_type: "a_blanc", status: "checkout" },
+    priority: 19,
+    is_active: true,
+    description: "Mot-clé Apaleo 'Parti' = Départ client → À Blanc"
+  },
+  // APALEO: En arrivée = Arrivée prévue → À Blanc
+  {
+    rule_name: "Apaleo: En arrivée = À Blanc",
+    rule_type: "status_keyword",
+    condition: { pattern: "\\b(En arrivée|Arrivé)\\b", operator: "regex_match" },
+    result: { cleaning_type: "a_blanc", status: "arrival" },
+    priority: 18,
+    is_active: true,
+    description: "Mot-clé Apaleo 'En arrivée' = Arrivée prévue → À Blanc"
   },
   // PRIORITÉ TRÈS HAUTE: Client avec date arrivée ET départ = Recouche (séjour en cours)
   // Ex: "102 SGL DIR Farid GAOUTARA 04/05/2025 1× Adults Guoda 07/05/2025" = Recouche car séjour du 04 au 07
@@ -521,11 +551,16 @@ class MewsDetectionService {
     const departureTimeMatch = line.match(/\b(0?[5-9]|1[0-2]):\d{2}\b/);
     const arrivalTimeMatch = line.match(/\b(1[4-9]):\d{2}\b/);
     
-    // Chercher les statuts
-    const statusMatch = line.match(/\b(SAL|DIR|DEP|INS|ARR|DEPART|ARRIVEE|STAYOVER|CHECKOUT|CHECKIN)\b/i);
+    // Chercher les statuts - inclure les mots-clés Apaleo (Recouche, Parti, En arrivée)
+    const statusMatch = line.match(/\b(SAL|DIR|DEP|INS|ARR|DEPART|ARRIVEE|STAYOVER|CHECKOUT|CHECKIN|Recouche|Parti|En arrivée|Arrivé|A contrôler)\b/i);
     
     // Détecter Out of order
     const isOutOfOrder = /\b(Out of order|OOO|HS|Hors service)\b/i.test(line);
+    
+    // Détecter les mots-clés Apaleo spécifiques pour le type de nettoyage
+    const isApaleoRecouche = /\bRecouche\b/i.test(line);
+    const isApaleoParti = /\bParti\b/i.test(line);
+    const isApaleoArrivee = /\b(En arrivée|Arrivé)\b/i.test(line);
     
     // Détecter présence client
     const guestPresence = this.detectGuestPresence(line);
