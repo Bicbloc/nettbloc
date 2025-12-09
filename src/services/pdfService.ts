@@ -152,70 +152,219 @@ function parseRoomsFromText(
   learnedPattern?: LearnedPattern | null
 ): Room[] {
   const rooms: Room[] = [];
+  const foundRooms = new Map<string, Room>(); // Utiliser Map pour éviter doublons et garder le meilleur résultat
+  
+  // Détecter le type de PMS pour adapter le parsing
+  const pmsDetection = patternLearningService.detectPmsFromText(text);
+  const isApaleo = pmsDetection.pmsType === 'apaleo' || 
+                   text.includes('Rapport Housekeeping') || 
+                   text.includes('Ch.') && text.includes('Type de chambre');
+  
+  console.log(`📄 PMS détecté: ${pmsDetection.pmsType} (confiance: ${pmsDetection.confidence}%)`);
+  
+  if (isApaleo) {
+    return parseApaleoRooms(text, learnedPattern);
+  }
+  
+  // Pour les autres PMS, utiliser le parsing standard
+  return parseStandardRooms(text, roomFormatConfig, learnedPattern);
+}
+
+// Parsing spécifique pour les rapports Apaleo
+function parseApaleoRooms(text: string, learnedPattern?: LearnedPattern | null): Room[] {
+  const rooms: Room[] = [];
+  const roomData = new Map<string, { statuses: string[]; lines: string[] }>();
+  
+  console.log(`🏨 Parsing Apaleo détecté`);
+  
+  // Apaleo utilise des tableaux avec colonnes:
+  // Ch. | Type de chambre | Arrivée | Départ | Adultes, enfants | Nom du client | Statut | Statut
+  // Le numéro de chambre est généralement 2 chiffres (01-99)
+  
+  // Pattern pour détecter les lignes de chambre Apaleo
+  // Le numéro de chambre est au début d'une ligne avec des données tabulaires
+  const apaleoLinePattern = /^[|\s]*(\d{1,2})\s*\|?\s*(Chambre|SGL|DBL|TWN|TPL|TRPL|QUAD)/i;
+  const roomNumberOnlyPattern = /^[|\s]*(\d{1,2})\s*[|\s]/;
+  
+  // Analyser ligne par ligne
+  const lines = text.split(/\n|\r\n|\r/);
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    // Chercher un numéro de chambre en début de ligne
+    let roomNumber: string | null = null;
+    
+    // Pattern 1: Numéro suivi de type de chambre
+    const match1 = line.match(apaleoLinePattern);
+    if (match1) {
+      roomNumber = match1[1].padStart(2, '0');
+    } else {
+      // Pattern 2: Numéro seul en début de ligne dans un tableau
+      const match2 = line.match(roomNumberOnlyPattern);
+      if (match2) {
+        const num = parseInt(match2[1]);
+        // Filtrer les numéros trop grands (probablement des années ou autres)
+        if (num >= 1 && num <= 99) {
+          roomNumber = match2[1].padStart(2, '0');
+        }
+      }
+    }
+    
+    if (!roomNumber) continue;
+    
+    // Vérifier que ce n'est pas une année ou autre faux positif
+    if (/^20[0-9]{2}$/.test(roomNumber)) continue;
+    
+    // Extraire les statuts de cette ligne
+    const statuses: string[] = [];
+    
+    // Statuts Apaleo principaux
+    if (/\bRecouche\b/i.test(line)) statuses.push('Recouche');
+    if (/\bParti\b/i.test(line)) statuses.push('Parti');
+    if (/\bEn arrivée\b/i.test(line)) statuses.push('En arrivée');
+    if (/\bArrivé\b/i.test(line) && !/\bEn arrivée\b/i.test(line)) statuses.push('Arrivé');
+    if (/\bA contrôler\b/i.test(line) || /\bA controler\b/i.test(line)) statuses.push('A contrôler');
+    if (/\bSale\b/i.test(line)) statuses.push('Sale');
+    if (/\bPropre\b/i.test(line)) statuses.push('Propre');
+    
+    console.log(`🏠 Chambre ${roomNumber}: Statuts trouvés: [${statuses.join(', ')}]`);
+    
+    // Ajouter ou fusionner les statuts pour cette chambre
+    if (!roomData.has(roomNumber)) {
+      roomData.set(roomNumber, { statuses: [], lines: [] });
+    }
+    const data = roomData.get(roomNumber)!;
+    data.statuses.push(...statuses);
+    data.lines.push(line);
+  }
+  
+  console.log(`📊 ${roomData.size} chambres uniques détectées`);
+  
+  // Convertir les données en rooms avec le bon type de nettoyage
+  for (const [roomNumber, data] of roomData) {
+    const allStatuses = data.statuses;
+    const uniqueStatuses = [...new Set(allStatuses)];
+    
+    // Déterminer le type de nettoyage selon les règles Apaleo
+    let cleaningType: 'full' | 'quick' | 'none' = 'none';
+    let roomStatus = 'clean';
+    let matchedRule = '';
+    
+    const hasParti = uniqueStatuses.includes('Parti');
+    const hasRecouche = uniqueStatuses.includes('Recouche');
+    const hasEnArrivee = uniqueStatuses.includes('En arrivée');
+    const hasArrive = uniqueStatuses.includes('Arrivé');
+    const hasSale = uniqueStatuses.includes('Sale');
+    const hasAControler = uniqueStatuses.includes('A contrôler');
+    
+    // RÈGLE 1: Parti (départ) → Nettoyage complet (à blanc)
+    if (hasParti) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      matchedRule = 'Parti (Départ)';
+    }
+    // RÈGLE 2: En arrivée sans Parti → Nettoyage complet pour préparer
+    else if (hasEnArrivee && !hasParti) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      matchedRule = 'En arrivée (préparation)';
+    }
+    // RÈGLE 3: Recouche → Nettoyage rapide
+    else if (hasRecouche) {
+      cleaningType = 'quick';
+      roomStatus = 'needs-cleaning';
+      matchedRule = 'Recouche';
+    }
+    // RÈGLE 4: Arrivé (client présent) → Pas de nettoyage
+    else if (hasArrive) {
+      cleaningType = 'none';
+      roomStatus = 'occupied';
+      matchedRule = 'Arrivé (occupée)';
+    }
+    // RÈGLE 5: Sale → Nettoyage complet
+    else if (hasSale) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      matchedRule = 'Sale';
+    }
+    // RÈGLE 6: A contrôler seul → Propre
+    else if (hasAControler) {
+      cleaningType = 'none';
+      roomStatus = 'clean';
+      matchedRule = 'A contrôler';
+    }
+    
+    console.log(`   ✅ ${roomNumber}: ${matchedRule} → ${cleaningType}`);
+    
+    // Calculer l'étage
+    const floor = getRoomFloor(roomNumber);
+    
+    rooms.push({
+      number: roomNumber,
+      status: roomStatus,
+      cleaningType,
+      priority: cleaningType === 'full' ? 'high' : cleaningType === 'quick' ? 'medium' : 'low',
+      isTwin: data.lines.some(l => /TWN|twin/i.test(l)),
+      isUrgent: hasParti && hasEnArrivee, // Départ + Arrivée même jour = urgent
+      notUrgent: hasRecouche && !hasEnArrivee,
+      floor,
+      notes: `Statuts: ${uniqueStatuses.join(', ')}. Règle: ${matchedRule}`
+    });
+  }
+  
+  console.log(`✅ ${rooms.length} chambres parsées (Apaleo)`);
+  
+  // Trier par numéro de chambre
+  return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+}
+
+// Parsing standard pour les autres PMS (Mews, etc.)
+function parseStandardRooms(
+  text: string,
+  roomFormatConfig?: RoomFormatConfig | null,
+  learnedPattern?: LearnedPattern | null
+): Room[] {
+  const rooms: Room[] = [];
   const lines = text.split(/\n|\r\n|\r/).filter(line => line.trim());
   const foundRooms = new Set<string>();
   
-  // Pour Apaleo: collecter les statuts par chambre pour appliquer les règles de combinaison
-  const roomStatuses: Map<string, string[]> = new Map();
-  
   // Déterminer le pattern de chambre à utiliser
   let roomPattern: RegExp;
-  let minLength = 1;
-  let maxLength = 5;
+  let minLength = 2;
+  let maxLength = 4;
   
   if (roomFormatConfig) {
-    // Utiliser le format appris
     roomPattern = roomFormatConfig.regex;
     minLength = roomFormatConfig.minLength;
     maxLength = roomFormatConfig.maxLength;
-    console.log(`📄 Parsing PDF avec format appris ${roomFormatConfig.format}: ${roomPattern}`);
   } else if (learnedPattern && learnedPattern.roomFormat) {
-    // Utiliser le format du pattern appris
     const format = learnedPattern.roomFormat;
     if (format === 'NN' || format === '00') {
-      // Format 2 chiffres (01-99)
       roomPattern = /\b(0?[1-9]|[1-9][0-9])\b/g;
       minLength = 1;
       maxLength = 2;
     } else if (format === 'XXX') {
-      // Format 3 chiffres (100-999)
       roomPattern = /\b([1-9][0-9]{2})\b/g;
       minLength = 3;
       maxLength = 3;
-    } else if (format === 'XXXX') {
-      // Format 4 chiffres (1000-9999)
-      roomPattern = /\b([1-9][0-9]{3})\b/g;
-      minLength = 4;
-      maxLength = 4;
     } else {
       roomPattern = /\b([1-9]\d{1,3})\b/g;
-      minLength = 2;
-      maxLength = 4;
     }
-    console.log(`📄 Parsing PDF avec format du pattern ${format}: ${roomPattern}`);
   } else {
-    // Pattern par défaut: accepter 2-4 chiffres uniquement (pas les 1 chiffre pour éviter faux positifs)
     roomPattern = /\b([1-9][0-9]{1,3})\b/g;
-    minLength = 2;
-    maxLength = 4;
-    console.log(`📄 Parsing PDF avec format par défaut: ${roomPattern}`);
   }
   
-  console.log(`📄 ${lines.length} lignes, utilisation de mewsDetectionService`);
-  if (learnedPattern) {
-    console.log(`🎓 Mots-clés appris: ${Object.keys(learnedPattern.statusKeywords).join(', ')}`);
-  }
+  console.log(`📄 Parsing standard: ${lines.length} lignes`);
   
-  // Patterns à exclure - dates, années, heures, etc.
+  // Patterns à exclure
   const excludePatterns = [
-    /^20(2[0-9]|3[0-9])$/, // Années 2020-2039
-    /^(0?[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])$/, // Dates DDMM ou MMDD
-    /^(0[1-9]|1[0-9]|2[0-3])[0-5][0-9]$/, // Heures HHMM
+    /^20(2[0-9]|3[0-9])$/, // Années
+    /^(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])$/, // Dates MMDD
   ];
   
-  // Parcourir ligne par ligne et utiliser mewsDetectionService
   for (const line of lines) {
-    // Réinitialiser lastIndex pour chaque ligne
     roomPattern.lastIndex = 0;
     let match;
     
@@ -232,141 +381,40 @@ function parseRoomsFromText(
       }
       if (shouldExclude) continue;
       
-      // Ne pas inclure les nombres trop grands
+      if (roomNumber.length < minLength || roomNumber.length > maxLength) continue;
       if (parseInt(roomNumber) > 9999) continue;
+      if (foundRooms.has(roomNumber)) continue;
       
-      // Vérifier la longueur
-      if (roomNumber.length < minLength || roomNumber.length > maxLength) {
-        console.log(`🚫 Chambre ${roomNumber} ignorée (longueur ${roomNumber.length} != ${minLength}-${maxLength})`);
-        continue;
-      }
+      foundRooms.add(roomNumber);
       
-      // Vérifier que la ligne contient des mots-clés hôteliers pour valider que c'est bien une chambre
-      const lineUpper = line.toUpperCase();
-      const hasHotelContext = /\b(ROOM|CHAMBRE|RECOUCHE|PARTI|ARRIVÉE|ARRIVEE|DIR|INS|SAL|DEP|ARR|CLEAN|DIRTY|OCC|VAC|STAYOVER|CHECKOUT|ARRIVAL|DEPART|NIGHT|ADULTS)\b/i.test(line);
-      
-      // Si pas de contexte hôtelier et le numéro est petit (< 100), ignorer
-      if (!hasHotelContext && parseInt(roomNumber) < 100) {
-        console.log(`🚫 Chambre ${roomNumber} ignorée (pas de contexte hôtelier)`);
-        continue;
-      }
-      
-      // Normaliser le format du numéro - garder le format original
-      const normalizedRoomNumber = roomNumber;
-      
-      // Éviter les doublons
-      if (foundRooms.has(normalizedRoomNumber)) continue;
-      foundRooms.add(normalizedRoomNumber);
-      
-      // PRIORITÉ 1: Vérifier si la chambre a un pattern validé (apprentissage)
-      const validatedPattern = mewsDetectionService.getValidatedPattern(normalizedRoomNumber);
+      // Utiliser mewsDetectionService pour analyser
+      const analysis = mewsDetectionService.analyzeLine(line);
       
       let cleaningType: 'full' | 'quick' | 'none' = 'none';
       let roomStatus = 'clean';
-      let matchedRule: string | null = null;
       
-      if (validatedPattern) {
-        // Utiliser le pattern validé (PRIORITÉ ABSOLUE)
-        console.log(`🎓 Chambre ${normalizedRoomNumber}: Pattern validé trouvé → ${validatedPattern.cleaningType}`);
-        
-        if (validatedPattern.cleaningType === 'full' || validatedPattern.cleaningType === 'a_blanc') {
-          cleaningType = 'full';
-          roomStatus = 'needs-cleaning';
-        } else if (validatedPattern.cleaningType === 'quick' || validatedPattern.cleaningType === 'recouche') {
-          cleaningType = 'quick';
-          roomStatus = 'needs-cleaning';
-        } else {
-          cleaningType = 'none';
-          roomStatus = validatedPattern.status === 'inspected' ? 'clean' : validatedPattern.status || 'clean';
-        }
-        matchedRule = 'Pattern validé (apprentissage)';
-      } else {
-        // PRIORITÉ 2: Utiliser les mots-clés appris du pattern (si disponible)
-        if (learnedPattern && Object.keys(learnedPattern.statusKeywords).length > 0) {
-          const keywordResult = patternLearningService.detectCleaningTypeFromKeywords(line, learnedPattern);
-          if (keywordResult.matchedKeyword) {
-            cleaningType = keywordResult.cleaning;
-            roomStatus = keywordResult.status === 'stayover' ? 'needs-cleaning' : 
-                         keywordResult.status === 'checkout' ? 'needs-cleaning' :
-                         keywordResult.status === 'arrival' ? 'needs-cleaning' :
-                         keywordResult.status === 'clean' ? 'clean' : 'needs-cleaning';
-            matchedRule = `Mot-clé appris: ${keywordResult.matchedKeyword}`;
-            console.log(`🎓 Chambre ${normalizedRoomNumber}: Mot-clé appris "${keywordResult.matchedKeyword}" → ${cleaningType}`);
-          } else {
-            // Fallback: utiliser mewsDetectionService
-            const analysis = mewsDetectionService.analyzeLine(line);
-            const detectedType = analysis.cleaningType;
-            
-            if (detectedType === 'a_blanc') {
-              cleaningType = 'full';
-              roomStatus = 'needs-cleaning';
-            } else if (detectedType === 'recouche') {
-              cleaningType = 'quick';
-              roomStatus = 'needs-cleaning';
-            } else {
-              cleaningType = 'none';
-              roomStatus = analysis.blocks.isOutOfOrder ? 'out-of-order' : 
-                           analysis.blocks.status === 'INS' ? 'clean' :
-                           analysis.blocks.status === 'OCC' ? 'occupied' : 'clean';
-            }
-            matchedRule = analysis.matchedRule;
-          }
-        } else {
-          // PRIORITÉ 3: Utiliser mewsDetectionService pour analyser la ligne
-          const analysis = mewsDetectionService.analyzeLine(line);
-          
-          console.log(`🏠 Chambre ${normalizedRoomNumber}: cleaningType=${analysis.cleaningType}, rule=${analysis.matchedRule}`);
-          
-          const detectedType = analysis.cleaningType;
-          
-          if (detectedType === 'a_blanc') {
-            cleaningType = 'full';
-            roomStatus = 'needs-cleaning';
-          } else if (detectedType === 'recouche') {
-            cleaningType = 'quick';
-            roomStatus = 'needs-cleaning';
-          } else {
-            cleaningType = 'none';
-            if (analysis.blocks.isOutOfOrder) {
-              roomStatus = 'out-of-order';
-            } else if (analysis.blocks.status === 'INS') {
-              roomStatus = 'clean';
-            } else if (analysis.blocks.status === 'OCC') {
-              roomStatus = 'occupied';
-            } else {
-              roomStatus = 'clean';
-            }
-          }
-          matchedRule = analysis.matchedRule;
-        }
+      if (analysis.cleaningType === 'a_blanc') {
+        cleaningType = 'full';
+        roomStatus = 'needs-cleaning';
+      } else if (analysis.cleaningType === 'recouche') {
+        cleaningType = 'quick';
+        roomStatus = 'needs-cleaning';
       }
       
-      // Déterminer si c'est une chambre twin
-      const isTwin = /TWN|TWS/.test(line);
-      
-      // Déterminer la priorité
-      const priority = determinePriority(line);
-      
-      // Déterminer l'étage
-      const floor = getRoomFloor(normalizedRoomNumber);
-      
       rooms.push({
-        number: normalizedRoomNumber,
+        number: roomNumber,
         status: roomStatus,
         cleaningType,
-        priority,
-        isTwin,
-        isUrgent: priority === 'high',
-        notUrgent: priority === 'low',
-        floor,
-        notes: matchedRule ? `Règle: ${matchedRule}` : undefined
+        priority: determinePriority(line),
+        isTwin: /TWN|TWS/.test(line),
+        isUrgent: cleaningType === 'full',
+        floor: getRoomFloor(roomNumber),
+        notes: analysis.matchedRule ? `Règle: ${analysis.matchedRule}` : undefined
       });
     }
   }
   
-  console.log(`✅ Détecté ${rooms.length} chambres avec mewsDetectionService`);
-  
-  // Trier les chambres par numéro
+  console.log(`✅ ${rooms.length} chambres parsées (standard)`);
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
 }
 
