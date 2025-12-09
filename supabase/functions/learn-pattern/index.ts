@@ -5,9 +5,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Règles métier avancées pour détection précise
+// Règles métier avancées pour détection précise - OPTIMISÉ APALEO
 const CLEANING_RULES = `
 ### RÈGLES DE DÉTECTION DU TYPE DE NETTOYAGE ###
+
+## RÈGLE SPÉCIALE APALEO - DOUBLONS ##
+Dans les rapports Apaleo, UNE MÊME CHAMBRE peut apparaître PLUSIEURS FOIS avec des statuts différents.
+
+RÈGLE CRITIQUE - COMBINAISONS DE STATUTS:
+1. Si chambre X apparaît avec "PARTI/DEP" ET "EN ARRIVÉE/ARR" → C'est un À BLANC (checkout_arrival)
+   - Le client est parti ET un nouveau arrive le même jour
+   - Nécessite un nettoyage COMPLET
+   - NE PAS créer 2 entrées, FUSIONNER en UNE seule avec cleaningType="full"
+
+2. Si chambre X apparaît avec "EN ARRIVÉE/ARR" ET "A CONTROLER" → C'est PROPRE (clean)
+   - La chambre attend un client mais est déjà prête
+   - cleaningType="none", la chambre n'a pas besoin de nettoyage
+   - NE PAS créer 2 entrées, FUSIONNER en UNE seule
+
+3. Si chambre X apparaît avec "ARRIVÉ" (client présent) ET "A CONTROLER" → PROPRE
+   - Le client est déjà là, chambre inspectée
+   - cleaningType="none"
+
+IMPORTANT: Quand tu vois la même chambre plusieurs fois, FUSIONNE les informations!
 
 ## PRIORITÉ 1: HORS SERVICE (cleaningType="none", status="out_of_order")
 - Mots-clés: OOO, Out of order, HS, Hors service, Maintenance, Blocked
@@ -18,67 +38,82 @@ CONDITIONS pour RECOUCHE:
 - Client avec DATE ARRIVÉE + DATE DÉPART visibles = séjour en cours
 - "Nuit X/Y" où X > 1 (ex: Nuit 2/3, Nuit 3/5)
 - Statut "INS" ou "SALE" ou "DIRTY" AVEC un nom de client
-- "Stay" ou "Stayover" ou "Continue" dans le statut
+- "Stay" ou "Stayover" ou "Recouche" dans le statut
 - Client présent + pas de départ imminent aujourd'hui
 
 EXEMPLES RECOUCHE:
-- "102 SGL DIR Farid GAOUTARA 04/05/2025 Adults Guoda Cirtautaite, Night 3/3 07/05/2025" → RECOUCHE (dates arrivée+départ = en séjour)
+- "102 SGL DIR Farid GAOUTARA 04/05/2025 Adults Guoda Cirtautaite, Night 3/3 07/05/2025" → RECOUCHE (Nuit 3/3, dernier jour = nettoyage rapide)
 - "205 DBL INS Martin DUPONT Night 2/4" → RECOUCHE (Nuit 2/4, X>1)
 - "301 SALE Jean MARTIN" → RECOUCHE (sale avec client)
 
-## PRIORITÉ 3: À BLANC - Départ sans arrivée (cleaningType="full", status="checkout")
+## PRIORITÉ 3: À BLANC - Départ ET Arrivée même jour OU Départ seul (cleaningType="full")
 CONDITIONS pour À BLANC:
+- Chambre apparaît avec PARTI/DÉPART ET EN ARRIVÉE = checkout_arrival
 - Statut "DIR" ou "DEP" ou "Departure" ou "Check-out" SANS nouveau client
 - Chambre vide après départ
-- "Nuit 1/1" = départ le jour même
-- Pas de nom de client OU client parti
+- "Nuit 1/1" = départ le jour même (une seule nuit)
 
 EXEMPLES À BLANC:
+- "102 PARTI" + "102 EN ARRIVÉE" sur le même rapport → À BLANC (checkout_arrival)
 - "102 DIR" → À BLANC (départ sans client)
 - "205 DEP" → À BLANC (departure)
 - "301 Check-out 10:00" → À BLANC
 
-## PRIORITÉ 4: ARRIVÉE (cleaningType="full", status="arrival")
+## PRIORITÉ 4: ARRIVÉE SEULE (cleaningType="full", status="arrival")
 CONDITIONS:
-- "Nuit 1/Y" où Y > 1 (première nuit d'un séjour multi-nuits)
-- Statut "ARR" ou "Arrival" avec client prévu
-- Chambre propre + arrivée prévue
+- "EN ARRIVÉE" ou "ARR" SANS doublon "PARTI" pour cette chambre
+- Chambre doit être préparée pour nouveau client
 
 ## PRIORITÉ 5: PROPRE (cleaningType="none", status="clean")
 CONDITIONS:
-- Statut "INS" ou "Inspected" ou "Clean" SANS client
+- "EN ARRIVÉE" + "A CONTROLER" = déjà propre, pas de nettoyage
+- "ARRIVÉ" + "A CONTROLER" = client présent, chambre OK
+- Statut "INS" ou "Inspected" ou "Clean" ou "Propre" SANS client
 - Chambre libre et propre
-- Pas de réservation
 
 ### INDICES POUR DIFFÉRENCIER ###
 
+À BLANC (checkout_arrival) si:
+✓ Même chambre avec PARTI/DEP ET EN ARRIVÉE/ARR
+✓ Client parti + nouveau client arrive
+
 RECOUCHE si:
 ✓ Deux dates visibles (arrivée ET départ) sur la même ligne
-✓ Nuit X/Y avec X > 1
+✓ Nuit X/Y avec X > 1 (sauf Nuit 1/1)
 ✓ Client présent + statut SALE/DIRTY/INS
-✓ Mot "Stay" ou "Continue"
 
-À BLANC si:
-✓ Statut DIR/DEP sans dates multiples
-✓ Pas de nom de client après DIR/DEP
+PROPRE si:
+✓ EN ARRIVÉE + A CONTROLER (chambre prête)
+✓ ARRIVÉ + A CONTROLER (client déjà là)
+
+À BLANC simple si:
+✓ Statut DIR/DEP sans doublon "EN ARRIVÉE"
 ✓ Nuit 1/1 (départ jour même)
-✓ Chambre vide après checkout
+
+### MOTS-CLÉS APALEO ###
+- PARTI = checkout/départ
+- EN ARRIVÉE = arrivée prévue
+- ARRIVÉ = client déjà présent
+- A CONTROLER = à inspecter
+- RECOUCHE = stayover
+- SALE/DIR = dirty
 
 ### NOMS À IGNORER (staff, pas clients) ###
-staff, superviseur, manager, farid, admin, maintenance, housekeeping
+staff, superviseur, manager, farid, admin, maintenance, housekeeping, reception
 `;
 
-// Définition du tool pour extraction structurée
+// Définition du tool pour extraction structurée - OPTIMISÉ APALEO
 const extractionTool = {
   type: "function",
   function: {
     name: "extract_rooms",
-    description: "Extraire les chambres du rapport avec leur type de nettoyage",
+    description: "Extraire les chambres du rapport avec leur type de nettoyage. IMPORTANT: Fusionner les doublons de chambres!",
     parameters: {
       type: "object",
       properties: {
         rooms: {
           type: "array",
+          description: "Liste des chambres UNIQUES. Si une chambre apparaît plusieurs fois, la fusionner en une seule entrée.",
           items: {
             type: "object",
             properties: {
@@ -86,20 +121,25 @@ const extractionTool = {
               cleaningType: { 
                 type: "string", 
                 enum: ["full", "quick", "none"],
-                description: "full=à blanc, quick=recouche, none=pas de nettoyage" 
+                description: "full=à blanc (départ ou départ+arrivée), quick=recouche, none=pas de nettoyage (propre/arrivé)" 
               },
               status: { 
                 type: "string",
-                enum: ["checkout", "stayover", "arrival", "clean", "out_of_order", "occupied"],
-                description: "Statut de la chambre"
+                enum: ["checkout", "checkout_arrival", "stayover", "arrival", "clean", "out_of_order", "occupied"],
+                description: "checkout_arrival=PARTI+ARRIVÉE même jour, checkout=départ seul, stayover=recouche, clean=propre"
               },
               hasGuest: { type: "boolean", description: "Client présent (nom visible)" },
               guestName: { type: "string", description: "Nom du client si présent" },
-              rawStatus: { type: "string", description: "Statut brut du rapport (DIR/INS/SAL)" },
+              rawStatuses: { 
+                type: "array", 
+                items: { type: "string" },
+                description: "TOUS les statuts bruts trouvés pour cette chambre (ex: ['PARTI', 'EN ARRIVÉE'])" 
+              },
               nightInfo: { type: "string", description: "Info Nuit X/Y si présente" },
               arrivalDate: { type: "string", description: "Date arrivée DD/MM/YYYY" },
               departureDate: { type: "string", description: "Date départ DD/MM/YYYY" },
-              reason: { type: "string", description: "Raison courte de la décision" }
+              reason: { type: "string", description: "Explication de la décision (ex: 'PARTI+EN ARRIVÉE=à blanc')" },
+              isMerged: { type: "boolean", description: "True si cette chambre résulte d'une fusion de plusieurs lignes" }
             },
             required: ["roomNumber", "cleaningType", "status", "hasGuest", "reason"]
           }
@@ -109,7 +149,10 @@ const extractionTool = {
           properties: {
             roomFormat: { type: "string", description: "Format numéro chambre détecté" },
             statusKeywords: { type: "array", items: { type: "string" }, description: "Mots-clés statut trouvés" },
-            hasNightInfo: { type: "boolean", description: "Présence de Nuit X/Y" }
+            hasNightInfo: { type: "boolean", description: "Présence de Nuit X/Y" },
+            pmsType: { type: "string", description: "Type de PMS détecté (apaleo, mews, etc.)" },
+            hasDuplicates: { type: "boolean", description: "True si des chambres apparaissent plusieurs fois" },
+            mergedCount: { type: "integer", description: "Nombre de chambres fusionnées" }
           },
           required: ["roomFormat", "statusKeywords", "hasNightInfo"]
         }
@@ -124,7 +167,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { textSample, annotations, context, mode, learnedPatterns, fullText } = body;
+    const { textSample, annotations, context, mode, learnedPatterns, fullText, exclusions } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -134,33 +177,64 @@ serve(async (req) => {
     const textToAnalyze = mode === 'apply' ? fullText : textSample;
     const patternsInfo = learnedPatterns ? `\nPatterns appris: ${JSON.stringify(learnedPatterns)}` : '';
     const annotationsInfo = annotations?.length ? `\nExemples annotés: ${JSON.stringify(annotations)}` : '';
+    const exclusionsInfo = exclusions?.length ? `\nÉléments à IGNORER (ne pas extraire): ${exclusions.map((e: any) => e.text || e).join(', ')}` : '';
 
-    const prompt = `Tu es un expert en analyse de rapports hôteliers. Analyse ce rapport et extrais TOUTES les chambres.
+    // Détection du type de PMS
+    const textUpper = textToAnalyze?.toUpperCase() || '';
+    const isApaleo = textUpper.includes('APALEO') || textUpper.includes('HOUSEKEEPING REPORT') || 
+                     (textUpper.includes('PARTI') && textUpper.includes('EN ARRIVÉE'));
+    
+    const pmsSpecificRules = isApaleo ? `
+### RÈGLES SPÉCIFIQUES APALEO ###
+Ce rapport vient d'APALEO. Applique ces règles:
+
+1. FUSION OBLIGATOIRE: Si tu vois la chambre 101 avec "PARTI" et aussi 101 avec "EN ARRIVÉE", 
+   créé UNE SEULE entrée avec status="checkout_arrival" et cleaningType="full"
+
+2. PROPRE SI ARRIVÉE+CONTROLER: Si chambre avec "EN ARRIVÉE" ET "A CONTROLER" → status="clean", cleaningType="none"
+
+3. MOTS-CLÉS APALEO:
+   - PARTI = départ
+   - EN ARRIVÉE = arrivée attendue
+   - ARRIVÉ = client présent
+   - A CONTROLER = à inspecter
+   - RECOUCHE = client reste
+
+4. NE CRÉE PAS DE DOUBLONS! Chaque numéro de chambre = 1 seule entrée dans le résultat.
+` : '';
+
+    const prompt = `Tu es un expert en analyse de rapports hôteliers. Analyse ce rapport et extrais TOUTES les chambres UNIQUES.
 
 ${CLEANING_RULES}
 
+${pmsSpecificRules}
+
 ### CONTEXTE ###
-PMS: ${context?.pmsType || 'inconnu'}
+PMS: ${context?.pmsType || (isApaleo ? 'apaleo' : 'inconnu')}
 Rapport: ${context?.reportName || 'inconnu'}
 ${patternsInfo}
 ${annotationsInfo}
+${exclusionsInfo}
 
 ### ANALYSE REQUISE ###
-Pour CHAQUE chambre:
+Pour CHAQUE chambre UNIQUE:
 1. Identifie le numéro de chambre
-2. Cherche les dates (arrivée ET départ) - si 2 dates = RECOUCHE
-3. Cherche "Nuit X/Y" - si X>1 = RECOUCHE
-4. Cherche le statut brut (DIR, INS, SALE, DEP, ARR, OOO)
-5. Cherche un nom de client (ignore les noms staff)
-6. Applique les règles de priorité ci-dessus
+2. VÉRIFIE si cette chambre apparaît plusieurs fois avec des statuts différents
+3. Si oui, FUSIONNE les informations et applique les règles de combinaison
+4. Cherche les dates (arrivée ET départ)
+5. Cherche "Nuit X/Y"
+6. Détermine le cleaningType et status selon les règles
 7. Justifie ta décision dans "reason"
 
 ### TEXTE DU RAPPORT ###
 ${textToAnalyze}
 
-IMPORTANT: Sois très attentif aux indices de RECOUCHE vs À BLANC. Une chambre avec un client ET deux dates = RECOUCHE.`;
+IMPORTANT: 
+- NE CRÉE PAS DE DOUBLONS! Si chambre 101 apparaît 2 fois, retourne 1 seule entrée fusionnée.
+- PARTI + EN ARRIVÉE = checkout_arrival (à blanc)
+- EN ARRIVÉE + A CONTROLER = clean (propre)`;
 
-    console.log("Calling AI with tool calling, text length:", textToAnalyze?.length || 0);
+    console.log("Calling AI with tool calling, text length:", textToAnalyze?.length || 0, "PMS:", isApaleo ? 'apaleo' : 'unknown');
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
