@@ -21,6 +21,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { RoomArchiveService } from "@/services/roomArchiveService";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  loadHotelRoomFormat, 
+  filterRoomsByFormat, 
+  getInactiveRoomNumbers, 
+  filterOutInactiveRooms 
+} from "@/utils/roomFormatUtils";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -192,26 +198,60 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     }
 
     setIsUploading(true);
-    setUploadStatus(mode === 'replace' ? '🗑️ Suppression des anciennes chambres...' : '💾 Enregistrement des chambres...');
-    setUploadProgress(60);
+    setUploadStatus('🔍 Vérification du format et du registre...');
+    setUploadProgress(55);
 
     try {
+      // Charger le format appris et les chambres inactives en parallèle
+      const [roomFormatConfig, inactiveRooms] = await Promise.all([
+        loadHotelRoomFormat(hotelId),
+        getInactiveRoomNumbers(hotelId)
+      ]);
+      
+      // Filtrer les chambres selon le format appris
+      let filteredData = filterRoomsByFormat(data, roomFormatConfig);
+      
+      // Filtrer les chambres désactivées dans le registre
+      filteredData = filterOutInactiveRooms(filteredData, inactiveRooms);
+      
+      const excludedCount = data.length - filteredData.length;
+      if (excludedCount > 0) {
+        console.log(`📋 ${excludedCount} chambres exclues (format ou registre)`);
+        toast({
+          title: "ℹ️ Chambres filtrées",
+          description: `${excludedCount} chambres exclues (format non conforme ou désactivées).`,
+        });
+      }
+      
+      if (filteredData.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Aucune chambre valide",
+          description: "Toutes les chambres ont été exclues par les filtres.",
+        });
+        setIsUploading(false);
+        return;
+      }
+      
+      setUploadStatus(mode === 'replace' ? '🗑️ Suppression des anciennes chambres...' : '💾 Enregistrement des chambres...');
+      setUploadProgress(60);
+
       let insertedCount = 0;
 
       if (mode === 'replace') {
         // Remplacer toutes les chambres
-        const result = await RoomArchiveService.replaceAllRooms(hotelId, data, selectedFile?.name || 'pdf_import');
+        const result = await RoomArchiveService.replaceAllRooms(hotelId, filteredData, selectedFile?.name || 'pdf_import');
         insertedCount = result.inserted;
         
         toast({
           title: "✅ Chambres remplacées",
-          description: `${result.deleted} anciennes chambres supprimées, ${result.inserted} nouvelles chambres ajoutées.`,
+          description: `${result.deleted} anciennes supprimées, ${result.inserted} nouvelles ajoutées.`,
         });
       } else {
         // Mode update (upsert)
-        console.log('🔄 Début enregistrement dans hotel_rooms_registry pour', data.length, 'chambres');
+        console.log('🔄 Début enregistrement dans hotel_rooms_registry pour', filteredData.length, 'chambres');
         
-        const roomsData = data.map((room: any) => {
+        const roomsData = filteredData.map((room: any) => {
           const roomNumber = room.roomNumber || room.room_number || room.number;
           return {
             hotel_id: hotelId,
@@ -227,7 +267,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         }).filter(r => !!r.room_number);
 
         // Préparer les données pour la table rooms
-        const roomsForSync = data.map((room: any) => {
+        const roomsForSync = filteredData.map((room: any) => {
           const roomNumber = room.roomNumber || room.room_number || room.number;
           return {
             hotel_id: hotelId,
@@ -243,7 +283,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         // Exécuter les deux upserts EN PARALLÈLE avec timeout court
         setUploadStatus(`💾 Enregistrement de ${roomsData.length} chambres...`);
         
-        const timeout = 15000; // 15s au lieu de 45s
+        const timeout = 15000;
         
         const [registryResult, roomsResult] = await Promise.all([
           Promise.race([
@@ -268,7 +308,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         });
       }
 
-      proceedToHousekeepers(data);
+      proceedToHousekeepers(filteredData);
 
     } catch (err: any) {
       console.error('❌ Erreur enregistrement:', err);
