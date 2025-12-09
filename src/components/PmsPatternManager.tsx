@@ -716,12 +716,13 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header avec nom établissement */}
+      {/* Header avec nom établissement - masqué pour super admin */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h2 className="text-2xl font-bold">Gestion des Modèles d'Extraction</h2>
-            {currentHotel && (
+            {/* Afficher le badge hôtel uniquement pour les non-super admins */}
+            {!isSuperAdmin && currentHotel && (
               <Badge variant="secondary" className="flex items-center gap-1.5 py-1 px-3">
                 <MapPin className="h-3.5 w-3.5" />
                 {currentHotel.name}
@@ -731,7 +732,11 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
               </Badge>
             )}
           </div>
-          <p className="text-muted-foreground">Gérez, modifiez et réutilisez vos modèles appris</p>
+          <p className="text-muted-foreground">
+            {isSuperAdmin 
+              ? "Gérez tous les modèles de tous les établissements" 
+              : "Gérez, modifiez et réutilisez vos modèles appris"}
+          </p>
         </div>
         <Button onClick={() => createNewPattern('custom')}>
           <Plus className="h-4 w-4 mr-2" />
