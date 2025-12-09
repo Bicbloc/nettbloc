@@ -299,71 +299,101 @@ function parseRoomsFromText(
 // Parsing spécifique pour les rapports Apaleo
 function parseApaleoRooms(text: string, learnedPattern?: LearnedPattern | null): Room[] {
   const rooms: Room[] = [];
-  const roomData = new Map<string, { statuses: string[]; lines: string[] }>();
+  const roomData = new Map<string, { statuses: string[]; roomType: string; clientName: string }>();
   
   console.log(`🏨 Parsing Apaleo détecté`);
   
-  // Apaleo utilise des tableaux avec colonnes:
-  // Ch. | Type de chambre | Arrivée | Départ | Adultes, enfants | Nom du client | Statut | Statut
-  // Le numéro de chambre est généralement 2 chiffres (01-99)
+  // Le texte PDF extrait ressemble à:
+  // "01  Chambre twin      17/05/2025 15:00 19/05/2025 12:00 2 adultes                LI HANJIE                  Recouche   Sale"
+  // Les colonnes sont séparées par des espaces multiples ou pipes |
   
-  // Pattern pour détecter les lignes de chambre Apaleo
-  // Le numéro de chambre est au début d'une ligne avec des données tabulaires
-  const apaleoLinePattern = /^[|\s]*(\d{1,2})\s*\|?\s*(Chambre|SGL|DBL|TWN|TPL|TRPL|QUAD)/i;
-  const roomNumberOnlyPattern = /^[|\s]*(\d{1,2})\s*[|\s]/;
+  // Pattern pour extraire une ligne de chambre Apaleo
+  // Format: NuméroChambre (1-2 chiffres) suivi d'infos puis statuts à la fin
+  const apaleoLinePattern = /\b(\d{1,2})\s+(Chambre\s+\w+|SGL|DBL|TWN|TPL|TRPL|QUAD)[^|]*?(Recouche|Parti|En arrivée|Arrivé|A contrôler|Sale|Propre)/gi;
   
-  // Analyser ligne par ligne
-  const lines = text.split(/\n|\r\n|\r/);
+  // Chercher toutes les occurrences dans le texte brut
+  let match;
+  const textLower = text.toLowerCase();
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  // Approche alternative: diviser le texte en segments et chercher les patterns
+  // Le texte PDF extrait met souvent tout sur une ligne continue
+  
+  // Pattern plus flexible pour le texte extrait par PDF.js
+  // Recherche: numéro (2 chiffres) + type de chambre + ... + statuts à la fin
+  const segments = text.split(/\s{3,}|\|/); // Séparer par espaces multiples ou pipes
+  
+  let currentRoomNumber: string | null = null;
+  let currentStatuses: string[] = [];
+  let currentRoomType = '';
+  
+  console.log(`📊 ${segments.length} segments à analyser`);
+  
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i].trim();
+    if (!segment) continue;
     
-    // Chercher un numéro de chambre en début de ligne
-    let roomNumber: string | null = null;
-    
-    // Pattern 1: Numéro suivi de type de chambre
-    const match1 = line.match(apaleoLinePattern);
-    if (match1) {
-      roomNumber = match1[1].padStart(2, '0');
-    } else {
-      // Pattern 2: Numéro seul en début de ligne dans un tableau
-      const match2 = line.match(roomNumberOnlyPattern);
-      if (match2) {
-        const num = parseInt(match2[1]);
-        // Filtrer les numéros trop grands (probablement des années ou autres)
-        if (num >= 1 && num <= 99) {
-          roomNumber = match2[1].padStart(2, '0');
+    // Détecter un numéro de chambre (1-2 chiffres isolés)
+    const roomNumMatch = segment.match(/^(\d{1,2})$/);
+    if (roomNumMatch) {
+      const num = parseInt(roomNumMatch[1]);
+      // Filtrer les numéros valides (1-99, pas les années)
+      if (num >= 1 && num <= 99) {
+        // Sauvegarder la chambre précédente si elle existe
+        if (currentRoomNumber && currentStatuses.length > 0) {
+          if (!roomData.has(currentRoomNumber)) {
+            roomData.set(currentRoomNumber, { statuses: [], roomType: '', clientName: '' });
+          }
+          const data = roomData.get(currentRoomNumber)!;
+          data.statuses.push(...currentStatuses);
+          if (currentRoomType) data.roomType = currentRoomType;
         }
+        
+        currentRoomNumber = roomNumMatch[1].padStart(2, '0');
+        currentStatuses = [];
+        currentRoomType = '';
+        continue;
       }
     }
     
-    if (!roomNumber) continue;
-    
-    // Vérifier que ce n'est pas une année ou autre faux positif
-    if (/^20[0-9]{2}$/.test(roomNumber)) continue;
-    
-    // Extraire les statuts de cette ligne
-    const statuses: string[] = [];
-    
-    // Statuts Apaleo principaux
-    if (/\bRecouche\b/i.test(line)) statuses.push('Recouche');
-    if (/\bParti\b/i.test(line)) statuses.push('Parti');
-    if (/\bEn arrivée\b/i.test(line)) statuses.push('En arrivée');
-    if (/\bArrivé\b/i.test(line) && !/\bEn arrivée\b/i.test(line)) statuses.push('Arrivé');
-    if (/\bA contrôler\b/i.test(line) || /\bA controler\b/i.test(line)) statuses.push('A contrôler');
-    if (/\bSale\b/i.test(line)) statuses.push('Sale');
-    if (/\bPropre\b/i.test(line)) statuses.push('Propre');
-    
-    console.log(`🏠 Chambre ${roomNumber}: Statuts trouvés: [${statuses.join(', ')}]`);
-    
-    // Ajouter ou fusionner les statuts pour cette chambre
-    if (!roomData.has(roomNumber)) {
-      roomData.set(roomNumber, { statuses: [], lines: [] });
+    // Détecter type de chambre
+    if (/^Chambre\s+(simple|double|triple|twin|quadruple)/i.test(segment)) {
+      currentRoomType = segment;
+      continue;
     }
-    const data = roomData.get(roomNumber)!;
-    data.statuses.push(...statuses);
-    data.lines.push(line);
+    
+    // Détecter les statuts Apaleo
+    const statusLower = segment.toLowerCase();
+    if (statusLower === 'recouche') {
+      currentStatuses.push('Recouche');
+    } else if (statusLower === 'parti') {
+      currentStatuses.push('Parti');
+    } else if (statusLower === 'en arrivée' || statusLower === 'en arrivee') {
+      currentStatuses.push('En arrivée');
+    } else if (statusLower === 'arrivé' || statusLower === 'arrive') {
+      currentStatuses.push('Arrivé');
+    } else if (statusLower === 'a contrôler' || statusLower === 'a controler') {
+      currentStatuses.push('A contrôler');
+    } else if (statusLower === 'sale') {
+      currentStatuses.push('Sale');
+    } else if (statusLower === 'propre') {
+      currentStatuses.push('Propre');
+    }
+  }
+  
+  // Sauvegarder la dernière chambre
+  if (currentRoomNumber && currentStatuses.length > 0) {
+    if (!roomData.has(currentRoomNumber)) {
+      roomData.set(currentRoomNumber, { statuses: [], roomType: '', clientName: '' });
+    }
+    const data = roomData.get(currentRoomNumber)!;
+    data.statuses.push(...currentStatuses);
+    if (currentRoomType) data.roomType = currentRoomType;
+  }
+  
+  // Si peu de résultats, essayer parsing ligne par ligne alternatif
+  if (roomData.size < 3) {
+    console.log('📋 Parsing alternatif par pattern global...');
+    parseApaleoAlternative(text, roomData);
   }
   
   console.log(`📊 ${roomData.size} chambres uniques détectées`);
@@ -385,44 +415,56 @@ function parseApaleoRooms(text: string, learnedPattern?: LearnedPattern | null):
     const hasSale = uniqueStatuses.includes('Sale');
     const hasAControler = uniqueStatuses.includes('A contrôler');
     
-    // RÈGLE 1: Parti (départ) → Nettoyage complet (à blanc)
-    if (hasParti) {
+    // RÈGLE 1: Parti + En arrivée = Checkout/Arrivée même jour → Nettoyage complet URGENT
+    if (hasParti && hasEnArrivee) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
-      matchedRule = 'Parti (Départ)';
+      matchedRule = 'Parti + En arrivée (urgent)';
     }
-    // RÈGLE 2: En arrivée sans Parti → Nettoyage complet pour préparer
-    else if (hasEnArrivee && !hasParti) {
+    // RÈGLE 2: Parti seul → Nettoyage complet (checkout)
+    else if (hasParti) {
+      cleaningType = 'full';
+      roomStatus = 'needs-cleaning';
+      matchedRule = 'Parti (checkout)';
+    }
+    // RÈGLE 3: En arrivée sans Parti → Nettoyage complet pour préparer
+    else if (hasEnArrivee && !hasRecouche) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
       matchedRule = 'En arrivée (préparation)';
     }
-    // RÈGLE 3: Recouche → Nettoyage rapide
+    // RÈGLE 4: Recouche → Nettoyage rapide (stayover)
     else if (hasRecouche) {
       cleaningType = 'quick';
       roomStatus = 'needs-cleaning';
-      matchedRule = 'Recouche';
+      matchedRule = 'Recouche (stayover)';
     }
-    // RÈGLE 4: Arrivé (client présent) → Pas de nettoyage
-    else if (hasArrive) {
+    // RÈGLE 5: Arrivé (client présent) → Pas de nettoyage
+    else if (hasArrive && !hasParti && !hasEnArrivee) {
       cleaningType = 'none';
       roomStatus = 'occupied';
       matchedRule = 'Arrivé (occupée)';
     }
-    // RÈGLE 5: Sale → Nettoyage complet
-    else if (hasSale) {
+    // RÈGLE 6: Sale seul → Nettoyage complet
+    else if (hasSale && !hasRecouche) {
       cleaningType = 'full';
       roomStatus = 'needs-cleaning';
       matchedRule = 'Sale';
     }
-    // RÈGLE 6: A contrôler seul → Propre
-    else if (hasAControler) {
+    // RÈGLE 7: Recouche + Sale = Stayover avec chambre sale → Nettoyage rapide
+    else if (hasRecouche && hasSale) {
+      cleaningType = 'quick';
+      roomStatus = 'needs-cleaning';
+      matchedRule = 'Recouche + Sale';
+    }
+    // RÈGLE 8: A contrôler seul → Inspection seulement
+    else if (hasAControler && uniqueStatuses.length === 1) {
       cleaningType = 'none';
       roomStatus = 'clean';
-      matchedRule = 'A contrôler';
+      matchedRule = 'A contrôler uniquement';
     }
     
-    console.log(`   ✅ ${roomNumber}: ${matchedRule} → ${cleaningType}`);
+    console.log(`   ✅ ${roomNumber}: [${uniqueStatuses.join(', ')}] → ${cleaningType} (${matchedRule})`);
     
     // Calculer l'étage
     const floor = getRoomFloor(roomNumber);
@@ -432,9 +474,9 @@ function parseApaleoRooms(text: string, learnedPattern?: LearnedPattern | null):
       status: roomStatus,
       cleaningType,
       priority: cleaningType === 'full' ? 'high' : cleaningType === 'quick' ? 'medium' : 'low',
-      isTwin: data.lines.some(l => /TWN|twin/i.test(l)),
+      isTwin: /twin/i.test(data.roomType),
       isUrgent: hasParti && hasEnArrivee, // Départ + Arrivée même jour = urgent
-      notUrgent: hasRecouche && !hasEnArrivee,
+      notUrgent: hasRecouche && !hasEnArrivee && !hasParti,
       floor,
       notes: `Statuts: ${uniqueStatuses.join(', ')}. Règle: ${matchedRule}`
     });
@@ -444,6 +486,51 @@ function parseApaleoRooms(text: string, learnedPattern?: LearnedPattern | null):
   
   // Trier par numéro de chambre
   return rooms.sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+}
+
+// Parsing alternatif pour Apaleo - utilise des regex globaux sur le texte complet
+function parseApaleoAlternative(
+  text: string, 
+  roomData: Map<string, { statuses: string[]; roomType: string; clientName: string }>
+): void {
+  // Pattern pour capturer: numéro + ... + statut principal + statut secondaire
+  // Ex: "01  Chambre twin  ... Recouche   Sale"
+  
+  // Pattern 1: Chercher les motifs "numéro ... statut statut" typiques d'Apaleo
+  const fullLinePattern = /\b(\d{1,2})\s+(?:Chambre\s+\w+|[A-Z]{3,4})[^R|P|E|A|S]*(Recouche|Parti|En arrivée|Arrivé)\s+(A contrôler|Sale|Propre)?/gi;
+  
+  let match;
+  while ((match = fullLinePattern.exec(text)) !== null) {
+    const roomNum = match[1].padStart(2, '0');
+    const status1 = match[2];
+    const status2 = match[3] || '';
+    
+    if (!roomData.has(roomNum)) {
+      roomData.set(roomNum, { statuses: [], roomType: '', clientName: '' });
+    }
+    const data = roomData.get(roomNum)!;
+    if (status1) data.statuses.push(status1);
+    if (status2) data.statuses.push(status2);
+  }
+  
+  // Pattern 2: Recherche simplifiée - numéro de chambre suivi d'un statut dans les 200 caractères
+  const simplePattern = /\b(\d{1,2})\b[^0-9]{5,200}?(Recouche|Parti|En arrivée|Arrivé)/gi;
+  
+  while ((match = simplePattern.exec(text)) !== null) {
+    const num = parseInt(match[1]);
+    if (num < 1 || num > 99) continue;
+    
+    const roomNum = match[1].padStart(2, '0');
+    const status = match[2];
+    
+    if (!roomData.has(roomNum)) {
+      roomData.set(roomNum, { statuses: [], roomType: '', clientName: '' });
+    }
+    const data = roomData.get(roomNum)!;
+    if (!data.statuses.includes(status)) {
+      data.statuses.push(status);
+    }
+  }
 }
 
 // Parsing standard pour les autres PMS (Mews, etc.)
