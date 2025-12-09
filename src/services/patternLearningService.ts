@@ -30,14 +30,39 @@ export interface PmsMatchResult {
   unexpectedKeywords: string[];
 }
 
-// Mots-clés par défaut par type de PMS
+// Mots-clés par défaut par type de PMS (avec mapping vers type de nettoyage)
 const DEFAULT_PMS_KEYWORDS: Record<string, string[]> = {
-  apaleo: ['Recouche', 'Parti', 'En arrivée', 'Arrivé', 'A contrôler', 'Propre'],
+  apaleo: ['Recouche', 'Parti', 'En arrivée', 'Arrivé', 'A contrôler', 'Propre', 'PARTI', 'EN ARRIVÉE', 'ARRIVÉ', 'A CONTROLER'],
   mews: ['DIR', 'INS', 'SAL', 'OCC', 'VAC', 'CL', 'DEP', 'ARR', 'Adults', 'Night'],
   opera: ['DIRTY', 'CLEAN', 'INSPECTED', 'OUT OF ORDER', 'OOO', 'PICKUP', 'VACANT', 'DUE OUT'],
   medialog: ['DRAPS', 'RECOUCHE', 'BLANC', 'À BLANC', 'NE PAS NETTOYER', 'DÉPART'],
   protel: ['DIRTY', 'CLEAN', 'CHECKED OUT', 'OCCUPIED', 'VACANT', 'OUT OF ORDER'],
   fidelio: ['DRT', 'CLN', 'INS', 'OOO', 'OCC', 'VAC', 'DEP']
+};
+
+// Mapping par défaut des mots-clés vers type de nettoyage (utilisé quand pas de pattern appris)
+const DEFAULT_KEYWORD_CLEANING_MAP: Record<string, { cleaning: 'full' | 'quick' | 'none'; status: string }> = {
+  // Apaleo
+  'RECOUCHE': { cleaning: 'quick', status: 'stayover' },
+  'Recouche': { cleaning: 'quick', status: 'stayover' },
+  'PARTI': { cleaning: 'full', status: 'checkout' },
+  'Parti': { cleaning: 'full', status: 'checkout' },
+  'EN ARRIVÉE': { cleaning: 'full', status: 'arrival' },
+  'En arrivée': { cleaning: 'full', status: 'arrival' },
+  'ARRIVÉ': { cleaning: 'none', status: 'occupied' },
+  'Arrivé': { cleaning: 'none', status: 'occupied' },
+  'A CONTROLER': { cleaning: 'none', status: 'clean' },
+  'A contrôler': { cleaning: 'none', status: 'clean' },
+  'PROPRE': { cleaning: 'none', status: 'clean' },
+  'Propre': { cleaning: 'none', status: 'clean' },
+  // Mews
+  'DIR': { cleaning: 'full', status: 'checkout' },
+  'INS': { cleaning: 'none', status: 'clean' },
+  'SAL': { cleaning: 'quick', status: 'stayover' },
+  'DEP': { cleaning: 'full', status: 'checkout' },
+  'ARR': { cleaning: 'full', status: 'arrival' },
+  'OCC': { cleaning: 'quick', status: 'stayover' },
+  'VAC': { cleaning: 'none', status: 'clean' },
 };
 
 // Règles de combinaison par défaut pour Apaleo
@@ -265,20 +290,33 @@ class PatternLearningService {
     pattern: LearnedPattern | null
   ): { cleaning: 'full' | 'quick' | 'none'; status: string; matchedKeyword: string | null } {
     
-    if (!pattern || Object.keys(pattern.statusKeywords).length === 0) {
-      // Fallback aux mots-clés par défaut
-      return this.detectCleaningTypeDefault(lineText);
-    }
-
     const lineUpper = lineText.toUpperCase();
     
-    // Chercher les mots-clés dans l'ordre de priorité (les plus longs d'abord pour éviter les faux positifs)
-    const sortedKeywords = Object.entries(pattern.statusKeywords)
-      .sort((a, b) => b[0].length - a[0].length);
+    // Si pattern avec mots-clés appris, les utiliser en priorité
+    if (pattern && Object.keys(pattern.statusKeywords).length > 0) {
+      // Chercher les mots-clés dans l'ordre de priorité (les plus longs d'abord)
+      const sortedKeywords = Object.entries(pattern.statusKeywords)
+        .sort((a, b) => b[0].length - a[0].length);
 
-    for (const [keyword, config] of sortedKeywords) {
+      for (const [keyword, config] of sortedKeywords) {
+        if (lineUpper.includes(keyword.toUpperCase())) {
+          console.log(`   🏷️ Mot-clé appris trouvé: "${keyword}" → ${config.cleaning}`);
+          return {
+            cleaning: config.cleaning,
+            status: config.status,
+            matchedKeyword: keyword
+          };
+        }
+      }
+    }
+    
+    // Utiliser le mapping par défaut
+    const sortedDefaultKeywords = Object.entries(DEFAULT_KEYWORD_CLEANING_MAP)
+      .sort((a, b) => b[0].length - a[0].length);
+    
+    for (const [keyword, config] of sortedDefaultKeywords) {
       if (lineUpper.includes(keyword.toUpperCase())) {
-        console.log(`   🏷️ Mot-clé trouvé: "${keyword}" → ${config.cleaning}`);
+        console.log(`   🏷️ Mot-clé par défaut trouvé: "${keyword}" → ${config.cleaning}`);
         return {
           cleaning: config.cleaning,
           status: config.status,
@@ -287,8 +325,8 @@ class PatternLearningService {
       }
     }
 
-    // Aucun mot-clé trouvé
-    return { cleaning: 'none', status: 'unknown', matchedKeyword: null };
+    // Fallback: détection par regex
+    return this.detectCleaningTypeDefault(lineText);
   }
 
   /**

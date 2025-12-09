@@ -264,17 +264,56 @@ export const SimplePatternLearning = ({
     try {
       const user = await supabase.auth.getUser();
       
-      await supabase.from('report_training_patterns').insert({
+      // Détecter le type de PMS depuis les patterns ou le texte
+      let pmsType = patterns?.pmsType || 'learned';
+      
+      // Si pas détecté, essayer de le déduire du texte brut
+      if (pmsType === 'learned' || pmsType === 'unknown') {
+        const textUpper = rawText.toUpperCase();
+        if (textUpper.includes('PARTI') && textUpper.includes('EN ARRIVÉE')) {
+          pmsType = 'apaleo';
+        } else if (textUpper.includes('DIR') && textUpper.includes('INS') && /NIGHT \d+\/\d+/i.test(rawText)) {
+          pmsType = 'mews';
+        }
+      }
+      
+      console.log(`💾 Sauvegarde pattern: PMS=${pmsType}, Format=${patterns?.roomFormat}, ${rooms.length} chambres`);
+      
+      // Structurer les données extraites correctement
+      const extractedData = {
+        rooms: rooms,
+        patterns: patterns,
+        extractedAt: new Date().toISOString()
+      };
+      
+      // Structurer les detection_rules
+      const detectionRules = {
+        roomFormat: patterns?.roomFormat || 'XXX',
+        statusKeywords: patterns?.statusKeywords || [],
+        hasNightInfo: patterns?.hasNightInfo || false,
+        pmsType: pmsType
+      };
+      
+      const { error } = await supabase.from('report_training_patterns').insert({
         hotel_id: hotelId,
+        assigned_to_hotel_id: hotelId, // Assigner automatiquement à cet hôtel!
         report_name: reportName,
-        pms_type: 'learned',
+        pms_type: pmsType,
+        pattern_name: `Pattern ${pmsType.toUpperCase()} - ${reportName}`,
         raw_text: rawText.substring(0, 2000),
-        extracted_data: rooms as any,
-        detection_rules: patterns as any,
+        extracted_data: extractedData as any,
+        detection_rules: detectionRules as any,
         validated: true,
         created_by: user.data.user?.id || '',
-        accuracy_score: rooms.reduce((acc, r) => acc + r.confidence, 0) / rooms.length
+        accuracy_score: rooms.reduce((acc, r) => acc + r.confidence, 0) / rooms.length,
+        attribution_reason: 'Auto-assigné lors de la création'
       });
+      
+      if (error) {
+        console.error('Erreur sauvegarde pattern:', error);
+      } else {
+        console.log('✅ Pattern sauvegardé et assigné à l\'hôtel');
+      }
     } catch (error) {
       console.error('Erreur sauvegarde patterns:', error);
     }
