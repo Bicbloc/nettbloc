@@ -160,14 +160,44 @@ function parseRoomsFromText(
   
   // Déterminer le pattern de chambre à utiliser
   let roomPattern: RegExp;
+  let minLength = 1;
+  let maxLength = 5;
   
   if (roomFormatConfig) {
     // Utiliser le format appris
     roomPattern = roomFormatConfig.regex;
+    minLength = roomFormatConfig.minLength;
+    maxLength = roomFormatConfig.maxLength;
     console.log(`📄 Parsing PDF avec format appris ${roomFormatConfig.format}: ${roomPattern}`);
+  } else if (learnedPattern && learnedPattern.roomFormat) {
+    // Utiliser le format du pattern appris
+    const format = learnedPattern.roomFormat;
+    if (format === 'NN' || format === '00') {
+      // Format 2 chiffres (01-99)
+      roomPattern = /\b(0?[1-9]|[1-9][0-9])\b/g;
+      minLength = 1;
+      maxLength = 2;
+    } else if (format === 'XXX') {
+      // Format 3 chiffres (100-999)
+      roomPattern = /\b([1-9][0-9]{2})\b/g;
+      minLength = 3;
+      maxLength = 3;
+    } else if (format === 'XXXX') {
+      // Format 4 chiffres (1000-9999)
+      roomPattern = /\b([1-9][0-9]{3})\b/g;
+      minLength = 4;
+      maxLength = 4;
+    } else {
+      roomPattern = /\b([1-9]\d{1,3})\b/g;
+      minLength = 2;
+      maxLength = 4;
+    }
+    console.log(`📄 Parsing PDF avec format du pattern ${format}: ${roomPattern}`);
   } else {
-    // Pattern par défaut: accepter 2-5 chiffres
-    roomPattern = /\b([1-9]\d{1,4}|0[1-9])\b/g;
+    // Pattern par défaut: accepter 2-4 chiffres uniquement (pas les 1 chiffre pour éviter faux positifs)
+    roomPattern = /\b([1-9][0-9]{1,3})\b/g;
+    minLength = 2;
+    maxLength = 4;
     console.log(`📄 Parsing PDF avec format par défaut: ${roomPattern}`);
   }
   
@@ -175,6 +205,13 @@ function parseRoomsFromText(
   if (learnedPattern) {
     console.log(`🎓 Mots-clés appris: ${Object.keys(learnedPattern.statusKeywords).join(', ')}`);
   }
+  
+  // Patterns à exclure - dates, années, heures, etc.
+  const excludePatterns = [
+    /^20(2[0-9]|3[0-9])$/, // Années 2020-2039
+    /^(0?[1-9]|[12][0-9]|3[01])(0[1-9]|1[0-2])$/, // Dates DDMM ou MMDD
+    /^(0[1-9]|1[0-9]|2[0-3])[0-5][0-9]$/, // Heures HHMM
+  ];
   
   // Parcourir ligne par ligne et utiliser mewsDetectionService
   for (const line of lines) {
@@ -185,20 +222,33 @@ function parseRoomsFromText(
     while ((match = roomPattern.exec(line)) !== null) {
       const roomNumber = match[1];
       
-      // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
-      if (/^20(2[5-9]|3[0-9])$/.test(roomNumber)) continue;
+      // Appliquer les exclusions
+      let shouldExclude = false;
+      for (const pattern of excludePatterns) {
+        if (pattern.test(roomNumber)) {
+          shouldExclude = true;
+          break;
+        }
+      }
+      if (shouldExclude) continue;
       
-      // Ne pas inclure les nombres très petits sans contexte (éviter faux positifs)
+      // Ne pas inclure les nombres trop grands
       if (parseInt(roomNumber) > 9999) continue;
       
-      // Si un format est défini, vérifier que le numéro correspond
-      if (roomFormatConfig) {
-        const expectedMinLen = roomFormatConfig.minLength;
-        const expectedMaxLen = roomFormatConfig.maxLength;
-        if (roomNumber.length < expectedMinLen || roomNumber.length > expectedMaxLen) {
-          console.log(`🚫 Chambre ${roomNumber} ignorée (longueur ${roomNumber.length} != ${expectedMinLen}-${expectedMaxLen})`);
-          continue;
-        }
+      // Vérifier la longueur
+      if (roomNumber.length < minLength || roomNumber.length > maxLength) {
+        console.log(`🚫 Chambre ${roomNumber} ignorée (longueur ${roomNumber.length} != ${minLength}-${maxLength})`);
+        continue;
+      }
+      
+      // Vérifier que la ligne contient des mots-clés hôteliers pour valider que c'est bien une chambre
+      const lineUpper = line.toUpperCase();
+      const hasHotelContext = /\b(ROOM|CHAMBRE|RECOUCHE|PARTI|ARRIVÉE|ARRIVEE|DIR|INS|SAL|DEP|ARR|CLEAN|DIRTY|OCC|VAC|STAYOVER|CHECKOUT|ARRIVAL|DEPART|NIGHT|ADULTS)\b/i.test(line);
+      
+      // Si pas de contexte hôtelier et le numéro est petit (< 100), ignorer
+      if (!hasHotelContext && parseInt(roomNumber) < 100) {
+        console.log(`🚫 Chambre ${roomNumber} ignorée (pas de contexte hôtelier)`);
+        continue;
       }
       
       // Normaliser le format du numéro - garder le format original
