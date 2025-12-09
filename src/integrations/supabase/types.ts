@@ -1787,6 +1787,59 @@ export type Database = {
         }
         Relationships: []
       }
+      pattern_improvement_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string | null
+          detected_keywords: string[] | null
+          detected_pms_type: string | null
+          expected_pms_type: string | null
+          hotel_id: string
+          id: string
+          mismatch_score: number | null
+          report_sample: string
+          status: string | null
+          submitted_by: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string | null
+          detected_keywords?: string[] | null
+          detected_pms_type?: string | null
+          expected_pms_type?: string | null
+          hotel_id: string
+          id?: string
+          mismatch_score?: number | null
+          report_sample: string
+          status?: string | null
+          submitted_by: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string | null
+          detected_keywords?: string[] | null
+          detected_pms_type?: string | null
+          expected_pms_type?: string | null
+          hotel_id?: string
+          id?: string
+          mismatch_score?: number | null
+          report_sample?: string
+          status?: string | null
+          submitted_by?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pattern_improvement_requests_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pattern_validation_history: {
         Row: {
           annotations_count: number | null

@@ -2,9 +2,26 @@ import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { mewsDetectionService } from "@/services/mewsDetectionService";
 import { loadHotelRoomFormat, RoomFormatConfig, getRoomFormatConfig } from "@/utils/roomFormatUtils";
+import { patternLearningService, LearnedPattern, PmsMatchResult } from "@/services/patternLearningService";
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+// Store for PMS mismatch detection
+let lastPmsMismatchResult: PmsMatchResult | null = null;
+let lastExtractedText: string = '';
+
+export function getLastPmsMismatchResult(): PmsMatchResult | null {
+  return lastPmsMismatchResult;
+}
+
+export function getLastExtractedText(): string {
+  return lastExtractedText;
+}
+
+export function clearPmsMismatchResult(): void {
+  lastPmsMismatchResult = null;
+}
 
 export interface Room {
   number: string;
@@ -43,23 +60,33 @@ export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(fa
 export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
   try {
     let roomFormatConfig: RoomFormatConfig | null = null;
+    let learnedPattern: LearnedPattern | null = null;
+    
+    // Réinitialiser le résultat de mismatch
+    lastPmsMismatchResult = null;
+    lastExtractedText = '';
     
     // Charger les règles personnalisées et le format appris si un hotelId est fourni
     if (hotelId) {
       console.log(`📋 Chargement des règles personnalisées pour l'hôtel ${hotelId}...`);
       
-      // Charger en parallèle les règles et le format
-      const [_, formatConfig] = await Promise.all([
+      // Charger en parallèle les règles, le format et le pattern appris
+      const [_, formatConfig, pattern] = await Promise.all([
         mewsDetectionService.loadCustomRules(hotelId),
-        loadHotelRoomFormat(hotelId)
+        loadHotelRoomFormat(hotelId),
+        patternLearningService.loadHotelPattern(hotelId)
       ]);
       
       roomFormatConfig = formatConfig;
+      learnedPattern = pattern;
       
       const customRulesCount = mewsDetectionService.getHotelCleaningRules().length;
       console.log(`✅ ${customRulesCount} règles personnalisées chargées`);
       if (roomFormatConfig) {
         console.log(`📐 Format de chambre: ${roomFormatConfig.format}`);
+      }
+      if (learnedPattern) {
+        console.log(`🎓 Pattern appris: ${learnedPattern.pmsType} avec ${Object.keys(learnedPattern.statusKeywords).length} mots-clés`);
       }
     }
 
@@ -81,9 +108,19 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
     }
     
     console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
+    lastExtractedText = fullText;
+    
+    // Vérifier si le PMS détecté correspond au pattern attendu
+    if (hotelId && learnedPattern) {
+      const matchResult = await patternLearningService.compareWithExpectedPattern(hotelId, fullText);
+      if (!matchResult.isMatch) {
+        console.log(`⚠️ Mismatch PMS détecté: attendu ${matchResult.expectedPms}, détecté ${matchResult.detectedPms}`);
+        lastPmsMismatchResult = matchResult;
+      }
+    }
     
     // Analyser le texte pour extraire les informations des chambres avec le format appris
-    const rooms = parseRoomsFromText(fullText, roomFormatConfig);
+    const rooms = parseRoomsFromText(fullText, roomFormatConfig, learnedPattern);
     
     toast({
       title: "PDF Processed",
@@ -109,10 +146,17 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
 }
 
 // Analyse le texte pour extraire les informations des chambres
-function parseRoomsFromText(text: string, roomFormatConfig?: RoomFormatConfig | null): Room[] {
+function parseRoomsFromText(
+  text: string, 
+  roomFormatConfig?: RoomFormatConfig | null,
+  learnedPattern?: LearnedPattern | null
+): Room[] {
   const rooms: Room[] = [];
   const lines = text.split(/\n|\r\n|\r/).filter(line => line.trim());
   const foundRooms = new Set<string>();
+  
+  // Pour Apaleo: collecter les statuts par chambre pour appliquer les règles de combinaison
+  const roomStatuses: Map<string, string[]> = new Map();
   
   // Déterminer le pattern de chambre à utiliser
   let roomPattern: RegExp;
@@ -128,6 +172,9 @@ function parseRoomsFromText(text: string, roomFormatConfig?: RoomFormatConfig | 
   }
   
   console.log(`📄 ${lines.length} lignes, utilisation de mewsDetectionService`);
+  if (learnedPattern) {
+    console.log(`🎓 Mots-clés appris: ${Object.keys(learnedPattern.statusKeywords).join(', ')}`);
+  }
   
   // Parcourir ligne par ligne et utiliser mewsDetectionService
   for (const line of lines) {
@@ -184,35 +231,64 @@ function parseRoomsFromText(text: string, roomFormatConfig?: RoomFormatConfig | 
         }
         matchedRule = 'Pattern validé (apprentissage)';
       } else {
-        // PRIORITÉ 2: Utiliser mewsDetectionService pour analyser la ligne
-        const analysis = mewsDetectionService.analyzeLine(line);
-        
-        console.log(`🏠 Chambre ${normalizedRoomNumber}: cleaningType=${analysis.cleaningType}, rule=${analysis.matchedRule}`);
-        
-        // Le type retourné est 'a_blanc' | 'recouche' | 'none'
-        const detectedType = analysis.cleaningType;
-        
-        if (detectedType === 'a_blanc') {
-          cleaningType = 'full';
-          roomStatus = 'needs-cleaning';
-        } else if (detectedType === 'recouche') {
-          cleaningType = 'quick';
-          roomStatus = 'needs-cleaning';
-        } else {
-          // cleaningType === 'none'
-          cleaningType = 'none';
-          // Déterminer le statut basé sur les blocs détectés
-          if (analysis.blocks.isOutOfOrder) {
-            roomStatus = 'out-of-order';
-          } else if (analysis.blocks.status === 'INS') {
-            roomStatus = 'clean';
-          } else if (analysis.blocks.status === 'OCC') {
-            roomStatus = 'occupied';
+        // PRIORITÉ 2: Utiliser les mots-clés appris du pattern (si disponible)
+        if (learnedPattern && Object.keys(learnedPattern.statusKeywords).length > 0) {
+          const keywordResult = patternLearningService.detectCleaningTypeFromKeywords(line, learnedPattern);
+          if (keywordResult.matchedKeyword) {
+            cleaningType = keywordResult.cleaning;
+            roomStatus = keywordResult.status === 'stayover' ? 'needs-cleaning' : 
+                         keywordResult.status === 'checkout' ? 'needs-cleaning' :
+                         keywordResult.status === 'arrival' ? 'needs-cleaning' :
+                         keywordResult.status === 'clean' ? 'clean' : 'needs-cleaning';
+            matchedRule = `Mot-clé appris: ${keywordResult.matchedKeyword}`;
+            console.log(`🎓 Chambre ${normalizedRoomNumber}: Mot-clé appris "${keywordResult.matchedKeyword}" → ${cleaningType}`);
           } else {
-            roomStatus = 'clean';
+            // Fallback: utiliser mewsDetectionService
+            const analysis = mewsDetectionService.analyzeLine(line);
+            const detectedType = analysis.cleaningType;
+            
+            if (detectedType === 'a_blanc') {
+              cleaningType = 'full';
+              roomStatus = 'needs-cleaning';
+            } else if (detectedType === 'recouche') {
+              cleaningType = 'quick';
+              roomStatus = 'needs-cleaning';
+            } else {
+              cleaningType = 'none';
+              roomStatus = analysis.blocks.isOutOfOrder ? 'out-of-order' : 
+                           analysis.blocks.status === 'INS' ? 'clean' :
+                           analysis.blocks.status === 'OCC' ? 'occupied' : 'clean';
+            }
+            matchedRule = analysis.matchedRule;
           }
+        } else {
+          // PRIORITÉ 3: Utiliser mewsDetectionService pour analyser la ligne
+          const analysis = mewsDetectionService.analyzeLine(line);
+          
+          console.log(`🏠 Chambre ${normalizedRoomNumber}: cleaningType=${analysis.cleaningType}, rule=${analysis.matchedRule}`);
+          
+          const detectedType = analysis.cleaningType;
+          
+          if (detectedType === 'a_blanc') {
+            cleaningType = 'full';
+            roomStatus = 'needs-cleaning';
+          } else if (detectedType === 'recouche') {
+            cleaningType = 'quick';
+            roomStatus = 'needs-cleaning';
+          } else {
+            cleaningType = 'none';
+            if (analysis.blocks.isOutOfOrder) {
+              roomStatus = 'out-of-order';
+            } else if (analysis.blocks.status === 'INS') {
+              roomStatus = 'clean';
+            } else if (analysis.blocks.status === 'OCC') {
+              roomStatus = 'occupied';
+            } else {
+              roomStatus = 'clean';
+            }
+          }
+          matchedRule = analysis.matchedRule;
         }
-        matchedRule = analysis.matchedRule;
       }
       
       // Déterminer si c'est une chambre twin
