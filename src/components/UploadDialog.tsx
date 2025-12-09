@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp } from "lucide-react";
+import { FileUp, Sparkles, FileText } from "lucide-react";
 import { HousekeeperSetupDialog } from './HousekeeperSetupDialog';
+import { patternLearningService } from "@/services/patternLearningService";
 
 interface UploadDialogProps {
   onPdfProcessed: (data: any, distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -29,7 +30,19 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
   const [processedData, setProcessedData] = useState<any>(null);
   const [showHousekeeperSetup, setShowHousekeeperSetup] = useState(false);
   const [selectedHousekeepers, setSelectedHousekeepers] = useState<string[]>([]);
+  const [hasLearnedPattern, setHasLearnedPattern] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Vérifier si un pattern appris existe pour cet hôtel
+  useEffect(() => {
+    async function checkPattern() {
+      if (hotelId) {
+        const pattern = await patternLearningService.loadHotelPattern(hotelId);
+        setHasLearnedPattern(!!pattern);
+      }
+    }
+    checkPattern();
+  }, [hotelId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -140,10 +153,28 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
         {!showHousekeeperSetup && !showDistributionOptions ? (
           <>
             <DialogHeader>
-              <DialogTitle>Importer un Rapport Mews</DialogTitle>
+              <DialogTitle>Importer un Rapport</DialogTitle>
               <DialogDescription>
-                Téléversez un rapport PDF exporté depuis Mews pour analyser les statuts des chambres.
+                Téléversez un rapport PDF pour analyser les statuts des chambres.
               </DialogDescription>
+              {/* Indicateur du mode d'extraction */}
+              <div className={`mt-3 p-2 rounded-md text-sm flex items-center gap-2 ${
+                hasLearnedPattern 
+                  ? 'bg-primary/10 text-primary border border-primary/20' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {hasLearnedPattern ? (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    <span>Extraction IA avec modèle entraîné</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    <span>Extraction standard (regex)</span>
+                  </>
+                )}
+              </div>
             </DialogHeader>
             <div 
               className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer"
