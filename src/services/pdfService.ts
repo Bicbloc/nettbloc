@@ -3,6 +3,7 @@ import * as pdfjs from 'pdfjs-dist';
 import { mewsDetectionService } from "@/services/mewsDetectionService";
 import { loadHotelRoomFormat, RoomFormatConfig, getRoomFormatConfig } from "@/utils/roomFormatUtils";
 import { patternLearningService, LearnedPattern, PmsMatchResult } from "@/services/patternLearningService";
+import { supabase } from "@/integrations/supabase/client";
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -55,6 +56,103 @@ export const getDefaultCleaningConfig = (isPremium: boolean = false): CleaningCo
 
 // Legacy export for backward compatibility
 export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(false);
+
+// Fonction pour extraire les chambres via l'IA (edge function learn-pattern)
+async function extractRoomsWithAI(
+  fullText: string, 
+  learnedPattern: LearnedPattern, 
+  hotelId: string,
+  reportName: string
+): Promise<Room[]> {
+  console.log('🤖 Appel de l\'edge function learn-pattern en mode apply...');
+  
+  // Préparer les patterns appris pour l'IA
+  const learnedPatterns = {
+    pmsType: learnedPattern.pmsType,
+    roomFormat: learnedPattern.roomFormat,
+    statusKeywords: learnedPattern.statusKeywords,
+    combinationRules: learnedPattern.combinationRules || []
+  };
+  
+  const { data, error } = await supabase.functions.invoke('learn-pattern', {
+    body: {
+      mode: 'apply',
+      fullText: fullText,
+      learnedPatterns: learnedPatterns,
+      context: { 
+        hotelId, 
+        reportName,
+        timestamp: new Date().toISOString()
+      }
+    }
+  });
+  
+  if (error) {
+    console.error('❌ Erreur edge function learn-pattern:', error);
+    throw new Error(`Edge function error: ${error.message}`);
+  }
+  
+  if (!data) {
+    console.warn('⚠️ Aucune donnée retournée par l\'IA');
+    return [];
+  }
+  
+  console.log('📊 Réponse IA:', data);
+  
+  // Convertir la réponse IA en format Room[]
+  const aiRooms = data.rooms || data.extractedRooms?.rooms || [];
+  
+  if (!Array.isArray(aiRooms) || aiRooms.length === 0) {
+    console.warn('⚠️ Aucune chambre extraite par l\'IA');
+    return [];
+  }
+  
+  return convertAIRoomsToRooms(aiRooms);
+}
+
+// Convertir le format de réponse IA vers le format Room[] de l'application
+function convertAIRoomsToRooms(aiRooms: any[]): Room[] {
+  return aiRooms.map(aiRoom => {
+    // Normaliser le cleaningType
+    let cleaningType: 'full' | 'quick' | 'none' = 'none';
+    const rawType = (aiRoom.cleaningType || aiRoom.cleaning_type || '').toLowerCase();
+    
+    if (rawType === 'full' || rawType === 'a_blanc' || rawType === 'checkout' || rawType === 'checkout_arrival') {
+      cleaningType = 'full';
+    } else if (rawType === 'quick' || rawType === 'recouche' || rawType === 'stayover') {
+      cleaningType = 'quick';
+    }
+    
+    // Normaliser le status
+    let status = 'clean';
+    const rawStatus = (aiRoom.status || '').toLowerCase();
+    
+    if (rawStatus.includes('needs') || rawStatus.includes('dirty') || rawStatus.includes('sale')) {
+      status = 'needs-cleaning';
+    } else if (rawStatus.includes('occupied') || rawStatus.includes('stayover')) {
+      status = 'occupied';
+    } else if (rawStatus.includes('clean') || rawStatus.includes('propre') || rawStatus.includes('inspected')) {
+      status = 'clean';
+    } else if (cleaningType !== 'none') {
+      status = 'needs-cleaning';
+    }
+    
+    const roomNumber = String(aiRoom.roomNumber || aiRoom.room_number || aiRoom.number || '');
+    
+    return {
+      number: roomNumber,
+      status,
+      cleaningType,
+      priority: cleaningType === 'full' ? 'high' : cleaningType === 'quick' ? 'medium' : 'low',
+      isTwin: aiRoom.isTwin || aiRoom.is_twin || false,
+      isUrgent: aiRoom.isUrgent || aiRoom.is_urgent || cleaningType === 'full',
+      notUrgent: cleaningType === 'none',
+      floor: aiRoom.floor || getRoomFloor(roomNumber),
+      notes: aiRoom.notes || aiRoom.matchedRule || aiRoom.matched_rule || undefined,
+      remark: aiRoom.remark || undefined
+    } as Room;
+  }).filter(room => room.number && room.number.length > 0);
+}
 
 // Process PDF file - now accepts optional hotelId to load custom rules
 export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
@@ -119,12 +217,40 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
       }
     }
     
-    // Analyser le texte pour extraire les informations des chambres avec le format appris
-    const rooms = parseRoomsFromText(fullText, roomFormatConfig, learnedPattern);
+    // NOUVELLE LOGIQUE: Si un pattern appris existe, utiliser l'IA pour l'extraction
+    let rooms: Room[] = [];
+    
+    if (learnedPattern && hotelId) {
+      console.log('🎓 Pattern appris détecté - utilisation de l\'extraction IA...');
+      
+      try {
+        rooms = await extractRoomsWithAI(fullText, learnedPattern, hotelId, file.name);
+        console.log(`✅ Extraction IA: ${rooms.length} chambres`);
+        
+        if (rooms.length > 0) {
+          toast({
+            title: "Extraction IA réussie",
+            description: `${rooms.length} chambres extraites avec le modèle entraîné`,
+          });
+          return rooms;
+        }
+      } catch (aiError) {
+        console.error('❌ Erreur extraction IA, fallback regex:', aiError);
+        toast({
+          title: "Extraction IA échouée",
+          description: "Utilisation du parsing standard",
+          variant: "destructive"
+        });
+      }
+    }
+    
+    // FALLBACK: Parsing regex si pas de pattern ou erreur IA
+    console.log('📋 Utilisation du parsing standard (regex)...');
+    rooms = parseRoomsFromText(fullText, roomFormatConfig, learnedPattern);
     
     toast({
       title: "PDF Processed",
-      description: `Successfully processed ${file.name}`,
+      description: `${rooms.length} chambres traitées depuis ${file.name}`,
     });
     
     // Si aucune chambre n'a été trouvée, retourner des données de test
