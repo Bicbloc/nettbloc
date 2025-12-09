@@ -1,6 +1,7 @@
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { mewsDetectionService } from "@/services/mewsDetectionService";
+import { loadHotelRoomFormat, RoomFormatConfig, getRoomFormatConfig } from "@/utils/roomFormatUtils";
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -41,12 +42,25 @@ export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(fa
 // Process PDF file - now accepts optional hotelId to load custom rules
 export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
   try {
-    // Charger les règles personnalisées si un hotelId est fourni
+    let roomFormatConfig: RoomFormatConfig | null = null;
+    
+    // Charger les règles personnalisées et le format appris si un hotelId est fourni
     if (hotelId) {
       console.log(`📋 Chargement des règles personnalisées pour l'hôtel ${hotelId}...`);
-      await mewsDetectionService.loadCustomRules(hotelId);
+      
+      // Charger en parallèle les règles et le format
+      const [_, formatConfig] = await Promise.all([
+        mewsDetectionService.loadCustomRules(hotelId),
+        loadHotelRoomFormat(hotelId)
+      ]);
+      
+      roomFormatConfig = formatConfig;
+      
       const customRulesCount = mewsDetectionService.getHotelCleaningRules().length;
       console.log(`✅ ${customRulesCount} règles personnalisées chargées`);
+      if (roomFormatConfig) {
+        console.log(`📐 Format de chambre: ${roomFormatConfig.format}`);
+      }
     }
 
     // Convertir le fichier en ArrayBuffer
@@ -68,8 +82,8 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
     
     console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
     
-    // Analyser le texte pour extraire les informations des chambres
-    const rooms = parseRoomsFromText(fullText);
+    // Analyser le texte pour extraire les informations des chambres avec le format appris
+    const rooms = parseRoomsFromText(fullText, roomFormatConfig);
     
     toast({
       title: "PDF Processed",
@@ -95,18 +109,30 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
 }
 
 // Analyse le texte pour extraire les informations des chambres
-function parseRoomsFromText(text: string): Room[] {
+function parseRoomsFromText(text: string, roomFormatConfig?: RoomFormatConfig | null): Room[] {
   const rooms: Room[] = [];
   const lines = text.split(/\n|\r\n|\r/).filter(line => line.trim());
   const foundRooms = new Set<string>();
   
-  console.log(`📄 Parsing PDF avec ${lines.length} lignes, utilisation de mewsDetectionService`);
+  // Déterminer le pattern de chambre à utiliser
+  let roomPattern: RegExp;
+  
+  if (roomFormatConfig) {
+    // Utiliser le format appris
+    roomPattern = roomFormatConfig.regex;
+    console.log(`📄 Parsing PDF avec format appris ${roomFormatConfig.format}: ${roomPattern}`);
+  } else {
+    // Pattern par défaut: accepter 2-5 chiffres
+    roomPattern = /\b([1-9]\d{1,4}|0[1-9])\b/g;
+    console.log(`📄 Parsing PDF avec format par défaut: ${roomPattern}`);
+  }
+  
+  console.log(`📄 ${lines.length} lignes, utilisation de mewsDetectionService`);
   
   // Parcourir ligne par ligne et utiliser mewsDetectionService
   for (const line of lines) {
-    // Regex amélioré: capture les chambres 01, 02, 03... jusqu'à 9999
-    // Supporte les formats: 01, 02, 1, 12, 101, 1001
-    const roomPattern = /\b(0?[1-9]|[1-9]\d{0,3})\b/g;
+    // Réinitialiser lastIndex pour chaque ligne
+    roomPattern.lastIndex = 0;
     let match;
     
     while ((match = roomPattern.exec(line)) !== null) {
@@ -116,15 +142,20 @@ function parseRoomsFromText(text: string): Room[] {
       if (/^20(2[5-9]|3[0-9])$/.test(roomNumber)) continue;
       
       // Ne pas inclure les nombres très petits sans contexte (éviter faux positifs)
-      // mais garder les 01, 02, etc. s'ils ressemblent à des chambres
       if (parseInt(roomNumber) > 9999) continue;
       
-      // Normaliser le format du numéro - garder le format original pour les petits nombres
-      const normalizedRoomNumber = roomNumber.length === 1 
-        ? roomNumber.padStart(2, '0')  // 1 -> 01
-        : roomNumber.startsWith('0') 
-          ? roomNumber  // Garder 01, 02, etc.
-          : roomNumber.padStart(3, '0');  // 12 -> 012
+      // Si un format est défini, vérifier que le numéro correspond
+      if (roomFormatConfig) {
+        const expectedMinLen = roomFormatConfig.minLength;
+        const expectedMaxLen = roomFormatConfig.maxLength;
+        if (roomNumber.length < expectedMinLen || roomNumber.length > expectedMaxLen) {
+          console.log(`🚫 Chambre ${roomNumber} ignorée (longueur ${roomNumber.length} != ${expectedMinLen}-${expectedMaxLen})`);
+          continue;
+        }
+      }
+      
+      // Normaliser le format du numéro - garder le format original
+      const normalizedRoomNumber = roomNumber;
       
       // Éviter les doublons
       if (foundRooms.has(normalizedRoomNumber)) continue;
