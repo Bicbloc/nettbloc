@@ -326,11 +326,11 @@ class MewsDetectionService {
    */
   private async loadValidatedPatterns(hotelId: string): Promise<void> {
     try {
-      // Charger les patterns créés par cet hôtel OU attribués à cet hôtel
+      // Charger les patterns créés par cet hôtel OU attribués à cet hôtel OU par défaut
       const { data, error } = await supabase
         .from('report_training_patterns')
-        .select('extracted_data, pattern_name, assigned_to_hotel_id, hotel_id')
-        .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId}`)
+        .select('extracted_data, pattern_name, assigned_to_hotel_id, hotel_id, pms_type')
+        .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId},is_default.eq.true`)
         .eq('validated', true)
         .order('updated_at', { ascending: false })
         .limit(10);
@@ -343,26 +343,31 @@ class MewsDetectionService {
       console.log(`📚 Patterns trouvés pour hôtel ${hotelId}:`, data?.length || 0);
 
       // Extraire les chambres validées et les stocker dans la map
-      // NOTE: Le flag "validated" est au niveau du pattern (vérifié dans la requête SQL),
-      // pas au niveau de chaque chambre individuelle
       for (const pattern of data || []) {
-        console.log(`   📋 Pattern: ${pattern.pattern_name}, assigned_to: ${pattern.assigned_to_hotel_id}, hotel_id: ${pattern.hotel_id}`);
+        console.log(`   📋 Pattern: ${pattern.pattern_name}, PMS: ${pattern.pms_type}, assigned_to: ${pattern.assigned_to_hotel_id}, hotel_id: ${pattern.hotel_id}`);
         
-        const extractedData = pattern.extracted_data as any[];
+        // Supporter les deux formats de extracted_data (array direct ou {rooms: []})
+        const extractedData = Array.isArray(pattern.extracted_data) 
+          ? pattern.extracted_data 
+          : ((pattern.extracted_data as any)?.rooms || []);
+          
         if (Array.isArray(extractedData)) {
           for (const room of extractedData) {
-            // On ne vérifie plus room.validated car le pattern entier est validé
             if (room.roomNumber) {
               // Stocker avec PLUSIEURS formats de normalisation pour maximiser les correspondances
-              const numericValue = parseInt(room.roomNumber, 10);
+              // Support des chambres à 2 chiffres (01, 02, etc.) et 3-4 chiffres
+              const originalNum = String(room.roomNumber);
+              const numericValue = parseInt(originalNum, 10);
+              
               const formats = [
-                room.roomNumber,                           // Format original
-                String(numericValue),                      // Sans leading zeros
-                String(numericValue).padStart(3, '0'),     // Padding 3 chiffres
+                originalNum,                               // Format original (ex: "01", "102")
+                String(numericValue),                      // Sans leading zeros (ex: "1", "102")
+                String(numericValue).padStart(2, '0'),     // Padding 2 chiffres (ex: "01")
+                String(numericValue).padStart(3, '0'),     // Padding 3 chiffres (ex: "001", "102")
               ];
               
               const patternData: ValidatedRoomPattern = {
-                roomNumber: String(numericValue),
+                roomNumber: originalNum,
                 cleaningType: room.cleaningType || 'none',
                 status: room.status || 'clean'
               };
