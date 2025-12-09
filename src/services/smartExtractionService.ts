@@ -314,11 +314,16 @@ export class SmartExtractionService {
       let detectedRoomFormat: string | null = null;
 
       patterns.forEach(p => {
-        // Extraire le format de chambre détecté par l'IA
-        const patternsData = p.extracted_data?.patterns || p.patterns;
-        if (patternsData?.roomFormat) {
+        // Extraire le format de chambre détecté par l'IA - vérifier plusieurs emplacements
+        const patternsData = p.detection_rules || p.extracted_data?.patterns || p.patterns;
+        if (patternsData?.roomFormat && !detectedRoomFormat) {
           detectedRoomFormat = patternsData.roomFormat;
-          console.log(`   🔢 Format chambre détecté: ${detectedRoomFormat}`);
+          console.log(`   🔢 Format chambre détecté depuis detection_rules: ${detectedRoomFormat}`);
+        }
+        // Aussi essayer d'extraire depuis extracted_data.patterns
+        if (!detectedRoomFormat && p.extracted_data?.patterns?.roomFormat) {
+          detectedRoomFormat = p.extracted_data.patterns.roomFormat;
+          console.log(`   🔢 Format chambre détecté depuis extracted_data.patterns: ${detectedRoomFormat}`);
         }
         
         const extractedData = Array.isArray(p.extracted_data) 
@@ -345,10 +350,22 @@ export class SmartExtractionService {
       if (existingPattern) {
         // Mettre à jour le regex si un format spécifique a été détecté
         if (detectedRoomFormat) {
-          // Si format commence par 0 (ex: 01, 02), ajuster le regex
-          if (detectedRoomFormat.startsWith('0') || detectedRoomFormat.includes('01') || detectedRoomFormat.includes('02')) {
-            existingPattern.room_number_regex = '\\b(0?[1-9]\\d{0,4}|[1-9]\\d{0,4})\\b';
-            console.log(`   ✅ Regex mis à jour pour capturer les chambres à 2 chiffres commençant par 0`);
+          // Analyser le format de chambre appris
+          const formatLength = detectedRoomFormat.replace(/[^X]/g, '').length || detectedRoomFormat.length;
+          const startsWithZero = detectedRoomFormat.startsWith('0') || detectedRoomFormat.includes('01') || detectedRoomFormat.includes('02');
+          
+          if (startsWithZero) {
+            // Format 2 chiffres commençant par 0 (ex: 01, 02, 09)
+            existingPattern.room_number_regex = '\\b(0[1-9])\\b';
+            console.log(`   ✅ Regex mis à jour pour chambres 2 chiffres (01-09)`);
+          } else if (formatLength >= 3 || detectedRoomFormat === 'XXX') {
+            // Format 3+ chiffres (ex: 101, 102, 301)
+            existingPattern.room_number_regex = '\\b([1-9]\\d{2,4})\\b';
+            console.log(`   ✅ Regex mis à jour pour chambres 3+ chiffres (100-99999)`);
+          } else {
+            // Format générique
+            existingPattern.room_number_regex = '\\b([1-9]\\d{1,4})\\b';
+            console.log(`   ✅ Regex générique pour chambres 2-5 chiffres`);
           }
         }
         
