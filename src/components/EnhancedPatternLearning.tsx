@@ -138,15 +138,21 @@ export const EnhancedPatternLearning = ({
   }, [rawText]);
 
   const loadExistingPatterns = async () => {
+    console.log(`🔍 EnhancedPatternLearning: Chargement des patterns pour ${hotelId}`);
+    
+    // Charger les patterns: créés par cet hôtel OU assignés à cet hôtel OU patterns par défaut
     const { data } = await supabase
       .from('report_training_patterns')
       .select('*')
-      .eq('hotel_id', hotelId)
+      .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId},is_default.eq.true`)
       .eq('validated', true)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(10);
 
-    if (data) setExistingPatterns(data);
+    if (data) {
+      console.log(`✅ ${data.length} pattern(s) trouvé(s)`);
+      setExistingPatterns(data);
+    }
   };
 
   const analyzePreviewLines = useCallback(() => {

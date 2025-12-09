@@ -104,8 +104,9 @@ function parseRoomsFromText(text: string): Room[] {
   
   // Parcourir ligne par ligne et utiliser mewsDetectionService
   for (const line of lines) {
-    // Chercher des numéros de chambre dans cette ligne
-    const roomPattern = /\b([1-9]\d{2,3})\b/g;
+    // Regex amélioré: capture les chambres 01, 02, 03... jusqu'à 9999
+    // Supporte les formats: 01, 02, 1, 12, 101, 1001
+    const roomPattern = /\b(0?[1-9]|[1-9]\d{0,3})\b/g;
     let match;
     
     while ((match = roomPattern.exec(line)) !== null) {
@@ -114,8 +115,16 @@ function parseRoomsFromText(text: string): Room[] {
       // Ne pas inclure les années comme 2025, 2026, 2027, 2028 comme chambres
       if (/^20(2[5-9]|3[0-9])$/.test(roomNumber)) continue;
       
-      // Normaliser le format du numéro
-      const normalizedRoomNumber = String(parseInt(roomNumber, 10)).padStart(3, '0');
+      // Ne pas inclure les nombres très petits sans contexte (éviter faux positifs)
+      // mais garder les 01, 02, etc. s'ils ressemblent à des chambres
+      if (parseInt(roomNumber) > 9999) continue;
+      
+      // Normaliser le format du numéro - garder le format original pour les petits nombres
+      const normalizedRoomNumber = roomNumber.length === 1 
+        ? roomNumber.padStart(2, '0')  // 1 -> 01
+        : roomNumber.startsWith('0') 
+          ? roomNumber  // Garder 01, 02, etc.
+          : roomNumber.padStart(3, '0');  // 12 -> 012
       
       // Éviter les doublons
       if (foundRooms.has(normalizedRoomNumber)) continue;

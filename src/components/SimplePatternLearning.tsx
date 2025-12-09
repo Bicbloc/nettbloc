@@ -80,16 +80,25 @@ export const SimplePatternLearning = ({
   }, [hotelId]);
 
   const loadExistingPatterns = async () => {
+    console.log(`🔍 Chargement des patterns pour l'hôtel: ${hotelId}`);
+    
+    // Charger les patterns: créés par cet hôtel OU assignés à cet hôtel OU patterns par défaut
     const { data, error } = await supabase
       .from('report_training_patterns')
       .select('*')
-      .eq('hotel_id', hotelId)
+      .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId},is_default.eq.true`)
       .eq('validated', true)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(10);
 
     if (!error && data && data.length > 0) {
+      console.log(`✅ ${data.length} pattern(s) trouvé(s):`);
+      data.forEach(p => {
+        console.log(`   📋 ${p.pattern_name || 'Sans nom'} - PMS: ${p.pms_type || 'auto'} - Créé par: ${p.hotel_id} - Assigné à: ${p.assigned_to_hotel_id || 'aucun'}`);
+      });
       setExistingPatterns(data);
+    } else {
+      console.log(`⚠️ Aucun pattern trouvé pour cet hôtel`);
     }
   };
 
