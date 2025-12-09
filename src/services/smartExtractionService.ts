@@ -232,17 +232,25 @@ export class SmartExtractionService {
   }
 
   async loadLearnedPatterns(hotelId: string): Promise<void> {
+    console.log(`🔍 Chargement des patterns pour l'hôtel: ${hotelId}`);
+    
+    // Charger les patterns: créés par cet hôtel OU assignés à cet hôtel OU patterns par défaut
     const { data, error } = await supabase
       .from('report_training_patterns')
       .select('*')
-      .eq('hotel_id', hotelId)
+      .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId},is_default.eq.true`)
       .eq('validated', true)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error loading learned patterns:', error);
+      console.error('❌ Erreur chargement patterns:', error);
       return;
     }
+
+    console.log(`✅ ${data?.length || 0} pattern(s) chargé(s):`);
+    data?.forEach(p => {
+      console.log(`   📋 ${p.pattern_name || 'Sans nom'} - PMS: ${p.pms_type || 'auto'} - Créé par: ${p.hotel_id} - Assigné à: ${p.assigned_to_hotel_id || 'aucun'}`);
+    });
 
     this.learnedPatterns = data || [];
     this.analyzeAndUpdatePatterns();
