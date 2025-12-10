@@ -84,6 +84,9 @@ import { HeroHeader } from "@/components/HeroHeader";
 import { StatsOverview } from "@/components/StatsOverview";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
+import { useRoomManagement } from "@/hooks/use-room-management";
+import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
+import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -128,6 +131,73 @@ const Index = () => {
   const { needsSetup, loading: setupCheckLoading } = useFirstTimeSetup(currentHotelId);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   
+  // Hooks de gestion refactorisés
+  const {
+    handleRoomUpdate,
+    handleRoomUnassign,
+    handleRoomReassign,
+    handleAddRoom,
+    handleDeleteRoom: handleDeleteRoomFromHook,
+    handleLinkRooms,
+    handleGenerateAccessCode
+  } = useRoomManagement({
+    hotelId: currentHotelId,
+    rooms,
+    setRooms,
+    housekeepers,
+    refreshHousekeepers
+  });
+  
+  const {
+    housekeeperFloorPreferences,
+    setHousekeeperFloorPreferences,
+    housekeeperMaxRoomsOverrides,
+    setHousekeeperMaxRoomsOverrides,
+    handleDeleteHousekeeper,
+    handleRenameHousekeeper,
+    handleFloorPreferenceChange,
+    handleMaxRoomsOverrideChange
+  } = useHousekeeperManagement({
+    housekeeperNames,
+    setHousekeeperNames,
+    setRooms,
+    housekeepers,
+    refreshHousekeepers
+  });
+  
+  const {
+    isManualAssignmentOpen,
+    setIsManualAssignmentOpen,
+    isReportDialogOpen,
+    setIsReportDialogOpen,
+    isRedistributionDialogOpen,
+    setIsRedistributionDialogOpen,
+    isHotelSelectionOpen,
+    setIsHotelSelectionOpen,
+    showInviteDialog,
+    setShowInviteDialog,
+    showDeleteDialog,
+    setShowDeleteDialog,
+    showLinkDialog,
+    setShowLinkDialog,
+    showActionLogPanel,
+    setShowActionLogPanel,
+    showCreateColumnDialog,
+    setShowCreateColumnDialog,
+    selectedRoom,
+    setSelectedRoom,
+    selectedHousekeeper,
+    setSelectedHousekeeper,
+    reportAction,
+    setReportAction,
+    reportHousekeeper,
+    setReportHousekeeper,
+    openDeleteDialog,
+    openLinkDialog,
+    openSingleReport,
+    openAllReports
+  } = useDashboardDialogs();
+  
   // Afficher le wizard si nécessaire
   useEffect(() => {
     if (!setupCheckLoading && needsSetup && isAuthenticated && currentHotelId) {
@@ -140,26 +210,17 @@ const Index = () => {
     setShowSetupWizard(false);
   };
   
-  const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
-  const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
-  const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
-  const [selectedHousekeeper, setSelectedHousekeeper] = useState<string>("");
-  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
-  const [reportAction, setReportAction] = useState<"single" | "all">("single");
-  const [reportHousekeeper, setReportHousekeeper] = useState<string>("");
   const { email, setEmail, isValid } = useReportEmail();
   const [recommendedHousekeepers, setRecommendedHousekeepers] = useState<number>(0);
-const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ 
+  const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ 
     toDoItems: [], 
     toKnowItems: [] 
   });
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
   
   // États pour la gestion des hôtels (conservés pour compatibilité)
   const [availableHotels, setAvailableHotels] = useState<any[]>([]);
   const [selectedHotel, setSelectedHotel] = useState<any | null>(null);
-  const [isHotelSelectionOpen, setIsHotelSelectionOpen] = useState(false);
 
   // Mettre à jour la configuration selon le statut premium
   useEffect(() => {
@@ -176,14 +237,9 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   const [userEmail, setUserEmail] = useState<string>("");
   
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
-  const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   
-  // États pour les dialogs de gestion des chambres
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [showActionLogPanel, setShowActionLogPanel] = useState(false);
-  const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
+  // Flag pour éviter le rechargement pendant l'import PDF
+  const [isImporting, setIsImporting] = useState(false);
   
   const [existingHousekeepers, setExistingHousekeepers] = useState<string[]>([]);
   
@@ -374,9 +430,6 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     setHousekeeperFloorPreferences(initialPreferences);
   }, [housekeeperNames]);
 
-  // Flag pour éviter le rechargement pendant l'import PDF
-  const [isImporting, setIsImporting] = useState(false);
-
   // PHASE 4: Restaurer les données à la reconnexion (charger rooms depuis Supabase)
   useEffect(() => {
     const loadRoomsFromDatabase = async () => {
@@ -563,249 +616,8 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
   
   console.log("Index - isDistributed:", isDistributed); // Debug log
   
-  const handleRoomUpdate = async (updatedRoom: Room) => {
-    // 1. Mise à jour locale immédiate (UX responsive)
-    setRooms(prevRooms => 
-      prevRooms.map(room => 
-        room.number === updatedRoom.number ? updatedRoom : room
-      )
-    );
-    
-    // 2. Synchronisation temps réel vers Supabase
-    if (currentHotelId) {
-      const { RoomSyncService } = await import('@/services/roomSyncService');
-      await RoomSyncService.syncRoom(currentHotelId, updatedRoom);
-    }
-  };
-  
-  const handleRoomUnassign = (roomToUnassign: Room) => {
-    const updatedRoom = { ...roomToUnassign };
-    delete updatedRoom.assignedTo;
-    handleRoomUpdate(updatedRoom);
-  };
-
-  const handleRoomReassign = (room: Room, newHousekeeper: string | null) => {
-    const updatedRoom = { 
-      ...room, 
-      assignedTo: newHousekeeper || undefined 
-    };
-    handleRoomUpdate(updatedRoom);
-    
-    toast({
-      description: newHousekeeper 
-        ? `Chambre ${room.number} réassignée à ${newHousekeeper}`
-        : `Chambre ${room.number} désassignée`
-    });
-  };
-
-  const handleDeleteHousekeeper = async (housekeeperName: string) => {
-    setHousekeeperNames(prev => prev.filter(name => name !== housekeeperName));
-    
-    // Désactiver en base de données
-    const housekeeper = housekeepers.find(h => h.name === housekeeperName);
-    if (housekeeper) {
-      try {
-        const { SupabaseService } = await import('@/services/supabaseService');
-        await SupabaseService.deactivateHousekeeper(housekeeper.id);
-        refreshHousekeepers();
-        console.log('✅ Femme de chambre désactivée en base:', housekeeperName);
-      } catch (error) {
-        console.error('❌ Erreur désactivation femme de chambre:', error);
-      }
-    }
-    
-    // Also remove from floor preferences and max rooms overrides
-    setHousekeeperFloorPreferences(prev => {
-      const updated = { ...prev };
-      delete updated[housekeeperName];
-      return updated;
-    });
-    
-    setHousekeeperMaxRoomsOverrides(prev => {
-      const updated = { ...prev };
-      delete updated[housekeeperName];
-      return updated;
-    });
-  };
-  
-  // Handle changing housekeeper name directly in the assignment section
-  const handleRenameHousekeeper = (oldName: string, newName: string) => {
-    // Don't rename if the new name is empty or already exists
-    if (!newName.trim() || (oldName !== newName && housekeeperNames.includes(newName))) {
-      toast({
-        variant: "destructive",
-        title: "Nom invalide",
-        description: "Le nom ne peut pas être vide ou déjà existant."
-      });
-      return;
-    }
-    
-    // Update housekeeperNames array
-    setHousekeeperNames(prev => prev.map(name => name === oldName ? newName : name));
-    
-    // Update floor preferences
-    setHousekeeperFloorPreferences(prev => {
-      const updated = { ...prev };
-      if (updated[oldName]) {
-        updated[newName] = updated[oldName];
-        delete updated[oldName];
-      }
-      return updated;
-    });
-    
-    // Update max rooms overrides
-    setHousekeeperMaxRoomsOverrides(prev => {
-      const updated = { ...prev };
-      if (updated[oldName]) {
-        updated[newName] = updated[oldName];
-        delete updated[oldName];
-      }
-      return updated;
-    });
-    
-    // Update room assignments
-    setRooms(prevRooms => 
-      prevRooms.map(room => 
-        room.assignedTo === oldName ? { ...room, assignedTo: newName } : room
-      )
-    );
-    
-    toast({
-      title: "Nom modifié",
-      description: `"${oldName}" a été renommé en "${newName}".`
-    });
-  };
-
-  // Nouvelle fonction pour générer un code d'accès pour une femme de chambre
-  const handleGenerateAccessCode = async (housekeeperName: string) => {
-    if (!hotel?.id) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Aucun hôtel sélectionné pour générer le code d'accès."
-      });
-      return;
-    }
-
-    try {
-      const { data: codeData, error } = await supabase
-        .rpc('generate_and_insert_access_code', {
-          p_hotel_id: hotel.id,
-          p_housekeeper_name: housekeeperName
-        });
-
-      if (error) throw error;
-
-      // Rafraîchir la liste des femmes de chambre
-      refreshHousekeepers();
-
-      // Copier automatiquement le code dans le presse-papiers
-      try {
-        await navigator.clipboard.writeText(codeData);
-        toast({
-          title: "Code généré et copié",
-          description: `Code d'accès généré pour ${housekeeperName} et copié: ${codeData}`
-        });
-      } catch (clipboardError) {
-        toast({
-          title: "Code généré",
-          description: `Code d'accès généré pour ${housekeeperName}: ${codeData} (impossible de copier automatiquement)`
-        });
-      }
-
-      return codeData;
-    } catch (error) {
-      console.error('Erreur génération code:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de générer le code d'accès."
-      });
-    }
-  };
-  
-  const handleFloorPreferenceChange = (housekeeperName: string, floors: number[]) => {
-    setHousekeeperFloorPreferences(prev => ({
-      ...prev,
-      [housekeeperName]: floors
-    }));
-  };
-  
-  const handleMaxRoomsOverrideChange = (housekeeperName: string, maxRooms: number) => {
-    setHousekeeperMaxRoomsOverrides(prev => ({
-      ...prev,
-      [housekeeperName]: maxRooms
-    }));
-  };
-
-  const handleAddRoom = async (newRoom: Room) => {
-    const updatedRooms = [...rooms, newRoom];
-    setRooms(updatedRooms);
-    
-    console.log('✅ Chambre ajoutée:', newRoom.number);
-    
-    // Afficher un toast de confirmation
-    toast({
-      title: "Chambre ajoutée",
-      description: `La chambre ${newRoom.number} a été ajoutée avec succès`,
-    });
-  };
-
-  const handleDeleteRoom = async (roomNumber: string) => {
-    const roomToDelete = rooms.find(r => r.number === roomNumber);
-    if (!roomToDelete) return;
-
-    // Supprimer les liaisons bidirectionnelles
-    const updatedRooms = rooms
-      .filter(r => r.number !== roomNumber) // Supprimer la chambre
-      .map(room => ({
-        ...room,
-        linkedRooms: room.linkedRooms?.filter(linkedRoom => linkedRoom !== roomNumber) || []
-      }));
-
-    setRooms(updatedRooms);
-    
-    console.log('✅ Chambre supprimée:', roomNumber);
-    
-    toast({
-      title: "Chambre supprimée",
-      description: `La chambre ${roomNumber} a été supprimée avec succès`,
-    });
-  };
-
-  const handleLinkRooms = async (roomNumber: string, linkedRoomNumbers: string[]) => {
-    const updatedRooms = rooms.map(room => {
-      if (room.number === roomNumber) {
-        return {
-          ...room,
-          linkedRooms: linkedRoomNumbers
-        };
-      }
-      
-      // Mettre à jour les liaisons bidirectionnelles
-      const shouldBeLinked = linkedRoomNumbers.includes(room.number);
-      const currentlyLinked = room.linkedRooms?.includes(roomNumber) || false;
-      
-      if (shouldBeLinked && !currentlyLinked) {
-        // Ajouter la liaison
-        return {
-          ...room,
-          linkedRooms: [...(room.linkedRooms || []), roomNumber]
-        };
-      } else if (!shouldBeLinked && currentlyLinked) {
-        // Supprimer la liaison
-        return {
-          ...room,
-          linkedRooms: room.linkedRooms?.filter(linked => linked !== roomNumber) || []
-        };
-      }
-      
-      return room;
-    });
-
-    setRooms(updatedRooms);
-    console.log('✅ Liaisons de chambres sauvegardées:', roomNumber, linkedRoomNumbers);
-  };
+  // handleDeleteRoom from hook is renamed to avoid conflict with local handleDeleteRoom used differently
+  const handleDeleteRoom = handleDeleteRoomFromHook;
   
   const handlePdfProcessed = async (data: Room[], housekeeperNames?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
     console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeeperNames || []);

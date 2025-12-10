@@ -12,8 +12,6 @@ export function useDashboardDialogs() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showActionLogPanel, setShowActionLogPanel] = useState(false);
   const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
-  const [showHousekeeperManagement, setShowHousekeeperManagement] = useState(false);
-  const [showSetupWizard, setShowSetupWizard] = useState(false);
   
   // Selected items
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -62,10 +60,6 @@ export function useDashboardDialogs() {
     setShowActionLogPanel,
     showCreateColumnDialog,
     setShowCreateColumnDialog,
-    showHousekeeperManagement,
-    setShowHousekeeperManagement,
-    showSetupWizard,
-    setShowSetupWizard,
     
     // Selected items
     selectedRoom,

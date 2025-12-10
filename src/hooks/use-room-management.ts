@@ -1,17 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Room } from '@/services/pdfService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 interface UseRoomManagementProps {
   hotelId: string | null;
+  rooms: Room[];
+  setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
   housekeepers: any[];
   refreshHousekeepers?: () => void;
 }
 
-export function useRoomManagement({ hotelId, housekeepers, refreshHousekeepers }: UseRoomManagementProps) {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [isImporting, setIsImporting] = useState(false);
+export function useRoomManagement({ hotelId, rooms, setRooms, housekeepers, refreshHousekeepers }: UseRoomManagementProps) {
 
   const handleRoomUpdate = useCallback(async (updatedRoom: Room) => {
     // 1. Mise à jour locale immédiate (UX responsive)
@@ -149,10 +149,6 @@ export function useRoomManagement({ hotelId, housekeepers, refreshHousekeepers }
   }, [hotelId, refreshHousekeepers]);
 
   return {
-    rooms,
-    setRooms,
-    isImporting,
-    setIsImporting,
     handleRoomUpdate,
     handleRoomUnassign,
     handleRoomReassign,

@@ -3,17 +3,20 @@ import { Room } from '@/services/pdfService';
 import { toast } from '@/hooks/use-toast';
 
 interface UseHousekeeperManagementProps {
+  housekeeperNames: string[];
+  setHousekeeperNames: React.Dispatch<React.SetStateAction<string[]>>;
+  setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
   housekeepers: any[];
   refreshHousekeepers?: () => void;
-  setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
 }
 
 export function useHousekeeperManagement({ 
+  housekeeperNames,
+  setHousekeeperNames,
+  setRooms,
   housekeepers, 
-  refreshHousekeepers,
-  setRooms 
+  refreshHousekeepers
 }: UseHousekeeperManagementProps) {
-  const [housekeeperNames, setHousekeeperNames] = useState<string[]>([]);
   const [housekeeperFloorPreferences, setHousekeeperFloorPreferences] = useState<Record<string, number[]>>({});
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
 
@@ -104,8 +107,6 @@ export function useHousekeeperManagement({
   }, []);
 
   return {
-    housekeeperNames,
-    setHousekeeperNames,
     housekeeperFloorPreferences,
     setHousekeeperFloorPreferences,
     housekeeperMaxRoomsOverrides,
