@@ -50,22 +50,29 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const notifications = notificationsHook?.notifications || [];
   const addNotificationFn = notificationsHook?.addNotification;
 
-  // Phase 5: Simplified initialization - just load from storage
+  // Phase 5: Simplified initialization - load from HotelStorageService (source unique)
   useEffect(() => {
     const initializeFromStorage = () => {
       const hotelData = HotelStorageService.get();
+      console.log('🔍 HousekeepingContext: Lecture cache hotel', hotelData?.id?.slice(0, 8) + '...');
+      
       if (hotelData?.id && hotelData.id.length > 30) {
         setHotelId(hotelData.id);
-        console.log('✅ HousekeepingContext: Hotel ID chargé depuis storage');
+        console.log('✅ HousekeepingContext: Hotel ID chargé depuis storage:', hotelData.id.slice(0, 8) + '...');
         setIsInitialized(true);
+      } else {
+        console.log('⚠️ HousekeepingContext: Pas de hotel dans le cache');
       }
     };
     
     initializeFromStorage();
     
     // Listen for storage changes (when hotel is set by useAutoSetup)
-    const handleStorageChange = () => {
-      initializeFromStorage();
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'hotel_session' || e.key === 'selectedHotelId') {
+        console.log('🔄 HousekeepingContext: Storage change détecté');
+        initializeFromStorage();
+      }
     };
     
     window.addEventListener('storage', handleStorageChange);
