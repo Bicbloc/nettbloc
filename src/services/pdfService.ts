@@ -109,6 +109,30 @@ function getRoomFloor(roomNumber: string): number {
 /**
  * Process PDF file - utilise le service unifié
  */
+/**
+ * Prétraite le texte PDF pour séparer les chambres concaténées
+ */
+function preprocessPdfText(text: string): string {
+  let processed = text;
+  
+  // Pattern: Statut suivi d'un numéro de chambre et "Chambre"
+  // Ex: "Sale 02 Chambre triple" → "Sale\n02 Chambre triple"
+  processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler|Propre|A blanc)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
+  
+  // Pattern: Pagination (ex: "1", "2") suivi d'un numéro de chambre
+  // Ex: "1 02 Chambre triple" → "1\n02 Chambre triple"  
+  processed = processed.replace(/(\s)(\d{1,2})\s+(0?\d{1,3})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1$2\n$3 $4');
+  
+  // Pattern: "Ch. NN" format
+  processed = processed.replace(/(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$1$2$3');
+  
+  // Pattern: Numéro seul suivi de type de chambre (format tableau Apaleo)
+  // Ex: "... 02 Chambre triple" quand pas de statut avant
+  processed = processed.replace(/(\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '\n$2 $3');
+  
+  return processed;
+}
+
 export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
   try {
     // Extraire le texte du PDF
@@ -122,10 +146,13 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ');
-      fullText += pageText + ' ';
+      fullText += pageText + '\n'; // Ajouter newline entre pages
     }
     
-    console.log("📄 PDF texte extrait:", fullText.substring(0, 500) + "...");
+    // Prétraiter le texte pour séparer les chambres
+    fullText = preprocessPdfText(fullText);
+    
+    console.log("📄 PDF texte extrait et prétraité:", fullText.substring(0, 500) + "...");
     lastExtractedText = fullText;
     
     let rooms: Room[] = [];
