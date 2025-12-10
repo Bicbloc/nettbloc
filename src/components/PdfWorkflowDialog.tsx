@@ -257,9 +257,40 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
       let insertedCount = 0;
 
+      // Récupérer et valider le hotelId
+      let effectiveHotelId = hotelId;
+      
+      if (!effectiveHotelId) {
+        // Récupérer depuis le profil utilisateur
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('current_hotel_id')
+            .eq('id', user.id)
+            .maybeSingle();
+          effectiveHotelId = profile?.current_hotel_id;
+        }
+      }
+      
+      if (!effectiveHotelId) {
+        throw new Error('ID de l\'hôtel manquant. Veuillez vous reconnecter.');
+      }
+      
+      // Vérifier que l'utilisateur a accès à cet hôtel
+      const { data: hotelCheck, error: hotelError } = await supabase
+        .from('hotels')
+        .select('id')
+        .eq('id', effectiveHotelId)
+        .maybeSingle();
+        
+      if (hotelError || !hotelCheck) {
+        throw new Error('Accès à l\'hôtel non autorisé. Veuillez vous reconnecter.');
+      }
+
       if (mode === 'replace') {
         // Remplacer toutes les chambres
-        const result = await RoomArchiveService.replaceAllRooms(hotelId, filteredData, selectedFile?.name || 'pdf_import');
+        const result = await RoomArchiveService.replaceAllRooms(effectiveHotelId, filteredData, selectedFile?.name || 'pdf_import');
         insertedCount = result.inserted;
         
         toast({
@@ -275,7 +306,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           // Normaliser le numéro (05 → 5, 01 → 1, etc.)
           const roomNumber = normalizeRoomNumber(rawRoomNumber);
           return {
-            hotel_id: hotelId,
+            hotel_id: effectiveHotelId,
             room_number: roomNumber,
             floor: room.floor ?? null,
             room_type: room.type || room.room_type || null,
@@ -293,7 +324,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           // Normaliser le numéro (05 → 5, 01 → 1, etc.)
           const roomNumber = normalizeRoomNumber(rawRoomNumber);
           return {
-            hotel_id: hotelId,
+            hotel_id: effectiveHotelId,
             room_number: roomNumber,
             floor: room.floor ?? null,
             status: room.status || 'dirty',
