@@ -107,31 +107,45 @@ function getRoomFloor(roomNumber: string): number {
 }
 
 /**
- * Process PDF file - utilise le service unifié
- */
-/**
  * Prétraite le texte PDF pour séparer les chambres concaténées
+ * Gère le format tableau Apaleo où les chambres sont concaténées
  */
 function preprocessPdfText(text: string): string {
   let processed = text;
   
-  // Pattern: Statut suivi d'un numéro de chambre et "Chambre"
+  // Pattern 1: Début de ligne ou après espace - numéro + "Chambre" (format tableau Apaleo)
+  // Ex: "01   Chambre twin" ou " 02 Chambre triple"
+  processed = processed.replace(/(^|\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gim, '\n$2 $3');
+  
+  // Pattern 2: Statut suivi d'un numéro de chambre et "Chambre"
   // Ex: "Sale 02 Chambre triple" → "Sale\n02 Chambre triple"
-  processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler|Propre|A blanc)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
+  processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|Arrivée|En arrivée|A contrôler|Propre|A blanc)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
   
-  // Pattern: Pagination (ex: "1", "2") suivi d'un numéro de chambre
-  // Ex: "1 02 Chambre triple" → "1\n02 Chambre triple"  
-  processed = processed.replace(/(\s)(\d{1,2})\s+(0?\d{1,3})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1$2\n$3 $4');
+  // Pattern 3: Statut2 suivi directement d'un numéro (format "A contrôler 02 Chambre")
+  // Ex: "TW // NR Formulaire... A contrôler 02" → séparer avant le 02
+  processed = processed.replace(/(Sale|A contrôler|Propre)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
   
-  // Pattern: "Ch. NN" format
+  // Pattern 4: Pagination (ex: "1", "2", "3") suivie d'un numéro de chambre
+  // Ex: "1 02 Chambre triple" → "1\n02 Chambre triple"
+  processed = processed.replace(/(\s)(\d{1})\s+(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1$2\n$3 $4');
+  
+  // Pattern 5: "Ch. NN" format  
   processed = processed.replace(/(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$1$2$3');
   
-  // Pattern: Numéro seul suivi de type de chambre (format tableau Apaleo)
-  // Ex: "... 02 Chambre triple" quand pas de statut avant
-  processed = processed.replace(/(\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '\n$2 $3');
+  // Pattern 6: Format numéro seul en début apparent (après info facture, etc.)
+  // Ex: "...250518012) 02 Chambre triple" → séparer avant 02
+  processed = processed.replace(/(\))\s*(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1\n$2 $3');
+  
+  // Pattern 7: Format avec statut "Sale" ou autre juste avant le numéro suivant
+  // Ex: "...Sale TW // NR 02 Chambre" 
+  processed = processed.replace(/(NR|RO|BB|FLEX)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
   
   return processed;
 }
+
+/**
+ * Process PDF file - utilise le service unifié
+ */
 
 export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
   try {
