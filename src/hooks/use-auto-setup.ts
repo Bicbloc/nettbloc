@@ -108,16 +108,18 @@ export const useAutoSetup = () => {
       // PHASE 1: Vérification RAPIDE du cache localStorage
       const cachedHotel = HotelStorageService.get();
       if (cachedHotel && cachedHotel.id && cachedHotel.id.length > 30) {
-        console.log('⚡ CACHE HIT - Hôtel chargé depuis localStorage:', cachedHotel.id.slice(0, 8) + '...');
+        console.log('⚡ CACHE HIT - Vérification propriété:', cachedHotel.id.slice(0, 8) + '...');
         
-        // Vérifier que l'hôtel existe toujours en base (en arrière-plan)
+        // Vérifier que l'hôtel existe ET appartient à l'utilisateur connecté
         const { data: hotelExists } = await supabase
           .from('hotels')
           .select('id, name, hotel_code')
           .eq('id', cachedHotel.id)
+          .eq('user_id', user.id) // IMPORTANT: Vérifier la propriété!
           .maybeSingle();
         
         if (hotelExists) {
+          console.log('✅ Cache validé - hôtel appartient à l\'utilisateur');
           setHotel({
             id: hotelExists.id,
             name: hotelExists.name,
@@ -133,7 +135,7 @@ export const useAutoSetup = () => {
           
           return; // Démarrage rapide!
         } else {
-          console.log('⚠️ Cache invalide - hôtel supprimé, nettoyage...');
+          console.log('⚠️ Cache invalide - hôtel n\'appartient pas à l\'utilisateur, nettoyage...');
           HotelStorageService.clear();
         }
       }
