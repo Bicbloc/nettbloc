@@ -236,13 +236,24 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
           });
           return rooms;
         }
-      } catch (aiError) {
+      } catch (aiError: any) {
         console.error('❌ Erreur extraction IA, fallback regex:', aiError);
-        toast({
-          title: "Extraction IA échouée",
-          description: "Utilisation du parsing standard",
-          variant: "destructive"
-        });
+        
+        // Détecter l'erreur 402 (crédits insuffisants)
+        const errorMessage = aiError?.message || String(aiError);
+        if (errorMessage.includes('402') || errorMessage.includes('crédits') || errorMessage.includes('insuffisants')) {
+          toast({
+            title: "Crédits IA insuffisants",
+            description: "Rechargez vos crédits. Extraction standard utilisée.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Extraction IA échouée",
+            description: "Utilisation du parsing standard",
+            variant: "destructive"
+          });
+        }
       }
     }
     

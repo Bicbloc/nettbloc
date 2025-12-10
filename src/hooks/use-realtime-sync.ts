@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { realtimeManager } from '@/services/RealtimeManager';
 
 interface RealtimeSyncOptions {
@@ -16,6 +16,9 @@ export const useRealtimeSync = ({
   // Utiliser une ref pour toujours avoir la dernière version du callback
   const onUpdateRef = useRef(onUpdate);
   
+  // CORRECTION: Mémoriser le tableau tables pour éviter les re-souscriptions infinies
+  const stableTables = useMemo(() => tables, [tables.join(',')]);
+  
   useEffect(() => {
     onUpdateRef.current = onUpdate;
   }, [onUpdate]);
@@ -32,7 +35,7 @@ export const useRealtimeSync = ({
     realtimeManager.connect(effectiveHotelId);
 
     // Utiliser la ref dans le callback pour toujours avoir la version à jour
-    const subscriptionIds = tables.map(table => 
+    const subscriptionIds = stableTables.map(table => 
       realtimeManager.subscribe(table, (tableName, payload) => {
         onUpdateRef.current?.(tableName, payload);
       })
@@ -41,7 +44,7 @@ export const useRealtimeSync = ({
     return () => {
       subscriptionIds.forEach(id => realtimeManager.unsubscribe(id));
     };
-  }, [hotelId, tables]);
+  }, [hotelId, stableTables]);
 
   const status = realtimeManager.getStatus();
 

@@ -28,6 +28,7 @@ class RealtimeManager {
   private onStatusChangeCallback: ((status: string) => void) | null = null;
   private isOnline = true;
   private lastSuccessfulPing = Date.now();
+  private isPaused = false; // État pause pendant les imports
 
   private constructor() {
     // Écouter les changements de connectivité réseau
@@ -191,8 +192,8 @@ class RealtimeManager {
       return;
     }
 
-    // Backoff exponentiel avec max 15 secondes
-    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 15000);
+    // Backoff exponentiel avec max 30 secondes (augmenté pour stabilité)
+    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1500, 30000);
     this.reconnectAttempts++;
 
     console.log(`🔄 RealtimeManager: Reconnexion dans ${delay}ms (tentative ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
@@ -259,13 +260,29 @@ class RealtimeManager {
   }
 
   /**
+   * Mettre en pause les reconnexions (pendant les imports)
+   */
+  pause() {
+    this.isPaused = true;
+    console.log('⏸️ RealtimeManager: Pause activée');
+  }
+
+  /**
+   * Reprendre les reconnexions
+   */
+  resume() {
+    this.isPaused = false;
+    console.log('▶️ RealtimeManager: Reprise');
+  }
+
+  /**
    * Démarrer le heartbeat avec vrai ping vers Supabase
    */
   private startHeartbeat() {
     this.stopHeartbeat();
     
     this.heartbeatInterval = setInterval(async () => {
-      if (!this.channel || !this.isOnline) {
+      if (!this.channel || !this.isOnline || this.isPaused) {
         return;
       }
       
@@ -288,7 +305,7 @@ class RealtimeManager {
         console.log('💔 Heartbeat: Exception');
         this.scheduleReconnect();
       }
-    }, 30000); // Toutes les 30 secondes (réduit pour éviter faux positifs)
+    }, 45000); // Toutes les 45 secondes (augmenté pour stabilité)
   }
 
   /**
@@ -298,19 +315,19 @@ class RealtimeManager {
     this.stopPing();
     
     this.pingInterval = setInterval(async () => {
-      if (!this.isOnline) return;
+      if (!this.isOnline || this.isPaused) return;
       
       const timeSinceLastPing = Date.now() - this.lastSuccessfulPing;
-      if (timeSinceLastPing > 90000) { // Plus de 90s sans ping réussi (augmenté)
+      if (timeSinceLastPing > 120000) { // Plus de 2 minutes sans ping réussi
         console.log('⚠️ Ping: Connexion potentiellement perdue');
-        // Debounce: attendre 3s avant reconnexion pour éviter les faux positifs
+        // Debounce: attendre 5s avant reconnexion pour éviter les faux positifs
         setTimeout(() => {
-          if (Date.now() - this.lastSuccessfulPing > 90000) {
+          if (Date.now() - this.lastSuccessfulPing > 120000 && !this.isPaused) {
             this.forceReconnect();
           }
-        }, 3000);
+        }, 5000);
       }
-    }, 30000); // Check toutes les 30 secondes (réduit la fréquence)
+    }, 45000); // Check toutes les 45 secondes
   }
 
   private stopPing() {
