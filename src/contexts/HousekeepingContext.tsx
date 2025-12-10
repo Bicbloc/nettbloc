@@ -80,15 +80,19 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       try {
         const session = await HotelSessionService.getSession();
         if (session) {
-          // SAUVEGARDE CONTINUE dans localStorage + SessionPersistenceService
+          // SAUVEGARDE via HotelStorageService (source unique de vérité)
           const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
           
-          // Sauvegarder l'hotel_id dans TOUS les emplacements
           if (session.hotel_id) {
-            localStorage.setItem('selectedHotelId', session.hotel_id);
-            localStorage.setItem('hotelId', session.hotel_id);
-            localStorage.setItem('lastSavedHotelId', session.hotel_id);
-            localStorage.setItem('currentHotelId', session.hotel_id);
+            // Utiliser HotelStorageService pour éviter les conflits de clés
+            const hotelData = HotelStorageService.get();
+            if (!hotelData || hotelData.id !== session.hotel_id) {
+              HotelStorageService.save({
+                id: session.hotel_id,
+                name: hotelData?.name || '',
+                code: hotelData?.code || ''
+              });
+            }
             setHotelId(session.hotel_id);
           }
           

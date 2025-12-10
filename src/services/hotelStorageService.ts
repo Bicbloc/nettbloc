@@ -9,6 +9,9 @@ export class HotelStorageService {
   private static readonly KEY = 'hotel_session';
   private static readonly EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+  // Clé unique pour éviter les conflits de synchronisation
+  private static readonly LEGACY_KEY = 'selectedHotelId';
+
   static save(hotel: { id: string; name: string; code: string }): void {
     try {
       // Validation des données
@@ -22,17 +25,17 @@ export class HotelStorageService {
         timestamp: Date.now(),
       };
       
-      // Save to new key
+      // Source unique de vérité
       localStorage.setItem(this.KEY, JSON.stringify(session));
       
-      // Also save to legacy keys for retrocompatibility
-      localStorage.setItem('selectedHotelId', hotel.id);
-      localStorage.setItem('selectedHotelCode', hotel.code);
-      localStorage.setItem('selectedHotelName', hotel.name);
-      localStorage.setItem('currentHotelId', hotel.id);
+      // UNE SEULE clé legacy pour rétrocompatibilité (évite les conflits)
+      localStorage.setItem(this.LEGACY_KEY, hotel.id);
+      
+      // Backup pour récupération (lecture seule, jamais écrit ailleurs)
+      localStorage.setItem('lastSelectedHotelId', hotel.id);
       
       // Vérification immédiate
-      const verification = localStorage.getItem('selectedHotelId');
+      const verification = localStorage.getItem(this.LEGACY_KEY);
       if (verification !== hotel.id) {
         console.error('❌ Échec sauvegarde localStorage');
         throw new Error('localStorage save failed');
@@ -83,10 +86,7 @@ export class HotelStorageService {
   static clear(): void {
     try {
       localStorage.removeItem(this.KEY);
-      // Also clear legacy keys for migration
-      localStorage.removeItem('selectedHotelId');
-      localStorage.removeItem('currentHotelId');
-      localStorage.removeItem('hotelId');
+      localStorage.removeItem(this.LEGACY_KEY);
       // Ne PAS effacer lastSelectedHotelId (backup de récupération)
     } catch (error) {
       console.error('Failed to clear hotel session:', error);
