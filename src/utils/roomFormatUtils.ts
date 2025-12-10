@@ -1,5 +1,25 @@
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * Normalise un numéro de chambre pour la comparaison
+ * Supprime les zéros initiaux sauf si le numéro est uniquement "0"
+ * "05" → "5", "01" → "1", "10" → "10", "101" → "101"
+ */
+export function normalizeRoomNumber(roomNumber: string): string {
+  if (!roomNumber) return '';
+  const trimmed = roomNumber.trim();
+  // Supprime les zéros initiaux
+  const normalized = trimmed.replace(/^0+/, '') || '0';
+  return normalized;
+}
+
+/**
+ * Compare deux numéros de chambre de manière normalisée
+ */
+export function roomNumbersMatch(room1: string, room2: string): boolean {
+  return normalizeRoomNumber(room1) === normalizeRoomNumber(room2);
+}
+
 export interface RoomFormatConfig {
   format: string; // 'XXX', '0X', 'XXXX', 'NN', etc.
   regex: RegExp;
@@ -197,11 +217,16 @@ export function filterOutInactiveRooms(rooms: any[], inactiveRoomNumbers: Set<st
     return rooms;
   }
   
+  // Normaliser les numéros inactifs pour la comparaison
+  const normalizedInactive = new Set<string>();
+  inactiveRoomNumbers.forEach(num => normalizedInactive.add(normalizeRoomNumber(num)));
+  
   const filteredRooms = rooms.filter(room => {
     const roomNumber = room.roomNumber || room.room_number || room.number;
     if (!roomNumber) return false;
     
-    const isInactive = inactiveRoomNumbers.has(roomNumber);
+    // Comparer avec le numéro normalisé
+    const isInactive = normalizedInactive.has(normalizeRoomNumber(roomNumber));
     if (isInactive) {
       console.log(`🚫 Chambre ${roomNumber} exclue (désactivée dans le registre)`);
     }

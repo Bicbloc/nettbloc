@@ -170,8 +170,10 @@ export class ApaleoAdapter extends PmsAdapter {
       const lineRoomRegex = new RegExp(roomRegex.source, 'g');
       
       while ((match = lineRoomRegex.exec(cleanedLine)) !== null) {
-        const roomNum = match[1];
-        const numValue = parseInt(roomNum, 10);
+        const rawRoomNum = match[1];
+        const numValue = parseInt(rawRoomNum, 10);
+        // Normaliser: "05" → "5", "01" → "1", etc.
+        const roomNum = String(numValue);
         
         // Filtrer les numéros invalides
         if (this.isDateOrTime(numValue, originalLine)) continue;

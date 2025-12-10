@@ -25,7 +25,8 @@ import {
   loadHotelRoomFormat, 
   filterRoomsByFormat, 
   getInactiveRoomNumbers, 
-  filterOutInactiveRooms 
+  filterOutInactiveRooms,
+  normalizeRoomNumber
 } from "@/utils/roomFormatUtils";
 
 interface PdfWorkflowDialogProps {
@@ -252,7 +253,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         console.log('🔄 Début enregistrement dans hotel_rooms_registry pour', filteredData.length, 'chambres');
         
         const roomsData = filteredData.map((room: any) => {
-          const roomNumber = room.roomNumber || room.room_number || room.number;
+          const rawRoomNumber = room.roomNumber || room.room_number || room.number;
+          // Normaliser le numéro (05 → 5, 01 → 1, etc.)
+          const roomNumber = normalizeRoomNumber(rawRoomNumber);
           return {
             hotel_id: hotelId,
             room_number: roomNumber,
@@ -268,7 +271,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
         // Préparer les données pour la table rooms
         const roomsForSync = filteredData.map((room: any) => {
-          const roomNumber = room.roomNumber || room.room_number || room.number;
+          const rawRoomNumber = room.roomNumber || room.room_number || room.number;
+          // Normaliser le numéro (05 → 5, 01 → 1, etc.)
+          const roomNumber = normalizeRoomNumber(rawRoomNumber);
           return {
             hotel_id: hotelId,
             room_number: roomNumber,
