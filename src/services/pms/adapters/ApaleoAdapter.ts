@@ -155,15 +155,18 @@ export class ApaleoAdapter extends PmsAdapter {
       // Ignorer les en-têtes et métadonnées
       if (this.isHeaderOrMetadataLine(originalLine)) continue;
       
-      // La ligne doit contenir un statut valide
-      if (!this.lineHasValidStatus(originalLine)) continue;
+      // Vérifier si la ligne contient un statut valide
+      const hasStatus = this.lineHasValidStatus(originalLine);
       
       // Nettoyer la ligne des dates pour l'extraction
       const cleanedLine = this.cleanLineFromDates(originalLine);
       
       // Détecter le statut
       const statusInfo = this.detectStatus(originalLine);
-      if (!statusInfo || statusInfo.status === 'unknown') continue;
+      
+      // Si pas de statut détecté mais ligne contient un numéro, utiliser défaut
+      const finalStatus = statusInfo.status !== 'unknown' ? statusInfo.status : (hasStatus ? 'needs-cleaning' : null);
+      if (!finalStatus) continue;
       
       // Extraire les numéros de la ligne nettoyée
       let match;
@@ -182,12 +185,14 @@ export class ApaleoAdapter extends PmsAdapter {
         if (seenRooms.has(roomNum)) continue;
         seenRooms.add(roomNum);
         
+        const cleaning = statusInfo.status !== 'unknown' ? statusInfo.cleaning : 'full';
+        
         rooms.push({
           roomNumber: roomNum,
-          status: statusInfo.status,
-          cleaningType: statusInfo.cleaning as CleaningType,
+          status: finalStatus,
+          cleaningType: cleaning as CleaningType,
           originalText: originalLine.trim(),
-          confidence: 0.85
+          confidence: statusInfo.status !== 'unknown' ? 85 : 60
         });
       }
     }

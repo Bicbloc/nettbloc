@@ -10,13 +10,13 @@ export class MewsAdapter extends PmsAdapter {
   
   readonly keywords = [
     'MEWS', 'COMMANDER', 'MEWS SYSTEMS', 'MEWS COMMANDER', 
-    'STATUT DES ESPACES', 'DIR', 'INS', 'SAL', 'Night'
+    'STATUT DES ESPACES', 'SPACE STATUS', 'DIR', 'INS', 'SAL', 'Night', 'Nuit'
   ];
 
   readonly config: PmsConfig = {
     pmsType: 'mews',
     keywords: this.keywords,
-    roomNumberRegex: '\\b([1-9]\\d{2,4})\\b',
+    roomNumberRegex: '\\b([1-9]\\d{1,3})\\b',
     statusMappings: {
       // Statuts anglais
       'Dirty': { status: 'dirty', cleaning: 'full', priority: 20 },
@@ -27,15 +27,22 @@ export class MewsAdapter extends PmsAdapter {
       'OOO': { status: 'out-of-order', cleaning: 'none', priority: 25 },
       'Occupied Clean': { status: 'occupied', cleaning: 'none', priority: 5 },
       'Occupied Dirty': { status: 'occupied', cleaning: 'quick', priority: 10 },
-      // Statuts français (abréviations Mews)
-      'SAL': { status: 'stayover', cleaning: 'quick', priority: 10 },
-      'INS': { status: 'inspected', cleaning: 'none', priority: 7 },
-      'DIR': { status: 'checkout', cleaning: 'full', priority: 20 },
-      'DEP': { status: 'checkout', cleaning: 'full', priority: 20 },
-      'ARR': { status: 'arrival', cleaning: 'full', priority: 15 },
+      
+      // Statuts français/Mews abréviations
+      'SAL': { status: 'dirty', cleaning: 'full', priority: 20 },  // SALE = dirty
+      'SALE': { status: 'dirty', cleaning: 'full', priority: 20 },
+      'INS': { status: 'clean', cleaning: 'none', priority: 8 },   // Inspecté = propre
+      'DIR': { status: 'dirty', cleaning: 'full', priority: 20 },  // Dirty
+      'DEP': { status: 'checkout', cleaning: 'full', priority: 22 },
+      'ARR': { status: 'arrival', cleaning: 'full', priority: 18 },
       'COC': { status: 'occupied', cleaning: 'none', priority: 5 },
       'CLA': { status: 'clean', cleaning: 'none', priority: 8 },
       'VAC': { status: 'vacant', cleaning: 'none', priority: 6 },
+      
+      // Termes complets français
+      'PARTI': { status: 'checkout', cleaning: 'full', priority: 22 },
+      'DEPART': { status: 'checkout', cleaning: 'full', priority: 22 },
+      'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 15 },
     },
     combinationRules: [
       // Départ + Arrivée même ligne = À blanc
