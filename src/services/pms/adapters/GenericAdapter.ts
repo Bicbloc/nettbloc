@@ -17,24 +17,46 @@ export class GenericAdapter extends PmsAdapter {
     // Regex amélioré: chambres avec zéros initiaux (01, 02, 06, 10, 101, etc.)
     roomNumberRegex: '(?<![/\\-\\.\\d])\\b(0*[1-9]\\d{0,3})\\b(?![/\\-\\.\\d])',
     statusMappings: {
-      // Français
+      // Français - Priorité haute (statuts principaux)
+      'PARTI': { status: 'checkout', cleaning: 'full', priority: 22 },
+      'DEPART': { status: 'checkout', cleaning: 'full', priority: 22 },
+      'DÉPART': { status: 'checkout', cleaning: 'full', priority: 22 },
+      'CHECKOUT': { status: 'checkout', cleaning: 'full', priority: 22 },
+      'EN ARRIVÉE': { status: 'arrival', cleaning: 'full', priority: 20 },
+      'EN ARRIVEE': { status: 'arrival', cleaning: 'full', priority: 20 },
+      'ARRIVÉE': { status: 'arrival', cleaning: 'full', priority: 18 },
+      'ARRIVEE': { status: 'arrival', cleaning: 'full', priority: 18 },
+      'ARRIVAL': { status: 'arrival', cleaning: 'full', priority: 18 },
+      
+      // Statuts "sale" / dirty
       'SALE': { status: 'dirty', cleaning: 'full', priority: 20 },
+      'SAL': { status: 'dirty', cleaning: 'full', priority: 20 },
+      'DIR': { status: 'dirty', cleaning: 'full', priority: 20 },
       'DIRTY': { status: 'dirty', cleaning: 'full', priority: 20 },
+      
+      // Recouche / Stayover
+      'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 15 },
+      'STAYOVER': { status: 'stayover', cleaning: 'quick', priority: 15 },
+      'DRAPS': { status: 'stayover', cleaning: 'quick', priority: 14 },
+      
+      // Propre / Clean / Inspecté
       'PROPRE': { status: 'clean', cleaning: 'none', priority: 8 },
       'CLEAN': { status: 'clean', cleaning: 'none', priority: 8 },
+      'INS': { status: 'clean', cleaning: 'none', priority: 8 },
+      'INSPECTED': { status: 'clean', cleaning: 'none', priority: 8 },
+      'A CONTROLER': { status: 'needs-inspection', cleaning: 'none', priority: 6 },
+      'A CONTRÔLER': { status: 'needs-inspection', cleaning: 'none', priority: 6 },
+      
+      // Occupé
       'OCCUPÉ': { status: 'occupied', cleaning: 'none', priority: 5 },
       'OCCUPE': { status: 'occupied', cleaning: 'none', priority: 5 },
       'OCCUPIED': { status: 'occupied', cleaning: 'none', priority: 5 },
-      'DÉPART': { status: 'checkout', cleaning: 'full', priority: 20 },
-      'DEPART': { status: 'checkout', cleaning: 'full', priority: 20 },
-      'CHECKOUT': { status: 'checkout', cleaning: 'full', priority: 20 },
-      'ARRIVÉE': { status: 'arrival', cleaning: 'full', priority: 15 },
-      'ARRIVEE': { status: 'arrival', cleaning: 'full', priority: 15 },
-      'ARRIVAL': { status: 'arrival', cleaning: 'full', priority: 15 },
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 10 },
-      'STAYOVER': { status: 'stayover', cleaning: 'quick', priority: 10 },
+      
+      // Libre / Vacant
       'LIBRE': { status: 'vacant', cleaning: 'full', priority: 15 },
       'VACANT': { status: 'vacant', cleaning: 'full', priority: 15 },
+      
+      // Hors service
       'HS': { status: 'out-of-order', cleaning: 'none', priority: 25 },
       'HORS SERVICE': { status: 'out-of-order', cleaning: 'none', priority: 25 },
       'OUT OF ORDER': { status: 'out-of-order', cleaning: 'none', priority: 25 },
@@ -107,16 +129,14 @@ export class GenericAdapter extends PmsAdapter {
         
         const { status, cleaning } = this.detectStatus(line);
         
-        // Ignorer si aucun statut détecté (probablement pas une ligne de chambre)
-        if (status === 'unknown') continue;
-        
+        // Créer la chambre même si statut inconnu (sera "needs-cleaning" par défaut)
         const room: ExtractedRoom = {
           roomNumber,
-          status,
-          cleaningType: cleaning,
+          status: status === 'unknown' ? 'needs-cleaning' : status,
+          cleaningType: status === 'unknown' ? 'full' : cleaning,
           originalText: line.trim(),
           validated: false,
-          confidence: 75
+          confidence: status === 'unknown' ? 50 : 75
         };
 
         if (!seenRooms.has(roomNumber)) {
