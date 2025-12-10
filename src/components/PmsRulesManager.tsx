@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap } from "lucide-react";
+import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTriangle, PenLine, Save } from "lucide-react";
 import { pmsAdapterFactory, unifiedParserService, ExtractedRoom, CleaningType } from "@/services/pms";
+import { TestResultItem } from "@/components/pms/TestResultItem";
+import { ManualCorrectionPanel } from "@/components/pms/ManualCorrectionPanel";
 
 interface PmsRule {
   id: string;
@@ -43,6 +45,7 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
   const [detectedPms, setDetectedPms] = useState<string>('');
   const [detectedConfidence, setDetectedConfidence] = useState<number>(0);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [showManualCorrection, setShowManualCorrection] = useState(false);
   const [newRule, setNewRule] = useState({
     pms_type: '',
     rule_name: '',
@@ -454,34 +457,93 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
               )}
 
               {testResults.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-medium">Résultats ({testResults.length} chambres)</h4>
-                  <div className="max-h-[300px] overflow-auto space-y-2">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Résultats ({testResults.length} chambres)</h4>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowManualCorrection(true)}
+                      >
+                        <PenLine className="h-4 w-4 mr-1" />
+                        Corriger manuellement
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={async () => {
+                          const validatedRooms = testResults.filter(r => r.validated);
+                          if (validatedRooms.length === 0) {
+                            toast.error('Validez au moins une chambre avant de sauvegarder');
+                            return;
+                          }
+                          // Sauvegarder comme règle
+                          const user = await supabase.auth.getUser();
+                          await supabase.from('report_training_patterns').insert([{
+                            hotel_id: hotelId,
+                            assigned_to_hotel_id: hotelId,
+                            report_name: 'Validation manuelle',
+                            pms_type: detectedPms || 'learned',
+                            pattern_name: `Validation - ${new Date().toLocaleDateString()}`,
+                            raw_text: testText.substring(0, 2000),
+                            extracted_data: JSON.parse(JSON.stringify({ rooms: validatedRooms })),
+                            validated: true,
+                            created_by: user.data.user?.id || '',
+                            attribution_reason: 'Validation manuelle des résultats'
+                          }]);
+                          toast.success(`${validatedRooms.length} chambre(s) validée(s) et sauvegardée(s)!`);
+                        }}
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        Sauvegarder les validées
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {detectedConfidence < 70 && (
+                    <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-950/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>Confiance faible - Vérifiez et corrigez les résultats avec les boutons ci-dessous</span>
+                    </div>
+                  )}
+                  
+                  <div className="max-h-[350px] overflow-auto space-y-2">
                     {testResults.map((room, idx) => (
-                      <Card key={idx} className="p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono font-bold">{room.roomNumber}</span>
-                            <Badge variant={
-                              room.cleaningType === 'full' ? 'destructive' :
-                              room.cleaningType === 'quick' ? 'default' : 'secondary'
-                            }>
-                              {getCleaningLabel(room.cleaningType)}
-                            </Badge>
-                            {room.status && (
-                              <span className="text-sm text-muted-foreground">{room.status}</span>
-                            )}
-                          </div>
-                          {room.validated ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
-                      </Card>
+                      <TestResultItem
+                        key={idx}
+                        room={room}
+                        index={idx}
+                        onValidate={(i) => {
+                          const updated = [...testResults];
+                          updated[i] = { ...updated[i], validated: true };
+                          setTestResults(updated);
+                        }}
+                        onRemove={(i) => {
+                          setTestResults(prev => prev.filter((_, index) => index !== i));
+                        }}
+                        onModify={(i, updates) => {
+                          const updated = [...testResults];
+                          updated[i] = { ...updated[i], ...updates, validated: true };
+                          setTestResults(updated);
+                        }}
+                      />
                     ))}
                   </div>
                 </div>
+              )}
+              
+              {showManualCorrection && testText && (
+                <ManualCorrectionPanel
+                  rawText={testText}
+                  hotelId={hotelId}
+                  existingRooms={testResults}
+                  onRoomsUpdated={(rooms) => {
+                    setTestResults(rooms);
+                    setShowManualCorrection(false);
+                  }}
+                  onClose={() => setShowManualCorrection(false)}
+                />
               )}
             </CardContent>
           </Card>
