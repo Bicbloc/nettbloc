@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Plus, Trash2, Play, Settings, Lightbulb, CheckCircle, XCircle } from 'lucide-react';
-import { mewsDetectionService, DetectionRule } from '@/services/mewsDetectionService';
+import { pmsAdapterFactory, unifiedParserService, mewsDetectionService, DetectionRule } from "@/services/pms";
 import { getCleaningTypeLabel } from '@/utils/cleaningTypeUtils';
 
 interface HotelDetectionRulesManagerProps {

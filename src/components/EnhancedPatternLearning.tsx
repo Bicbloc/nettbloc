@@ -11,7 +11,7 @@ import {
   Target, CheckCircle2, Lightbulb, User, UserX, Ban, Plus, X, Wand2, CheckCheck, XCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { mewsDetectionService } from "@/services/mewsDetectionService";
+import { pmsAdapterFactory, unifiedParserService, mewsDetectionService } from "@/services/pms";
 import { getCleaningTypeLabel, normalizeCleaningType } from "@/utils/cleaningTypeUtils";
 import { HotelDetectionRulesManager } from "./HotelDetectionRulesManager";
 import { PatternAttributionDialog } from "./PatternAttributionDialog";

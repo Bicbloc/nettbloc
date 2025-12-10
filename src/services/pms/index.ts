@@ -8,3 +8,15 @@ export { PmsAdapter } from './PmsAdapter';
 export { pmsAdapterFactory } from './PmsAdapterFactory';
 export { unifiedParserService } from './UnifiedParserService';
 export * from './adapters';
+
+// Export des services de compatibilité pour les composants legacy
+export {
+  mewsDetectionService,
+  smartExtractionService,
+  patternLearningService,
+  type DetectionRule,
+  type PmsMatchResult,
+  type ReservationBlock,
+  type AnalysisResult,
+  type PmsPattern
+} from './compat';

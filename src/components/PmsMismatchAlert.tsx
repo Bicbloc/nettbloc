@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Send, X } from "lucide-react";
-import { patternLearningService, PmsMatchResult } from "@/services/patternLearningService";
+import { unifiedParserService, patternLearningService, PmsMatchResult } from "@/services/pms";
 import { toast } from "@/components/ui/use-toast";
 
 interface PmsMismatchAlertProps {
