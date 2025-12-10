@@ -9,15 +9,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle, Database } from "lucide-react";
+import { FileText, Check, X, Brain, Sparkles, Link2, Unlink, Eye, Wand2, BarChart3, AlertCircle, Database, Settings } from "lucide-react";
 import { SimplePatternLearning } from "./SimplePatternLearning";
 import { EnhancedPatternLearning } from "./EnhancedPatternLearning";
 import { PatternValidation } from "./PatternValidation";
 import { ErrorAnalysisDashboard } from "./ErrorAnalysisDashboard";
 import { ConnectedRoomRulesManager } from "./ConnectedRoomRulesManager";
 import { PmsPatternManager } from "./PmsPatternManager";
+import { PmsRulesManager } from "./PmsRulesManager";
 import * as pdfjsLib from 'pdfjs-dist';
-import { pmsAdapterFactory, unifiedParserService, smartExtractionService, ExtractedRoom } from "@/services/pms";
+import { pmsAdapterFactory, unifiedParserService, ExtractedRoom } from "@/services/pms";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -43,7 +44,8 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
   useEffect(() => {
-    smartExtractionService.loadLearnedPatterns(hotelId);
+    // Charger les patterns avec le service unifié
+    unifiedParserService.loadHotelPatterns(hotelId);
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setCurrentUserId(data.user.id);
     });
@@ -67,14 +69,19 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
   };
 
   const autoExtractRooms = (text: string, pmsType?: string): ExtractedRoom[] => {
-    const smartRooms = smartExtractionService.extractRooms(text, pmsType);
+    // Utiliser le service unifié pour l'extraction
+    const adapter = pmsType && pmsType !== 'auto' 
+      ? pmsAdapterFactory.getAdapter(pmsType)
+      : pmsAdapterFactory.detectPms(text).adapter;
+    
+    const rooms = adapter.extractRooms(text);
     
     if (!pmsType || pmsType === 'auto') {
-      const detected = smartExtractionService.detectPmsType(text);
-      setDetectedPmsType(detected);
+      const detection = unifiedParserService.detectPmsType(text);
+      setDetectedPmsType(detection.pmsType);
     }
     
-    return smartRooms;
+    return rooms;
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,7 +298,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         title: "Succès",
         description: "Pattern d'entraînement sauvegardé"
       });
-      await smartExtractionService.loadLearnedPatterns(hotelId);
+      await unifiedParserService.loadHotelPatterns(hotelId);
     }
   };
 
@@ -420,7 +427,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
     });
   };
 
-  const availablePmsTypes = smartExtractionService.getAvailablePmsTypes();
+  const availablePmsTypes = pmsAdapterFactory.getAvailablePmsTypes();
 
   return (
     <div className="space-y-6">
@@ -510,7 +517,7 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
         {selectedReport && (
           <Card className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-6 mb-4">
+              <TabsList className="grid w-full grid-cols-7 mb-4">
                 <TabsTrigger value="validation">Validation</TabsTrigger>
                 <TabsTrigger value="preview">
                   <Eye className="h-4 w-4 mr-2" />
@@ -528,9 +535,13 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
                   <AlertCircle className="h-4 w-4 mr-2" />
                   Analyse
                 </TabsTrigger>
-              <TabsTrigger value="rules">
+                <TabsTrigger value="rules">
                   <Link2 className="h-4 w-4 mr-2" />
-                  Règles
+                  Connexions
+                </TabsTrigger>
+                <TabsTrigger value="pms">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Règles PMS
                 </TabsTrigger>
               </TabsList>
 
@@ -718,6 +729,10 @@ export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
 
           <TabsContent value="rules">
             <ConnectedRoomRulesManager hotelId={hotelId} />
+          </TabsContent>
+
+          <TabsContent value="pms">
+            <PmsRulesManager hotelId={hotelId} />
           </TabsContent>
 
         </Tabs>
