@@ -180,9 +180,15 @@ export const ManualCorrectionPanel = ({
       } else {
         toast.error('Aucune chambre trouvée. Essayez d\'ajouter plus d\'annotations.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur apprentissage:', error);
-      toast.error('Erreur lors de l\'apprentissage');
+      // Extraire le message d'erreur de l'API
+      const errorMessage = error?.message || error?.error || 'Erreur lors de l\'apprentissage';
+      if (errorMessage.includes('Crédits') || errorMessage.includes('402')) {
+        toast.error('Crédits IA insuffisants. Le parsing local sera utilisé.');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLearning(false);
     }

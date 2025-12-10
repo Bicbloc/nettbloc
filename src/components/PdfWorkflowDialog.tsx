@@ -155,11 +155,29 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setUploadProgress(0);
     setUploadStatus('');
     
+    // Extraire le message d'erreur réel
+    const errorMessage = error?.message || error?.error || '';
+    const isCreditsError = errorMessage.toLowerCase().includes('crédit') || 
+                          errorMessage.includes('402') ||
+                          errorMessage.toLowerCase().includes('insufficient');
+    
+    if (isCreditsError) {
+      // Erreur de crédits AI - ne pas réessayer
+      toast({
+        variant: "destructive",
+        title: "Crédits IA insuffisants",
+        description: "Le parsing local sera utilisé. Réimportez le PDF.",
+      });
+      setOpen(false);
+      resetDialog();
+      return;
+    }
+    
     if (canRetry && retryCount < 3) {
       toast({
         variant: "destructive",
-        title: "Erreur de connexion",
-        description: "Problème de connexion au serveur. Cliquez sur Réessayer.",
+        title: "Erreur de traitement",
+        description: errorMessage || "Problème lors du traitement. Cliquez sur Réessayer.",
         action: (
           <Button variant="outline" size="sm" onClick={() => retrySave()}>
             <RotateCcw className="h-4 w-4 mr-1" /> Réessayer
@@ -170,7 +188,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       toast({
         variant: "destructive",
         title: "Échec du traitement",
-        description: error?.message || "Une erreur s'est produite lors du traitement du fichier PDF.",
+        description: errorMessage || "Une erreur s'est produite lors du traitement du fichier PDF.",
       });
       setOpen(false);
       resetDialog();
