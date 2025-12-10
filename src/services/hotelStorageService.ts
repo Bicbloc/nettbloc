@@ -64,15 +64,39 @@ export class HotelStorageService {
         return session;
       }
 
-      // Fallback to legacy keys
-      const id = localStorage.getItem('selectedHotelId');
-      if (id) {
+      // Fallback vers clé legacy unique
+      const id = localStorage.getItem(this.LEGACY_KEY);
+      if (id && id.length >= 30) {
+        console.log('🔄 Migration depuis clé legacy selectedHotelId');
         return {
           id,
           name: localStorage.getItem('selectedHotelName') || '',
           code: localStorage.getItem('selectedHotelCode') || '',
           timestamp: Date.now()
         };
+      }
+      
+      // Fallback vers anciennes clés (migration one-time)
+      const legacyKeys = ['currentHotelId', 'hotelId', 'lastSelectedHotelId'];
+      for (const key of legacyKeys) {
+        const legacyId = localStorage.getItem(key);
+        if (legacyId && legacyId.length >= 30) {
+          console.log(`🔄 Migration depuis ancienne clé ${key}`);
+          // Migrer vers la nouvelle structure
+          const session: HotelSession = {
+            id: legacyId,
+            name: localStorage.getItem('selectedHotelName') || '',
+            code: localStorage.getItem('selectedHotelCode') || '',
+            timestamp: Date.now()
+          };
+          // Sauvegarder dans le nouveau format
+          localStorage.setItem(this.KEY, JSON.stringify(session));
+          localStorage.setItem(this.LEGACY_KEY, legacyId);
+          // Nettoyer les anciennes clés
+          localStorage.removeItem('currentHotelId');
+          localStorage.removeItem('hotelId');
+          return session;
+        }
       }
 
       return null;

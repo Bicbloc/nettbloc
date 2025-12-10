@@ -108,21 +108,34 @@ export const useAutoSetup = () => {
       // PHASE 1: Vérification RAPIDE du cache localStorage
       const cachedHotel = HotelStorageService.get();
       if (cachedHotel && cachedHotel.id && cachedHotel.id.length > 30) {
-        console.log('⚡ CACHE HIT - Hôtel chargé depuis localStorage:', cachedHotel.id);
-        setHotel({
-          id: cachedHotel.id,
-          name: cachedHotel.name,
-          hotel_code: cachedHotel.code
-        });
-        setIsSetupComplete(true);
-        setLoading(false);
+        console.log('⚡ CACHE HIT - Hôtel chargé depuis localStorage:', cachedHotel.id.slice(0, 8) + '...');
         
-        // Charger le code d'accès en arrière-plan
-        getActiveAccessCode(cachedHotel.id).then(code => {
-          if (code) setAccessCode(code);
-        });
+        // Vérifier que l'hôtel existe toujours en base (en arrière-plan)
+        const { data: hotelExists } = await supabase
+          .from('hotels')
+          .select('id, name, hotel_code')
+          .eq('id', cachedHotel.id)
+          .maybeSingle();
         
-        return; // Démarrage INSTANTANÉ!
+        if (hotelExists) {
+          setHotel({
+            id: hotelExists.id,
+            name: hotelExists.name,
+            hotel_code: hotelExists.hotel_code
+          });
+          setIsSetupComplete(true);
+          setLoading(false);
+          
+          // Charger le code d'accès en arrière-plan
+          getActiveAccessCode(cachedHotel.id).then(code => {
+            if (code) setAccessCode(code);
+          });
+          
+          return; // Démarrage rapide!
+        } else {
+          console.log('⚠️ Cache invalide - hôtel supprimé, nettoyage...');
+          HotelStorageService.clear();
+        }
       }
 
       console.log('📡 Cache miss - Chargement depuis base de données...');
