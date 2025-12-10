@@ -813,6 +813,10 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
     // Activer le flag pour bloquer le rechargement automatique
     setIsImporting(true);
     
+    // Mettre en pause le RealtimeManager pour éviter les conflits
+    const { realtimeManager } = await import('@/services/RealtimeManager');
+    realtimeManager.pause();
+    
     try {
       const floors = new Set<number>();
       data.forEach(room => {
@@ -925,10 +929,13 @@ const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>
       });
     } finally {
       // Désactiver le flag après un délai pour laisser le temps aux données de se propager
-      setTimeout(() => {
+      setTimeout(async () => {
         setIsImporting(false);
+        // Reprendre le RealtimeManager
+        const { realtimeManager } = await import('@/services/RealtimeManager');
+        realtimeManager.resume();
         console.log('✅ Import terminé, rechargement automatique réactivé');
-      }, 5000);
+      }, 3000);
     }
   };
 
