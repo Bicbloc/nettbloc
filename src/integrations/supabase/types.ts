@@ -1890,6 +1890,71 @@ export type Database = {
           },
         ]
       }
+      pms_rules: {
+        Row: {
+          combination_rules: Json | null
+          created_at: string | null
+          created_by: string | null
+          date_formats: string[] | null
+          hotel_id: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          keywords: string[] | null
+          pms_type: string
+          priority: number | null
+          room_number_regex: string | null
+          rule_name: string
+          source: string | null
+          status_mappings: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          combination_rules?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          date_formats?: string[] | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          keywords?: string[] | null
+          pms_type: string
+          priority?: number | null
+          room_number_regex?: string | null
+          rule_name: string
+          source?: string | null
+          status_mappings?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          combination_rules?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          date_formats?: string[] | null
+          hotel_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          keywords?: string[] | null
+          pms_type?: string
+          priority?: number | null
+          room_number_regex?: string | null
+          rule_name?: string
+          source?: string | null
+          status_mappings?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pms_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_config: {
         Row: {
           created_at: string | null
