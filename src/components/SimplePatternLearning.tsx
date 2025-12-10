@@ -248,13 +248,23 @@ export const SimplePatternLearning = ({
           variant: "destructive"
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur apprentissage:', error);
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Erreur lors de l'apprentissage",
-        variant: "destructive"
-      });
+      // Extraire le message d'erreur de l'API
+      const errorMessage = error?.message || error?.error || "Erreur lors de l'apprentissage";
+      if (errorMessage.includes('Crédits') || errorMessage.includes('402')) {
+        toast({
+          title: "Crédits IA insuffisants",
+          description: "Le parsing local sera utilisé à la place",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Erreur",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLearning(false);
     }
