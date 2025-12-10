@@ -14,8 +14,8 @@ export class GenericAdapter extends PmsAdapter {
   readonly config: PmsConfig = {
     pmsType: 'generic',
     keywords: [],
-    // Regex amélioré: chambres 1-4 chiffres, évite les patterns de date
-    roomNumberRegex: '(?<![/\\-\\.\\d])\\b([1-9]\\d{0,3})\\b(?![/\\-\\.\\d])',
+    // Regex amélioré: chambres avec zéros initiaux (01, 02, 06, 10, 101, etc.)
+    roomNumberRegex: '(?<![/\\-\\.\\d])\\b(0*[1-9]\\d{0,3})\\b(?![/\\-\\.\\d])',
     statusMappings: {
       // Français
       'SALE': { status: 'dirty', cleaning: 'full', priority: 20 },
@@ -129,8 +129,8 @@ export class GenericAdapter extends PmsAdapter {
    */
   private extractRoomNumbers(line: string): string[] {
     const numbers: string[] = [];
-    // Pattern: numéro 1-4 chiffres, pas précédé/suivi de séparateur de date
-    const regex = /(?<![\/\-\.\d])\b([1-9]\d{0,3})\b(?![\/\-\.\d])/g;
+    // Pattern: numéro avec zéros initiaux possibles (01, 02, 06, 10, 101, etc.)
+    const regex = /(?<![\/\-\.\d])\b(0*[1-9]\d{0,3})\b(?![\/\-\.\d])/g;
     
     let match;
     while ((match = regex.exec(line)) !== null) {

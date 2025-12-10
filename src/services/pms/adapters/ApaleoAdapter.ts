@@ -32,7 +32,8 @@ export class ApaleoAdapter extends PmsAdapter {
   readonly config: PmsConfig = {
     pmsType: 'apaleo',
     keywords: this.keywords,
-    roomNumberRegex: '(?<![/\\-.:\\d])\\b([1-9]\\d{0,3})\\b(?![/\\-.:\\d])',
+    // Accepte les chambres 01, 02, 06, 10, 101, etc. (1-4 chiffres avec zéros possibles)
+    roomNumberRegex: '(?<![/\\-.:\\d])\\b(0?[1-9]\\d{0,3}|[1-9]\\d{0,3})\\b(?![/\\-.:\\d])',
     statusMappings: {
       'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 10 },
       'Recouche': { status: 'stayover', cleaning: 'quick', priority: 10 },
@@ -127,8 +128,8 @@ export class ApaleoAdapter extends PmsAdapter {
     const lines = text.split('\n');
     const seenRooms = new Set<string>();
     
-    // Regex pour extraire les numéros de chambre (1-4 chiffres, pas dans une date)
-    const roomRegex = /(?<![/\-.:\d])\b([1-9]\d{0,3})\b(?![/\-.:\d])/g;
+    // Regex pour extraire les numéros de chambre (avec zéros initiaux possibles: 01, 02, 06, 10, etc.)
+    const roomRegex = /(?<![/\-.:\d])\b(0*[1-9]\d{0,3})\b(?![/\-.:\d])/g;
 
     for (const originalLine of lines) {
       // Ignorer les lignes vides ou trop courtes
