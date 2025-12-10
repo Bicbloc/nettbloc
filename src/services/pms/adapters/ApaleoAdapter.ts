@@ -149,11 +149,31 @@ export class ApaleoAdapter extends PmsAdapter {
    * Extrait le premier numéro de chambre valide d'une ligne (format tableau Apaleo)
    */
   private extractFirstRoomNumber(line: string): string | null {
-    // Pattern spécifique pour le début de ligne: "01 Chambre twin", "02 Chambre triple"
-    const tableMatch = line.match(/^\s*(0?\d{1,2})\s+Chambre\s+(?:twin|triple|double|simple|quadruple)/i);
+    // Pattern 1: Format tableau strict au début - "01 Chambre twin", "02 Chambre triple"
+    const tableMatch = line.match(/^\s*(0?\d{1,2})\s+Chambre\s+(?:twin|triple|double|simple|quadruple|standard)/i);
     if (tableMatch) {
       return tableMatch[1];
     }
+    
+    // Pattern 2: Numéro + "Chambre" n'importe où dans la ligne (avec \b pour word boundary)
+    const flexMatch = line.match(/\b(0?[1-9]\d?)\s+Chambre\s+(?:twin|triple|double|simple|quadruple|standard)/i);
+    if (flexMatch) {
+      return flexMatch[1];
+    }
+    
+    // Pattern 3: Format "Ch. NN" ou "CH NN" 
+    const chMatch = line.match(/\bCh\.?\s*(0?\d{1,3})\b/i);
+    if (chMatch) {
+      return chMatch[1];
+    }
+    
+    // Pattern 4: Numéro suivi de type de chambre sans mot "Chambre"
+    // Ex: "01 twin", "02 double"
+    const shortMatch = line.match(/^\s*(0?\d{1,2})\s+(?:twin|triple|double|simple|quadruple|standard)\b/i);
+    if (shortMatch) {
+      return shortMatch[1];
+    }
+    
     return null;
   }
 
@@ -199,7 +219,24 @@ export class ApaleoAdapter extends PmsAdapter {
       if (this.isHeaderOrMetadataLine(originalLine)) continue;
       
       // Extraire le numéro de chambre (format tableau Apaleo)
-      const roomNum = this.extractFirstRoomNumber(originalLine);
+      let roomNum = this.extractFirstRoomNumber(originalLine);
+      
+      // Fallback: chercher n'importe quel numéro suivi de "Chambre" dans la ligne
+      if (!roomNum) {
+        const fallbackMatch = originalLine.match(/\b(0?[1-9]\d?)\b.*Chambre/i);
+        if (fallbackMatch) {
+          roomNum = fallbackMatch[1];
+        }
+      }
+      
+      // Fallback 2: chercher un numéro 1-2 chiffres au début de la ligne
+      if (!roomNum) {
+        const startMatch = originalLine.match(/^\s*(0?[1-9]\d?)\s+/);
+        if (startMatch && this.lineHasValidStatus(originalLine)) {
+          roomNum = startMatch[1];
+        }
+      }
+      
       if (!roomNum) continue;
       
       // Nettoyer le numéro (garder le format original pour l'affichage)
