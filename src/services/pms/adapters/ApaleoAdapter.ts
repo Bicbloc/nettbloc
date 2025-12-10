@@ -208,24 +208,46 @@ export class ApaleoAdapter extends PmsAdapter {
     const preprocessedText = this.preprocessText(text);
     const lines = preprocessedText.split('\n');
     
+    console.log(`🔍 [ApaleoAdapter] ${lines.length} lignes à analyser`);
+    
+    // DEBUG: Afficher les 20 premières lignes non-vides
+    const nonEmptyLines = lines.filter(l => l.trim().length > 3).slice(0, 20);
+    console.log('📝 [DEBUG] Premières lignes:');
+    nonEmptyLines.forEach((l, i) => console.log(`  ${i}: "${l.substring(0, 100)}"`));
+    
     // Map pour stocker les chambres avec leurs statuts (gère Parti + Arrivée)
     const roomsMap = new Map<string, { statuses: string[]; cleanings: CleaningType[]; originalText: string }>();
+    
+    // DEBUG: Compteurs pour diagnostic
+    let skippedEmpty = 0;
+    let skippedHeader = 0;
+    let skippedNoRoom = 0;
+    let skippedDate = 0;
+    let skippedNoStatus = 0;
 
     for (const originalLine of lines) {
       // Ignorer les lignes vides ou trop courtes
-      if (!originalLine || originalLine.trim().length < 3) continue;
+      if (!originalLine || originalLine.trim().length < 3) {
+        skippedEmpty++;
+        continue;
+      }
       
       // Ignorer les en-têtes et métadonnées
-      if (this.isHeaderOrMetadataLine(originalLine)) continue;
+      if (this.isHeaderOrMetadataLine(originalLine)) {
+        skippedHeader++;
+        continue;
+      }
       
       // Extraire le numéro de chambre (format tableau Apaleo)
       let roomNum = this.extractFirstRoomNumber(originalLine);
+      let extractionMethod = 'main';
       
       // Fallback: chercher n'importe quel numéro suivi de "Chambre" dans la ligne
       if (!roomNum) {
         const fallbackMatch = originalLine.match(/\b(0?[1-9]\d?)\b.*Chambre/i);
         if (fallbackMatch) {
           roomNum = fallbackMatch[1];
+          extractionMethod = 'fallback1';
         }
       }
       
@@ -234,24 +256,46 @@ export class ApaleoAdapter extends PmsAdapter {
         const startMatch = originalLine.match(/^\s*(0?[1-9]\d?)\s+/);
         if (startMatch && this.lineHasValidStatus(originalLine)) {
           roomNum = startMatch[1];
+          extractionMethod = 'fallback2';
         }
       }
       
-      if (!roomNum) continue;
+      if (!roomNum) {
+        // DEBUG: Afficher les lignes contenant "Chambre" mais sans numéro extrait
+        if (originalLine.toLowerCase().includes('chambre')) {
+          console.log(`⚠️ [DEBUG] Ligne avec "Chambre" ignorée: "${originalLine.substring(0, 80)}..."`);
+        }
+        skippedNoRoom++;
+        continue;
+      }
       
       // Nettoyer le numéro (garder le format original pour l'affichage)
       const numValue = parseInt(roomNum, 10);
       
       // Filtrer les numéros invalides
-      if (this.isDateOrTime(numValue, originalLine)) continue;
-      if (numValue < 1 || numValue > 999) continue;
+      if (this.isDateOrTime(numValue, originalLine)) {
+        console.log(`⏰ [DEBUG] Numéro ${roomNum} ignoré (date/heure) dans: "${originalLine.substring(0, 60)}..."`);
+        skippedDate++;
+        continue;
+      }
+      if (numValue < 1 || numValue > 999) {
+        skippedDate++;
+        continue;
+      }
       
       // Utiliser le numéro normalisé comme clé (sans zéro initial)
       const roomKey = String(numValue);
       
       // Détecter le statut dans la ligne
       const statusInfo = this.detectStatusInLine(originalLine);
-      if (statusInfo.status === 'unknown') continue;
+      if (statusInfo.status === 'unknown') {
+        console.log(`❓ [DEBUG] Chambre ${roomNum} sans statut: "${originalLine.substring(0, 80)}..."`);
+        skippedNoStatus++;
+        continue;
+      }
+      
+      // DEBUG: Log des chambres extraites
+      console.log(`✅ [DEBUG] Chambre ${roomNum} (${extractionMethod}) → ${statusInfo.status}/${statusInfo.cleaning}`);
       
       // Ajouter ou mettre à jour la chambre
       if (roomsMap.has(roomKey)) {
@@ -266,6 +310,9 @@ export class ApaleoAdapter extends PmsAdapter {
         });
       }
     }
+    
+    console.log(`📊 [DEBUG] Stats: vides=${skippedEmpty}, headers=${skippedHeader}, noRoom=${skippedNoRoom}, date=${skippedDate}, noStatus=${skippedNoStatus}`);
+    console.log(`📊 [DEBUG] Chambres uniques trouvées: ${roomsMap.size}`);
 
     // Convertir la map en tableau de chambres avec gestion des combinaisons
     const rooms: ExtractedRoom[] = [];
