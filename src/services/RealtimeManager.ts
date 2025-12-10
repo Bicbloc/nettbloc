@@ -105,7 +105,8 @@ class RealtimeManager {
 
     console.log('🔗 RealtimeManager: Connexion au canal temps réel...', hotelId.slice(0, 8) + '...');
 
-    const channelName = `realtime_${hotelId}_${Date.now()}`;
+    // Nom de canal STABLE pour éviter les canaux orphelins lors des reconnexions
+    const channelName = `realtime_${hotelId}`;
     this.channel = supabase.channel(channelName);
 
     // Écouter les changements sur toutes les tables critiques - incluant rooms pour la synchro temps réel

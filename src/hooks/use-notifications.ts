@@ -40,31 +40,21 @@ export const useNotifications = (hotelId?: string) => {
     return uuidV4Regex.test(id) || uuidGenericRegex.test(id) || customHotelRegex.test(id);
   }, []);
 
-  // Récupération améliorée du hotelId depuis le contexte ou localStorage
+  // Récupération via source unique (HotelStorageService)
   const getEffectiveHotelId = useCallback((): string | null => {
     if (hotelId && isValidHotelId(hotelId)) {
       return hotelId;
     }
 
-    // Fallback vers localStorage avec différents clés possibles
-    const storageKeys = ['selectedHotelId', 'currentHotelId', 'hotel_id', 'hotelId'];
-    
-    for (const key of storageKeys) {
-      const stored = localStorage.getItem(key);
-      if (stored && isValidHotelId(stored)) {
-        console.log(`✅ HotelId trouvé dans localStorage[${key}]:`, stored.slice(0, 8) + '...');
-        return stored;
-      }
+    // Fallback vers HotelStorageService (source unique de vérité)
+    const stored = localStorage.getItem('selectedHotelId');
+    if (stored && isValidHotelId(stored)) {
+      console.log('✅ HotelId trouvé via selectedHotelId:', stored.slice(0, 8) + '...');
+      return stored;
     }
 
-    // Fallback vers sessionStorage
-    for (const key of storageKeys) {
-      const stored = sessionStorage.getItem(key);
-      if (stored && isValidHotelId(stored)) {
-        console.log(`✅ HotelId trouvé dans sessionStorage[${key}]:`, stored.slice(0, 8) + '...');
-        return stored;
-      }
-    }
+    console.log('❌ Aucun hotelId valide trouvé');
+    return null;
 
     console.log('❌ Aucun hotelId valide trouvé');
     return null;
