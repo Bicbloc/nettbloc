@@ -164,34 +164,8 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
     lastPmsMismatchResult = null;
     lastExtractedText = '';
     
-    // Charger les règles personnalisées et le format appris si un hotelId est fourni
-    if (hotelId) {
-      console.log(`📋 Chargement des règles personnalisées pour l'hôtel ${hotelId}...`);
-      
-      // Charger en parallèle les règles, le format et le pattern appris
-      const [_, formatConfig, pattern] = await Promise.all([
-        mewsDetectionService.loadCustomRules(hotelId),
-        loadHotelRoomFormat(hotelId),
-        patternLearningService.loadHotelPattern(hotelId)
-      ]);
-      
-      roomFormatConfig = formatConfig;
-      learnedPattern = pattern;
-      
-      const customRulesCount = mewsDetectionService.getHotelCleaningRules().length;
-      console.log(`✅ ${customRulesCount} règles personnalisées chargées`);
-      if (roomFormatConfig) {
-        console.log(`📐 Format de chambre: ${roomFormatConfig.format}`);
-      }
-      if (learnedPattern) {
-        console.log(`🎓 Pattern appris: ${learnedPattern.pmsType} avec ${Object.keys(learnedPattern.statusKeywords).length} mots-clés`);
-      }
-    }
-
-    // Convertir le fichier en ArrayBuffer
+    // Convertir le fichier en ArrayBuffer d'abord pour extraire le texte
     const arrayBuffer = await file.arrayBuffer();
-    
-    // Charger le document PDF
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
     // Extraire le texte de toutes les pages
@@ -207,6 +181,34 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
     
     console.log("PDF texte extrait:", fullText.substring(0, 500) + "...");
     lastExtractedText = fullText;
+    
+    // Détecter le type PMS à partir du texte AVANT de charger le pattern
+    const detectedPms = patternLearningService.detectPmsFromText(fullText);
+    console.log(`🔍 PMS détecté: ${detectedPms.pmsType} (confiance: ${detectedPms.confidence.toFixed(1)}%)`);
+    
+    // Charger les règles personnalisées et le format appris si un hotelId est fourni
+    if (hotelId) {
+      console.log(`📋 Chargement des règles personnalisées pour l'hôtel ${hotelId}...`);
+      
+      // Charger en parallèle les règles, le format et le pattern appris (avec PMS détecté pour fallback)
+      const [_, formatConfig, pattern] = await Promise.all([
+        mewsDetectionService.loadCustomRules(hotelId),
+        loadHotelRoomFormat(hotelId),
+        patternLearningService.loadHotelPattern(hotelId, detectedPms.pmsType)
+      ]);
+      
+      roomFormatConfig = formatConfig;
+      learnedPattern = pattern;
+      
+      const customRulesCount = mewsDetectionService.getHotelCleaningRules().length;
+      console.log(`✅ ${customRulesCount} règles personnalisées chargées`);
+      if (roomFormatConfig) {
+        console.log(`📐 Format de chambre: ${roomFormatConfig.format}`);
+      }
+      if (learnedPattern) {
+        console.log(`🎓 Pattern appris: ${learnedPattern.pmsType} avec ${Object.keys(learnedPattern.statusKeywords).length} mots-clés`);
+      }
+    }
     
     // Vérifier si le PMS détecté correspond au pattern attendu
     if (hotelId && learnedPattern) {

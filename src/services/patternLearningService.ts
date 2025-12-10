@@ -81,8 +81,9 @@ class PatternLearningService {
 
   /**
    * Charger le pattern complet d'un hôtel (format + mots-clés + règles de combinaison)
+   * Avec fallback automatique vers un pattern partagé du même type PMS
    */
-  async loadHotelPattern(hotelId: string): Promise<LearnedPattern | null> {
+  async loadHotelPattern(hotelId: string, detectedPmsType?: string): Promise<LearnedPattern | null> {
     // Vérifier le cache
     const cached = this.hotelPatterns.get(hotelId);
     if (cached) {
@@ -91,8 +92,8 @@ class PatternLearningService {
     }
 
     try {
-      // Charger les patterns: créés par cet hôtel OU assignés à cet hôtel
-      const { data, error } = await supabase
+      // Étape 1: Chercher un pattern spécifique à cet hôtel
+      let { data, error } = await supabase
         .from('report_training_patterns')
         .select('*')
         .or(`hotel_id.eq.${hotelId},assigned_to_hotel_id.eq.${hotelId}`)
@@ -100,8 +101,45 @@ class PatternLearningService {
         .order('updated_at', { ascending: false })
         .limit(1);
 
+      // Étape 2: Si aucun pattern spécifique, chercher un pattern partagé du même type PMS
+      if ((!data || data.length === 0) && detectedPmsType && detectedPmsType !== 'unknown') {
+        console.log(`🔄 Aucun pattern spécifique, recherche de pattern partagé pour PMS: ${detectedPmsType}`);
+        
+        const { data: sharedData, error: sharedError } = await supabase
+          .from('report_training_patterns')
+          .select('*')
+          .eq('pms_type', detectedPmsType)
+          .eq('validated', true)
+          .order('accuracy_score', { ascending: false })
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (!sharedError && sharedData && sharedData.length > 0) {
+          console.log(`✅ Pattern partagé trouvé: ${sharedData[0].pattern_name} (PMS: ${detectedPmsType})`);
+          data = sharedData;
+        }
+      }
+
+      // Étape 3: Fallback - chercher n'importe quel pattern validé si toujours rien
+      if (!data || data.length === 0) {
+        console.log(`🔄 Fallback: recherche de n'importe quel pattern validé...`);
+        
+        const { data: anyData } = await supabase
+          .from('report_training_patterns')
+          .select('*')
+          .eq('validated', true)
+          .order('accuracy_score', { ascending: false })
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (anyData && anyData.length > 0) {
+          console.log(`✅ Pattern fallback trouvé: ${anyData[0].pattern_name}`);
+          data = anyData;
+        }
+      }
+
       if (error || !data || data.length === 0) {
-        console.log(`📐 Aucun pattern appris pour hotel ${hotelId}`);
+        console.log(`📐 Aucun pattern disponible pour hotel ${hotelId}`);
         return null;
       }
 
@@ -174,6 +212,7 @@ class PatternLearningService {
       console.log(`   📋 PMS: ${learnedPattern.pmsType}`);
       console.log(`   📐 Format: ${learnedPattern.roomFormat}`);
       console.log(`   🔤 Mots-clés: ${Object.keys(learnedPattern.statusKeywords).join(', ')}`);
+      console.log(`   📦 Source: ${pattern.pattern_name} (${pattern.assigned_to_hotel_id === hotelId ? 'assigné' : 'partagé'})`);
 
       return learnedPattern;
     } catch (err) {
