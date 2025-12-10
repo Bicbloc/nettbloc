@@ -141,6 +141,7 @@ export class GenericAdapter extends PmsAdapter {
 
   /**
    * Extrait les numéros de chambre d'une ligne nettoyée
+   * Normalise les numéros: "05" → "5", "01" → "1"
    */
   private extractRoomNumbers(line: string): string[] {
     const numbers: string[] = [];
@@ -149,7 +150,9 @@ export class GenericAdapter extends PmsAdapter {
     
     let match;
     while ((match = regex.exec(line)) !== null) {
-      numbers.push(match[1]);
+      // Normaliser: "05" → "5", "01" → "1"
+      const normalized = String(parseInt(match[1], 10));
+      numbers.push(normalized);
     }
     
     return numbers;
