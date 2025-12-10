@@ -1006,7 +1006,7 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                         >
                           {pattern.validated ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                         </Button>
-                        {userHotels.length > 1 && (
+                        {(userHotels.length > 1 || isSuperAdmin) && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -1040,7 +1040,7 @@ export const PmsPatternManager = ({ hotelId }: { hotelId: string }) => {
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
-                        {userHotels.length > 1 && (
+                        {(userHotels.length > 1 || isSuperAdmin) && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
