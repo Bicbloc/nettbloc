@@ -127,8 +127,8 @@ export class ApaleoAdapter extends PmsAdapter {
   private preprocessText(text: string): string {
     let processed = text;
     
-    // Pattern 1: Numéro de chambre suivi de "Chambre" (avec 1+ espaces)
-    processed = processed.replace(/(\s)(0?\d{1,3})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple))/gi, '\n$2 $3');
+    // Pattern 1: Début de ligne ou après espace - numéro + "Chambre" (format tableau)
+    processed = processed.replace(/(^|\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple))/gim, '\n$2 $3');
     
     // Pattern 2: Après un statut (Sale, Parti, etc.) suivi d'un numéro de chambre
     processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler|Propre)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
@@ -136,21 +136,60 @@ export class ApaleoAdapter extends PmsAdapter {
     // Pattern 3: Format "Ch. NN" ou "Ch NN"
     processed = processed.replace(/(\s)(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$2$3$4');
     
-    // Pattern 4: Pagination et métadonnées suivies d'un numéro
-    processed = processed.replace(/(\d+)\s+(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple))/gi, '$1\n$2 $3');
+    // Pattern 4: Après info de facture ou référence, numéro de chambre
+    processed = processed.replace(/(\))\s*(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
+    
+    // Pattern 5: Après code (NR, RO, BB, FLEX) suivi d'un numéro
+    processed = processed.replace(/(NR|RO|BB|FLEX)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
     
     return processed;
   }
 
+  /**
+   * Extrait le premier numéro de chambre valide d'une ligne (format tableau Apaleo)
+   */
+  private extractFirstRoomNumber(line: string): string | null {
+    // Pattern spécifique pour le début de ligne: "01 Chambre twin", "02 Chambre triple"
+    const tableMatch = line.match(/^\s*(0?\d{1,2})\s+Chambre\s+(?:twin|triple|double|simple|quadruple)/i);
+    if (tableMatch) {
+      return tableMatch[1];
+    }
+    return null;
+  }
+
+  /**
+   * Détecte le statut dans une ligne, en cherchant n'importe où dans la ligne
+   */
+  private detectStatusInLine(line: string): { status: string; cleaning: CleaningType } {
+    const upperLine = line.toUpperCase();
+    
+    // Priorité aux statuts les plus spécifiques
+    const statusOrder = [
+      { pattern: /\bPARTI\b/i, status: 'checkout', cleaning: 'full' as CleaningType },
+      { pattern: /\bEN ARRIVÉE?\b/i, status: 'arrival', cleaning: 'full' as CleaningType },
+      { pattern: /\bRECOUCHE\b/i, status: 'stayover', cleaning: 'quick' as CleaningType },
+      { pattern: /\bARRIVÉ?\b/i, status: 'occupied', cleaning: 'none' as CleaningType },
+      { pattern: /\bSALE\b/i, status: 'dirty', cleaning: 'full' as CleaningType },
+      { pattern: /\bA CONTRÔLER\b|\bA CONTROLER\b/i, status: 'to_check', cleaning: 'none' as CleaningType },
+      { pattern: /\bPROPRE\b/i, status: 'clean', cleaning: 'none' as CleaningType },
+    ];
+    
+    for (const { pattern, status, cleaning } of statusOrder) {
+      if (pattern.test(line)) {
+        return { status, cleaning };
+      }
+    }
+    
+    return { status: 'unknown', cleaning: 'none' as CleaningType };
+  }
+
   extractRooms(text: string): ExtractedRoom[] {
-    const rooms: ExtractedRoom[] = [];
     // Pré-traitement pour séparer les chambres concaténées
     const preprocessedText = this.preprocessText(text);
     const lines = preprocessedText.split('\n');
-    const seenRooms = new Set<string>();
     
-    // Regex pour extraire les numéros de chambre (avec zéros initiaux possibles: 01, 02, 06, 10, etc.)
-    const roomRegex = /(?<![/\-.:\d])\b(0*[1-9]\d{0,3})\b(?![/\-.:\d])/g;
+    // Map pour stocker les chambres avec leurs statuts (gère Parti + Arrivée)
+    const roomsMap = new Map<string, { statuses: string[]; cleanings: CleaningType[]; originalText: string }>();
 
     for (const originalLine of lines) {
       // Ignorer les lignes vides ou trop courtes
@@ -159,47 +198,74 @@ export class ApaleoAdapter extends PmsAdapter {
       // Ignorer les en-têtes et métadonnées
       if (this.isHeaderOrMetadataLine(originalLine)) continue;
       
-      // Vérifier si la ligne contient un statut valide
-      const hasStatus = this.lineHasValidStatus(originalLine);
+      // Extraire le numéro de chambre (format tableau Apaleo)
+      const roomNum = this.extractFirstRoomNumber(originalLine);
+      if (!roomNum) continue;
       
-      // Nettoyer la ligne des dates pour l'extraction
-      const cleanedLine = this.cleanLineFromDates(originalLine);
+      // Nettoyer le numéro (garder le format original pour l'affichage)
+      const numValue = parseInt(roomNum, 10);
       
-      // Détecter le statut
-      const statusInfo = this.detectStatus(originalLine);
+      // Filtrer les numéros invalides
+      if (this.isDateOrTime(numValue, originalLine)) continue;
+      if (numValue < 1 || numValue > 999) continue;
       
-      // Si pas de statut détecté mais ligne contient un numéro, utiliser défaut
-      const finalStatus = statusInfo.status !== 'unknown' ? statusInfo.status : (hasStatus ? 'needs-cleaning' : null);
-      if (!finalStatus) continue;
+      // Utiliser le numéro normalisé comme clé (sans zéro initial)
+      const roomKey = String(numValue);
       
-      // Extraire les numéros de la ligne nettoyée
-      let match;
-      const lineRoomRegex = new RegExp(roomRegex.source, 'g');
+      // Détecter le statut dans la ligne
+      const statusInfo = this.detectStatusInLine(originalLine);
+      if (statusInfo.status === 'unknown') continue;
       
-      while ((match = lineRoomRegex.exec(cleanedLine)) !== null) {
-        const rawRoomNum = match[1];
-        const numValue = parseInt(rawRoomNum, 10);
-        // Normaliser: "05" → "5", "01" → "1", etc.
-        const roomNum = String(numValue);
-        
-        // Filtrer les numéros invalides
-        if (this.isDateOrTime(numValue, originalLine)) continue;
-        
-        // Éviter les doublons
-        if (seenRooms.has(roomNum)) continue;
-        seenRooms.add(roomNum);
-        
-        const cleaning = statusInfo.status !== 'unknown' ? statusInfo.cleaning : 'full';
-        
-        rooms.push({
-          roomNumber: roomNum,
-          status: finalStatus,
-          cleaningType: cleaning as CleaningType,
-          originalText: originalLine.trim(),
-          confidence: statusInfo.status !== 'unknown' ? 85 : 60
+      // Ajouter ou mettre à jour la chambre
+      if (roomsMap.has(roomKey)) {
+        const existing = roomsMap.get(roomKey)!;
+        existing.statuses.push(statusInfo.status);
+        existing.cleanings.push(statusInfo.cleaning);
+      } else {
+        roomsMap.set(roomKey, {
+          statuses: [statusInfo.status],
+          cleanings: [statusInfo.cleaning],
+          originalText: originalLine.trim()
         });
       }
     }
+
+    // Convertir la map en tableau de chambres avec gestion des combinaisons
+    const rooms: ExtractedRoom[] = [];
+    
+    for (const [roomNum, data] of roomsMap) {
+      let finalStatus = data.statuses[0];
+      let finalCleaning = data.cleanings[0];
+      
+      // Gérer les combinaisons (Parti + En arrivée = checkout_arrival)
+      if (data.statuses.includes('checkout') && data.statuses.includes('arrival')) {
+        finalStatus = 'checkout_arrival';
+        finalCleaning = 'full';
+      } else if (data.statuses.length > 1) {
+        // Prendre le statut avec le nettoyage le plus important
+        const cleaningPriority = { 'full': 3, 'quick': 2, 'none': 1 };
+        let maxPriority = 0;
+        for (let i = 0; i < data.statuses.length; i++) {
+          const priority = cleaningPriority[data.cleanings[i]] || 0;
+          if (priority > maxPriority) {
+            maxPriority = priority;
+            finalStatus = data.statuses[i];
+            finalCleaning = data.cleanings[i];
+          }
+        }
+      }
+      
+      rooms.push({
+        roomNumber: roomNum,
+        status: finalStatus,
+        cleaningType: finalCleaning,
+        originalText: data.originalText,
+        confidence: 85
+      });
+    }
+
+    // Trier par numéro de chambre
+    rooms.sort((a, b) => parseInt(a.roomNumber) - parseInt(b.roomNumber));
 
     // Détecter les chambres communicantes
     return this.detectConnectedRooms(rooms, text);
