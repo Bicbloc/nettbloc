@@ -1,5 +1,5 @@
 /**
- * Adapter pour Apaleo PMS
+ * Adapter pour Apaleo PMS - avec filtrage intelligent des dates
  */
 
 import { PmsAdapter } from '../PmsAdapter';
@@ -13,10 +13,26 @@ export class ApaleoAdapter extends PmsAdapter {
     'Recouche', 'Parti', 'En arrivée', 'Arrivé', 'A contrôler', 'Propre'
   ];
 
+  // Patterns de dates à exclure
+  private readonly datePatterns = [
+    /\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b/g,  // 01/12/2024, 1-12-24
+    /\b\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}\b/g,    // 2024-12-01
+    /\b\d{1,2}:\d{2}(:\d{2})?\b/g,               // 14:30, 14:30:00
+  ];
+
+  // Mots-clés de statut valides
+  private readonly validStatusKeywords = [
+    'RECOUCHE', 'PARTI', 'DEPART', 'DEPARTURE', 'CHECKOUT',
+    'EN ARRIVEE', 'EN ARRIVÉE', 'ARRIVAL', 'ARRIVEE', 'ARRIVÉ', 'ARRIVE',
+    'A CONTROLER', 'CONTROLER', 'PROPRE', 'CLEAN',
+    'DIR', 'DIRTY', 'SALE', 'INS', 'INSPECTED', 'OCC', 'OCCUPIED',
+    'STAYOVER', 'DUE OUT', 'DUE IN', 'VACANT', 'VD', 'VC', 'OD', 'OC'
+  ];
+
   readonly config: PmsConfig = {
     pmsType: 'apaleo',
     keywords: this.keywords,
-    roomNumberRegex: '\\b(0?[1-9]\\d{0,4}|[1-9]\\d{1,4})\\b',
+    roomNumberRegex: '(?<![/\\-.:\\d])\\b([1-9]\\d{0,3})\\b(?![/\\-.:\\d])',
     statusMappings: {
       'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 10 },
       'Recouche': { status: 'stayover', cleaning: 'quick', priority: 10 },
@@ -44,11 +60,9 @@ export class ApaleoAdapter extends PmsAdapter {
       'OCCUPIED': { status: 'occupied', cleaning: 'none', priority: 5 },
     },
     combinationRules: [
-      // Départ + Arrivée = À blanc
       { conditions: ['checkout', 'arrival'], result: { status: 'checkout_arrival', cleaning: 'full' } },
       { conditions: ['PARTI', 'EN ARRIVEE'], result: { status: 'checkout_arrival', cleaning: 'full' } },
       { conditions: ['DEPART', 'ARRIVEE'], result: { status: 'checkout_arrival', cleaning: 'full' } },
-      // Arrivée + À contrôler = Propre
       { conditions: ['arrival', 'clean'], result: { status: 'clean', cleaning: 'none' } },
       { conditions: ['EN ARRIVEE', 'A CONTROLER'], result: { status: 'clean', cleaning: 'none' } },
     ],
@@ -56,12 +70,116 @@ export class ApaleoAdapter extends PmsAdapter {
   };
 
   /**
-   * Extraction spécifique pour Apaleo avec gestion des chambres communicantes
+   * Nettoie une ligne en supprimant les dates et heures
+   */
+  private cleanLineFromDates(line: string): string {
+    let cleaned = line;
+    for (const pattern of this.datePatterns) {
+      cleaned = cleaned.replace(new RegExp(pattern.source, 'g'), ' ');
+    }
+    return cleaned;
+  }
+
+  /**
+   * Vérifie si une ligne contient un statut valide
+   */
+  private lineHasValidStatus(line: string): boolean {
+    const upperLine = line.toUpperCase();
+    return this.validStatusKeywords.some(keyword => upperLine.includes(keyword));
+  }
+
+  /**
+   * Vérifie si un numéro est une date/année/heure
+   */
+  private isDateOrTime(num: number, originalLine: string): boolean {
+    // Années
+    if (num >= 1900 && num <= 2100) return true;
+    
+    // Vérifier si le numéro fait partie d'une date dans la ligne originale
+    const dateRegexes = [
+      new RegExp(`\\b${num}[/\\-.:]\\d`),
+      new RegExp(`\\d[/\\-.:]${num}\\b`),
+    ];
+    
+    return dateRegexes.some(regex => regex.test(originalLine));
+  }
+
+  /**
+   * Vérifie si une ligne est un en-tête ou une ligne de métadonnées
+   */
+  private isHeaderOrMetadataLine(line: string): boolean {
+    const headerPatterns = [
+      /^(date|room|chambre|status|statut|type|floor|étage|guest|client|name|nom|report|rapport)/i,
+      /housekeeping\s*(report|list)/i,
+      /^\s*(total|summary|résumé)/i,
+      /page\s*\d+/i,
+      /^\s*\d+\s*\/\s*\d+\s*$/,  // Pagination like 1/5
+    ];
+    
+    return headerPatterns.some(pattern => pattern.test(line));
+  }
+
+  /**
+   * Extraction spécifique pour Apaleo avec filtrage amélioré
    */
   extractRooms(text: string): ExtractedRoom[] {
-    const rooms = super.extractRooms(text);
+    const rooms: ExtractedRoom[] = [];
+    const lines = text.split('\n');
+    const seenRooms = new Set<string>();
     
+    // Regex pour extraire les numéros de chambre (1-4 chiffres, pas dans une date)
+    const roomRegex = /(?<![/\-.:\d])\b([1-9]\d{0,3})\b(?![/\-.:\d])/g;
+
+    for (const originalLine of lines) {
+      // Ignorer les lignes vides ou trop courtes
+      if (!originalLine || originalLine.trim().length < 3) continue;
+      
+      // Ignorer les en-têtes et métadonnées
+      if (this.isHeaderOrMetadataLine(originalLine)) continue;
+      
+      // La ligne doit contenir un statut valide
+      if (!this.lineHasValidStatus(originalLine)) continue;
+      
+      // Nettoyer la ligne des dates pour l'extraction
+      const cleanedLine = this.cleanLineFromDates(originalLine);
+      
+      // Détecter le statut
+      const statusInfo = this.detectStatus(originalLine);
+      if (!statusInfo || statusInfo.status === 'unknown') continue;
+      
+      // Extraire les numéros de la ligne nettoyée
+      let match;
+      const lineRoomRegex = new RegExp(roomRegex.source, 'g');
+      
+      while ((match = lineRoomRegex.exec(cleanedLine)) !== null) {
+        const roomNum = match[1];
+        const numValue = parseInt(roomNum, 10);
+        
+        // Filtrer les numéros invalides
+        if (this.isDateOrTime(numValue, originalLine)) continue;
+        
+        // Éviter les doublons
+        if (seenRooms.has(roomNum)) continue;
+        seenRooms.add(roomNum);
+        
+        rooms.push({
+          roomNumber: roomNum,
+          status: statusInfo.status,
+          cleaningType: statusInfo.cleaning as CleaningType,
+          originalText: originalLine.trim(),
+          confidence: 0.85
+        });
+      }
+    }
+
     // Détecter les chambres communicantes
+    return this.detectConnectedRooms(rooms, text);
+  }
+
+  /**
+   * Détection des chambres communicantes
+   */
+  private detectConnectedRooms(rooms: ExtractedRoom[], text: string): ExtractedRoom[] {
     const connectedPatterns = [
       /(\d{2,4})\s*[-–—]\s*(\d{2,4})/g,
       /(\d{2,4})\s*[+&]\s*(\d{2,4})/g,
@@ -74,7 +192,6 @@ export class ApaleoAdapter extends PmsAdapter {
       while ((match = pattern.exec(text)) !== null) {
         const [, room1, room2] = match;
         
-        // Marquer les chambres comme connectées
         const r1 = rooms.find(r => r.roomNumber === room1);
         const r2 = rooms.find(r => r.roomNumber === room2);
         
