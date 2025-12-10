@@ -113,21 +113,25 @@ function getRoomFloor(roomNumber: string): number {
 function preprocessPdfText(text: string): string {
   let processed = text;
   
+  // Pattern 0: Numéro de chambre au tout début du texte (sans espace avant)
+  // Ex: "01 Chambre twin..." au début du document
+  processed = processed.replace(/^(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/im, '\n$1 $2');
+  
   // Pattern 1: Début de ligne ou après espace - numéro + "Chambre" (format tableau Apaleo)
   // Ex: "01   Chambre twin" ou " 02 Chambre triple"
-  processed = processed.replace(/(^|\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gim, '\n$2 $3');
+  processed = processed.replace(/(^|\n|\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gim, '\n$2 $3');
   
   // Pattern 2: Statut suivi d'un numéro de chambre et "Chambre"
   // Ex: "Sale 02 Chambre triple" → "Sale\n02 Chambre triple"
   processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|Arrivée|En arrivée|A contrôler|Propre|A blanc)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
   
-  // Pattern 3: Statut2 suivi directement d'un numéro (format "A contrôler 02 Chambre")
-  // Ex: "TW // NR Formulaire... A contrôler 02" → séparer avant le 02
-  processed = processed.replace(/(Sale|A contrôler|Propre)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
+  // Pattern 3: Après un digit simple (pagination) + numéro 01-09
+  // Ex: "1 01 Chambre" ou "2 02 Chambre"
+  processed = processed.replace(/(\s)(\d)\s+(0[1-9])\s+(Chambre)/gi, '$1$2\n$3 $4');
   
-  // Pattern 4: Pagination (ex: "1", "2", "3") suivie d'un numéro de chambre
-  // Ex: "1 02 Chambre triple" → "1\n02 Chambre triple"
-  processed = processed.replace(/(\s)(\d{1})\s+(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1$2\n$3 $4');
+  // Pattern 4: Après un nombre quelconque + numéro chambre avec zéro
+  // Ex: "...123 01 Chambre twin"
+  processed = processed.replace(/(\d)\s+(0[1-9])\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1\n$2 $3');
   
   // Pattern 5: "Ch. NN" format  
   processed = processed.replace(/(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$1$2$3');
@@ -136,9 +140,11 @@ function preprocessPdfText(text: string): string {
   // Ex: "...250518012) 02 Chambre triple" → séparer avant 02
   processed = processed.replace(/(\))\s*(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1\n$2 $3');
   
-  // Pattern 7: Format avec statut "Sale" ou autre juste avant le numéro suivant
-  // Ex: "...Sale TW // NR 02 Chambre" 
+  // Pattern 7: Format avec code (NR, RO, BB, FLEX) suivi d'un numéro
   processed = processed.replace(/(NR|RO|BB|FLEX)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
+  
+  // Pattern 8: Après "A contrôler" ou statut similaire + numéro 
+  processed = processed.replace(/(A contrôler|A controler|Propre|Sale)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
   
   return processed;
 }
