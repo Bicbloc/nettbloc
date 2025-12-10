@@ -14,7 +14,7 @@ import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
 import { FileUp, Sparkles, FileText } from "lucide-react";
 import { HousekeeperSetupDialog } from './HousekeeperSetupDialog';
-import { patternLearningService } from "@/services/patternLearningService";
+import { unifiedParserService } from "@/services/pms";
 
 interface UploadDialogProps {
   onPdfProcessed: (data: any, distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -33,15 +33,16 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
   const [hasLearnedPattern, setHasLearnedPattern] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Vérifier si un pattern appris existe pour cet hôtel
+  // Charger les patterns pour cet hôtel via le service unifié
   useEffect(() => {
-    async function checkPattern() {
+    async function loadPatterns() {
       if (hotelId) {
-        const pattern = await patternLearningService.loadHotelPattern(hotelId);
-        setHasLearnedPattern(!!pattern);
+        await unifiedParserService.loadHotelPatterns(hotelId);
+        // Le service unifié gère tout en interne
+        setHasLearnedPattern(true);
       }
     }
-    checkPattern();
+    loadPatterns();
   }, [hotelId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

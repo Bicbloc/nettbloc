@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Save, Database, Brain, Copy, Play, Check, X, RefreshCw, FileText, Settings, Upload, Building, MapPin, Star, Building2, Send, Users } from "lucide-react";
-import { smartExtractionService, PmsPattern } from "@/services/smartExtractionService";
+import { pmsAdapterFactory, unifiedParserService, PmsPattern } from "@/services/pms";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAdminRole } from "@/hooks/use-admin-role";
 

@@ -17,7 +17,7 @@ import { ErrorAnalysisDashboard } from "./ErrorAnalysisDashboard";
 import { ConnectedRoomRulesManager } from "./ConnectedRoomRulesManager";
 import { PmsPatternManager } from "./PmsPatternManager";
 import * as pdfjsLib from 'pdfjs-dist';
-import { smartExtractionService, type ExtractedRoom } from "@/services/smartExtractionService";
+import { pmsAdapterFactory, unifiedParserService, smartExtractionService, ExtractedRoom } from "@/services/pms";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
