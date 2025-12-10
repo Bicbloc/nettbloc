@@ -60,9 +60,24 @@ export class GenericAdapter extends PmsAdapter {
   /**
    * Extraction avec filtrage intelligent des faux positifs
    */
+  /**
+   * Pré-traite le texte pour séparer les chambres concaténées (PDF copié)
+   */
+  private preprocessText(text: string): string {
+    // Pattern: espace(s) + numéro de chambre (01-999) + espaces + "Chambre"
+    let processed = text.replace(/(\s)(0?\d{1,3}\s{2,}Chambre)/gi, '\n$2');
+    
+    // Pattern alternatif: après un statut suivi d'un numéro
+    processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler|Dirty|Clean|Checkout|Arrival)\s+(0?\d{1,3}\s)/gi, '$1\n$2');
+    
+    return processed;
+  }
+
   extractRooms(text: string): ExtractedRoom[] {
     const rooms: ExtractedRoom[] = [];
-    const lines = text.split('\n');
+    // Pré-traitement pour séparer les chambres concaténées
+    const preprocessedText = this.preprocessText(text);
+    const lines = preprocessedText.split('\n');
     const seenRooms = new Map<string, ExtractedRoom[]>();
 
     // Patterns à exclure (dates, années, heures, etc.)
