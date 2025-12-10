@@ -121,19 +121,23 @@ export class ApaleoAdapter extends PmsAdapter {
   }
 
   /**
-   * Extraction spécifique pour Apaleo avec filtrage amélioré
-   */
-  /**
    * Pré-traite le texte pour séparer les chambres concaténées (PDF copié)
    * Ex: "01   Chambre twin...Sale 02   Chambre triple" → lignes séparées
    */
   private preprocessText(text: string): string {
-    // Pattern: espace(s) + numéro de chambre (01-999) + espaces + "Chambre"
-    // Insère un retour à la ligne avant chaque entrée de chambre
-    let processed = text.replace(/(\s)(0?\d{1,3}\s{2,}Chambre)/gi, '\n$2');
+    let processed = text;
     
-    // Pattern alternatif: après un statut (Sale, Parti, etc.) suivi d'un numéro
-    processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler)\s+(0?\d{1,3}\s{2,}Chambre)/gi, '$1\n$2');
+    // Pattern 1: Numéro de chambre suivi de "Chambre" (avec 1+ espaces)
+    processed = processed.replace(/(\s)(0?\d{1,3})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple))/gi, '\n$2 $3');
+    
+    // Pattern 2: Après un statut (Sale, Parti, etc.) suivi d'un numéro de chambre
+    processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler|Propre)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
+    
+    // Pattern 3: Format "Ch. NN" ou "Ch NN"
+    processed = processed.replace(/(\s)(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$2$3$4');
+    
+    // Pattern 4: Pagination et métadonnées suivies d'un numéro
+    processed = processed.replace(/(\d+)\s+(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple))/gi, '$1\n$2 $3');
     
     return processed;
   }
