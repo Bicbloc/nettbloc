@@ -6,8 +6,26 @@ const corsHeaders = {
 };
 
 // Règles métier avancées pour détection précise - OPTIMISÉ APALEO
-const CLEANING_RULES = `
+const CLEANING_RULES = (reportDate?: string) => `
 ### RÈGLES DE DÉTECTION DU TYPE DE NETTOYAGE ###
+
+${reportDate ? `
+### DATE DU RAPPORT : ${reportDate} ###
+
+RÈGLE CRITIQUE - COMPARAISON DES DATES:
+Pour déterminer si c'est À BLANC ou RECOUCHE, COMPARER la date de DÉPART avec la date du rapport (${reportDate}):
+
+1. Si DATE_DÉPART == ${reportDate} → À BLANC (le client part AUJOURD'HUI)
+2. Si DATE_DÉPART > ${reportDate} → RECOUCHE (le client reste, part un autre jour)
+
+EXEMPLES avec rapport du ${reportDate}:
+- "Nuit 2/2 21/11/2025" avec rapport du 20/11/2025 → RECOUCHE (départ 21/11 > rapport 20/11)
+- "Nuit 2/2 20/11/2025" avec rapport du 20/11/2025 → À BLANC (départ 20/11 == rapport 20/11)
+- "Nuit 4/5 22/11/2025" avec rapport du 20/11/2025 → RECOUCHE (départ 22/11 > rapport 20/11)
+- "Nuit 5/5 20/11/2025" avec rapport du 20/11/2025 → À BLANC (départ 20/11 == rapport 20/11)
+
+IMPORTANT: La date à côté de "Nuit X/Y" est souvent la DATE DE DÉPART, pas d'arrivée!
+` : ''}
 
 ## RÈGLE SPÉCIALE APALEO - DOUBLONS ##
 Dans les rapports Apaleo, UNE MÊME CHAMBRE peut apparaître PLUSIEURS FOIS avec des statuts différents.
@@ -33,36 +51,23 @@ IMPORTANT: Quand tu vois la même chambre plusieurs fois, FUSIONNE les informati
 - Mots-clés: OOO, Out of order, HS, Hors service, Maintenance, Blocked
 - → Aucun nettoyage requis
 
-## PRIORITÉ 2: À BLANC - Dernier jour OU Départ (cleaningType="full")
+## PRIORITÉ 2: À BLANC - Départ AUJOURD'HUI (cleaningType="full")
 CONDITIONS pour À BLANC:
-- "Nuit X/X" où X = Y (ex: Nuit 2/2, Nuit 4/4, Nuit 5/5, Nuit 6/6) = DERNIER JOUR = DÉPART = À BLANC
-- "Nuit 1/1" = une seule nuit = départ aujourd'hui = À BLANC
+${reportDate ? `- DATE DE DÉPART == DATE DU RAPPORT (${reportDate}) = départ aujourd'hui = À BLANC` : ''}
 - Chambre apparaît avec PARTI/DÉPART ET EN ARRIVÉE = checkout_arrival = À BLANC
 - Deux noms de clients différents sur la même ligne = départ + arrivée = À BLANC
 - Statut "DIR" ou "DEP" ou "Departure" ou "Check-out"
 - Heure de départ visible (ex: 08:16, 09:00) PUIS heure d'arrivée = checkout_arrival
 
-EXEMPLES À BLANC:
-- "208 B CLA SAL ... Laure Lepoittevin, Nuit 2/2 21/11/2025" → À BLANC (Nuit 2/2, X=Y, dernier jour)
-- "302 COC SAL ... Susanne Incorvaia, Nuit 5/5 21/11/2025" → À BLANC (Nuit 5/5, X=Y, dernier jour)
-- "407 B SUP BLC SAL ... YURUI HUANG, Nuit 6/6 21/11/2025" → À BLANC (Nuit 6/6, X=Y, dernier jour)
-- "102 PARTI" + "102 EN ARRIVÉE" → À BLANC (checkout_arrival)
-- "401 B ... Vanessa Wouters 08:08 11:48 ... PHILIPPE JOSS 14:55" → À BLANC (2 clients = départ+arrivée)
-
-## PRIORITÉ 3: RECOUCHE - Client en séjour qui RESTE (cleaningType="quick", status="stayover")
+## PRIORITÉ 3: RECOUCHE - Client RESTE (cleaningType="quick", status="stayover")
 CONDITIONS pour RECOUCHE:
+${reportDate ? `- DATE DE DÉPART > DATE DU RAPPORT (${reportDate}) = client reste = RECOUCHE` : ''}
 - "Nuit X/Y" où X < Y (ex: Nuit 2/3, Nuit 2/4, Nuit 4/5) = client reste encore = RECOUCHE
 - UN SEUL nom de client visible + statut SAL/INS = séjour en cours
-- Pas de "Nuit X/X" (si X=Y c'est un départ!)
 
-EXEMPLES RECOUCHE:
-- "216 SUP SAL ... Abdelilah Talsmat, Nuit 4/5 22/11/2025" → RECOUCHE (Nuit 4/5, X<Y, reste 1 nuit)
-- "300 PMR CLA SAL ... SAFAE LOUMMOU, Nuit 2/3 22/11/2025" → RECOUCHE (Nuit 2/3, X<Y, reste 1 nuit)
-- "318 Twinable CLA SAL ... KATIA Garabedian, Nuit 2/4 23/11/2025" → RECOUCHE (Nuit 2/4, X<Y, reste 2 nuits)
-
-RÈGLE CRITIQUE NUIT X/Y:
-- Si X = Y → À BLANC (dernier jour, client part)
-- Si X < Y → RECOUCHE (client reste)
+RÈGLE CRITIQUE:
+- Si date_départ == date_rapport → À BLANC
+- Si date_départ > date_rapport → RECOUCHE
 
 ## PRIORITÉ 4: ARRIVÉE SEULE (cleaningType="full", status="arrival")
 CONDITIONS:
@@ -75,25 +80,6 @@ CONDITIONS:
 - "ARRIVÉ" + "A CONTROLER" = client présent, chambre OK
 - Statut "INS" ou "Inspected" ou "Clean" ou "Propre" SANS client
 - Chambre libre et propre
-
-### INDICES POUR DIFFÉRENCIER ###
-
-À BLANC (checkout_arrival) si:
-✓ Même chambre avec PARTI/DEP ET EN ARRIVÉE/ARR
-✓ Client parti + nouveau client arrive
-
-RECOUCHE si:
-✓ Deux dates visibles (arrivée ET départ) sur la même ligne
-✓ Nuit X/Y avec X > 1 (sauf Nuit 1/1)
-✓ Client présent + statut SALE/DIRTY/INS
-
-PROPRE si:
-✓ EN ARRIVÉE + A CONTROLER (chambre prête)
-✓ ARRIVÉ + A CONTROLER (client déjà là)
-
-À BLANC simple si:
-✓ Statut DIR/DEP sans doublon "EN ARRIVÉE"
-✓ Nuit 1/1 (départ jour même)
 
 ### MOTS-CLÉS APALEO ###
 - PARTI = checkout/départ
@@ -172,7 +158,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { textSample, annotations, context, mode, learnedPatterns, fullText, exclusions } = body;
+    const { textSample, annotations, context, mode, learnedPatterns, fullText, exclusions, reportDate } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -210,13 +196,14 @@ Ce rapport vient d'APALEO. Applique ces règles:
 
     const prompt = `Tu es un expert en analyse de rapports hôteliers. Analyse ce rapport et extrais TOUTES les chambres UNIQUES.
 
-${CLEANING_RULES}
+${CLEANING_RULES(reportDate)}
 
 ${pmsSpecificRules}
 
 ### CONTEXTE ###
 PMS: ${context?.pmsType || (isApaleo ? 'apaleo' : 'inconnu')}
 Rapport: ${context?.reportName || 'inconnu'}
+${reportDate ? `Date du rapport: ${reportDate}` : ''}
 ${patternsInfo}
 ${annotationsInfo}
 ${exclusionsInfo}
@@ -227,8 +214,8 @@ Pour CHAQUE chambre UNIQUE:
 2. VÉRIFIE si cette chambre apparaît plusieurs fois avec des statuts différents
 3. Si oui, FUSIONNE les informations et applique les règles de combinaison
 4. Cherche les dates (arrivée ET départ)
-5. Cherche "Nuit X/Y"
-6. Détermine le cleaningType et status selon les règles
+5. Cherche "Nuit X/Y" et COMPARE la date de départ avec la date du rapport (${reportDate || 'non spécifiée'})
+6. Détermine le cleaningType et status selon les règles DE COMPARAISON DE DATES
 7. Justifie ta décision dans "reason"
 
 ### TEXTE DU RAPPORT ###
@@ -237,9 +224,11 @@ ${textToAnalyze}
 IMPORTANT: 
 - NE CRÉE PAS DE DOUBLONS! Si chambre 101 apparaît 2 fois, retourne 1 seule entrée fusionnée.
 - PARTI + EN ARRIVÉE = checkout_arrival (à blanc)
-- EN ARRIVÉE + A CONTROLER = clean (propre)`;
+- EN ARRIVÉE + A CONTROLER = clean (propre)
+${reportDate ? `- DATE_DÉPART == ${reportDate} → À BLANC (départ aujourd'hui)
+- DATE_DÉPART > ${reportDate} → RECOUCHE (client reste)` : ''}`;
 
-    console.log("Calling AI with tool calling, text length:", textToAnalyze?.length || 0, "PMS:", isApaleo ? 'apaleo' : 'unknown');
+    console.log("Calling AI with tool calling, text length:", textToAnalyze?.length || 0, "PMS:", isApaleo ? 'apaleo' : 'unknown', "reportDate:", reportDate);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

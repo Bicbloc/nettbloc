@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,10 @@ import { toast } from "sonner";
 import { 
   Brain, Sparkles, Check, Loader2, 
   MousePointer, Eye, Zap, RotateCcw,
-  Target, CheckCircle2, Lightbulb, User, UserX, Ban, Plus, X, Wand2, CheckCheck, XCircle
+  Target, CheckCircle2, Lightbulb, User, UserX, Ban, Plus, X, Wand2, CheckCheck, XCircle, Calendar
 } from "lucide-react";
+import { format, parse } from "date-fns";
+import { fr } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { pmsAdapterFactory, unifiedParserService, mewsDetectionService } from "@/services/pms";
 import { getCleaningTypeLabel, normalizeCleaningType } from "@/utils/cleaningTypeUtils";
@@ -93,6 +95,34 @@ export const EnhancedPatternLearning = ({
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [suggestionsSummary, setSuggestionsSummary] = useState<AISuggestionSummary | null>(null);
   const [detectedPMS, setDetectedPMS] = useState<string>('');
+  
+  // État pour la date du rapport
+  const [reportDate, setReportDate] = useState<string>('');
+  
+  // Extraire automatiquement la date du rapport depuis le texte
+  const extractReportDate = useCallback((text: string): string => {
+    // Format: "Statut des espaces - 20/11/2025"
+    const titleMatch = text.match(/(?:Statut|Status|Report).*?(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (titleMatch) return titleMatch[1];
+    
+    // Format: "Hôtel Acanthe 20/11/2025 15:32:05"
+    const footerMatch = text.match(/Hôtel.*?(\d{1,2}\/\d{1,2}\/\d{4})\s+\d{2}:\d{2}/i);
+    if (footerMatch) return footerMatch[1];
+    
+    // Format générique: première date trouvée au format JJ/MM/AAAA
+    const genericMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    if (genericMatch) return genericMatch[1];
+    
+    // Par défaut, date du jour
+    return format(new Date(), 'dd/MM/yyyy');
+  }, []);
+  
+  // Initialiser la date du rapport
+  useEffect(() => {
+    const extractedDate = extractReportDate(rawText);
+    setReportDate(extractedDate);
+    console.log('📅 Date du rapport extraite:', extractedDate);
+  }, [rawText, extractReportDate]);
   
   // Diviser le texte en lignes pour affichage
   const lines = rawText.split('\n').filter(l => l.trim().length > 5);
@@ -378,7 +408,8 @@ export const EnhancedPatternLearning = ({
             reason: e.reason
           })),
           context: { hotelId, reportName, pmsType: 'mews' },
-          mode: 'learn'
+          mode: 'learn',
+          reportDate: reportDate // Envoyer la date du rapport
         }
       });
 
@@ -469,7 +500,8 @@ export const EnhancedPatternLearning = ({
           mode: 'apply',
           learnedPatterns: pattern.detection_rules,
           fullText: rawText,
-          context: { hotelId, reportName }
+          context: { hotelId, reportName },
+          reportDate: reportDate // Envoyer la date du rapport
         }
       });
 
@@ -637,6 +669,28 @@ export const EnhancedPatternLearning = ({
         </TabsList>
 
         <TabsContent value="annotate" className="space-y-4">
+          {/* Date du rapport */}
+          <Card className="border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Date du rapport :</span>
+                </div>
+                <Input 
+                  type="text" 
+                  value={reportDate}
+                  onChange={(e) => setReportDate(e.target.value)}
+                  className="w-32 h-8 text-center border-amber-300 focus:border-amber-500"
+                  placeholder="JJ/MM/AAAA"
+                />
+                <span className="text-xs text-muted-foreground">
+                  (utilisé pour déterminer départs vs recouches)
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Sélecteur de type */}
           <Card>
             <CardContent className="pt-4">
