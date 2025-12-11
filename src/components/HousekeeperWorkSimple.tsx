@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X } from 'lucide-react';
-import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import { IncidentReportDialogSimple } from './incident/IncidentReportDialogSimple';
 import { Package } from 'lucide-react';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
@@ -67,23 +66,12 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }, ...prev].slice(0, 50));
   }, []);
 
-  // Récupération des paramètres URL
-  const accessCodeFromUrl = searchParams.get('access_code');
+  // Récupération des paramètres URL (pour compatibilité)
   const hotelIdFromUrl = searchParams.get('hotel');
-  const housekeeperNameFromUrl = searchParams.get('name');
 
-  // Récupération unifiée depuis storageService
-  const housekeeperProfile = storageService.getHousekeeperProfile();
-  // Check localStorage for legacy data
-  const legacyHousekeeper = localStorage.getItem('housekeeper') ? JSON.parse(localStorage.getItem('housekeeper')!) : null;
-  const legacyProfile = localStorage.getItem('housekeeperProfile') ? JSON.parse(localStorage.getItem('housekeeperProfile')!) : null;
-  
-  const isAuthenticatedHousekeeper = legacyProfile?.isAuthenticated || false;
-  
-  // Code d'accès: URL ou profil stocké
-  const accessCode = isAuthenticatedHousekeeper 
-    ? null 
-    : (accessCodeFromUrl || legacyHousekeeper?.accessCode);
+  // State pour le profil housekeeper authentifié
+  const [housekeeperProfile, setHousekeeperProfile] = useState<any>(null);
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
   
   // Récupération robuste du hotelId - simplifié avec storageService
   const getHotelId = (): string | null => {
@@ -100,7 +88,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
   };
   
   const hotelId = getHotelId();
-  const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || 'Femme de chambre';
+  const housekeeperName = housekeeperProfile?.name || 'Femme de chambre';
 
   // Charger/sauvegarder le pointage
   useEffect(() => {
@@ -128,32 +116,61 @@ export const HousekeeperWorkSimple: React.FC = () => {
     addToActivityLog(`⏰ Pointage fin: ${now}`, 'success');
   };
 
+  // Vérification de l'authentification au montage
   useEffect(() => {
-    console.log('🔍 Vérification hotelId:', {
-      fromUrl: hotelIdFromUrl,
-      fromStorage: storageService.getHotelId(),
-      final: hotelId,
-      isAuthenticatedHousekeeper
-    });
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.warn('⚠️ Pas de session Supabase, redirection vers auth');
+          navigate('/housekeeper/auth');
+          return;
+        }
+        
+        // Charger le profil housekeeper depuis la base de données
+        const { data: profile, error } = await supabase
+          .from('housekeeper_profiles')
+          .select('*')
+          .eq('email', session.user.email)
+          .maybeSingle();
+        
+        if (error || !profile) {
+          console.warn('⚠️ Profil housekeeper non trouvé, redirection vers signup');
+          navigate('/housekeeper/signup');
+          return;
+        }
+        
+        setHousekeeperProfile(profile);
+        
+        // Vérifier qu'un hôtel est sélectionné
+        const currentHotelId = storageService.getHotelId() || hotelIdFromUrl;
+        if (!currentHotelId || currentHotelId.length < 30) {
+          console.warn('⚠️ Pas d\'hôtel sélectionné, redirection vers hotels');
+          navigate('/housekeeper/hotels');
+          return;
+        }
+        
+        setIsAuthChecked(true);
+      } catch (error) {
+        console.error('❌ Erreur vérification auth:', error);
+        navigate('/housekeeper/auth');
+      }
+    };
+    
+    checkAuth();
+  }, [navigate, hotelIdFromUrl]);
 
-    // Validation stricte du hotelId
-    if (hotelId && hotelId.length < 30) {
-      console.error('❌ HotelId invalide:', hotelId);
-      toast({
-        title: "Erreur de session",
-        description: "Hotel ID introuvable. Veuillez resélectionner votre hôtel.",
-        variant: "destructive"
+  // Charger les données une fois authentifié
+  useEffect(() => {
+    if (isAuthChecked && housekeeperProfile && hotelId) {
+      console.log('🔍 Session vérifiée, chargement des données:', {
+        profileId: housekeeperProfile.id,
+        hotelId: hotelId
       });
-      navigate('/housekeeper/hotels');
-      return;
-    }
-
-    if ((accessCode && hotelId) || (isAuthenticatedHousekeeper && hotelId)) {
       loadWorkData();
-    } else if (!accessCode && !isAuthenticatedHousekeeper) {
-      navigate('/housekeeper/auth');
     }
-  }, [accessCode, hotelId, isAuthenticatedHousekeeper]);
+  }, [isAuthChecked, housekeeperProfile, hotelId]);
 
   // Normaliser un nom pour comparaison
   const normalizeName = (name: string | null | undefined): string => {
@@ -253,55 +270,46 @@ export const HousekeeperWorkSimple: React.FC = () => {
       
       let authResult: any;
       
-      if (isAuthenticatedHousekeeper && housekeeperProfile) {
-        const { data: hotelData, error: hotelError } = await supabase
-          .from('hotels')
-          .select('*')
-          .eq('id', hotelId)
-          .single();
-
-        if (hotelError || !hotelData) {
-          toast({
-            title: "Erreur",
-            description: "Hôtel non trouvé",
-            variant: "destructive"
-          });
-          navigate('/housekeeper/hotels');
-          return;
-        }
-
-        authResult = {
-          success: true,
-          hotel: hotelData,
-          user: {
-            id: housekeeperProfile.id,
-            name: housekeeperProfile.name,
-            email: housekeeperProfile.email
-          }
-        };
-      } else {
-        authResult = await HousekeeperAuthService.authenticateWithFullCode(accessCode!);
-        
-        if (!authResult.success) {
-          toast({
-            title: "Code invalide",
-            description: authResult.error || "Code d'accès non valide",
-            variant: "destructive"
-          });
-          navigate('/housekeeper/login');
-          return;
-        }
+      // Utiliser uniquement l'authentification via profil
+      if (!housekeeperProfile) {
+        console.error('❌ Pas de profil housekeeper');
+        navigate('/housekeeper/auth');
+        return;
       }
+      
+      const { data: hotelData, error: hotelError } = await supabase
+        .from('hotels')
+        .select('*')
+        .eq('id', hotelId)
+        .single();
+
+      if (hotelError || !hotelData) {
+        toast({
+          title: "Erreur",
+          description: "Hôtel non trouvé",
+          variant: "destructive"
+        });
+        navigate('/housekeeper/hotels');
+        return;
+      }
+
+      authResult = {
+        success: true,
+        hotel: hotelData,
+        user: {
+          id: housekeeperProfile.id,
+          name: housekeeperProfile.name,
+          email: housekeeperProfile.email
+        }
+      };
 
       setHotel(authResult.hotel);
       setHousekeeper(authResult.user);
 
-      const housekeeperId = isAuthenticatedHousekeeper 
-        ? housekeeperProfile?.id 
-        : (authResult.user?.id || authResult.user?.access_code);
+      const housekeeperId = housekeeperProfile?.id;
 
       let housekeeperTableId = housekeeperId;
-      if (isAuthenticatedHousekeeper && housekeeperId) {
+      if (housekeeperId) {
         const { data: hkData } = await supabase
           .from('housekeepers')
           .select('id')
@@ -488,15 +496,12 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     storageService.clearHousekeeperProfile();
+    storageService.clearHotel();
     localStorage.removeItem(`assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`);
-    
-    if (isAuthenticatedHousekeeper) {
-      navigate('/housekeeper/hotels');
-    } else {
-      navigate('/housekeeper/login');
-    }
+    navigate('/housekeeper/auth');
   };
 
   const completedRooms = rooms.filter(r => r.status === 'clean').length;

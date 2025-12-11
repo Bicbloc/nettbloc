@@ -58,7 +58,7 @@ const App = () => (
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/admin" element={<Admin />} />
                     <Route path="/room-registry" element={<RoomRegistry />} />
-                    <Route path="/housekeeper/login" element={<HousekeeperLogin />} />
+                    <Route path="/housekeeper/login" element={<Navigate to="/housekeeper/auth" replace />} />
                     <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
                     <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
                     <Route path="/housekeeper/hotels" element={<HousekeeperHotels />} />
