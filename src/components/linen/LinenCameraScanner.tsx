@@ -330,7 +330,20 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         body: { image: imageData, linenTypeId, hotelId }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Gestion erreur 402 (crédits IA insuffisants)
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('402') || errorMsg.includes('credits') || errorMsg.includes('Payment')) {
+          toast({ 
+            title: "Crédits IA insuffisants", 
+            description: "Utilisez le mode manuel pour compter le linge.", 
+            variant: "default" 
+          });
+          setMode('manual');
+          return;
+        }
+        throw error;
+      }
 
       setResult({
         count: data.count,
@@ -345,9 +358,14 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       } else {
         toast({ title: "⚠️ Confiance faible", description: "Recommandé de reprendre", variant: "destructive" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur comptage:', error);
-      toast({ title: "Erreur", description: "Impossible de compter le linge", variant: "destructive" });
+      toast({ 
+        title: "Erreur", 
+        description: "Impossible de compter. Utilisez le mode manuel.", 
+        variant: "destructive" 
+      });
+      setMode('manual');
     } finally {
       setIsCounting(false);
     }

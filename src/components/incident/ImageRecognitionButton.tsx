@@ -92,11 +92,23 @@ export function ImageRecognitionButton({
 
     } catch (error: any) {
       console.error('Image analysis failed:', error);
-      toast({
-        title: "Erreur d'analyse",
-        description: error.message || "Impossible d'analyser l'image",
-        variant: "destructive",
-      });
+      
+      // Gestion spécifique erreur 402 (crédits IA insuffisants)
+      const isCreditsError = error.message?.includes('402') || error.message?.includes('credits') || error.message?.includes('Payment');
+      
+      if (isCreditsError) {
+        toast({
+          title: "Crédits IA insuffisants",
+          description: "Remplissez le formulaire manuellement. L'analyse IA nécessite des crédits.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Erreur d'analyse",
+          description: error.message || "Impossible d'analyser l'image. Remplissez manuellement.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsAnalyzing(false);
     }
