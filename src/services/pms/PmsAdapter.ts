@@ -12,7 +12,9 @@ import {
   CleaningType,
   StatusMapping,
   CombinationRule,
-  ExtractionDebugInfo
+  ExtractionDebugInfo,
+  normalizeCleaningType,
+  NormalizedCleaningType
 } from './types';
 import { fieldExtractor } from './FieldExtractor';
 
@@ -103,10 +105,13 @@ export abstract class PmsAdapter {
           confidence: Math.max(80, extraction.confidence)
         };
         
+        // Normaliser le type de nettoyage (full→a_blanc, quick→recouche)
+        const normalizedCleaning = normalizeCleaningType(finalCleaning);
+        
         const room: ExtractedRoom = {
           roomNumber,
           status: finalStatus,
-          cleaningType: finalCleaning,
+          cleaningType: normalizedCleaning,
           // Champs enrichis
           arrivalDate: fields.arrivalDate || undefined,
           departureDate: fields.departureDate || undefined,
@@ -231,12 +236,16 @@ export abstract class PmsAdapter {
     }
 
     // Par défaut, prendre l'entrée avec la priorité de nettoyage la plus haute
-    const priorityOrder: CleaningType[] = ['full', 'quick', 'none'];
+    // Supporte les deux formats (ancien et nouveau)
+    const priorityOrder: CleaningType[] = ['a_blanc', 'full', 'recouche', 'quick', 'none'];
     const sorted = [...roomEntries].sort((a, b) => 
       priorityOrder.indexOf(a.cleaningType) - priorityOrder.indexOf(b.cleaningType)
     );
     
-    return sorted[0];
+    // Normaliser le résultat
+    const result = sorted[0];
+    result.cleaningType = normalizeCleaningType(result.cleaningType);
+    return result;
   }
 
   /**

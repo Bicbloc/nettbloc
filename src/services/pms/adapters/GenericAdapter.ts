@@ -20,36 +20,36 @@ export class GenericAdapter extends PmsAdapter {
     // Regex universelle améliorée: supporte numérique, alphanumérique, avec tirets
     roomNumberRegex: '(?<![\/\\-\\.\\d:])(?:(?:Room|Ch\\.?|Chambre|R|#)\\s*)?([A-Z]?-?0*[1-9]\\d{0,3}[A-Z]?)(?![\/\\-\\.\\d:])',
     statusMappings: {
-      // Français - Priorité haute (statuts principaux)
-      'PARTI': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'DEPART': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'DÉPART': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'CHECKOUT': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'CHECK-OUT': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'EN ARRIVÉE': { status: 'arrival', cleaning: 'full', priority: 20 },
-      'EN ARRIVEE': { status: 'arrival', cleaning: 'full', priority: 20 },
-      'ARRIVÉE': { status: 'arrival', cleaning: 'full', priority: 18 },
-      'ARRIVEE': { status: 'arrival', cleaning: 'full', priority: 18 },
-      'ARRIVAL': { status: 'arrival', cleaning: 'full', priority: 18 },
-      'CHECK-IN': { status: 'arrival', cleaning: 'full', priority: 18 },
-      'DUE IN': { status: 'arrival', cleaning: 'full', priority: 18 },
-      'DUE OUT': { status: 'checkout', cleaning: 'full', priority: 20 },
+      // Français - Priorité haute (statuts principaux) - Utilise a_blanc/recouche
+      'PARTI': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'DEPART': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'DÉPART': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'CHECKOUT': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'CHECK-OUT': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'EN ARRIVÉE': { status: 'arrival', cleaning: 'a_blanc', priority: 20 },
+      'EN ARRIVEE': { status: 'arrival', cleaning: 'a_blanc', priority: 20 },
+      'ARRIVÉE': { status: 'arrival', cleaning: 'a_blanc', priority: 18 },
+      'ARRIVEE': { status: 'arrival', cleaning: 'a_blanc', priority: 18 },
+      'ARRIVAL': { status: 'arrival', cleaning: 'a_blanc', priority: 18 },
+      'CHECK-IN': { status: 'arrival', cleaning: 'a_blanc', priority: 18 },
+      'DUE IN': { status: 'arrival', cleaning: 'a_blanc', priority: 18 },
+      'DUE OUT': { status: 'checkout', cleaning: 'a_blanc', priority: 20 },
       
       // Statuts "sale" / dirty
-      'SALE': { status: 'dirty', cleaning: 'full', priority: 20 },
-      'SAL': { status: 'dirty', cleaning: 'full', priority: 20 },
-      'DIR': { status: 'dirty', cleaning: 'full', priority: 20 },
-      'DIRTY': { status: 'dirty', cleaning: 'full', priority: 20 },
-      'VD': { status: 'dirty', cleaning: 'full', priority: 20 },
-      'VACANT DIRTY': { status: 'dirty', cleaning: 'full', priority: 21 },
+      'SALE': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'SAL': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'DIR': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'DIRTY': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'VD': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'VACANT DIRTY': { status: 'dirty', cleaning: 'a_blanc', priority: 21 },
       
-      // Recouche / Stayover
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 15 },
-      'STAYOVER': { status: 'stayover', cleaning: 'quick', priority: 15 },
-      'STAY OVER': { status: 'stayover', cleaning: 'quick', priority: 15 },
-      'DRAPS': { status: 'stayover', cleaning: 'quick', priority: 14 },
-      'OD': { status: 'stayover', cleaning: 'quick', priority: 15 },
-      'OCCUPIED DIRTY': { status: 'stayover', cleaning: 'quick', priority: 16 },
+      // Recouche / Stayover - Utilise recouche
+      'RECOUCHE': { status: 'stayover', cleaning: 'recouche', priority: 15 },
+      'STAYOVER': { status: 'stayover', cleaning: 'recouche', priority: 15 },
+      'STAY OVER': { status: 'stayover', cleaning: 'recouche', priority: 15 },
+      'DRAPS': { status: 'stayover', cleaning: 'recouche', priority: 14 },
+      'OD': { status: 'stayover', cleaning: 'recouche', priority: 15 },
+      'OCCUPIED DIRTY': { status: 'stayover', cleaning: 'recouche', priority: 16 },
       
       // Propre / Clean / Inspecté
       'PROPRE': { status: 'clean', cleaning: 'none', priority: 8 },
@@ -70,8 +70,8 @@ export class GenericAdapter extends PmsAdapter {
       'OC': { status: 'occupied', cleaning: 'none', priority: 5 },
       
       // Libre / Vacant
-      'LIBRE': { status: 'vacant', cleaning: 'full', priority: 15 },
-      'VACANT': { status: 'vacant', cleaning: 'full', priority: 15 },
+      'LIBRE': { status: 'vacant', cleaning: 'a_blanc', priority: 15 },
+      'VACANT': { status: 'vacant', cleaning: 'a_blanc', priority: 15 },
       
       // Hors service
       'HS': { status: 'out-of-order', cleaning: 'none', priority: 25 },
@@ -81,9 +81,26 @@ export class GenericAdapter extends PmsAdapter {
       'MAINTENANCE': { status: 'maintenance', cleaning: 'none', priority: 25 },
     },
     combinationRules: [
-      { conditions: ['checkout', 'arrival'], result: { status: 'checkout_arrival', cleaning: 'full' } },
-      { conditions: ['DEPART', 'ARRIVEE'], result: { status: 'checkout_arrival', cleaning: 'full' } },
-      { conditions: ['DUE OUT', 'DUE IN'], result: { status: 'checkout_arrival', cleaning: 'full' } },
+      // Départ + Arrivée = À blanc
+      { conditions: ['checkout', 'arrival'], result: { status: 'checkout_arrival', cleaning: 'a_blanc' } },
+      { conditions: ['DEPART', 'ARRIVEE'], result: { status: 'checkout_arrival', cleaning: 'a_blanc' } },
+      { conditions: ['DÉPART', 'ARRIVÉE'], result: { status: 'checkout_arrival', cleaning: 'a_blanc' } },
+      { conditions: ['DUE OUT', 'DUE IN'], result: { status: 'checkout_arrival', cleaning: 'a_blanc' } },
+      { conditions: ['PARTI', 'ARRIVÉE'], result: { status: 'checkout_arrival', cleaning: 'a_blanc' } },
+      // Sale + Arrivée = À blanc prioritaire
+      { conditions: ['dirty', 'arrival'], result: { status: 'dirty_arrival', cleaning: 'a_blanc' } },
+      { conditions: ['SALE', 'ARRIVÉE'], result: { status: 'dirty_arrival', cleaning: 'a_blanc' } },
+      { conditions: ['SALE', 'ARRIVEE'], result: { status: 'dirty_arrival', cleaning: 'a_blanc' } },
+      // Vacant + Arrivée = À blanc
+      { conditions: ['vacant', 'arrival'], result: { status: 'arrival', cleaning: 'a_blanc' } },
+      { conditions: ['LIBRE', 'ARRIVÉE'], result: { status: 'arrival', cleaning: 'a_blanc' } },
+      { conditions: ['VACANT', 'ARRIVAL'], result: { status: 'arrival', cleaning: 'a_blanc' } },
+      // Libre + Sale = À blanc
+      { conditions: ['vacant', 'dirty'], result: { status: 'vacant_dirty', cleaning: 'a_blanc' } },
+      { conditions: ['LIBRE', 'SALE'], result: { status: 'vacant_dirty', cleaning: 'a_blanc' } },
+      // Occupé + Sale = Recouche
+      { conditions: ['occupied', 'dirty'], result: { status: 'stayover', cleaning: 'recouche' } },
+      { conditions: ['OCCUPÉ', 'SALE'], result: { status: 'stayover', cleaning: 'recouche' } },
     ],
     dateFormats: ['dd/MM/yyyy', 'dd/MM/yy', 'yyyy-MM-dd', 'MM/dd/yyyy']
   };

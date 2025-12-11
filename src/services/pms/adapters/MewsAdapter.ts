@@ -17,38 +17,39 @@ export class MewsAdapter extends PmsAdapter {
   readonly config: PmsConfig = {
     pmsType: 'mews',
     keywords: this.keywords,
-    roomNumberRegex: '\\b([1-9]\\d{1,3})\\b',
+    // Regex améliorée: supporte 01-09 et formats alphanumériques
+    roomNumberRegex: '(?<![\\d])([0-9]{1,4}[A-Z]?|[A-Z][0-9]{1,4})(?![\\d])',
     statusMappings: {
-      // Statuts anglais
-      'Dirty': { status: 'dirty', cleaning: 'full', priority: 20 },
+      // Statuts anglais - utilise a_blanc/recouche
+      'Dirty': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
       'Clean': { status: 'clean', cleaning: 'none', priority: 8 },
       'Inspected': { status: 'inspected', cleaning: 'none', priority: 7 },
       'Out of Service': { status: 'out-of-order', cleaning: 'none', priority: 25 },
       'Out of order': { status: 'out-of-order', cleaning: 'none', priority: 25 },
       'OOO': { status: 'out-of-order', cleaning: 'none', priority: 25 },
       'Occupied Clean': { status: 'occupied', cleaning: 'none', priority: 5 },
-      'Occupied Dirty': { status: 'occupied', cleaning: 'quick', priority: 10 },
+      'Occupied Dirty': { status: 'occupied', cleaning: 'recouche', priority: 10 },
       
       // Statuts français/Mews abréviations
-      'SAL': { status: 'dirty', cleaning: 'full', priority: 20 },  // SALE = dirty
-      'SALE': { status: 'dirty', cleaning: 'full', priority: 20 },
-      'INS': { status: 'clean', cleaning: 'none', priority: 8 },   // Inspecté = propre
-      'DIR': { status: 'dirty', cleaning: 'full', priority: 20 },  // Dirty
-      'DEP': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'ARR': { status: 'arrival', cleaning: 'full', priority: 18 },
+      'SAL': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'SALE': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'INS': { status: 'clean', cleaning: 'none', priority: 8 },
+      'DIR': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
+      'DEP': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'ARR': { status: 'arrival', cleaning: 'a_blanc', priority: 18 },
       'COC': { status: 'occupied', cleaning: 'none', priority: 5 },
       'CLA': { status: 'clean', cleaning: 'none', priority: 8 },
       'VAC': { status: 'vacant', cleaning: 'none', priority: 6 },
       
       // Termes complets français
-      'PARTI': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'DEPART': { status: 'checkout', cleaning: 'full', priority: 22 },
-      'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 15 },
+      'PARTI': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'DEPART': { status: 'checkout', cleaning: 'a_blanc', priority: 22 },
+      'RECOUCHE': { status: 'stayover', cleaning: 'recouche', priority: 15 },
     },
     combinationRules: [
       // Départ + Arrivée même ligne = À blanc
-      { conditions: ['DIR', 'ARR'], result: { status: 'checkout_arrival', cleaning: 'full' } },
-      { conditions: ['DEP', 'ARR'], result: { status: 'checkout_arrival', cleaning: 'full' } },
+      { conditions: ['DIR', 'ARR'], result: { status: 'checkout_arrival', cleaning: 'a_blanc' } },
+      { conditions: ['DEP', 'ARR'], result: { status: 'checkout_arrival', cleaning: 'a_blanc' } },
       // INS avec arrivée = Propre
       { conditions: ['INS', 'ARR'], result: { status: 'ready', cleaning: 'none' } },
       // VAC + INS = Propre
@@ -77,16 +78,16 @@ export class MewsAdapter extends PmsAdapter {
         const [, currentNight, totalNights] = nightMatch;
         const current = parseInt(currentNight, 10);
         
-        // Nuit > 1 = client qui reste = recouche
-        if (current > 1 && room.cleaningType !== 'full') {
-          room.cleaningType = 'quick';
-          room.status = 'stayover';
-        }
-        // Nuit 1 = arrivée
-        else if (current === 1) {
-          room.cleaningType = 'full';
-          room.status = 'arrival';
-        }
+      // Nuit > 1 = client qui reste = recouche
+      if (current > 1 && room.cleaningType !== 'a_blanc' && room.cleaningType !== 'full') {
+        room.cleaningType = 'recouche';
+        room.status = 'stayover';
+      }
+      // Nuit 1 = arrivée
+      else if (current === 1) {
+        room.cleaningType = 'a_blanc';
+        room.status = 'arrival';
+      }
       }
     }
 
