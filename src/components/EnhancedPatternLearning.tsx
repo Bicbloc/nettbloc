@@ -274,7 +274,14 @@ export const EnhancedPatternLearning = ({
         body: { rawText, hotelId, reportName }
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('402') || errorMsg.includes('credits') || errorMsg.includes('Payment')) {
+          toast.info("Crédits IA insuffisants. Utilisez l'annotation manuelle ou le parsing local.");
+          return;
+        }
+        throw error;
+      }
 
       if (data?.suggestions?.length > 0) {
         const suggestions: Annotation[] = data.suggestions.map((s: any) => ({
@@ -290,7 +297,7 @@ export const EnhancedPatternLearning = ({
       }
     } catch (error) {
       console.error('Erreur suggestions IA:', error);
-      toast.error("Erreur lors de la génération des suggestions");
+      toast.error("Erreur IA. Utilisez l'annotation manuelle.");
     } finally {
       setIsLoadingSuggestions(false);
     }
@@ -375,7 +382,16 @@ export const EnhancedPatternLearning = ({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('402') || errorMsg.includes('credits') || errorMsg.includes('Payment')) {
+          toast.info("Crédits IA insuffisants. Utilisez le parsing local automatique à la place.");
+          setIsLearning(false);
+          setCurrentStep(1);
+          return;
+        }
+        throw error;
+      }
 
       if (data?.rooms?.length > 0) {
         // Normaliser les types de nettoyage
@@ -396,7 +412,7 @@ export const EnhancedPatternLearning = ({
       }
     } catch (error) {
       console.error('Erreur:', error);
-      toast.error(error instanceof Error ? error.message : "Erreur d'apprentissage");
+      toast.error(error instanceof Error ? error.message : "Erreur d'apprentissage. Utilisez le parsing local.");
     } finally {
       setIsLearning(false);
     }
