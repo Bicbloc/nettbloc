@@ -703,9 +703,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
                     key={room.id}
                     room={room}
                     hotelId={hotelId || ''}
-                    onStatusChange={handleRoomStatusChange}
-                    onNotesChange={(roomId, notes) => {
-                      setRoomNotes(prev => ({ ...prev, [roomId]: notes }));
+                    onUpdateStatus={handleRoomStatusChange}
+                    onUnassign={(roomId, roomNumber) => {
+                      console.log('Unassign room:', roomId, roomNumber);
                     }}
                   />
                 ))}
@@ -718,7 +718,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
             <LinenQuickInventory
               taskId={activeLinenTask}
               hotelId={hotelId}
-              onComplete={() => {
+              onClose={() => {
                 setActiveLinenTask(null);
                 setActiveTab('rooms');
                 toast({
