@@ -12,8 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTriangle, PenLine, Save, Sparkles, ChevronDown, Wand2, FileText } from "lucide-react";
+import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTriangle, PenLine, Save, Sparkles, ChevronDown, Wand2, FileText, Calendar, Download } from "lucide-react";
 import { pmsAdapterFactory, unifiedParserService, mewsDetectionService, ExtractedRoom, CleaningType } from "@/services/pms";
+import { localRoomParser, ParsedRoom } from "@/services/pms/LocalRoomParser";
 import { TestResultItem } from "@/components/pms/TestResultItem";
 import { ManualCorrectionPanel } from "@/components/pms/ManualCorrectionPanel";
 import { SimplifiedRulesManager } from "@/components/pms/SimplifiedRulesManager";
@@ -39,6 +40,57 @@ interface PmsRulesManagerProps {
   hotelId: string;
 }
 
+// Résumé des résultats
+const TestResultSummary = ({ 
+  rooms, 
+  reportDate 
+}: { 
+  rooms: ExtractedRoom[]; 
+  reportDate: Date;
+}) => {
+  const aBlancCount = rooms.filter(r => r.cleaningType === 'a_blanc' || r.cleaningType === 'full').length;
+  const recoucheCount = rooms.filter(r => r.cleaningType === 'recouche' || r.cleaningType === 'quick').length;
+  const noneCount = rooms.filter(r => r.cleaningType === 'none').length;
+  const validatedCount = rooms.filter(r => r.validated).length;
+  const total = rooms.length;
+
+  return (
+    <div className="p-4 bg-muted/50 rounded-lg border space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium flex items-center gap-2">
+          📊 Résumé
+        </h4>
+        <Badge variant="outline" className="flex items-center gap-1">
+          <Calendar className="h-3 w-3" />
+          {reportDate.toLocaleDateString('fr-FR')}
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-2">
+        <div className="text-center p-2 bg-destructive/10 rounded">
+          <div className="text-lg font-bold text-destructive">{aBlancCount}</div>
+          <div className="text-xs text-muted-foreground">À Blanc ({total > 0 ? Math.round(aBlancCount/total*100) : 0}%)</div>
+        </div>
+        <div className="text-center p-2 bg-primary/10 rounded">
+          <div className="text-lg font-bold text-primary">{recoucheCount}</div>
+          <div className="text-xs text-muted-foreground">Recouche ({total > 0 ? Math.round(recoucheCount/total*100) : 0}%)</div>
+        </div>
+        <div className="text-center p-2 bg-muted rounded">
+          <div className="text-lg font-bold">{noneCount}</div>
+          <div className="text-xs text-muted-foreground">Aucun ({total > 0 ? Math.round(noneCount/total*100) : 0}%)</div>
+        </div>
+      </div>
+      
+      {validatedCount > 0 && (
+        <div className="text-xs text-green-600 flex items-center gap-1">
+          <CheckCircle className="h-3 w-3" />
+          {validatedCount} chambre(s) validée(s)
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
   const [rules, setRules] = useState<PmsRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,9 +102,10 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
   const [showManualCorrection, setShowManualCorrection] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [showDebugLogs, setShowDebugLogs] = useState(false);
-  const [useLightMode, setUseLightMode] = useState(false);
+  const [useLightMode, setUseLightMode] = useState(true); // Par défaut activé
   const [forceAi, setForceAi] = useState(false);
   const [isTestLoading, setIsTestLoading] = useState(false);
+  const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [newRule, setNewRule] = useState({
     pms_type: '',
     rule_name: '',
@@ -102,13 +155,36 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
       setDetectedConfidence(detection.confidence);
 
       if (useLightMode) {
-        // Mode extraction légère - comme la prévisualisation
-        const rooms = extractRoomsLightMode(testText);
+        // Mode extraction légère - utilise LocalRoomParser v2
+        const dateObj = new Date(reportDate);
+        const result = localRoomParser.parseReport(testText, dateObj);
+        
+        // Convertir ParsedRoom en ExtractedRoom avec données étendues
+        const rooms = result.rooms.map(room => ({
+          roomNumber: room.roomNumber,
+          status: room.status,
+          cleaningType: room.cleaningType as CleaningType,
+          confidence: room.confidence,
+          originalText: room.originalLine,
+          validated: false,
+          reason: room.reason,
+          nightInfo: room.nightInfo,
+          departureDate: room.departureDate,
+          debugInfo: {
+            rawLine: room.originalLine,
+            cleanedLine: room.originalLine.trim(),
+            detectedKeywords: [],
+            source: 'regex' as const,
+            confidence: room.confidence
+          }
+        })) as ExtractedRoom[];
+        
         setTestResults(rooms);
         setDebugLogs([
+          `[Mode léger] Date du rapport: ${dateObj.toLocaleDateString('fr-FR')}`,
           `[Mode léger] ${rooms.length} chambres extraites`,
-          `[Mode léger] Méthode: analyse ligne par ligne avec regex simple`,
-          `[Mode léger] PMS détecté: ${detection.pmsType} (${detection.confidence.toFixed(0)}%)`
+          `[Mode léger] PMS détecté: ${result.detectedPms}`,
+          ...localRoomParser.getDebugLogs()
         ]);
         toast.success(`${rooms.length} chambre(s) détectée(s) (mode léger)`);
       } else {
@@ -129,59 +205,44 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
     }
   };
 
-  // Mode extraction légère - similaire à la prévisualisation
-  const extractRoomsLightMode = (text: string): ExtractedRoom[] => {
-    const lines = text.split('\n').filter(l => l.trim());
-    const rooms: ExtractedRoom[] = [];
-    const seenRooms = new Set<string>();
+  // Sauvegarder les patterns validés
+  const handleSavePatterns = async () => {
+    const validatedRooms = testResults.filter(r => r.validated);
     
-    // Regex améliorée pour extraire les numéros de chambre
-    const roomRegex = /(?:^|\s|Ch\.?\s*|Room\s*|#)([A-Z]?-?0*[1-9]\d{0,3}[A-Z]?)(?:\s|$|[:\-\.])/gi;
-    
-    for (const line of lines) {
-      // Utiliser l'analyse de mewsDetectionService pour détecter le statut
-      const analysis = mewsDetectionService.analyzeLine(line);
-      
-      // Extraire les numéros de chambre de la ligne
-      const matches = [...line.matchAll(roomRegex)];
-      
-      for (const match of matches) {
-        let roomNumber = match[1];
-        
-        // Normaliser le numéro
-        const numMatch = roomNumber.match(/^0*(\d+)$/);
-        if (numMatch) {
-          roomNumber = numMatch[1];
-        }
-        
-        // Valider le numéro
-        const num = parseInt(roomNumber, 10);
-        if (!isNaN(num) && (num < 1 || num > 9999 || (num >= 1900 && num <= 2100))) {
-          continue; // Ignorer les dates/années
-        }
-        
-        if (seenRooms.has(roomNumber)) continue;
-        seenRooms.add(roomNumber);
-        
-        rooms.push({
-          roomNumber,
-          status: analysis.rawStatus || 'unknown',
-          cleaningType: analysis.cleaningType || 'full',
-          confidence: analysis.confidence || 50,
-          originalText: line.trim(),
-          validated: false,
-          debugInfo: {
-            rawLine: line,
-            cleanedLine: line.trim(),
-            detectedKeywords: analysis.matchedRule ? [analysis.matchedRule] : [],
-            source: 'regex',
-            confidence: analysis.confidence || 50
-          }
-        });
-      }
+    if (validatedRooms.length === 0) {
+      toast.error('Aucune chambre validée à sauvegarder');
+      return;
     }
-    
-    return rooms;
+
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        toast.error('Utilisateur non connecté');
+        return;
+      }
+
+      // Sauvegarder dans hotel_detection_rules comme patterns appris
+      for (const room of validatedRooms) {
+        await supabase.from('hotel_detection_rules').upsert({
+          hotel_id: hotelId,
+          created_by: user.user.id,
+          rule_name: `Pattern chambre ${room.roomNumber}`,
+          rule_type: 'learned_pattern',
+          condition: { room_number: room.roomNumber },
+          result: { 
+            cleaning_type: room.cleaningType, 
+            status: room.status 
+          },
+          is_active: true,
+          priority: 100
+        }, { onConflict: 'hotel_id,rule_name' });
+      }
+
+      toast.success(`${validatedRooms.length} pattern(s) sauvegardé(s)`);
+    } catch (error) {
+      console.error('Erreur sauvegarde patterns:', error);
+      toast.error('Erreur lors de la sauvegarde');
+    }
   };
 
   const handleAddRule = async () => {
@@ -323,7 +384,7 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
               </div>
 
               {/* Options de parsing */}
-              <div className="flex flex-wrap gap-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex flex-wrap gap-4 p-3 bg-muted/50 rounded-lg items-center">
                 <div className="flex items-center gap-2">
                   <Switch
                     id="light-mode"
@@ -335,6 +396,22 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
                     Mode léger
                   </Label>
                 </div>
+                
+                {useLightMode && (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="report-date" className="text-sm flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Date rapport:
+                    </Label>
+                    <Input
+                      id="report-date"
+                      type="date"
+                      value={reportDate}
+                      onChange={e => setReportDate(e.target.value)}
+                      className="h-8 w-36"
+                    />
+                  </div>
+                )}
                 
                 {!useLightMode && (
                   <div className="flex items-center gap-2">
@@ -374,6 +451,14 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
                 </div>
               )}
 
+              {/* Résumé des résultats */}
+              {testResults.length > 0 && (
+                <TestResultSummary 
+                  rooms={testResults} 
+                  reportDate={new Date(reportDate)} 
+                />
+              )}
+
               {/* Debug logs */}
               {debugLogs.length > 0 && (
                 <Collapsible open={showDebugLogs} onOpenChange={setShowDebugLogs}>
@@ -397,7 +482,31 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
 
               {testResults.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="font-medium">Résultats ({testResults.length} chambres)</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Résultats ({testResults.length} chambres)</h4>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const updated = testResults.map(r => ({ ...r, validated: true }));
+                          setTestResults(updated);
+                          toast.success('Toutes les chambres validées');
+                        }}
+                      >
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Tout valider
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSavePatterns}
+                        disabled={testResults.filter(r => r.validated).length === 0}
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        Sauvegarder ({testResults.filter(r => r.validated).length})
+                      </Button>
+                    </div>
+                  </div>
                   <div className="max-h-[350px] overflow-auto space-y-2">
                     {testResults.map((room, idx) => (
                       <TestResultItem 
