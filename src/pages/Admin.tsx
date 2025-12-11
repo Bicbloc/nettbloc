@@ -156,13 +156,9 @@ const Admin = () => {
 
         if (!error && data) {
           setIsSuperAdmin(true);
-          // Charger les données et attendre qu'elles soient chargées avant d'arrêter le loading
-          try {
-            await loadAdminData();
-          } catch (err) {
-            console.error('Erreur chargement données:', err);
-          }
-          setLoadingData(false);
+          setLoadingData(false); // Afficher l'UI immédiatement
+          // Charger les données en arrière-plan de façon optimisée
+          loadAdminDataOptimized();
         } else {
           setLoadingData(false);
         }
@@ -177,9 +173,43 @@ const Admin = () => {
     }
   }, [user, loading]);
 
+  // Chargement optimisé: hôtels d'abord (pour l'entraînement IA), puis le reste
+  const loadAdminDataOptimized = async () => {
+    try {
+      console.log('🔄 Chargement optimisé des données admin...');
+      
+      // 1. Charger les hôtels en PREMIER (critique pour l'entraînement IA)
+      const { data: hotelsData, error: hotelsError } = await supabase
+        .from('hotels')
+        .select('id, name, hotel_code, created_at, user_id');
+
+      if (!hotelsError && hotelsData) {
+        // Afficher les hôtels immédiatement sans attendre les stats
+        const basicHotels = hotelsData.map(hotel => ({
+          id: hotel.id,
+          name: hotel.name,
+          hotel_code: hotel.hotel_code || '',
+          user_email: 'Chargement...',
+          housekeepers_count: 0,
+          active_sessions: 0,
+          created_at: hotel.created_at
+        }));
+        setHotels(basicHotels);
+        console.log('✅ Hôtels chargés:', basicHotels.length);
+      }
+
+      // 2. Charger le reste des données en parallèle
+      loadAdminData();
+    } catch (error) {
+      console.error('Erreur chargement optimisé:', error);
+      // Fallback au chargement complet
+      loadAdminData();
+    }
+  };
+
   const loadAdminData = async () => {
     try {
-      console.log('🔄 Début du chargement des données admin...');
+      console.log('🔄 Chargement complet des données admin...');
       
       // Vérifier d'abord si l'utilisateur a vraiment les permissions super_admin
       const { data: currentUserRoles, error: roleCheckError } = await supabase
