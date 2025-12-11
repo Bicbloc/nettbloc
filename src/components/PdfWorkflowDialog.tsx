@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -38,7 +38,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'upload' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('upload');
+  const [step, setStep] = useState<'choice' | 'upload' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('choice');
   const [pdfData, setPdfData] = useState<any>(null);
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
@@ -456,7 +456,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setSelectedFile(null);
     setPdfData(null);
     setSavedPdfData(null);
-    setStep('upload');
+    setStep('choice');
     setHousekeepers([]);
     setNewHousekeeperName('');
     setSelectedExisting([]);
@@ -474,6 +474,73 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       fileInputRef.current.click();
     }
   };
+
+  const renderChoiceStep = () => (
+    <>
+      <DialogHeader>
+        <DialogTitle>Importer les chambres</DialogTitle>
+        <DialogDescription>
+          Choisissez comment importer les données de vos chambres
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div className="space-y-3 py-4">
+        {/* Option PDF */}
+        <button
+          onClick={() => setStep('upload')}
+          className="w-full p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all text-left group"
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              <FileUp className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-foreground">Télécharger un rapport PDF</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Importez un rapport depuis votre PMS (Mews, Apaleo, Opera, Protel, etc.)
+              </p>
+              <Badge variant="secondary" className="text-xs mt-2">
+                Extraction automatique IA
+              </Badge>
+            </div>
+          </div>
+        </button>
+
+        {/* Option API - Coming Soon */}
+        <div className="w-full p-4 rounded-lg border-2 border-dashed border-border bg-muted/30 relative overflow-hidden">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-lg bg-muted text-muted-foreground">
+              <Plug className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-muted-foreground">Connexion API directe</h3>
+                <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-500/10">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Bientôt disponible
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Synchronisation automatique avec votre PMS en temps réel
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs text-muted-foreground">
+                  <span className="font-medium">Mews</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs text-muted-foreground">
+                  <span className="font-medium">Apaleo</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs text-muted-foreground">
+                  <span className="font-medium">Opera</span>
+                </div>
+                <span className="text-xs text-muted-foreground">et plus...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 
   const renderUploadStep = () => (
     <>
@@ -543,8 +610,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       )}
       
       <DialogFooter>
-        <Button variant="outline" onClick={() => setOpen(false)}>
-          Annuler
+        <Button variant="outline" onClick={() => setStep('choice')}>
+          Retour
         </Button>
         <Button
           onClick={handlePdfUpload}
@@ -1123,10 +1190,11 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       <DialogTrigger asChild>
         <Button>
           <FileUp className="mr-2 h-4 w-4" />
-          Importer un Rapport
+          Importer les chambres
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
+        {step === 'choice' && renderChoiceStep()}
         {step === 'upload' && renderUploadStep()}
         {step === 'import-mode' && renderImportModeStep()}
         {step === 'housekeepers' && renderHousekeepersStep()}
