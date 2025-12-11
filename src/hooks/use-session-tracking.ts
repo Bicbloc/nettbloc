@@ -202,32 +202,58 @@ export function useSessionTracking() {
   useEffect(() => {
     let isMounted = true;
     let hasInitialized = false;
+    let lastEventTime = 0;
+    const EVENT_DEBOUNCE_MS = 500; // Debounce 500ms entre les événements
 
     const handleAuthChange = async (event: string, session: any) => {
       if (!isMounted) return;
 
-      if (event === 'SIGNED_IN' && session?.user && !hasInitialized) {
+      const now = Date.now();
+      
+      // Debounce: ignorer les événements trop rapprochés
+      if (now - lastEventTime < EVENT_DEBOUNCE_MS) {
+        console.log('⏭️ Session tracking: événement ignoré (debounce)');
+        return;
+      }
+      lastEventTime = now;
+
+      // Ignorer INITIAL_SESSION si on a déjà initialisé via SIGNED_IN
+      if (event === 'INITIAL_SESSION' && hasInitialized) {
+        console.log('⏭️ Session tracking: INITIAL_SESSION ignoré (déjà initialisé)');
+        return;
+      }
+
+      // Traiter SIGNED_IN et INITIAL_SESSION de la même manière
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !hasInitialized) {
         hasInitialized = true;
+        console.log('✅ Session tracking: initialisation via', event);
         await createOrUpdateSession(session.user);
         startActivityTracking();
       } else if (event === 'SIGNED_OUT') {
         stopActivityTracking();
         await endSession();
         hasInitialized = false;
+        lastEventTime = 0; // Reset debounce après déconnexion
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // Sur refresh token, juste mettre à jour l'activité, pas créer nouvelle session
+        updateActivity();
       }
     };
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Check for existing session on mount (but don't duplicate if auth listener fires)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (isMounted && session?.user && !hasInitialized) {
-        hasInitialized = true;
-        createOrUpdateSession(session.user);
-        startActivityTracking();
-      }
-    });
+    // Check for existing session on mount avec délai pour éviter race condition
+    const initTimeout = setTimeout(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (isMounted && session?.user && !hasInitialized) {
+          hasInitialized = true;
+          console.log('✅ Session tracking: initialisation via getSession');
+          createOrUpdateSession(session.user);
+          startActivityTracking();
+        }
+      });
+    }, 100); // Petit délai pour laisser l'auth listener s'installer
 
     // Handle visibility change - mark inactive when hidden
     const handleVisibilityChange = () => {
@@ -242,6 +268,7 @@ export function useSessionTracking() {
 
     return () => {
       isMounted = false;
+      clearTimeout(initTimeout);
       subscription.unsubscribe();
       stopActivityTracking();
       document.removeEventListener('visibilitychange', handleVisibilityChange);

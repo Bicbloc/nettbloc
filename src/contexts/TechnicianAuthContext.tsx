@@ -83,15 +83,29 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
   const loadTechnicianProfile = async (userId: string) => {
     try {
+      // Utiliser maybeSingle() pour éviter l'erreur PGRST116 si aucun profil n'existe
       const { data: profileData, error: profileError } = await supabase
         .from('housekeeper_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (profileError) throw profileError;
+      // Ignorer l'erreur PGRST116 (aucune ligne trouvée)
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.warn('⚠️ Erreur profil technicien (ignorée):', profileError.message);
+      }
+      
+      // Si pas de profil, ne pas lever d'erreur - l'utilisateur n'est peut-être pas un technicien
+      if (!profileData) {
+        console.log('ℹ️ Pas de profil technicien pour cet utilisateur');
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      
       setProfile(profileData);
 
+      // Utiliser maybeSingle() également pour les sessions
       const { data: sessionData } = await supabase
         .from('hotel_access_sessions')
         .select(`
@@ -105,7 +119,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
         `)
         .eq('housekeeper_profile_id', userId)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (sessionData) {
         setCurrentHotelSession({
