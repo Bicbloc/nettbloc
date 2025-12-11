@@ -1,10 +1,11 @@
 /**
  * Adapter générique pour PMS inconnus
- * Utilise des patterns communs et regex universelle
+ * Utilise le préprocesseur centralisé et patterns communs
  */
 
 import { PmsAdapter } from '../PmsAdapter';
 import { PmsConfig, ExtractedRoom, CleaningType, ExtractionDebugInfo } from '../types';
+import { textPreprocessor } from '../TextPreprocessor';
 
 export class GenericAdapter extends PmsAdapter {
   readonly name = 'generic';
@@ -98,48 +99,19 @@ export class GenericAdapter extends PmsAdapter {
     };
   }
 
-  /**
-   * Pré-traite le texte pour séparer les chambres concaténées (PDF copié)
-   */
-  private preprocessText(text: string): string {
-    let processed = text;
-    
-    // Pattern: espace(s) + numéro de chambre (01-999) + espaces + "Chambre"
-    processed = processed.replace(/(\s)(0?\d{1,3}\s{2,}Chambre)/gi, '\n$2');
-    
-    // Pattern alternatif: après un statut suivi d'un numéro
-    processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler|Dirty|Clean|Checkout|Arrival)\s+(0?\d{1,3}\s)/gi, '$1\n$2');
-    
-    // Pattern: Room/Ch suivi d'un numéro
-    processed = processed.replace(/(Room|Ch\.?)\s*(\d+)/gi, '\n$1 $2');
-    
-    return processed;
-  }
-
   extractRooms(text: string): ExtractedRoom[] {
     const rooms: ExtractedRoom[] = [];
-    // Pré-traitement pour séparer les chambres concaténées
-    const preprocessedText = this.preprocessText(text);
-    const lines = preprocessedText.split('\n');
+    // Utiliser le préprocesseur centralisé
+    const preprocessResult = textPreprocessor.preprocess(text, { cleanDates: false });
+    const lines = preprocessResult.text.split('\n');
     const seenRooms = new Map<string, ExtractedRoom[]>();
 
-    // Patterns de dates à exclure
-    const datePatterns = [
-      /\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g,
-      /\b\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}\b/g,
-      /\b\d{1,2}:\d{2}\b/g,
-      /\b(19|20)\d{2}\b/g,
-    ];
-
     for (const line of lines) {
-      // Ignorer lignes d'en-tête ou de date
-      if (this.isHeaderOrDateLine(line)) continue;
+      // Ignorer lignes d'en-tête ou de date (utiliser le préprocesseur)
+      if (textPreprocessor.isHeaderLine(line)) continue;
       
-      // Nettoyer la ligne en remplaçant les dates par des espaces
-      let cleanedLine = line;
-      for (const pattern of datePatterns) {
-        cleanedLine = cleanedLine.replace(pattern, ' ');
-      }
+      // Nettoyer la ligne
+      const cleanedLine = textPreprocessor.cleanLine(line);
 
       // Extraire les numéros de chambre potentiels
       const roomNumbers = this.extractRoomNumbers(cleanedLine);
@@ -152,7 +124,7 @@ export class GenericAdapter extends PmsAdapter {
         
         const debugInfo: ExtractionDebugInfo = {
           rawLine: line,
-          cleanedLine: cleanedLine.trim(),
+          cleanedLine: cleanedLine,
           detectedKeywords: keyword ? [keyword] : [],
           source: 'regex',
           confidence: status === 'unknown' ? 50 : 75
@@ -235,28 +207,5 @@ export class GenericAdapter extends PmsAdapter {
     }
     
     return true;
-  }
-
-  /**
-   * Détecte si une ligne est un en-tête ou contient principalement des dates
-   */
-  private isHeaderOrDateLine(line: string): boolean {
-    const lowerLine = line.toLowerCase();
-    
-    // Mots-clés d'en-tête
-    const headerKeywords = [
-      'date', 'rapport', 'report', 'hôtel', 'hotel', 'page', 
-      'total', 'généré', 'generated', 'imprimé', 'printed',
-      'housekeeping', 'cleaning list', 'room list'
-    ];
-    
-    if (headerKeywords.some(kw => lowerLine.includes(kw))) {
-      // Vérifier si c'est vraiment un en-tête (pas beaucoup de chiffres)
-      const digitCount = (line.match(/\d/g) || []).length;
-      const letterCount = (line.match(/[a-zA-Z]/g) || []).length;
-      if (letterCount > digitCount * 2) return true;
-    }
-    
-    return false;
   }
 }

@@ -1,6 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
-import { unifiedParserService, ExtractedRoom } from "@/services/pms";
+import { unifiedParserService, ExtractedRoom, textPreprocessor } from "@/services/pms";
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -107,52 +107,8 @@ function getRoomFloor(roomNumber: string): number {
 }
 
 /**
- * Prétraite le texte PDF pour séparer les chambres concaténées
- * Gère le format tableau Apaleo où les chambres sont concaténées
+ * Process PDF file - utilise le service unifié avec prétraitement centralisé
  */
-function preprocessPdfText(text: string): string {
-  let processed = text;
-  
-  // Pattern 0: Numéro de chambre au tout début du texte (sans espace avant)
-  // Ex: "01 Chambre twin..." au début du document
-  processed = processed.replace(/^(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/im, '\n$1 $2');
-  
-  // Pattern 1: Début de ligne ou après espace - numéro + "Chambre" (format tableau Apaleo)
-  // Ex: "01   Chambre twin" ou " 02 Chambre triple"
-  processed = processed.replace(/(^|\n|\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gim, '\n$2 $3');
-  
-  // Pattern 2: Statut suivi d'un numéro de chambre et "Chambre"
-  // Ex: "Sale 02 Chambre triple" → "Sale\n02 Chambre triple"
-  processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|Arrivée|En arrivée|A contrôler|Propre|A blanc)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
-  
-  // Pattern 3: Après un digit simple (pagination) + numéro 01-09
-  // Ex: "1 01 Chambre" ou "2 02 Chambre"
-  processed = processed.replace(/(\s)(\d)\s+(0[1-9])\s+(Chambre)/gi, '$1$2\n$3 $4');
-  
-  // Pattern 4: Après un nombre quelconque + numéro chambre avec zéro
-  // Ex: "...123 01 Chambre twin"
-  processed = processed.replace(/(\d)\s+(0[1-9])\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1\n$2 $3');
-  
-  // Pattern 5: "Ch. NN" format  
-  processed = processed.replace(/(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$1$2$3');
-  
-  // Pattern 6: Format numéro seul en début apparent (après info facture, etc.)
-  // Ex: "...250518012) 02 Chambre triple" → séparer avant 02
-  processed = processed.replace(/(\))\s*(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gi, '$1\n$2 $3');
-  
-  // Pattern 7: Format avec code (NR, RO, BB, FLEX) suivi d'un numéro
-  processed = processed.replace(/(NR|RO|BB|FLEX)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
-  
-  // Pattern 8: Après "A contrôler" ou statut similaire + numéro 
-  processed = processed.replace(/(A contrôler|A controler|Propre|Sale)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
-  
-  return processed;
-}
-
-/**
- * Process PDF file - utilise le service unifié
- */
-
 export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
   try {
     // Extraire le texte du PDF
@@ -166,13 +122,15 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ');
-      fullText += pageText + '\n'; // Ajouter newline entre pages
+      fullText += pageText + '\n';
     }
     
-    // Prétraiter le texte pour séparer les chambres
-    fullText = preprocessPdfText(fullText);
+    // Prétraitement centralisé
+    const preprocessResult = textPreprocessor.preprocess(fullText);
+    fullText = preprocessResult.text;
     
-    console.log("📄 PDF texte extrait et prétraité:", fullText.substring(0, 500) + "...");
+    console.log(`📄 PDF extrait: ${preprocessResult.stats.originalLength} → ${preprocessResult.stats.processedLength} chars`);
+    console.log(`📝 Patterns appliqués: ${preprocessResult.stats.patternsApplied.join(', ') || 'aucun'}`);
     lastExtractedText = fullText;
     
     let rooms: Room[] = [];
@@ -183,16 +141,16 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
       
       const result = await unifiedParserService.parseReport(fullText, hotelId);
       
-      console.log(`✅ PMS détecté: ${result.pmsType} (confiance: ${result.confidence.toFixed(1)}%)`);
-      console.log(`📊 ${result.rooms.length} chambres extraites`);
-      console.log(`🎓 Patterns appris utilisés: ${result.usedLearnedPatterns}`);
+      console.log(`✅ PMS: ${result.pmsType} (confiance: ${result.confidence.toFixed(1)}%)`);
+      console.log(`📊 ${result.rooms.length} chambres extraites (AI: ${result.usedAi}, Patterns: ${result.usedLearnedPatterns})`);
+      console.log(`⏱️ Temps: ${result.processingTime}ms`);
       
       rooms = convertExtractedRoomsToRooms(result.rooms);
       
       if (rooms.length > 0) {
         toast({
           title: "Extraction réussie",
-          description: `${rooms.length} chambres extraites (${result.pmsType})`,
+          description: `${rooms.length} chambres extraites (${result.pmsType}${result.usedAi ? ' + IA' : ''})`,
         });
         return rooms;
       }
@@ -203,7 +161,6 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
       const detection = unifiedParserService.detectPmsType(fullText);
       console.log(`🔍 PMS détecté: ${detection.pmsType} (confiance: ${detection.confidence.toFixed(1)}%)`);
       
-      // Utiliser le service sans charger les patterns spécifiques
       const result = await unifiedParserService.parseReport(fullText, 'default');
       rooms = convertExtractedRoomsToRooms(result.rooms);
     }

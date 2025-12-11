@@ -1,10 +1,13 @@
 /**
  * Service de parsing unifié pour les rapports PMS
- * Avec chargement dynamique des règles et fallback IA
+ * Avec chargement dynamique des règles, fallback IA, et validation
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { pmsAdapterFactory } from './PmsAdapterFactory';
+import { textPreprocessor } from './TextPreprocessor';
+import { roomValidator } from './RoomValidator';
+import { detectionCache } from './DetectionCache';
 import { 
   ExtractedRoom, 
   PmsDetectionResult, 
@@ -35,6 +38,7 @@ class UnifiedParserService {
   private dynamicRules: Map<string, PmsRuleFromDb> = new Map();
   private hotelId: string | null = null;
   private debugLogs: string[] = [];
+  private isLoading = false;
 
   private log(message: string): void {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
@@ -75,12 +79,15 @@ class UnifiedParserService {
    * Charge les patterns appris pour un hôtel
    */
   async loadHotelPatterns(hotelId: string): Promise<void> {
-    this.hotelId = hotelId;
-    this.learnedPatterns.clear();
-    this.customStatusMappings.clear();
-    this.debugLogs = [];
-
+    if (this.isLoading) return;
+    this.isLoading = true;
+    
     try {
+      this.hotelId = hotelId;
+      this.learnedPatterns.clear();
+      this.customStatusMappings.clear();
+      this.debugLogs = [];
+
       // Charger les règles PMS dynamiques
       await this.loadPmsRules(hotelId);
 
@@ -148,43 +155,75 @@ class UnifiedParserService {
       this.log(`📚 Patterns chargés: ${this.learnedPatterns.size} chambres, ${this.customStatusMappings.size} mappings`);
     } catch (error) {
       this.log(`❌ Erreur chargement patterns: ${error}`);
+    } finally {
+      this.isLoading = false;
     }
   }
 
   /**
-   * Parse un rapport avec fallback IA automatique
+   * Parse un rapport avec fallback IA automatique et validation
    */
   async parseReportHybrid(text: string, hotelId: string): Promise<ParseResultWithMeta> {
     const startTime = Date.now();
     this.debugLogs = [];
+    
+    // Vérifier le cache
+    const cachedRooms = detectionCache.getParsedRooms(text, hotelId);
+    if (cachedRooms) {
+      this.log(`📦 Résultat du cache (${cachedRooms.length} chambres)`);
+      return {
+        rooms: cachedRooms,
+        pmsType: 'cached',
+        confidence: 95,
+        usedAi: false,
+        usedLearnedPatterns: true,
+        debugLogs: this.debugLogs,
+        processingTime: Date.now() - startTime
+      };
+    }
     
     // Charger les patterns si nécessaire
     if (this.hotelId !== hotelId) {
       await this.loadHotelPatterns(hotelId);
     }
 
+    // Prétraiter le texte (centralisé)
+    const preprocessResult = textPreprocessor.preprocess(text);
+    const preprocessedText = preprocessResult.text;
+    this.log(`📝 Prétraitement: ${preprocessResult.stats.linesAdded} lignes ajoutées, patterns: ${preprocessResult.stats.patternsApplied.join(', ')}`);
+
     // Étape 1: Parsing local
-    const localResult = await this.parseReportLocal(text);
+    const localResult = await this.parseReportLocal(preprocessedText);
     
+    // Validation des chambres locales
+    const validationResult = roomValidator.validate(localResult.rooms, text);
+    this.log(`✅ Validation: ${validationResult.stats.valid}/${validationResult.stats.totalInput} chambres valides (confiance moy: ${validationResult.stats.averageConfidence}%)`);
+    
+    localResult.rooms = validationResult.validRooms;
+    localResult.confidence = validationResult.stats.averageConfidence;
+
     this.log(`🔍 Parsing local: ${localResult.rooms.length} chambres, confiance ${localResult.confidence.toFixed(1)}%`);
 
     // Critères pour déclencher le fallback IA
     const needsAiFallback = 
-      localResult.confidence < 60 || 
+      localResult.confidence < 55 || 
       localResult.rooms.length < 3 ||
       (localResult.rooms.length > 0 && localResult.rooms.filter(r => r.status === 'unknown').length > localResult.rooms.length * 0.3);
 
     if (needsAiFallback) {
-      this.log(`🤖 Confiance insuffisante, appel IA...`);
+      this.log(`🤖 Confiance insuffisante (${localResult.confidence.toFixed(1)}%), appel IA...`);
       
       try {
-        const aiResult = await this.callAiFallback(text, hotelId);
+        const aiResult = await this.callAiFallback(preprocessedText, hotelId);
         
         if (aiResult && aiResult.length > 0) {
-          // Fusionner les résultats (IA a priorité pour les chambres manquantes)
-          const mergedRooms = this.mergeResults(localResult.rooms, aiResult);
+          // Fusion intelligente avec scoring
+          const mergedRooms = roomValidator.smartMerge(localResult.rooms, aiResult);
           
-          this.log(`✅ Fusion: ${mergedRooms.length} chambres (local: ${localResult.rooms.length}, IA: ${aiResult.length})`);
+          this.log(`✅ Fusion intelligente: ${mergedRooms.length} chambres (local: ${localResult.rooms.length}, IA: ${aiResult.length})`);
+          
+          // Mettre en cache
+          detectionCache.setParsedRooms(text, hotelId, mergedRooms);
           
           return {
             rooms: mergedRooms,
@@ -201,6 +240,9 @@ class UnifiedParserService {
       }
     }
 
+    // Mettre en cache le résultat local
+    detectionCache.setParsedRooms(text, hotelId, localResult.rooms);
+
     return {
       ...localResult,
       debugLogs: this.debugLogs,
@@ -212,8 +254,22 @@ class UnifiedParserService {
    * Parse un rapport localement (sans IA)
    */
   private async parseReportLocal(text: string): Promise<ParseResultWithMeta> {
-    // Détecter le PMS
-    const { adapter, detection } = pmsAdapterFactory.detectPms(text);
+    // Vérifier le cache de détection
+    let detection = detectionCache.getDetection(text);
+    let adapter;
+    
+    if (detection) {
+      this.log(`📦 Détection PMS du cache: ${detection.pmsType}`);
+      adapter = pmsAdapterFactory.getAdapter(detection.pmsType);
+    } else {
+      // Détecter le PMS
+      const result = pmsAdapterFactory.detectPms(text);
+      adapter = result.adapter;
+      detection = result.detection;
+      
+      // Mettre en cache
+      detectionCache.setDetection(text, detection);
+    }
     
     // Enrichir l'adapter avec les règles dynamiques
     const dynamicRule = this.dynamicRules.get(detection.pmsType);
@@ -224,8 +280,8 @@ class UnifiedParserService {
       this.log(`📜 Règles dynamiques appliquées pour ${detection.pmsType}`);
     }
     
-    // Si confiance > 50%, utiliser le parsing local
-    if (detection.confidence >= 50) {
+    // Si confiance > 45%, utiliser le parsing local
+    if (detection.confidence >= 45) {
       this.log(`✅ Parsing local avec adapter ${adapter.name} (confiance: ${detection.confidence.toFixed(1)}%)`);
       
       let rooms = adapter.extractRooms(text);
@@ -268,9 +324,9 @@ class UnifiedParserService {
     try {
       const { data, error } = await supabase.functions.invoke('learn-pattern', {
         body: {
-          reportText: text.substring(0, 5000), // Limiter la taille
+          reportText: text.substring(0, 6000), // Augmenté pour plus de contexte
           hotelId,
-          mode: 'extract' // Mode extraction simple
+          mode: 'extract'
         }
       });
 
@@ -285,12 +341,14 @@ class UnifiedParserService {
           status: r.status || 'unknown',
           cleaningType: r.cleaningType || r.cleaning_type || 'full',
           confidence: r.confidence || 70,
+          originalText: r.reason || '',
           debugInfo: {
             rawLine: '',
             cleanedLine: '',
-            detectedKeywords: [],
+            detectedKeywords: r.rawStatuses || [],
             source: 'ai' as const,
-            confidence: r.confidence || 70
+            confidence: r.confidence || 70,
+            appliedRule: r.reason || 'AI extraction'
           }
         }));
       }
@@ -303,41 +361,9 @@ class UnifiedParserService {
   }
 
   /**
-   * Fusionne les résultats locaux et IA
-   */
-  private mergeResults(localRooms: ExtractedRoom[], aiRooms: ExtractedRoom[]): ExtractedRoom[] {
-    const roomsMap = new Map<string, ExtractedRoom>();
-    
-    // D'abord les chambres locales
-    for (const room of localRooms) {
-      roomsMap.set(room.roomNumber, room);
-    }
-    
-    // Ensuite les chambres IA (seulement si pas déjà présentes ou meilleure confiance)
-    for (const room of aiRooms) {
-      const existing = roomsMap.get(room.roomNumber);
-      if (!existing) {
-        roomsMap.set(room.roomNumber, room);
-      } else if ((room.confidence || 0) > (existing.confidence || 0)) {
-        // L'IA a une meilleure confiance, mettre à jour
-        roomsMap.set(room.roomNumber, {
-          ...room,
-          debugInfo: {
-            ...room.debugInfo!,
-            source: 'ai'
-          }
-        });
-      }
-    }
-    
-    return Array.from(roomsMap.values());
-  }
-
-  /**
    * Parse un rapport PDF et extrait les chambres (méthode principale)
    */
   async parseReport(text: string, hotelId: string): Promise<ParseResultWithMeta> {
-    // Utiliser la méthode hybride par défaut
     return this.parseReportHybrid(text, hotelId);
   }
 
@@ -421,7 +447,6 @@ class UnifiedParserService {
     if (lower.includes('propre') || lower.includes('clean') || lower.includes('ins') || lower.includes('contrôl')) {
       return 'none';
     }
-    // Par défaut, nettoyage complet
     return 'full';
   }
 
@@ -429,7 +454,12 @@ class UnifiedParserService {
    * Détecte le type de PMS
    */
   detectPmsType(text: string): PmsDetectionResult {
+    // Vérifier le cache
+    const cached = detectionCache.getDetection(text);
+    if (cached) return cached;
+    
     const { detection } = pmsAdapterFactory.detectPms(text);
+    detectionCache.setDetection(text, detection);
     return detection;
   }
 
@@ -441,7 +471,7 @@ class UnifiedParserService {
   }
 
   /**
-   * Vide le cache des patterns
+   * Vide le cache des patterns et le cache global
    */
   clearCache(): void {
     this.learnedPatterns.clear();
@@ -449,6 +479,20 @@ class UnifiedParserService {
     this.dynamicRules.clear();
     this.hotelId = null;
     this.debugLogs = [];
+    detectionCache.clear();
+    textPreprocessor.clearCache();
+  }
+
+  /**
+   * Invalide le cache pour un hôtel spécifique
+   */
+  invalidateCacheForHotel(hotelId: string): void {
+    if (this.hotelId === hotelId) {
+      this.learnedPatterns.clear();
+      this.customStatusMappings.clear();
+      this.hotelId = null;
+    }
+    detectionCache.invalidateForHotel(hotelId);
   }
 
   /**
@@ -456,6 +500,13 @@ class UnifiedParserService {
    */
   getDebugLogs(): string[] {
     return [...this.debugLogs];
+  }
+
+  /**
+   * Statistiques du cache
+   */
+  getCacheStats() {
+    return detectionCache.getStats();
   }
 }
 
