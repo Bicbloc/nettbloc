@@ -130,7 +130,10 @@ const Admin = () => {
   // Vérifier les permissions super admin
   useEffect(() => {
     const checkSuperAdminRole = async () => {
-      if (!user) return;
+      if (!user) {
+        setLoadingData(false);
+        return;
+      }
 
       try {
         const { data, error } = await supabase
@@ -138,15 +141,18 @@ const Admin = () => {
           .select('role')
           .eq('user_id', user.id)
           .eq('role', 'super_admin')
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setIsSuperAdmin(true);
-          await loadAdminData();
+          setLoadingData(false); // Afficher l'UI immédiatement
+          // Charger les données en arrière-plan
+          loadAdminData().catch(console.error);
+        } else {
+          setLoadingData(false);
         }
       } catch (error) {
         console.error('Erreur vérification role:', error);
-      } finally {
         setLoadingData(false);
       }
     };
