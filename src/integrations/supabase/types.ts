@@ -449,10 +449,12 @@ export type Database = {
       }
       hotel_cleaning_rules: {
         Row: {
+          condition_logic: string | null
           conditions: Json
           created_at: string
           created_by: string | null
           description: string | null
+          display_name: string | null
           hotel_id: string
           id: string
           is_active: boolean
@@ -463,10 +465,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          condition_logic?: string | null
           conditions?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
+          display_name?: string | null
           hotel_id: string
           id?: string
           is_active?: boolean
@@ -477,10 +481,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          condition_logic?: string | null
           conditions?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
+          display_name?: string | null
           hotel_id?: string
           id?: string
           is_active?: boolean

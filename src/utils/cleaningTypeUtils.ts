@@ -1,9 +1,11 @@
 // Utility functions for cleaning type compatibility and conversion
+// Re-export types from pms/types for consistency
+import { normalizeCleaningType as normalize, NormalizedCleaningType } from '@/services/pms/types';
 
-export type CleaningType = 'a_blanc' | 'recouche' | 'none';
+export type CleaningType = 'a_blanc' | 'recouche' | 'none' | 'full' | 'quick';
 
-// Map old values to new values
-const CLEANING_TYPE_MAP: Record<string, CleaningType> = {
+// Map old values to new values (kept for backward compatibility)
+const CLEANING_TYPE_MAP: Record<string, NormalizedCleaningType> = {
   'full': 'a_blanc',
   'quick': 'recouche',
   'none': 'none',
@@ -14,10 +16,8 @@ const CLEANING_TYPE_MAP: Record<string, CleaningType> = {
 /**
  * Normalizes cleaning type from any format to the new standard format
  */
-export function normalizeCleaningType(type: string | undefined | null): CleaningType {
-  if (!type) return 'a_blanc';
-  const normalized = CLEANING_TYPE_MAP[type.toLowerCase()];
-  return normalized || 'a_blanc';
+export function normalizeCleaningType(type: string | undefined | null): NormalizedCleaningType {
+  return normalize(type);
 }
 
 /**

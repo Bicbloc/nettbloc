@@ -11,10 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTriangle, PenLine, Save } from "lucide-react";
+import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTriangle, PenLine, Save, Sparkles } from "lucide-react";
 import { pmsAdapterFactory, unifiedParserService, ExtractedRoom, CleaningType } from "@/services/pms";
 import { TestResultItem } from "@/components/pms/TestResultItem";
 import { ManualCorrectionPanel } from "@/components/pms/ManualCorrectionPanel";
+import { CleaningRulesEditor } from "@/components/pms/CleaningRulesEditor";
+import { RuleTemplates } from "@/components/pms/RuleTemplates";
 
 interface PmsRule {
   id: string;
@@ -199,13 +201,28 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="adapters" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="adapters">Adaptateurs PMS</TabsTrigger>
-          <TabsTrigger value="custom">Mes Règles</TabsTrigger>
-          <TabsTrigger value="defaults">Règles Défaut</TabsTrigger>
+      <Tabs defaultValue="cleaning" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="cleaning" className="gap-1">
+            <Sparkles className="h-3 w-3" />
+            Nettoyage
+          </TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="adapters">Adaptateurs</TabsTrigger>
+          <TabsTrigger value="custom">Règles PMS</TabsTrigger>
+          <TabsTrigger value="defaults">Défaut</TabsTrigger>
           <TabsTrigger value="test">Tester</TabsTrigger>
         </TabsList>
+
+        {/* Nouvel onglet Règles de Nettoyage */}
+        <TabsContent value="cleaning" className="space-y-4">
+          <CleaningRulesEditor hotelId={hotelId} />
+        </TabsContent>
+
+        {/* Nouvel onglet Templates */}
+        <TabsContent value="templates" className="space-y-4">
+          <RuleTemplates hotelId={hotelId} onTemplateApplied={loadRules} />
+        </TabsContent>
 
         <TabsContent value="adapters" className="space-y-4">
           <div className="flex items-center justify-between">
