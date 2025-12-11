@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,10 +11,12 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Sparkles, FileText, Plug, Clock, ArrowLeft } from "lucide-react";
+import { FileUp, Sparkles, FileText, Plug, Clock, ArrowLeft, Zap } from "lucide-react";
 import { HousekeeperSetupDialog } from './HousekeeperSetupDialog';
 import { unifiedParserService } from "@/services/pms";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface UploadDialogProps {
   onPdfProcessed: (data: any, distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -35,6 +36,7 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
   const [selectedHousekeepers, setSelectedHousekeepers] = useState<string[]>([]);
   const [hasLearnedPattern, setHasLearnedPattern] = useState(false);
   const [importMethod, setImportMethod] = useState<ImportMethod>('choice');
+  const [forceAiExtraction, setForceAiExtraction] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Charger les patterns pour cet hôtel via le service unifié
@@ -104,16 +106,18 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
 
     try {
       setIsUploading(true);
-      console.log("Traitement du fichier:", selectedFile.name, "hotelId:", hotelId);
-      const data = await processPdf(selectedFile, hotelId);
-      console.log("Données traitées:", data.length, "chambres");
+      console.log("Traitement du fichier:", selectedFile.name, "hotelId:", hotelId, "forceAi:", forceAiExtraction);
+      
+      // Passer l'option forceAi au service
+      const data = await processPdf(selectedFile, hotelId, forceAiExtraction);
+      console.log("Données traitées:", data.length, "chambres", forceAiExtraction ? "(IA forcée)" : "");
       
       setProcessedData(data);
       setShowHousekeeperSetup(true);
       
       toast({
         title: "Téléversement réussi",
-        description: `${data.length} chambres traitées depuis ${selectedFile.name}`,
+        description: `${data.length} chambres traitées depuis ${selectedFile.name}${forceAiExtraction ? ' (extraction IA)' : ''}`,
       });
     } catch (error) {
       console.error("Erreur lors du traitement du PDF:", error);
@@ -143,6 +147,7 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
       setSelectedFile(null);
       setSelectedHousekeepers([]);
       setImportMethod('choice');
+      setForceAiExtraction(false);
     }
   };
 
@@ -276,6 +281,27 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
           )}
         </div>
       </DialogHeader>
+      
+      {/* Option Forcer Extraction IA */}
+      <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+        <div className="flex items-center gap-3">
+          <Zap className="h-5 w-5 text-amber-500" />
+          <div>
+            <Label htmlFor="force-ai" className="font-medium cursor-pointer">
+              Forcer extraction IA
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Utilise l'IA même si l'extraction locale fonctionne
+            </p>
+          </div>
+        </div>
+        <Switch
+          id="force-ai"
+          checked={forceAiExtraction}
+          onCheckedChange={setForceAiExtraction}
+        />
+      </div>
+
       <div 
         className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
         onDrop={handleDrop}

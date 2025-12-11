@@ -108,8 +108,11 @@ function getRoomFloor(roomNumber: string): number {
 
 /**
  * Process PDF file - utilise le service unifié avec prétraitement centralisé
+ * @param file Le fichier PDF à traiter
+ * @param hotelId L'identifiant de l'hôtel (optionnel)
+ * @param forceAi Force l'utilisation de l'IA même si le parsing local est suffisant
  */
-export async function processPdf(file: File, hotelId?: string): Promise<Room[]> {
+export async function processPdf(file: File, hotelId?: string, forceAi: boolean = false): Promise<Room[]> {
   try {
     // Extraire le texte du PDF
     const arrayBuffer = await file.arrayBuffer();
@@ -131,6 +134,7 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
     
     console.log(`📄 PDF extrait: ${preprocessResult.stats.originalLength} → ${preprocessResult.stats.processedLength} chars`);
     console.log(`📝 Patterns appliqués: ${preprocessResult.stats.patternsApplied.join(', ') || 'aucun'}`);
+    if (forceAi) console.log(`🤖 Extraction IA forcée par l'utilisateur`);
     lastExtractedText = fullText;
     
     let rooms: Room[] = [];
@@ -139,7 +143,7 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
     if (hotelId) {
       console.log(`🔄 Parsing avec unifiedParserService pour hôtel ${hotelId}...`);
       
-      const result = await unifiedParserService.parseReport(fullText, hotelId);
+      const result = await unifiedParserService.parseReport(fullText, hotelId, forceAi);
       
       console.log(`✅ PMS: ${result.pmsType} (confiance: ${result.confidence.toFixed(1)}%)`);
       console.log(`📊 ${result.rooms.length} chambres extraites (AI: ${result.usedAi}, Patterns: ${result.usedLearnedPatterns})`);
@@ -161,7 +165,7 @@ export async function processPdf(file: File, hotelId?: string): Promise<Room[]> 
       const detection = unifiedParserService.detectPmsType(fullText);
       console.log(`🔍 PMS détecté: ${detection.pmsType} (confiance: ${detection.confidence.toFixed(1)}%)`);
       
-      const result = await unifiedParserService.parseReport(fullText, 'default');
+      const result = await unifiedParserService.parseReport(fullText, 'default', forceAi);
       rooms = convertExtractedRoomsToRooms(result.rooms);
     }
     
