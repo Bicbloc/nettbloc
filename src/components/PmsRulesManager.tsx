@@ -10,9 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTriangle, PenLine, Save, Sparkles } from "lucide-react";
-import { pmsAdapterFactory, unifiedParserService, ExtractedRoom, CleaningType } from "@/services/pms";
+import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTriangle, PenLine, Save, Sparkles, ChevronDown, Wand2, FileText } from "lucide-react";
+import { pmsAdapterFactory, unifiedParserService, mewsDetectionService, ExtractedRoom, CleaningType } from "@/services/pms";
 import { TestResultItem } from "@/components/pms/TestResultItem";
 import { ManualCorrectionPanel } from "@/components/pms/ManualCorrectionPanel";
 import { SimplifiedRulesManager } from "@/components/pms/SimplifiedRulesManager";
@@ -47,6 +48,11 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
   const [detectedConfidence, setDetectedConfidence] = useState<number>(0);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showManualCorrection, setShowManualCorrection] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showDebugLogs, setShowDebugLogs] = useState(false);
+  const [useLightMode, setUseLightMode] = useState(false);
+  const [forceAi, setForceAi] = useState(false);
+  const [isTestLoading, setIsTestLoading] = useState(false);
   const [newRule, setNewRule] = useState({
     pms_type: '',
     rule_name: '',
@@ -86,21 +92,96 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
       return;
     }
 
+    setIsTestLoading(true);
+    setDebugLogs([]);
+    
     try {
       // Détecter le PMS
       const detection = unifiedParserService.detectPmsType(testText);
       setDetectedPms(detection.pmsType);
       setDetectedConfidence(detection.confidence);
 
-      // Parser avec le service unifié
-      const result = await unifiedParserService.parseReport(testText, hotelId);
-      setTestResults(result.rooms);
-
-      toast.success(`${result.rooms.length} chambre(s) détectée(s) - PMS: ${result.pmsType}`);
-    } catch (error) {
+      if (useLightMode) {
+        // Mode extraction légère - comme la prévisualisation
+        const rooms = extractRoomsLightMode(testText);
+        setTestResults(rooms);
+        setDebugLogs([
+          `[Mode léger] ${rooms.length} chambres extraites`,
+          `[Mode léger] Méthode: analyse ligne par ligne avec regex simple`,
+          `[Mode léger] PMS détecté: ${detection.pmsType} (${detection.confidence.toFixed(0)}%)`
+        ]);
+        toast.success(`${rooms.length} chambre(s) détectée(s) (mode léger)`);
+      } else {
+        // Parser avec le service unifié (mode strict)
+        const result = await unifiedParserService.parseReport(testText, hotelId, forceAi);
+        setTestResults(result.rooms);
+        setDebugLogs(result.debugLogs || []);
+        
+        const aiInfo = result.usedAi ? ' (avec IA)' : '';
+        toast.success(`${result.rooms.length} chambre(s) détectée(s) - PMS: ${result.pmsType}${aiInfo}`);
+      }
+    } catch (error: any) {
       console.error('Erreur parsing:', error);
+      setDebugLogs(prev => [...prev, `❌ Erreur: ${error.message || error}`]);
       toast.error('Erreur lors de l\'analyse');
+    } finally {
+      setIsTestLoading(false);
     }
+  };
+
+  // Mode extraction légère - similaire à la prévisualisation
+  const extractRoomsLightMode = (text: string): ExtractedRoom[] => {
+    const lines = text.split('\n').filter(l => l.trim());
+    const rooms: ExtractedRoom[] = [];
+    const seenRooms = new Set<string>();
+    
+    // Regex améliorée pour extraire les numéros de chambre
+    const roomRegex = /(?:^|\s|Ch\.?\s*|Room\s*|#)([A-Z]?-?0*[1-9]\d{0,3}[A-Z]?)(?:\s|$|[:\-\.])/gi;
+    
+    for (const line of lines) {
+      // Utiliser l'analyse de mewsDetectionService pour détecter le statut
+      const analysis = mewsDetectionService.analyzeLine(line);
+      
+      // Extraire les numéros de chambre de la ligne
+      const matches = [...line.matchAll(roomRegex)];
+      
+      for (const match of matches) {
+        let roomNumber = match[1];
+        
+        // Normaliser le numéro
+        const numMatch = roomNumber.match(/^0*(\d+)$/);
+        if (numMatch) {
+          roomNumber = numMatch[1];
+        }
+        
+        // Valider le numéro
+        const num = parseInt(roomNumber, 10);
+        if (!isNaN(num) && (num < 1 || num > 9999 || (num >= 1900 && num <= 2100))) {
+          continue; // Ignorer les dates/années
+        }
+        
+        if (seenRooms.has(roomNumber)) continue;
+        seenRooms.add(roomNumber);
+        
+        rooms.push({
+          roomNumber,
+          status: analysis.rawStatus || 'unknown',
+          cleaningType: analysis.cleaningType || 'full',
+          confidence: analysis.confidence || 50,
+          originalText: line.trim(),
+          validated: false,
+          debugInfo: {
+            rawLine: line,
+            cleanedLine: line.trim(),
+            detectedKeywords: analysis.matchedRule ? [analysis.matchedRule] : [],
+            source: 'regex',
+            confidence: analysis.confidence || 50
+          }
+        });
+      }
+    }
+    
+    return rooms;
   };
 
   const handleAddRule = async () => {
@@ -241,13 +322,42 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
                 />
               </div>
 
-              <Button onClick={handleTestParsing} className="w-full">
+              {/* Options de parsing */}
+              <div className="flex flex-wrap gap-4 p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="light-mode"
+                    checked={useLightMode}
+                    onCheckedChange={setUseLightMode}
+                  />
+                  <Label htmlFor="light-mode" className="text-sm flex items-center gap-1 cursor-pointer">
+                    <FileText className="h-3 w-3" />
+                    Mode léger
+                  </Label>
+                </div>
+                
+                {!useLightMode && (
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="force-ai"
+                      checked={forceAi}
+                      onCheckedChange={setForceAi}
+                    />
+                    <Label htmlFor="force-ai" className="text-sm flex items-center gap-1 cursor-pointer">
+                      <Wand2 className="h-3 w-3" />
+                      Forcer IA
+                    </Label>
+                  </div>
+                )}
+              </div>
+
+              <Button onClick={handleTestParsing} className="w-full" disabled={isTestLoading}>
                 <Play className="h-4 w-4 mr-2" />
-                Analyser
+                {isTestLoading ? 'Analyse en cours...' : 'Analyser'}
               </Button>
 
               {detectedPms && (
-                <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
+                <div className="flex flex-wrap items-center gap-4 p-3 bg-muted rounded-lg">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">PMS détecté:</span>
                     <Badge>{detectedPms.toUpperCase()}</Badge>
@@ -258,7 +368,31 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
                       {detectedConfidence.toFixed(0)}%
                     </Badge>
                   </div>
+                  {useLightMode && (
+                    <Badge variant="outline" className="text-xs">Mode léger</Badge>
+                  )}
                 </div>
+              )}
+
+              {/* Debug logs */}
+              {debugLogs.length > 0 && (
+                <Collapsible open={showDebugLogs} onOpenChange={setShowDebugLogs}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        Logs de debug ({debugLogs.length})
+                      </span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${showDebugLogs ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="mt-2 p-3 bg-muted/30 rounded-lg max-h-48 overflow-auto">
+                      <pre className="text-xs font-mono whitespace-pre-wrap">
+                        {debugLogs.join('\n')}
+                      </pre>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
 
               {testResults.length > 0 && (
@@ -286,6 +420,15 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
                       />
                     ))}
                   </div>
+                </div>
+              )}
+
+              {testResults.length === 0 && detectedPms && !isTestLoading && (
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Aucune chambre détectée. Essayez le "Mode léger" ou "Forcer IA".
+                  </p>
                 </div>
               )}
             </CardContent>

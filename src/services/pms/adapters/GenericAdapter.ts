@@ -163,25 +163,44 @@ export class GenericAdapter extends PmsAdapter {
 
   /**
    * Extrait les numéros de chambre d'une ligne nettoyée
-   * Supporte: numériques (01, 101), alphanumériques (1A, R101), avec tirets (P-202)
+   * Supporte: numériques (01, 101, 0101), alphanumériques (1A, R101), avec tirets (P-202)
    */
   private extractRoomNumbers(line: string): string[] {
     const numbers: string[] = [];
     
-    // Regex universelle améliorée
-    const regex = /(?<![\/\-\.\d:])(?:(?:Room|Ch\.?|Chambre|R|#)\s*)?([A-Z]?-?0*[1-9]\d{0,3}[A-Z]?)(?![\/\-\.\d:])/gi;
+    // Plusieurs patterns pour maximiser la détection
+    const patterns = [
+      // Pattern 1: Avec préfixe explicite (Room, Ch., Chambre, #)
+      /(?:Room|Ch\.?|Chambre|#)\s*([A-Z]?-?0*[1-9]\d{0,3}[A-Z]?)\b/gi,
+      // Pattern 2: Numéro en début de ligne ou après espace/tab
+      /(?:^|\s|\t)([0-9]{1,4}[A-Z]?)(?=\s|$|[:\-\.]|\t)/gm,
+      // Pattern 3: Numéros avec zéros initiaux (01, 001, 0101)
+      /(?:^|\s)(0+[1-9]\d{0,3})(?=\s|$|[:\-])/gm,
+      // Pattern 4: Format alphanumérique (A1, 1A, P-101)
+      /(?:^|\s)([A-Z]-?\d{1,4}|\d{1,4}[A-Z])(?=\s|$)/gi,
+    ];
     
-    let match;
-    while ((match = regex.exec(line)) !== null) {
-      const roomNum = match[1];
-      
-      // Normaliser: "05" → "5", "01" → "1" (seulement pour les purement numériques)
-      const numMatch = roomNum.match(/^0*(\d+)$/);
-      if (numMatch) {
-        numbers.push(numMatch[1]);
-      } else {
-        // Garder le format pour les alphanumériques
-        numbers.push(roomNum.replace(/^0+/, '') || roomNum);
+    for (const regex of patterns) {
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        const roomNum = match[1];
+        
+        // Ignorer les valeurs trop courtes ou trop longues
+        if (!roomNum || roomNum.length < 1 || roomNum.length > 6) continue;
+        
+        // Normaliser: "05" → "5", "01" → "1" (seulement pour les purement numériques)
+        const numMatch = roomNum.match(/^0*(\d+)$/);
+        if (numMatch) {
+          const num = parseInt(numMatch[1], 10);
+          // Ignorer les années (1900-2100) et les nombres trop grands
+          if (num >= 1900 && num <= 2100) continue;
+          if (num > 9999) continue;
+          numbers.push(numMatch[1]);
+        } else {
+          // Garder le format pour les alphanumériques
+          const normalized = roomNum.replace(/^0+/, '') || roomNum;
+          numbers.push(normalized);
+        }
       }
     }
     
