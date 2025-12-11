@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/storageService';
 import { 
   CheckCircle, 
   Clock, 
@@ -85,9 +86,11 @@ export default function HousekeeperMobile() {
   const touchStartX = useRef<number>(0);
   const touchCurrentX = useRef<number>(0);
 
-  // Get housekeeper info from URL or localStorage
+  // Get housekeeper info from URL or localStorage (utiliser storageService en priorité)
   const accessCode = searchParams.get('access_code');
-  const hotelId = searchParams.get('hotel') || localStorage.getItem('selectedHotelId');
+  const hotelIdFromUrl = searchParams.get('hotel');
+  const hotelIdFromStorage = storageService.getHotelId() || localStorage.getItem('selectedHotelId');
+  const hotelId = hotelIdFromUrl || hotelIdFromStorage;
   const nameFromUrl = searchParams.get('name');
 
   // Récupérer le nom du housekeeper au chargement initial
@@ -363,9 +366,13 @@ export default function HousekeeperMobile() {
   };
 
   const handleLogout = () => {
+    // Nettoyer toutes les données de session
     localStorage.removeItem('housekeeper');
     localStorage.removeItem('housekeeperProfile');
     localStorage.removeItem('selectedHotelId');
+    localStorage.removeItem('housekeeperSessionToken');
+    localStorage.removeItem('housekeeperSessionExpires');
+    storageService.clearHotel();
     navigate('/housekeeper-login');
   };
 

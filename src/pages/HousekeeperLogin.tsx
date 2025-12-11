@@ -130,12 +130,21 @@ export default function HousekeeperLogin() {
         accessCode: housekeeperCode
       }));
       
+      // Sauvegarder aussi dans housekeeperProfile pour compatibilité avec HousekeeperMobile
+      localStorage.setItem('housekeeperProfile', JSON.stringify({
+        id: housekeeper.id,
+        name: housekeeper.name
+      }));
+      
       // Sauvegarder l'hôtel sélectionné avec le service centralisé
       storageService.saveHotel({
         id: selectedHotel.id,
         name: selectedHotel.name,
         code: selectedHotel.hotel_code || ''
       });
+      
+      // Sauvegarder aussi dans selectedHotelId pour compatibilité
+      localStorage.setItem('selectedHotelId', selectedHotel.id);
       
       toast({
         title: "Connexion réussie",
@@ -197,12 +206,21 @@ export default function HousekeeperLogin() {
         accessCode: fullAccessCode
       }));
       
+      // Sauvegarder aussi dans housekeeperProfile pour compatibilité avec HousekeeperMobile
+      localStorage.setItem('housekeeperProfile', JSON.stringify({
+        id: housekeeper.id,
+        name: housekeeper.name
+      }));
+      
       // Sauvegarder l'hôtel avec le service centralisé
       storageService.saveHotel({
         id: hotel.id,
         name: hotel.name,
         code: hotel.hotel_code || ''
       });
+      
+      // Sauvegarder aussi dans selectedHotelId pour compatibilité
+      localStorage.setItem('selectedHotelId', hotel.id);
 
       toast({
         title: "Connexion réussie",
