@@ -83,8 +83,11 @@ export const ManualCorrectionPanel = ({
     setAnnotations(prev => prev.filter(a => a.id !== id));
   };
 
+  // Augmenté de 40 à 200 lignes pour capturer plus de chambres
+  const MAX_PREVIEW_LINES = 200;
+  
   const renderAnnotatedText = () => {
-    const previewText = rawText.split('\n').slice(0, 40).join('\n');
+    const previewText = rawText.split('\n').slice(0, MAX_PREVIEW_LINES).join('\n');
     
     if (annotations.length === 0) {
       return <span className="whitespace-pre-wrap">{previewText}</span>;
@@ -157,6 +160,24 @@ export const ManualCorrectionPanel = ({
       if (error) throw error;
 
       if (data?.rooms && data.rooms.length > 0) {
+        // Vérifier les chambres manquantes par rapport aux annotations
+        const annotatedRoomNumbers = annotations
+          .filter(a => a.field === 'roomNumber')
+          .map(a => a.text.trim().replace(/^0+/, ''));
+        
+        const extractedRoomNumbers = data.rooms.map((r: ExtractedRoom) => 
+          r.roomNumber.replace(/^0+/, '')
+        );
+        
+        const missingRooms = annotatedRoomNumbers.filter(
+          room => !extractedRoomNumbers.includes(room) && 
+                  !extractedRoomNumbers.some(e => e === room || room === e)
+        );
+        
+        if (missingRooms.length > 0) {
+          toast.warning(`⚠️ ${missingRooms.length} chambre(s) annotée(s) non trouvée(s): ${missingRooms.join(', ')}`);
+        }
+        
         onRoomsUpdated(data.rooms);
         
         // Sauvegarder le pattern appris
@@ -167,7 +188,7 @@ export const ManualCorrectionPanel = ({
           report_name: 'Correction manuelle',
           pms_type: data.patterns?.pmsType || 'learned',
           pattern_name: `Correction manuelle - ${new Date().toLocaleDateString()}`,
-          raw_text: rawText.substring(0, 2000),
+          raw_text: rawText.substring(0, 5000), // Augmenté de 2000 à 5000
           extracted_data: { rooms: data.rooms, patterns: data.patterns },
           detection_rules: data.patterns || {},
           validated: true,
