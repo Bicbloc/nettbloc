@@ -696,8 +696,7 @@ const Index = () => {
               <TabsContent value="overview" className="space-y-6 mt-0">
                 <StatsOverview 
                   rooms={rooms}
-                  housekeeperNames={housekeeperNames}
-                  cleaningConfig={cleaningConfig}
+                  housekeeperCount={housekeeperNames.length}
                 />
 
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
@@ -797,24 +796,30 @@ const Index = () => {
                     <UnassignedRoomsColumn
                       rooms={getUnassignedRooms()}
                       housekeeperNames={housekeeperNames}
-                      onAssignRoom={handleDirectRoomAssignment}
+                      onRoomUpdate={handleRoomUpdate}
+                      onDirectAssign={handleDirectRoomAssignment}
+                      hotelId={currentHotelId}
                     />
                     {housekeeperNames.map((name) => (
                       <HousekeeperCard
                         key={name}
                         name={name}
                         rooms={getHousekeeperRooms(name)}
-                        config={cleaningConfig}
+                        cleaningConfig={cleaningConfig}
                         onRoomUpdate={handleRoomUpdate}
-                        onUnassignRoom={handleRoomUnassign}
-                        onReassignRoom={handleRoomReassign}
+                        onRoomUnassign={handleRoomUnassign}
+                        onReassign={handleRoomReassign}
                         onGenerateReport={() => handleGenerateReport(name, getHousekeeperRooms(name))}
-                        allRooms={rooms}
+                        unassignedRooms={getUnassignedRooms()}
                         housekeeperNames={housekeeperNames}
                         accessCode={housekeepers.find(h => h.name === name)?.access_code}
+                        availableFloors={availableFloors}
+                        onFloorPreferenceChange={() => {}}
+                        preferredFloors={[]}
+                        hotelId={currentHotelId}
                       />
                     ))}
-                    <CleanRoomsSection rooms={getCleanRooms()} />
+                    <CleanRoomsSection rooms={getCleanRooms()} onRoomUpdate={handleRoomUpdate} hotelId={currentHotelId} />
                   </div>
                 )}
               </TabsContent>
