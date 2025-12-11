@@ -12,6 +12,7 @@ import { Package } from 'lucide-react';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
+import { storageService } from '@/services/storageService';
 
 interface Room {
   id: string;
@@ -63,37 +64,35 @@ export const HousekeeperWorkSimple: React.FC = () => {
       time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       message,
       type
-    }, ...prev].slice(0, 50)); // Garder max 50 entrées
+    }, ...prev].slice(0, 50));
   }, []);
 
-  // Essayer d'abord les query params, puis le localStorage
+  // Récupération des paramètres URL
   const accessCodeFromUrl = searchParams.get('access_code');
   const hotelIdFromUrl = searchParams.get('hotel');
   const housekeeperNameFromUrl = searchParams.get('name');
 
-  // Récupérer depuis localStorage avec fallbacks multiples
-  const housekeeperData = localStorage.getItem('housekeeper') ? JSON.parse(localStorage.getItem('housekeeper')!) : null;
-  const housekeeperProfile = localStorage.getItem('housekeeperProfile') ? JSON.parse(localStorage.getItem('housekeeperProfile')!) : null;
+  // Récupération unifiée depuis storageService
+  const housekeeperProfile = storageService.getHousekeeperProfile();
+  // Check localStorage for legacy data
+  const legacyHousekeeper = localStorage.getItem('housekeeper') ? JSON.parse(localStorage.getItem('housekeeper')!) : null;
+  const legacyProfile = localStorage.getItem('housekeeperProfile') ? JSON.parse(localStorage.getItem('housekeeperProfile')!) : null;
   
-  const isAuthenticatedHousekeeper = housekeeperProfile?.isAuthenticated;
+  const isAuthenticatedHousekeeper = legacyProfile?.isAuthenticated || false;
+  
+  // Code d'accès: URL ou profil stocké
   const accessCode = isAuthenticatedHousekeeper 
     ? null 
-    : (accessCodeFromUrl || housekeeperData?.accessCode);
+    : (accessCodeFromUrl || legacyHousekeeper?.accessCode);
   
-  // Récupération robuste du hotelId avec plusieurs fallbacks
+  // Récupération robuste du hotelId - simplifié avec storageService
   const getHotelId = (): string | null => {
     // 1. URL en priorité
     if (hotelIdFromUrl && hotelIdFromUrl.length >= 30) return hotelIdFromUrl;
-    // 2. localStorage standard
-    const storedId = localStorage.getItem('selectedHotelId');
+    // 2. storageService unifié
+    const storedId = storageService.getHotelId();
     if (storedId && storedId.length >= 30) return storedId;
-    // 3. Clé de backup
-    const backupId = localStorage.getItem('lastSelectedHotelId');
-    if (backupId && backupId.length >= 30) return backupId;
-    // 4. currentHotelId legacy
-    const legacyId = localStorage.getItem('currentHotelId');
-    if (legacyId && legacyId.length >= 30) return legacyId;
-    // 5. Dans le profil
+    // 3. Profil housekeeper
     if (housekeeperProfile?.currentHotelId && housekeeperProfile.currentHotelId.length >= 30) {
       return housekeeperProfile.currentHotelId;
     }
@@ -101,9 +100,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
   };
   
   const hotelId = getHotelId();
-  const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || housekeeperData?.name || 'Femme de chambre';
+  const housekeeperName = housekeeperNameFromUrl || housekeeperProfile?.name || 'Femme de chambre';
 
-  // Charger/sauvegarder le pointage depuis localStorage
+  // Charger/sauvegarder le pointage
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     const savedStart = localStorage.getItem(`pointage_start_${today}_${housekeeperName}`);
@@ -128,18 +127,16 @@ export const HousekeeperWorkSimple: React.FC = () => {
     localStorage.setItem(`pointage_end_${today}_${housekeeperName}`, now);
     addToActivityLog(`⏰ Pointage fin: ${now}`, 'success');
   };
+
   useEffect(() => {
-    // Vérification renforcée de l'hotelId
-    const storedHotelId = localStorage.getItem('selectedHotelId');
-    
     console.log('🔍 Vérification hotelId:', {
       fromUrl: hotelIdFromUrl,
-      fromStorage: storedHotelId,
+      fromStorage: storageService.getHotelId(),
       final: hotelId,
       isAuthenticatedHousekeeper
     });
 
-    // Validation stricte du hotelId (doit être un UUID valide)
+    // Validation stricte du hotelId
     if (hotelId && hotelId.length < 30) {
       console.error('❌ HotelId invalide:', hotelId);
       toast({
@@ -151,7 +148,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
       return;
     }
 
-    // Une femme de chambre authentifiée n'a pas besoin de code d'accès
     if ((accessCode && hotelId) || (isAuthenticatedHousekeeper && hotelId)) {
       loadWorkData();
     } else if (!accessCode && !isAuthenticatedHousekeeper) {
@@ -159,7 +155,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   }, [accessCode, hotelId, isAuthenticatedHousekeeper]);
 
-  // Normaliser un nom pour comparaison (trim + lowercase)
+  // Normaliser un nom pour comparaison
   const normalizeName = (name: string | null | undefined): string => {
     return (name || '').trim().toLowerCase();
   };
@@ -171,7 +167,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
     
     if (table === 'assignments') {
       if (eventType === 'INSERT') {
-        // Identifiants possibles du housekeeper actuel
         const possibleIds = [
           housekeeperProfile?.id,
           housekeeper?.id,
@@ -179,48 +174,25 @@ export const HousekeeperWorkSimple: React.FC = () => {
           housekeeper?.user_id
         ].filter(Boolean);
         
-        // Normaliser les noms pour comparaison
         const normalizedMyName = normalizeName(housekeeperName);
         const normalizedRecordName = normalizeName(newRecord.housekeeper_name);
         
-        // Vérifier par ID OU par nom normalisé
         const isForMe = possibleIds.includes(newRecord.housekeeper_id) || 
                         normalizedRecordName === normalizedMyName;
-        
-        // Vérifier que c'est pour le bon hôtel
         const isCorrectHotel = newRecord.hotel_id === hotelId;
         
-        console.log('🔍 Vérification assignation:', {
-          possibleIds,
-          recordHousekeeperId: newRecord.housekeeper_id,
-          recordHousekeeperName: newRecord.housekeeper_name,
-          normalizedRecordName,
-          housekeeperName,
-          normalizedMyName,
-          isForMe,
-          isCorrectHotel
-        });
-        
         if (isForMe && isCorrectHotel) {
-          console.log('🆕 Nouvelle assignation reçue pour moi! Rechargement complet...');
-          
-          // Recharger TOUTES les données pour être sûr de la synchronisation
+          console.log('🆕 Nouvelle assignation reçue! Rechargement...');
           loadWorkData();
-          
-          // Ajouter au journal d'activité
           addToActivityLog('🆕 Nouvelle chambre assignée', 'info');
-          
-          // Incrémenter le compteur
           setNewRoomsCount(prev => prev + 1);
           setTimeout(() => setNewRoomsCount(0), 5000);
         }
       } else if (eventType === 'UPDATE') {
-        // Mise à jour d'une assignation existante
         setAssignments(prev => prev.map(a => 
           a.id === newRecord.id ? { ...a, ...newRecord } : a
         ));
       } else if (eventType === 'DELETE') {
-        // Assignation supprimée
         setAssignments(prev => prev.filter(a => a.id !== oldRecord.id));
         setRooms(prev => prev.filter(r => r.id !== oldRecord.room_id));
       }
@@ -228,12 +200,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
     
     if (table === 'rooms') {
       if (eventType === 'UPDATE' || eventType === 'INSERT') {
-        // Vérifier si une chambre devient ready-to-clean
         if (newRecord.status === 'ready-to-clean' && oldRecord?.status !== 'ready-to-clean') {
-          console.log('🚪 Nouvelle chambre disponible:', newRecord.room_number);
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
-          
-          // Ajouter à la liste des chambres disponibles
           setAvailableRooms(prev => {
             if (!prev.find(r => r.id === newRecord.id)) {
               return [...prev, newRecord];
@@ -242,19 +210,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
           });
         }
         
-        // Mettre à jour le statut de la chambre localement
         setRooms(prev => {
           const exists = prev.find(r => r.id === newRecord.id);
           if (exists) {
-            // Log cleaning_type changes (sans notification)
-            if (newRecord.cleaning_type && newRecord.cleaning_type !== exists.cleaning_type) {
-              console.log('🔄 Type de nettoyage mis à jour:', {
-                room: newRecord.room_number,
-                oldType: exists.cleaning_type,
-                newType: newRecord.cleaning_type
-              });
-            }
-            
             return prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r);
           } else if (eventType === 'INSERT') {
             return [...prev, newRecord];
@@ -265,67 +223,37 @@ export const HousekeeperWorkSimple: React.FC = () => {
         setRooms(prev => prev.filter(r => r.id !== oldRecord.id));
       }
     }
-  }, [hotelId, housekeeperName, isAuthenticatedHousekeeper, housekeeperProfile, housekeeper, addToActivityLog]);
+  }, [hotelId, housekeeperName, housekeeperProfile, housekeeper, addToActivityLog]);
 
-  // Synchronisation en temps réel des assignations et chambres
+  // Synchronisation en temps réel
   const { isConnected } = useRealtimeSync({
     hotelId: hotelId || undefined,
     tables: ['assignments', 'rooms'],
     onUpdate: handleRealtimeUpdate
   });
 
-  // Polling de secours si le realtime échoue (toutes les 15 secondes)
-  // NE PAS effacer les données existantes pendant le polling
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      // Vérifier que hotelId existe toujours
-      const currentHotelId = getHotelId();
-      if (!currentHotelId) {
-        console.warn('⚠️ HotelId disparu pendant le polling!');
-        // Tenter de récupérer depuis le backup
-        const backupId = localStorage.getItem('lastSelectedHotelId');
-        if (backupId && backupId.length >= 30) {
-          console.log('🔄 Récupération hotelId depuis backup');
-          localStorage.setItem('selectedHotelId', backupId);
-        }
-        return;
-      }
-      
-      if (!isConnected && currentHotelId) {
-        console.log('⏰ Polling de secours - realtime non connecté');
-        loadWorkData();
-      }
-    }, 15000); // 15 secondes
-
-    return () => clearInterval(pollInterval);
-  }, [isConnected]);
-
   const loadWorkData = async () => {
     try {
       setIsRefreshing(true);
       
-      // Charger immédiatement depuis le cache pour affichage rapide
+      // Cache rapide
       const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
       const cachedData = localStorage.getItem(cachedKey);
       if (cachedData && rooms.length === 0) {
         try {
           const { assignments: cachedAssignments, rooms: cachedRooms, timestamp } = JSON.parse(cachedData);
-          // Utiliser le cache si moins de 12h
           if (Date.now() - timestamp < 12 * 60 * 60 * 1000) {
-            console.log('📦 Chargement rapide depuis le cache');
             setAssignments(cachedAssignments || []);
             setRooms(cachedRooms || []);
           }
         } catch (e) {
-          console.error('Erreur parsing cache initial:', e);
+          console.error('Erreur parsing cache:', e);
         }
       }
       
       let authResult: any;
       
-      // Si c'est une femme de chambre authentifiée (avec profil)
       if (isAuthenticatedHousekeeper && housekeeperProfile) {
-        // Récupérer l'hôtel
         const { data: hotelData, error: hotelError } = await supabase
           .from('hotels')
           .select('*')
@@ -352,7 +280,6 @@ export const HousekeeperWorkSimple: React.FC = () => {
           }
         };
       } else {
-        // Vérifier l'authentification avec le code (femmes de chambre temporaires)
         authResult = await HousekeeperAuthService.authenticateWithFullCode(accessCode!);
         
         if (!authResult.success) {
@@ -369,20 +296,10 @@ export const HousekeeperWorkSimple: React.FC = () => {
       setHotel(authResult.hotel);
       setHousekeeper(authResult.user);
 
-      // Charger les assignations de cette femme de chambre
-      // Utiliser l'ID du profil pour les femmes de chambre authentifiées
       const housekeeperId = isAuthenticatedHousekeeper 
-        ? housekeeperProfile.id 
+        ? housekeeperProfile?.id 
         : (authResult.user?.id || authResult.user?.access_code);
 
-      console.log('🔍 Recherche assignations pour:', {
-        housekeeperId,
-        hotelId,
-        isAuthenticated: isAuthenticatedHousekeeper,
-        profileId: housekeeperProfile?.id
-      });
-
-      // Récupérer l'ID du housekeeper dans la table housekeepers si authentifié
       let housekeeperTableId = housekeeperId;
       if (isAuthenticatedHousekeeper && housekeeperId) {
         const { data: hkData } = await supabase
@@ -394,29 +311,20 @@ export const HousekeeperWorkSimple: React.FC = () => {
         
         if (hkData) {
           housekeeperTableId = hkData.id;
-          console.log('🔗 ID housekeeper trouvé:', housekeeperTableId);
         }
       }
 
-      // Charger les assignations depuis Supabase - chercher par TOUS les identifiants possibles
-      // Construire une liste complète d'identifiants à rechercher
       const possibleIds = [
         housekeeperId,
         housekeeperTableId,
         housekeeperProfile?.id
       ].filter(Boolean);
 
-      console.log('🔍 Recherche avec identifiants possibles:', possibleIds);
-
-      // Construire le filtre OR pour tous les IDs possibles
       let orFilter = possibleIds.map(id => `housekeeper_id.eq.${id}`).join(',');
-      
-      // Ajouter également le filtre par nom
       if (housekeeperName) {
         orFilter += `,housekeeper_name.eq.${housekeeperName}`;
       }
 
-      // Récupérer toutes les assignations actives (sans filtre de date)
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select(`
@@ -435,91 +343,76 @@ export const HousekeeperWorkSimple: React.FC = () => {
         .in('status', ['assigned', 'in_progress', 'completed'])
         .order('created_at', { ascending: false });
 
-      console.log('📋 Assignations trouvées:', assignmentsData);
-      console.log('❌ Erreur assignations (le cas échéant):', assignmentsError);
-
       if (assignmentsError) {
         console.error('Erreur chargement assignations:', assignmentsError);
-        // Essayer de charger depuis le cache localStorage
-        const cachedData = localStorage.getItem(`assignments_${hotelId}_${housekeeperId}`);
-        if (cachedData) {
+        const cached = localStorage.getItem(`assignments_${hotelId}_${housekeeperId}`);
+        if (cached) {
           try {
-            const { assignments: cachedAssignments, rooms: cachedRooms, timestamp } = JSON.parse(cachedData);
-            // Utiliser le cache si moins de 12h
+            const { assignments: cachedAssignments, rooms: cachedRooms, timestamp } = JSON.parse(cached);
             if (Date.now() - timestamp < 12 * 60 * 60 * 1000) {
-              console.log('📦 Utilisation du cache localStorage pour les assignations');
-              setAssignments(cachedAssignments || []);
-              setRooms(cachedRooms || []);
-              return;
+              setAssignments(cachedAssignments);
+              setRooms(cachedRooms);
             }
           } catch (e) {
             console.error('Erreur parsing cache:', e);
           }
         }
-        // Fallback: afficher toutes les chambres en attente
-        loadAllPendingRooms();
-      } else {
-        setAssignments(assignmentsData || []);
-        const roomsList = (assignmentsData || [])
-          .map(a => a.rooms)
-          .filter(Boolean);
-        
-        // Dédoublonner par room_id pour éviter les doublons
-        const uniqueRooms = roomsList.reduce((acc: typeof roomsList, room) => {
-          if (!acc.find(r => r.id === room.id)) {
-            acc.push(room);
-          }
-          return acc;
-        }, []);
-        
-        setRooms(uniqueRooms);
-        
-        // Persister en localStorage pour la reconnexion
-        try {
-          localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
-            assignments: assignmentsData,
-            rooms: uniqueRooms,
-            timestamp: Date.now()
-          }));
-          console.log('💾 Assignations sauvegardées en cache');
-        } catch (e) {
-          console.error('Erreur sauvegarde cache:', e);
+        return;
+      }
+
+      // Dédupliquer les assignations
+      const uniqueAssignments = assignmentsData?.reduce((acc: any[], curr: any) => {
+        const existingIndex = acc.findIndex(a => a.room_id === curr.room_id);
+        if (existingIndex === -1) {
+          acc.push(curr);
+        } else if (new Date(curr.created_at) > new Date(acc[existingIndex].created_at)) {
+          acc[existingIndex] = curr;
         }
-      }
+        return acc;
+      }, []) || [];
 
-      // Charger les chambres disponibles (ready-to-clean non assignées)
-      const { data: availableRoomsData } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('hotel_id', hotelId)
-        .eq('status', 'ready-to-clean')
-        .order('room_number');
+      const extractedRooms: Room[] = uniqueAssignments
+        .filter((a: any) => a.rooms)
+        .map((a: any) => ({
+          id: a.rooms.id,
+          room_number: a.rooms.room_number,
+          status: a.rooms.status || 'needs-cleaning',
+          notes: a.rooms.notes,
+          cleaning_priority: a.rooms.cleaning_priority || 5,
+          cleaning_type: a.rooms.cleaning_type
+        }));
+
+      setAssignments(uniqueAssignments);
+      setRooms(extractedRooms);
       
-      if (availableRoomsData) {
-        // Filtrer celles qui ne sont pas déjà assignées
-        const assignedRoomIds = (assignmentsData || []).map(a => a.room_id);
-        const unassignedAvailable = availableRoomsData.filter(
-          room => !assignedRoomIds.includes(room.id)
-        );
-        setAvailableRooms(unassignedAvailable);
-      }
+      // Sauvegarder dans le cache
+      localStorage.setItem(`assignments_${hotelId}_${housekeeperId}`, JSON.stringify({
+        assignments: uniqueAssignments,
+        rooms: extractedRooms,
+        timestamp: Date.now()
+      }));
 
-      // Charger les tâches d'inventaire du linge
-      const { data: linenTask } = await supabase
+      // Charger les tâches d'inventaire linge
+      const today = new Date().toISOString().split('T')[0];
+      const { data: linenTasks } = await supabase
         .from('linen_inventory_tasks')
         .select('*')
-        .eq('assigned_to', housekeeperId)
-        .in('status', ['pending', 'in_progress'])
-        .order('task_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .eq('hotel_id', hotelId)
+        .eq('task_date', today)
+        .in('status', ['pending', 'in_progress']);
       
-      if (linenTask) {
-        setActiveLinenTask(linenTask.id);
+      if (linenTasks && linenTasks.length > 0) {
+        const myTask = linenTasks.find((t: any) => 
+          t.assigned_to === housekeeperName || 
+          t.assigned_to === housekeeperId
+        );
+        if (myTask) {
+          setActiveLinenTask(myTask.id);
+        }
       }
-
+      
     } catch (error) {
-      console.error('Erreur chargement données travail:', error);
+      console.error('Erreur chargement données:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les données de travail",
@@ -531,206 +424,74 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
-
-  const loadAllPendingRooms = async () => {
-    // Fallback: charger toutes les chambres à nettoyer
-    console.log('🔄 Fallback: Chargement de toutes les chambres à nettoyer pour hotel:', hotelId);
-    const { data: roomsData, error } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('hotel_id', hotelId)
-      .in('status', ['dirty', 'to_clean'])
-      .order('room_number');
-
-    console.log('🏠 Chambres en fallback:', roomsData);
-    if (error) {
-      console.error('❌ Erreur fallback chambres:', error);
-    }
-
-    if (!error && roomsData) {
-      setRooms(roomsData);
-      
-      // Si aucune chambre trouvée, afficher un message informatif
-      if (roomsData.length === 0) {
-        toast({
-          title: "Aucune chambre à nettoyer",
-          description: "Toutes les chambres sont propres ou aucune chambre n'est configurée pour cet établissement.",
-          variant: "default"
-        });
-      }
-    } else if (error) {
-      console.error('Erreur chargement chambres:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger les chambres",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const updateRoomStatus = async (roomId: string, newStatus: string) => {
-    const startTime = Date.now();
-    
+  const handleRoomStatusChange = async (roomId: string, newStatus: string, notes?: string) => {
     try {
       const room = rooms.find(r => r.id === roomId);
-      
-      // Mettre à jour le statut de la chambre
-      const updateData: any = { 
-        status: newStatus,
-        last_cleaned_at: newStatus === 'clean' ? new Date().toISOString() : null
-      };
-      
-      // Ajouter les notes si disponibles
-      const hasComment = roomNotes[roomId] && roomNotes[roomId].trim().length > 0;
-      if (hasComment) {
-        updateData.notes = roomNotes[roomId];
-      }
-      
+      if (!room) return;
+
       const { error: roomError } = await supabase
         .from('rooms')
-        .update(updateData)
+        .update({ 
+          status: newStatus,
+          notes: notes || room.notes
+        })
         .eq('id', roomId);
 
-      if (roomError) {
-        toast({
-          title: "Erreur",
-          description: "Impossible de mettre à jour le statut",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Notification uniquement pour chambre terminée
-      if (newStatus === 'clean') {
-        toast({
-          title: "✅ Chambre terminée",
-          description: `Chambre ${room?.room_number} marquée comme propre`,
-          duration: 3000
-        });
-      }
-      
-      // Notification séparée si un commentaire a été ajouté
-      if (hasComment) {
-        toast({
-          title: "💬 Commentaire ajouté",
-          description: `Commentaire enregistré pour la chambre ${room?.room_number}`,
-          duration: 3000
-        });
-      }
+      if (roomError) throw roomError;
 
-      // Calculer la durée si la chambre est terminée
-      let duration = 0;
-      const assignment = assignments.find(a => a.rooms?.id === roomId);
-      
-      if (assignment && newStatus === 'clean') {
-        const startedAt = new Date(assignment.started_at || assignment.assigned_at).getTime();
-        duration = Math.round((Date.now() - startedAt) / 60000); // en minutes
-      }
-
-      // Mettre à jour l'assignation si elle existe
+      const assignment = assignments.find(a => a.room_id === roomId);
       if (assignment) {
-        const updateData: any = {
-          status: newStatus === 'clean' ? 'completed' : 'in_progress',
-        };
+        const newAssignmentStatus = newStatus === 'clean' ? 'completed' : 
+                                    newStatus === 'in-progress' ? 'in_progress' : 'assigned';
         
-        if (newStatus === 'in_progress') {
-          updateData.started_at = new Date().toISOString();
-        } else if (newStatus === 'clean') {
-          updateData.completed_at = new Date().toISOString();
-          updateData.actual_duration = duration;
-        }
-
-        const { error: assignmentError } = await supabase
+        await supabase
           .from('assignments')
-          .update(updateData)
+          .update({ 
+            status: newAssignmentStatus,
+            completed_at: newStatus === 'clean' ? new Date().toISOString() : null
+          })
           .eq('id', assignment.id);
-
-        if (assignmentError) {
-          console.error('Erreur mise à jour assignation:', assignmentError);
-        }
       }
 
-      // Si la chambre est terminée, ajouter au journal
-      if (newStatus === 'clean') {
-        const roomNumber = rooms.find(r => r.id === roomId)?.room_number || roomId;
-        addToActivityLog(`✅ Chambre ${roomNumber} terminée`, 'success');
-      } else if (newStatus === 'in_progress') {
-        const roomNumber = rooms.find(r => r.id === roomId)?.room_number || roomId;
-        addToActivityLog(`🔄 Chambre ${roomNumber} en cours`, 'info');
-      }
-
-      // Mettre à jour l'état local - garder la chambre dans la liste même si propre
-      setRooms(prev => {
-        const updatedRooms = prev.map(room => 
-          room.id === roomId 
-            ? { ...room, status: newStatus }
-            : room
-        );
-        
-        // Mettre à jour le cache avec les chambres mises à jour (ne pas supprimer les chambres propres)
-        const cachedKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
-        try {
-          const updatedAssignments = assignments.map(a => 
-            a.rooms?.id === roomId 
-              ? { ...a, status: newStatus === 'clean' ? 'completed' : 'in_progress', rooms: { ...a.rooms, status: newStatus } }
-              : a
-          );
-          localStorage.setItem(cachedKey, JSON.stringify({
-            assignments: updatedAssignments,
-            rooms: updatedRooms,
-            timestamp: Date.now()
-          }));
-        } catch (e) {
-          console.error('Erreur mise à jour cache:', e);
-        }
-        
-        return updatedRooms;
-      });
-
-      // Log d'activité
-      await supabase
-        .from('activities')
-        .insert({
+      // Logger l'action
+      if (hotelId) {
+        await supabase.from('daily_action_logs').insert({
           hotel_id: hotelId,
-          entity_type: 'room',
-          entity_id: roomId,
-          activity_type: 'room_status_update',
+          action_type: newStatus === 'clean' ? 'cleaning-end' : 'cleaning-start',
+          description: `Chambre ${room.room_number} - ${newStatus === 'clean' ? 'Nettoyage terminé' : 'Nettoyage en cours'}`,
+          room_number: room.room_number,
           actor_name: housekeeperName,
           actor_type: 'housekeeper',
-          details: {
-            room_number: rooms.find(r => r.id === roomId)?.room_number,
-            new_status: newStatus,
-            access_code: accessCode
-          }
+          details: { notes, previousStatus: room.status }
         });
-
-      if (newStatus !== 'clean') {
-        // Log entry already added above
       }
 
+      setRooms(prev => prev.map(r => 
+        r.id === roomId ? { ...r, status: newStatus, notes: notes || r.notes } : r
+      ));
+
+      const statusText = newStatus === 'clean' ? 'terminé' : 'en cours';
+      addToActivityLog(`✅ Chambre ${room.room_number} - Nettoyage ${statusText}`, 'success');
+
+      toast({
+        title: newStatus === 'clean' ? "✅ Chambre nettoyée" : "🔄 En cours",
+        description: `Chambre ${room.room_number} ${statusText}`,
+      });
+
     } catch (error) {
-      console.error('Erreur mise à jour statut:', error);
+      console.error('Erreur changement statut:', error);
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue",
+        description: "Impossible de mettre à jour le statut",
         variant: "destructive"
       });
     }
   };
 
   const handleLogout = () => {
-    // Nettoyer le localStorage - MAIS garder le cache des assignations pour la persistance
-    localStorage.removeItem('housekeeper');
-    localStorage.removeItem('housekeeperProfile');
-    localStorage.removeItem('selectedHotelId');
-    localStorage.removeItem('selectedHotelName');
-    localStorage.removeItem('selectedHotelCode');
+    storageService.clearHousekeeperProfile();
+    localStorage.removeItem(`assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`);
     
-    // NE PAS nettoyer le cache des assignations - le garder pour la prochaine connexion
-    // const cacheKey = `assignments_${hotelId}_${housekeeperProfile?.id || 'temp'}`;
-    // localStorage.removeItem(cacheKey);
-    
-    // Rediriger vers la page appropriée
     if (isAuthenticatedHousekeeper) {
       navigate('/housekeeper/hotels');
     } else {
@@ -738,655 +499,256 @@ export const HousekeeperWorkSimple: React.FC = () => {
     }
   };
 
-  const handleRefresh = async () => {
-    console.log('🔄 Rafraîchissement manuel déclenché');
-    await loadWorkData();
-  };
+  const completedRooms = rooms.filter(r => r.status === 'clean').length;
+  const totalRooms = rooms.length;
+  const progressPercent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 0;
 
-  const takeAvailableRoom = async (roomId: string) => {
-    try {
-      // Déterminer l'ID du housekeeper
-      const housekeeperId = isAuthenticatedHousekeeper 
-        ? housekeeperProfile.id 
-        : (housekeeper?.id || housekeeper?.access_code);
-      
-      // Créer une assignation
-      const { error } = await supabase
-        .from('assignments')
-        .insert({
-          hotel_id: hotelId,
-          room_id: roomId,
-          housekeeper_id: housekeeperId,
-          housekeeper_name: housekeeperName,
-          status: 'assigned'
-        });
-      
-      if (error) throw error;
-      
-      // Mettre à jour le statut de la chambre à dirty
-      await supabase
-        .from('rooms')
-        .update({ status: 'dirty' })
-        .eq('id', roomId);
-      
-      // Retirer de la liste des chambres disponibles
-      const room = availableRooms.find(r => r.id === roomId);
-      setAvailableRooms(prev => prev.filter(r => r.id !== roomId));
-      
-      // Ajouter à mes chambres
-      if (room) {
-        setRooms(prev => [...prev, { ...room, status: 'dirty' }]);
-      }
-      
-      toast({
-        title: "✅ Chambre assignée",
-        description: `Chambre ${room?.room_number} ajoutée à votre liste`,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erreur auto-assignation:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de prendre cette chambre",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleOpenLinenInventory = async () => {
-    if (!hotelId) return;
-    
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const assignedToId = housekeeperProfile?.id || housekeeper?.id;
-      
-      if (!assignedToId) {
-        toast({
-          title: "Erreur",
-          description: "Impossible d'identifier l'utilisateur",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Check if there's already a task for today
-      const { data: existingTasks } = await supabase
-        .from('linen_inventory_tasks')
-        .select('*')
-        .eq('hotel_id', hotelId)
-        .eq('assigned_to', assignedToId)
-        .eq('task_date', today)
-        .maybeSingle();
-      
-      let taskId: string;
-      
-      if (existingTasks) {
-        taskId = existingTasks.id;
-      } else {
-        // Create a new task
-        const { data: newTask, error } = await supabase
-          .from('linen_inventory_tasks')
-          .insert({
-            hotel_id: hotelId,
-            assigned_to: assignedToId,
-            assigned_by: assignedToId,
-            task_date: today,
-            status: 'pending'
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        taskId = newTask.id;
-      }
-      
-      setActiveLinenTask(taskId);
-      setShowLinenInventory(true);
-    } catch (error: any) {
-      console.error('Erreur création tâche inventaire:', error);
-      
-      // Message d'erreur plus explicite selon le type d'erreur
-      let errorMessage = "Impossible de créer la tâche d'inventaire";
-      
-      if (error?.message?.includes('row-level security') || error?.code === '42501') {
-        errorMessage = "Permission refusée. Veuillez vous reconnecter ou contacter l'administrateur.";
-        console.error('Erreur RLS - vérifier les politiques pour linen_inventory_tasks');
-      } else if (error?.message) {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "Erreur inventaire",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const unassignRoom = async (roomId: string, roomNumber: string) => {
-    try {
-      // Find assignment for this room
-      const assignment = assignments.find(a => a.rooms?.id === roomId);
-      if (!assignment) return;
-
-      // Delete assignment
-      const { error } = await supabase
-        .from('assignments')
-        .delete()
-        .eq('id', assignment.id);
-
-      if (error) throw error;
-
-      // Remove from local state
-      setRooms(prev => prev.filter(r => r.id !== roomId));
-      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
-
-      // Pas de notification pour désassignation
-      console.log(`Chambre ${roomNumber} désassignée`);
-
-    } catch (error) {
-      console.error('Erreur désassignation:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de désassigner la chambre"
-      });
-    }
-  };
+  const sortedRooms = [...rooms].sort((a, b) => {
+    if (a.status === 'clean' && b.status !== 'clean') return 1;
+    if (a.status !== 'clean' && b.status === 'clean') return -1;
+    if (a.cleaning_priority !== b.cleaning_priority) return b.cleaning_priority - a.cleaning_priority;
+    return a.room_number.localeCompare(b.room_number, undefined, { numeric: true });
+  });
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <Card className="p-6 text-center">
-          <div className="animate-pulse">Chargement...</div>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Chargement de vos chambres...</p>
+        </div>
       </div>
     );
   }
 
-  const completedRooms = rooms.filter(r => r.status === 'clean').length;
-  const totalRooms = rooms.length;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 lg:p-6">
-      {/* Journal d'activité (panneau latéral) */}
-      {showActivityLog && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
-          <div className="bg-background w-80 max-w-full h-full shadow-xl flex flex-col">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h3 className="font-semibold flex items-center gap-2">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Home className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="font-semibold text-lg">{hotel?.name || 'Mon Hôtel'}</h1>
+                <p className="text-sm text-muted-foreground">{housekeeperName}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Indicateur connexion */}
+              <Badge variant={isConnected ? "default" : "destructive"} className="gap-1">
+                {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                {isConnected ? 'Connecté' : 'Hors ligne'}
+              </Badge>
+              
+              {/* Nouvelles chambres */}
+              {newRoomsCount > 0 && (
+                <Badge variant="secondary" className="animate-pulse bg-green-100 text-green-800">
+                  +{newRoomsCount} nouvelle(s)
+                </Badge>
+              )}
+              
+              <Button variant="ghost" size="icon" onClick={() => setShowActivityLog(!showActivityLog)}>
                 <ScrollText className="h-5 w-5" />
-                Journal d'activité
-              </h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowActivityLog(false)}>
-                <X className="h-4 w-4" />
+              </Button>
+              
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
+                <LogOut className="h-5 w-5" />
               </Button>
             </div>
-            <div className="flex-1 overflow-y-auto p-3">
+          </div>
+        </div>
+      </div>
+
+      {/* Journal d'activité */}
+      {showActivityLog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
+          <Card className="w-full max-w-md max-h-[60vh] overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between py-3">
+              <CardTitle className="text-lg">Journal d'activité</CardTitle>
+              <Button variant="ghost" size="icon" onClick={() => setShowActivityLog(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="overflow-y-auto max-h-[calc(60vh-80px)]">
               {activityLog.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Aucune activité récente
-                </p>
+                <p className="text-center text-muted-foreground py-4">Aucune activité</p>
               ) : (
                 <div className="space-y-2">
                   {activityLog.map(entry => (
-                    <div 
-                      key={entry.id}
-                      className={`p-2 rounded-lg text-sm ${
-                        entry.type === 'success' ? 'bg-green-50 border-green-200 border' :
-                        entry.type === 'warning' ? 'bg-orange-50 border-orange-200 border' :
-                        entry.type === 'error' ? 'bg-red-50 border-red-200 border' :
-                        'bg-blue-50 border-blue-200 border'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <span>{entry.message}</span>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{entry.time}</span>
-                      </div>
+                    <div key={entry.id} className="flex items-start gap-2 text-sm">
+                      <span className="text-muted-foreground whitespace-nowrap">{entry.time}</span>
+                      <span className={
+                        entry.type === 'success' ? 'text-green-600' :
+                        entry.type === 'warning' ? 'text-yellow-600' :
+                        entry.type === 'error' ? 'text-red-600' : ''
+                      }>{entry.message}</span>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Header */}
-      <div className="mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-2xl font-bold text-gray-800 truncate">
-                {hotel?.name || localStorage.getItem('selectedHotelName') || 'Hôtel non identifié'}
-              </h1>
-               <p className="text-xs sm:text-base text-gray-600 flex items-center gap-2 truncate">
-                 <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                 <span className="truncate">{hotel?.address || 'Adresse non spécifiée'}</span>
-                 {isConnected ? (
-                   <Badge variant="default" className="text-xs bg-green-500 ml-2">
-                     <Wifi className="h-3 w-3 mr-1" />
-                     Temps réel
-                   </Badge>
-                 ) : (
-                   <Badge variant="outline" className="text-xs border-orange-500 text-orange-500 ml-2">
-                     <WifiOff className="h-3 w-3 mr-1" />
-                     Hors ligne
-                   </Badge>
-                 )}
-               </p>
+      <div className="container mx-auto px-4 py-4 space-y-4">
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{completedRooms}</div>
+            <div className="text-xs text-muted-foreground">Terminées</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold">{totalRooms - completedRooms}</div>
+            <div className="text-xs text-muted-foreground">Restantes</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-green-600">{progressPercent}%</div>
+            <div className="text-xs text-muted-foreground">Progression</div>
+          </Card>
+        </div>
+
+        {/* Barre de progression */}
+        <div className="w-full bg-gray-200 rounded-full h-3">
+          <div 
+            className="bg-gradient-to-r from-primary to-green-500 h-3 rounded-full transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+
+        {/* Pointage */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">Pointage</span>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {/* Bouton journal d'activité */}
-            <Button
-              onClick={() => setShowActivityLog(true)}
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-primary relative"
-              title="Journal d'activité"
-            >
-              <ScrollText className="h-4 w-4" />
-              {activityLog.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  {activityLog.length > 9 ? '9+' : activityLog.length}
-                </span>
+            <div className="flex items-center gap-2">
+              {startTime && <Badge variant="outline">Début: {startTime}</Badge>}
+              {endTime && <Badge variant="outline">Fin: {endTime}</Badge>}
+              {!startTime && (
+                <Button size="sm" onClick={handleStartPointage}>
+                  Commencer
+                </Button>
               )}
-            </Button>
-            <Button
-              onClick={handleRefresh}
-              variant="ghost"
-              size="sm"
-              disabled={isRefreshing}
-              className="text-muted-foreground hover:text-primary"
-              title="Actualiser les données"
-            >
-              <Clock className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleLogout}
-              className="flex-1 sm:flex-initial"
-            >
-              <LogOut className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Déconnexion</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Indicateur de connexion et nouvelles chambres */}
-        <div className="flex items-center gap-3 mb-4">
-          <Badge 
-            variant={isConnected ? "default" : "destructive"} 
-            className="flex items-center gap-1.5"
-          >
-            {isConnected ? (
-              <>
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <Wifi className="h-3 w-3" />
-                <span className="hidden sm:inline">En direct</span>
-              </>
-            ) : (
-              <>
-                <div className="w-2 h-2 rounded-full bg-red-400" />
-                <WifiOff className="h-3 w-3" />
-                <span className="hidden sm:inline">Déconnecté</span>
-              </>
-            )}
-          </Badge>
-          
-          {newRoomsCount > 0 && (
-            <Badge 
-              variant="secondary" 
-              className="bg-blue-500 text-white animate-bounce inline-flex items-center gap-1"
-            >
-              +{newRoomsCount} nouvelle{newRoomsCount > 1 ? 's' : ''}
-            </Badge>
-          )}
-        </div>
-
-        {/* Statistics Section */}
-        <Card className="mb-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              📊 Mes statistiques
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-background/60 rounded-lg p-3">
-                <div className="text-2xl font-bold text-primary">{assignments.length}</div>
-                <div className="text-xs text-muted-foreground">Assignées</div>
-              </div>
-              <div className="bg-background/60 rounded-lg p-3">
-                <div className="text-2xl font-bold text-orange-500">
-                  {assignments.filter(a => a.status === 'in_progress').length}
-                </div>
-                <div className="text-xs text-muted-foreground">En cours</div>
-              </div>
-              <div className="bg-background/60 rounded-lg p-3">
-                <div className="text-2xl font-bold text-green-500">
-                  {assignments.filter(a => a.status === 'completed').length}
-                </div>
-                <div className="text-xs text-muted-foreground">Terminées</div>
-              </div>
-              <div className="bg-background/60 rounded-lg p-3">
-                <div className="text-2xl font-bold text-blue-500">{availableRooms.length}</div>
-                <div className="text-xs text-muted-foreground">Client sorti</div>
-              </div>
+              {startTime && !endTime && (
+                <Button size="sm" variant="secondary" onClick={handleEndPointage}>
+                  Terminer
+                </Button>
+              )}
             </div>
-          </CardContent>
+          </div>
         </Card>
 
-        {/* Tab Navigation */}
-        <div className="flex gap-2 mb-4">
+        {/* Tabs */}
+        <div className="flex gap-2">
           <Button 
             variant={activeTab === 'rooms' ? 'default' : 'outline'}
             onClick={() => setActiveTab('rooms')}
             className="flex-1"
           >
-            🛏️ Chambres ({rooms.length})
+            <Home className="h-4 w-4 mr-2" />
+            Chambres ({totalRooms})
           </Button>
-          <Button 
-            variant={activeTab === 'inventory' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('inventory')}
-            className="flex-1 relative"
-          >
-            📦 Inventaire
-            {activeLinenTask && (
-              <Badge className="ml-1 bg-red-500 text-white">1</Badge>
-            )}
-          </Button>
+          {activeLinenTask && (
+            <Button 
+              variant={activeTab === 'inventory' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('inventory')}
+              className="flex-1"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Inventaire
+            </Button>
+          )}
         </div>
 
-         {/* Session Info avec Pointage */}
-         <Card className="p-3 sm:p-4 bg-blue-50 border-blue-200">
-           <div className="flex flex-col gap-3">
-             {/* Info utilisateur */}
-             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-                 <div>
-                   <p className="text-xs sm:text-sm font-medium text-blue-800">Connecté en tant que</p>
-                   <p className="text-sm sm:text-base text-blue-600 truncate">{housekeeperName}</p>
-                 </div>
-                 {!isAuthenticatedHousekeeper && (
-                   <div>
-                     <p className="text-xs sm:text-sm font-medium text-blue-800">Code d'accès</p>
-                     <p className="text-sm font-mono text-blue-600">{accessCode}</p>
-                   </div>
-                 )}
-               </div>
-               <Badge variant="default" className="bg-green-100 text-green-800 whitespace-nowrap">
-                 <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                 Connecté
-               </Badge>
-             </div>
-             
-             {/* Pointage */}
-             <div className="border-t border-blue-200 pt-3">
-               <p className="text-xs sm:text-sm font-medium text-blue-800 mb-2 flex items-center gap-1">
-                 <Clock className="h-3.5 w-3.5" />
-                 Pointage du jour
-               </p>
-               <div className="flex flex-wrap items-center gap-2">
-                 {!startTime ? (
-                   <Button 
-                     size="sm" 
-                     onClick={handleStartPointage}
-                     className="bg-green-600 hover:bg-green-700 text-white"
-                   >
-                     <Clock className="h-3.5 w-3.5 mr-1" />
-                     Pointer arrivée
-                   </Button>
-                 ) : (
-                   <Badge variant="outline" className="bg-green-50 border-green-300 text-green-700 px-3 py-1">
-                     Début: {startTime}
-                   </Badge>
-                 )}
-                 
-                 {startTime && !endTime ? (
-                   <Button 
-                     size="sm" 
-                     onClick={handleEndPointage}
-                     className="bg-orange-600 hover:bg-orange-700 text-white"
-                   >
-                     <Clock className="h-3.5 w-3.5 mr-1" />
-                     Pointer départ
-                   </Button>
-                 ) : endTime ? (
-                   <Badge variant="outline" className="bg-orange-50 border-orange-300 text-orange-700 px-3 py-1">
-                     Fin: {endTime}
-                   </Badge>
-                 ) : null}
-                 
-                 {startTime && endTime && (
-                   <Badge variant="default" className="bg-blue-100 text-blue-800 px-3 py-1">
-                     ✓ Journée complète
-                   </Badge>
-                 )}
-               </div>
-             </div>
-           </div>
-         </Card>
-      </div>
+        {/* Contenu */}
+        {activeTab === 'rooms' ? (
+          <>
+            {/* Actions rapides */}
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => loadWorkData()}
+                disabled={isRefreshing}
+              >
+                {isRefreshing ? 'Actualisation...' : 'Actualiser'}
+              </Button>
+              {hotelId && (
+                <IncidentReportDialogSimple 
+                  hotelId={hotelId}
+                  userType="housekeeper"
+                />
+              )}
+            </div>
 
-      {/* Progress */}
-      <Card className="mb-4 sm:mb-6">
-        <CardContent className="pt-4 sm:pt-6">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h3 className="text-base sm:text-lg font-semibold">Progression</h3>
-            <Badge variant="outline" className="text-sm sm:text-lg px-2 sm:px-3 py-1">
-              {completedRooms} / {totalRooms}
-            </Badge>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
-            <div 
-              className="bg-green-500 h-2 sm:h-3 rounded-full transition-all duration-300"
-              style={{ width: `${totalRooms > 0 ? (completedRooms / totalRooms) * 100 : 0}%` }}
-            />
-          </div>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-            {completedRooms === totalRooms && totalRooms > 0 
-              ? 'Toutes les chambres terminées !' 
-              : `${totalRooms - completedRooms} chambres restantes`}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Linen Inventory Section */}
-      {activeTab === 'inventory' && (
-        <>
-          {showLinenInventory && activeLinenTask && hotelId ? (
+            {/* Liste des chambres */}
+            {sortedRooms.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-semibold text-lg mb-2">Aucune chambre assignée</h3>
+                <p className="text-muted-foreground">
+                  Attendez que le responsable vous assigne des chambres
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {sortedRooms.map(room => (
+                  <RoomCardEnhanced
+                    key={room.id}
+                    room={room}
+                    hotelId={hotelId || ''}
+                    onStatusChange={handleRoomStatusChange}
+                    onNotesChange={(roomId, notes) => {
+                      setRoomNotes(prev => ({ ...prev, [roomId]: notes }));
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Inventaire linge */
+          activeLinenTask && hotelId && (
             <LinenQuickInventory
               taskId={activeLinenTask}
               hotelId={hotelId}
-              onClose={() => setShowLinenInventory(false)}
+              onComplete={() => {
+                setActiveLinenTask(null);
+                setActiveTab('rooms');
+                toast({
+                  title: "✅ Inventaire terminé",
+                  description: "Merci pour votre travail!"
+                });
+              }}
             />
-          ) : (
-            <Card className="mb-4 sm:mb-6">
-              <CardContent className="pt-6 pb-6 text-center">
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  Inventaire du linge
-                </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Comptez le linge propre et sale de l'établissement
-                </p>
-                <Button 
-                  onClick={handleOpenLinenInventory}
-                  className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700"
-                >
-                  <Package className="h-4 w-4 mr-2" />
-                  Démarrer l'inventaire
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
+          )
+        )}
 
-      {/* Rooms Tab Content */}
-      {activeTab === 'rooms' && (
-        <>
-          {/* Available Rooms Section */}
-          {availableRooms.length > 0 && (
-            <Card className="mb-4 sm:mb-6 border-blue-200 bg-blue-50/50">
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <Badge variant="default" className="bg-blue-600">
-                    {availableRooms.length}
-                  </Badge>
-                  Chambres prêtes à nettoyer
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3">
-                  {availableRooms.map(room => (
-                    <div
-                      key={room.id}
-                      className="p-3 sm:p-4 rounded-lg border-2 border-blue-300 bg-white"
-                    >
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0 w-full sm:w-auto">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-lg sm:text-xl font-bold">Chambre {room.room_number}</span>
-                            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
-                              🚪 Client sorti
-                            </Badge>
-                            
-                            {/* Badge type de nettoyage */}
-                            {room.cleaning_type && (
-                              <Badge variant={room.cleaning_type === 'full' ? 'default' : 'secondary'} className="text-xs">
-                                <Sparkles className="h-3 w-3 mr-1" />
-                                {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
-                              </Badge>
-                            )}
-                          </div>
-                          {room.notes && (
-                            <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                              📝 {room.notes}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <Button 
-                          onClick={() => takeAvailableRoom(room.id)}
-                          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
-                          size="sm"
-                        >
-                          Prendre cette chambre
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* Room List */}
-      {activeTab === 'rooms' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Mes chambres assignées</CardTitle>
-          </CardHeader>
-          <CardContent>
-          {rooms.length === 0 ? (
-            <div className="text-center py-8">
-              <Home className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
-                Aucune chambre à nettoyer
-              </h3>
-              <p className="text-xs sm:text-base text-gray-500 mb-4 px-4">
-                {isLoading 
-                  ? "Chargement des chambres..." 
-                  : "Toutes les chambres sont propres ou aucune chambre n'est configurée pour cet établissement."}
-              </p>
-              <p className="text-xs sm:text-sm text-gray-400 px-4">
-                L'administrateur doit créer des chambres ou vous assigner des chambres à nettoyer.
-              </p>
+        {/* Chambres disponibles (client sorti) */}
+        {availableRooms.length > 0 && (
+          <Card className="border-green-200 bg-green-50 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="h-5 w-5 text-green-600" />
+              <span className="font-medium text-green-800">
+                {availableRooms.length} chambre(s) disponible(s)
+              </span>
             </div>
-          ) : (
-            <div className="grid gap-4">
-              {rooms.map(room => (
-                <RoomCardEnhanced
-                  key={room.id}
-                  room={room}
-                  hotelId={hotelId!}
-                  onUpdateStatus={updateRoomStatus}
-                  onUnassign={unassignRoom}
-                />
+            <div className="flex flex-wrap gap-2">
+              {availableRooms.map(room => (
+                <Badge key={room.id} variant="outline" className="bg-white">
+                  {room.room_number}
+                </Badge>
               ))}
             </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Floating Linen Inventory Button */}
-      <div className="fixed bottom-24 right-6 z-50">
-        <Button
-          size="lg"
-          className="rounded-full shadow-lg bg-blue-500 hover:bg-blue-600 text-white h-14 w-14 sm:h-auto sm:w-auto sm:px-6"
-          onClick={handleOpenLinenInventory}
-        >
-          <Package className="h-6 w-6 sm:mr-2" />
-          <span className="hidden sm:inline">Inventaire linge</span>
-        </Button>
+          </Card>
+        )}
       </div>
-
-      {/* Floating Incident Report Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          size="lg"
-          className="rounded-full shadow-lg bg-red-500 hover:bg-red-600 text-white h-14 w-14 sm:h-auto sm:w-auto sm:px-6"
-          onClick={() => setShowGeneralIncidentDialog(true)}
-        >
-          <AlertCircle className="h-6 w-6 sm:mr-2" />
-          <span className="hidden sm:inline">Signaler un incident</span>
-        </Button>
-      </div>
-
-      {/* General Incident Dialog */}
-      {showGeneralIncidentDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Signaler un incident</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowGeneralIncidentDialog(false)}
-              >
-                ✕
-              </Button>
-            </div>
-            <div className="p-4">
-              <IncidentReportDialogSimple 
-                hotelId={hotelId!} 
-                userType="housekeeper"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Linen Quick Inventory */}
-      {showLinenInventory && activeLinenTask && hotelId && (
-        <LinenQuickInventory
-          taskId={activeLinenTask}
-          hotelId={hotelId}
-          onClose={() => {
-            setShowLinenInventory(false);
-            setActiveLinenTask(null);
-          }}
-        />
-      )}
     </div>
   );
 };
