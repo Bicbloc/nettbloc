@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { HotelStorageService } from '@/services/hotelStorageService';
+import { storageService } from '@/services/storageService';
 import { HotelSessionService } from '@/services/hotelSessionService';
 
 interface HotelData {
@@ -106,7 +106,7 @@ export const useAutoSetup = () => {
     
     try {
       // PHASE 1: Vérification RAPIDE du cache localStorage
-      const cachedHotel = HotelStorageService.get();
+      const cachedHotel = storageService.getHotel();
       if (cachedHotel && cachedHotel.id && cachedHotel.id.length > 30) {
         console.log('⚡ CACHE HIT - Vérification propriété:', cachedHotel.id.slice(0, 8) + '...');
         
@@ -136,7 +136,7 @@ export const useAutoSetup = () => {
           return; // Démarrage rapide!
         } else {
           console.log('⚠️ Cache invalide - hôtel n\'appartient pas à l\'utilisateur, nettoyage...');
-          HotelStorageService.clear();
+          storageService.clearHotel();
         }
       }
 
@@ -206,7 +206,7 @@ export const useAutoSetup = () => {
 
       // Sauvegarder dans le cache pour prochain chargement
       setHotel(hotelResult);
-      HotelStorageService.save({
+      storageService.saveHotel({
         id: hotelResult.id,
         name: hotelResult.name,
         code: hotelResult.hotel_code || ''

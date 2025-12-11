@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { HotelStorageService } from '@/services/hotelStorageService';
+import { storageService } from '@/services/storageService';
 
 interface AuthContextType {
   user: User | null;
@@ -126,7 +126,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Clear storage on sign out
         if (event === 'SIGNED_OUT') {
-          HotelStorageService.clear();
+          storageService.clearHotel();
         }
       }
     );

@@ -43,8 +43,8 @@ export const MobileOptimizedInterface: React.FC<MobileOptimizedInterfaceProps> =
   useEffect(() => {
     const checkHotelPersistence = async () => {
       if (!hotelId) {
-        const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
-        const storedHotelId = SessionPersistenceService.getStoredHotelId();
+        const { storageService } = await import('@/services/storageService');
+        const storedHotelId = storageService.recoverHotelId();
         if (storedHotelId) {
           console.log('🏨 Hôtel restauré depuis le stockage:', storedHotelId);
         } else {
