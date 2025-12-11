@@ -221,11 +221,20 @@ class UnifiedParserService {
       ? localResult.rooms.filter(r => r.status === 'unknown').length / localResult.rooms.length 
       : 0;
 
-    const needsAiFallback = forceAi ||
+    // Désactiver le fallback IA en mode test pour éviter les erreurs 402
+    const isTestMode = hotelId === 'test-mode' || !hotelId;
+    
+    const needsAiFallback = !isTestMode && (
+      forceAi ||
       localResult.confidence < 70 ||  // Seuil augmenté de 55% à 70%
       localResult.rooms.length < 3 ||
       unknownStatusRatio > 0.2 ||  // Réduit de 30% à 20%
-      (expectedRoomCount > 0 && roomCountDeviation > 0.2);  // Écart > 20% avec patterns appris
+      (expectedRoomCount > 0 && roomCountDeviation > 0.2)  // Écart > 20% avec patterns appris
+    );
+
+    if (isTestMode && (forceAi || localResult.confidence < 70 || localResult.rooms.length < 3)) {
+      this.log(`🧪 Mode test: fallback IA désactivé (parsing local uniquement)`);
+    }
 
     if (needsAiFallback) {
       const reason = forceAi ? 'forcé par utilisateur' :

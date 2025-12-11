@@ -185,20 +185,30 @@ export class GenericAdapter extends PmsAdapter {
   private extractRoomNumbers(line: string): string[] {
     const numbers: string[] = [];
     
-    // Plusieurs patterns pour maximiser la détection
+    // Plusieurs patterns pour maximiser la détection (ordre de priorité)
     const patterns = [
       // Pattern 1: Avec préfixe explicite (Room, Ch., Chambre, #)
       /(?:Room|Ch\.?|Chambre|#)\s*([A-Z]?-?0*[1-9]\d{0,3}[A-Z]?)\b/gi,
-      // Pattern 2: Numéro en début de ligne ou après espace/tab
+      // Pattern 2: Numéro en début de ligne (format tableau PMS)
+      /^([0-9]{1,4})\s+/gm,
+      // Pattern 3: Format avec tiret/statut (101 - DEPART, 205-ARRIVEE)
+      /([0-9]{1,4})\s*[-–]\s*[A-Z]/gi,
+      // Pattern 4: Numéro seul suivi de texte (espaces/tab)
       /(?:^|\s|\t)([0-9]{1,4}[A-Z]?)(?=\s|$|[:\-\.]|\t)/gm,
-      // Pattern 3: Numéros avec zéros initiaux (01, 001, 0101)
+      // Pattern 5: Numéros avec zéros initiaux (01, 001, 0101)
       /(?:^|\s)(0+[1-9]\d{0,3})(?=\s|$|[:\-])/gm,
-      // Pattern 4: Format alphanumérique (A1, 1A, P-101)
+      // Pattern 6: Format alphanumérique (A1, 1A, P-101)
       /(?:^|\s)([A-Z]-?\d{1,4}|\d{1,4}[A-Z])(?=\s|$)/gi,
+      // Pattern 7: Numéro après pipe ou virgule (format CSV/tableau)
+      /[|,]\s*([0-9]{1,4})\s*[|,]/g,
+      // Pattern 8: Numéro isolé sur une ligne simple
+      /^(\d{1,4})$/gm,
     ];
     
     for (const regex of patterns) {
       let match;
+      // Reset regex lastIndex pour chaque pattern
+      regex.lastIndex = 0;
       while ((match = regex.exec(line)) !== null) {
         const roomNum = match[1];
         
@@ -212,6 +222,8 @@ export class GenericAdapter extends PmsAdapter {
           // Ignorer les années (1900-2100) et les nombres trop grands
           if (num >= 1900 && num <= 2100) continue;
           if (num > 9999) continue;
+          // Ignorer les nombres trop petits qui sont souvent des compteurs
+          if (num === 0) continue;
           numbers.push(numMatch[1]);
         } else {
           // Garder le format pour les alphanumériques
@@ -240,6 +252,10 @@ export class GenericAdapter extends PmsAdapter {
       
       // Les chambres sont généralement entre 1 et 9999
       if (n < 1 || n > 9999) return false;
+      
+      // Exclure les heures isolées (format HH:MM détecté dans la ligne)
+      const timePattern = new RegExp(`\\b${num}:\\d{2}\\b`);
+      if (timePattern.test(originalLine)) return false;
     }
     
     return true;
