@@ -64,16 +64,17 @@ const DEFAULT_VALIDATION_RULES: ValidationRule[] = [
         'checkout', 'checkout_arrival', 'stayover', 'arrival', 
         'clean', 'dirty', 'occupied', 'vacant', 'maintenance',
         'out-of-order', 'needs-cleaning', 'needs-inspection',
-        'to_check', 'inspected', 'unknown'
+        'to_check', 'inspected', 'unknown', 'libre', 'occupé',
+        'départ', 'arrivée', 'recouche', 'a_blanc', 'vci', 'vcd'
       ];
       return validStatuses.some(s => room.status.toLowerCase().includes(s) || s.includes(room.status.toLowerCase()));
     },
-    penalty: 20
+    penalty: 10  // Réduit de 20 à 10 pour être moins restrictif
   },
   {
     name: 'has_cleaning_type',
     check: (room) => ['full', 'quick', 'none'].includes(room.cleaningType),
-    penalty: 30
+    penalty: 15  // Réduit de 30 à 15
   },
   {
     name: 'not_isolated_number',
@@ -82,10 +83,10 @@ const DEFAULT_VALIDATION_RULES: ValidationRule[] = [
       if (!room.originalText) return true;
       const text = room.originalText.toLowerCase();
       // Doit contenir au moins un mot-clé de statut ou "chambre/room"
-      const hasContext = /chambre|room|ch\.|status|statut|clean|dirty|sale|propre|parti|arrivé|checkout|arrival/i.test(text);
-      return hasContext || (room.confidence || 0) > 70;
+      const hasContext = /chambre|room|ch\.|status|statut|clean|dirty|sale|propre|parti|arrivé|checkout|arrival|départ|libre|occupé|recouche/i.test(text);
+      return hasContext || (room.confidence || 0) > 60;  // Réduit de 70 à 60
     },
-    penalty: 40
+    penalty: 15  // Réduit de 40 à 15
   }
 ];
 
@@ -116,7 +117,8 @@ class RoomValidator {
         }
       }
 
-      if (!isValid || score < 30) {
+      // Score minimum réduit de 30 à 20 pour accepter plus de chambres
+      if (!isValid || score < 20) {
         invalidRooms.push({ ...room, confidence: Math.max(0, score) });
         continue;
       }

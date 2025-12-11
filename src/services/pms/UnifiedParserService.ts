@@ -163,23 +163,29 @@ class UnifiedParserService {
   /**
    * Parse un rapport avec fallback IA automatique et validation
    */
-  async parseReportHybrid(text: string, hotelId: string): Promise<ParseResultWithMeta> {
+  /**
+   * Parse un rapport avec fallback IA automatique et validation
+   * @param forceAi Force l'utilisation de l'IA même si le parsing local est suffisant
+   */
+  async parseReportHybrid(text: string, hotelId: string, forceAi: boolean = false): Promise<ParseResultWithMeta> {
     const startTime = Date.now();
     this.debugLogs = [];
     
-    // Vérifier le cache
-    const cachedRooms = detectionCache.getParsedRooms(text, hotelId);
-    if (cachedRooms) {
-      this.log(`📦 Résultat du cache (${cachedRooms.length} chambres)`);
-      return {
-        rooms: cachedRooms,
-        pmsType: 'cached',
-        confidence: 95,
-        usedAi: false,
-        usedLearnedPatterns: true,
-        debugLogs: this.debugLogs,
-        processingTime: Date.now() - startTime
-      };
+    // Ne pas utiliser le cache si forceAi est activé
+    if (!forceAi) {
+      const cachedRooms = detectionCache.getParsedRooms(text, hotelId);
+      if (cachedRooms) {
+        this.log(`📦 Résultat du cache (${cachedRooms.length} chambres)`);
+        return {
+          rooms: cachedRooms,
+          pmsType: 'cached',
+          confidence: 95,
+          usedAi: false,
+          usedLearnedPatterns: true,
+          debugLogs: this.debugLogs,
+          processingTime: Date.now() - startTime
+        };
+      }
     }
     
     // Charger les patterns si nécessaire
@@ -204,14 +210,31 @@ class UnifiedParserService {
 
     this.log(`🔍 Parsing local: ${localResult.rooms.length} chambres, confiance ${localResult.confidence.toFixed(1)}%`);
 
-    // Critères pour déclencher le fallback IA
-    const needsAiFallback = 
-      localResult.confidence < 55 || 
+    // Comparer avec le nombre de chambres attendu (patterns appris)
+    const expectedRoomCount = this.learnedPatterns.size;
+    const roomCountDeviation = expectedRoomCount > 0 
+      ? Math.abs(localResult.rooms.length - expectedRoomCount) / expectedRoomCount 
+      : 0;
+
+    // Critères ASSOUPLIS pour déclencher le fallback IA
+    const unknownStatusRatio = localResult.rooms.length > 0 
+      ? localResult.rooms.filter(r => r.status === 'unknown').length / localResult.rooms.length 
+      : 0;
+
+    const needsAiFallback = forceAi ||
+      localResult.confidence < 70 ||  // Seuil augmenté de 55% à 70%
       localResult.rooms.length < 3 ||
-      (localResult.rooms.length > 0 && localResult.rooms.filter(r => r.status === 'unknown').length > localResult.rooms.length * 0.3);
+      unknownStatusRatio > 0.2 ||  // Réduit de 30% à 20%
+      (expectedRoomCount > 0 && roomCountDeviation > 0.2);  // Écart > 20% avec patterns appris
 
     if (needsAiFallback) {
-      this.log(`🤖 Confiance insuffisante (${localResult.confidence.toFixed(1)}%), appel IA...`);
+      const reason = forceAi ? 'forcé par utilisateur' :
+        localResult.confidence < 70 ? `confiance faible (${localResult.confidence.toFixed(1)}%)` :
+        localResult.rooms.length < 3 ? `peu de chambres (${localResult.rooms.length})` :
+        unknownStatusRatio > 0.2 ? `trop de statuts inconnus (${(unknownStatusRatio * 100).toFixed(0)}%)` :
+        `écart avec patterns (${(roomCountDeviation * 100).toFixed(0)}%)`;
+      
+      this.log(`🤖 Fallback IA: ${reason}`);
       
       try {
         const aiResult = await this.callAiFallback(preprocessedText, hotelId);
@@ -362,9 +385,10 @@ class UnifiedParserService {
 
   /**
    * Parse un rapport PDF et extrait les chambres (méthode principale)
+   * @param forceAi Force l'utilisation de l'IA même si le parsing local est suffisant
    */
-  async parseReport(text: string, hotelId: string): Promise<ParseResultWithMeta> {
-    return this.parseReportHybrid(text, hotelId);
+  async parseReport(text: string, hotelId: string, forceAi: boolean = false): Promise<ParseResultWithMeta> {
+    return this.parseReportHybrid(text, hotelId, forceAi);
   }
 
   /**
