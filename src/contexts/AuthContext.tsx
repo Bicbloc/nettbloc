@@ -52,8 +52,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(false);
   }, []);
 
-  const initializeSession = useCallback(async () => {
-    console.log('🚀 Starting session initialization...');
+  const initializeSession = useCallback(async (retryCount = 0) => {
+    console.log('🚀 Starting session initialization...', { retryCount });
     const startTime = Date.now();
     
     try {
@@ -70,9 +70,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) {
         console.error('❌ Session error:', error);
-        // Check for refresh token errors
-        if (error.message?.includes('refresh_token') || error.message?.includes('Refresh Token')) {
-          console.warn('🔄 Detected corrupted refresh token, clearing storage...');
+        // Check for various auth errors
+        const errorMessage = error.message?.toLowerCase() || '';
+        if (
+          errorMessage.includes('refresh_token') || 
+          errorMessage.includes('refresh token') ||
+          errorMessage.includes('network') ||
+          errorMessage.includes('networkerror') ||
+          errorMessage.includes('failed to fetch')
+        ) {
+          console.warn('🔄 Detected auth/network error, clearing storage...');
           clearAuthStorage();
         }
         setSession(null);
@@ -86,11 +93,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     } catch (error: any) {
       console.error('❌ Session init failed after', Date.now() - startTime, 'ms:', error);
-      // Check for refresh token errors in catch block too
-      if (error?.message?.includes('refresh_token') || error?.message?.includes('Refresh Token')) {
+      
+      const errorMessage = error?.message?.toLowerCase() || '';
+      const isNetworkError = 
+        errorMessage.includes('network') || 
+        errorMessage.includes('failed to fetch') ||
+        errorMessage.includes('timeout') ||
+        error?.name === 'TypeError';
+
+      // Retry logic for network errors with progressive delay
+      if (isNetworkError && retryCount < 2 && isMountedRef.current) {
+        const delay = (retryCount + 1) * 1000; // 1s, 2s
+        console.log(`🔄 Network error, retrying in ${delay}ms...`);
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            initializeSession(retryCount + 1);
+          }
+        }, delay);
+        return;
+      }
+
+      // Check for refresh token errors
+      if (errorMessage.includes('refresh_token') || errorMessage.includes('refresh token')) {
         console.warn('🔄 Detected corrupted refresh token in catch, clearing storage...');
         clearAuthStorage();
       }
+      
       if (isMountedRef.current) {
         setSession(null);
         setUser(null);
@@ -134,20 +162,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // THEN get initial session
     initializeSession();
 
-    // Safety timeout - 8 seconds (reduced from 15)
+    // Safety timeout - 5 seconds (reduced for better UX)
     const safetyTimeout = setTimeout(() => {
       if (isMountedRef.current && loading) {
         initAttemptsRef.current += 1;
         
         if (initAttemptsRef.current < 2) {
           console.warn(`⚠️ Auth timeout - retry attempt ${initAttemptsRef.current}`);
-          initializeSession();
+          initializeSession(0);
         } else {
           console.error('❌ Auth initialization failed after retries, forcing completion');
           setLoading(false);
         }
       }
-    }, 8000);
+    }, 5000);
 
     return () => {
       isMountedRef.current = false;
