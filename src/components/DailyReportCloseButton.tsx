@@ -4,7 +4,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { HotelSessionService } from '@/services/hotelSessionService';
-import { SessionPersistenceService } from '@/services/sessionPersistenceService';
+import { storageService } from '@/services/storageService';
 import { ActionLogService } from '@/services/actionLogService';
 import { RoomArchiveService } from '@/services/roomArchiveService';
 
@@ -56,11 +56,6 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       // 4. Archiver le rapport de la journée (legacy)
       setClosingStep('Finalisation de l\'archivage...');
       console.log('📦 Archivage du rapport en cours...');
-      const archived = await SessionPersistenceService.archiveOldReport(currentToken, hotelId);
-
-      if (!archived) {
-        console.warn('⚠️ Archivage rapport partiel');
-      }
 
       // 5. Désactiver la session actuelle
       setClosingStep('Fermeture de la session...');
@@ -68,7 +63,7 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       await HotelSessionService.deactivateSession(currentToken);
 
       // 6. Nettoyer le stockage local
-      SessionPersistenceService.clearSavedSession();
+      storageService.clearHotel();
       localStorage.removeItem('sessionToken');
       localStorage.removeItem('hotelSessionToken');
       
@@ -87,10 +82,10 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       }
 
       // 8. Sauvegarder la nouvelle session
-      SessionPersistenceService.saveSessionData({
-        sessionToken: newToken,
-        hotelId: hotelId,
-        lastActiveDate: new Date().toISOString()
+      storageService.saveHotel({
+        id: hotelId,
+        name: '',
+        code: ''
       });
 
       toast.success(`Journée clôturée ! ${archiveResult.archived} chambres archivées, ${archiveResult.assignmentsCleared} assignations effacées.`);

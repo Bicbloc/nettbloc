@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, LogOut, User, Loader2, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { HotelStorageService } from '@/services/hotelStorageService';
+import { storageService } from '@/services/storageService';
 import { realtimeManager } from '@/services/RealtimeManager';
 
 export default function HousekeeperHotels() {
@@ -199,7 +199,7 @@ export default function HousekeeperHotels() {
     
     try {
       // 1. SAUVEGARDER D'ABORD le nouvel hôtel (avant de nettoyer)
-      HotelStorageService.save({
+      storageService.saveHotel({
         id: hotel.id,
         name: hotel.name,
         code: hotel.hotel_code,
@@ -251,7 +251,7 @@ export default function HousekeeperHotels() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    HotelStorageService.clear();
+    storageService.clearHotel();
     localStorage.clear();
     navigate('/housekeeper/auth');
   };

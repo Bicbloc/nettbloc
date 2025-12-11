@@ -3,7 +3,7 @@ import { Room } from '@/services/pdfService';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { supabase } from '@/integrations/supabase/client';
-import { HotelStorageService } from '@/services/hotelStorageService';
+import { storageService } from '@/services/storageService';
 
 interface HousekeepingContextType {
   housekeeperNames: string[];
@@ -50,10 +50,10 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const notifications = notificationsHook?.notifications || [];
   const addNotificationFn = notificationsHook?.addNotification;
 
-  // Phase 5: Simplified initialization - load from HotelStorageService (source unique)
+  // Phase 5: Simplified initialization - load from storageService (source unique)
   useEffect(() => {
     const initializeFromStorage = () => {
-      const hotelData = HotelStorageService.get();
+      const hotelData = storageService.getHotel();
       console.log('🔍 HousekeepingContext: Lecture cache hotel', hotelData?.id?.slice(0, 8) + '...');
       
       if (hotelData?.id && hotelData.id.length > 30) {
@@ -69,7 +69,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     
     // Listen for storage changes (when hotel is set by useAutoSetup)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'hotel_session' || e.key === 'selectedHotelId') {
+      if (e.key === 'nettobloc_hotel_session' || e.key === 'selectedHotelId') {
         console.log('🔄 HousekeepingContext: Storage change détecté');
         initializeFromStorage();
       }
@@ -79,7 +79,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Synchronisation temps réel ROBUSTE avec sauvegarde continue
+  // Synchronisation temps réel ROBUSTE avec sauvegarde continue (réduit à 15s)
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -87,14 +87,11 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       try {
         const session = await HotelSessionService.getSession();
         if (session) {
-          // SAUVEGARDE via HotelStorageService (source unique de vérité)
-          const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
-          
           if (session.hotel_id) {
-            // Utiliser HotelStorageService pour éviter les conflits de clés
-            const hotelData = HotelStorageService.get();
+            // Utiliser storageService pour éviter les conflits de clés
+            const hotelData = storageService.getHotel();
             if (!hotelData || hotelData.id !== session.hotel_id) {
-              HotelStorageService.save({
+              storageService.saveHotel({
                 id: session.hotel_id,
                 name: hotelData?.name || '',
                 code: hotelData?.code || ''
@@ -102,44 +99,28 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
             }
             setHotelId(session.hotel_id);
           }
-          
-          // Sauvegarder les données de session complètes
-          SessionPersistenceService.saveSessionData({
-            sessionToken: HotelSessionService.getSessionToken() || '',
-            hotelId: session.hotel_id || '',
-            lastActiveDate: new Date().toISOString()
-          });
 
           // Mettre à jour les données si elles ont changé
           setHousekeeperNames(prev => {
             const newNames = session.housekeeper_names || [];
             return JSON.stringify(prev) !== JSON.stringify(newNames) ? newNames : prev;
           });
-          
-          // Les rooms sont maintenant dans la table rooms, pas dans la session
 
           // Rafraîchir les femmes de chambre moins fréquemment
-          if (session.hotel_id && Math.random() < 0.1) { // 10% des fois seulement
+          if (session.hotel_id && Math.random() < 0.1) {
             refreshHousekeepers();
           }
         }
       } catch (error) {
-        console.error('⚠️ Erreur synchronisation, tentative de récupération...', error);
+        console.error('⚠️ Erreur synchronisation:', error);
         
-        // RÉCUPÉRATION AUTOMATIQUE en cas d'erreur avec fallback vers données locales
-        const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
-        const savedData = SessionPersistenceService.getSavedSessionData();
-        
-        if (savedData) {
-          console.log('🔄 Restauration depuis session locale');
-          if (savedData.hotelId && !hotelId) {
-          setHotelId(savedData.hotelId);
-          localStorage.setItem('selectedHotelId', savedData.hotelId);
-        }
-        // Les rooms sont chargées depuis la table rooms, pas depuis savedData
+        // Récupération via storageService
+        const recoveredId = storageService.recoverHotelId();
+        if (recoveredId && !hotelId) {
+          setHotelId(recoveredId);
         }
       }
-    }, 5000); // Réduit à 5 secondes au lieu de 2 pour moins de charge
+    }, 15000); // Réduit à 15 secondes pour moins de charge
 
     return () => clearInterval(interval);
   }, [isInitialized, hotelId, rooms.length, housekeeperNames.length]);
@@ -609,16 +590,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           const combined = [...new Set([...prevNames, ...allNames])];
           return combined;
         });
-        
-        // Sauvegarder immédiatement dans la session
-        const sessionData = await HotelSessionService.getSession();
-        if (sessionData?.hotel_id) {
-          const { SessionPersistenceService } = await import('@/services/sessionPersistenceService');
-          SessionPersistenceService.updateSessionData({
-            hotelId: sessionData.hotel_id,
-            lastActiveDate: new Date().toISOString()
-          });
-        }
       }
     } catch (error) {
       console.error('❌ Erreur lors du rafraîchissement des housekeepers:', error);

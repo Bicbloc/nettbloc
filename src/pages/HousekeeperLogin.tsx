@@ -9,7 +9,7 @@ import { Smartphone, User, ArrowLeft, Loader2, Building, KeyRound } from "lucide
 import { SupabaseService } from "@/services/supabaseService";
 import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import BackButton from '@/components/BackButton';
-import { HotelStorageService } from '@/services/hotelStorageService';
+import { storageService } from '@/services/storageService';
 
 export default function HousekeeperLogin() {
   const [step, setStep] = useState<"direct" | "hotel" | "housekeeper">("direct");
@@ -131,7 +131,7 @@ export default function HousekeeperLogin() {
       }));
       
       // Sauvegarder l'hôtel sélectionné avec le service centralisé
-      HotelStorageService.save({
+      storageService.saveHotel({
         id: selectedHotel.id,
         name: selectedHotel.name,
         code: selectedHotel.hotel_code || ''
@@ -198,7 +198,7 @@ export default function HousekeeperLogin() {
       }));
       
       // Sauvegarder l'hôtel avec le service centralisé
-      HotelStorageService.save({
+      storageService.saveHotel({
         id: hotel.id,
         name: hotel.name,
         code: hotel.hotel_code || ''

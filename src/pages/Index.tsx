@@ -104,7 +104,7 @@ const Index = () => {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useSessionTracking(); // Hook pour tracker les sessions
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('admin_active_tab') || 'overview';
+    return localStorage.getItem('nettobloc_admin_tab') || 'overview';
   });
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   const [showHousekeeperManagement, setShowHousekeeperManagement] = useState(false);
@@ -324,9 +324,9 @@ const Index = () => {
     cleanupInvalidHotelIds();
   }, []);
   
-  // Persister l'onglet actif
+  // Persister l'onglet actif avec storageService
   useEffect(() => {
-    localStorage.setItem('admin_active_tab', activeTab);
+    localStorage.setItem('nettobloc_admin_tab', activeTab);
   }, [activeTab]);
   
   // Persister les assignations complètes (rooms + housekeeperNames)

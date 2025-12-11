@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Room } from '@/services/pdfService';
-import { SessionPersistenceService } from './sessionPersistenceService';
+import { storageService } from './storageService';
 
 interface HotelSessionRaw {
   id: string;
@@ -153,12 +153,14 @@ export class HotelSessionService {
       // Phase 4: Store session token explicitly
       this.setSessionToken(sessionToken);
       
-      // Sauvegarder dans SessionPersistenceService
-      SessionPersistenceService.saveSessionData({
-        sessionToken: sessionToken,
-        hotelId: effectiveHotelId,
-        lastActiveDate: new Date().toISOString()
-      });
+      // Sauvegarder via storageService
+      if (effectiveHotelId) {
+        storageService.saveHotel({
+          id: effectiveHotelId,
+          name: '',
+          code: ''
+        });
+      }
       
       return sessionToken;
     } catch (error) {
@@ -259,12 +261,7 @@ export class HotelSessionService {
         return false;
       }
 
-      // Also save to SessionPersistenceService for redundancy
-      SessionPersistenceService.updateSessionData({
-        lastSyncTimestamp: Date.now()
-      });
-
-      console.log('✅ Assignments persistés (DB + localStorage) via hotel_id');
+      console.log('✅ Assignments persistés via hotel_id');
       return true;
     } catch (err) {
       console.error('Erreur updateHousekeeperAssignments:', err);
@@ -384,8 +381,12 @@ export class HotelSessionService {
     };
   }
 
-  // Modifier le service HotelSessionService pour utiliser la persistance
+  // Initialize session from storage
   static async initializeSession(): Promise<string | null> {
-    return await SessionPersistenceService.restoreOrCreateSession();
+    const hotelId = storageService.recoverHotelId();
+    if (hotelId) {
+      return await this.createSession(hotelId);
+    }
+    return null;
   }
 }
