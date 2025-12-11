@@ -278,6 +278,7 @@ class RealtimeManager {
 
   /**
    * Démarrer le heartbeat avec vrai ping vers Supabase
+   * Vérifie aussi que la session auth est toujours valide
    */
   private startHeartbeat() {
     this.stopHeartbeat();
@@ -288,6 +289,15 @@ class RealtimeManager {
       }
       
       try {
+        // Vérifier d'abord que la session auth est valide
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log('💔 Heartbeat: Session auth invalide, arrêt du heartbeat');
+          this.stopHeartbeat();
+          this.stopPing();
+          return;
+        }
+        
         // Vrai ping vers Supabase
         const { error } = await supabase
           .from('hotels')
@@ -297,16 +307,22 @@ class RealtimeManager {
         
         if (error) {
           console.log('💔 Heartbeat: Échec -', error.message);
-          this.scheduleReconnect();
+          // Ne pas reconnecter immédiatement sur une erreur isolée
+          if (Date.now() - this.lastSuccessfulPing > 90000) {
+            this.scheduleReconnect();
+          }
         } else {
           this.lastSuccessfulPing = Date.now();
-          console.log('💓 Heartbeat: OK');
+          // Log moins fréquent pour réduire le bruit
         }
       } catch (err) {
         console.log('💔 Heartbeat: Exception');
-        this.scheduleReconnect();
+        // Ne reconnecter que si vraiment déconnecté depuis longtemps
+        if (Date.now() - this.lastSuccessfulPing > 90000) {
+          this.scheduleReconnect();
+        }
       }
-    }, 45000); // Toutes les 45 secondes (augmenté pour stabilité)
+    }, 60000); // Toutes les 60 secondes (augmenté pour stabilité et économie de ressources)
   }
 
   /**

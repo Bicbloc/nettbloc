@@ -129,11 +129,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     isMountedRef.current = true;
+    let hasProcessedSignIn = false;
 
     // Set up auth state listener FIRST (before checking session)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         if (!isMountedRef.current) return;
+
+        // Éviter les doublons: ignorer INITIAL_SESSION si SIGNED_IN a déjà été traité
+        if (event === 'INITIAL_SESSION' && hasProcessedSignIn) {
+          console.log('⏭️ INITIAL_SESSION ignoré (déjà traité via SIGNED_IN)');
+          return;
+        }
+
+        if (event === 'SIGNED_IN') {
+          hasProcessedSignIn = true;
+        }
 
         console.log('🔐 Auth state changed:', { 
           event, 
@@ -141,10 +152,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           user_id: currentSession?.user?.id 
         });
 
-        // Handle token refresh errors
+        // Handle token refresh errors - mais ne pas effacer immédiatement
         if (event === 'TOKEN_REFRESHED' && !currentSession) {
-          console.warn('🔄 Token refresh failed, clearing storage...');
-          clearAuthStorage();
+          console.warn('🔄 Token refresh potentiellement échoué, vérification...');
+          // Tenter une récupération silencieuse avant d'effacer
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session && isMountedRef.current) {
+              console.warn('🔄 Confirmation: session invalide, nettoyage...');
+              clearAuthStorage();
+            }
+          });
+          return;
         }
 
         // Keep this callback lightweight and synchronous
@@ -155,6 +173,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Clear storage on sign out
         if (event === 'SIGNED_OUT') {
           storageService.clearHotel();
+          hasProcessedSignIn = false;
         }
       }
     );
@@ -162,20 +181,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // THEN get initial session
     initializeSession();
 
-    // Safety timeout - 5 seconds (reduced for better UX)
+    // Safety timeout - 10 seconds (augmenté pour éviter les faux positifs)
     const safetyTimeout = setTimeout(() => {
       if (isMountedRef.current && loading) {
         initAttemptsRef.current += 1;
         
-        if (initAttemptsRef.current < 2) {
+        // Réduire à 1 seul retry pour éviter les boucles
+        if (initAttemptsRef.current < 1) {
           console.warn(`⚠️ Auth timeout - retry attempt ${initAttemptsRef.current}`);
           initializeSession(0);
         } else {
-          console.error('❌ Auth initialization failed after retries, forcing completion');
+          console.warn('⚠️ Auth initialization timeout, forcing completion (session may still be valid)');
+          // Ne pas effacer la session, juste arrêter le loading
           setLoading(false);
         }
       }
-    }, 5000);
+    }, 10000); // Augmenté de 5s à 10s
 
     return () => {
       isMountedRef.current = false;
