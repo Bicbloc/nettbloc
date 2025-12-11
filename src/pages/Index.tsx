@@ -1,29 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Bed, Smartphone, Building, Key, LogIn, Bell } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import UserMenu from "@/components/UserMenu";
-import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
-import { ActiveUsersPanel } from "@/components/ActiveUsersPanel";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { Room, CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
 import { Badge } from "@/components/ui/badge";
-import { HousekeeperCard } from "@/components/HousekeeperCard";
-import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
-import { CleanRoomsSection } from "@/components/CleanRoomsSection";
 import { generateReport, generateCombinedReport } from "@/services/reportService";
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useReportEmail } from "@/hooks/use-report-email";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailReportDialog from "@/components/EmailReportDialog";
-import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
-import { CreateColumnDialog } from "@/components/CreateColumnDialog";
-import { SyncHousekeepersButton } from "@/components/SyncHousekeepersButton";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
@@ -31,45 +22,31 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
 import { DailyActionLogPanel } from "@/components/DailyActionLogPanel";
 import { NotificationSound } from "@/components/NotificationSound";
-import { RoomFilters } from "@/components/RoomFilters";
-import { HousekeeperManagement } from "@/components/HousekeeperManagement";
-import { IncidentList } from "@/components/incident/IncidentList";
-import { useNotificationContext } from "@/contexts/NotificationContext";
-import { LinenTypeManager } from "@/components/linen/LinenTypeManager";
-import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
-import { LinenTaskAssignment } from "@/components/linen/LinenTaskAssignment";
-import { AdminLinenInventory } from "@/components/linen/AdminLinenInventory";
-import { StaffManagement } from "@/components/incident/StaffManagement";
-import { IncidentInventoryManager } from "@/components/incident/IncidentInventoryManager";
-import { IncidentReportDialogSimple } from "@/components/incident/IncidentReportDialogSimple";
-import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
-import { RolePermissionsManager } from "@/components/incident/RolePermissionsManager";
-import { IncidentReportPrint } from "@/components/incident/IncidentReportPrint";
-import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
-import { SupabaseService } from "@/services/supabaseService";
-import { AssignmentService } from "@/services/assignmentService";
-import { AddRoomDialog } from "@/components/AddRoomDialog";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
-import { generateHotelId, cleanupInvalidHotelIds } from "@/lib/utils";
-import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
+import { cleanupInvalidHotelIds, generateHotelId } from "@/lib/utils";
+import { redistributeRooms } from "@/utils/redistributionUtils";
 import { UpgradeButton } from "@/components/UpgradeButton";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
-import { StatsOverview } from "@/components/StatsOverview";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
 import { useRoomManagement } from "@/hooks/use-room-management";
 import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
 import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
+import { SupabaseService } from "@/services/supabaseService";
+import { AssignmentService } from "@/services/assignmentService";
 
-// New refactored components
-import { QuickActionsCard } from "@/components/dashboard/QuickActionsCard";
-import { PlanningSummaryCard } from "@/components/dashboard/PlanningSummaryCard";
-import { PersonnelSection } from "@/components/dashboard/PersonnelSection";
+// Dashboard tab components
+import { OverviewTab } from "@/components/dashboard/OverviewTab";
+import { RoomManagementTab } from "@/components/dashboard/RoomManagementTab";
+import { AssignmentTab } from "@/components/dashboard/AssignmentTab";
+import { AccessCodesTab } from "@/components/dashboard/AccessCodesTab";
+import { LinenTab } from "@/components/dashboard/LinenTab";
+import { IncidentsTab } from "@/components/dashboard/IncidentsTab";
+import { ReportsTab } from "@/components/dashboard/ReportsTab";
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
-import { RoomsTable } from "@/components/dashboard/RoomsTable";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
@@ -78,9 +55,8 @@ const Index = () => {
   const { isAuthenticated, loading } = useAuth();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
-  const location = useLocation();
   
-  const { plan, isPremium, isFree, canAccessFeature, loading: subscriptionLoading } = useSubscription();
+  const { isPremium, isFree, loading: subscriptionLoading } = useSubscription();
   
   useSessionTracking();
   
@@ -694,258 +670,89 @@ const Index = () => {
             {/* Main Content */}
             <div className="flex-1 min-w-0">
               <TabsContent value="overview" className="space-y-6 mt-0">
-                <StatsOverview 
+                <OverviewTab
                   rooms={rooms}
-                  housekeeperCount={housekeeperNames.length}
+                  housekeeperNames={housekeeperNames}
+                  cleaningConfig={cleaningConfig}
+                  isPremium={isPremium}
+                  currentHotelId={currentHotelId}
+                  roomStats={roomStats}
+                  onPdfProcessed={handlePdfProcessed}
+                  onConfigChange={handleConfigChange}
+                  onHousekeeperNamesChange={handleHousekeeperNamesChange}
+                  onDistribute={handleDistributeWithValidation}
                 />
-
-                <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
-                  <QuickActionsCard
-                    currentHotelId={currentHotelId}
-                    cleaningConfig={cleaningConfig}
-                    housekeeperNames={housekeeperNames}
-                    rooms={rooms}
-                    isPremium={isPremium}
-                    onPdfProcessed={handlePdfProcessed}
-                    onConfigChange={handleConfigChange}
-                    onHousekeeperNamesChange={handleHousekeeperNamesChange}
-                    onDistribute={handleDistributeWithValidation}
-                  />
-                  <PlanningSummaryCard
-                    twinRooms={roomStats.twinRooms}
-                    fullCleaningRooms={roomStats.fullCleaningRooms}
-                    quickCleaningRooms={roomStats.quickCleaningRooms}
-                    housekeeperCount={housekeeperNames.length}
-                    cleaningConfig={cleaningConfig}
-                  />
-                </div>
-                
-                <ActiveUsersPanel />
-                <PersonnelSection housekeeperCount={housekeeperNames.length} />
               </TabsContent>
 
               <TabsContent value="rooms" className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Gestion des chambres</h2>
-                  <div className="flex gap-2">
-                    <AddRoomDialog onAddRoom={handleAddRoom} existingRooms={rooms} />
-                    <PdfWorkflowDialog hotelId={currentHotelId} onWorkflowComplete={handlePdfProcessed} />
-                    <Button onClick={() => openManualAssignment()} variant="outline" disabled={housekeeperNames.length === 0}>
-                      <Plus className="mr-2 h-4 w-4" />Assignation manuelle
-                    </Button>
-                  </div>
-                </div>
-
-                {rooms.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Aucune chambre importée</h3>
-                      <p className="text-muted-foreground text-center mb-4">Importez un fichier PDF ou ajoutez des chambres manuellement</p>
-                      <div className="flex gap-2 justify-center">
-                        <AddRoomDialog onAddRoom={handleAddRoom} existingRooms={rooms} />
-                        <PdfWorkflowDialog hotelId={currentHotelId} onWorkflowComplete={handlePdfProcessed} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <>
-                    <Card>
-                      <CardHeader><CardTitle>Filtres et options</CardTitle></CardHeader>
-                      <CardContent>
-                        <RoomFilters rooms={rooms} onFiltersChange={(filtered) => setFilteredRooms(filtered)} />
-                      </CardContent>
-                    </Card>
-                    <RoomsTable
-                      rooms={filteredRooms || rooms}
-                      housekeeperNames={housekeeperNames}
-                      onRoomUpdate={handleRoomUpdate}
-                      onRoomUnassign={handleRoomUnassign}
-                      onRoomReassign={handleRoomReassign}
-                      onOpenLinkDialog={(room) => { setSelectedRoom(room); setShowLinkDialog(true); }}
-                      onOpenDeleteDialog={(room) => { setSelectedRoom(room); setShowDeleteDialog(true); }}
-                    />
-                  </>
-                )}
+                <RoomManagementTab
+                  rooms={rooms}
+                  housekeeperNames={housekeeperNames}
+                  currentHotelId={currentHotelId}
+                  onPdfProcessed={handlePdfProcessed}
+                  onAddRoom={handleAddRoom}
+                  onRoomUpdate={handleRoomUpdate}
+                  onRoomUnassign={handleRoomUnassign}
+                  onRoomReassign={handleRoomReassign}
+                  onOpenManualAssignment={() => openManualAssignment()}
+                  onDeleteRoom={handleDeleteRoom}
+                  onLinkRooms={(roomNumber) => { 
+                    const room = rooms.find(r => r.number === roomNumber);
+                    if (room) { setSelectedRoom(room); setShowLinkDialog(true); }
+                  }}
+                />
               </TabsContent>
 
               <TabsContent value="assignment" className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Affectation des chambres</h2>
-                  <div className="flex gap-2">
-                    <Button onClick={() => openManualAssignment()} disabled={!isDistributed} variant="outline">
-                      <UserIcon className="mr-2 h-4 w-4" />Assignation manuelle
-                    </Button>
-                    <Button onClick={() => setIsRedistributionDialogOpen(true)} disabled={!isDistributed} variant="outline">
-                      <Calendar className="mr-2 h-4 w-4" />Redistribuer
-                    </Button>
-                    <Button onClick={handleGenerateAllReports} disabled={!isDistributed}>
-                      <FileDown className="mr-2 h-4 w-4" />Générer tous les rapports
-                    </Button>
-                  </div>
-                </div>
-
-                {!isDistributed ? (
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Distribution requise</AlertTitle>
-                    <AlertDescription>Distribuez d'abord les chambres pour les affecter.</AlertDescription>
-                  </Alert>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                    <UnassignedRoomsColumn
-                      rooms={getUnassignedRooms()}
-                      housekeeperNames={housekeeperNames}
-                      onRoomUpdate={handleRoomUpdate}
-                      onDirectAssign={handleDirectRoomAssignment}
-                      hotelId={currentHotelId}
-                    />
-                    {housekeeperNames.map((name) => (
-                      <HousekeeperCard
-                        key={name}
-                        name={name}
-                        rooms={getHousekeeperRooms(name)}
-                        cleaningConfig={cleaningConfig}
-                        onRoomUpdate={handleRoomUpdate}
-                        onRoomUnassign={handleRoomUnassign}
-                        onReassign={handleRoomReassign}
-                        onGenerateReport={() => handleGenerateReport(name, getHousekeeperRooms(name))}
-                        unassignedRooms={getUnassignedRooms()}
-                        housekeeperNames={housekeeperNames}
-                        accessCode={housekeepers.find(h => h.name === name)?.access_code}
-                        availableFloors={availableFloors}
-                        onFloorPreferenceChange={() => {}}
-                        preferredFloors={[]}
-                        hotelId={currentHotelId}
-                      />
-                    ))}
-                    <CleanRoomsSection rooms={getCleanRooms()} onRoomUpdate={handleRoomUpdate} hotelId={currentHotelId} />
-                  </div>
-                )}
+                <AssignmentTab
+                  rooms={rooms}
+                  housekeeperNames={housekeeperNames}
+                  housekeepers={housekeepers}
+                  cleaningConfig={cleaningConfig}
+                  currentHotelId={currentHotelId}
+                  hotelId={currentHotelId || ''}
+                  availableFloors={availableFloors}
+                  housekeeperFloorPreferences={housekeeperFloorPreferences}
+                  housekeeperMaxRoomsOverrides={housekeeperMaxRoomsOverrides}
+                  isDistributed={isDistributed}
+                  onPdfProcessed={handlePdfProcessed}
+                  onRedistribute={handleRedistribute}
+                  onRoomUpdate={handleRoomUpdate}
+                  onRoomUnassign={handleRoomUnassign}
+                  onRoomReassign={handleRoomReassign}
+                  onDirectAssign={handleDirectRoomAssignment}
+                  onFloorPreferenceChange={(name, floors) => setHousekeeperFloorPreferences(prev => ({ ...prev, [name]: floors }))}
+                  onDeleteHousekeeper={handleDeleteHousekeeper}
+                  onMaxRoomsOverrideChange={(name, maxRooms) => setHousekeeperMaxRoomsOverrides(prev => ({ ...prev, [name]: maxRooms || 0 }))}
+                  onRenameHousekeeper={handleRenameHousekeeper}
+                  onGenerateReport={handleGenerateReport}
+                  onGenerateAccessCode={async (name) => housekeepers.find(h => h.name === name)?.access_code || ''}
+                  onOpenManualAssignment={openManualAssignment}
+                  setActiveTab={setActiveTab}
+                />
               </TabsContent>
 
               <TabsContent value="access-codes" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" />Gestion des codes d'accès</CardTitle>
-                    <CardDescription>Codes d'accès des femmes de chambre et demandes en attente</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Tabs defaultValue="requests" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="requests" className="relative">
-                          Demandes d'accès
-                          <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">!</Badge>
-                        </TabsTrigger>
-                        <TabsTrigger value="codes">Codes existants</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="requests" className="space-y-4">
-                        <Alert className="bg-blue-50 border-blue-200">
-                          <Bell className="h-4 w-4 text-blue-600" />
-                          <AlertDescription className="text-blue-800">
-                            <strong>📋 Comment ça marche ?</strong> Les femmes de chambre s'inscrivent avec votre code d'hôtel. Validez ou suspendez leur accès ici.
-                          </AlertDescription>
-                        </Alert>
-                        <HousekeeperAccessRequests />
-                      </TabsContent>
-                      <TabsContent value="codes" className="space-y-4">
-                        <p className="text-muted-foreground">Codes d'accès des femmes de chambre validées.</p>
-                        <HousekeeperManagement />
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                </Card>
+                <AccessCodesTab currentHotelId={currentHotelId} />
               </TabsContent>
 
               <TabsContent value="linen" className="space-y-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">🧺 Inventaire du linge</h2>
-                    <p className="text-muted-foreground">Gérer les types de linge et les tâches</p>
-                  </div>
-                </div>
-                <Tabs defaultValue="types" className="space-y-4">
-                  <TabsList>
-                    <TabsTrigger value="types">Types de linge</TabsTrigger>
-                    <TabsTrigger value="inventory">Saisie & Validation</TabsTrigger>
-                    <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
-                    <TabsTrigger value="training">Entraînement IA</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="types">{currentHotelId ? <LinenTypeManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="inventory">{currentHotelId ? <AdminLinenInventory hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="tasks">{currentHotelId ? <LinenTaskAssignment hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="training">{currentHotelId ? <LinenTrainingManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                </Tabs>
+                <LinenTab currentHotelId={currentHotelId} />
               </TabsContent>
 
               <TabsContent value="incidents" className="space-y-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">Gestion des incidents</h2>
-                    <p className="text-muted-foreground">Gérer les incidents et le personnel</p>
-                  </div>
-                  {currentHotelId && <IncidentReportDialogSimple hotelId={currentHotelId} userType="admin" />}
-                </div>
-                <Tabs defaultValue="dashboard" className="space-y-4">
-                  <TabsList>
-                    <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
-                    <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
-                    <TabsTrigger value="staff">Personnel</TabsTrigger>
-                    <TabsTrigger value="inventory">Inventaire</TabsTrigger>
-                    <TabsTrigger value="permissions">Permissions</TabsTrigger>
-                    <TabsTrigger value="print">Imprimer rapport</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="dashboard">{currentHotelId ? <IncidentDashboard hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="incidents">{currentHotelId ? <IncidentList hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="staff">{currentHotelId ? <StaffManagement hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="inventory">{currentHotelId ? <IncidentInventoryManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="permissions">{currentHotelId ? <RolePermissionsManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                  <TabsContent value="print">{currentHotelId ? <IncidentReportPrint hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
-                </Tabs>
+                <IncidentsTab currentHotelId={currentHotelId} />
               </TabsContent>
 
               <TabsContent value="reports" className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Rapports</h2>
-                  <Button onClick={handleGenerateAllReports} disabled={!isDistributed || housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0).length === 0}>
-                    <FileDown className="mr-2 h-4 w-4" />Générer tous les rapports
-                  </Button>
-                </div>
-
-                {!isDistributed ? (
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Distribution requise</AlertTitle>
-                    <AlertDescription>Distribuez d'abord les chambres pour générer des rapports.</AlertDescription>
-                  </Alert>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {housekeeperNames.map((name) => {
-                      const hkRooms = getHousekeeperRooms(name);
-                      if (hkRooms.length === 0) return null;
-                      return (
-                        <Card key={name}>
-                          <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
-                              <span>{name}</span>
-                              <Badge variant="secondary">{hkRooms.length} chambres</Badge>
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-2 mb-4">
-                              <div className="text-sm"><span className="font-medium">Nettoyage complet:</span> {hkRooms.filter(r => r.cleaningType === 'full' || r.cleaningType === 'a_blanc').length}</div>
-                              <div className="text-sm"><span className="font-medium">Recouches:</span> {hkRooms.filter(r => r.cleaningType === 'quick' || r.cleaningType === 'recouche').length}</div>
-                              <div className="text-sm"><span className="font-medium">Temps estimé:</span> {Math.round(calculateHousekeeperLoad(hkRooms, cleaningConfig) / 60)}h</div>
-                            </div>
-                            <Button onClick={() => handleGenerateReport(name, hkRooms)} className="w-full" size="sm">
-                              <FileDown className="mr-2 h-4 w-4" />Générer rapport
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
+                <ReportsTab
+                  rooms={rooms}
+                  housekeeperNames={housekeeperNames}
+                  cleaningConfig={cleaningConfig}
+                  isDistributed={isDistributed}
+                  onGenerateReport={handleGenerateReport}
+                  onGenerateAllReports={handleGenerateAllReports}
+                />
               </TabsContent>
             </div>
           </div>
