@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell, UserPlus } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import UserMenu from "@/components/UserMenu";
@@ -23,19 +23,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useReportEmail } from "@/hooks/use-report-email";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import EmailReportDialog from "@/components/EmailReportDialog";
-import { autoDistributeRooms } from "@/components/assignment/RoomDistribution";
 import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
 import { CreateColumnDialog } from "@/components/CreateColumnDialog";
 import { SyncHousekeepersButton } from "@/components/SyncHousekeepersButton";
@@ -47,13 +39,11 @@ import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
 import { DailyActionLogPanel } from "@/components/DailyActionLogPanel";
 import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
-import { HousekeeperSetup } from "@/components/HousekeeperSetup";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { IncidentList } from "@/components/incident/IncidentList";
 import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
-import { HotelSetupFix } from "@/components/HotelSetupFix";
 import { SetupStatusSimple } from "@/components/SetupStatusSimple";
-import { NotificationProvider, useNotificationContext } from "@/contexts/NotificationContext";
+import { useNotificationContext } from "@/contexts/NotificationContext";
 import { LinenTypeManager } from "@/components/linen/LinenTypeManager";
 import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
 import { LinenTaskAssignment } from "@/components/linen/LinenTaskAssignment";
@@ -68,14 +58,12 @@ import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicato
 import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
 import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
 import { SupabaseService } from "@/services/supabaseService";
-import { CodeGenerationService } from "@/services/codeGenerationService";
 import { AssignmentService } from "@/services/assignmentService";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
-import { saveEmailHotelAssociation, getHotelCodeForEmail } from "@/lib/supabase";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
-import { generateHotelId, cleanupInvalidHotelIds, isValidUUID } from "@/lib/utils";
+import { generateHotelId, cleanupInvalidHotelIds } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
 import { UpgradeButton } from "@/components/UpgradeButton";
@@ -87,6 +75,7 @@ import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeS
 import { useRoomManagement } from "@/hooks/use-room-management";
 import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
 import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
+import { isFullCleaning, isQuickCleaning } from "@/utils/cleaningTypeUtils";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
