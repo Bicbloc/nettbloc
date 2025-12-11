@@ -46,9 +46,9 @@ export class HousekeeperAuthService {
       // TOUJOURS sauvegarder le token localement - c'est notre source de vérité
       localStorage.setItem('housekeeperSessionToken', sessionToken);
       localStorage.setItem('housekeeperSessionExpires', expiresAt.toISOString());
-      localStorage.setItem('housekeeperSessionHotelId', hotelId);
-      localStorage.setItem('housekeeperSessionHousekeeperId', housekeeperId);
-      localStorage.setItem('housekeeperSessionHousekeeperName', housekeeperName);
+      localStorage.setItem('housekeeperSessionHotelId', hotelId || '');
+      localStorage.setItem('housekeeperSessionHousekeeperId', housekeeperId || 'anonymous');
+      localStorage.setItem('housekeeperSessionHousekeeperName', housekeeperName || 'Housekeeper');
       
       console.log('✅ Session sauvegardée localement:', { sessionToken, expiresAt: expiresAt.toISOString() });
       return sessionToken;
@@ -161,14 +161,14 @@ export class HousekeeperAuthService {
           }
 
           const hotel = {
-            id: (codeRecord as any).hotels?.id,
-            name: (codeRecord as any).hotels?.name,
-            hotel_code: (codeRecord as any).hotels?.hotel_code,
+            id: (codeRecord as any).hotels?.id || (codeRecord as any).hotel_id,
+            name: (codeRecord as any).hotels?.name || 'Hôtel',
+            hotel_code: (codeRecord as any).hotels?.hotel_code || '',
           };
 
           const housekeeper = {
-            id: (codeRecord as any).housekeepers?.id,
-            name: (codeRecord as any).housekeepers?.name,
+            id: (codeRecord as any).housekeepers?.id || (codeRecord as any).housekeeper_id || `hk-${Date.now()}`,
+            name: (codeRecord as any).housekeepers?.name || (codeRecord as any).invited_name || 'Housekeeper',
             access_code: (codeRecord as any).access_code,
             hotel_id: (codeRecord as any).hotel_id,
             is_active: (codeRecord as any).housekeepers?.is_active ?? true,
@@ -214,13 +214,13 @@ export class HousekeeperAuthService {
       // Construire les objets hotel et housekeeper compatibles avec le reste de l'app
       const hotel = {
         id: result.hotel_id,
-        name: result.hotel_name,
-        hotel_code: result.hotel_code
+        name: result.hotel_name || 'Hôtel',
+        hotel_code: result.hotel_code || ''
       };
 
       const housekeeper = {
-        id: result.housekeeper_id,
-        name: result.housekeeper_name,
+        id: result.housekeeper_id || `hk-${Date.now()}`,
+        name: result.housekeeper_name || 'Housekeeper',
         access_code: result.resolved_access_code,
         hotel_id: result.hotel_id,
         is_active: true,
