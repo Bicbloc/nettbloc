@@ -33,31 +33,36 @@ IMPORTANT: Quand tu vois la même chambre plusieurs fois, FUSIONNE les informati
 - Mots-clés: OOO, Out of order, HS, Hors service, Maintenance, Blocked
 - → Aucun nettoyage requis
 
-## PRIORITÉ 2: RECOUCHE - Client en séjour (cleaningType="quick", status="stayover")
-CONDITIONS pour RECOUCHE:
-- Client avec DATE ARRIVÉE + DATE DÉPART visibles = séjour en cours
-- "Nuit X/Y" où X > 1 (ex: Nuit 2/3, Nuit 3/5)
-- Statut "INS" ou "SALE" ou "DIRTY" AVEC un nom de client
-- "Stay" ou "Stayover" ou "Recouche" dans le statut
-- Client présent + pas de départ imminent aujourd'hui
-
-EXEMPLES RECOUCHE:
-- "102 SGL DIR Farid GAOUTARA 04/05/2025 Adults Guoda Cirtautaite, Night 3/3 07/05/2025" → RECOUCHE (Nuit 3/3, dernier jour = nettoyage rapide)
-- "205 DBL INS Martin DUPONT Night 2/4" → RECOUCHE (Nuit 2/4, X>1)
-- "301 SALE Jean MARTIN" → RECOUCHE (sale avec client)
-
-## PRIORITÉ 3: À BLANC - Départ ET Arrivée même jour OU Départ seul (cleaningType="full")
+## PRIORITÉ 2: À BLANC - Dernier jour OU Départ (cleaningType="full")
 CONDITIONS pour À BLANC:
-- Chambre apparaît avec PARTI/DÉPART ET EN ARRIVÉE = checkout_arrival
-- Statut "DIR" ou "DEP" ou "Departure" ou "Check-out" SANS nouveau client
-- Chambre vide après départ
-- "Nuit 1/1" = départ le jour même (une seule nuit)
+- "Nuit X/X" où X = Y (ex: Nuit 2/2, Nuit 4/4, Nuit 5/5, Nuit 6/6) = DERNIER JOUR = DÉPART = À BLANC
+- "Nuit 1/1" = une seule nuit = départ aujourd'hui = À BLANC
+- Chambre apparaît avec PARTI/DÉPART ET EN ARRIVÉE = checkout_arrival = À BLANC
+- Deux noms de clients différents sur la même ligne = départ + arrivée = À BLANC
+- Statut "DIR" ou "DEP" ou "Departure" ou "Check-out"
+- Heure de départ visible (ex: 08:16, 09:00) PUIS heure d'arrivée = checkout_arrival
 
 EXEMPLES À BLANC:
-- "102 PARTI" + "102 EN ARRIVÉE" sur le même rapport → À BLANC (checkout_arrival)
-- "102 DIR" → À BLANC (départ sans client)
-- "205 DEP" → À BLANC (departure)
-- "301 Check-out 10:00" → À BLANC
+- "208 B CLA SAL ... Laure Lepoittevin, Nuit 2/2 21/11/2025" → À BLANC (Nuit 2/2, X=Y, dernier jour)
+- "302 COC SAL ... Susanne Incorvaia, Nuit 5/5 21/11/2025" → À BLANC (Nuit 5/5, X=Y, dernier jour)
+- "407 B SUP BLC SAL ... YURUI HUANG, Nuit 6/6 21/11/2025" → À BLANC (Nuit 6/6, X=Y, dernier jour)
+- "102 PARTI" + "102 EN ARRIVÉE" → À BLANC (checkout_arrival)
+- "401 B ... Vanessa Wouters 08:08 11:48 ... PHILIPPE JOSS 14:55" → À BLANC (2 clients = départ+arrivée)
+
+## PRIORITÉ 3: RECOUCHE - Client en séjour qui RESTE (cleaningType="quick", status="stayover")
+CONDITIONS pour RECOUCHE:
+- "Nuit X/Y" où X < Y (ex: Nuit 2/3, Nuit 2/4, Nuit 4/5) = client reste encore = RECOUCHE
+- UN SEUL nom de client visible + statut SAL/INS = séjour en cours
+- Pas de "Nuit X/X" (si X=Y c'est un départ!)
+
+EXEMPLES RECOUCHE:
+- "216 SUP SAL ... Abdelilah Talsmat, Nuit 4/5 22/11/2025" → RECOUCHE (Nuit 4/5, X<Y, reste 1 nuit)
+- "300 PMR CLA SAL ... SAFAE LOUMMOU, Nuit 2/3 22/11/2025" → RECOUCHE (Nuit 2/3, X<Y, reste 1 nuit)
+- "318 Twinable CLA SAL ... KATIA Garabedian, Nuit 2/4 23/11/2025" → RECOUCHE (Nuit 2/4, X<Y, reste 2 nuits)
+
+RÈGLE CRITIQUE NUIT X/Y:
+- Si X = Y → À BLANC (dernier jour, client part)
+- Si X < Y → RECOUCHE (client reste)
 
 ## PRIORITÉ 4: ARRIVÉE SEULE (cleaningType="full", status="arrival")
 CONDITIONS:
