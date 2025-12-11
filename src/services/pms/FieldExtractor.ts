@@ -296,16 +296,16 @@ class FieldExtractor {
   private inferFromStatuses(statuses: string[]): { cleaningType: CleaningType; status: string; reason: string; confidence: number } {
     const upper = statuses.map(s => s.toUpperCase());
     
-    // Checkout + Arrival = full clean
+    // Checkout + Arrival = à blanc (full clean)
     const hasCheckout = upper.some(s => ['PARTI', 'DEPART', 'CHECKOUT', 'CHECK-OUT', 'DEP', 'CO', 'DUE OUT'].includes(s));
     const hasArrival = upper.some(s => ['ARRIVÉE', 'ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'ARR', 'CI', 'DUE IN', 'EN ARRIVÉE'].includes(s));
     
     if (hasCheckout && hasArrival) {
-      return { cleaningType: 'full', status: 'checkout_arrival', reason: 'Départ + Arrivée', confidence: 90 };
+      return { cleaningType: 'a_blanc', status: 'checkout_arrival', reason: 'Départ + Arrivée', confidence: 90 };
     }
     
     if (hasCheckout) {
-      return { cleaningType: 'full', status: 'checkout', reason: 'Départ', confidence: 85 };
+      return { cleaningType: 'a_blanc', status: 'checkout', reason: 'Départ', confidence: 85 };
     }
     
     if (hasArrival) {
@@ -314,19 +314,19 @@ class FieldExtractor {
       if (hasClean) {
         return { cleaningType: 'none', status: 'clean', reason: 'Arrivée + Propre', confidence: 85 };
       }
-      return { cleaningType: 'full', status: 'arrival', reason: 'Arrivée', confidence: 80 };
+      return { cleaningType: 'a_blanc', status: 'arrival', reason: 'Arrivée', confidence: 80 };
     }
     
     // Stayover/Recouche
     const hasStayover = upper.some(s => ['RECOUCHE', 'STAYOVER', 'STAY', 'OD', 'OCCUPIED DIRTY'].includes(s));
     if (hasStayover) {
-      return { cleaningType: 'quick', status: 'stayover', reason: 'Recouche', confidence: 85 };
+      return { cleaningType: 'recouche', status: 'stayover', reason: 'Recouche', confidence: 85 };
     }
     
     // Dirty
     const hasDirty = upper.some(s => ['SALE', 'DIRTY', 'DIR', 'SAL', 'VD'].includes(s));
     if (hasDirty) {
-      return { cleaningType: 'full', status: 'dirty', reason: 'Sale', confidence: 80 };
+      return { cleaningType: 'a_blanc', status: 'dirty', reason: 'Sale', confidence: 80 };
     }
     
     // Clean
@@ -341,7 +341,7 @@ class FieldExtractor {
       return { cleaningType: 'none', status: 'out-of-order', reason: 'Hors service', confidence: 90 };
     }
     
-    return { cleaningType: 'full', status: 'unknown', reason: 'Pas de statut clair', confidence: 40 };
+    return { cleaningType: 'a_blanc', status: 'unknown', reason: 'Pas de statut clair', confidence: 40 };
   }
 }
 

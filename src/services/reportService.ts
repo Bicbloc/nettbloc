@@ -236,9 +236,9 @@ function generateReportHTML(data: ReportData): string {
   // Format current date in a readable format (e.g., "jeudi 15 mai 2025")
   const formattedDate = data.currentDate.split(' ').slice(0, 3).join(' ');
   
-  // Calculate room counts and estimated time
-  const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full').length;
-  const quickCleanCount = data.rooms.filter(room => room.cleaningType === 'quick').length;
+  // Calculate room counts and estimated time - support both old and new cleaning type formats
+  const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full' || room.cleaningType === 'a_blanc').length;
+  const quickCleanCount = data.rooms.filter(room => room.cleaningType === 'quick' || room.cleaningType === 'recouche').length;
   
   // Calculate estimated time
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
@@ -317,9 +317,10 @@ function generateReportHTML(data: ReportData): string {
     // Create rows for each room with appropriate styling
     let rowsHtml = '';
     roomsOnFloor.forEach(room => {
-      // Determine background color based on cleaning type
-      const bgColor = room.cleaningType === 'full' ? '#FEC6A1' : '#F2FCE2'; // Orange for full, Green for quick
-      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
+      // Determine background color based on cleaning type - support both old and new formats
+      const isFullClean = room.cleaningType === 'full' || room.cleaningType === 'a_blanc';
+      const bgColor = isFullClean ? '#FEC6A1' : '#F2FCE2'; // Orange for full, Green for quick
+      const cleaningTypeText = isFullClean ? 'À Blanc' : 'Recouche';
       const priorityText = room.priority === 'high' ? 'Haute' : 'Normale';
       
       rowsHtml += `
@@ -576,9 +577,9 @@ function generateReportHTML(data: ReportData): string {
 
 // Generate room summary table with improved styling
 function generateRoomSummaryTable(data: ReportData): string {
-  // Count different room types
-  const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full').length;
-  const quickCleanCount = data.rooms.filter(room => room.cleaningType === 'quick').length;
+  // Count different room types - support both old and new formats
+  const fullCleanCount = data.rooms.filter(room => room.cleaningType === 'full' || room.cleaningType === 'a_blanc').length;
+  const quickCleanCount = data.rooms.filter(room => room.cleaningType === 'quick' || room.cleaningType === 'recouche').length;
   
   // Calculate estimated time
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
@@ -643,9 +644,10 @@ function generateRoomsTablesByFloor(data: ReportData): string {
     
     // Create rows for each room
     const rowsHtml = roomsOnFloor.map(room => {
-      // Apply highlighting based on cleaning type
-      const rowClass = room.cleaningType === 'full' ? 'a-blanc' : 'recouche';
-      const cleaningTypeText = room.cleaningType === 'full' ? 'À Blanc' : 'Recouche';
+      // Apply highlighting based on cleaning type - support both old and new formats
+      const isFullClean = room.cleaningType === 'full' || room.cleaningType === 'a_blanc';
+      const rowClass = isFullClean ? 'a-blanc' : 'recouche';
+      const cleaningTypeText = isFullClean ? 'À Blanc' : 'Recouche';
       
       return `
         <tr class="${rowClass}">

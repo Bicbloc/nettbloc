@@ -105,8 +105,10 @@ export function RoomCard({
   const getCleaningTypeBadge = (type: string) => {
     switch (type) {
       case 'full':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">🚪 Départ</Badge>;
+      case 'a_blanc':
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800">🚪 À Blanc</Badge>;
       case 'quick':
+      case 'recouche':
         return <Badge variant="outline" className="bg-blue-100 text-blue-800">🛏️ Recouche</Badge>;
       case 'none':
         return null;
@@ -146,7 +148,7 @@ export function RoomCard({
     }
   };
 
-  const setCleaningType = (type: 'full' | 'quick') => {
+  const setCleaningType = (type: 'a_blanc' | 'recouche') => {
     onUpdate({
       ...room,
       cleaningType: type,
@@ -154,7 +156,7 @@ export function RoomCard({
     });
     
     toast({
-      description: `Chambre ${room.number} : ${type === 'full' ? '🚪 Départ' : '🛏️ Recouche'}`
+      description: `Chambre ${room.number} : ${type === 'a_blanc' ? '🚪 À Blanc' : '🛏️ Recouche'}`
     });
   };
 
@@ -187,12 +189,12 @@ export function RoomCard({
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="font-semibold text-sm whitespace-nowrap">{room.number}</span>
-          {room.cleaningType === 'full' && (
+          {(room.cleaningType === 'full' || room.cleaningType === 'a_blanc') && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-purple-100 text-purple-700 border border-purple-200">
               À BLANC
             </span>
           )}
-          {room.cleaningType === 'quick' && (
+          {(room.cleaningType === 'quick' || room.cleaningType === 'recouche') && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-blue-100 text-blue-700 border border-blue-200">
               RECOUCHE
             </span>
@@ -235,7 +237,7 @@ export function RoomCard({
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-purple-100 text-purple-700 transition-colors font-semibold text-xs"
               onClick={(e) => {
                 e.stopPropagation();
-                setCleaningType('full');
+                setCleaningType('a_blanc');
               }}
               title="À Blanc"
             >
@@ -245,7 +247,7 @@ export function RoomCard({
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors font-semibold text-xs"
               onClick={(e) => {
                 e.stopPropagation();
-                setCleaningType('quick');
+                setCleaningType('recouche');
               }}
               title="Recouche"
             >
@@ -478,23 +480,23 @@ export function RoomCard({
       <div className="mb-3 mt-2 p-2 border border-gray-200 rounded-md bg-gray-50">
         <p className="text-xs font-medium mb-2 text-gray-700">Type de nettoyage:</p>
         <RadioGroup 
-          value={room.cleaningType} 
+          value={room.cleaningType === 'full' ? 'a_blanc' : room.cleaningType === 'quick' ? 'recouche' : room.cleaningType} 
           className="flex gap-2"
-          onValueChange={(value) => setCleaningType(value as 'full' | 'quick')}
+          onValueChange={(value) => setCleaningType(value as 'a_blanc' | 'recouche')}
         >
           <div className="flex items-center space-x-1">
-            <RadioGroupItem value="full" id={`full-${room.number}`} />
+            <RadioGroupItem value="a_blanc" id={`a_blanc-${room.number}`} />
             <Label 
-              htmlFor={`full-${room.number}`}
+              htmlFor={`a_blanc-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
             >
-              🚪 Départ
+              🚪 À Blanc
             </Label>
           </div>
           <div className="flex items-center space-x-1">
-            <RadioGroupItem value="quick" id={`quick-${room.number}`} />
+            <RadioGroupItem value="recouche" id={`recouche-${room.number}`} />
             <Label 
-              htmlFor={`quick-${room.number}`}
+              htmlFor={`recouche-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-blue-800"
             >
               🛏️ Recouche
