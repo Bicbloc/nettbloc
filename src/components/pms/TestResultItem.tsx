@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Pencil, AlertTriangle } from "lucide-react";
+import { Check, X, Pencil, AlertTriangle, Calendar, Moon } from "lucide-react";
 import { ExtractedRoom, CleaningType } from "@/services/pms";
 
 interface TestResultItemProps {
@@ -49,6 +49,21 @@ export const TestResultItem = ({
     }
   };
 
+  const getCleaningVariant = (cleaning: CleaningType): "destructive" | "default" | "secondary" | "outline" => {
+    switch (cleaning) {
+      case 'full':
+      case 'a_blanc':
+        return 'destructive';
+      case 'quick':
+      case 'recouche':
+        return 'default';
+      case 'none':
+        return 'secondary';
+      default:
+        return 'outline';
+    }
+  };
+
   const handleSaveEdit = () => {
     onModify(index, editedRoom);
     setIsEditing(false);
@@ -62,6 +77,11 @@ export const TestResultItem = ({
     });
     setIsEditing(false);
   };
+
+  // Extraire la raison depuis les données
+  const reason = (room as any).reason || (room.debugInfo as any)?.reason || '';
+  const nightInfo = (room as any).nightInfo;
+  const departureDate = (room as any).departureDate;
 
   if (isEditing) {
     return (
@@ -115,57 +135,86 @@ export const TestResultItem = ({
   }
 
   return (
-    <Card className={`p-3 ${isLikelyError ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : room.validated ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' : ''}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1">
-          {isLikelyError && (
-            <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
-          )}
-          <span className="font-mono font-bold">{room.roomNumber}</span>
-          <Badge variant={
-            room.cleaningType === 'full' || room.cleaningType === 'a_blanc' ? 'destructive' :
-            room.cleaningType === 'quick' || room.cleaningType === 'recouche' ? 'default' : 'secondary'
-          }>
-            {getCleaningLabel(room.cleaningType)}
-          </Badge>
-          {room.status && (
-            <span className="text-sm text-muted-foreground">{room.status}</span>
-          )}
-          {room.confidence < 70 && (
-            <Badge variant="outline" className="text-xs">
-              {room.confidence.toFixed(0)}%
+    <Card className={`p-3 ${
+      isLikelyError 
+        ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' 
+        : room.validated 
+          ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' 
+          : ''
+    }`}>
+      <div className="flex flex-col gap-2">
+        {/* Ligne principale */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 flex-wrap">
+            {isLikelyError && (
+              <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+            )}
+            <span className="font-mono font-bold text-lg">{room.roomNumber}</span>
+            <Badge variant={getCleaningVariant(room.cleaningType)}>
+              {getCleaningLabel(room.cleaningType)}
             </Badge>
-          )}
+            {room.status && room.status !== 'unknown' && (
+              <span className="text-sm text-muted-foreground">{room.status}</span>
+            )}
+            {room.confidence < 70 && (
+              <Badge variant="outline" className="text-xs">
+                {room.confidence.toFixed(0)}%
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
+              onClick={() => onValidate(index)}
+              title="Valider"
+            >
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
+              onClick={() => setIsEditing(true)}
+              title="Modifier"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => onRemove(index)}
+              title="Supprimer"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
-            onClick={() => onValidate(index)}
-            title="Valider"
-          >
-            <Check className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
-            onClick={() => setIsEditing(true)}
-            title="Modifier"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => onRemove(index)}
-            title="Supprimer"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+        
+        {/* Ligne de détails (raison, dates, nuits) */}
+        {(reason || nightInfo || departureDate) && (
+          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap pl-1">
+            {reason && (
+              <span className="bg-muted px-2 py-0.5 rounded">
+                💡 {reason}
+              </span>
+            )}
+            {nightInfo && (
+              <span className="flex items-center gap-1">
+                <Moon className="h-3 w-3" />
+                Nuit {nightInfo}
+              </span>
+            )}
+            {departureDate && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Départ: {departureDate}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );
