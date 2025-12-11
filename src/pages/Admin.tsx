@@ -118,6 +118,7 @@ const Admin = () => {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserCompany, setNewUserCompany] = useState('');
   const [selectedHotelId, setSelectedHotelId] = useState('new');
+  const [selectedTrainingHotelId, setSelectedTrainingHotelId] = useState<string>('');
   const [suspensionDialog, setSuspensionDialog] = useState<{
     open: boolean;
     userId: string;
@@ -127,6 +128,12 @@ const Admin = () => {
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
   const [showCreateUser, setShowCreateUser] = useState(false);
 
+  // Initialiser l'hôtel de training quand les hotels sont chargés
+  useEffect(() => {
+    if (hotels.length > 0 && !selectedTrainingHotelId) {
+      setSelectedTrainingHotelId(hotels[0].id);
+    }
+  }, [hotels, selectedTrainingHotelId]);
   // Vérifier les permissions super admin
   useEffect(() => {
     const checkSuperAdminRole = async () => {
@@ -1421,9 +1428,36 @@ const Admin = () => {
         </TabsContent>
 
         <TabsContent value="training" className="space-y-6">
-          {hotels.length > 0 && <ReportTrainingPanel hotelId={hotels[0].id} />}
-          {hotels.length === 0 && (
+          {hotels.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                <Label htmlFor="training-hotel" className="font-medium whitespace-nowrap">
+                  Sélectionner l'hôtel :
+                </Label>
+                <Select value={selectedTrainingHotelId} onValueChange={setSelectedTrainingHotelId}>
+                  <SelectTrigger id="training-hotel" className="w-64 bg-background">
+                    <SelectValue placeholder="Choisir un hôtel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hotels.map(hotel => (
+                      <SelectItem key={hotel.id} value={hotel.id}>
+                        {hotel.name} ({hotel.hotel_code || 'Sans code'})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedTrainingHotelId ? (
+                <ReportTrainingPanel hotelId={selectedTrainingHotelId} />
+              ) : (
+                <Alert>
+                  <AlertDescription>Veuillez sélectionner un hôtel pour accéder à l'entraînement IA</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          ) : (
             <Alert>
+              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>Aucun hôtel disponible pour l'entraînement IA</AlertDescription>
             </Alert>
           )}
