@@ -1,39 +1,39 @@
 /**
- * Adapter pour Apaleo PMS - avec filtrage intelligent des dates
+ * Adapter pour Apaleo PMS - Optimisé avec scoring pondéré
  */
 
 import { PmsAdapter } from '../PmsAdapter';
-import { PmsConfig, ExtractedRoom, CleaningType } from '../types';
+import { PmsConfig, ExtractedRoom, CleaningType, ExtractionDebugInfo } from '../types';
 
 export class ApaleoAdapter extends PmsAdapter {
   readonly name = 'apaleo';
   
+  // Mots-clés critiques (50+ points chacun)
+  readonly criticalKeywords = [
+    'APALEO', 
+    'CLOUD PMS'
+  ];
+  
+  // Mots-clés normaux (10 points chacun)
   readonly keywords = [
-    'APALEO', 'CLOUD PMS', 'HOUSEKEEPING REPORT',
-    'Recouche', 'Parti', 'En arrivée', 'Arrivé', 'A contrôler', 'Propre'
+    'HOUSEKEEPING REPORT',
+    'Recouche', 'Parti', 'En arrivée', 'Arrivé', 
+    'A contrôler', 'Propre', 'Chambre twin', 'Chambre triple'
   ];
 
   // Patterns de dates à exclure
   private readonly datePatterns = [
-    /\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b/g,  // 01/12/2024, 1-12-24
-    /\b\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}\b/g,    // 2024-12-01
-    /\b\d{1,2}:\d{2}(:\d{2})?\b/g,               // 14:30, 14:30:00
-  ];
-
-  // Mots-clés de statut valides
-  private readonly validStatusKeywords = [
-    'RECOUCHE', 'PARTI', 'DEPART', 'DEPARTURE', 'CHECKOUT',
-    'EN ARRIVEE', 'EN ARRIVÉE', 'ARRIVAL', 'ARRIVEE', 'ARRIVÉ', 'ARRIVE',
-    'A CONTROLER', 'CONTROLER', 'PROPRE', 'CLEAN',
-    'DIR', 'DIRTY', 'SALE', 'INS', 'INSPECTED', 'OCC', 'OCCUPIED',
-    'STAYOVER', 'DUE OUT', 'DUE IN', 'VACANT', 'VD', 'VC', 'OD', 'OC'
+    /\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b/g,
+    /\b\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}\b/g,
+    /\b\d{1,2}:\d{2}(:\d{2})?\b/g,
   ];
 
   readonly config: PmsConfig = {
     pmsType: 'apaleo',
     keywords: this.keywords,
-    // Accepte les chambres 01, 02, 06, 10, 101, etc. (1-4 chiffres avec zéros possibles)
-    roomNumberRegex: '(?<![/\\-.:\\d])\\b(0?[1-9]\\d{0,3}|[1-9]\\d{0,3})\\b(?![/\\-.:\\d])',
+    criticalKeywords: this.criticalKeywords,
+    // Regex pour chambres 1-999 avec zéros optionnels
+    roomNumberRegex: '(?<![/\\-.:\\d])\\b(0?[1-9]\\d{0,2})\\b(?![/\\-.:\\d])',
     statusMappings: {
       'RECOUCHE': { status: 'stayover', cleaning: 'quick', priority: 10 },
       'Recouche': { status: 'stayover', cleaning: 'quick', priority: 10 },
@@ -48,8 +48,9 @@ export class ApaleoAdapter extends PmsAdapter {
       'ARRIVEE': { status: 'arrival', cleaning: 'full', priority: 15 },
       'ARRIVÉ': { status: 'occupied', cleaning: 'none', priority: 5 },
       'ARRIVE': { status: 'occupied', cleaning: 'none', priority: 5 },
-      'A CONTROLER': { status: 'clean', cleaning: 'none', priority: 8 },
-      'CONTROLER': { status: 'clean', cleaning: 'none', priority: 8 },
+      'A CONTROLER': { status: 'to_check', cleaning: 'none', priority: 8 },
+      'A CONTRÔLER': { status: 'to_check', cleaning: 'none', priority: 8 },
+      'CONTROLER': { status: 'to_check', cleaning: 'none', priority: 8 },
       'PROPRE': { status: 'clean', cleaning: 'none', priority: 8 },
       'CLEAN': { status: 'clean', cleaning: 'none', priority: 8 },
       'DIR': { status: 'dirty', cleaning: 'full', priority: 18 },
@@ -71,75 +72,24 @@ export class ApaleoAdapter extends PmsAdapter {
   };
 
   /**
-   * Nettoie une ligne en supprimant les dates et heures
-   */
-  private cleanLineFromDates(line: string): string {
-    let cleaned = line;
-    for (const pattern of this.datePatterns) {
-      cleaned = cleaned.replace(new RegExp(pattern.source, 'g'), ' ');
-    }
-    return cleaned;
-  }
-
-  /**
-   * Vérifie si une ligne contient un statut valide
-   */
-  private lineHasValidStatus(line: string): boolean {
-    const upperLine = line.toUpperCase();
-    return this.validStatusKeywords.some(keyword => upperLine.includes(keyword));
-  }
-
-  /**
-   * Vérifie si un numéro est une date/année/heure
-   */
-  private isDateOrTime(num: number, originalLine: string): boolean {
-    // Années
-    if (num >= 1900 && num <= 2100) return true;
-    
-    // Vérifier si le numéro fait partie d'une date dans la ligne originale
-    const dateRegexes = [
-      new RegExp(`\\b${num}[/\\-.:]\\d`),
-      new RegExp(`\\d[/\\-.:]${num}\\b`),
-    ];
-    
-    return dateRegexes.some(regex => regex.test(originalLine));
-  }
-
-  /**
-   * Vérifie si une ligne est un en-tête ou une ligne de métadonnées
-   */
-  private isHeaderOrMetadataLine(line: string): boolean {
-    const headerPatterns = [
-      /^(date|room|chambre|status|statut|type|floor|étage|guest|client|name|nom|report|rapport)/i,
-      /housekeeping\s*(report|list)/i,
-      /^\s*(total|summary|résumé)/i,
-      /page\s*\d+/i,
-      /^\s*\d+\s*\/\s*\d+\s*$/,  // Pagination like 1/5
-    ];
-    
-    return headerPatterns.some(pattern => pattern.test(line));
-  }
-
-  /**
-   * Pré-traite le texte pour séparer les chambres concaténées (PDF copié)
-   * Ex: "01   Chambre twin...Sale 02   Chambre triple" → lignes séparées
+   * Pré-traite le texte pour séparer les chambres concaténées
    */
   private preprocessText(text: string): string {
     let processed = text;
     
-    // Pattern 1: Début de ligne ou après espace - numéro + "Chambre" (format tableau)
-    processed = processed.replace(/(^|\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple))/gim, '\n$2 $3');
+    // Pattern 1: Numéro + "Chambre" (format tableau)
+    processed = processed.replace(/(^|\s)(0?\d{1,2})\s+(Chambre\s+(?:twin|triple|double|simple|quadruple|standard))/gim, '\n$2 $3');
     
-    // Pattern 2: Après un statut (Sale, Parti, etc.) suivi d'un numéro de chambre
+    // Pattern 2: Après un statut suivi d'un numéro
     processed = processed.replace(/(Sale|Parti|Recouche|Arrivé|En arrivée|A contrôler|Propre)\s+(0?\d{1,3})\s+(Chambre)/gi, '$1\n$2 $3');
     
-    // Pattern 3: Format "Ch. NN" ou "Ch NN"
-    processed = processed.replace(/(\s)(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$2$3$4');
+    // Pattern 3: Format "Ch. NN"
+    processed = processed.replace(/(Ch\.?\s*)(0?\d{1,3})(\s+(?:Chambre|Type))/gi, '\n$1$2$3');
     
-    // Pattern 4: Après info de facture ou référence, numéro de chambre
+    // Pattern 4: Après info de facture
     processed = processed.replace(/(\))\s*(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
     
-    // Pattern 5: Après code (NR, RO, BB, FLEX) suivi d'un numéro
+    // Pattern 5: Après code (NR, RO, BB, FLEX)
     processed = processed.replace(/(NR|RO|BB|FLEX)\s+(0?\d{1,2})\s+(Chambre)/gi, '$1\n$2 $3');
     
     return processed;
@@ -148,136 +98,120 @@ export class ApaleoAdapter extends PmsAdapter {
   /**
    * Extrait le premier numéro de chambre valide d'une ligne (format tableau Apaleo)
    */
-  private extractFirstRoomNumber(line: string): string | null {
-    // Pattern 1: Format tableau strict au début - "01 Chambre twin", "02 Chambre triple"
+  private extractApaleoRoomNumber(line: string): string | null {
+    // Pattern 1: Format tableau strict "01 Chambre twin"
     const tableMatch = line.match(/^\s*(0?\d{1,2})\s+Chambre\s+(?:twin|triple|double|simple|quadruple|standard)/i);
-    if (tableMatch) {
-      return tableMatch[1];
-    }
+    if (tableMatch) return tableMatch[1];
     
-    // Pattern 2: Numéro + "Chambre" n'importe où dans la ligne (avec \b pour word boundary)
+    // Pattern 2: Numéro + "Chambre" flexible
     const flexMatch = line.match(/\b(0?[1-9]\d?)\s+Chambre\s+(?:twin|triple|double|simple|quadruple|standard)/i);
-    if (flexMatch) {
-      return flexMatch[1];
-    }
+    if (flexMatch) return flexMatch[1];
     
-    // Pattern 3: Format "Ch. NN" ou "CH NN" 
+    // Pattern 3: Format "Ch. NN"
     const chMatch = line.match(/\bCh\.?\s*(0?\d{1,3})\b/i);
-    if (chMatch) {
-      return chMatch[1];
-    }
+    if (chMatch) return chMatch[1];
     
-    // Pattern 4: Numéro suivi de type de chambre sans mot "Chambre"
-    // Ex: "01 twin", "02 double"
+    // Pattern 4: Numéro + type sans "Chambre"
     const shortMatch = line.match(/^\s*(0?\d{1,2})\s+(?:twin|triple|double|simple|quadruple|standard)\b/i);
-    if (shortMatch) {
-      return shortMatch[1];
-    }
+    if (shortMatch) return shortMatch[1];
     
     return null;
   }
 
   /**
-   * Détecte le statut dans une ligne, en cherchant n'importe où dans la ligne
+   * Vérifie si la ligne contient un statut valide Apaleo
    */
-  private detectStatusInLine(line: string): { status: string; cleaning: CleaningType } {
+  private hasValidApaleoStatus(line: string): boolean {
     const upperLine = line.toUpperCase();
-    
-    // Priorité aux statuts les plus spécifiques
-    const statusOrder = [
-      { pattern: /\bPARTI\b/i, status: 'checkout', cleaning: 'full' as CleaningType },
-      { pattern: /\bEN ARRIVÉE?\b/i, status: 'arrival', cleaning: 'full' as CleaningType },
-      { pattern: /\bRECOUCHE\b/i, status: 'stayover', cleaning: 'quick' as CleaningType },
-      { pattern: /\bARRIVÉ?\b/i, status: 'occupied', cleaning: 'none' as CleaningType },
-      { pattern: /\bSALE\b/i, status: 'dirty', cleaning: 'full' as CleaningType },
-      { pattern: /\bA CONTRÔLER\b|\bA CONTROLER\b/i, status: 'to_check', cleaning: 'none' as CleaningType },
-      { pattern: /\bPROPRE\b/i, status: 'clean', cleaning: 'none' as CleaningType },
+    const validStatuses = [
+      'RECOUCHE', 'PARTI', 'DEPART', 'CHECKOUT',
+      'EN ARRIVEE', 'EN ARRIVÉE', 'ARRIVAL', 'ARRIVEE', 'ARRIVÉ',
+      'A CONTROLER', 'A CONTRÔLER', 'PROPRE', 'CLEAN',
+      'DIR', 'DIRTY', 'SALE', 'INS', 'OCC', 'OCCUPIED'
     ];
-    
-    for (const { pattern, status, cleaning } of statusOrder) {
-      if (pattern.test(line)) {
-        return { status, cleaning };
-      }
-    }
-    
-    return { status: 'unknown', cleaning: 'none' as CleaningType };
+    return validStatuses.some(s => upperLine.includes(s));
   }
 
   extractRooms(text: string): ExtractedRoom[] {
-    // Pré-traitement pour séparer les chambres concaténées
+    // Pré-traitement
     const preprocessedText = this.preprocessText(text);
     const lines = preprocessedText.split('\n');
     
-    // Map pour stocker les chambres avec leurs statuts (gère Parti + Arrivée)
-    const roomsMap = new Map<string, { statuses: string[]; cleanings: CleaningType[]; originalText: string }>();
+    // Map pour gérer les chambres avec multiples statuts
+    const roomsMap = new Map<string, { statuses: string[]; cleanings: CleaningType[]; originalText: string; debugInfo: ExtractionDebugInfo }>();
 
     for (const originalLine of lines) {
-      // Ignorer les lignes vides ou trop courtes
       if (!originalLine || originalLine.trim().length < 3) continue;
+      if (this.isHeaderLine(originalLine)) continue;
       
-      // Ignorer les en-têtes et métadonnées
-      if (this.isHeaderOrMetadataLine(originalLine)) continue;
+      // Extraire le numéro de chambre (format Apaleo spécifique)
+      let roomNum = this.extractApaleoRoomNumber(originalLine);
       
-      // Extraire le numéro de chambre (format tableau Apaleo)
-      let roomNum = this.extractFirstRoomNumber(originalLine);
-      
-      // Fallback: chercher n'importe quel numéro suivi de "Chambre" dans la ligne
+      // Fallback: chercher pattern générique avec statut valide
       if (!roomNum) {
         const fallbackMatch = originalLine.match(/\b(0?[1-9]\d?)\b.*Chambre/i);
-        if (fallbackMatch) {
+        if (fallbackMatch && this.hasValidApaleoStatus(originalLine)) {
           roomNum = fallbackMatch[1];
         }
       }
       
-      // Fallback 2: chercher un numéro 1-2 chiffres au début de la ligne
+      // Fallback 2: numéro au début de ligne avec statut valide
       if (!roomNum) {
         const startMatch = originalLine.match(/^\s*(0?[1-9]\d?)\s+/);
-        if (startMatch && this.lineHasValidStatus(originalLine)) {
+        if (startMatch && this.hasValidApaleoStatus(originalLine)) {
           roomNum = startMatch[1];
         }
       }
       
       if (!roomNum) continue;
       
-      // Nettoyer le numéro (garder le format original pour l'affichage)
+      // Normaliser le numéro
       const numValue = parseInt(roomNum, 10);
-      
-      // Filtrer les numéros invalides
       if (this.isDateOrTime(numValue, originalLine)) continue;
       if (numValue < 1 || numValue > 999) continue;
       
-      // Utiliser le numéro normalisé comme clé (sans zéro initial)
       const roomKey = String(numValue);
       
-      // Détecter le statut dans la ligne
-      const statusInfo = this.detectStatusInLine(originalLine);
-      if (statusInfo.status === 'unknown') continue;
+      // Détecter le statut
+      const { status, cleaning, keyword } = this.detectStatus(originalLine);
+      if (status === 'unknown') continue;
       
-      // Ajouter ou mettre à jour la chambre
+      const debugInfo: ExtractionDebugInfo = {
+        rawLine: originalLine,
+        cleanedLine: originalLine.trim(),
+        detectedKeywords: keyword ? [keyword] : [],
+        source: 'regex',
+        confidence: 85
+      };
+      
+      // Ajouter ou mettre à jour
       if (roomsMap.has(roomKey)) {
         const existing = roomsMap.get(roomKey)!;
-        existing.statuses.push(statusInfo.status);
-        existing.cleanings.push(statusInfo.cleaning);
+        existing.statuses.push(status);
+        existing.cleanings.push(cleaning);
       } else {
         roomsMap.set(roomKey, {
-          statuses: [statusInfo.status],
-          cleanings: [statusInfo.cleaning],
-          originalText: originalLine.trim()
+          statuses: [status],
+          cleanings: [cleaning],
+          originalText: originalLine.trim(),
+          debugInfo
         });
       }
     }
 
-    // Convertir la map en tableau de chambres avec gestion des combinaisons
+    // Convertir en tableau avec gestion des combinaisons
     const rooms: ExtractedRoom[] = [];
     
     for (const [roomNum, data] of roomsMap) {
       let finalStatus = data.statuses[0];
       let finalCleaning = data.cleanings[0];
+      let appliedRule = '';
       
-      // Gérer les combinaisons (Parti + En arrivée = checkout_arrival)
+      // Gérer les combinaisons
       if (data.statuses.includes('checkout') && data.statuses.includes('arrival')) {
         finalStatus = 'checkout_arrival';
         finalCleaning = 'full';
+        appliedRule = 'Combination: checkout + arrival';
       } else if (data.statuses.length > 1) {
         // Prendre le statut avec le nettoyage le plus important
         const cleaningPriority = { 'full': 3, 'quick': 2, 'none': 1 };
@@ -297,15 +231,48 @@ export class ApaleoAdapter extends PmsAdapter {
         status: finalStatus,
         cleaningType: finalCleaning,
         originalText: data.originalText,
-        confidence: 85
+        confidence: 85,
+        debugInfo: {
+          ...data.debugInfo,
+          appliedRule,
+          confidence: 85
+        }
       });
     }
 
-    // Trier par numéro de chambre
+    // Trier par numéro
     rooms.sort((a, b) => parseInt(a.roomNumber) - parseInt(b.roomNumber));
 
     // Détecter les chambres communicantes
     return this.detectConnectedRooms(rooms, text);
+  }
+
+  /**
+   * Vérifie si un numéro est une date/année/heure
+   */
+  private isDateOrTime(num: number, originalLine: string): boolean {
+    if (num >= 1900 && num <= 2100) return true;
+    
+    const dateRegexes = [
+      new RegExp(`\\b${num}[/\\-.:]\\d`),
+      new RegExp(`\\d[/\\-.:]${num}\\b`),
+    ];
+    
+    return dateRegexes.some(regex => regex.test(originalLine));
+  }
+
+  /**
+   * Vérifie si une ligne est un en-tête
+   */
+  private isHeaderLine(line: string): boolean {
+    const headerPatterns = [
+      /^(date|room|chambre|status|statut|type|floor|étage|guest|client|name|nom|report|rapport)/i,
+      /housekeeping\s*(report|list)/i,
+      /^\s*(total|summary|résumé)/i,
+      /page\s*\d+/i,
+    ];
+    
+    return headerPatterns.some(pattern => pattern.test(line));
   }
 
   /**

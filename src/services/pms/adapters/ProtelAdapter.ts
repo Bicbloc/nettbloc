@@ -8,8 +8,10 @@ import { PmsConfig } from '../types';
 export class ProtelAdapter extends PmsAdapter {
   readonly name = 'protel';
   
+  readonly criticalKeywords = ['PROTEL', 'PROTEL PMS'];
+  
   readonly keywords = [
-    'PROTEL', 'PROTEL PMS', 'PROTEL HOTELSOFTWARE', 'PROTEL AIR'
+    'PROTEL HOTELSOFTWARE', 'PROTEL AIR'
   ];
 
   readonly config: PmsConfig = {

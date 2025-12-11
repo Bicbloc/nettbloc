@@ -8,9 +8,10 @@ import { PmsConfig } from '../types';
 export class OperaAdapter extends PmsAdapter {
   readonly name = 'opera';
   
+  readonly criticalKeywords = ['OPERA', 'ORACLE HOSPITALITY', 'OPERA CLOUD'];
+  
   readonly keywords = [
-    'OPERA', 'ORACLE HOSPITALITY', 'MICROS', 'OPERA PMS', 
-    'OPERA CLOUD', 'DUE OUT', 'PICKUP', 'VACANT'
+    'MICROS', 'OPERA PMS', 'DUE OUT', 'PICKUP', 'VACANT'
   ];
 
   readonly config: PmsConfig = {
