@@ -33,9 +33,9 @@ export function ReportsTab({
 
   const calculateHousekeeperLoad = (assignedRooms: Room[]): number => {
     return assignedRooms.reduce((total, room) => {
-      if (room.cleaningType === 'full') {
+      if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
         return total + cleaningConfig.fullCleaningTime;
-      } else if (room.cleaningType === 'quick') {
+      } else if (room.cleaningType === 'quick' || room.cleaningType === 'recouche') {
         return total + cleaningConfig.quickCleaningTime;
       }
       return total;
@@ -82,12 +82,12 @@ export function ReportsTab({
                 <CardContent>
                   <div className="space-y-2 mb-4">
                     <div className="text-sm">
-                      <span className="font-medium">Nettoyage complet:</span>{" "}
-                      {housekeeperRooms.filter(r => r.cleaningType === 'full').length}
+                      <span className="font-medium">À Blanc:</span>{" "}
+                      {housekeeperRooms.filter(r => r.cleaningType === 'full' || r.cleaningType === 'a_blanc').length}
                     </div>
                     <div className="text-sm">
                       <span className="font-medium">Recouches:</span>{" "}
-                      {housekeeperRooms.filter(r => r.cleaningType === 'quick').length}
+                      {housekeeperRooms.filter(r => r.cleaningType === 'quick' || r.cleaningType === 'recouche').length}
                     </div>
                     <div className="text-sm">
                       <span className="font-medium">Temps estimé:</span>{" "}

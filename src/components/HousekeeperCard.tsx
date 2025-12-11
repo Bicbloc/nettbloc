@@ -140,11 +140,11 @@ export function HousekeeperCard({
   }, {} as Record<number, Room[]>);
   
   useEffect(() => {
-    // Calculate estimated time
+    // Calculate estimated time - support both old and new cleaning type formats
     const time = rooms.reduce((total, room) => {
-      if (room.cleaningType === 'full') {
+      if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
         return total + cleaningConfig.fullCleaningTime;
-      } else if (room.cleaningType === 'quick') {
+      } else if (room.cleaningType === 'quick' || room.cleaningType === 'recouche') {
         return total + cleaningConfig.quickCleaningTime;
       }
       return total;
@@ -599,10 +599,10 @@ export function HousekeeperCard({
               {/* Totaux par type de nettoyage */}
               <div className="flex gap-2 mt-2">
                 <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
-                  🚪 À Blanc: {rooms.filter(r => r.cleaningType === 'full').length}
+                  🚪 À Blanc: {rooms.filter(r => r.cleaningType === 'full' || r.cleaningType === 'a_blanc').length}
                 </span>
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                  🛏️ Recouche: {rooms.filter(r => r.cleaningType === 'quick').length}
+                  🛏️ Recouche: {rooms.filter(r => r.cleaningType === 'quick' || r.cleaningType === 'recouche').length}
                 </span>
               </div>
             </div>

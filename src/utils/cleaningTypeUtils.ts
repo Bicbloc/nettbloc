@@ -21,6 +21,20 @@ export function normalizeCleaningType(type: string | undefined | null): Normaliz
 }
 
 /**
+ * Check if cleaning type is "À Blanc" (full cleaning) - supports both old and new formats
+ */
+export function isFullCleaning(type: string | undefined | null): boolean {
+  return type === 'full' || type === 'a_blanc';
+}
+
+/**
+ * Check if cleaning type is "Recouche" (quick cleaning) - supports both old and new formats
+ */
+export function isQuickCleaning(type: string | undefined | null): boolean {
+  return type === 'quick' || type === 'recouche';
+}
+
+/**
  * Get display label for cleaning type
  */
 export function getCleaningTypeLabel(type: string | undefined): string {
@@ -47,44 +61,22 @@ export function getCleaningTypeShortLabel(type: string | undefined): string {
 }
 
 /**
- * Check if cleaning type is "À Blanc" (full cleaning)
- */
-export function isFullCleaning(type: string | undefined): boolean {
-  return normalizeCleaningType(type) === 'a_blanc';
-}
-
-/**
- * Check if cleaning type is "Recouche" (quick cleaning)
- */
-export function isQuickCleaning(type: string | undefined): boolean {
-  return normalizeCleaningType(type) === 'recouche';
-}
-
-/**
  * Get estimated time for cleaning type in minutes
  */
 export function getCleaningTime(type: string | undefined, config?: { fullTime?: number; quickTime?: number }): number {
-  const normalized = normalizeCleaningType(type);
   const fullTime = config?.fullTime || 30;
   const quickTime = config?.quickTime || 15;
   
-  switch (normalized) {
-    case 'a_blanc': return fullTime;
-    case 'recouche': return quickTime;
-    case 'none': return 0;
-    default: return fullTime;
-  }
+  if (isFullCleaning(type)) return fullTime;
+  if (isQuickCleaning(type)) return quickTime;
+  return fullTime; // Default
 }
 
 /**
  * Get badge variant for cleaning type
  */
 export function getCleaningTypeBadgeVariant(type: string | undefined): 'default' | 'secondary' | 'outline' {
-  const normalized = normalizeCleaningType(type);
-  switch (normalized) {
-    case 'a_blanc': return 'default';
-    case 'recouche': return 'secondary';
-    case 'none': return 'outline';
-    default: return 'default';
-  }
+  if (isFullCleaning(type)) return 'default';
+  if (isQuickCleaning(type)) return 'secondary';
+  return 'outline';
 }

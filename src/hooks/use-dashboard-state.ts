@@ -173,16 +173,22 @@ export function useDashboardState(): DashboardState {
       setRooms(prev => {
         const existingIndex = prev.findIndex(r => r.number === newRecord.room_number);
         if (existingIndex !== -1) {
-          return prev.map((r, i) => 
-            i === existingIndex 
-              ? { 
-                  ...r, 
-                  status: newRecord.status,
-                  cleaningType: newRecord.cleaning_type === 'full' ? 'full' : (newRecord.cleaning_type === 'quick' ? 'quick' : r.cleaningType),
-                  notes: newRecord.notes || r.notes
-                } 
-              : r
-          );
+          return prev.map((r, i) => {
+            if (i !== existingIndex) return r;
+            // Normalize cleaning_type from database to UI format
+            let normalizedCleaningType: 'a_blanc' | 'recouche' | 'none' = r.cleaningType as any;
+            if (newRecord.cleaning_type === 'full' || newRecord.cleaning_type === 'a_blanc') {
+              normalizedCleaningType = 'a_blanc';
+            } else if (newRecord.cleaning_type === 'quick' || newRecord.cleaning_type === 'recouche') {
+              normalizedCleaningType = 'recouche';
+            }
+            return { 
+              ...r, 
+              status: newRecord.status,
+              cleaningType: normalizedCleaningType,
+              notes: newRecord.notes || r.notes
+            };
+          });
         }
         return prev;
       });

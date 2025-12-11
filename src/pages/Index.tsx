@@ -270,16 +270,22 @@ const Index = () => {
         const existingIndex = prev.findIndex(r => r.number === newRecord.room_number);
         if (existingIndex !== -1) {
           console.log(`✅ Chambre ${newRecord.room_number} trouvée, mise à jour: ${oldRecord?.status} → ${newRecord.status}`);
-          return prev.map((r, i) => 
-            i === existingIndex 
-              ? { 
-                  ...r, 
-                  status: newRecord.status,
-                  cleaningType: newRecord.cleaning_type === 'full' ? 'full' : (newRecord.cleaning_type === 'quick' ? 'quick' : r.cleaningType),
-                  notes: newRecord.notes || r.notes
-                } 
-              : r
-          );
+          return prev.map((r, i) => {
+            if (i !== existingIndex) return r;
+            // Normalize cleaning_type from database to UI format
+            let normalizedCleaningType: typeof r.cleaningType = r.cleaningType;
+            if (newRecord.cleaning_type === 'full' || newRecord.cleaning_type === 'a_blanc') {
+              normalizedCleaningType = 'a_blanc';
+            } else if (newRecord.cleaning_type === 'quick' || newRecord.cleaning_type === 'recouche') {
+              normalizedCleaningType = 'recouche';
+            }
+            return { 
+              ...r, 
+              status: newRecord.status,
+              cleaningType: normalizedCleaningType,
+              notes: newRecord.notes || r.notes
+            };
+          });
         }
         console.log(`⚠️ Chambre ${newRecord.room_number} non trouvée dans la liste locale`);
         return prev;
@@ -506,12 +512,20 @@ const Index = () => {
             const sessionAssigned = sessionAssignments[r.room_number];
             const assignedTo = assignment?.housekeeper_name || sessionAssigned || undefined;
             
-            // Lire cleaning_type correctement
-            const cleaningType = r.cleaning_type === 'full' ? 'full' : (r.cleaning_type === 'quick' ? 'quick' : 'none');
+            // Lire cleaning_type et normaliser vers les nouveaux types
+            const rawCleaningType = r.cleaning_type;
+            let cleaningType: 'a_blanc' | 'recouche' | 'none' = 'a_blanc';
+            if (rawCleaningType === 'full' || rawCleaningType === 'a_blanc') {
+              cleaningType = 'a_blanc';
+            } else if (rawCleaningType === 'quick' || rawCleaningType === 'recouche') {
+              cleaningType = 'recouche';
+            } else if (rawCleaningType === 'none') {
+              cleaningType = 'none';
+            }
             return {
               number: r.room_number,
               status: r.status,
-              cleaningType: cleaningType as 'full' | 'quick' | 'none',
+              cleaningType: cleaningType,
               assignedTo,
               floor: r.floor || undefined,
               notes: r.notes || undefined,
@@ -592,9 +606,9 @@ const Index = () => {
     
     // Calculer le temps total estimé
     const totalTime = roomsToClean.reduce((total, room) => {
-      if (room.cleaningType === 'full') {
+      if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
         return total + cleaningConfig.fullCleaningTime;
-      } else if (room.cleaningType === 'quick') {
+      } else if (room.cleaningType === 'quick' || room.cleaningType === 'recouche') {
         return total + cleaningConfig.quickCleaningTime;
       }
       return total;
