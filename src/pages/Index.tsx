@@ -1,18 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Check, Bed, Smartphone, Building, Key, LogIn, Archive, Link, Trash2, Lock, Bell, UserPlus } from "lucide-react";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { UserIcon, FileText, Calendar, Layers, Plus, FileDown, AlertTriangle, Bed, Smartphone, Building, Key, LogIn, Bell } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import UserMenu from "@/components/UserMenu";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { ActiveUsersPanel } from "@/components/ActiveUsersPanel";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
-import { ConfigDialog } from "@/components/ConfigDialog";
 import { Room, CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
 import { Badge } from "@/components/ui/badge";
-import { RoomCard } from "@/components/RoomCard";
 import { HousekeeperCard } from "@/components/HousekeeperCard";
 import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
 import { CleanRoomsSection } from "@/components/CleanRoomsSection";
@@ -21,12 +19,7 @@ import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useReportEmail } from "@/hooks/use-report-email";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import EmailReportDialog from "@/components/EmailReportDialog";
 import { QuickAddHousekeeperButton } from "@/components/QuickAddHousekeeperButton";
 import { CreateColumnDialog } from "@/components/CreateColumnDialog";
@@ -41,8 +34,6 @@ import { NotificationSound } from "@/components/NotificationSound";
 import { RoomFilters } from "@/components/RoomFilters";
 import { HousekeeperManagement } from "@/components/HousekeeperManagement";
 import { IncidentList } from "@/components/incident/IncidentList";
-import { HousekeeperStatusDashboard } from "@/components/HousekeeperStatusDashboard";
-import { SetupStatusSimple } from "@/components/SetupStatusSimple";
 import { useNotificationContext } from "@/contexts/NotificationContext";
 import { LinenTypeManager } from "@/components/linen/LinenTypeManager";
 import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
@@ -54,8 +45,6 @@ import { IncidentReportDialogSimple } from "@/components/incident/IncidentReport
 import { IncidentDashboard } from "@/components/incident/IncidentDashboard";
 import { RolePermissionsManager } from "@/components/incident/RolePermissionsManager";
 import { IncidentReportPrint } from "@/components/incident/IncidentReportPrint";
-import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicator";
-import { HousekeeperTeamManager } from "@/components/HousekeeperTeamManager";
 import { HousekeeperAccessRequests } from "@/components/HousekeeperAccessRequests";
 import { SupabaseService } from "@/services/supabaseService";
 import { AssignmentService } from "@/services/assignmentService";
@@ -65,7 +54,6 @@ import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { useAutoSetup } from "@/hooks/use-auto-setup";
 import { generateHotelId, cleanupInvalidHotelIds } from "@/lib/utils";
 import { redistributeRooms, getDistributionStats } from "@/utils/redistributionUtils";
-import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
 import { UpgradeButton } from "@/components/UpgradeButton";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
@@ -75,7 +63,15 @@ import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeS
 import { useRoomManagement } from "@/hooks/use-room-management";
 import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
 import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
-import { isFullCleaning, isQuickCleaning } from "@/utils/cleaningTypeUtils";
+
+// New refactored components
+import { QuickActionsCard } from "@/components/dashboard/QuickActionsCard";
+import { PlanningSummaryCard } from "@/components/dashboard/PlanningSummaryCard";
+import { PersonnelSection } from "@/components/dashboard/PersonnelSection";
+import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
+import { RoomsTable } from "@/components/dashboard/RoomsTable";
+import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
+import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -84,21 +80,13 @@ const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Hook pour la gestion de l'abonnement
   const { plan, isPremium, isFree, canAccessFeature, loading: subscriptionLoading } = useSubscription();
   
-  // Mode invité : supprimer la plupart des restrictions
-  const isGuestModeUnlocked = isGuestMode;
-
-  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
-  useSessionTracking(); // Hook pour tracker les sessions
-  const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('nettobloc_admin_tab') || 'overview';
-  });
-  const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
-  const [showHousekeeperManagement, setShowHousekeeperManagement] = useState(false);
+  useSessionTracking();
   
-  // Utiliser directement le contexte (le hook lance déjà une erreur si indisponible)
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('nettobloc_admin_tab') || 'overview');
+  const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
+  
   const { 
     housekeeperNames, 
     setHousekeeperNames,
@@ -110,25 +98,20 @@ const Index = () => {
     refreshHousekeepers
   } = useHousekeeping();
   
-  // Auto-setup automatique de l'hôtel et génération des codes
   const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
-  
-  // Utiliser l'hotel du hook useAutoSetup comme source unique de vérité
   const currentHotelId = hotel?.id || null;
   
-  // Hook pour vérifier si c'est la première connexion et si le setup initial est requis
   const { needsSetup, loading: setupCheckLoading } = useFirstTimeSetup(currentHotelId);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   
-  // Hooks de gestion refactorisés
+  // Room management hooks
   const {
     handleRoomUpdate,
     handleRoomUnassign,
     handleRoomReassign,
     handleAddRoom,
-    handleDeleteRoom: handleDeleteRoomFromHook,
+    handleDeleteRoom,
     handleLinkRooms,
-    handleGenerateAccessCode
   } = useRoomManagement({
     hotelId: currentHotelId,
     rooms,
@@ -144,8 +127,6 @@ const Index = () => {
     setHousekeeperMaxRoomsOverrides,
     handleDeleteHousekeeper,
     handleRenameHousekeeper,
-    handleFloorPreferenceChange,
-    handleMaxRoomsOverrideChange
   } = useHousekeeperManagement({
     housekeeperNames,
     setHousekeeperNames,
@@ -163,8 +144,6 @@ const Index = () => {
     setIsRedistributionDialogOpen,
     isHotelSelectionOpen,
     setIsHotelSelectionOpen,
-    showInviteDialog,
-    setShowInviteDialog,
     showDeleteDialog,
     setShowDeleteDialog,
     showLinkDialog,
@@ -181,13 +160,32 @@ const Index = () => {
     setReportAction,
     reportHousekeeper,
     setReportHousekeeper,
-    openDeleteDialog,
-    openLinkDialog,
-    openSingleReport,
-    openAllReports
   } = useDashboardDialogs();
   
-  // Afficher le wizard si nécessaire
+  // Assignment handlers
+  const { handleManualAssign, handleDirectRoomAssignment } = useAssignmentHandlers({
+    hotelId: currentHotelId,
+    rooms,
+    setRooms,
+    housekeepers,
+    refreshHousekeepers
+  });
+  
+  // Room stats
+  const roomStats = useRoomStats(rooms, cleaningConfig);
+  const { getHousekeeperRooms, getUnassignedRooms, getCleanRooms, calculateHousekeeperLoad } = useRoomHelpers(rooms);
+  
+  const [availableFloors, setAvailableFloors] = useState<number[]>([]);
+  const { email, setEmail } = useReportEmail();
+  const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ toDoItems: [], toKnowItems: [] });
+  const [availableHotels, setAvailableHotels] = useState<any[]>([]);
+  const [selectedHotel, setSelectedHotel] = useState<any | null>(null);
+  const [hotelCode, setHotelCode] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Setup wizard effect
   useEffect(() => {
     if (!setupCheckLoading && needsSetup && isAuthenticated && currentHotelId) {
       setShowSetupWizard(true);
@@ -198,70 +196,45 @@ const Index = () => {
     setCleaningConfig(newConfig);
     setShowSetupWizard(false);
   };
-  
-  const [availableFloors, setAvailableFloors] = useState<number[]>([]);
-  const { email, setEmail, isValid } = useReportEmail();
-  const [recommendedHousekeepers, setRecommendedHousekeepers] = useState<number>(0);
-  const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ 
-    toDoItems: [], 
-    toKnowItems: [] 
-  });
-  
-  // États pour la gestion des hôtels (conservés pour compatibilité)
-  const [availableHotels, setAvailableHotels] = useState<any[]>([]);
-  const [selectedHotel, setSelectedHotel] = useState<any | null>(null);
 
-  // Mettre à jour la configuration selon le statut premium
+  // Update config based on premium status
   useEffect(() => {
     if (!subscriptionLoading) {
       setCleaningConfig(prevConfig => ({
         ...getDefaultCleaningConfig(isPremium),
-        // Conserver les customisations utilisateur pour les temps si elles existent
         fullCleaningTime: prevConfig.fullCleaningTime,
         quickCleaningTime: prevConfig.quickCleaningTime
       }));
     }
   }, [isPremium, subscriptionLoading]);
-  const [hotelCode, setHotelCode] = useState<string>("");
-  const [userEmail, setUserEmail] = useState<string>("");
   
-  const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
-  
-  // Flag pour éviter le rechargement pendant l'import PDF
-  const [isImporting, setIsImporting] = useState(false);
-  
-  const [existingHousekeepers, setExistingHousekeepers] = useState<string[]>([]);
-  
-  console.log("🏨 Hotel ID synchronisé:", {
-    hotelId: currentHotelId,
-    hotelName: hotel?.name,
-    setupComplete: isSetupComplete
-  });
-  
-  // Utiliser le contexte de notifications
-  const { addNotification } = useNotificationContext();
+  // Persist active tab
+  useEffect(() => {
+    localStorage.setItem('nettobloc_admin_tab', activeTab);
+  }, [activeTab]);
 
-  // Phase 3: Gestion temps réel des mises à jour depuis les housekeepers
+  // Cleanup invalid hotel IDs
+  useEffect(() => {
+    cleanupInvalidHotelIds();
+  }, []);
+
+  // Sync hotel code
+  useEffect(() => {
+    if (hotel?.hotel_code) {
+      setHotelCode(hotel.hotel_code);
+    }
+  }, [hotel?.hotel_code]);
+  
+  // Realtime handler
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
-    console.log(`📡 Temps réel [${table}] ${payload.eventType}:`, {
-      roomNumber: payload.new?.room_number,
-      status: payload.new?.status,
-      notes: payload.new?.notes,
-      assignedTo: payload.new?.housekeeper_name,
-      id: payload.new?.id
-    });
-    
     const { eventType, new: newRecord, old: oldRecord } = payload;
     
     if (table === 'rooms' && (eventType === 'UPDATE' || eventType === 'INSERT')) {
-      // Mettre à jour l'état local quand un housekeeper change le statut
       setRooms(prev => {
         const existingIndex = prev.findIndex(r => r.number === newRecord.room_number);
         if (existingIndex !== -1) {
-          console.log(`✅ Chambre ${newRecord.room_number} trouvée, mise à jour: ${oldRecord?.status} → ${newRecord.status}`);
           return prev.map((r, i) => {
             if (i !== existingIndex) return r;
-            // Normalize cleaning_type from database to UI format
             let normalizedCleaningType: typeof r.cleaningType = r.cleaningType;
             if (newRecord.cleaning_type === 'full' || newRecord.cleaning_type === 'a_blanc') {
               normalizedCleaningType = 'a_blanc';
@@ -276,361 +249,103 @@ const Index = () => {
             };
           });
         }
-        console.log(`⚠️ Chambre ${newRecord.room_number} non trouvée dans la liste locale`);
         return prev;
       });
 
-      // Notification seulement si statut change à clean
       if (newRecord.status === 'clean') {
         toast({
           title: "✅ Chambre nettoyée",
-          description: `Chambre ${newRecord.room_number} marquée propre${newRecord.notes ? ` - ${newRecord.notes}` : ''}`,
+          description: `Chambre ${newRecord.room_number} marquée propre`,
           duration: 4000
         });
       }
     }
     
-    if (table === 'assignments' && (eventType === 'INSERT' || eventType === 'UPDATE')) {
-      console.log('✅ Assignment temps réel:', {
-        housekeeper: newRecord.housekeeper_name,
-        roomId: newRecord.room_id,
-        status: newRecord.status
-      });
-      
-      // Recharger les données si une assignation est complétée
-      if (newRecord.status === 'completed' && currentHotelId) {
-        // Déclencher un refresh des données pour mettre à jour les sections
-        setTimeout(() => {
-          refreshHousekeepers?.();
-        }, 500);
-      }
+    if (table === 'assignments' && newRecord?.status === 'completed' && currentHotelId) {
+      setTimeout(() => refreshHousekeepers?.(), 500);
     }
-  }, [toast, currentHotelId, refreshHousekeepers]);
+  }, [currentHotelId, refreshHousekeepers, setRooms]);
 
-  // Phase 5: Ajouter des listeners temps réel avec indicateur de connexion
   const realtimeSync = useRealtimeSync({
     hotelId: currentHotelId || undefined,
     tables: ['rooms', 'assignments'],
     onUpdate: handleRealtimeUpdate
   });
 
-  // ALL useEffect hooks must be here too - before any conditional returns
-  useEffect(() => {
-    cleanupInvalidHotelIds();
-  }, []);
-  
-  // Persister l'onglet actif avec storageService
-  useEffect(() => {
-    localStorage.setItem('nettobloc_admin_tab', activeTab);
-  }, [activeTab]);
-  
-  // Persister les assignations complètes (rooms + housekeeperNames)
-  useEffect(() => {
-    if (!currentHotelId || rooms.length === 0) return;
-    
-    const assignmentState = {
-      rooms: rooms.map(r => ({
-        number: r.number,
-        assignedTo: r.assignedTo,
-        cleaningType: r.cleaningType,
-        status: r.status
-      })),
-      housekeeperNames,
-      timestamp: Date.now()
-    };
-    localStorage.setItem(`assignments_${currentHotelId}`, JSON.stringify(assignmentState));
-  }, [rooms, housekeeperNames, currentHotelId]);
-  
-  // Charger les femmes de chambre existantes
-  useEffect(() => {
-    const loadExistingHousekeepers = async () => {
-      if (!currentHotelId) return;
-      
-      try {
-        console.log("🔍 Chargement des femmes de chambre existantes pour l'hôtel:", currentHotelId);
-        
-        const { data: hkList, error: hkError } = await supabase
-          .from('housekeepers')
-          .select('id, name, is_active')
-          .eq('hotel_id', currentHotelId)
-          .eq('is_active', true);
-
-        if (hkError) {
-          console.error('Erreur lors du chargement des femmes de chambre:', hkError);
-          return;
-        }
-
-        const hkById = new Map<string, string>();
-        (hkList || []).forEach((h: any) => hkById.set(h.id, h.name));
-
-        const { data: sessions, error: sessError } = await supabase
-          .from('user_sessions')
-          .select('housekeeper_id, user_name, last_activity')
-          .eq('hotel_id', currentHotelId)
-          .eq('user_type', 'housekeeper')
-          .order('last_activity', { ascending: false });
-
-        if (sessError) {
-          console.warn('⚠️ Chargement sessions impossible, fallback ordre alphabétique');
-        }
-
-        const ordered: string[] = [];
-        const seen = new Set<string>();
-
-        (sessions || []).forEach((s: any) => {
-          const name = (s.housekeeper_id && hkById.get(s.housekeeper_id)) || s.user_name;
-          if (name && !seen.has(name)) { seen.add(name); ordered.push(name); }
-        });
-
-        (hkList || []).forEach((h: any) => {
-          if (!seen.has(h.name)) { seen.add(h.name); ordered.push(h.name); }
-        });
-
-        console.log("✅ Femmes de chambre (priorisées):", ordered);
-        setExistingHousekeepers(ordered);
-      } catch (error) {
-        console.error('Erreur lors du chargement des femmes de chambre:', error);
-      }
-    };
-
-    loadExistingHousekeepers();
-  }, [currentHotelId]);
-  
-  // Traiter les données de l'AnalysisWorkflow
-  useEffect(() => {
-    if (location.state) {
-      const { rooms: analyzedRooms, housekeepers: analyzedHousekeepers, distributionMethod } = location.state as any;
-      
-      if (analyzedRooms && analyzedHousekeepers) {
-        console.log('📊 Données reçues de l\'AnalysisWorkflow:', {
-          rooms: analyzedRooms.length,
-          housekeepers: analyzedHousekeepers.length,
-          method: distributionMethod
-        });
-        
-        // Appliquer les données analysées
-        handlePdfProcessed(analyzedRooms, analyzedHousekeepers, distributionMethod);
-        
-        // Nettoyer l'état de navigation pour éviter les répétitions
-        navigate('/', { replace: true });
-      }
-    }
-  }, [location.state]);
-  
-  useEffect(() => {
-    const initialPreferences: Record<string, number[]> = {};
-    housekeeperNames.forEach((name) => {
-      initialPreferences[name] = [];
-    });
-    setHousekeeperFloorPreferences(initialPreferences);
-  }, [housekeeperNames]);
-
-  // PHASE 4: Restaurer les données à la reconnexion (charger rooms depuis Supabase)
+  // Load rooms from database
   useEffect(() => {
     const loadRoomsFromDatabase = async () => {
-      if (!currentHotelId) return;
+      if (!currentHotelId || isImporting) return;
       
-      // Ne pas recharger pendant un import PDF en cours
-      if (isImporting) {
-        console.log('⏳ Import en cours, rechargement différé');
-        return;
-      }
-
       try {
-        console.log('🔄 Phase 4: Chargement des chambres depuis Supabase...');
-        
-        // Nettoyer les données localStorage obsolètes (> 24h)
-        const savedState = localStorage.getItem(`assignments_${currentHotelId}`);
-        if (savedState) {
-          try {
-            const { timestamp } = JSON.parse(savedState);
-            if (timestamp && (Date.now() - timestamp > 24 * 60 * 60 * 1000)) {
-              console.log('🧹 Nettoyage données localStorage obsolètes');
-              localStorage.removeItem(`assignments_${currentHotelId}`);
-            }
-          } catch (e) {
-            localStorage.removeItem(`assignments_${currentHotelId}`);
-          }
-        }
-        
-        // Charger les chambres depuis la table rooms
-        const { data: dbRooms, error: roomsError } = await supabase
+        const { data: roomsData, error } = await supabase
           .from('rooms')
           .select('*')
           .eq('hotel_id', currentHotelId);
 
-        if (roomsError) throw roomsError;
+        if (error || !roomsData) return;
 
-        // Charger les assignations actives depuis la table assignments
-        const { data: dbAssignments, error: assignmentsError } = await supabase
+        const { data: assignmentsData } = await supabase
           .from('assignments')
           .select('room_id, housekeeper_name')
           .eq('hotel_id', currentHotelId)
           .in('status', ['assigned', 'in_progress']);
 
-        if (assignmentsError) throw assignmentsError;
-
-        // Charger aussi les assignations depuis hotel_sessions comme fallback
-        const { data: hotelSession } = await supabase
-          .from('hotel_sessions')
-          .select('housekeeper_assignments, housekeeper_names')
-          .eq('hotel_id', currentHotelId)
-          .eq('is_active', true)
-          .maybeSingle();
-        
-        const sessionAssignments: Record<string, string> = 
-          hotelSession?.housekeeper_assignments && typeof hotelSession.housekeeper_assignments === 'object'
-            ? hotelSession.housekeeper_assignments as Record<string, string>
-            : {};
-        const sessionHousekeeperNames: string[] = 
-          hotelSession?.housekeeper_names && Array.isArray(hotelSession.housekeeper_names)
-            ? hotelSession.housekeeper_names as string[]
-            : [];
-
-        console.log('📊 Données de session:', { 
-          sessionAssignments: Object.keys(sessionAssignments).length,
-          sessionHousekeeperNames: sessionHousekeeperNames.length,
-          dbAssignments: dbAssignments?.length || 0
+        const assignmentMap: Record<string, string> = {};
+        (assignmentsData || []).forEach((a: any) => {
+          assignmentMap[a.room_id] = a.housekeeper_name;
         });
 
-        // Fusionner les données
-        if (dbRooms && dbRooms.length > 0) {
-          const mergedRooms: Room[] = dbRooms.map(r => {
-            // Priorité : assignments table > hotel_sessions > rien
-            const assignment = dbAssignments?.find(a => a.room_id === r.id);
-            const sessionAssigned = sessionAssignments[r.room_number];
-            const assignedTo = assignment?.housekeeper_name || sessionAssigned || undefined;
-            
-            // Lire cleaning_type et normaliser vers les nouveaux types
-            const rawCleaningType = r.cleaning_type;
-            let cleaningType: 'a_blanc' | 'recouche' | 'none' = 'a_blanc';
-            if (rawCleaningType === 'full' || rawCleaningType === 'a_blanc') {
-              cleaningType = 'a_blanc';
-            } else if (rawCleaningType === 'quick' || rawCleaningType === 'recouche') {
-              cleaningType = 'recouche';
-            } else if (rawCleaningType === 'none') {
-              cleaningType = 'none';
-            }
-            return {
-              number: r.room_number,
-              status: r.status,
-              cleaningType: cleaningType,
-              assignedTo,
-              floor: r.floor || undefined,
-              notes: r.notes || undefined,
-              isUrgent: r.cleaning_priority === 10,
-              notUrgent: r.cleaning_priority === 1,
-              isTwin: false,
-              priority: r.cleaning_priority === 10 ? 'high' as const : undefined
-            };
-          });
+        const mergedRooms: Room[] = roomsData.map((r: any) => {
+          const assignment = assignmentMap[r.id];
+          let cleaningType: 'a_blanc' | 'recouche' | 'none' = 'a_blanc';
+          if (r.cleaning_type === 'full' || r.cleaning_type === 'a_blanc') {
+            cleaningType = 'a_blanc';
+          } else if (r.cleaning_type === 'quick' || r.cleaning_type === 'recouche') {
+            cleaningType = 'recouche';
+          } else if (r.cleaning_type === 'none') {
+            cleaningType = 'none';
+          }
+          return {
+            number: r.room_number,
+            status: r.status,
+            cleaningType,
+            assignedTo: assignment || undefined,
+            floor: r.floor || undefined,
+            notes: r.notes || undefined,
+            isUrgent: r.cleaning_priority === 10,
+            notUrgent: r.cleaning_priority === 1,
+            isTwin: false,
+            priority: r.cleaning_priority === 10 ? 'high' as const : undefined
+          };
+        });
 
-          // Appliquer les chambres restaurées
-          setRooms(mergedRooms);
+        setRooms(mergedRooms);
+        
+        // Extract floors
+        const floors = new Set<number>();
+        mergedRooms.forEach(room => {
+          const floor = room.floor || (room.number.length > 0 ? parseInt(room.number[0]) : 0);
+          if (!isNaN(floor)) floors.add(floor);
+        });
+        setAvailableFloors(Array.from(floors).sort((a, b) => a - b));
 
-          console.log('✅ Phase 4: Chambres restaurées depuis Supabase:', mergedRooms.length);
-          
-          // Restaurer les housekeeperNames depuis la session ou la base
-          const assignedHousekeepers = Array.from(new Set(
-            mergedRooms.map(r => r.assignedTo).filter(Boolean) as string[]
-          ));
-          
-          // Priorité: session > assignations > base de données
-          let housekeepersToSet: string[] = [];
-          
-          if (sessionHousekeeperNames.length > 0) {
-            housekeepersToSet = sessionHousekeeperNames;
-            console.log('✅ Housekeepers restaurés depuis hotel_sessions:', housekeepersToSet);
-          } else if (assignedHousekeepers.length > 0) {
-            housekeepersToSet = assignedHousekeepers;
-            console.log('✅ Housekeepers restaurés depuis assignments:', housekeepersToSet);
-          } else {
-            const { data: dbHousekeepers } = await supabase
-              .from('housekeepers')
-              .select('name')
-              .eq('hotel_id', currentHotelId)
-              .eq('is_active', true);
-              
-            if (dbHousekeepers && dbHousekeepers.length > 0) {
-              housekeepersToSet = dbHousekeepers.map(h => h.name);
-              console.log('✅ Housekeepers restaurés depuis table housekeepers:', housekeepersToSet);
-            }
-          }
-          
-          if (housekeepersToSet.length > 0 && housekeeperNames.length === 0) {
-            setHousekeeperNames(housekeepersToSet);
-          }
-          
-          // Marquer comme distribué si des assignations existent
-          if (mergedRooms.some(r => r.assignedTo)) {
-            setIsDistributed(true);
-          }
+        if (mergedRooms.some(r => r.assignedTo)) {
+          setIsDistributed(true);
         }
       } catch (error) {
-        console.error('❌ Phase 4: Erreur chargement chambres:', error);
+        console.error('Error loading rooms:', error);
       }
     };
 
-    // Charger au montage et à chaque changement d'hôtel
     loadRoomsFromDatabase();
-
-    // Recharger toutes les 2 minutes au lieu de 30 secondes (réduction des conflits)
     const interval = setInterval(loadRoomsFromDatabase, 120000);
     return () => clearInterval(interval);
-  }, [currentHotelId, isImporting]);
+  }, [currentHotelId, isImporting, setRooms, setIsDistributed]);
 
-  // Synchroniser hotel code quand l'hotel est chargé
-  useEffect(() => {
-    if (hotel?.hotel_code) {
-      setHotelCode(hotel.hotel_code);
-      console.log('✅ Hotel code synchronisé:', hotel.hotel_code);
-    }
-  }, [hotel?.hotel_code]);
-  
-  // Calculer le nombre recommandé de femmes de chambre
-  useEffect(() => {
-    if (rooms.length === 0) return;
-    
-    const roomsToClean = rooms.filter(room => room.cleaningType !== 'none' && room.status !== 'maintenance');
-    
-    // Calculer le temps total estimé
-    const totalTime = roomsToClean.reduce((total, room) => {
-      if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
-        return total + cleaningConfig.fullCleaningTime;
-      } else if (room.cleaningType === 'quick' || room.cleaningType === 'recouche') {
-        return total + cleaningConfig.quickCleaningTime;
-      }
-      return total;
-    }, 0);
-    
-    // Calculer le temps moyen par femme de chambre (en minutes)
-    const averageTimePerHousekeeper = 360; // 6 heures = 360 minutes
-    
-    // Calculer le nombre recommandé de femmes de chambre
-    const recommended = Math.ceil(totalTime / averageTimePerHousekeeper);
-    setRecommendedHousekeepers(recommended);
-    
-  }, [rooms, cleaningConfig]);
-
-  // Redirect to auth if not authenticated and not in guest mode - AFTER ALL HOOKS
-  if (!loading && !isAuthenticated && !isGuestMode) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  console.log("Index - isDistributed:", isDistributed); // Debug log
-  
-  // handleDeleteRoom from hook is renamed to avoid conflict with local handleDeleteRoom used differently
-  const handleDeleteRoom = handleDeleteRoomFromHook;
-  
-  const handlePdfProcessed = async (data: Room[], housekeeperNames?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
-    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeeperNames || []);
-    
-    // Activer le flag pour bloquer le rechargement automatique
+  // PDF processing handler
+  const handlePdfProcessed = async (data: Room[], housekeeperNamesParam?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
     setIsImporting(true);
-    
-    // Mettre en pause le RealtimeManager pour éviter les conflits
-    const { realtimeManager } = await import('@/services/RealtimeManager');
-    realtimeManager.pause();
     
     try {
       const floors = new Set<number>();
@@ -638,25 +353,21 @@ const Index = () => {
         const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
         floors.add(floor);
         room.floor = floor;
-        room.isTwin = false; 
+        room.isTwin = false;
       });
-      const floorArray = Array.from(floors).sort((a, b) => a - b);
-      setAvailableFloors(floorArray);
+      setAvailableFloors(Array.from(floors).sort((a, b) => a - b));
       
       const sortedData = [...data].sort((a, b) => 
         a.number.localeCompare(b.number, undefined, { numeric: true })
       );
 
-      // Mettre à jour les noms des femmes de chambre si fournis
-      if (housekeeperNames && housekeeperNames.length > 0) {
-        setHousekeeperNames(housekeeperNames);
+      if (housekeeperNamesParam && housekeeperNamesParam.length > 0) {
+        setHousekeeperNames(housekeeperNamesParam);
       }
 
-      // PHASE 1: Synchroniser CHAQUE chambre PDF vers Supabase avec CLEANING_TYPE correct
+      // Sync to Supabase
       if (currentHotelId) {
-        console.log('🔄 Phase 1: Synchronisation des chambres PDF vers Supabase...');
         for (const room of sortedData) {
-          // Normaliser le cleaning_type : a_blanc → full, recouche → quick
           let normalizedCleaningType: string | null = null;
           if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
             normalizedCleaningType = 'full';
@@ -671,7 +382,6 @@ const Index = () => {
             room_number: room.number,
             floor: room.floor || null,
             status: room.status || 'needs-cleaning',
-            // CORRECTION: Utiliser cleaning_type au lieu de room_type
             cleaning_type: normalizedCleaningType,
             cleaning_priority: room.isUrgent ? 10 : (room.notUrgent ? 1 : 5),
             notes: room.notes || null
@@ -680,23 +390,20 @@ const Index = () => {
             ignoreDuplicates: false 
           });
         }
-        console.log('✅ Phase 1: Toutes les chambres synchronisées vers Supabase avec cleaning_type correct');
       }
 
       // Auto-distribute if method specified
-      if (distributionMethod && housekeeperNames && housekeeperNames.length > 0) {
-        console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
-        // Simuler une distribution simple pour l'instant
-        const roomsPerHousekeeper = Math.ceil(sortedData.length / housekeeperNames.length);
+      if (distributionMethod && housekeeperNamesParam && housekeeperNamesParam.length > 0) {
+        const roomsPerHousekeeper = Math.ceil(sortedData.length / housekeeperNamesParam.length);
         const updatedRooms = sortedData.map((room, index) => {
           const housekeeperIndex = Math.floor(index / roomsPerHousekeeper);
-          const assignedHousekeeper = housekeeperNames[housekeeperIndex] || housekeeperNames[0];
+          const assignedHousekeeper = housekeeperNamesParam[housekeeperIndex] || housekeeperNamesParam[0];
           return { ...room, assignedTo: assignedHousekeeper };
         });
         setRooms(updatedRooms);
         setIsDistributed(true);
         
-        // Phase 1: Persister les assignations dans Supabase avec validation UUID
+        // Persist assignments
         if (currentHotelId && housekeepers.length > 0) {
           for (const room of updatedRooms) {
             if (room.assignedTo) {
@@ -708,19 +415,11 @@ const Index = () => {
                 .eq('room_number', room.number)
                 .single();
               
-              // Phase 1: Valider que housekeeper_id n'est pas "null" string
               const housekeeperId = hk?.user_id && hk.user_id !== 'null' ? hk.user_id : 
                                     hk?.id && hk.id !== 'null' ? hk.id : null;
               
               if (roomData?.id && housekeeperId) {
-                await AssignmentService.assignRoom(
-                  currentHotelId,
-                  roomData.id,
-                  housekeeperId,
-                  room.assignedTo
-                );
-              } else {
-                console.warn(`⚠️ Assignment ignorée pour ${room.number} - ID invalide:`, { hk, housekeeperId });
+                await AssignmentService.assignRoom(currentHotelId, roomData.id, housekeeperId, room.assignedTo);
               }
             }
           }
@@ -734,341 +433,20 @@ const Index = () => {
         title: "PDF traité avec succès",
         description: `${data.length} chambres importées${distributionMethod ? ` et distribuées (${distributionMethod})` : ''}`
       });
-      
-    } catch (error) {
-      console.error("❌ Erreur traitement PDF:", error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Erreur lors du traitement du PDF"
-      });
     } finally {
-      // Désactiver le flag après un délai pour laisser le temps aux données de se propager
-      setTimeout(async () => {
-        setIsImporting(false);
-        // Reprendre le RealtimeManager
-        const { realtimeManager } = await import('@/services/RealtimeManager');
-        realtimeManager.resume();
-        console.log('✅ Import terminé, rechargement automatique réactivé');
-      }, 3000);
+      setTimeout(() => setIsImporting(false), 3000);
     }
   };
 
-  const distributeRooms = async (
-    roomsList: Room[], 
-    housekeepersParam: string[], 
-    floorPreferences: Record<string, number[]> = {},
-    maxRoomsOverrides: Record<string, number> = {}
-  ) => {
-    if (housekeepersParam.length === 0) return;
-    
-    const sortedRooms = [...roomsList].sort((a, b) => {
-      if (a.priority === 'high' && b.priority !== 'high') return -1;
-      if (b.priority === 'high' && a.priority !== 'high') return 1;
-      if (a.cleaningType === 'full' && b.cleaningType !== 'full') return -1;
-      if (b.cleaningType === 'full' && a.cleaningType !== 'full') return 1;
-      const floorA = a.floor !== undefined ? a.floor : (a.number ? parseInt(a.number[0]) : 0);
-      const floorB = b.floor !== undefined ? b.floor : (b.number ? parseInt(b.number[0]) : 0);
-      if (floorA !== floorB) return floorA - floorB;
-      return a.number.localeCompare(b.number, undefined, { numeric: true });
-    });
-    
-    const roomsToClean = sortedRooms.filter(room => 
-      room.cleaningType !== 'none' && room.status !== 'maintenance'
-    );
-    
-    const roomsByFloor: Record<number, Room[]> = {};
-    for (const room of roomsToClean) {
-      const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
-      if (!roomsByFloor[floor]) roomsByFloor[floor] = [];
-      roomsByFloor[floor].push(room);
-    }
-    
-    const assignments: Record<string, Room[]> = {};
-    housekeepersParam.forEach(name => {
-      assignments[name] = [];
-    });
-    
-    const findMinLoadHousekeeper = (preferredFloor?: number) => {
-      let candidates = housekeepersParam;
-      if (preferredFloor !== undefined) {
-        // Only assign to housekeepers with this floor preference or no preference
-        const housekeepersForFloor = housekeepersParam.filter(name => {
-          const preferences = floorPreferences[name] || [];
-          return preferences.length === 0 || preferences.includes(preferredFloor);
-        });
-        
-        if (housekeepersForFloor.length > 0) {
-          candidates = housekeepersForFloor;
-        }
-      }
-      
-      // Filter candidates that haven't reached their max rooms limit
-      const availableCandidates = candidates.filter(name => {
-        const maxRooms = maxRoomsOverrides[name] || cleaningConfig.maxRoomsPerHousekeeper;
-        return assignments[name].length < maxRooms;
-      });
-      
-      // If all candidates have reached their max, return null
-      if (availableCandidates.length === 0) return null;
-      
-      let minLoadHousekeeper = availableCandidates[0];
-      let minLoad = calculateHousekeeperLoad(assignments[minLoadHousekeeper], cleaningConfig);
-      
-      for (let i = 1; i < availableCandidates.length; i++) {
-        const currentLoad = calculateHousekeeperLoad(assignments[availableCandidates[i]], cleaningConfig);
-        if (currentLoad < minLoad) {
-          minLoad = currentLoad;
-          minLoadHousekeeper = availableCandidates[i];
-        }
-      }
-      
-      return minLoadHousekeeper;
-    };
-    
-    const assignedRooms = new Set<string>();
-    
-    // First assign high priority rooms
-    for (const room of roomsToClean.filter(r => r.priority === 'high')) {
-      const floor = room.floor !== undefined ? room.floor : parseInt(room.number[0]) || 0;
-      const housekeeper = findMinLoadHousekeeper(floor);
-      
-      if (!housekeeper) continue; // Skip if all housekeepers are at max capacity
-      
-      // Only assign if the housekeeper accepts this floor or has no preferences
-      const preferences = floorPreferences[housekeeper] || [];
-      if (preferences.length === 0 || preferences.includes(floor)) {
-        assignments[housekeeper].push({ ...room, assignedTo: housekeeper });
-        assignedRooms.add(room.number);
-      }
-    }
-    
-    // Then assign remaining rooms by floor
-    Object.entries(roomsByFloor).forEach(([floor, floorRooms]) => {
-      const floorNum = parseInt(floor);
-      for (const room of floorRooms) {
-        if (assignedRooms.has(room.number)) continue;
-        
-        const housekeeper = findMinLoadHousekeeper(floorNum);
-        if (!housekeeper) continue; // Skip if all housekeepers are at max capacity
-        
-        // Only assign if the housekeeper accepts this floor or has no preferences
-        const preferences = floorPreferences[housekeeper] || [];
-        if (preferences.length === 0 || preferences.includes(floorNum)) {
-          assignments[housekeeper].push({ ...room, assignedTo: housekeeper });
-          assignedRooms.add(room.number);
-        }
-      }
-    });
-    
-    // Update all rooms
-    const updatedRooms = [...sortedRooms];
-    for (const housekeeperName of housekeepersParam) {
-      for (const room of assignments[housekeeperName]) {
-        const index = updatedRooms.findIndex(r => r.number === room.number);
-        if (index !== -1) {
-          updatedRooms[index] = { ...updatedRooms[index], assignedTo: housekeeperName };
-        }
-      }
-    }
-    
-    setRooms(updatedRooms);
-    
-    // Phase 2: Persister les assignations dans Supabase avec validation UUID
-    if (currentHotelId) {
-      for (const room of updatedRooms) {
-        if (room.assignedTo) {
-          const hk = housekeepers.find(h => h.name === room.assignedTo);
-          const { data: roomData } = await supabase
-            .from('rooms')
-            .select('id')
-            .eq('hotel_id', currentHotelId)
-            .eq('room_number', room.number)
-            .single();
-          
-          // Phase 1: Valider que housekeeper_id n'est pas "null" string
-          const housekeeperId = hk?.user_id && hk.user_id !== 'null' ? hk.user_id : 
-                                hk?.id && hk.id !== 'null' ? hk.id : null;
-          
-          if (roomData?.id && housekeeperId) {
-            await AssignmentService.assignRoom(
-              currentHotelId,
-              roomData.id,
-              housekeeperId,
-              room.assignedTo
-            );
-          } else {
-            console.warn(`⚠️ Assignment ignorée pour ${room.number} - ID invalide:`, { hk, housekeeperId });
-          }
-        }
-      }
-    }
-    
-    // Notify user about unassigned rooms
-    const unassignedRooms = getUnassignedRooms();
-    if (unassignedRooms.length > 0) {
-      toast({
-        title: "Distribution terminée",
-        description: `${unassignedRooms.length} chambres n'ont pas pu être assignées en raison des préférences d'étage ou des limites de chambres.`,
-        variant: "default",
-      });
-    }
-  };
-  
-  const calculateHousekeeperLoad = (assignedRooms: Room[], config: CleaningConfig): number => {
-    return assignedRooms.reduce((total, room) => {
-      if (room.cleaningType === 'full') {
-        return total + config.fullCleaningTime;
-      } else if (room.cleaningType === 'quick') {
-        return total + config.quickCleaningTime;
-      }
-      return total;
-    }, 0);
-  };
-  
-  const handleGenerateReport = async (housekeeperName: string, housekeeperRooms: Room[]) => {
-    setReportHousekeeper(housekeeperName);
-    setReportAction("single");
-    
-    // Mode invité : seule restriction est les 50 chambres pour les rapports
-    if (isGuestMode) {
-      const roomsToClean = rooms.filter(room => 
-        room.cleaningType !== 'none' && room.status !== 'maintenance'
-      );
-      
-      if (roomsToClean.length > 50) {
-        toast({
-          variant: "destructive",
-          title: "Limite atteinte en mode invité",
-          description: "Passez au Premium pour générer des rapports de plus de 50 chambres."
-        });
-        return;
-      }
-    }
-
-    // Pour les utilisateurs connectés, vérifier les limites selon le plan
-    if (isAuthenticated && !isPremium) {
-      const roomsToClean = rooms.filter(room => 
-        room.cleaningType !== 'none' && room.status !== 'maintenance'
-      );
-      
-      if (roomsToClean.length > 50) {
-        toast({
-          variant: "destructive",
-          title: "Limite atteinte",
-          description: "Le plan gratuit est limité à 50 chambres. Passez au Premium pour plus."
-        });
-        return;
-      }
-    }
-
-    // Ouvrir directement le dialog de rapport
-    setIsReportDialogOpen(true);
-  };
-  
-  const handleGenerateAllReports = async () => {
-    setReportAction("all");
-    
-    // Mode invité : seule restriction est les 50 chambres pour les rapports
-    if (isGuestMode) {
-      const roomsToClean = rooms.filter(room => 
-        room.cleaningType !== 'none' && room.status !== 'maintenance'
-      );
-      
-      if (roomsToClean.length > 50) {
-        toast({
-          variant: "destructive",
-          title: "Limite atteinte en mode invité",
-          description: "Passez au Premium pour générer des rapports de plus de 50 chambres."
-        });
-        return;
-      }
-    }
-
-    // Pour les utilisateurs connectés, vérifier les limites selon le plan
-    if (isAuthenticated && !isPremium) {
-      const roomsToClean = rooms.filter(room => 
-        room.cleaningType !== 'none' && room.status !== 'maintenance'
-      );
-      
-      if (roomsToClean.length > 50) {
-        toast({
-          variant: "destructive",
-          title: "Limite atteinte",
-          description: "Le plan gratuit est limité à 50 chambres. Passez au Premium pour plus."
-        });
-        return;
-      }
-    }
-
-    // Ouvrir directement le dialog de rapport
-    setIsReportDialogOpen(true);
-  };
-  
-  const totalRooms = rooms.length;
-  const roomsToClean = rooms.filter(r => r.status === 'needs-cleaning' || r.cleaningType !== 'none').length;
-  const fullCleaningRooms = rooms.filter(r => r.cleaningType === 'full').length;
-  const quickCleaningRooms = rooms.filter(r => r.cleaningType === 'quick').length;
-  const priorityRooms = rooms.filter(r => r.priority === 'high').length;
-  const cleanRooms = rooms.filter(r => r.status === 'clean').length;
-  const twinRooms = rooms.filter(r => r.isTwin).length;
-  
-  const getHousekeeperRooms = (name: string) => {
-    return rooms.filter(room => room.assignedTo === name);
-  };
-  
-  const getUnassignedRooms = () => {
-    return rooms.filter(room => 
-      !room.assignedTo && 
-      room.cleaningType !== 'none' && 
-      room.status !== 'maintenance' &&
-      room.status !== 'clean' // Exclure les chambres déjà propres
-    );
-  };
-
-  // Chambres propres (nettoyées)
-  const getCleanRooms = () => {
-    return rooms.filter(room => 
-      room.status === 'clean' &&
-      room.cleaningType !== 'none'
-    );
-  };
-
-  // Fonction pour gérer la redistribution des chambres
+  // Redistribution handler
   const handleRedistribute = async (method: RedistributionMethod) => {
-    console.log(`🔄 Redistribution via ${method}`);
-    
-    if (housekeeperNames.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Erreur de redistribution",
-        description: "Aucune femme de chambre disponible pour la redistribution."
-      });
+    if (housekeeperNames.length === 0 || rooms.length === 0) {
+      toast({ variant: "destructive", title: "Erreur", description: "Données manquantes" });
       return;
     }
 
-    const availableRooms = rooms.filter(room => 
-      room.cleaningType !== 'none' && room.status !== 'maintenance'
-    );
-
-    if (availableRooms.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Erreur de redistribution",
-        description: "Aucune chambre disponible pour la redistribution."
-      });
-      return;
-    }
-
-    // PHASE 5: Nettoyer les anciennes assignations avant redistribution
     if (currentHotelId) {
-      console.log('🧹 Phase 5: Nettoyage des anciennes assignations...');
-      await supabase
-        .from('assignments')
-        .delete()
-        .eq('hotel_id', currentHotelId)
-        .in('status', ['assigned']);
-      console.log('✅ Phase 5: Anciennes assignations supprimées');
+      await supabase.from('assignments').delete().eq('hotel_id', currentHotelId).in('status', ['assigned']);
     }
 
     try {
@@ -1077,22 +455,11 @@ const Index = () => {
       setIsDistributed(true);
       setIsRedistributionDialogOpen(false);
 
-      const methodName = method === 'random' ? 'aléatoire' : 
-                        method === 'floor' ? 'par étage' : 'par type de nettoyage';
-      
-      const assignedCount = redistributedRooms.filter(r => 
-        r.assignedTo && r.cleaningType !== 'none' && r.status !== 'maintenance'
-      ).length;
-
-      // PHASE 2: Créer les assignations dans Supabase
+      // Persist assignments
       if (currentHotelId) {
-        console.log('💾 Phase 2: Persistance des assignations...');
-        const { AssignmentService } = await import('@/services/assignmentService');
-        
         for (const room of redistributedRooms) {
           if (room.assignedTo && room.cleaningType !== 'none' && room.status !== 'maintenance') {
             const hk = housekeepers.find(h => h.name === room.assignedTo);
-            
             const { data: roomData } = await supabase
               .from('rooms')
               .select('id')
@@ -1101,324 +468,63 @@ const Index = () => {
               .single();
             
             if (roomData?.id && hk) {
-              await AssignmentService.assignRoom(
-                currentHotelId,
-                roomData.id,
-                hk.user_id || hk.id,
-                room.assignedTo
-              );
+              await AssignmentService.assignRoom(currentHotelId, roomData.id, hk.user_id || hk.id, room.assignedTo);
             }
           }
         }
-        console.log('✅ Phase 2: Assignations persistées');
       }
 
-      toast({
-        title: "Redistribution terminée",
-        description: `${assignedCount} chambres redistribuées avec la méthode ${methodName}.`
-      });
-
-      // Notifications admin désactivées
-
+      const methodName = method === 'random' ? 'aléatoire' : method === 'floor' ? 'par étage' : 'par type';
+      toast({ title: "Redistribution terminée", description: `Méthode ${methodName}` });
     } catch (error) {
-      console.error('Erreur lors de la redistribution:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur de redistribution", 
-        description: "Une erreur s'est produite lors de la redistribution des chambres."
-      });
+      toast({ variant: "destructive", title: "Erreur", description: "Erreur lors de la redistribution" });
     }
   };
-  
-  const handleConfigChange = (newConfig: CleaningConfig) => {
-    setCleaningConfig(newConfig);
-  };
+
+  const handleConfigChange = (newConfig: CleaningConfig) => setCleaningConfig(newConfig);
   
   const handleHousekeeperNamesChange = (names: string[]) => {
     setHousekeeperNames(names);
-    
     const updatedPreferences: Record<string, number[]> = {};
     names.forEach(name => {
       updatedPreferences[name] = housekeeperFloorPreferences[name] || [];
     });
     setHousekeeperFloorPreferences(updatedPreferences);
-    
-    // Mettre à jour les overrides
-    const updatedOverrides: Record<string, number> = {};
-    names.forEach(name => {
-      if (housekeeperMaxRoomsOverrides[name]) {
-        updatedOverrides[name] = housekeeperMaxRoomsOverrides[name];
-      }
-    });
-    setHousekeeperMaxRoomsOverrides(updatedOverrides);
-  };
-  
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'needs-cleaning':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">À Nettoyer</Badge>;
-      case 'clean':
-        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">Propre</Badge>;
-      case 'occupied':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Occupé</Badge>;
-      case 'maintenance':
-        return <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">Maintenance</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-  
-  const getCleaningTypeBadge = (type: string) => {
-    switch (type) {
-      case 'full':
-        return <Badge variant="outline" className="bg-red-100 text-red-800">À blanc</Badge>;
-      case 'quick':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
-      case 'none':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Aucun</Badge>;
-      default:
-        return <Badge variant="outline">{type}</Badge>;
-    }
   };
 
-  // Auto-générer les codes d'accès pour la distribution
-  const generateAccessCodesForDistribution = async () => {
-    const hotelId = selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId");
-    if (!hotelId) return;
-    
-    try {
-      console.log('🔑 Génération automatique des codes pour:', housekeeperNames);
-      
-      for (const housekeeperName of housekeeperNames) {
-        // Vérifier si la femme de chambre a déjà un code
-        const { data: existingHousekeeper } = await supabase
-          .from('housekeepers')
-          .select('id, access_code')
-          .eq('hotel_id', hotelId)
-          .eq('name', housekeeperName)
-          .eq('is_active', true)
-          .maybeSingle();
-        
-        if (!existingHousekeeper?.access_code) {
-          // Générer un nouveau code avec le nom
-          const { data: newCodeData, error: codeError } = await supabase
-            .rpc('generate_housekeeper_access_code_with_name', {
-              p_hotel_id: hotelId,
-              p_housekeeper_id: existingHousekeeper?.id || null,
-              p_housekeeper_name: housekeeperName
-            });
-          
-          if (codeError) {
-            console.error('❌ Erreur génération code pour', housekeeperName, ':', codeError);
-            continue;
-          }
-          
-          console.log('✅ Code généré pour', housekeeperName, ':', newCodeData);
-          
-          // Mettre à jour la femme de chambre avec le nouveau code
-          if (existingHousekeeper) {
-            await supabase
-              .from('housekeepers')
-              .update({ access_code: newCodeData })
-              .eq('id', existingHousekeeper.id);
-          }
-        }
-      }
-      
-      // Rafraîchir les données
-      if (refreshHousekeepers) {
-        await refreshHousekeepers();
-      }
-      
-    } catch (error) {
-      console.error('❌ Erreur génération automatique codes:', error);
-    }
-  };
-  
-  // Nouvelle fonction de redistribution avec méthode
-  const handleRedistributeWithMethod = async (method: RedistributionMethod) => {
-    console.log(`🔄 Redistribution avec méthode: ${method}`);
-    
-    // PHASE 5: Nettoyer les anciennes assignations
-    if (currentHotelId) {
-      const { data: deleted, error: deleteError } = await supabase
-        .from('assignments')
-        .delete()
-        .eq('hotel_id', currentHotelId)
-        .in('status', ['assigned', 'in_progress'])
-        .select();
-
-      if (deleteError) {
-        console.error('❌ Erreur suppression assignations:', deleteError);
-        toast({
-          variant: 'destructive',
-          title: 'Erreur',
-          description: 'Impossible de nettoyer les anciennes assignations'
-        });
-        return;
-      }
-      console.log(`✅ ${deleted?.length || 0} assignations supprimées`);
-    }
-    
-    const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
-    setRooms(redistributedRooms);
-    setIsDistributed(true);
-    
-    // PHASE 2: Persister les assignations dans Supabase
-    if (currentHotelId) {
-      console.log('💾 Phase 2: Persistance des assignations...');
-      const { AssignmentService } = await import('@/services/assignmentService');
-      
-      for (const room of redistributedRooms) {
-        if (room.assignedTo && room.cleaningType !== 'none' && room.status !== 'maintenance') {
-          const hk = housekeepers.find(h => h.name === room.assignedTo);
-          
-          const { data: roomData } = await supabase
-            .from('rooms')
-            .select('id')
-            .eq('hotel_id', currentHotelId)
-            .eq('room_number', room.number)
-            .single();
-          
-          if (roomData?.id && hk) {
-            await AssignmentService.assignRoom(
-              currentHotelId,
-              roomData.id,
-              hk.user_id || hk.id,
-              room.assignedTo
-            );
-          }
-        }
-      }
-      console.log('✅ Phase 2: Assignations persistées');
-    }
-    
-    // Auto-générer les codes d'accès lors de la distribution
-    await generateAccessCodesForDistribution();
-    
-    // Statistiques de distribution
-    const stats = getDistributionStats(redistributedRooms, housekeeperNames);
-    
-    let methodName = '';
-    switch (method) {
-      case 'random': methodName = 'aléatoire'; break;
-      case 'floor': methodName = 'par étage'; break;
-      case 'cleaning-type': methodName = 'par type de nettoyage'; break;
-    }
-    
-    toast({
-      title: `Redistribution ${methodName} terminée`,
-      description: `${redistributedRooms.filter(r => r.assignedTo).length} chambres redistribuées entre ${housekeeperNames.length} femmes de chambre`,
-    });
-    
-    // Notification de redistribution avec ID déterministe
-    const notificationHotelId = hotelCode ? generateHotelId(hotelCode) : 
-      (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
-    
-    console.log("📨 Notification redistribution désactivée (admin)");
-    
-    console.log('📊 Statistiques de distribution:', stats);
-  };
-  
   const handleDistributeWithValidation = async () => {
-    console.log("handleDistributeWithValidation appelé");
-    
-    // Validation des données requises
     if (!hotelCode.trim() || !userEmail.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Informations manquantes",
-        description: "Veuillez renseigner le code de l'hôtel et votre email."
-      });
+      toast({ variant: "destructive", title: "Informations manquantes", description: "Renseignez le code hôtel et votre email." });
       return;
     }
     
-    if (housekeeperNames.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Aucune femme de chambre",
-        description: "Veuillez ajouter au moins une femme de chambre."
-      });
-      return;
-    }
-    
-    if (rooms.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Aucune chambre",
-        description: "Veuillez importer la liste des chambres."
-      });
+    if (housekeeperNames.length === 0 || rooms.length === 0) {
+      toast({ variant: "destructive", title: "Données manquantes", description: "Ajoutez des chambres et des femmes de chambre." });
       return;
     }
 
-    // Créer ou récupérer l'hôtel avec un ID déterministe
     try {
-      console.log("🔍 Recherche hôtel avec code:", hotelCode);
-      
-      // Générer un ID déterministe pour cet hôtel
       const deterministicHotelId = generateHotelId(hotelCode);
-      console.log("🆔 ID déterministe généré:", deterministicHotelId);
-      
       let hotel = await SupabaseService.getHotelByCode(hotelCode);
       
       if (!hotel) {
-        console.log("🏨 Création nouvel hôtel avec ID déterministe...");
-        // Créer l'hôtel avec l'ID déterministe
-        hotel = await SupabaseService.createHotelWithId(
-          deterministicHotelId,     // id déterministe
-          `Hôtel ${hotelCode}`,     // name
-          userEmail,                // email
-          hotelCode                 // hotelCode
-        );
-        console.log("✅ Hôtel créé avec ID déterministe:", hotel);
-      } else {
-        console.log("✅ Hôtel existant trouvé:", hotel);
-        // Mettre à jour l'ID de l'hôtel existant si nécessaire (mais seulement si différent)
-        if (hotel.id !== deterministicHotelId) {
-          console.log("🔄 Mise à jour ID hôtel vers déterministe");
-          hotel = await SupabaseService.updateHotelId(hotel.id, deterministicHotelId) || hotel;
-        }
+        hotel = await SupabaseService.createHotelWithId(deterministicHotelId, `Hôtel ${hotelCode}`, userEmail, hotelCode);
       }
       
-      if (!hotel || !hotel.id) {
-        console.error("❌ Hotel ou hotel.id manquant:", hotel);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de créer ou récupérer l'hôtel."
-        });
+      if (!hotel?.id) {
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer l'hôtel" });
         return;
       }
 
-      // Sauvegarder toutes les informations importantes dans localStorage
-      console.log("💾 Sauvegarde localStorage avec hotelId:", hotel.id);
       localStorage.setItem('selectedHotelCode', hotelCode);
       localStorage.setItem('userEmail', userEmail);
       localStorage.setItem('selectedHotelId', hotel.id);
       localStorage.setItem('hotelId', hotel.id);
-      localStorage.setItem('hotelIdDeterministic', deterministicHotelId);
       
-      // Vérifier que la sauvegarde a bien fonctionné
-      const savedId = localStorage.getItem('hotelId');
-      console.log("🔍 Vérification localStorage hotelId:", savedId);
-      
-      console.log("🏨 Hôtel configuré avec ID:", hotel.id);
       setSelectedHotel(hotel);
-      
-      toast({
-        title: "Hôtel configuré",
-        description: `Hôtel "${hotel.name}" configuré avec ID: ${hotel.id.slice(0, 8)}...`
-      });
-      
-      await handleRedistributeWithMethod('random');
+      await handleRedistribute('random');
     } catch (error) {
-      console.error("❌ Erreur lors de la création/récupération de l'hôtel:", error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de créer ou récupérer l'hôtel."
-      });
-      return;
+      toast({ variant: "destructive", title: "Erreur", description: "Erreur de configuration" });
     }
   };
 
@@ -1426,259 +532,27 @@ const Index = () => {
     setSelectedHotel(hotel);
     localStorage.setItem('selectedHotelId', hotel.id);
     setIsHotelSelectionOpen(false);
-    
-    toast({
-      title: "Hôtel sélectionné",
-      description: `Hôtel "${hotel.name}" (${hotel.hotel_code}) sélectionné pour cette session.`
-    });
-    
-    // Maintenant on peut faire la redistribution
-    setTimeout(() => {
-      handleRedistributeWithMethod('random');
-    }, 500);
+    toast({ title: "Hôtel sélectionné", description: `${hotel.name} sélectionné` });
+    setTimeout(() => handleRedistribute('random'), 500);
   };
-  
+
   const openManualAssignment = (housekeeperName?: string) => {
     setSelectedHousekeeper(housekeeperName || "");
     setIsManualAssignmentOpen(true);
   };
-  
-  const handleManualAssign = async (housekeeperName: string, selectedRooms: Room[]) => {
-    console.log('🔄 Assignation manuelle:', { housekeeperName, roomCount: selectedRooms.length, currentHotelId });
-    
-    if (!currentHotelId) {
-      console.error('❌ currentHotelId est null dans handleManualAssign!');
-      toast({
-        variant: "destructive",
-        title: "Erreur de configuration",
-        description: "Aucun hôtel sélectionné"
-      });
-      return;
-    }
-    
-    // Trouver l'ID de la femme de chambre (recherche insensible à la casse)
-    let housekeeper = housekeepers.find(h => h.name.toLowerCase() === housekeeperName.toLowerCase());
-    
-    // Si non trouvée, créer automatiquement la femme de chambre
-    if (!housekeeper) {
-      console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
-      try {
-        // Utiliser la fonction SQL pour générer le code et créer la femme de chambre
-        const { data: accessCode, error: codeError } = await supabase
-          .rpc('generate_and_insert_access_code', {
-            p_hotel_id: currentHotelId,
-            p_housekeeper_name: housekeeperName
-          });
-        
-        if (!codeError && accessCode) {
-          // Récupérer la femme de chambre créée
-          const { data: newHousekeeper } = await supabase
-            .from('housekeepers')
-            .select('id, name, access_code, user_id')
-            .eq('hotel_id', currentHotelId)
-            .eq('name', housekeeperName)
-            .eq('is_active', true)
-            .maybeSingle();
-          
-          if (newHousekeeper) {
-            housekeeper = newHousekeeper;
-            console.log('✅ Femme de chambre créée:', newHousekeeper);
-            refreshHousekeepers();
-          }
-        }
-      } catch (error) {
-        console.error('❌ Erreur création femme de chambre:', error);
-      }
-    }
-    
-    // Même si housekeeper n'existe pas en base, on assigne localement
-    const housekeeperId = housekeeper?.user_id || housekeeper?.id || null;
-    
-    // Persister dans Supabase pour synchronisation temps réel
-    if (currentHotelId && housekeeper) {
-      for (const room of selectedRooms) {
-        // Trouver ou créer la room dans Supabase
-        const { data: existingRoom } = await supabase
-          .from('rooms')
-          .select('id')
-          .eq('hotel_id', currentHotelId)
-          .eq('room_number', room.number)
-          .single();
-        
-        let roomId = existingRoom?.id;
-        
-        // Si la room n'existe pas, la créer
-        if (!roomId) {
-          const { data: newRoom } = await supabase
-            .from('rooms')
-            .insert({
-              hotel_id: currentHotelId,
-              room_number: room.number,
-              floor: room.floor,
-              status: room.status || 'dirty',
-              room_type: null,
-              cleaning_priority: room.priority === 'high' ? 2 : 1
-            })
-            .select('id')
-            .single();
-          
-          roomId = newRoom?.id;
-        }
-        
-        // Créer l'assignation dans Supabase
-        if (roomId) {
-          console.log('✅ Création assignation manuelle:', { housekeeperId: housekeeper.user_id || housekeeper.id, housekeeperName, roomId, roomNumber: room.number });
-          const { AssignmentService } = await import('@/services/assignmentService');
-          await AssignmentService.assignRoom(
-            currentHotelId,
-            roomId,
-            housekeeper.user_id || housekeeper.id,
-            housekeeperName
-          );
-        }
-      }
-    }
-    
-    // Mise à jour de l'état local
-    const updatedRooms = rooms.map(room => {
-      if (selectedRooms.some(selectedRoom => selectedRoom.number === room.number)) {
-        return { ...room, assignedTo: housekeeperName };
-      }
-      return room;
-    });
-    
-    setRooms(updatedRooms);
-    setIsManualAssignmentOpen(false);
-    
-    toast({
-      title: "Assignation manuelle",
-      description: `${selectedRooms.length} chambre(s) ont été assignées à ${housekeeperName}.`
-    });
+
+  const handleGenerateReport = async (name: string, housekeeperRooms: Room[]) => {
+    setReportAction("single");
+    setReportHousekeeper(name);
+    setIsReportDialogOpen(true);
   };
 
-  // Fonction pour l'assignation directe depuis les chambres non assignées
-  const handleDirectRoomAssignment = async (roomNumber: string, housekeeperName: string) => {
-    console.log('🔄 Tentative assignation directe:', { roomNumber, housekeeperName, currentHotelId });
-    
-    if (!currentHotelId) {
-      console.error('❌ currentHotelId est null!');
-      toast({ variant: "destructive", title: "Erreur", description: "Hôtel non configuré" });
-      return;
-    }
-    
-    // Trouver l'ID de la femme de chambre (recherche insensible à la casse)
-    let housekeeper = housekeepers.find(h => h.name.toLowerCase() === housekeeperName.toLowerCase());
-    
-    // Si non trouvée, créer automatiquement la femme de chambre
-    if (!housekeeper) {
-      console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
-      try {
-        // Utiliser la fonction SQL pour générer le code et créer la femme de chambre
-        const { data: accessCode, error: codeError } = await supabase
-          .rpc('generate_and_insert_access_code', {
-            p_hotel_id: currentHotelId,
-            p_housekeeper_name: housekeeperName
-          });
-        
-        if (!codeError && accessCode) {
-          // Récupérer la femme de chambre créée
-          const { data: newHousekeeper } = await supabase
-            .from('housekeepers')
-            .select('id, name, access_code, user_id')
-            .eq('hotel_id', currentHotelId)
-            .eq('name', housekeeperName)
-            .eq('is_active', true)
-            .maybeSingle();
-          
-          if (newHousekeeper) {
-            housekeeper = newHousekeeper;
-            console.log('✅ Femme de chambre créée:', newHousekeeper);
-            refreshHousekeepers();
-          }
-        }
-      } catch (error) {
-        console.error('❌ Erreur création femme de chambre:', error);
-      }
-    }
-    
-    // Persister dans Supabase pour synchronisation temps réel
-    if (currentHotelId) {
-      // Trouver ou créer la room dans Supabase
-      const { data: existingRoom } = await supabase
-        .from('rooms')
-        .select('id')
-        .eq('hotel_id', currentHotelId)
-        .eq('room_number', roomNumber)
-        .single();
-      
-      let roomId = existingRoom?.id;
-      
-      // Si la room n'existe pas, la créer
-      if (!roomId) {
-        const room = rooms.find(r => r.number === roomNumber);
-        const { data: newRoom } = await supabase
-          .from('rooms')
-          .insert({
-            hotel_id: currentHotelId,
-            room_number: roomNumber,
-            floor: room?.floor,
-            status: room?.status || 'dirty',
-            room_type: null,
-            cleaning_priority: room?.priority === 'high' ? 2 : 1
-          })
-          .select('id')
-          .single();
-        
-        roomId = newRoom?.id;
-      }
-      
-      // Créer l'assignation dans Supabase (si housekeeper existe)
-      if (roomId && housekeeper) {
-        console.log('✅ Création assignation directe:', { housekeeperId: housekeeper.user_id || housekeeper.id, housekeeperName, roomId });
-        const { AssignmentService } = await import('@/services/assignmentService');
-        await AssignmentService.assignRoom(
-          currentHotelId,
-          roomId,
-          housekeeper.user_id || housekeeper.id,
-          housekeeperName
-        );
-      }
-    }
-    
-    // Mise à jour de l'état local
-    const updatedRooms = rooms.map(room => {
-      if (room.number === roomNumber) {
-        return { ...room, assignedTo: housekeeperName };
-      }
-      return room;
-    });
-    
-    setRooms(updatedRooms);
-    
-    toast({
-      title: "Chambre assignée",
-      description: `Chambre ${roomNumber} assignée à ${housekeeperName}.`
-    });
-
-    // Test de création de notification avec l'hotel ID déterministe
-    const notificationHotelId = hotelCode ? generateHotelId(hotelCode) : 
-      (selectedHotel?.id || localStorage.getItem("selectedHotelId") || localStorage.getItem("hotelId"));
-    
-    console.log('🧪 Test notification - Hotel ID:', {
-      hotelCode,
-      notificationHotelId,
-      generatedId: hotelCode ? generateHotelId(hotelCode) : null,
-      selectedHotel: selectedHotel?.id
-    });
-    
-    // Notification d'assignation désactivée (admin)
+  const handleGenerateAllReports = async () => {
+    setReportAction("all");
+    setIsReportDialogOpen(true);
   };
-  
-  
-  const handleReportConfirm = async (
-    confirmedEmail: string,
-    customFields: CustomReportFields
-  ) => {
+
+  const handleReportConfirm = async (confirmedEmail: string, customFields: CustomReportFields) => {
     setEmail(confirmedEmail);
     setReportCustomFields(customFields);
     setIsReportDialogOpen(false);
@@ -1687,74 +561,43 @@ const Index = () => {
       if (reportAction === "single") {
         const housekeeperRooms = getHousekeeperRooms(reportHousekeeper);
         await generateReport(reportHousekeeper, housekeeperRooms, cleaningConfig, customFields);
-        
-        toast({
-          title: "Rapport envoyé",
-          description: `Le rapport pour ${reportHousekeeper} a été envoyé à ${confirmedEmail}.`,
-        });
+        toast({ title: "Rapport envoyé", description: `Rapport pour ${reportHousekeeper} créé.` });
       } else {
-        // Generate reports for all housekeepers with rooms
         const housekeepersWithRooms = housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0);
-        
         if (housekeepersWithRooms.length === 0) {
-          toast({
-            variant: "destructive",
-            title: "Aucune chambre assignée",
-            description: "Aucune femme de chambre n'a de chambres assignées.",
-          });
+          toast({ variant: "destructive", title: "Aucune chambre assignée" });
           return;
         }
-        
-        // Generate combined report
         await generateCombinedReport(
           housekeepersWithRooms.map(name => ({ name, rooms: getHousekeeperRooms(name) })), 
           cleaningConfig,
           customFields
         );
-        
-        toast({
-          title: "Rapports envoyés",
-          description: `Un rapport combiné pour ${housekeepersWithRooms.length} femme(s) de chambre a été créé.`,
-        });
+        toast({ title: "Rapports créés", description: `${housekeepersWithRooms.length} rapports générés.` });
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de générer le(s) rapport(s). Veuillez réessayer.",
-      });
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible de générer les rapports." });
     }
   };
+
+  // Auth redirect
+  if (!loading && !isAuthenticated && !isGuestMode) {
+    return <Navigate to="/auth" replace />;
+  }
   
-  // Interface de connexion si pas encore authentifié - redirection automatique
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">NettoBloc</CardTitle>
-            <CardDescription>
-              Accès nécessaire pour continuer
-            </CardDescription>
+            <CardDescription>Accès nécessaire pour continuer</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-center">
-            <p className="text-muted-foreground">
-              Vous devez être connecté pour accéder à l'interface de gestion.
-            </p>
+            <p className="text-muted-foreground">Vous devez être connecté pour accéder à l'interface de gestion.</p>
             <div className="space-y-2">
-              <Button 
-                onClick={() => navigate("/auth")}
-                className="w-full"
-              >
-                Se connecter / S'inscrire
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate("/housekeeper-login")}
-                className="w-full"
-              >
-                Accès Femme de Chambre
-              </Button>
+              <Button onClick={() => navigate("/auth")} className="w-full">Se connecter / S'inscrire</Button>
+              <Button variant="outline" onClick={() => navigate("/housekeeper-login")} className="w-full">Accès Femme de Chambre</Button>
             </div>
           </CardContent>
         </Card>
@@ -1762,12 +605,8 @@ const Index = () => {
     );
   }
 
-  // Si setup en cours, afficher directement le dashboard avec un indicateur discret
-  // Plus de blocage complet de l'interface
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* First Time Setup Wizard */}
       {hotel && (
         <FirstTimeSetupWizard
           isOpen={showSetupWizard}
@@ -1779,1012 +618,336 @@ const Index = () => {
       )}
       
       <div className="container mx-auto py-6 px-4 md:px-6">
-         {/* Modern Header */}
-         <div className="flex justify-between items-center mb-8">
-           <div className="flex items-center gap-4">
-             <div className="flex items-center gap-3">
-               <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg">
-                 <Building className="h-6 w-6 text-primary-foreground" />
-               </div>
-               <div>
-                 <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                   HotelFlow
-                 </h1>
-                 <div className="flex items-center gap-2 mt-1">
-                   {isGuestMode && (
-                     <Badge variant="outline" className="text-xs">Mode Invité</Badge>
-                   )}
-                   {!subscriptionLoading && isAuthenticated && (
-                     <Badge 
-                       variant="secondary"
-                       className={isPremium 
-                         ? "bg-gradient-premium text-premium-foreground text-xs border-0" 
-                         : "bg-gradient-freemium text-freemium-foreground text-xs border-0"
-                       }
-                     >
-                       {isPremium ? "Premium" : "Freemium"}
-                     </Badge>
-                   )}
-                   {hotel && (
-                     <span className="text-xs text-muted-foreground">
-                       {hotel.name} • {hotel.hotel_code}
-                     </span>
-                   )}
-                 </div>
-               </div>
-             </div>
-             {isFree && isAuthenticated && (
-               <UpgradeButton 
-                 variant="outline" 
-                 size="sm"
-                 className="h-8 px-4 text-xs" 
-               />
-             )}
-           </div>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg">
+                <Building className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  HotelFlow
+                </h1>
+                <div className="flex items-center gap-2 mt-1">
+                  {isGuestMode && <Badge variant="outline" className="text-xs">Mode Invité</Badge>}
+                  {!subscriptionLoading && (
+                    <Badge 
+                      variant="secondary"
+                      className={isPremium ? "bg-gradient-premium text-premium-foreground text-xs border-0" : "bg-gradient-freemium text-freemium-foreground text-xs border-0"}
+                    >
+                      {isPremium ? "Premium" : "Freemium"}
+                    </Badge>
+                  )}
+                  {hotel && <span className="text-xs text-muted-foreground">{hotel.name} • {hotel.hotel_code}</span>}
+                </div>
+              </div>
+            </div>
+            {isFree && <UpgradeButton variant="outline" size="sm" className="h-8 px-4 text-xs" />}
+          </div>
           
-           <div className="flex items-center space-x-4">
-             {!isAuthenticated && !isGuestMode && (
-               <>
-                  <Button asChild variant="outline">
-                    <a href="/housekeeper-login">
-                      <Smartphone className="mr-2 h-4 w-4" />
-                      Accès Femme de Chambre (Code Hôtel)
-                  </a>
-                </Button>
-                <Button asChild>
-                  <a href="/housekeeper/auth">
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    Espace Personnel Femme de Chambre
-                  </a>
-                  </Button>
-                 <Button asChild>
-                   <a href="/auth">
-                     <LogIn className="mr-2 h-4 w-4" />
-                     Se connecter
-                   </a>
-                 </Button>
-               </>
-              )}
-             {isAuthenticated && (
-               <>
-                  {/* Phase 5: Indicateur de connexion temps réel */}
-                  <Badge 
-                    variant={realtimeSync.isConnected ? "default" : "destructive"}
-                    className="h-8 gap-2 animate-in fade-in"
-                  >
-                    <div className={`h-2 w-2 rounded-full ${realtimeSync.isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                    {realtimeSync.isConnected ? 'Temps réel actif' : 'Déconnecté'}
-                  </Badge>
-                   <Button asChild>
-                     <a href="/housekeeper/auth">
-                       <UserIcon className="mr-2 h-4 w-4" />
-                       Espace Personnel Femme de Chambre
-                     </a>
-                     </Button>
-                   <DailyReportCloseButton 
-                     hotelId={currentHotelId || hotel?.id || ''} 
-                     onReportClosed={() => {
-                       console.log('Rapport clôturé, rafraîchissement...');
-                       window.location.reload();
-                     }}
-                   />
-                   <NotificationBell />
-                   <UserMenu />
-                </>
-              )}
+          <div className="flex items-center space-x-4">
+            <Badge variant={realtimeSync.isConnected ? "default" : "destructive"} className="h-8 gap-2">
+              <div className={`h-2 w-2 rounded-full ${realtimeSync.isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              {realtimeSync.isConnected ? 'Temps réel actif' : 'Déconnecté'}
+            </Badge>
+            <Button asChild><a href="/housekeeper/auth"><UserIcon className="mr-2 h-4 w-4" />Espace Personnel</a></Button>
+            <DailyReportCloseButton hotelId={currentHotelId || hotel?.id || ''} onReportClosed={() => window.location.reload()} />
+            <NotificationBell />
+            <UserMenu />
           </div>
         </div>
 
-        {/* Notification Sound Component - silent background component */}
         <NotificationSound />
-
-        {/* Hero Header */}
         <HeroHeader hotelName={hotel?.name} isPremium={isPremium} />
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" orientation="vertical">
           <div className="flex gap-6">
-            {/* Sidebar verticale */}
+            {/* Sidebar */}
             <div className="hidden md:flex flex-col w-56 shrink-0">
               <TabsList className="flex flex-col h-auto bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl p-2 sticky top-4 shadow-lg">
-                <TabsTrigger 
-                  value="overview" 
-                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                >
-                  <Layers className="h-5 w-5" />
-                  <span>Vue d'ensemble</span>
+                <TabsTrigger value="overview" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <Layers className="h-5 w-5" /><span>Vue d'ensemble</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="rooms" 
-                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                >
-                  <Bed className="h-5 w-5" />
-                  <span>Chambres</span>
+                <TabsTrigger value="rooms" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <Bed className="h-5 w-5" /><span>Chambres</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="assignment" 
-                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                >
-                  <UserIcon className="h-5 w-5" />
-                  <span>Affectation</span>
+                <TabsTrigger value="assignment" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <UserIcon className="h-5 w-5" /><span>Affectation</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="access-codes" 
-                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all relative"
-                >
-                  <Key className="h-5 w-5" />
-                  <span>Codes d'accès</span>
-                  <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
-                    !
-                  </Badge>
+                <TabsTrigger value="access-codes" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all relative">
+                  <Key className="h-5 w-5" /><span>Codes d'accès</span>
+                  <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">!</Badge>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="linen" 
-                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                >
-                  <span className="text-lg">🧺</span>
-                  <span>Inventaire Linge</span>
+                <TabsTrigger value="linen" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <span className="text-lg">🧺</span><span>Inventaire Linge</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="incidents" 
-                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                >
-                  <AlertTriangle className="h-5 w-5" />
-                  <span>Incidents</span>
+                <TabsTrigger value="incidents" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <AlertTriangle className="h-5 w-5" /><span>Incidents</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="reports" 
-                  className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all"
-                >
-                  <FileText className="h-5 w-5" />
-                  <span>Rapports</span>
-                </TabsTrigger>
-                
-                {/* Séparateur */}
-                <div className="my-2 border-t border-border/50" />
-                
-                {/* Actions secondaires */}
-                <Button
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowActionLogPanel(true)}
-                  className="w-full justify-start gap-3 px-4 py-3 text-muted-foreground hover:text-foreground"
-                >
-                  <FileText className="h-5 w-5" />
-                  <span>Journal d'actions</span>
-                </Button>
-                <Button
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => navigate('/reports')}
-                  className="w-full justify-start gap-3 px-4 py-3 text-muted-foreground hover:text-foreground"
-                >
-                  <Archive className="h-5 w-5" />
-                  <span>Archives</span>
-                </Button>
-              </TabsList>
-            </div>
-
-            {/* Navigation mobile (horizontal) */}
-            <div className="md:hidden w-full mb-4 overflow-x-auto">
-              <TabsList className="inline-flex w-auto min-w-full bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl p-1">
-                <TabsTrigger value="overview" className="flex items-center gap-2 px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <Layers className="h-4 w-4" />
-                  <span className="hidden sm:inline">Vue d'ensemble</span>
-                </TabsTrigger>
-                <TabsTrigger value="rooms" className="flex items-center gap-2 px-3 py-2">
-                  <Bed className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="assignment" className="flex items-center gap-2 px-3 py-2">
-                  <UserIcon className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="access-codes" className="flex items-center gap-2 px-3 py-2">
-                  <Key className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="linen" className="flex items-center gap-2 px-3 py-2">
-                  🧺
-                </TabsTrigger>
-                <TabsTrigger value="incidents" className="flex items-center gap-2 px-3 py-2">
-                  <AlertTriangle className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="reports" className="flex items-center gap-2 px-3 py-2">
-                  <FileText className="h-4 w-4" />
+                <TabsTrigger value="reports" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <FileText className="h-5 w-5" /><span>Rapports</span>
                 </TabsTrigger>
               </TabsList>
             </div>
-
-            {/* Contenu principal */}
+            
+            {/* Main Content */}
             <div className="flex-1 min-w-0">
+              <TabsContent value="overview" className="space-y-6 mt-0">
+                <StatsOverview 
+                  rooms={rooms}
+                  housekeeperNames={housekeeperNames}
+                  cleaningConfig={cleaningConfig}
+                />
 
-          <TabsContent value="overview" className="space-y-6 animate-fade-in">
-            {/* Stats Overview Component */}
-            <StatsOverview rooms={rooms} housekeeperCount={housekeeperNames.length} />
-
-            {/* Grid responsive améliorée */}
-            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
-              {/* Actions rapides */}
-              <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
-                      <Calendar className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-semibold">Actions rapides</CardTitle>
-                      <CardDescription className="text-xs mt-0.5">
-                        Gérez votre planning
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3 pt-0">
-                  <PdfWorkflowDialog 
-                    hotelId={currentHotelId}
-                    onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                      handlePdfProcessed(data, housekeepers, distributionMethod);
-                    }}
-                  />
-                  <ConfigDialog 
-                    config={cleaningConfig} 
-                    onConfigChange={handleConfigChange}
+                <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+                  <QuickActionsCard
+                    currentHotelId={currentHotelId}
+                    cleaningConfig={cleaningConfig}
                     housekeeperNames={housekeeperNames}
-                    onHousekeeperNamesChange={handleHousekeeperNamesChange}
+                    rooms={rooms}
                     isPremium={isPremium}
+                    onPdfProcessed={handlePdfProcessed}
+                    onConfigChange={handleConfigChange}
+                    onHousekeeperNamesChange={handleHousekeeperNamesChange}
+                    onDistribute={handleDistributeWithValidation}
                   />
-                  <Button 
-                    onClick={handleDistributeWithValidation}
-                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20"
-                    disabled={housekeeperNames.length === 0 || rooms.length === 0}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Distribuer automatiquement
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Résumé du planning */}
-              <Card className="group border-border/50 bg-gradient-to-br from-card to-card/80 hover:shadow-xl hover:shadow-info/5 transition-all duration-300 hover:-translate-y-1">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-info/10 text-info group-hover:bg-info group-hover:text-white transition-colors duration-300">
-                      <Layers className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-semibold">Résumé planning</CardTitle>
-                      <CardDescription className="text-xs mt-0.5">
-                        Aperçu des nettoyages
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                      <span className="text-sm text-muted-foreground">Chambres doubles</span>
-                      <span className="text-sm font-bold text-foreground">{twinRooms}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                      <span className="text-sm text-muted-foreground">Temps total estimé</span>
-                      <span className="text-sm font-bold text-foreground">
-                        {Math.round(
-                          (fullCleaningRooms * cleaningConfig.fullCleaningTime + 
-                           quickCleaningRooms * cleaningConfig.quickCleaningTime) / 60
-                        )}h
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                      <span className="text-sm text-muted-foreground">Temps moyen/pers.</span>
-                      <span className="text-sm font-bold text-foreground">
-                        {housekeeperNames.length > 0 ? 
-                          Math.round(
-                            (fullCleaningRooms * cleaningConfig.fullCleaningTime + 
-                             quickCleaningRooms * cleaningConfig.quickCleaningTime) / 
-                            (60 * housekeeperNames.length)
-                          ) : 0
-                        }h
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            {/* Active Users Panel - sous les deux colonnes */}
-            <ActiveUsersPanel />
-            
-            {/* Section Personnel - Design amélioré */}
-            <Card className="border-border/50 bg-gradient-to-br from-card to-card/80">
-              <CardHeader className="border-b border-border/50">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-success/10 text-success">
-                      <UserIcon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-semibold">Personnel</CardTitle>
-                      <CardDescription className="text-xs mt-0.5">
-                        Gérez vos femmes de chambre et leurs codes d'accès
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="w-fit text-xs px-3 py-1">
-                    {housekeeperNames.length} membre{housekeeperNames.length > 1 ? 's' : ''}
-                  </Badge>
+                  <PlanningSummaryCard
+                    twinRooms={roomStats.twinRooms}
+                    fullCleaningRooms={roomStats.fullCleaningRooms}
+                    quickCleaningRooms={roomStats.quickCleaningRooms}
+                    housekeeperCount={housekeeperNames.length}
+                    cleaningConfig={cleaningConfig}
+                  />
                 </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <HousekeeperManagement />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="rooms" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Gestion des chambres</h2>
-              <div className="flex gap-2">
-                <AddRoomDialog 
-                  onAddRoom={handleAddRoom} 
-                  existingRooms={rooms} 
-                />
-                    <PdfWorkflowDialog 
-                      hotelId={currentHotelId}
-                      onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                        handlePdfProcessed(data, housekeepers, distributionMethod);
-                      }}
-                    />
-                <Button
-                  onClick={() => openManualAssignment()}
-                  variant="outline"
-                  disabled={housekeeperNames.length === 0}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Assignation manuelle
-                </Button>
-              </div>
-            </div>
-
-            {rooms.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Aucune chambre importée</h3>
-                  <p className="text-muted-foreground text-center mb-4">
-                    Importez un fichier PDF pour commencer à gérer vos chambres ou ajoutez des chambres manuellement
-                  </p>
-                  <div className="flex gap-2 justify-center">
-                    <AddRoomDialog 
-                      onAddRoom={handleAddRoom} 
-                      existingRooms={rooms} 
-                    />
-                <PdfWorkflowDialog 
-                  hotelId={currentHotelId}
-                  onWorkflowComplete={(data, housekeepers, distributionMethod) => {
-                    handlePdfProcessed(data, housekeepers, distributionMethod);
-                  }}
-                />
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Filtres et options</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <RoomFilters 
-                      rooms={rooms}
-                      onFiltersChange={(filteredRooms) => setFilteredRooms(filteredRooms)}
-                    />
-                  </CardContent>
-                </Card>
                 
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>N° Chambre</TableHead>
-                        <TableHead>Statut</TableHead>
-                        <TableHead>Type de nettoyage</TableHead>
-                        <TableHead>Priorité</TableHead>
-                        <TableHead>Assignée à</TableHead>
-                        <TableHead>Twin</TableHead>
-                        <TableHead>Chambres liées</TableHead>
-                        <TableHead>Actions rapides</TableHead>
-                        <TableHead>Gestion</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(filteredRooms || rooms).map((room) => (
-                        <TableRow key={room.number}>
-                          <TableCell className="font-medium">{room.number}</TableCell>
-                          <TableCell>{getStatusBadge(room.status)}</TableCell>
-                          <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
-                          <TableCell>
-                            {room.priority === 'high' ? (
-                              <Badge variant="destructive">Élevée</Badge>
-                            ) : (
-                              <Badge variant="secondary">Normale</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {room.assignedTo ? (
-                              <Badge variant="outline">{room.assignedTo}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground">Non assignée</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Checkbox
-                              checked={room.isTwin || false}
-                              onCheckedChange={(checked) => {
-                                handleRoomUpdate({ ...room, isTwin: checked as boolean });
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {room.linkedRooms && room.linkedRooms.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {room.linkedRooms.map(linkedRoom => (
-                                  <Badge key={linkedRoom} variant="secondary" className="text-xs">
-                                    {linkedRoom}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">Aucune</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <RoomCard
-                              room={room}
-                              onUpdate={handleRoomUpdate}
-                              onUnassign={handleRoomUnassign}
-                              onReassign={handleRoomReassign}
-                              allRooms={rooms}
-                              housekeeperNames={housekeeperNames}
-                              compact={true}
-                              showActions={true}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedRoom(room);
-                                  setShowLinkDialog(true);
-                                }}
-                                className="flex items-center gap-1"
-                                title="Lier avec d'autres chambres"
-                              >
-                                <Link className="h-3 w-3" />
-                                Lier
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedRoom(room);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Supprimer la chambre"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                Supprimer
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
-            )}
-          </TabsContent>
+                <ActiveUsersPanel />
+                <PersonnelSection housekeeperCount={housekeeperNames.length} />
+              </TabsContent>
 
-
-
-          <TabsContent value="distribution" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Distribution des chambres</h2>
-              <div className="flex gap-2">
-                <QuickAddHousekeeperButton />
-                <SyncHousekeepersButton />
-                <Button
-                  onClick={() => setIsRedistributionDialogOpen(true)}
-                  disabled={housekeeperNames.length === 0 || rooms.length === 0}
-                  className="hover-scale"
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Redistribuer
-                </Button>
-                <Button
-                  onClick={() => openManualAssignment()}
-                  variant="outline"
-                  disabled={housekeeperNames.length === 0}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Assignation manuelle
-                </Button>
-              </div>
-            </div>
-
-            {/* Message informatif si pas de femmes de chambre */}
-            {housekeeperNames.length === 0 ? (
-              <Card className="border-orange-200 bg-orange-50">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <UserIcon className="h-16 w-16 text-orange-500 mb-4" />
-                  <h3 className="text-xl font-semibold text-orange-800 mb-2">
-                    Aucune femme de chambre configurée
-                  </h3>
-                  <p className="text-orange-700 text-center mb-6 max-w-md">
-                    Pour voir les colonnes de distribution avec les codes d'accès mobile, 
-                    vous devez d'abord créer des femmes de chambre.
-                  </p>
-                  <div className="flex flex-col gap-3 items-center">
-                    <Button 
-                      onClick={() => setActiveTab('access-codes')}
-                      className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2"
-                    >
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      Créer des femmes de chambre
+              <TabsContent value="rooms" className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Gestion des chambres</h2>
+                  <div className="flex gap-2">
+                    <AddRoomDialog onAddRoom={handleAddRoom} existingRooms={rooms} />
+                    <PdfWorkflowDialog hotelId={currentHotelId} onWorkflowComplete={handlePdfProcessed} />
+                    <Button onClick={() => openManualAssignment()} variant="outline" disabled={housekeeperNames.length === 0}>
+                      <Plus className="mr-2 h-4 w-4" />Assignation manuelle
                     </Button>
-                    <p className="text-sm text-orange-600">
-                      Les codes d'accès mobile s'afficheront ici une fois créées
-                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            ) : null}
-          </TabsContent>
+                </div>
 
-          <TabsContent value="assignment" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Affectation des chambres</h2>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => openManualAssignment()}
-                  disabled={!isDistributed}
-                  variant="outline"
-                >
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  Assignation manuelle
-                </Button>
-                <Button
-                  onClick={() => setIsRedistributionDialogOpen(true)}
-                  disabled={!isDistributed}
-                  variant="outline"
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Redistribuer
-                </Button>
-              </div>
-            </div>
-
-            {!isDistributed ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Distribution non effectuée</h3>
-                  <p className="text-muted-foreground text-center mb-4">
-                    Cliquez sur "Distribuer" pour répartir automatiquement les chambres
-                  </p>
-                  <Button
-                    onClick={handleDistributeWithValidation}
-                    disabled={housekeeperNames.length === 0 || rooms.length === 0}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Distribuer maintenant
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                <div className="space-y-6">
-                  {/* Disponibilités du jour et recommandations */}
-                  {(recommendedHousekeepers > housekeeperNames.length || getUnassignedRooms().length > 0) && (
+                {rooms.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Aucune chambre importée</h3>
+                      <p className="text-muted-foreground text-center mb-4">Importez un fichier PDF ou ajoutez des chambres manuellement</p>
+                      <div className="flex gap-2 justify-center">
+                        <AddRoomDialog onAddRoom={handleAddRoom} existingRooms={rooms} />
+                        <PdfWorkflowDialog hotelId={currentHotelId} onWorkflowComplete={handlePdfProcessed} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
                     <Card>
-                      <CardContent className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-lg font-semibold">Disponibilités du jour</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {recommendedHousekeepers > housekeeperNames.length
-                                ? `Recommandation: ${recommendedHousekeepers} femmes de chambre pour aujourd'hui.`
-                                : `${getUnassignedRooms().length} chambre(s) restent non assignées.`}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button onClick={() => setShowInviteDialog(true)}>
-                              Inviter / Ajouter
-                            </Button>
-                            <Button variant="outline" onClick={() => setActiveTab('access-codes')}>
-                              Gérer l'équipe
-                            </Button>
-                          </div>
-                        </div>
+                      <CardHeader><CardTitle>Filtres et options</CardTitle></CardHeader>
+                      <CardContent>
+                        <RoomFilters rooms={rooms} onFiltersChange={(filtered) => setFilteredRooms(filtered)} />
                       </CardContent>
                     </Card>
-                  )}
+                    <RoomsTable
+                      rooms={filteredRooms || rooms}
+                      housekeeperNames={housekeeperNames}
+                      onRoomUpdate={handleRoomUpdate}
+                      onRoomUnassign={handleRoomUnassign}
+                      onRoomReassign={handleRoomReassign}
+                      onOpenLinkDialog={(room) => { setSelectedRoom(room); setShowLinkDialog(true); }}
+                      onOpenDeleteDialog={(room) => { setSelectedRoom(room); setShowDeleteDialog(true); }}
+                    />
+                  </>
+                )}
+              </TabsContent>
 
-                  {/* Chambres non assignées en haut - toujours visible */}
-                  <div className="w-full space-y-4">
+              <TabsContent value="assignment" className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Affectation des chambres</h2>
+                  <div className="flex gap-2">
+                    <Button onClick={() => openManualAssignment()} disabled={!isDistributed} variant="outline">
+                      <UserIcon className="mr-2 h-4 w-4" />Assignation manuelle
+                    </Button>
+                    <Button onClick={() => setIsRedistributionDialogOpen(true)} disabled={!isDistributed} variant="outline">
+                      <Calendar className="mr-2 h-4 w-4" />Redistribuer
+                    </Button>
+                    <Button onClick={handleGenerateAllReports} disabled={!isDistributed}>
+                      <FileDown className="mr-2 h-4 w-4" />Générer tous les rapports
+                    </Button>
+                  </div>
+                </div>
+
+                {!isDistributed ? (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Distribution requise</AlertTitle>
+                    <AlertDescription>Distribuez d'abord les chambres pour les affecter.</AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     <UnassignedRoomsColumn
                       rooms={getUnassignedRooms()}
-                      onRoomUpdate={handleRoomUpdate}
-                      allRooms={rooms}
-                      forceHide={false}
                       housekeeperNames={housekeeperNames}
-                      onDirectAssign={handleDirectRoomAssignment}
-                      hotelId={currentHotelId || undefined}
+                      onAssignRoom={handleDirectRoomAssignment}
                     />
-
-                    {/* Section Chambres propres */}
-                    <CleanRoomsSection
-                      rooms={getCleanRooms()}
-                      onRoomUpdate={handleRoomUpdate}
-                      hotelId={currentHotelId || undefined}
-                    />
-
-                    <HousekeeperInviteDialog
-                      open={showInviteDialog}
-                      onOpenChange={setShowInviteDialog}
-                      hotelId={(hotel?.id as string) || (currentHotelId as string) || ''}
-                    />
+                    {housekeeperNames.map((name) => (
+                      <HousekeeperCard
+                        key={name}
+                        name={name}
+                        rooms={getHousekeeperRooms(name)}
+                        config={cleaningConfig}
+                        onRoomUpdate={handleRoomUpdate}
+                        onUnassignRoom={handleRoomUnassign}
+                        onReassignRoom={handleRoomReassign}
+                        onGenerateReport={() => handleGenerateReport(name, getHousekeeperRooms(name))}
+                        allRooms={rooms}
+                        housekeeperNames={housekeeperNames}
+                        accessCode={housekeepers.find(h => h.name === name)?.access_code}
+                      />
+                    ))}
+                    <CleanRoomsSection rooms={getCleanRooms()} />
                   </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="access-codes" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" />Gestion des codes d'accès</CardTitle>
+                    <CardDescription>Codes d'accès des femmes de chambre et demandes en attente</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs defaultValue="requests" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="requests" className="relative">
+                          Demandes d'accès
+                          <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">!</Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="codes">Codes existants</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="requests" className="space-y-4">
+                        <Alert className="bg-blue-50 border-blue-200">
+                          <Bell className="h-4 w-4 text-blue-600" />
+                          <AlertDescription className="text-blue-800">
+                            <strong>📋 Comment ça marche ?</strong> Les femmes de chambre s'inscrivent avec votre code d'hôtel. Validez ou suspendez leur accès ici.
+                          </AlertDescription>
+                        </Alert>
+                        <HousekeeperAccessRequests />
+                      </TabsContent>
+                      <TabsContent value="codes" className="space-y-4">
+                        <p className="text-muted-foreground">Codes d'accès des femmes de chambre validées.</p>
+                        <HousekeeperManagement />
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="linen" className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">🧺 Inventaire du linge</h2>
+                    <p className="text-muted-foreground">Gérer les types de linge et les tâches</p>
                   </div>
-                  
-                  {/* Grid responsive pour 2 sections en largeur avec codes d'accès */}
-                  {housekeeperNames.length > 0 && housekeeperNames.some(name => getHousekeeperRooms(name).length > 0) && (
-                    <div className="mb-4">
-                      <Alert className="bg-blue-50 border-blue-200">
-                        <Key className="h-4 w-4 text-blue-600" />
-                        <AlertDescription className="text-blue-800">
-                          <strong>Codes d'accès mobile :</strong> Chaque colonne affiche le code d'accès 
-                          spécifique à chaque femme de chambre pour l'interface mobile.
-                        </AlertDescription>
-                      </Alert>
-                    </div>
-                  )}
-                  
-                  <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-2">
-                    {/* Afficher uniquement les colonnes avec des chambres assignées */}
+                </div>
+                <Tabs defaultValue="types" className="space-y-4">
+                  <TabsList>
+                    <TabsTrigger value="types">Types de linge</TabsTrigger>
+                    <TabsTrigger value="inventory">Saisie & Validation</TabsTrigger>
+                    <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
+                    <TabsTrigger value="training">Entraînement IA</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="types">{currentHotelId ? <LinenTypeManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="inventory">{currentHotelId ? <AdminLinenInventory hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="tasks">{currentHotelId ? <LinenTaskAssignment hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="training">{currentHotelId ? <LinenTrainingManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                </Tabs>
+              </TabsContent>
+
+              <TabsContent value="incidents" className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">Gestion des incidents</h2>
+                    <p className="text-muted-foreground">Gérer les incidents et le personnel</p>
+                  </div>
+                  {currentHotelId && <IncidentReportDialogSimple hotelId={currentHotelId} userType="admin" />}
+                </div>
+                <Tabs defaultValue="dashboard" className="space-y-4">
+                  <TabsList>
+                    <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
+                    <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
+                    <TabsTrigger value="staff">Personnel</TabsTrigger>
+                    <TabsTrigger value="inventory">Inventaire</TabsTrigger>
+                    <TabsTrigger value="permissions">Permissions</TabsTrigger>
+                    <TabsTrigger value="print">Imprimer rapport</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="dashboard">{currentHotelId ? <IncidentDashboard hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="incidents">{currentHotelId ? <IncidentList hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="staff">{currentHotelId ? <StaffManagement hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="inventory">{currentHotelId ? <IncidentInventoryManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="permissions">{currentHotelId ? <RolePermissionsManager hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                  <TabsContent value="print">{currentHotelId ? <IncidentReportPrint hotelId={currentHotelId} /> : <Alert><AlertDescription>Aucun hôtel sélectionné</AlertDescription></Alert>}</TabsContent>
+                </Tabs>
+              </TabsContent>
+
+              <TabsContent value="reports" className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Rapports</h2>
+                  <Button onClick={handleGenerateAllReports} disabled={!isDistributed || housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0).length === 0}>
+                    <FileDown className="mr-2 h-4 w-4" />Générer tous les rapports
+                  </Button>
+                </div>
+
+                {!isDistributed ? (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Distribution requise</AlertTitle>
+                    <AlertDescription>Distribuez d'abord les chambres pour générer des rapports.</AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {housekeeperNames.map((name) => {
-                      const housekeeperRooms = getHousekeeperRooms(name);
-                      // Ne pas afficher les colonnes vides
-                      if (housekeeperRooms.length === 0) return null;
-                      
-                      const housekeeper = housekeepers.find(h => h.name === name);
+                      const hkRooms = getHousekeeperRooms(name);
+                      if (hkRooms.length === 0) return null;
                       return (
-                        <div key={name} className="min-w-0 w-full">
-                          <HousekeeperCard
-                            name={name}
-                            rooms={housekeeperRooms}
-                            cleaningConfig={cleaningConfig}
-                            onGenerateReport={handleGenerateReport}
-                            onRoomUpdate={handleRoomUpdate}
-                            onRoomUnassign={handleRoomUnassign}
-                            onReassign={handleRoomReassign}
-                            availableFloors={availableFloors}
-                            onFloorPreferenceChange={handleFloorPreferenceChange}
-                            preferredFloors={housekeeperFloorPreferences[name] || []}
-                            onDelete={handleDeleteHousekeeper}
-                            maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
-                            onMaxRoomsOverrideChange={handleMaxRoomsOverrideChange}
-                            onRename={(newName: string) => handleRenameHousekeeper(name, newName)}
-                            accessCode={housekeeper?.access_code || ''}
-                            housekeeperNames={housekeeperNames}
-                            onGenerateAccessCode={handleGenerateAccessCode}
-                            hotelId={currentHotelId || undefined}
-                          />
-                        </div>
+                        <Card key={name}>
+                          <CardHeader>
+                            <CardTitle className="flex items-center justify-between">
+                              <span>{name}</span>
+                              <Badge variant="secondary">{hkRooms.length} chambres</Badge>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2 mb-4">
+                              <div className="text-sm"><span className="font-medium">Nettoyage complet:</span> {hkRooms.filter(r => r.cleaningType === 'full' || r.cleaningType === 'a_blanc').length}</div>
+                              <div className="text-sm"><span className="font-medium">Recouches:</span> {hkRooms.filter(r => r.cleaningType === 'quick' || r.cleaningType === 'recouche').length}</div>
+                              <div className="text-sm"><span className="font-medium">Temps estimé:</span> {Math.round(calculateHousekeeperLoad(hkRooms, cleaningConfig) / 60)}h</div>
+                            </div>
+                            <Button onClick={() => handleGenerateReport(name, hkRooms)} className="w-full" size="sm">
+                              <FileDown className="mr-2 h-4 w-4" />Générer rapport
+                            </Button>
+                          </CardContent>
+                        </Card>
                       );
                     })}
-                    
-                    {/* Bouton pour créer une nouvelle colonne femme de chambre */}
-                    <div className="min-w-0 w-full">
-                      <Card 
-                        className="border-2 border-dashed border-muted-foreground/30 bg-muted/10 hover:border-primary/50 hover:bg-muted/20 transition-all cursor-pointer h-full min-h-[200px] flex items-center justify-center"
-                        onClick={() => setShowCreateColumnDialog(true)}
-                      >
-                        <CardContent className="flex flex-col items-center justify-center p-8 text-center">
-                          <div className="p-4 rounded-full bg-primary/10 mb-4">
-                            <UserPlus className="h-8 w-8 text-primary" />
-                          </div>
-                          <h3 className="font-semibold text-lg mb-2">Créer une colonne</h3>
-                          <p className="text-sm text-muted-foreground max-w-xs">
-                            Sélectionnez une femme de chambre existante ou ajoutez-en une nouvelle
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </div>
                   </div>
-                  
-                  {/* Dialog de création de colonne */}
-                  <CreateColumnDialog
-                    open={showCreateColumnDialog}
-                    onOpenChange={setShowCreateColumnDialog}
-                    hotelId={currentHotelId || ''}
-                    assignedHousekeeperNames={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
-                    onSelectExisting={(name) => {
-                      // La femme de chambre existe déjà, on la garde dans la liste
-                      // Elle apparaîtra quand on lui assignera des chambres
-                      toast({
-                        description: `${name} est prêt(e). Glissez-déposez des chambres dans sa colonne.`
-                      });
-                    }}
-                  />
-                </div>
-              )}
-            </TabsContent>
-
-          <TabsContent value="reports" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Rapports</h2>
-              <Button
-                onClick={handleGenerateAllReports}
-                disabled={!isDistributed || housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0).length === 0}
-              >
-                <FileDown className="mr-2 h-4 w-4" />
-                Générer tous les rapports
-              </Button>
-            </div>
-
-            {!isDistributed ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Distribution requise</AlertTitle>
-                <AlertDescription>
-                  Vous devez d'abord distribuer les chambres pour générer des rapports.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {housekeeperNames.map((name) => {
-                  const housekeeperRooms = getHousekeeperRooms(name);
-                  if (housekeeperRooms.length === 0) return null;
-                  
-                  return (
-                    <Card key={name}>
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          <span>{name}</span>
-                          <Badge variant="secondary">
-                            {housekeeperRooms.length} chambres
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2 mb-4">
-                          <div className="text-sm">
-                            <span className="font-medium">Nettoyage complet:</span>{" "}
-                            {housekeeperRooms.filter(r => r.cleaningType === 'full').length}
-                          </div>
-                          <div className="text-sm">
-                            <span className="font-medium">Recouches:</span>{" "}
-                            {housekeeperRooms.filter(r => r.cleaningType === 'quick').length}
-                          </div>
-                          <div className="text-sm">
-                            <span className="font-medium">Temps estimé:</span>{" "}
-                            {Math.round(calculateHousekeeperLoad(housekeeperRooms, cleaningConfig) / 60)}h
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleGenerateReport(name, housekeeperRooms)}
-                          className="w-full"
-                          size="sm"
-                        >
-                          <FileDown className="mr-2 h-4 w-4" />
-                          Générer rapport
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="access-codes" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  Gestion des codes d'accès
-                </CardTitle>
-                <CardDescription>
-                  Codes d'accès des femmes de chambre et demandes en attente
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="requests" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="requests" className="relative">
-                      Demandes d'accès
-                      <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">
-                        !
-                      </Badge>
-                    </TabsTrigger>
-                    <TabsTrigger value="codes">
-                      Codes existants
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="requests" className="space-y-4">
-                    <Alert className="bg-blue-50 border-blue-200">
-                      <Bell className="h-4 w-4 text-blue-600" />
-                      <AlertDescription className="text-blue-800">
-                        <strong>📋 Comment ça marche ?</strong> Les femmes de chambre s'inscrivent et soumettent une demande avec votre code d'hôtel. 
-                        Vous recevez une notification ici et pouvez <strong>valider</strong> ou <strong>suspendre</strong> leur accès.
-                      </AlertDescription>
-                    </Alert>
-                    
-                    <HousekeeperAccessRequests />
-                  </TabsContent>
-                  
-                  <TabsContent value="codes" className="space-y-4">
-                    <p className="text-muted-foreground">
-                      Codes d'accès des femmes de chambre déjà validées. 
-                      Gérez le personnel complet depuis l'onglet "Vue d'ensemble".
-                    </p>
-                    <div className="mt-4">
-                      <HousekeeperManagement />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-
-          <TabsContent value="linen" className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">🧺 Inventaire du linge</h2>
-                <p className="text-muted-foreground">Gérer les types de linge, entraîner l'IA et assigner les tâches</p>
-              </div>
-            </div>
-
-            <Tabs defaultValue="types" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="types">Types de linge</TabsTrigger>
-                <TabsTrigger value="inventory">Saisie & Validation</TabsTrigger>
-                <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
-                <TabsTrigger value="training">Entraînement IA</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="types" className="space-y-4">
-                {currentHotelId ? (
-                  <LinenTypeManager hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
-                  </Alert>
                 )}
               </TabsContent>
-
-              <TabsContent value="inventory" className="space-y-4">
-                {currentHotelId ? (
-                  <AdminLinenInventory hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="tasks" className="space-y-4">
-                {currentHotelId ? (
-                  <LinenTaskAssignment hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="training" className="space-y-4">
-                {currentHotelId ? (
-                  <LinenTrainingManager hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
-
-          <TabsContent value="incidents" className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">Gestion des incidents</h2>
-                <p className="text-muted-foreground">Gérer les incidents, le personnel et l'inventaire</p>
-              </div>
-              {currentHotelId && (
-                <IncidentReportDialogSimple hotelId={currentHotelId} userType="admin" />
-              )}
-            </div>
-
-            <Tabs defaultValue="dashboard" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
-                <TabsTrigger value="incidents">Liste des incidents</TabsTrigger>
-                <TabsTrigger value="staff">Personnel</TabsTrigger>
-                <TabsTrigger value="inventory">Inventaire</TabsTrigger>
-                <TabsTrigger value="permissions">Permissions</TabsTrigger>
-                <TabsTrigger value="print">Imprimer rapport</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="dashboard" className="space-y-4">
-                {currentHotelId ? (
-                  <IncidentDashboard hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné pour afficher le tableau de bord</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="incidents" className="space-y-4">
-                {currentHotelId ? (
-                  <IncidentList hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné pour gérer les incidents</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="staff" className="space-y-4">
-                {currentHotelId ? (
-                  <StaffManagement hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné pour gérer le personnel</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="inventory" className="space-y-4">
-                {currentHotelId ? (
-                  <IncidentInventoryManager hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné pour gérer l'inventaire</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="permissions" className="space-y-4">
-                {currentHotelId ? (
-                  <RolePermissionsManager hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné pour gérer les permissions</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-
-              <TabsContent value="print" className="space-y-4">
-                {currentHotelId ? (
-                  <IncidentReportPrint hotelId={currentHotelId} />
-                ) : (
-                  <Alert>
-                    <AlertDescription>Aucun hôtel sélectionné pour imprimer les rapports</AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
             </div>
           </div>
         </Tabs>
       </div>
 
+      {/* Dialogs */}
       <ManualAssignmentDialog
         isOpen={isManualAssignmentOpen}
         onClose={() => setIsManualAssignmentOpen(false)}
@@ -2793,7 +956,6 @@ const Index = () => {
         onAssignRooms={handleManualAssign}
         housekeeperPreferredFloors={housekeeperFloorPreferences}
       />
-      
       
       <EmailReportDialog
         isOpen={isReportDialogOpen}
@@ -2804,7 +966,6 @@ const Index = () => {
         allHousekeepers={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
       />
       
-      {/* Dialogs de gestion des chambres */}
       {showDeleteDialog && selectedRoom && (
         <DeleteRoomDialog
           open={showDeleteDialog}
@@ -2824,58 +985,13 @@ const Index = () => {
         />
       )}
       
-      {/* Dialogue de sélection d'hôtel */}
-      <Dialog open={isHotelSelectionOpen} onOpenChange={setIsHotelSelectionOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sélectionner un hôtel</DialogTitle>
-            <DialogDescription>
-              Vous devez sélectionner un hôtel avant de distribuer les chambres.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {availableHotels.length === 0 ? (
-              <div className="text-center py-4">
-                <Building className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">Aucun hôtel configuré</p>
-                <p className="text-sm text-muted-foreground">
-                  Créez d'abord un hôtel dans la section Configuration
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {availableHotels.map((hotel) => (
-                  <div 
-                    key={hotel.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                    onClick={() => handleHotelSelection(hotel)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Building className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">{hotel.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Code: {hotel.hotel_code}
-                        </div>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Sélectionner
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsHotelSelectionOpen(false)}>
-              Annuler
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <HotelSelectionDialog
+        isOpen={isHotelSelectionOpen}
+        onOpenChange={setIsHotelSelectionOpen}
+        availableHotels={availableHotels}
+        onSelectHotel={handleHotelSelection}
+      />
 
-      {/* Dialog de redistribution */}
       <RedistributionDialog
         isOpen={isRedistributionDialogOpen}
         onClose={() => setIsRedistributionDialogOpen(false)}
@@ -2884,13 +1000,12 @@ const Index = () => {
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
       />
 
-      {/* Journal d'actions quotidien */}
       <DailyActionLogPanel
         isOpen={showActionLogPanel}
         onClose={() => setShowActionLogPanel(false)}
         hotelId={currentHotelId || ''}
       />
-      </div>
+    </div>
   );
 };
 
