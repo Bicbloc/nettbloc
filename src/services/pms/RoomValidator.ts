@@ -262,7 +262,7 @@ class RoomValidator {
     }
 
     // Par défaut, prendre le nettoyage le plus important
-    const cleaningPriority: Record<CleaningType, number> = { full: 3, quick: 2, none: 1 };
+    const cleaningPriority: Record<string, number> = { full: 3, quick: 2, none: 1, a_blanc: 3, recouche: 2 };
     const bestCleaning = cleaningPriority[local.cleaningType] >= cleaningPriority[ai.cleaningType]
       ? local.cleaningType : ai.cleaningType;
 
