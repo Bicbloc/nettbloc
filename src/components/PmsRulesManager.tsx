@@ -15,8 +15,7 @@ import { Plus, Trash2, Play, Settings, Cpu, CheckCircle, XCircle, Zap, AlertTria
 import { pmsAdapterFactory, unifiedParserService, ExtractedRoom, CleaningType } from "@/services/pms";
 import { TestResultItem } from "@/components/pms/TestResultItem";
 import { ManualCorrectionPanel } from "@/components/pms/ManualCorrectionPanel";
-import { CleaningRulesEditor } from "@/components/pms/CleaningRulesEditor";
-import { RuleTemplates } from "@/components/pms/RuleTemplates";
+import { SimplifiedRulesManager } from "@/components/pms/SimplifiedRulesManager";
 
 interface PmsRule {
   id: string;
@@ -201,245 +200,34 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="cleaning" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="cleaning" className="gap-1">
+      <Tabs defaultValue="simple" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="simple" className="gap-1">
             <Sparkles className="h-3 w-3" />
-            Nettoyage
+            Règles
           </TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-          <TabsTrigger value="adapters">Adaptateurs</TabsTrigger>
-          <TabsTrigger value="custom">Règles PMS</TabsTrigger>
-          <TabsTrigger value="defaults">Défaut</TabsTrigger>
-          <TabsTrigger value="test">Tester</TabsTrigger>
+          <TabsTrigger value="test">
+            <Play className="h-3 w-3 mr-1" />
+            Tester
+          </TabsTrigger>
+          <TabsTrigger value="advanced">
+            <Settings className="h-3 w-3 mr-1" />
+            Avancé
+          </TabsTrigger>
         </TabsList>
 
-        {/* Nouvel onglet Règles de Nettoyage */}
-        <TabsContent value="cleaning" className="space-y-4">
-          <CleaningRulesEditor hotelId={hotelId} />
+        {/* Interface simplifiée */}
+        <TabsContent value="simple" className="space-y-4">
+          <SimplifiedRulesManager hotelId={hotelId} />
         </TabsContent>
 
-        {/* Nouvel onglet Templates */}
-        <TabsContent value="templates" className="space-y-4">
-          <RuleTemplates hotelId={hotelId} onTemplateApplied={loadRules} />
-        </TabsContent>
-
-        <TabsContent value="adapters" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium">Adaptateurs PMS Disponibles</h3>
-              <p className="text-sm text-muted-foreground">
-                Formats de rapports PMS reconnus automatiquement
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {availableAdapters.map(pmsType => (
-              <Card key={pmsType} className="relative overflow-hidden">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Cpu className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold uppercase">{pmsType}</h4>
-                      <p className="text-xs text-muted-foreground">Adaptateur intégré</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="mt-3">
-                    <Zap className="h-3 w-3 mr-1" />
-                    Parsing local
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="custom" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Règles Personnalisées</h3>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nouvelle Règle
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Ajouter une Règle PMS</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Type de PMS</Label>
-                    <Select value={newRule.pms_type} onValueChange={v => setNewRule({ ...newRule, pms_type: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableAdapters.map(type => (
-                          <SelectItem key={type} value={type}>{type.toUpperCase()}</SelectItem>
-                        ))}
-                        <SelectItem value="custom">Personnalisé</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Nom de la règle</Label>
-                    <Input
-                      value={newRule.rule_name}
-                      onChange={e => setNewRule({ ...newRule, rule_name: e.target.value })}
-                      placeholder="Ex: Règle spécifique hôtel"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Mots-clés de détection (séparés par virgule)</Label>
-                    <Input
-                      value={newRule.keywords}
-                      onChange={e => setNewRule({ ...newRule, keywords: e.target.value })}
-                      placeholder="Ex: SAL, RECOUCHE, DEPART"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Regex numéro de chambre</Label>
-                    <Input
-                      value={newRule.room_number_regex}
-                      onChange={e => setNewRule({ ...newRule, room_number_regex: e.target.value })}
-                      placeholder="\\b([1-9]\\d{2,3}[A-Z]?)\\b"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Priorité (1-100)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={newRule.priority}
-                      onChange={e => setNewRule({ ...newRule, priority: parseInt(e.target.value) || 50 })}
-                    />
-                  </div>
-
-                  <Button onClick={handleAddRule} className="w-full">
-                    Ajouter
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Chargement...</div>
-          ) : hotelRules.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Aucune règle personnalisée</p>
-                <p className="text-sm text-muted-foreground">Les adaptateurs par défaut seront utilisés</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {hotelRules.map(rule => (
-                <Card key={rule.id}>
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{rule.rule_name}</span>
-                          <Badge variant="outline">{rule.pms_type}</Badge>
-                          <Badge variant="secondary">P{rule.priority}</Badge>
-                        </div>
-                        {rule.keywords && rule.keywords.length > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Mots-clés: {rule.keywords.join(', ')}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={rule.is_active}
-                          onCheckedChange={v => handleToggleRule(rule.id, v)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteRule(rule.id, rule.is_default)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="defaults" className="space-y-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Cpu className="h-5 w-5 text-primary" />
-            <span className="text-sm text-muted-foreground">
-              Règles intégrées aux adaptateurs PMS
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {defaultRules.map(rule => (
-              <Card key={rule.id} className="bg-muted/30">
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{rule.rule_name}</span>
-                        <Badge variant="outline">{rule.pms_type}</Badge>
-                        <Badge variant="secondary">Défaut</Badge>
-                      </div>
-                      {rule.status_mappings && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {Object.entries(rule.status_mappings).slice(0, 5).map(([key, val]: [string, any]) => (
-                            <Badge key={key} variant="outline" className="text-xs">
-                              {key} → {getCleaningLabel(val.cleaning)}
-                            </Badge>
-                          ))}
-                          {Object.keys(rule.status_mappings).length > 5 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{Object.keys(rule.status_mappings).length - 5} autres
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <Badge variant="secondary">Intégré</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {defaultRules.length === 0 && (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">
-                    Les règles par défaut sont intégrées aux adaptateurs PMS
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
+        {/* Onglet Test */}
         <TabsContent value="test" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Play className="h-5 w-5" />
-                Tester le Parsing
+                Tester le parsing
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -475,60 +263,11 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
 
               {testResults.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Résultats ({testResults.length} chambres)</h4>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowManualCorrection(true)}
-                      >
-                        <PenLine className="h-4 w-4 mr-1" />
-                        Corriger manuellement
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={async () => {
-                          const validatedRooms = testResults.filter(r => r.validated);
-                          if (validatedRooms.length === 0) {
-                            toast.error('Validez au moins une chambre avant de sauvegarder');
-                            return;
-                          }
-                          // Sauvegarder comme règle
-                          const user = await supabase.auth.getUser();
-                          await supabase.from('report_training_patterns').insert([{
-                            hotel_id: hotelId,
-                            assigned_to_hotel_id: hotelId,
-                            report_name: 'Validation manuelle',
-                            pms_type: detectedPms || 'learned',
-                            pattern_name: `Validation - ${new Date().toLocaleDateString()}`,
-                            raw_text: testText.substring(0, 2000),
-                            extracted_data: JSON.parse(JSON.stringify({ rooms: validatedRooms })),
-                            validated: true,
-                            created_by: user.data.user?.id || '',
-                            attribution_reason: 'Validation manuelle des résultats'
-                          }]);
-                          toast.success(`${validatedRooms.length} chambre(s) validée(s) et sauvegardée(s)!`);
-                        }}
-                      >
-                        <Save className="h-4 w-4 mr-1" />
-                        Sauvegarder les validées
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {detectedConfidence < 70 && (
-                    <div className="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-950/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span>Confiance faible - Vérifiez et corrigez les résultats avec les boutons ci-dessous</span>
-                    </div>
-                  )}
-                  
+                  <h4 className="font-medium">Résultats ({testResults.length} chambres)</h4>
                   <div className="max-h-[350px] overflow-auto space-y-2">
                     {testResults.map((room, idx) => (
-                      <TestResultItem
-                        key={idx}
+                      <TestResultItem 
+                        key={idx} 
                         room={room}
                         index={idx}
                         onValidate={(i) => {
@@ -549,21 +288,155 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
                   </div>
                 </div>
               )}
-              
-              {showManualCorrection && testText && (
-                <ManualCorrectionPanel
-                  rawText={testText}
-                  hotelId={hotelId}
-                  existingRooms={testResults}
-                  onRoomsUpdated={(rooms) => {
-                    setTestResults(rooms);
-                    setShowManualCorrection(false);
-                  }}
-                  onClose={() => setShowManualCorrection(false)}
-                />
-              )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Onglet avancé */}
+        <TabsContent value="advanced" className="space-y-4">
+          <Card className="bg-muted/30">
+            <CardContent className="py-4">
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Options avancées pour utilisateurs expérimentés
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-6">
+            {/* Adaptateurs */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Cpu className="h-5 w-5 text-primary" />
+                Adaptateurs PMS
+              </h3>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {availableAdapters.map(pmsType => (
+                  <Card key={pmsType} className="relative overflow-hidden">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <Cpu className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold uppercase">{pmsType}</h4>
+                          <p className="text-xs text-muted-foreground">Adaptateur intégré</p>
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="mt-3">
+                        <Zap className="h-3 w-3 mr-1" />
+                        Parsing local
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Règles personnalisées */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">Règles PMS Personnalisées</h3>
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nouvelle Règle
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Ajouter une Règle PMS</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Type de PMS</Label>
+                        <Select value={newRule.pms_type} onValueChange={v => setNewRule({ ...newRule, pms_type: v })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableAdapters.map(type => (
+                              <SelectItem key={type} value={type}>{type.toUpperCase()}</SelectItem>
+                            ))}
+                            <SelectItem value="custom">Personnalisé</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Nom de la règle</Label>
+                        <Input
+                          value={newRule.rule_name}
+                          onChange={e => setNewRule({ ...newRule, rule_name: e.target.value })}
+                          placeholder="Ex: Règle spécifique hôtel"
+                        />
+                      </div>
+                      <div>
+                        <Label>Mots-clés (séparés par virgule)</Label>
+                        <Input
+                          value={newRule.keywords}
+                          onChange={e => setNewRule({ ...newRule, keywords: e.target.value })}
+                          placeholder="Ex: SAL, RECOUCHE, DEPART"
+                        />
+                      </div>
+                      <div>
+                        <Label>Priorité (1-100)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={newRule.priority}
+                          onChange={e => setNewRule({ ...newRule, priority: parseInt(e.target.value) || 50 })}
+                        />
+                      </div>
+                      <Button onClick={handleAddRule} className="w-full">
+                        Ajouter
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Chargement...</div>
+              ) : hotelRules.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="py-8 text-center">
+                    <p className="text-muted-foreground">Aucune règle personnalisée</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-2">
+                  {hotelRules.map(rule => (
+                    <Card key={rule.id}>
+                      <CardContent className="py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{rule.rule_name}</span>
+                            <Badge variant="outline">{rule.pms_type}</Badge>
+                            <Badge variant="secondary">P{rule.priority}</Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={rule.is_active}
+                              onCheckedChange={v => handleToggleRule(rule.id, v)}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteRule(rule.id, rule.is_default)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
