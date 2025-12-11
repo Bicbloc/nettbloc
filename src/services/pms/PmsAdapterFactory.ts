@@ -11,7 +11,8 @@ import {
   ProtelAdapter,
   MedialogAdapter,
   FidelioAdapter,
-  GenericAdapter
+  GenericAdapter,
+  SpaceStatusAdapter
 } from './adapters';
 
 class PmsAdapterFactory {
@@ -19,6 +20,7 @@ class PmsAdapterFactory {
 
   constructor() {
     // Enregistrer tous les adapters disponibles
+    this.registerAdapter(new SpaceStatusAdapter()); // Priorité haute pour format "Space status"
     this.registerAdapter(new ApaleoAdapter());
     this.registerAdapter(new MewsAdapter());
     this.registerAdapter(new OperaAdapter());
