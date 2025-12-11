@@ -10,6 +10,43 @@ export interface HousekeeperAuthResult {
 }
 
 export class HousekeeperAuthService {
+  // Créer une session d'accès pour permettre l'accès aux données via RLS
+  private static async createAccessSession(hotelId: string, housekeeperId: string, housekeeperName: string): Promise<void> {
+    try {
+      // Désactiver les anciennes sessions pour cet hôtel (nettoyage)
+      await supabase
+        .from('hotel_access_sessions')
+        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .lt('expires_at', new Date().toISOString());
+
+      // Créer une nouvelle session valide 24h
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      
+      const accessCode = `SESSION-${hotelId.substring(0, 8)}-${Date.now()}`;
+      
+      const { error } = await supabase
+        .from('hotel_access_sessions')
+        .insert({
+          hotel_id: hotelId,
+          access_code: accessCode,
+          is_active: true,
+          expires_at: expiresAt.toISOString(),
+          started_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('⚠️ Erreur création session d\'accès:', error);
+      } else {
+        console.log('✅ Session d\'accès créée pour hôtel:', hotelId);
+      }
+    } catch (err) {
+      console.error('⚠️ Erreur création session:', err);
+    }
+  }
+
   // Authentification avec code complet en s'alignant sur la fonction SQL authenticate_housekeeper_by_code
   static async authenticateWithFullCode(accessCode: string): Promise<HousekeeperAuthResult> {
     console.log('🔐 Authentification (RPC) avec code complet:', accessCode);
@@ -93,6 +130,9 @@ export class HousekeeperAuthService {
 
           console.log('✅ Authentification réussie via fallback direct:', { hotel, housekeeper });
 
+          // Créer une session d'accès pour permettre l'accès aux données via RLS
+          await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name);
+
           return {
             success: true,
             user: housekeeper,
@@ -141,6 +181,9 @@ export class HousekeeperAuthService {
       };
 
       console.log('✅ Authentification réussie via RPC:', { hotel, housekeeper, code_source: result.code_source });
+
+      // Créer une session d'accès pour permettre l'accès aux données via RLS
+      await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name);
 
       return {
         success: true,
