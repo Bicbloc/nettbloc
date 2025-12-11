@@ -137,6 +137,7 @@ const Admin = () => {
     }
   }, [hotels, selectedTrainingHotelId]);
   
+  
   // Vérifier les permissions super admin
   useEffect(() => {
     const checkSuperAdminRole = async () => {
@@ -155,9 +156,13 @@ const Admin = () => {
 
         if (!error && data) {
           setIsSuperAdmin(true);
-          setLoadingData(false); // Afficher l'UI immédiatement
-          // Charger les données en arrière-plan
-          loadAdminData().catch(console.error);
+          // Charger les données et attendre qu'elles soient chargées avant d'arrêter le loading
+          try {
+            await loadAdminData();
+          } catch (err) {
+            console.error('Erreur chargement données:', err);
+          }
+          setLoadingData(false);
         } else {
           setLoadingData(false);
         }
