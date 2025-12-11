@@ -258,13 +258,25 @@ IMPORTANT:
       
       if (status === 429) {
         return new Response(
-          JSON.stringify({ error: "Limite de requêtes dépassée. Réessayez plus tard." }),
+          JSON.stringify({ 
+            error: "AI_RATE_LIMITED",
+            message: "Limite de requêtes dépassée. Réessayez dans quelques secondes.",
+            fallback: "manual",
+            canRetry: true,
+            retryAfter: 5
+          }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       if (status === 402) {
         return new Response(
-          JSON.stringify({ error: "Crédits insuffisants." }),
+          JSON.stringify({ 
+            error: "AI_CREDITS_INSUFFICIENT",
+            message: "Crédits IA insuffisants. Utilisez le mode manuel ou les règles locales.",
+            fallback: "local_parsing",
+            canRetry: false,
+            suggestion: "Annotez manuellement les chambres ou utilisez l'analyseur local basé sur les règles apprises."
+          }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

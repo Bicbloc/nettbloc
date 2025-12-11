@@ -383,9 +383,24 @@ export const EnhancedPatternLearning = ({
       });
 
       if (error) {
-        const errorMsg = error.message || '';
-        if (errorMsg.includes('402') || errorMsg.includes('credits') || errorMsg.includes('Payment')) {
-          toast.info("Crédits IA insuffisants. Utilisez le parsing local automatique à la place.");
+        const errorData = typeof error === 'object' && 'message' in error ? error : null;
+        const errorMsg = errorData?.message || String(error);
+        
+        // Gestion structurée des erreurs 402/429
+        if (errorMsg.includes('402') || errorMsg.includes('AI_CREDITS_INSUFFICIENT') || errorMsg.includes('credits') || errorMsg.includes('Payment')) {
+          toast.warning("Crédits IA insuffisants", {
+            description: "Utilisez l'analyseur local ou annotez manuellement les chambres.",
+            duration: 5000
+          });
+          // Tenter le parsing local comme fallback
+          await tryLocalParsing();
+          return;
+        }
+        if (errorMsg.includes('429') || errorMsg.includes('AI_RATE_LIMITED')) {
+          toast.warning("Limite de requêtes atteinte", {
+            description: "Réessayez dans quelques secondes.",
+            duration: 3000
+          });
           setIsLearning(false);
           setCurrentStep(1);
           return;
@@ -412,9 +427,36 @@ export const EnhancedPatternLearning = ({
       }
     } catch (error) {
       console.error('Erreur:', error);
-      toast.error(error instanceof Error ? error.message : "Erreur d'apprentissage. Utilisez le parsing local.");
+      toast.error("Erreur d'apprentissage. Tentative d'analyse locale...");
+      await tryLocalParsing();
     } finally {
       setIsLearning(false);
+    }
+  };
+
+  // Fallback: parsing local sans IA
+  const tryLocalParsing = async () => {
+    try {
+      const localRooms = unifiedParserService.parseLocalFallback(rawText, hotelId);
+      if (localRooms.length > 0) {
+        const normalizedRooms = localRooms.map((room: any) => ({
+          ...room,
+          cleaningType: normalizeCleaningType(room.cleaningType),
+          confidence: 0.7
+        }));
+        setExtractedRooms(normalizedRooms);
+        onRoomsExtracted(normalizedRooms);
+        setCurrentStep(3);
+        toast.success(`${normalizedRooms.length} chambres extraites (analyse locale)`);
+      } else {
+        toast.info("Annotez manuellement pour de meilleurs résultats");
+      }
+    } catch (e) {
+      console.error('Erreur parsing local:', e);
+      toast.info("Annotez manuellement les chambres");
+    } finally {
+      setIsLearning(false);
+      setCurrentStep(1);
     }
   };
 
@@ -431,7 +473,15 @@ export const EnhancedPatternLearning = ({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorMsg = String(error?.message || error);
+        if (errorMsg.includes('402') || errorMsg.includes('AI_CREDITS_INSUFFICIENT')) {
+          toast.warning("Crédits IA insuffisants - tentative d'analyse locale");
+          await tryLocalParsing();
+          return;
+        }
+        throw error;
+      }
 
       const rooms = data?.extractedRooms?.rooms || [];
       if (rooms.length > 0) {
@@ -446,7 +496,8 @@ export const EnhancedPatternLearning = ({
       }
     } catch (error) {
       console.error('Erreur:', error);
-      toast.error("Erreur lors de l'application du pattern");
+      toast.warning("Erreur pattern - tentative d'analyse locale");
+      await tryLocalParsing();
     } finally {
       setIsLearning(false);
     }

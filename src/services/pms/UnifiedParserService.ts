@@ -520,6 +520,38 @@ class UnifiedParserService {
   }
 
   /**
+   * Parse local synchrone sans IA - Fallback quand l'IA n'est pas disponible
+   */
+  parseLocalFallback(text: string, hotelId: string): ExtractedRoom[] {
+    try {
+      // Prétraitement
+      const preprocessResult = textPreprocessor.preprocess(text);
+      const preprocessedText = preprocessResult.text;
+      
+      // Détecter le PMS
+      const result = pmsAdapterFactory.detectPms(preprocessedText);
+      const adapter = result.adapter;
+      
+      // Extraire les chambres
+      let rooms = adapter.extractRooms(preprocessedText);
+      
+      // Appliquer les patterns appris
+      rooms = this.applyLearnedPatterns(rooms);
+      
+      // Valider avec roomValidator
+      const validation = roomValidator.validate(rooms, text);
+      rooms = validation.validRooms;
+      
+      this.log(`🔧 Fallback local: ${rooms.length} chambres extraites avec ${adapter.name}`);
+      
+      return rooms;
+    } catch (error) {
+      this.log(`❌ Erreur fallback local: ${error}`);
+      return [];
+    }
+  }
+
+  /**
    * Retourne les logs de debug
    */
   getDebugLogs(): string[] {
