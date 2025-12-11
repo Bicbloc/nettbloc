@@ -11,39 +11,57 @@ export interface HousekeeperAuthResult {
 
 export class HousekeeperAuthService {
   // Créer une session d'accès pour permettre l'accès aux données via RLS
-  private static async createAccessSession(hotelId: string, housekeeperId: string, housekeeperName: string): Promise<void> {
+  private static async createAccessSession(hotelId: string, housekeeperId: string, housekeeperName: string): Promise<string | null> {
     try {
-      // Désactiver les anciennes sessions pour cet hôtel (nettoyage)
-      await supabase
+      console.log('🔑 Création session d\'accès pour:', { hotelId, housekeeperId, housekeeperName });
+      
+      // Désactiver les anciennes sessions expirées pour cet hôtel (nettoyage)
+      const { error: cleanupError } = await supabase
         .from('hotel_access_sessions')
         .update({ is_active: false, ended_at: new Date().toISOString() })
         .eq('hotel_id', hotelId)
         .eq('is_active', true)
         .lt('expires_at', new Date().toISOString());
 
+      if (cleanupError) {
+        console.warn('⚠️ Erreur nettoyage sessions expirées:', cleanupError);
+      }
+
       // Créer une nouvelle session valide 24h
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
       
+      // Générer un token de session unique
+      const sessionToken = `${hotelId.substring(0, 8)}-${housekeeperId?.substring(0, 8) || 'anon'}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       const accessCode = `SESSION-${hotelId.substring(0, 8)}-${Date.now()}`;
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('hotel_access_sessions')
         .insert({
           hotel_id: hotelId,
           access_code: accessCode,
+          session_token: sessionToken,
           is_active: true,
           expires_at: expiresAt.toISOString(),
           started_at: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
-        console.error('⚠️ Erreur création session d\'accès:', error);
-      } else {
-        console.log('✅ Session d\'accès créée pour hôtel:', hotelId);
+        console.error('❌ Erreur création session d\'accès:', error);
+        return null;
       }
+      
+      // Sauvegarder le token de session localement pour vérification ultérieure
+      localStorage.setItem('housekeeperSessionToken', sessionToken);
+      localStorage.setItem('housekeeperSessionExpires', expiresAt.toISOString());
+      
+      console.log('✅ Session d\'accès créée:', { sessionId: data?.id, sessionToken, expiresAt: expiresAt.toISOString() });
+      return sessionToken;
     } catch (err) {
-      console.error('⚠️ Erreur création session:', err);
+      console.error('💥 Erreur création session:', err);
+      return null;
     }
   }
 
