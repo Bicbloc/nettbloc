@@ -130,10 +130,13 @@ const Admin = () => {
 
   // Initialiser l'hôtel de training quand les hotels sont chargés
   useEffect(() => {
+    console.log('📊 Hotels chargés pour entraînement IA:', hotels.length, hotels.map(h => ({ id: h.id, name: h.name })));
     if (hotels.length > 0 && !selectedTrainingHotelId) {
+      console.log('🎯 Sélection automatique du premier hôtel:', hotels[0].id, hotels[0].name);
       setSelectedTrainingHotelId(hotels[0].id);
     }
   }, [hotels, selectedTrainingHotelId]);
+  
   // Vérifier les permissions super admin
   useEffect(() => {
     const checkSuperAdminRole = async () => {
