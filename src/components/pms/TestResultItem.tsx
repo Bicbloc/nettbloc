@@ -36,10 +36,16 @@ export const TestResultItem = ({
 
   const getCleaningLabel = (cleaning: CleaningType) => {
     switch (cleaning) {
-      case 'full': return 'À blanc';
-      case 'quick': return 'Recouche';
-      case 'none': return 'Aucun';
-      default: return cleaning;
+      case 'full':
+      case 'a_blanc':
+        return 'À Blanc';
+      case 'quick':
+      case 'recouche':
+        return 'Recouche';
+      case 'none':
+        return 'Aucun';
+      default:
+        return cleaning;
     }
   };
 
@@ -88,8 +94,8 @@ export const TestResultItem = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="full">À blanc</SelectItem>
-                  <SelectItem value="quick">Recouche</SelectItem>
+                  <SelectItem value="a_blanc">À Blanc</SelectItem>
+                  <SelectItem value="recouche">Recouche</SelectItem>
                   <SelectItem value="none">Aucun</SelectItem>
                 </SelectContent>
               </Select>
@@ -117,8 +123,8 @@ export const TestResultItem = ({
           )}
           <span className="font-mono font-bold">{room.roomNumber}</span>
           <Badge variant={
-            room.cleaningType === 'full' ? 'destructive' :
-            room.cleaningType === 'quick' ? 'default' : 'secondary'
+            room.cleaningType === 'full' || room.cleaningType === 'a_blanc' ? 'destructive' :
+            room.cleaningType === 'quick' || room.cleaningType === 'recouche' ? 'default' : 'secondary'
           }>
             {getCleaningLabel(room.cleaningType)}
           </Badge>
