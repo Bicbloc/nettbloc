@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image, linenTypeId, hotelId } = await req.json();
+    const { image, linenTypeId, hotelId, liveMode = false } = await req.json();
     
     if (!image || !linenTypeId || !hotelId) {
       return new Response(
@@ -46,63 +46,57 @@ serve(async (req) => {
       );
     }
 
-    // Get training samples for this linen type
-    const { data: trainingSamples, error: samplesError } = await supabase
-      .from('linen_training_samples')
-      .select('actual_count, notes')
-      .eq('linen_type_id', linenTypeId)
-      .order('created_at', { ascending: false })
-      .limit(5);
+    // Use different models based on mode
+    // Live mode: ultra-fast lightweight model for real-time detection
+    // Normal mode: balanced flash model for accuracy with good speed
+    const model = liveMode ? 'google/gemini-2.5-flash-lite' : 'google/gemini-2.5-flash';
+    
+    // Simplified prompt for live mode (fewer tokens = faster + cheaper)
+    const livePrompt = `Compte le linge "${linenType.name}" dans l'image. Réponds JSON: {"count": N, "confidence": 0-1}`;
+    
+    // Full prompt for normal mode
+    let fullPrompt = `Tu es un expert en comptage de linge d'hôtel. Compte le nombre EXACT de "${linenType.name}" (${linenType.category || 'linge'}) dans cette image.
 
-    // Build prompt with few-shot examples
-    let examplesText = '';
-    if (trainingSamples && trainingSamples.length > 0) {
-      examplesText = '\n\nVoici des exemples de comptages précédents pour ce type de linge:\n';
-      trainingSamples.forEach((sample, idx) => {
-        examplesText += `Exemple ${idx + 1}: ${sample.actual_count} pièces`;
-        if (sample.notes) examplesText += ` (${sample.notes})`;
-        examplesText += '\n';
-      });
+Informations:
+- Nom: ${linenType.name}
+- Catégorie: ${linenType.category || 'Non spécifiée'}
+${linenType.dimensions ? `- Dimensions: ${linenType.dimensions}` : ''}
+${linenType.color ? `- Couleur: ${linenType.color}` : ''}
+
+MÉTHODE:
+1. Examine toute l'image systématiquement
+2. Identifie les bords et coins de chaque pièce
+3. Pour les piles: compte les couches visibles
+4. Ne compte pas les ombres ou plis
+
+CONFIANCE:
+- 0.9-1.0: Pièces clairement visibles
+- 0.7-0.89: Quelques zones d'ombre
+- 0.5-0.69: Superpositions difficiles
+- <0.5: Image floue ou pile compacte
+
+Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "observations"}`;
+
+    // Get training samples for normal mode only (saves API calls in live mode)
+    if (!liveMode) {
+      const { data: trainingSamples } = await supabase
+        .from('linen_training_samples')
+        .select('actual_count, notes')
+        .eq('linen_type_id', linenTypeId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (trainingSamples && trainingSamples.length > 0) {
+        fullPrompt += '\n\nExemples précédents:\n';
+        trainingSamples.forEach((sample, idx) => {
+          fullPrompt += `- ${sample.actual_count} pièces${sample.notes ? ` (${sample.notes})` : ''}\n`;
+        });
+      }
     }
 
-    const systemPrompt = `Tu es un expert en comptage de linge d'hôtel avec une grande expérience. Tu dois analyser des photos de piles de linge et compter le nombre EXACT de pièces visibles avec précision.
+    const systemPrompt = liveMode ? livePrompt : fullPrompt;
 
-Informations sur le type de linge à compter:
-- Nom: ${linenType.name}
-- Catégorie: ${linenType.category}
-${linenType.dimensions ? `- Dimensions approximatives: ${linenType.dimensions}` : ''}
-${linenType.color ? `- Couleur typique: ${linenType.color}` : ''}
-${examplesText}
-
-MÉTHODOLOGIE DE COMPTAGE (TRÈS IMPORTANT):
-1. 📸 Examine TOUTE l'image de manière systématique, de haut en bas, de gauche à droite
-2. 🔍 Identifie les BORDS et COINS de chaque pièce - chaque coin visible = une pièce potentielle
-3. 📐 Compte les PLIS et SUPERPOSITIONS: si tu vois plusieurs couches, estime combien de pièces sont empilées
-4. 🎯 Pour les PILES: observe l'épaisseur, les bords qui dépassent, les variations de couleur entre les couches
-5. ✅ Compte une pièce SI: tu vois au moins 2 bords/coins distincts OU une épaisseur claire OU un bord qui dépasse
-6. ⚠️ NE compte PAS: les ombres, les plis d'une même pièce, les reflets
-
-EXEMPLES DE COMPTAGE:
-- Pile bien alignée: compte l'épaisseur visible (chaque "couche" = 1 pièce)
-- Pile désordonnée: compte chaque bord/coin visible séparément
-- Pièce pliée en deux: = 1 seule pièce (même si tu vois 2 épaisseurs)
-- Draps roulés: estime par la largeur du rouleau (ex: rouleau épais ≈ 2-3 draps)
-
-NIVEAU DE CONFIANCE:
-- 0.9-1.0: Toutes les pièces sont clairement visibles et distinctes
-- 0.7-0.89: Bonne visibilité mais quelques zones d'ombre ou superpositions
-- 0.5-0.69: Plusieurs pièces superposées difficiles à distinguer
-- 0.3-0.49: Image floue, pile très compacte, beaucoup d'incertitude
-- 0.0-0.29: Impossible de compter avec précision
-
-NOTES UTILES À AJOUTER:
-- Mentionne si des pièces sont partiellement cachées
-- Indique si la pile est trop compacte pour un comptage précis
-- Suggère de reprendre la photo si nécessaire (confiance < 0.6)
-- Décris brièvement ce que tu vois (ex: "pile de 5 serviettes blanches pliées")
-
-Réponds UNIQUEMENT avec un JSON valide au format suivant (sans markdown, sans \`\`\`):
-{"count": nombre_exact, "confidence": niveau_confiance, "notes": "description_et_observations"}`;
+    console.log(`[count-linen] Mode: ${liveMode ? 'LIVE' : 'NORMAL'}, Model: ${model}`);
 
     // Call Lovable AI with vision
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -112,36 +106,49 @@ Réponds UNIQUEMENT avec un JSON valide au format suivant (sans markdown, sans \
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model,
         messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
           {
             role: 'user',
             content: [
-              {
-                type: 'text',
-                text: 'Compte le nombre de pièces de linge dans cette image.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: image
-                }
-              }
+              { type: 'text', text: systemPrompt },
+              { type: 'image_url', image_url: { url: image } }
             ]
           }
         ],
         temperature: 0.1,
-        max_tokens: 500
+        max_tokens: liveMode ? 100 : 300
       })
     });
 
+    // Handle specific error codes
+    if (aiResponse.status === 402) {
+      console.error('[count-linen] 402 - Insufficient AI credits');
+      return new Response(
+        JSON.stringify({ 
+          error: 'AI_CREDITS_INSUFFICIENT',
+          message: 'Crédits IA insuffisants. Utilisez le mode manuel.',
+          fallback: 'manual'
+        }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (aiResponse.status === 429) {
+      console.error('[count-linen] 429 - Rate limited');
+      return new Response(
+        JSON.stringify({ 
+          error: 'RATE_LIMITED',
+          message: 'Trop de requêtes. Réessayez dans quelques secondes.',
+          fallback: 'retry'
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI Gateway error:', aiResponse.status, errorText);
+      console.error('[count-linen] AI Gateway error:', aiResponse.status, errorText);
       return new Response(
         JSON.stringify({ error: 'AI service error', details: errorText }),
         { status: aiResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -154,35 +161,39 @@ Réponds UNIQUEMENT avec un JSON valide au format suivant (sans markdown, sans \
     // Parse AI response
     let result;
     try {
-      // Remove markdown code blocks if present
       const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
       const jsonStr = jsonMatch ? jsonMatch[0] : aiContent;
       result = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', aiContent);
+      console.error('[count-linen] Failed to parse AI response:', aiContent);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to parse AI response',
-          rawResponse: aiContent 
+          rawResponse: aiContent,
+          fallback: 'manual'
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}`);
 
     return new Response(
       JSON.stringify({
         count: result.count || 0,
         confidence: result.confidence || 0,
         notes: result.notes || '',
-        linenType: linenType.name
+        linenType: linenType.name,
+        model: model,
+        mode: liveMode ? 'live' : 'normal'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in count-linen:', error);
+    console.error('[count-linen] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, fallback: 'manual' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
