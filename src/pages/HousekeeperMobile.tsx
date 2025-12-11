@@ -137,7 +137,7 @@ export default function HousekeeperMobile() {
         title: "Session expirée",
         description: "Veuillez vous reconnecter"
       });
-      navigate('/housekeeper-login');
+      navigate('/housekeeper/auth');
     }
   }, [nameFromUrl, navigate, toast]);
 
@@ -389,7 +389,7 @@ export default function HousekeeperMobile() {
     // Utiliser le service centralisé pour nettoyer la session
     HousekeeperAuthService.clearSession();
     storageService.clearHotel();
-    navigate('/housekeeper-login');
+    navigate('/housekeeper/auth');
   };
 
   const getPriorityColor = (priority: number) => {
