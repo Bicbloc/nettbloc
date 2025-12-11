@@ -14,6 +14,7 @@ import {
   CombinationRule,
   ExtractionDebugInfo
 } from './types';
+import { fieldExtractor } from './FieldExtractor';
 
 export abstract class PmsAdapter {
   abstract readonly name: string;
@@ -61,8 +62,9 @@ export abstract class PmsAdapter {
     };
   }
 
-  /**
+/**
    * Extrait les chambres depuis le texte du rapport PDF
+   * Utilise le FieldExtractor pour enrichir les données
    */
   extractRooms(text: string): ExtractedRoom[] {
     const rooms: ExtractedRoom[] = [];
@@ -81,23 +83,45 @@ export abstract class PmsAdapter {
         // Valider le numéro de chambre
         if (!this.isValidRoomNumber(roomNumber, line)) continue;
         
-        const { status, cleaning, keyword } = this.detectStatus(line);
+        // Utiliser le FieldExtractor pour extraire tous les champs
+        const extraction = fieldExtractor.extractFromLine(line, roomNumber);
+        const fields = extraction.fields;
+        
+        // Combiner la détection de statut locale avec l'extraction
+        const { status: localStatus, cleaning: localCleaning, keyword } = this.detectStatus(line);
+        
+        // Prendre la meilleure source (FieldExtractor si plus confiant)
+        const finalStatus = extraction.confidence > 70 ? extraction.inferredStatus : localStatus;
+        const finalCleaning = extraction.confidence > 70 ? extraction.inferredCleaning : localCleaning;
         
         const debugInfo: ExtractionDebugInfo = {
           rawLine: line,
           cleanedLine: line.trim(),
-          detectedKeywords: keyword ? [keyword] : [],
+          detectedKeywords: keyword ? [keyword, ...fields.rawStatuses] : fields.rawStatuses,
+          appliedRule: extraction.reason,
           source: 'regex',
-          confidence: 80
+          confidence: Math.max(80, extraction.confidence)
         };
         
         const room: ExtractedRoom = {
           roomNumber,
-          status,
-          cleaningType: cleaning,
+          status: finalStatus,
+          cleaningType: finalCleaning,
+          // Champs enrichis
+          arrivalDate: fields.arrivalDate || undefined,
+          departureDate: fields.departureDate || undefined,
+          nightInfo: fields.nightInfo || undefined,
+          currentNight: fields.currentNight || undefined,
+          totalNights: fields.totalNights || undefined,
+          guestName: fields.guestName || undefined,
+          guestCount: fields.guestCount || undefined,
+          roomType: fields.roomType || undefined,
+          rateCode: fields.rateCode || undefined,
+          rawStatuses: fields.rawStatuses.length > 0 ? fields.rawStatuses : undefined,
+          inferenceReason: extraction.reason,
           originalText: line.trim(),
           validated: false,
-          confidence: 80,
+          confidence: Math.max(80, extraction.confidence),
           debugInfo
         };
 

@@ -11,10 +11,11 @@ export { PmsAdapter } from './PmsAdapter';
 export { pmsAdapterFactory } from './PmsAdapterFactory';
 export { unifiedParserService } from './UnifiedParserService';
 
-// Nouveaux services optimisés
+// Services optimisés
 export { textPreprocessor } from './TextPreprocessor';
 export { roomValidator } from './RoomValidator';
 export { detectionCache } from './DetectionCache';
+export { fieldExtractor } from './FieldExtractor';
 
 // Adapters
 export * from './adapters';
