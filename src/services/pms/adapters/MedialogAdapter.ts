@@ -8,10 +8,11 @@ import { PmsConfig } from '../types';
 export class MedialogAdapter extends PmsAdapter {
   readonly name = 'medialog';
   
+  readonly criticalKeywords = ['MEDIALOG', 'Solutions digitales hôtelières'];
+  
   readonly keywords = [
-    'MEDIALOG', 'PLANNING MENAGE', 'PLANNING MÉNAGE', 'DRAPS', 'À BLANC',
-    'L\'état des chambres', 'état des chambres', 'ETAT', 'MEMO GOUVERNANTE',
-    'Solutions digitales hôtelières'
+    'PLANNING MENAGE', 'PLANNING MÉNAGE', 'DRAPS', 'À BLANC',
+    'L\'état des chambres', 'état des chambres', 'ETAT', 'MEMO GOUVERNANTE'
   ];
 
   readonly config: PmsConfig = {

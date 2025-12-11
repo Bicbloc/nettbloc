@@ -8,8 +8,10 @@ import { PmsConfig } from '../types';
 export class FidelioAdapter extends PmsAdapter {
   readonly name = 'fidelio';
   
+  readonly criticalKeywords = ['FIDELIO', 'FIDELIO SUITE 8'];
+  
   readonly keywords = [
-    'FIDELIO', 'FIDELIO SUITE 8', 'FIDELIO V8'
+    'FIDELIO V8', 'ORACLE HOSPITALITY'
   ];
 
   readonly config: PmsConfig = {

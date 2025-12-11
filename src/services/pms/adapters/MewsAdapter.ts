@@ -8,9 +8,10 @@ import { PmsConfig, ExtractedRoom, CleaningType } from '../types';
 export class MewsAdapter extends PmsAdapter {
   readonly name = 'mews';
   
+  readonly criticalKeywords = ['MEWS', 'MEWS COMMANDER', 'MEWS SYSTEMS'];
+  
   readonly keywords = [
-    'MEWS', 'COMMANDER', 'MEWS SYSTEMS', 'MEWS COMMANDER', 
-    'STATUT DES ESPACES', 'SPACE STATUS', 'DIR', 'INS', 'SAL', 'Night', 'Nuit'
+    'COMMANDER', 'STATUT DES ESPACES', 'SPACE STATUS', 'DIR', 'INS', 'SAL', 'Night', 'Nuit'
   ];
 
   readonly config: PmsConfig = {
