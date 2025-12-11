@@ -40,3 +40,6 @@ verify_jwt = false
 
 [functions.suggest-annotations]
 verify_jwt = true
+
+[functions.parse-report]
+verify_jwt = true

@@ -16,6 +16,7 @@ export { textPreprocessor } from './TextPreprocessor';
 export { roomValidator } from './RoomValidator';
 export { detectionCache } from './DetectionCache';
 export { fieldExtractor } from './FieldExtractor';
+export { localRoomParser } from './LocalRoomParser';
 
 // Adapters
 export * from './adapters';
