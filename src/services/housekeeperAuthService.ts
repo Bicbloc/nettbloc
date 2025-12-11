@@ -11,35 +11,22 @@ export interface HousekeeperAuthResult {
 
 export class HousekeeperAuthService {
   // Créer une session d'accès pour permettre l'accès aux données via RLS
-  private static async createAccessSession(hotelId: string, housekeeperId: string, housekeeperName: string): Promise<string | null> {
+  private static async createAccessSession(hotelId: string, housekeeperId: string, housekeeperName: string, accessCodeUsed: string): Promise<string | null> {
     try {
       console.log('🔑 Création session d\'accès pour:', { hotelId, housekeeperId, housekeeperName });
       
-      // Désactiver les anciennes sessions expirées pour cet hôtel (nettoyage)
-      const { error: cleanupError } = await supabase
-        .from('hotel_access_sessions')
-        .update({ is_active: false, ended_at: new Date().toISOString() })
-        .eq('hotel_id', hotelId)
-        .eq('is_active', true)
-        .lt('expires_at', new Date().toISOString());
-
-      if (cleanupError) {
-        console.warn('⚠️ Erreur nettoyage sessions expirées:', cleanupError);
-      }
-
       // Créer une nouvelle session valide 24h
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
       
-      // Générer un token de session unique
-      const sessionToken = `${hotelId.substring(0, 8)}-${housekeeperId?.substring(0, 8) || 'anon'}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      const accessCode = `SESSION-${hotelId.substring(0, 8)}-${Date.now()}`;
+      // Générer un token de session unique et plus court
+      const sessionToken = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
       
       const { data, error } = await supabase
         .from('hotel_access_sessions')
         .insert({
           hotel_id: hotelId,
-          access_code: accessCode,
+          access_code: accessCodeUsed,
           session_token: sessionToken,
           is_active: true,
           expires_at: expiresAt.toISOString(),
@@ -50,19 +37,65 @@ export class HousekeeperAuthService {
 
       if (error) {
         console.error('❌ Erreur création session d\'accès:', error);
-        return null;
+        // Ne pas bloquer la connexion si la session échoue
+        console.warn('⚠️ Poursuite sans session en base - utilisation localStorage uniquement');
+      } else {
+        console.log('✅ Session d\'accès créée en base:', { sessionId: data?.id });
       }
       
-      // Sauvegarder le token de session localement pour vérification ultérieure
+      // TOUJOURS sauvegarder le token localement - c'est notre source de vérité
       localStorage.setItem('housekeeperSessionToken', sessionToken);
       localStorage.setItem('housekeeperSessionExpires', expiresAt.toISOString());
+      localStorage.setItem('housekeeperSessionHotelId', hotelId);
+      localStorage.setItem('housekeeperSessionHousekeeperId', housekeeperId);
+      localStorage.setItem('housekeeperSessionHousekeeperName', housekeeperName);
       
-      console.log('✅ Session d\'accès créée:', { sessionId: data?.id, sessionToken, expiresAt: expiresAt.toISOString() });
+      console.log('✅ Session sauvegardée localement:', { sessionToken, expiresAt: expiresAt.toISOString() });
       return sessionToken;
     } catch (err) {
       console.error('💥 Erreur création session:', err);
       return null;
     }
+  }
+  
+  // Vérifier si une session locale est valide
+  static isSessionValid(): boolean {
+    const expiresAt = localStorage.getItem('housekeeperSessionExpires');
+    if (!expiresAt) return false;
+    
+    const isValid = new Date(expiresAt) > new Date();
+    if (!isValid) {
+      console.log('⚠️ Session expirée, nettoyage...');
+      this.clearSession();
+    }
+    return isValid;
+  }
+  
+  // Récupérer les données de session locales
+  static getLocalSession(): { hotelId: string; housekeeperId: string; housekeeperName: string; sessionToken: string } | null {
+    if (!this.isSessionValid()) return null;
+    
+    const hotelId = localStorage.getItem('housekeeperSessionHotelId');
+    const housekeeperId = localStorage.getItem('housekeeperSessionHousekeeperId');
+    const housekeeperName = localStorage.getItem('housekeeperSessionHousekeeperName');
+    const sessionToken = localStorage.getItem('housekeeperSessionToken');
+    
+    if (!hotelId || !housekeeperId || !housekeeperName || !sessionToken) return null;
+    
+    return { hotelId, housekeeperId, housekeeperName, sessionToken };
+  }
+  
+  // Nettoyer la session locale
+  static clearSession(): void {
+    localStorage.removeItem('housekeeperSessionToken');
+    localStorage.removeItem('housekeeperSessionExpires');
+    localStorage.removeItem('housekeeperSessionHotelId');
+    localStorage.removeItem('housekeeperSessionHousekeeperId');
+    localStorage.removeItem('housekeeperSessionHousekeeperName');
+    localStorage.removeItem('housekeeper');
+    localStorage.removeItem('housekeeperProfile');
+    localStorage.removeItem('selectedHotelId');
+    console.log('🧹 Session locale nettoyée');
   }
 
   // Authentification avec code complet en s'alignant sur la fonction SQL authenticate_housekeeper_by_code
@@ -149,7 +182,7 @@ export class HousekeeperAuthService {
           console.log('✅ Authentification réussie via fallback direct:', { hotel, housekeeper });
 
           // Créer une session d'accès pour permettre l'accès aux données via RLS
-          await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name);
+          await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name, normalized);
 
           return {
             success: true,
@@ -201,7 +234,7 @@ export class HousekeeperAuthService {
       console.log('✅ Authentification réussie via RPC:', { hotel, housekeeper, code_source: result.code_source });
 
       // Créer une session d'accès pour permettre l'accès aux données via RLS
-      await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name);
+      await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name, normalized);
 
       return {
         success: true,

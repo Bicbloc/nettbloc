@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
+import { HousekeeperAuthService } from '@/services/housekeeperAuthService';
 import { 
   CheckCircle, 
   Clock, 
@@ -93,8 +94,18 @@ export default function HousekeeperMobile() {
   const hotelId = hotelIdFromUrl || hotelIdFromStorage;
   const nameFromUrl = searchParams.get('name');
 
-  // Récupérer le nom du housekeeper au chargement initial
+  // Vérifier la session et récupérer le nom du housekeeper au chargement initial
   useEffect(() => {
+    // Vérifier d'abord si une session locale valide existe
+    const localSession = HousekeeperAuthService.getLocalSession();
+    
+    if (localSession) {
+      console.log('✅ Session locale trouvée:', localSession);
+      setHousekeeperName(localSession.housekeeperName);
+      return;
+    }
+    
+    // Fallback sur les anciennes méthodes
     const housekeeperData = localStorage.getItem('housekeeper');
     const housekeeperProfile = localStorage.getItem('housekeeperProfile');
     
@@ -118,8 +129,17 @@ export default function HousekeeperMobile() {
     
     if (name) {
       setHousekeeperName(name);
+    } else {
+      // Pas de session valide, rediriger vers login
+      console.warn('⚠️ Aucune session valide trouvée, redirection vers login');
+      toast({
+        variant: "destructive",
+        title: "Session expirée",
+        description: "Veuillez vous reconnecter"
+      });
+      navigate('/housekeeper-login');
     }
-  }, [nameFromUrl]);
+  }, [nameFromUrl, navigate, toast]);
 
   // Charger les données quand hotelId ET housekeeperName sont disponibles
   useEffect(() => {
@@ -366,12 +386,8 @@ export default function HousekeeperMobile() {
   };
 
   const handleLogout = () => {
-    // Nettoyer toutes les données de session
-    localStorage.removeItem('housekeeper');
-    localStorage.removeItem('housekeeperProfile');
-    localStorage.removeItem('selectedHotelId');
-    localStorage.removeItem('housekeeperSessionToken');
-    localStorage.removeItem('housekeeperSessionExpires');
+    // Utiliser le service centralisé pour nettoyer la session
+    HousekeeperAuthService.clearSession();
     storageService.clearHotel();
     navigate('/housekeeper-login');
   };
