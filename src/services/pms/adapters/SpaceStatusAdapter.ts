@@ -147,27 +147,36 @@ export class SpaceStatusAdapter extends PmsAdapter {
 
   detect(text: string): PmsDetectionResult {
     const matchedKeywords: string[] = [];
+    const criticalKeywordsMatched: string[] = [];
     let score = 0;
 
+    const lower = text.toLowerCase();
+
     for (const keyword of this.criticalKeywords) {
-      if (text.toLowerCase().includes(keyword.toLowerCase())) {
-        matchedKeywords.push(keyword);
-        score += 30;
+      if (lower.includes(keyword.toLowerCase())) {
+        criticalKeywordsMatched.push(keyword);
+        score += 50; // Aligné sur PmsAdapter: 50 pts par mot-clé critique
       }
     }
 
     for (const keyword of this.keywords) {
-      if (text.toLowerCase().includes(keyword.toLowerCase())) {
-        if (!matchedKeywords.includes(keyword)) {
-          matchedKeywords.push(keyword);
-          score += 5;
-        }
+      if (lower.includes(keyword.toLowerCase())) {
+        matchedKeywords.push(keyword);
+        score += 10; // Aligné sur PmsAdapter: 10 pts par mot-clé normal
       }
     }
 
+    // Bonus si pattern de ligne de chambre détecté
     if (text.match(this.ROOM_LINE_PATTERN)) score += 20;
 
-    const confidence = Math.min(score / 100, 1.0);
-    return { pmsType: this.name, confidence, matchedKeywords };
+    const confidence = Math.min(score, 100);
+    return { 
+      pmsType: this.name, 
+      confidence, 
+      matchedKeywords, 
+      criticalKeywordsMatched, 
+      score 
+    };
   }
 }
+
