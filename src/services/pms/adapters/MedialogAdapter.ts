@@ -90,10 +90,145 @@ export class MedialogAdapter extends PmsAdapter {
   extractRooms(text: string): ExtractedRoom[] {
     // Détecter si c'est le format "Rapport Housekeeping" (tableau structuré)
     if (this.isStructuredReportFormat(text)) {
-      return this.extractFromStructuredReport(text);
+      const rooms = this.extractFromStructuredReport(text);
+      if (rooms.length > 0) {
+        return rooms;
+      }
+      // Fallback: essayer le parsing de texte collé
+      console.log("📄 MedialogAdapter: Format structuré détecté mais pas de chambres, essai parsing collé...");
+      return this.extractFromConcatenatedText(text);
     }
     // Sinon utiliser l'extraction standard
     return super.extractRooms(text);
+  }
+
+  /**
+   * Extrait les chambres depuis un texte PDF "collé" où les lignes ne sont pas séparées
+   * Pattern cible: "01   Chambre twin   17/05/2025..." 
+   */
+  private extractFromConcatenatedText(text: string): ExtractedRoom[] {
+    console.log("📄 MedialogAdapter: Parsing texte concaténé...");
+    
+    const roomDataMap = new Map<string, StructuredRoomData[]>();
+    
+    // Pattern pour détecter le début de chaque entrée chambre
+    // "01   Chambre twin" ou "02   Chambre triple" etc.
+    const roomStartPattern = /(\d{1,3})\s{2,}(Chambre\s+(?:twin|double|triple|quadruple|simple))/gi;
+    
+    // Trouver toutes les positions de début
+    const matches = [...text.matchAll(roomStartPattern)];
+    console.log(`📄 MedialogAdapter: ${matches.length} entrées de chambre trouvées`);
+    
+    if (matches.length === 0) {
+      // Fallback: essayer un pattern encore plus souple
+      return this.extractFromConcatenatedTextFallback(text);
+    }
+    
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const startPos = match.index!;
+      const endPos = matches[i + 1]?.index ?? text.length;
+      
+      // Extraire le segment pour cette chambre
+      const segment = text.substring(startPos, endPos);
+      const roomNumber = match[1];
+      const roomType = match[2];
+      
+      // Extraire statut séjour
+      const stayStatusMatch = segment.match(/\b(Parti|Recouche|En arrivée|Arrivé)\b/i);
+      const stayStatus = stayStatusMatch?.[1] || 'unknown';
+      
+      // Extraire statut chambre  
+      const roomStatusMatch = segment.match(/\b(Sale|A contrôler|À contrôler)\b/i);
+      const roomStatus = roomStatusMatch?.[1] || '';
+      
+      // Extraire dates
+      const dates = segment.match(/\d{1,2}\/\d{1,2}\/\d{4}/g);
+      
+      // Extraire nom client - entre "adulte(s)" et le statut
+      let guestName = '';
+      const guestMatch = segment.match(/\d+\s+adultes?\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)\s+(?:Parti|Recouche|En arrivée|Arrivé)/i);
+      if (guestMatch) {
+        guestName = guestMatch[1].trim();
+      } else {
+        // Essayer un autre pattern
+        const altGuestMatch = segment.match(/adultes?\s+(.+?)\s+(?:Parti|Recouche|En arrivée|Arrivé)/i);
+        if (altGuestMatch) {
+          guestName = altGuestMatch[1].trim();
+        }
+      }
+      
+      const roomData: StructuredRoomData = {
+        roomNumber,
+        roomType,
+        arrivalDate: dates?.[0] || '',
+        departureDate: dates?.[1] || '',
+        guestInfo: '',
+        guestName,
+        stayStatus,
+        roomStatus
+      };
+      
+      if (!roomDataMap.has(roomNumber)) {
+        roomDataMap.set(roomNumber, []);
+      }
+      roomDataMap.get(roomNumber)!.push(roomData);
+    }
+    
+    // Convertir avec fusion départ+arrivée
+    return this.convertToExtractedRooms(roomDataMap, text);
+  }
+
+  /**
+   * Fallback pour texte très mal formaté
+   */
+  private extractFromConcatenatedTextFallback(text: string): ExtractedRoom[] {
+    console.log("📄 MedialogAdapter: Fallback - recherche pattern souple...");
+    
+    const roomDataMap = new Map<string, StructuredRoomData[]>();
+    
+    // Pattern très souple: juste chercher "Chambre TYPE" précédé d'un numéro
+    const loosePattern = /(\d{1,3})\s+Chambre\s+(twin|double|triple|quadruple|simple)/gi;
+    const matches = [...text.matchAll(loosePattern)];
+    
+    console.log(`📄 MedialogAdapter Fallback: ${matches.length} entrées trouvées`);
+    
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const startPos = match.index!;
+      const endPos = matches[i + 1]?.index ?? Math.min(startPos + 500, text.length);
+      
+      const segment = text.substring(startPos, endPos);
+      const roomNumber = match[1];
+      const roomType = `Chambre ${match[2]}`;
+      
+      // Chercher le statut dans le segment
+      const stayStatusMatch = segment.match(/\b(Parti|Recouche|En arrivée|Arrivé)\b/i);
+      const stayStatus = stayStatusMatch?.[1] || 'unknown';
+      
+      const roomStatusMatch = segment.match(/\b(Sale|A contrôler|À contrôler)\b/i);
+      const roomStatus = roomStatusMatch?.[1] || '';
+      
+      const dates = segment.match(/\d{1,2}\/\d{1,2}\/\d{4}/g);
+      
+      const roomData: StructuredRoomData = {
+        roomNumber,
+        roomType,
+        arrivalDate: dates?.[0] || '',
+        departureDate: dates?.[1] || '',
+        guestInfo: '',
+        guestName: '',
+        stayStatus,
+        roomStatus
+      };
+      
+      if (!roomDataMap.has(roomNumber)) {
+        roomDataMap.set(roomNumber, []);
+      }
+      roomDataMap.get(roomNumber)!.push(roomData);
+    }
+    
+    return this.convertToExtractedRooms(roomDataMap, text);
   }
 
   /**

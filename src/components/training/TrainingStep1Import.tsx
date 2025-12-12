@@ -27,8 +27,29 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(" ");
-      fullText += pageText + "\n";
+      
+      // Reconstruire les lignes en utilisant la position Y des éléments
+      let lastY: number | null = null;
+      let lineBuffer = "";
+      
+      for (const item of textContent.items as any[]) {
+        const currentY = item.transform[5]; // Position Y
+        
+        // Si la position Y change significativement, c'est une nouvelle ligne
+        if (lastY !== null && Math.abs(currentY - lastY) > 5) {
+          fullText += lineBuffer.trim() + "\n";
+          lineBuffer = "";
+        }
+        
+        lineBuffer += item.str + " ";
+        lastY = currentY;
+      }
+      
+      // Ajouter la dernière ligne de la page
+      if (lineBuffer.trim()) {
+        fullText += lineBuffer.trim() + "\n";
+      }
+      fullText += "\n"; // Séparateur de page
     }
     
     return fullText;
