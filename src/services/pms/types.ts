@@ -177,7 +177,7 @@ export interface ExtractionDebugInfo {
   cleanedLine: string;
   detectedKeywords: string[];
   appliedRule?: string;
-  source: 'regex' | 'pattern' | 'ai' | 'fallback';
+  source: 'regex' | 'pattern' | 'ai' | 'fallback' | 'structured-parser';
   confidence: number;
 }
 
