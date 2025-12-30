@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Check, X, ChevronLeft, Link2, Unlink, Plus, 
-  AlertTriangle, Eye, Sparkles, Save, Calendar, User, ArrowRight
+  AlertTriangle, Sparkles, Save, Calendar, User, ArrowRight, Copy, FileText
 } from "lucide-react";
 import { ExtractedRoom, CLEANING_TYPE_LABELS } from "@/services/pms";
 import { TrainingData } from "./TrainingWizard";
@@ -56,8 +56,12 @@ export const TrainingStep2Annotate = ({
   const [rooms, setRooms] = useState<ExtractedRoom[]>(trainingData.extractedRooms);
   const [mergingMode, setMergingMode] = useState(false);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
-  const [showPreview, setShowPreview] = useState(false);
   const [newRoom, setNewRoom] = useState({ roomNumber: "", cleaningType: "full" as const });
+
+  const copyRawText = () => {
+    navigator.clipboard.writeText(trainingData.rawText);
+    toast({ title: "Texte copié dans le presse-papiers" });
+  };
 
   const validatedCount = rooms.filter((r) => r.validated).length;
   const totalCount = rooms.length;
@@ -265,38 +269,25 @@ export const TrainingStep2Annotate = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header with stats */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Retour
-          </Button>
-          <Badge variant="outline" className="gap-1">
-            <Sparkles className="w-3 h-3" />
-            PMS: {trainingData.detectedPmsType.toUpperCase()}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={validatedCount === totalCount ? "default" : "secondary"}>
-            {validatedCount}/{totalCount} validées
-          </Badge>
-          <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)}>
-            <Eye className="w-4 h-4 mr-1" />
-            {showPreview ? "Masquer" : "Texte brut"}
+    <div className="flex gap-4 h-[600px]">
+      {/* Left panel - Raw PDF text */}
+      <div className="w-1/2 flex flex-col">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Texte brut du PDF</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={copyRawText}>
+            <Copy className="w-4 h-4 mr-1" />
+            Copier
           </Button>
         </div>
-      </div>
-
-      {/* Preview Modal */}
-      {showPreview && (
-        <Card className="p-4 max-h-48 overflow-auto">
+        <Card className="flex-1 p-4 overflow-hidden">
           <ScrollArea className="h-full">
-            <div className="font-mono text-xs whitespace-pre-wrap">
+            <div className="font-mono text-xs whitespace-pre-wrap leading-relaxed">
               {highlightedText.map((seg, i) =>
                 seg.isRoom ? (
-                  <mark key={i} className="bg-primary/20 text-primary px-0.5 rounded">
+                  <mark key={i} className="bg-primary/20 text-primary px-1 rounded font-bold">
                     {seg.text}
                   </mark>
                 ) : (
@@ -306,7 +297,29 @@ export const TrainingStep2Annotate = ({
             </div>
           </ScrollArea>
         </Card>
-      )}
+        <p className="text-xs text-muted-foreground mt-2">
+          Les numéros de chambres détectés sont surlignés en couleur.
+        </p>
+      </div>
+
+      {/* Right panel - Room list */}
+      <div className="w-1/2 flex flex-col">
+        {/* Header with stats */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Retour
+            </Button>
+            <Badge variant="outline" className="gap-1">
+              <Sparkles className="w-3 h-3" />
+              PMS: {trainingData.detectedPmsType.toUpperCase()}
+            </Badge>
+          </div>
+          <Badge variant={validatedCount === totalCount ? "default" : "secondary"}>
+            {validatedCount}/{totalCount} validées
+          </Badge>
+        </div>
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
@@ -521,12 +534,13 @@ export const TrainingStep2Annotate = ({
         </ScrollArea>
       </TooltipProvider>
 
-      {/* Continue button */}
-      <div className="flex justify-end pt-4 border-t">
-        <Button onClick={handleComplete} size="lg" className="gap-2">
-          <Save className="w-4 h-4" />
-          Sauvegarder et terminer
-        </Button>
+        {/* Continue button */}
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={handleComplete} size="lg" className="gap-2">
+            <Save className="w-4 h-4" />
+            Sauvegarder et terminer
+          </Button>
+        </div>
       </div>
     </div>
   );

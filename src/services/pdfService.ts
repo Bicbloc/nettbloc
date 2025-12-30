@@ -174,10 +174,15 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       description: `${rooms.length} chambres traitées depuis ${file.name}`,
     });
     
-    // Si aucune chambre trouvée, retourner des données de test
+    // Si aucune chambre trouvée, retourner un tableau vide avec un message explicatif
     if (rooms.length === 0) {
-      console.log("⚠️ Aucune chambre détectée, utilisation des données simulées");
-      return generateMockRoomData();
+      console.log("⚠️ Aucune chambre détectée dans le PDF");
+      toast({
+        variant: "destructive",
+        title: "Aucune chambre détectée",
+        description: "Le format du rapport n'est pas reconnu. Utilisez l'onglet 'Entraînement IA' pour apprendre ce format.",
+      });
+      return [];
     }
     
     return rooms;
@@ -185,37 +190,9 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     console.error("❌ Error processing PDF:", error);
     toast({
       variant: "destructive",
-      title: "Processing Failed",
-      description: "Failed to process the PDF file. Please try again.",
+      title: "Erreur de traitement",
+      description: "Impossible de lire le fichier PDF. Vérifiez qu'il n'est pas protégé.",
     });
     throw error;
   }
-}
-
-/**
- * Génère des données de test
- */
-function generateMockRoomData(): Room[] {
-  const statuses = ['needs-cleaning', 'clean', 'occupied', 'maintenance'];
-  const cleaningTypes = ['a_blanc', 'recouche', 'none'] as const;
-  const priorities = ['high', 'medium', 'low'] as const;
-  
-  return Array.from({ length: 50 }, (_, i) => {
-    const floor = Math.floor(i / 20) + 1;
-    const room = (i % 20) + 1;
-    const roomNumber = `${floor}${room.toString().padStart(2, '0')}`;
-    const isTwin = Math.random() > 0.7;
-    const priority = priorities[Math.floor(Math.random() * priorities.length)];
-    
-    return {
-      number: roomNumber,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      cleaningType: cleaningTypes[Math.floor(Math.random() * cleaningTypes.length)],
-      priority,
-      isTwin,
-      isUrgent: priority === 'high',
-      notUrgent: priority === 'low',
-      floor
-    };
-  });
 }
