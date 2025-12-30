@@ -33,6 +33,8 @@ export const TrainingStep3Result = ({
   const validatedRooms = trainingData.extractedRooms.filter((r) => r.validated);
   const accuracy = Math.round((validatedRooms.length / trainingData.extractedRooms.length) * 100);
 
+  const isUpdate = !!trainingData.existingPatternId;
+
   const saveTraining = async () => {
     setSaving(true);
 
@@ -43,28 +45,47 @@ export const TrainingStep3Result = ({
         return;
       }
 
-      const { error } = await supabase.from("report_training_patterns").insert([
-        {
-          hotel_id: hotelId,
-          report_name: trainingData.reportName,
-          pms_type: trainingData.detectedPmsType,
-          raw_text: trainingData.rawText.substring(0, 10000), // Limit size
-          extracted_data: validatedRooms as any,
-          validated: true,
-          created_by: user.id,
-          detection_rules: {
-            connected_rooms: validatedRooms
-              .filter((r) => r.isConnected)
-              .map((r) => ({ pattern: r.roomNumber, rooms: r.linkedRooms })),
-          },
+      const patternData = {
+        hotel_id: hotelId,
+        report_name: trainingData.reportName,
+        pms_type: trainingData.detectedPmsType,
+        raw_text: trainingData.rawText.substring(0, 10000), // Limit size
+        extracted_data: validatedRooms as any,
+        validated: true,
+        created_by: user.id,
+        updated_at: new Date().toISOString(),
+        detection_rules: {
+          connected_rooms: validatedRooms
+            .filter((r) => r.isConnected)
+            .map((r) => ({ pattern: r.roomNumber, rooms: r.linkedRooms })),
         },
-      ]);
+      };
+
+      let error;
+
+      if (isUpdate && trainingData.existingPatternId) {
+        // Update existing pattern
+        const result = await supabase
+          .from("report_training_patterns")
+          .update(patternData)
+          .eq("id", trainingData.existingPatternId);
+        error = result.error;
+      } else {
+        // Insert new pattern
+        const result = await supabase
+          .from("report_training_patterns")
+          .insert([patternData]);
+        error = result.error;
+      }
 
       if (error) throw error;
 
       await unifiedParserService.loadHotelPatterns(hotelId);
       setSaved(true);
-      toast({ title: "Entraînement sauvegardé", description: "L'IA a appris de ce rapport" });
+      toast({ 
+        title: isUpdate ? "Entraînement mis à jour" : "Entraînement sauvegardé", 
+        description: "L'IA a appris de ce rapport" 
+      });
     } catch (error) {
       console.error("Erreur:", error);
       toast({ title: "Erreur", description: "Impossible de sauvegarder", variant: "destructive" });
@@ -112,9 +133,12 @@ export const TrainingStep3Result = ({
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-semibold mb-1">Entraînement terminé !</h3>
+            <h3 className="text-xl font-semibold mb-1">
+              {isUpdate ? "Mise à jour terminée !" : "Entraînement terminé !"}
+            </h3>
             <p className="text-muted-foreground">
               {validatedRooms.length} chambres validées à partir de "{trainingData.reportName}"
+              {isUpdate && " (mise à jour)"}
             </p>
             
             <div className="flex flex-wrap gap-3 mt-4">
@@ -143,10 +167,10 @@ export const TrainingStep3Result = ({
                   Sauvegarde...
                 </>
               ) : (
-                <>
-                  <Brain className="w-4 h-4" />
-                  Sauvegarder l'entraînement
-                </>
+              <>
+                <Brain className="w-4 h-4" />
+                {isUpdate ? "Mettre à jour l'entraînement" : "Sauvegarder l'entraînement"}
+              </>
               )}
             </Button>
           </div>
