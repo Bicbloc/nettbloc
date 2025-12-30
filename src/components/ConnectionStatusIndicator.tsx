@@ -19,31 +19,30 @@ export function ConnectionStatusIndicator() {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [lastPing, setLastPing] = useState<Date | null>(null);
   const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const [httpOk, setHttpOk] = useState(true);
 
   useEffect(() => {
     // Écouter les changements de statut du RealtimeManager
+    // Note: On ne change pas l'état si le ping HTTP fonctionne
     const unsubscribe = realtimeManager.onConnectionStatusChange((status) => {
       if (status === 'SUBSCRIBED') {
         setConnectionState('online');
         setLastPing(new Date());
         setConsecutiveFailures(0);
-      } else if (status === 'OFFLINE') {
+      } else if (status === 'OFFLINE' && !navigator.onLine) {
+        // Seulement si vraiment hors ligne
         setConnectionState('offline');
       } else if (status === 'RECONNECTING') {
-        setConnectionState('reconnecting');
-      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        setConnectionState('reconnecting');
-        setConsecutiveFailures(prev => prev + 1);
-      } else if (status === 'FAILED') {
-        setConnectionState('degraded');
-      } else if (status === 'AUTH_EXPIRED') {
-        setConnectionState('offline');
+        // Ne pas changer en reconnecting si le HTTP fonctionne
+        if (!httpOk) {
+          setConnectionState('reconnecting');
+        }
       }
+      // Ignorer CLOSED, CHANNEL_ERROR, TIMED_OUT si le ping HTTP fonctionne
     });
 
     // Écouter les événements navigateur
     const handleOnline = () => {
-      setConnectionState('reconnecting');
       setConsecutiveFailures(0);
       pingSupabase();
     };
@@ -56,8 +55,8 @@ export function ConnectionStatusIndicator() {
     // Ping initial
     pingSupabase();
 
-    // Ping périodique (toutes les 45s)
-    const interval = setInterval(pingSupabase, 45000);
+    // Ping périodique (toutes les 30s)
+    const interval = setInterval(pingSupabase, 30000);
 
     return () => {
       unsubscribe();
@@ -65,11 +64,12 @@ export function ConnectionStatusIndicator() {
       window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
     };
-  }, []);
+  }, [httpOk]);
 
   const pingSupabase = async () => {
     if (!navigator.onLine) {
       setConnectionState('offline');
+      setHttpOk(false);
       return;
     }
 
@@ -84,18 +84,23 @@ export function ConnectionStatusIndicator() {
       const latency = Date.now() - start;
       
       if (error && error.code !== 'PGRST116') {
+        setHttpOk(false);
         setConsecutiveFailures(prev => prev + 1);
         if (consecutiveFailures >= 2) {
           setConnectionState('degraded');
         }
       } else if (latency > 5000) {
+        setHttpOk(true);
         setConnectionState('degraded');
       } else {
+        // HTTP fonctionne - on est connecté même si le realtime a des soucis
+        setHttpOk(true);
         setConnectionState('online');
         setLastPing(new Date());
         setConsecutiveFailures(0);
       }
     } catch {
+      setHttpOk(false);
       setConsecutiveFailures(prev => prev + 1);
       if (consecutiveFailures >= 2) {
         setConnectionState('degraded');
