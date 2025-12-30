@@ -45,12 +45,19 @@ export const TrainingStep3Result = ({
         return;
       }
 
+      // IMPORTANT: Ne sauvegarder QUE les chambres validées (validated: true)
+      // Les chambres non validées ne doivent JAMAIS apparaître dans l'analyse
+      const roomsToSave = validatedRooms.map(r => ({
+        ...r,
+        validated: true // S'assurer que le flag est bien présent
+      }));
+
       const patternData = {
         hotel_id: hotelId,
         report_name: trainingData.reportName,
         pms_type: trainingData.detectedPmsType,
         raw_text: trainingData.rawText.substring(0, 10000), // Limit size
-        extracted_data: validatedRooms as any,
+        extracted_data: roomsToSave as any,
         validated: true,
         created_by: user.id,
         updated_at: new Date().toISOString(),
