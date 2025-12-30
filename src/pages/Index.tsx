@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +46,7 @@ import { AccessCodesTab } from "@/components/dashboard/AccessCodesTab";
 import { LinenTab } from "@/components/dashboard/LinenTab";
 import { IncidentsTab } from "@/components/dashboard/IncidentsTab";
 import { ReportsTab } from "@/components/dashboard/ReportsTab";
+import { TrainingTab } from "@/components/dashboard/TrainingTab";
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
@@ -664,6 +665,9 @@ const Index = () => {
                 <TabsTrigger value="reports" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                   <FileText className="h-5 w-5" /><span>Rapports</span>
                 </TabsTrigger>
+                <TabsTrigger value="training" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <Brain className="h-5 w-5" /><span>Entraînement IA</span>
+                </TabsTrigger>
               </TabsList>
             </div>
             
@@ -753,6 +757,10 @@ const Index = () => {
                   onGenerateReport={handleGenerateReport}
                   onGenerateAllReports={handleGenerateAllReports}
                 />
+              </TabsContent>
+
+              <TabsContent value="training" className="space-y-6">
+                <TrainingTab currentHotelId={currentHotelId} />
               </TabsContent>
             </div>
           </div>
