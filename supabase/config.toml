@@ -43,3 +43,6 @@ verify_jwt = true
 
 [functions.parse-report]
 verify_jwt = true
+
+[functions.cleanup-duplicates]
+verify_jwt = false
