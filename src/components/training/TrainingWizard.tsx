@@ -8,6 +8,7 @@ import { TrainingStep1Import } from "./TrainingStep1Import";
 import { TrainingStep2Annotate } from "./TrainingStep2Annotate";
 import { TrainingStep3Result } from "./TrainingStep3Result";
 import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
+import { TrainingHistory } from "./TrainingHistory";
 import { pmsAdapterFactory, unifiedParserService, ExtractedRoom } from "@/services/pms";
 
 interface TrainingWizardProps {
@@ -20,6 +21,7 @@ export interface TrainingData {
   extractedRooms: ExtractedRoom[];
   detectedPmsType: string;
   validatedCount: number;
+  existingPatternId?: string; // ID du pattern existant si modification
 }
 
 const STEPS = [
@@ -33,6 +35,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
   const [trainingData, setTrainingData] = useState<TrainingData | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     unifiedParserService.loadHotelPatterns(hotelId);
@@ -60,12 +63,36 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
   const handleReset = () => {
     setTrainingData(null);
     setCurrentStep(1);
+    setRefreshKey(prev => prev + 1); // Refresh history
   };
 
   const goToStep = (step: number) => {
     if (step < currentStep) {
       setCurrentStep(step);
     }
+  };
+
+  const handleEditPattern = async (pattern: any) => {
+    // Load existing pattern data for editing
+    const rooms: ExtractedRoom[] = Array.isArray(pattern.extracted_data)
+      ? pattern.extracted_data.map((r: any) => ({
+          ...r,
+          validated: true,
+        }))
+      : (pattern.extracted_data?.rooms || []).map((r: any) => ({
+          ...r,
+          validated: true,
+        }));
+
+    setTrainingData({
+      reportName: pattern.report_name,
+      rawText: "", // We don't store full raw text for existing patterns
+      extractedRooms: rooms,
+      detectedPmsType: pattern.pms_type,
+      validatedCount: rooms.length,
+      existingPatternId: pattern.id,
+    });
+    setCurrentStep(2);
   };
 
   return (
@@ -95,6 +122,17 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
           </Button>
         </div>
       </Card>
+
+      {/* Training History */}
+      <TrainingHistory 
+        key={refreshKey}
+        hotelId={hotelId} 
+        onEdit={handleEditPattern}
+        onDeleted={() => {
+          unifiedParserService.loadHotelPatterns(hotelId);
+          setRefreshKey(prev => prev + 1);
+        }}
+      />
 
       {/* Progress Steps */}
       <Card className="p-6">

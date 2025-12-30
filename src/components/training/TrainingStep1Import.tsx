@@ -1,10 +1,12 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Sparkles, AlertCircle } from "lucide-react";
+import { Upload, FileText, Sparkles, AlertCircle, AlertTriangle } from "lucide-react";
 import { pmsAdapterFactory, unifiedParserService, ExtractedRoom } from "@/services/pms";
 import { TrainingData } from "./TrainingWizard";
+import { useExistingTraining } from "./TrainingHistory";
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -18,6 +20,11 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [detectedPmsType, setDetectedPmsType] = useState<string | null>(null);
+  const [pendingData, setPendingData] = useState<TrainingData | null>(null);
+  
+  // Check if PMS type is already trained
+  const { existingPattern, loading: checkingExisting } = useExistingTraining(hotelId, detectedPmsType);
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -66,6 +73,8 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
     }
 
     setUploading(true);
+    setDetectedPmsType(null);
+    setPendingData(null);
 
     try {
       const text = await extractTextFromPdf(file);
@@ -73,13 +82,25 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
 
       // Auto-detect PMS type
       const detection = pmsAdapterFactory.detectPms(text);
-      const detectedPmsType = detection.detection.pmsType;
+      const pmsType = detection.detection.pmsType;
       
-      console.log("🔍 PMS détecté:", detectedPmsType, "confiance:", detection.detection.confidence);
+      console.log("🔍 PMS détecté:", pmsType, "confiance:", detection.detection.confidence);
+      setDetectedPmsType(pmsType);
 
       // Extract rooms using the detected adapter
       const extractedRooms = detection.adapter.extractRooms(text);
       console.log("🏠 Chambres extraites:", extractedRooms.length);
+
+      const trainingData: TrainingData = {
+        reportName: file.name,
+        rawText: text,
+        extractedRooms,
+        detectedPmsType: pmsType,
+        validatedCount: 0,
+      };
+
+      // Store pending data - will be processed after checking for existing training
+      setPendingData(trainingData);
 
       if (extractedRooms.length === 0) {
         toast({
@@ -90,17 +111,9 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
       } else {
         toast({
           title: "Import réussi",
-          description: `${extractedRooms.length} chambres détectées automatiquement`,
+          description: `${extractedRooms.length} chambres détectées - PMS: ${pmsType.toUpperCase()}`,
         });
       }
-
-      onComplete({
-        reportName: file.name,
-        rawText: text,
-        extractedRooms,
-        detectedPmsType,
-        validatedCount: 0,
-      });
     } catch (error) {
       console.error("Erreur lors du traitement:", error);
       toast({
@@ -110,6 +123,22 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleContinueWithUpdate = () => {
+    if (pendingData && existingPattern) {
+      // Continue with existing pattern ID for update
+      onComplete({
+        ...pendingData,
+        existingPatternId: existingPattern.id,
+      });
+    }
+  };
+
+  const handleContinueNew = () => {
+    if (pendingData) {
+      onComplete(pendingData);
     }
   };
 
@@ -139,6 +168,56 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
     }
   };
 
+  const handleReset = () => {
+    setDetectedPmsType(null);
+    setPendingData(null);
+  };
+
+  // Show existing training warning
+  if (pendingData && existingPattern && !checkingExisting) {
+    return (
+      <div className="space-y-6">
+        <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-5 w-5 text-amber-500" />
+          <AlertTitle className="text-amber-600">PMS déjà entraîné</AlertTitle>
+          <AlertDescription className="text-amber-600/80">
+            <p className="mb-3">
+              Un entraînement existe déjà pour le PMS <strong>{detectedPmsType?.toUpperCase()}</strong>.
+            </p>
+            <p className="text-sm mb-4">
+              Fichier existant : <strong>{existingPattern.report_name}</strong>
+              <br />
+              Chambres validées : <strong>{
+                Array.isArray(existingPattern.extracted_data) 
+                  ? existingPattern.extracted_data.length 
+                  : existingPattern.extracted_data?.rooms?.length || 0
+              }</strong>
+            </p>
+            <p className="text-sm">
+              Vous pouvez soit <strong>mettre à jour</strong> l'entraînement existant avec ce nouveau rapport,
+              soit <strong>supprimer</strong> l'ancien depuis l'historique ci-dessus avant de continuer.
+            </p>
+          </AlertDescription>
+        </Alert>
+
+        <div className="flex gap-3 justify-center">
+          <Button variant="outline" onClick={handleReset}>
+            Annuler
+          </Button>
+          <Button onClick={handleContinueWithUpdate} className="gap-2">
+            Mettre à jour l'entraînement
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If pending data exists and no conflict, continue automatically
+  if (pendingData && !existingPattern && !checkingExisting) {
+    // Auto-continue after a brief moment
+    setTimeout(() => handleContinueNew(), 100);
+  }
+
   return (
     <div className="space-y-6">
       {/* Drop Zone */}
@@ -153,12 +232,14 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
             : "border-muted-foreground/25 hover:border-primary/50"
         }`}
       >
-        {uploading ? (
+        {uploading || checkingExisting ? (
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
-            <p className="text-lg font-medium">Analyse du rapport en cours...</p>
+            <p className="text-lg font-medium">
+              {checkingExisting ? "Vérification des entraînements existants..." : "Analyse du rapport en cours..."}
+            </p>
             <p className="text-sm text-muted-foreground">
-              Extraction du texte et détection des chambres
+              {checkingExisting ? "Un instant..." : "Extraction du texte et détection des chambres"}
             </p>
           </div>
         ) : (
