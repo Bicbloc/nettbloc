@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 import { realtimeManager } from '@/services/RealtimeManager';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -18,23 +18,33 @@ export function ConnectionStatusIndicator() {
   const [connectionState, setConnectionState] = useState<ConnectionState>('online');
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [lastPing, setLastPing] = useState<Date | null>(null);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
 
   useEffect(() => {
     // Écouter les changements de statut du RealtimeManager
-    realtimeManager.onConnectionStatusChange((status) => {
+    const unsubscribe = realtimeManager.onConnectionStatusChange((status) => {
       if (status === 'SUBSCRIBED') {
         setConnectionState('online');
         setLastPing(new Date());
+        setConsecutiveFailures(0);
       } else if (status === 'OFFLINE') {
         setConnectionState('offline');
+      } else if (status === 'RECONNECTING') {
+        setConnectionState('reconnecting');
       } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         setConnectionState('reconnecting');
+        setConsecutiveFailures(prev => prev + 1);
+      } else if (status === 'FAILED') {
+        setConnectionState('degraded');
+      } else if (status === 'AUTH_EXPIRED') {
+        setConnectionState('offline');
       }
     });
 
     // Écouter les événements navigateur
     const handleOnline = () => {
       setConnectionState('reconnecting');
+      setConsecutiveFailures(0);
       pingSupabase();
     };
     
@@ -46,10 +56,11 @@ export function ConnectionStatusIndicator() {
     // Ping initial
     pingSupabase();
 
-    // Ping périodique (toutes les 30s)
-    const interval = setInterval(pingSupabase, 30000);
+    // Ping périodique (toutes les 45s)
+    const interval = setInterval(pingSupabase, 45000);
 
     return () => {
+      unsubscribe();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
@@ -65,32 +76,41 @@ export function ConnectionStatusIndicator() {
     try {
       const start = Date.now();
       const { error } = await supabase
-        .from('profiles')
+        .from('hotels')
         .select('id')
         .limit(1)
         .maybeSingle();
       
       const latency = Date.now() - start;
       
-      if (error) {
-        setConnectionState('degraded');
-      } else if (latency > 3000) {
+      if (error && error.code !== 'PGRST116') {
+        setConsecutiveFailures(prev => prev + 1);
+        if (consecutiveFailures >= 2) {
+          setConnectionState('degraded');
+        }
+      } else if (latency > 5000) {
         setConnectionState('degraded');
       } else {
         setConnectionState('online');
         setLastPing(new Date());
+        setConsecutiveFailures(0);
       }
     } catch {
-      setConnectionState('degraded');
+      setConsecutiveFailures(prev => prev + 1);
+      if (consecutiveFailures >= 2) {
+        setConnectionState('degraded');
+      }
     }
   };
 
   const handleReconnect = async () => {
     setIsReconnecting(true);
     setConnectionState('reconnecting');
+    setConsecutiveFailures(0);
     
     try {
       realtimeManager.forceReconnect();
+      await new Promise(resolve => setTimeout(resolve, 1000));
       await pingSupabase();
     } finally {
       setTimeout(() => setIsReconnecting(false), 1000);
@@ -102,7 +122,8 @@ export function ConnectionStatusIndicator() {
       case 'online':
         return {
           icon: Wifi,
-          color: 'bg-green-500',
+          color: 'text-green-500',
+          bgColor: 'bg-green-500/10',
           text: 'Connecté',
           badgeVariant: 'default' as const,
           showReconnect: false
@@ -110,15 +131,17 @@ export function ConnectionStatusIndicator() {
       case 'offline':
         return {
           icon: WifiOff,
-          color: 'bg-destructive',
+          color: 'text-destructive',
+          bgColor: 'bg-destructive/10',
           text: 'Hors ligne',
           badgeVariant: 'destructive' as const,
-          showReconnect: false
+          showReconnect: true
         };
       case 'reconnecting':
         return {
           icon: RefreshCw,
-          color: 'bg-yellow-500',
+          color: 'text-yellow-500',
+          bgColor: 'bg-yellow-500/10',
           text: 'Reconnexion...',
           badgeVariant: 'secondary' as const,
           showReconnect: false
@@ -126,8 +149,9 @@ export function ConnectionStatusIndicator() {
       case 'degraded':
         return {
           icon: AlertCircle,
-          color: 'bg-orange-500',
-          text: 'Connexion lente',
+          color: 'text-orange-500',
+          bgColor: 'bg-orange-500/10',
+          text: 'Connexion instable',
           badgeVariant: 'outline' as const,
           showReconnect: true
         };
@@ -136,6 +160,16 @@ export function ConnectionStatusIndicator() {
 
   const config = getStatusConfig();
   const Icon = config.icon;
+
+  const formatLastPing = (date: Date | null) => {
+    if (!date) return 'Jamais';
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diff < 60) return 'À l\'instant';
+    if (diff < 3600) return `Il y a ${Math.floor(diff / 60)}min`;
+    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <TooltipProvider>
@@ -146,12 +180,14 @@ export function ConnectionStatusIndicator() {
               variant={config.badgeVariant}
               className={cn(
                 "gap-1.5 cursor-pointer transition-all",
+                config.bgColor,
                 connectionState === 'reconnecting' && "animate-pulse"
               )}
               onClick={config.showReconnect ? handleReconnect : undefined}
             >
               <Icon className={cn(
                 "h-3 w-3",
+                config.color,
                 connectionState === 'reconnecting' && "animate-spin"
               )} />
               <span className="text-xs hidden sm:inline">{config.text}</span>
@@ -173,14 +209,20 @@ export function ConnectionStatusIndicator() {
             )}
           </div>
         </TooltipTrigger>
-        <TooltipContent>
-          <p>{config.text}</p>
-          {lastPing && connectionState === 'online' && (
-            <p className="text-xs text-muted-foreground">
-              Dernière sync: {lastPing.toLocaleTimeString()}
+        <TooltipContent className="space-y-1">
+          <p className="font-medium">{config.text}</p>
+          {lastPing && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Dernière sync: {formatLastPing(lastPing)}
             </p>
           )}
-          {connectionState === 'degraded' && (
+          {consecutiveFailures > 0 && (
+            <p className="text-xs text-destructive">
+              {consecutiveFailures} échec(s) consécutif(s)
+            </p>
+          )}
+          {config.showReconnect && (
             <p className="text-xs text-muted-foreground">
               Cliquez pour reconnecter
             </p>
