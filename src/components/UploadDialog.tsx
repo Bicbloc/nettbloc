@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
 import { FileUp, Sparkles, FileText, Plug, Clock, ArrowLeft, Zap } from "lucide-react";
@@ -372,80 +373,82 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
           Importer les chambres
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        {!showHousekeeperSetup && !showDistributionOptions ? (
-          importMethod === 'choice' ? renderMethodChoice() : renderPdfUpload()
-        ) : showHousekeeperSetup ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Configuration des femmes de chambre</DialogTitle>
-              <DialogDescription>
-                Sélectionnez les femmes de chambre existantes ou ajoutez-en de nouvelles avant la distribution.
-              </DialogDescription>
-            </DialogHeader>
-            <HousekeeperSetupDialog
-              isOpen={true}
-              onClose={() => {
-                setShowHousekeeperSetup(false);
-                setProcessedData(null);
-                setImportMethod('choice');
-              }}
-              onHousekeepersConfirmed={handleHousekeepersConfirmed}
-              existingHousekeepers={existingHousekeepers}
-              roomCount={processedData?.length || 0}
-              hotelId={hotelId}
-            />
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>Choisir la méthode de redistribution</DialogTitle>
-              <DialogDescription>
-                Comment souhaitez-vous distribuer les chambres aux femmes de chambre ?
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <Button
-                variant="outline"
-                className="w-full h-16 flex flex-col items-start p-4"
-                onClick={() => handleDistributionSelect('random')}
-              >
-                <div className="font-medium">🎲 Distribution aléatoire</div>
-                <div className="text-sm text-muted-foreground">Répartition équitable et aléatoire</div>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="w-full h-16 flex flex-col items-start p-4"
-                onClick={() => handleDistributionSelect('floor')}
-              >
-                <div className="font-medium">🏢 Par étage</div>
-                <div className="text-sm text-muted-foreground">Chambres d'étages proches pour la même femme de chambre</div>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="w-full h-16 flex flex-col items-start p-4"
-                onClick={() => handleDistributionSelect('cleaning-type')}
-              >
-                <div className="font-medium">🔴⚪ Par type de nettoyage</div>
-                <div className="text-sm text-muted-foreground">Séparer les chambres rouge et blanc</div>
-              </Button>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setShowDistributionOptions(false);
-                  setShowHousekeeperSetup(true);
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <ScrollArea className="flex-1 pr-4 -mr-4">
+          {!showHousekeeperSetup && !showDistributionOptions ? (
+            importMethod === 'choice' ? renderMethodChoice() : renderPdfUpload()
+          ) : showHousekeeperSetup ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Configuration des femmes de chambre</DialogTitle>
+                <DialogDescription>
+                  Sélectionnez les femmes de chambre existantes ou ajoutez-en de nouvelles avant la distribution.
+                </DialogDescription>
+              </DialogHeader>
+              <HousekeeperSetupDialog
+                isOpen={true}
+                onClose={() => {
+                  setShowHousekeeperSetup(false);
+                  setProcessedData(null);
+                  setImportMethod('choice');
                 }}
-              >
-                Retour
-              </Button>
-            </DialogFooter>
-          </>
-        )}
+                onHousekeepersConfirmed={handleHousekeepersConfirmed}
+                existingHousekeepers={existingHousekeepers}
+                roomCount={processedData?.length || 0}
+                hotelId={hotelId}
+              />
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Choisir la méthode de redistribution</DialogTitle>
+                <DialogDescription>
+                  Comment souhaitez-vous distribuer les chambres aux femmes de chambre ?
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Button
+                  variant="outline"
+                  className="w-full h-16 flex flex-col items-start p-4"
+                  onClick={() => handleDistributionSelect('random')}
+                >
+                  <div className="font-medium">🎲 Distribution aléatoire</div>
+                  <div className="text-sm text-muted-foreground">Répartition équitable et aléatoire</div>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  className="w-full h-16 flex flex-col items-start p-4"
+                  onClick={() => handleDistributionSelect('floor')}
+                >
+                  <div className="font-medium">🏢 Par étage</div>
+                  <div className="text-sm text-muted-foreground">Chambres d'étages proches pour la même femme de chambre</div>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  className="w-full h-16 flex flex-col items-start p-4"
+                  onClick={() => handleDistributionSelect('cleaning-type')}
+                >
+                  <div className="font-medium">🔴⚪ Par type de nettoyage</div>
+                  <div className="text-sm text-muted-foreground">Séparer les chambres rouge et blanc</div>
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowDistributionOptions(false);
+                    setShowHousekeeperSetup(true);
+                  }}
+                >
+                  Retour
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
