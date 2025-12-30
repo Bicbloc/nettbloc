@@ -78,9 +78,45 @@ export function usePdfWorkflow({
         setHousekeeperNames(housekeeperNames);
       }
 
-      // Sync each room to Supabase
+      // Sync each room to Supabase - with obsolete room cleanup
       if (hotelId) {
         console.log('🔄 Synchronisation des chambres PDF vers Supabase...');
+        
+        // 1. Récupérer les chambres existantes
+        const { data: existingRooms } = await supabase
+          .from('rooms')
+          .select('id, room_number')
+          .eq('hotel_id', hotelId);
+        
+        const existingRoomNumbers = new Set(existingRooms?.map(r => r.room_number) || []);
+        const newRoomNumbers = new Set(sortedData.map(r => r.number));
+        
+        // 2. Identifier les chambres à supprimer (dans DB mais pas dans nouveau rapport)
+        const roomsToDelete = existingRooms?.filter(r => !newRoomNumbers.has(r.room_number)) || [];
+        
+        if (roomsToDelete.length > 0) {
+          console.log(`🗑️ Suppression de ${roomsToDelete.length} chambres obsolètes:`, roomsToDelete.map(r => r.room_number));
+          
+          const roomIdsToDelete = roomsToDelete.map(r => r.id);
+          
+          // Supprimer les assignations correspondantes d'abord
+          await supabase
+            .from('assignments')
+            .delete()
+            .eq('hotel_id', hotelId)
+            .in('room_id', roomIdsToDelete);
+          
+          // Puis supprimer les chambres
+          await supabase
+            .from('rooms')
+            .delete()
+            .eq('hotel_id', hotelId)
+            .in('id', roomIdsToDelete);
+            
+          console.log('✅ Chambres obsolètes supprimées');
+        }
+        
+        // 3. Upsert les nouvelles chambres
         for (const room of sortedData) {
           // Normalize cleaning_type for database storage
           let normalizedCleaningType: string | null = null;
@@ -105,7 +141,11 @@ export function usePdfWorkflow({
             ignoreDuplicates: false 
           });
         }
-        console.log('✅ Toutes les chambres synchronisées vers Supabase');
+        
+        const addedCount = sortedData.filter(r => !existingRoomNumbers.has(r.number)).length;
+        const updatedCount = sortedData.filter(r => existingRoomNumbers.has(r.number)).length;
+        
+        console.log(`✅ Sync terminée: ${addedCount} ajoutées, ${updatedCount} mises à jour, ${roomsToDelete.length} supprimées`);
       }
 
       // Auto-distribute if method specified
@@ -132,8 +172,8 @@ export function usePdfWorkflow({
                 .eq('room_number', room.number)
                 .single();
               
-              const housekeeperId = hk?.user_id && hk.user_id !== 'null' ? hk.user_id : 
-                                    hk?.id && hk.id !== 'null' ? hk.id : null;
+              const housekeeperId = hk?.user_id && hk.user_id != null ? hk.user_id : 
+                                    hk?.id && hk.id != null ? hk.id : null;
               
               if (roomData?.id && housekeeperId) {
                 await AssignmentService.assignRoom(
