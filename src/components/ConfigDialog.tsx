@@ -18,6 +18,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Settings, MinusSquare, PlusSquare, Edit, Save, X } from "lucide-react";
 import { CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
 import { useForm } from "react-hook-form";
@@ -133,7 +134,7 @@ export function ConfigDialog({
           Configuration
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Configuration du Nettoyage</DialogTitle>
           <DialogDescription>
@@ -142,7 +143,9 @@ export function ConfigDialog({
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1 min-h-0">
+            <ScrollArea className="flex-1 pr-4 -mr-4">
+              <div className="space-y-4">
             <FormField
               control={form.control}
               name="fullCleaningTime"
@@ -313,7 +316,7 @@ export function ConfigDialog({
                 <Button type="button" onClick={handleAddName}>Ajouter</Button>
               </div>
               
-              <div className="space-y-1 max-h-40 overflow-y-auto">
+              <ScrollArea className="h-40 border rounded-md p-2">
                 {names.map((name, index) => (
                   <div key={index} className="flex items-center justify-between bg-muted px-3 py-2 rounded">
                     {editIndex === index ? (
@@ -370,10 +373,12 @@ export function ConfigDialog({
                 {names.length === 0 && (
                   <p className="text-sm text-muted-foreground">Aucune femme de chambre configurée</p>
                 )}
-              </div>
+              </ScrollArea>
             </div>
+              </div>
+            </ScrollArea>
             
-            <DialogFooter>
+            <DialogFooter className="mt-4 pt-4 border-t">
               <Button type="button" variant="outline" onClick={resetToDefaults}>
                 Réinitialiser
               </Button>
