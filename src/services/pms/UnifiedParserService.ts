@@ -402,12 +402,35 @@ class UnifiedParserService {
 
   /**
    * Applique les patterns appris aux chambres extraites
+   * IMPORTANT: Si des patterns existent, on FILTRE pour ne garder que les chambres validées
    */
   private applyLearnedPatterns(rooms: ExtractedRoom[]): ExtractedRoom[] {
-    return rooms.map(room => {
+    // Si aucun pattern appris, retourner tel quel (pas de filtrage)
+    if (this.learnedPatterns.size === 0) {
+      this.log(`📋 Aucun pattern appris, toutes les chambres conservées`);
+      return rooms;
+    }
+
+    // Créer un Set des numéros de chambres validés lors de l'entraînement
+    const validRoomNumbers = new Set(this.learnedPatterns.keys());
+    this.log(`🎓 Filtrage par patterns appris: ${validRoomNumbers.size} chambres validées`);
+    this.log(`📋 Chambres validées: ${Array.from(validRoomNumbers).slice(0, 20).join(', ')}${validRoomNumbers.size > 20 ? '...' : ''}`);
+
+    // FILTRER pour ne garder que les chambres qui sont dans les patterns appris
+    const filteredRooms = rooms.filter(room => {
+      const isValid = validRoomNumbers.has(room.roomNumber);
+      if (!isValid) {
+        this.log(`🚫 Chambre ${room.roomNumber} exclue (non validée dans l'entraînement)`);
+      }
+      return isValid;
+    });
+
+    this.log(`📊 Résultat filtrage: ${filteredRooms.length}/${rooms.length} chambres conservées`);
+
+    // Enrichir les chambres filtrées avec les données des patterns
+    return filteredRooms.map(room => {
       const learned = this.learnedPatterns.get(room.roomNumber);
       if (learned) {
-        this.log(`🎓 Pattern appris appliqué pour chambre ${room.roomNumber}`);
         return {
           ...room,
           cleaningType: learned.cleaningType,
