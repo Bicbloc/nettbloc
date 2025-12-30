@@ -107,7 +107,8 @@ class UnifiedParserService {
             : (pattern.extracted_data as any)?.rooms || [];
 
           for (const room of rooms) {
-            if (room.roomNumber) {
+            // IMPORTANT: Ne stocker QUE les chambres validées lors de l'entraînement
+            if (room.roomNumber && room.validated === true) {
               this.learnedPatterns.set(String(room.roomNumber), {
                 roomNumber: room.roomNumber,
                 cleaningType: room.cleaningType || 'none',
@@ -403,6 +404,7 @@ class UnifiedParserService {
   /**
    * Applique les patterns appris aux chambres extraites
    * IMPORTANT: Si des patterns existent, on FILTRE pour ne garder que les chambres validées
+   * MAIS on garde le type de nettoyage détecté dynamiquement (pas celui de l'entraînement)
    */
   private applyLearnedPatterns(rooms: ExtractedRoom[]): ExtractedRoom[] {
     // Si aucun pattern appris, retourner tel quel (pas de filtrage)
@@ -427,25 +429,21 @@ class UnifiedParserService {
 
     this.log(`📊 Résultat filtrage: ${filteredRooms.length}/${rooms.length} chambres conservées`);
 
-    // Enrichir les chambres filtrées avec les données des patterns
+    // IMPORTANT: On garde le type de nettoyage DETECTE (pas celui de l'entraînement)
+    // car le rapport du jour peut avoir des statuts différents
     return filteredRooms.map(room => {
-      const learned = this.learnedPatterns.get(room.roomNumber);
-      if (learned) {
-        return {
-          ...room,
-          cleaningType: learned.cleaningType,
-          status: learned.status,
-          confidence: 95,
-          validated: true,
-          debugInfo: {
-            ...room.debugInfo!,
-            source: 'pattern' as const,
-            appliedRule: 'Learned pattern',
-            confidence: 95
-          }
-        };
-      }
-      return room;
+      return {
+        ...room,
+        // Le cleaningType et status viennent de la détection dynamique, pas de l'entraînement
+        confidence: Math.max(room.confidence || 0, 85),
+        validated: true,
+        debugInfo: {
+          ...room.debugInfo!,
+          source: 'pattern' as const,
+          appliedRule: `Chambre validée + détection: ${room.debugInfo?.appliedRule || 'auto'}`,
+          confidence: Math.max(room.confidence || 0, 85)
+        }
+      };
     });
   }
 
