@@ -63,11 +63,19 @@ export class MewsAdapter extends PmsAdapter {
     let processed = text;
     
     // Fusionner les lignes fragmentées comme "DBL-" + "C" ou "SGL-" + "C"
-    // Pattern: une ligne finit par "DBL-", "SGL-", "TPL-" et la suivante commence par C ou S
+    // Pattern: une ligne finit par "DBL-", "SGL-", "TPL-" et la suivante commence par C ou S seul
+    processed = processed.replace(/([A-Z]{3})-\s*\n\s*([CS])\s*\n/gi, '$1-$2\n');
     processed = processed.replace(/([A-Z]{3})-\s*\n\s*([CS])\b/gi, '$1-$2');
     
-    // Fusionner les lignes où le type de chambre est fragmenté
+    // Fusionner DBL-C/S avec le statut sur la ligne suivante
     processed = processed.replace(/([A-Z]{3}-[CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi, '$1 $2');
+    
+    // Fusionner le numéro de chambre avec le type de chambre fragmenté
+    // Pattern: "001   DBL-" suivi d'un saut de ligne puis "C"
+    processed = processed.replace(/(\d{2,4})\s+(DBL|SGL|TPL|FAM)-\s*\n\s*([CS])/gi, '$1 $2-$3');
+    
+    // Normaliser les espaces multiples
+    processed = processed.replace(/[ \t]+/g, ' ');
     
     // Supprimer les sauts de ligne excessifs
     processed = processed.replace(/\n{3,}/g, '\n\n');
@@ -154,15 +162,21 @@ export class MewsAdapter extends PmsAdapter {
       if (line.includes('Étage') && line.includes('Espaces')) continue;
       if (line.includes('Hotel') && /\d{2}\/\d{2}\/\d{4}/.test(line)) continue;
       
-      // Chercher un numéro de chambre au début
-      const roomMatch = line.match(/^\s*(\d{2,4})(?:-T)?\s/);
+      // Ignorer les indicateurs d'étage seuls (juste un chiffre)
+      if (/^\s*\d\s*$/.test(line)) continue;
+      
+      // Chercher un numéro de chambre au début (avec ou sans espace après)
+      // Patterns: "001 DBL-C", "001-T DBL-S", "001   DBL-C PRO"
+      const roomMatch = line.match(/^\s*(\d{2,4})(?:-T)?(?:\s|$)/);
       if (!roomMatch) continue;
       
-      const roomNumber = roomMatch[1].replace(/^0+/, '');
+      // Garder le numéro original avec les zéros initiaux pour les chambres 001, 002, etc.
+      const roomNumber = roomMatch[1];
       
-      // Éviter les doublons
-      if (seenRooms.has(roomNumber)) continue;
-      seenRooms.add(roomNumber);
+      // Éviter les doublons (comparer sans zéros pour éviter 001 vs 1)
+      const normalizedRoom = roomNumber.replace(/^0+/, '') || '0';
+      if (seenRooms.has(normalizedRoom)) continue;
+      seenRooms.add(normalizedRoom);
       
       // Détecter le code de statut
       let status = 'unknown';
