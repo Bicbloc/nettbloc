@@ -2,9 +2,10 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Sparkles, AlertCircle, AlertTriangle } from "lucide-react";
-import { pmsAdapterFactory, unifiedParserService, ExtractedRoom } from "@/services/pms";
+import { Upload, FileText, Sparkles, AlertTriangle, RefreshCw, Edit2 } from "lucide-react";
+import { pmsAdapterFactory, ExtractedRoom } from "@/services/pms";
 import { TrainingData } from "./TrainingWizard";
 import { useExistingTraining } from "./TrainingHistory";
 import * as pdfjsLib from "pdfjs-dist";
@@ -21,10 +22,15 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [detectedPmsType, setDetectedPmsType] = useState<string | null>(null);
+  const [selectedPmsType, setSelectedPmsType] = useState<string | null>(null);
   const [pendingData, setPendingData] = useState<TrainingData | null>(null);
+  const [rawText, setRawText] = useState<string>("");
+  const [fileName, setFileName] = useState<string>("");
+  const [showPmsSelector, setShowPmsSelector] = useState(false);
   
   // Check if PMS type is already trained
-  const { existingPattern, loading: checkingExisting } = useExistingTraining(hotelId, detectedPmsType);
+  const activePmsType = selectedPmsType || detectedPmsType;
+  const { existingPattern, loading: checkingExisting } = useExistingTraining(hotelId, activePmsType);
 
   const extractTextFromPdf = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -62,6 +68,37 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
     return fullText;
   };
 
+  const parseWithPms = (text: string, pmsType: string, reportName: string): TrainingData => {
+    const adapter = pmsAdapterFactory.getAdapter(pmsType);
+    const extractedRooms = adapter.extractRooms(text);
+    
+    console.log(`🔄 Re-parse avec ${pmsType}: ${extractedRooms.length} chambres`);
+    
+    return {
+      reportName,
+      rawText: text,
+      extractedRooms,
+      detectedPmsType: pmsType,
+      validatedCount: 0,
+    };
+  };
+
+  const handlePmsChange = (newPmsType: string) => {
+    setSelectedPmsType(newPmsType);
+    
+    if (rawText && fileName) {
+      const newData = parseWithPms(rawText, newPmsType, fileName);
+      setPendingData(newData);
+      
+      toast({
+        title: "Ré-analyse effectuée",
+        description: `${newData.extractedRooms.length} chambres détectées avec ${newPmsType.toUpperCase()}`,
+      });
+    }
+    
+    setShowPmsSelector(false);
+  };
+
   const processFile = async (file: File) => {
     if (!file.type.includes("pdf")) {
       toast({
@@ -74,11 +111,16 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
 
     setUploading(true);
     setDetectedPmsType(null);
+    setSelectedPmsType(null);
     setPendingData(null);
+    setShowPmsSelector(false);
 
     try {
       const text = await extractTextFromPdf(file);
-      console.log("📄 Texte extrait:", text.substring(0, 300));
+      console.log("📄 Texte extrait:", text.substring(0, 500));
+      
+      setRawText(text);
+      setFileName(file.name);
 
       // Auto-detect PMS type
       const detection = pmsAdapterFactory.detectPms(text);
@@ -105,7 +147,7 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
       if (extractedRooms.length === 0) {
         toast({
           title: "Aucune chambre détectée",
-          description: "L'IA n'a pas pu détecter de chambres. Vous pourrez les ajouter manuellement à l'étape suivante.",
+          description: "Essayez de modifier le PMS manuellement ou ajoutez les chambres à l'étape suivante.",
           variant: "destructive",
         });
       } else {
@@ -170,52 +212,142 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
 
   const handleReset = () => {
     setDetectedPmsType(null);
+    setSelectedPmsType(null);
     setPendingData(null);
+    setRawText("");
+    setFileName("");
+    setShowPmsSelector(false);
   };
 
-  // Show existing training warning
-  if (pendingData && existingPattern && !checkingExisting) {
+  const availablePmsTypes = pmsAdapterFactory.getAvailablePmsTypes();
+
+  // Show PMS selector when data is pending
+  if (pendingData && !checkingExisting) {
+    // Show existing training warning if exists
+    if (existingPattern) {
+      return (
+        <div className="space-y-6">
+          <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTitle className="text-amber-600">PMS déjà entraîné</AlertTitle>
+            <AlertDescription className="text-amber-600/80">
+              <p className="mb-3">
+                Un entraînement existe déjà pour le PMS <strong>{activePmsType?.toUpperCase()}</strong>.
+              </p>
+              <p className="text-sm mb-4">
+                Fichier existant : <strong>{existingPattern.report_name}</strong>
+                <br />
+                Chambres validées : <strong>{
+                  Array.isArray(existingPattern.extracted_data) 
+                    ? existingPattern.extracted_data.length 
+                    : existingPattern.extracted_data?.rooms?.length || 0
+                }</strong>
+              </p>
+              <p className="text-sm">
+                Vous pouvez soit <strong>mettre à jour</strong> l'entraînement existant avec ce nouveau rapport,
+                soit <strong>supprimer</strong> l'ancien depuis l'historique ci-dessus avant de continuer.
+              </p>
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={handleReset}>
+              Annuler
+            </Button>
+            <Button onClick={handleContinueWithUpdate} className="gap-2">
+              Mettre à jour l'entraînement
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    // Show extraction result with PMS selector
     return (
       <div className="space-y-6">
-        <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
-          <AlertTriangle className="h-5 w-5 text-amber-500" />
-          <AlertTitle className="text-amber-600">PMS déjà entraîné</AlertTitle>
-          <AlertDescription className="text-amber-600/80">
-            <p className="mb-3">
-              Un entraînement existe déjà pour le PMS <strong>{detectedPmsType?.toUpperCase()}</strong>.
-            </p>
-            <p className="text-sm mb-4">
-              Fichier existant : <strong>{existingPattern.report_name}</strong>
-              <br />
-              Chambres validées : <strong>{
-                Array.isArray(existingPattern.extracted_data) 
-                  ? existingPattern.extracted_data.length 
-                  : existingPattern.extracted_data?.rooms?.length || 0
-              }</strong>
-            </p>
-            <p className="text-sm">
-              Vous pouvez soit <strong>mettre à jour</strong> l'entraînement existant avec ce nouveau rapport,
-              soit <strong>supprimer</strong> l'ancien depuis l'historique ci-dessus avant de continuer.
-            </p>
-          </AlertDescription>
-        </Alert>
-
-        <div className="flex gap-3 justify-center">
-          <Button variant="outline" onClick={handleReset}>
-            Annuler
-          </Button>
-          <Button onClick={handleContinueWithUpdate} className="gap-2">
-            Mettre à jour l'entraînement
+        {/* Résultat de l'extraction */}
+        <div className="bg-muted/50 rounded-lg p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-lg">Résultat de l'analyse</h3>
+              <p className="text-sm text-muted-foreground">{fileName}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              Importer un autre fichier
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-background rounded-lg p-4 border">
+              <p className="text-sm text-muted-foreground mb-1">PMS détecté</p>
+              <div className="flex items-center gap-2">
+                {showPmsSelector ? (
+                  <Select value={selectedPmsType || detectedPmsType || ''} onValueChange={handlePmsChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Sélectionner un PMS" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePmsTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type.toUpperCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <>
+                    <Badge variant="secondary" className="text-base px-3 py-1">
+                      {(selectedPmsType || detectedPmsType)?.toUpperCase()}
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 gap-1"
+                      onClick={() => setShowPmsSelector(true)}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                      Modifier
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-background rounded-lg p-4 border">
+              <p className="text-sm text-muted-foreground mb-1">Chambres extraites</p>
+              <p className="text-2xl font-bold">
+                {pendingData.extractedRooms.length}
+              </p>
+            </div>
+          </div>
+          
+          {pendingData.extractedRooms.length === 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Aucune chambre détectée. Essayez de <strong>modifier le PMS</strong> ci-dessus 
+                ou ajoutez les chambres manuellement à l'étape suivante.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {pendingData.extractedRooms.length > 0 && pendingData.extractedRooms.length < 5 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Peu de chambres détectées. Si ce n'est pas normal, essayez de <strong>modifier le PMS</strong> ci-dessus.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+        
+        <div className="flex justify-center">
+          <Button onClick={handleContinueNew} className="gap-2" size="lg">
+            Continuer vers l'annotation
           </Button>
         </div>
       </div>
     );
-  }
-
-  // If pending data exists and no conflict, continue automatically
-  if (pendingData && !existingPattern && !checkingExisting) {
-    // Auto-continue after a brief moment
-    setTimeout(() => handleContinueNew(), 100);
   }
 
   return (
@@ -283,7 +415,7 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
           <div>
             <p className="font-medium">PMS supportés</p>
             <div className="flex flex-wrap gap-2 mt-1">
-              {pmsAdapterFactory.getAvailablePmsTypes().map((type) => (
+              {availablePmsTypes.map((type) => (
                 <Badge key={type} variant="secondary" className="text-xs">
                   {type.toUpperCase()}
                 </Badge>
