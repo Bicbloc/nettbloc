@@ -82,6 +82,7 @@ export function AssignmentTab({
   const [isRedistributionDialogOpen, setIsRedistributionDialogOpen] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
+  const [activeColumns, setActiveColumns] = useState<string[]>([]);
 
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
@@ -211,7 +212,10 @@ export function AssignmentTab({
           <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-2">
             {housekeeperNames.map((name) => {
               const housekeeperRooms = getHousekeeperRooms(name);
-              if (housekeeperRooms.length === 0) return null;
+              const isActiveColumn = activeColumns.includes(name);
+              
+              // Afficher si a des chambres OU si colonne activée manuellement
+              if (housekeeperRooms.length === 0 && !isActiveColumn) return null;
               
               const housekeeper = housekeepers.find(h => h.name === name);
               return (
@@ -227,10 +231,16 @@ export function AssignmentTab({
                     availableFloors={availableFloors}
                     onFloorPreferenceChange={onFloorPreferenceChange}
                     preferredFloors={housekeeperFloorPreferences[name] || []}
-                    onDelete={onDeleteHousekeeper}
+                    onDelete={(deletedName) => {
+                      setActiveColumns(prev => prev.filter(n => n !== deletedName));
+                      onDeleteHousekeeper(deletedName);
+                    }}
                     maxRoomsOverride={housekeeperMaxRoomsOverrides[name]}
                     onMaxRoomsOverrideChange={onMaxRoomsOverrideChange}
-                    onRename={(newName: string) => onRenameHousekeeper(name, newName)}
+                    onRename={(newName: string) => {
+                      setActiveColumns(prev => prev.map(n => n === name ? newName : n));
+                      onRenameHousekeeper(name, newName);
+                    }}
                     accessCode={housekeeper?.access_code || ''}
                     housekeeperNames={housekeeperNames}
                     onGenerateAccessCode={onGenerateAccessCode}
@@ -270,10 +280,14 @@ export function AssignmentTab({
             open={showCreateColumnDialog}
             onOpenChange={setShowCreateColumnDialog}
             hotelId={currentHotelId || ''}
-            assignedHousekeeperNames={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
+            assignedHousekeeperNames={[
+              ...housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0),
+              ...activeColumns
+            ]}
             onSelectExisting={(name) => {
+              setActiveColumns(prev => [...prev, name]);
               toast({
-                description: `${name} est prêt(e). Glissez-déposez des chambres dans sa colonne.`
+                description: `Colonne ${name} créée. Assignez-lui des chambres.`
               });
             }}
           />
