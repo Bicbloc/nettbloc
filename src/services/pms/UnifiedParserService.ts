@@ -48,6 +48,19 @@ class UnifiedParserService {
   }
 
   /**
+   * Normalise un numéro de chambre en enlevant les zéros initiaux
+   * "001" -> "1", "01A" -> "1A", "100" -> "100"
+   */
+  private normalizeRoomNumber(roomNumber: string): string {
+    if (!roomNumber) return '';
+    const str = String(roomNumber).trim();
+    // Enlever les zéros initiaux mais garder au moins un caractère
+    // Gérer les cas comme "01A" -> "1A"
+    const normalized = str.replace(/^0+/, '') || '0';
+    return normalized;
+  }
+
+  /**
    * Charge les règles PMS depuis la base de données
    */
   async loadPmsRules(hotelId: string): Promise<void> {
@@ -109,8 +122,10 @@ class UnifiedParserService {
           for (const room of rooms) {
             // IMPORTANT: Ne stocker QUE les chambres validées lors de l'entraînement
             if (room.roomNumber && room.validated === true) {
-              this.learnedPatterns.set(String(room.roomNumber), {
-                roomNumber: room.roomNumber,
+              // Normaliser le numéro de chambre (enlever les zéros initiaux)
+              const normalizedNumber = this.normalizeRoomNumber(String(room.roomNumber));
+              this.learnedPatterns.set(normalizedNumber, {
+                roomNumber: room.roomNumber, // Garder l'original pour référence
                 cleaningType: room.cleaningType || 'none',
                 status: room.status || 'clean'
               });
@@ -413,16 +428,18 @@ class UnifiedParserService {
       return rooms;
     }
 
-    // Créer un Set des numéros de chambres validés lors de l'entraînement
+    // Créer un Set des numéros de chambres validés lors de l'entraînement (déjà normalisés)
     const validRoomNumbers = new Set(this.learnedPatterns.keys());
     this.log(`🎓 Filtrage par patterns appris: ${validRoomNumbers.size} chambres validées`);
     this.log(`📋 Chambres validées: ${Array.from(validRoomNumbers).slice(0, 20).join(', ')}${validRoomNumbers.size > 20 ? '...' : ''}`);
 
     // FILTRER pour ne garder que les chambres qui sont dans les patterns appris
+    // En normalisant le numéro pour comparer (001 == 1)
     const filteredRooms = rooms.filter(room => {
-      const isValid = validRoomNumbers.has(room.roomNumber);
+      const normalizedNumber = this.normalizeRoomNumber(room.roomNumber);
+      const isValid = validRoomNumbers.has(normalizedNumber);
       if (!isValid) {
-        this.log(`🚫 Chambre ${room.roomNumber} exclue (non validée dans l'entraînement)`);
+        this.log(`🚫 Chambre ${room.roomNumber} (normalisé: ${normalizedNumber}) exclue (non validée dans l'entraînement)`);
       }
       return isValid;
     });
