@@ -13,13 +13,31 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { 
   History, Trash2, Edit, Brain, Calendar, 
-  FileText, CheckCircle, RefreshCw 
+  FileText, CheckCircle, RefreshCw, Building2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+
+// User-friendly PMS options
+const pmsOptions = [
+  { value: 'mews', label: 'Mews', description: 'Interface moderne' },
+  { value: 'opera', label: 'Opera', description: 'Oracle Hospitality' },
+  { value: 'protel', label: 'Protel', description: 'Format classique' },
+  { value: 'fidelio', label: 'Fidelio', description: 'Suite Oracle' },
+  { value: 'apaleo', label: 'Apaleo', description: 'Solution cloud' },
+  { value: 'medialog', label: 'Medialog', description: 'PMS français' },
+  { value: 'generic', label: 'Autre', description: 'Format générique' },
+];
 
 interface TrainingPattern {
   id: string;
@@ -43,6 +61,8 @@ export const TrainingHistory = ({ hotelId, onEdit, onDeleted }: TrainingHistoryP
   const [loading, setLoading] = useState(true);
   const [deletePattern, setDeletePattern] = useState<TrainingPattern | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editPmsPattern, setEditPmsPattern] = useState<TrainingPattern | null>(null);
+  const [savingPms, setSavingPms] = useState(false);
 
   const loadPatterns = async () => {
     setLoading(true);
@@ -98,6 +118,39 @@ export const TrainingHistory = ({ hotelId, onEdit, onDeleted }: TrainingHistoryP
     }
   };
 
+  const handleChangePms = async (newPmsType: string) => {
+    if (!editPmsPattern) return;
+    
+    setSavingPms(true);
+    try {
+      const { error } = await supabase
+        .from("report_training_patterns")
+        .update({ pms_type: newPmsType, updated_at: new Date().toISOString() })
+        .eq("id", editPmsPattern.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Type de rapport modifié",
+        description: `Le modèle utilise maintenant le format ${newPmsType.toUpperCase()}`,
+      });
+
+      setPatterns(prev => prev.map(p => 
+        p.id === editPmsPattern.id ? { ...p, pms_type: newPmsType } : p
+      ));
+    } catch (error) {
+      console.error("Erreur modification PMS:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le type de rapport",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPms(false);
+      setEditPmsPattern(null);
+    }
+  };
+
   const getRoomCount = (pattern: TrainingPattern): number => {
     const data = pattern.extracted_data;
     if (Array.isArray(data)) return data.length;
@@ -148,7 +201,14 @@ export const TrainingHistory = ({ hotelId, onEdit, onDeleted }: TrainingHistoryP
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{pattern.pms_type.toUpperCase()}</span>
+                    <button
+                      onClick={() => setEditPmsPattern(pattern)}
+                      className="font-medium hover:text-primary transition-colors flex items-center gap-1"
+                      title="Cliquez pour modifier le type"
+                    >
+                      {pattern.pms_type.toUpperCase()}
+                      <Edit className="w-3 h-3 opacity-50" />
+                    </button>
                     {pattern.validated && (
                       <CheckCircle className="w-4 h-4 text-green-500" />
                     )}
@@ -221,6 +281,43 @@ export const TrainingHistory = ({ hotelId, onEdit, onDeleted }: TrainingHistoryP
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* PMS Type Edit Dialog */}
+      <Dialog open={!!editPmsPattern} onOpenChange={() => setEditPmsPattern(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier le type de rapport</DialogTitle>
+            <DialogDescription>
+              Sélectionnez le bon format pour ce modèle d'entraînement
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-4">
+            {pmsOptions.map((pms) => (
+              <button
+                key={pms.value}
+                onClick={() => handleChangePms(pms.value)}
+                disabled={savingPms}
+                className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50 ${
+                  editPmsPattern?.pms_type === pms.value 
+                    ? 'border-primary bg-primary/10' 
+                    : 'border-border'
+                }`}
+              >
+                <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{pms.label}</span>
+                    {editPmsPattern?.pms_type === pms.value && (
+                      <Badge variant="secondary" className="text-xs">Actuel</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{pms.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
