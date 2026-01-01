@@ -188,6 +188,9 @@ export interface ExtractedRoom {
   // Dates
   arrivalDate?: string;
   departureDate?: string;
+  // Heures (HH:MM)
+  arrivalTime?: string;
+  departureTime?: string;
   // Nuits
   nightInfo?: string;        // "2/3" ou "Night 2 of 3"
   currentNight?: number;     // Nuit actuelle

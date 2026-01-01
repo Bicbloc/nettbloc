@@ -38,6 +38,7 @@ export interface CleaningRule {
     field: 'status' | 'roomNumber' | 'floor';
     operator: 'equals' | 'contains' | 'startsWith' | 'greaterThan' | 'lessThan';
     value: string;
+    synonyms?: string[]; // Termes synonymes pour les différentes langues
   };
   result: {
     cleaningType: Room['cleaningType'];
@@ -254,10 +255,15 @@ export function CleaningRulesManager({ rules: externalRules, onRulesChange }: Cl
                           />
                           <div className="flex-1">
                             <div className="font-medium text-sm">{rule.name}</div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                               <span>{getFieldLabel(rule.condition.field)}</span>
                               <span>{getOperatorLabel(rule.condition.operator)}</span>
                               <Badge variant="outline" className="text-xs">{rule.condition.value}</Badge>
+                              {rule.condition.synonyms && rule.condition.synonyms.length > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  (+{rule.condition.synonyms.length} synonymes)
+                                </span>
+                              )}
                               <ArrowRight className="h-3 w-3" />
                               <Badge variant={rule.result.cleaningType === 'a_blanc' ? 'default' : 'secondary'}>
                                 {getCleaningTypeLabel(rule.result.cleaningType)}
@@ -398,6 +404,93 @@ export function CleaningRulesManager({ rules: externalRules, onRulesChange }: Cl
                       />
                     )}
                   </div>
+
+                  {/* Synonymes multilingues - seulement pour le champ "status" */}
+                  {editingRule.condition.field === 'status' && (
+                    <div className="mt-2 space-y-2">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        Synonymes / termes alternatifs
+                        <span className="text-xs opacity-70">(pour autres langues ou sigles)</span>
+                      </Label>
+                      <div className="flex flex-wrap gap-1">
+                        {(editingRule.condition.synonyms || []).map((syn, idx) => (
+                          <Badge key={idx} variant="secondary" className="gap-1 text-xs">
+                            {syn}
+                            <button
+                              type="button"
+                              className="ml-1 hover:text-destructive"
+                              onClick={() => {
+                                const newSynonyms = [...(editingRule.condition.synonyms || [])];
+                                newSynonyms.splice(idx, 1);
+                                setEditingRule({
+                                  ...editingRule,
+                                  condition: { ...editingRule.condition, synonyms: newSynonyms }
+                                });
+                              }}
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="new-synonym"
+                          placeholder="Ex: CHECK-OUT, SALIDA, DÉPART..."
+                          className="text-xs h-8"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.currentTarget;
+                              const value = input.value.trim().toUpperCase();
+                              if (value) {
+                                const existingSynonyms = editingRule.condition.synonyms || [];
+                                if (!existingSynonyms.includes(value)) {
+                                  setEditingRule({
+                                    ...editingRule,
+                                    condition: { 
+                                      ...editingRule.condition, 
+                                      synonyms: [...existingSynonyms, value] 
+                                    }
+                                  });
+                                }
+                                input.value = '';
+                              }
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => {
+                            const input = document.getElementById('new-synonym') as HTMLInputElement;
+                            const value = input?.value.trim().toUpperCase();
+                            if (value) {
+                              const existingSynonyms = editingRule.condition.synonyms || [];
+                              if (!existingSynonyms.includes(value)) {
+                                setEditingRule({
+                                  ...editingRule,
+                                  condition: { 
+                                    ...editingRule.condition, 
+                                    synonyms: [...existingSynonyms, value] 
+                                  }
+                                });
+                              }
+                              input.value = '';
+                            }
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Ajoutez des termes équivalents pour détecter ce statut dans d'autres langues 
+                        (ex: DEPARTURE, SALIDA, ABREISE pour "Départ")
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -479,7 +572,7 @@ export function applyCleaningRules(rooms: Room[], rules: CleaningRule[]): Room[]
 
   return rooms.map(room => {
     for (const rule of activeRules) {
-      const { field, operator, value } = rule.condition;
+      const { field, operator, value, synonyms } = rule.condition;
       let matches = false;
 
       const roomValue = field === 'status' 
@@ -488,15 +581,21 @@ export function applyCleaningRules(rooms: Room[], rules: CleaningRule[]): Room[]
           ? room.number 
           : room.floor?.toString() || '';
 
+      // Build all values to check against (main value + synonyms)
+      const valuesToMatch = [value.toLowerCase()];
+      if (synonyms && synonyms.length > 0) {
+        valuesToMatch.push(...synonyms.map(s => s.toLowerCase()));
+      }
+
       switch (operator) {
         case 'equals':
-          matches = roomValue.toLowerCase() === value.toLowerCase();
+          matches = valuesToMatch.some(v => roomValue.toLowerCase() === v);
           break;
         case 'contains':
-          matches = roomValue.toLowerCase().includes(value.toLowerCase());
+          matches = valuesToMatch.some(v => roomValue.toLowerCase().includes(v));
           break;
         case 'startsWith':
-          matches = roomValue.toLowerCase().startsWith(value.toLowerCase());
+          matches = valuesToMatch.some(v => roomValue.toLowerCase().startsWith(v));
           break;
         case 'greaterThan':
           matches = parseInt(roomValue) > parseInt(value);
