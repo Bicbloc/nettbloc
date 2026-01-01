@@ -343,35 +343,26 @@ export class MewsAdapter extends PmsAdapter {
         }
       }
       
-      // 2) Utiliser la date vs date du rapport
+      // 2) Utiliser la date comme date de DÉPART (C/O)
+      // Si date <= date du rapport → départ passé ou du jour → À BLANC
+      // Si date > date du rapport → client reste → RECOUCHE
       const dateMatch = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
       if (dateMatch && reportDate) {
         const [, day, month, year] = dateMatch;
-        const foundDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        const diffDays = Math.floor((reportDate.getTime() - foundDate.getTime()) / (1000 * 60 * 60 * 24));
+        const departureDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
         
-        // Heure de départ en fin de ligne?
-        const hasCheckoutTime = /\d{2}:\d{2}\s*$/.test(line.trim());
+        // Normaliser les dates (ignorer l'heure)
+        const reportDateNorm = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+        const departureDateNorm = new Date(departureDate.getFullYear(), departureDate.getMonth(), departureDate.getDate());
         
-        if (diffDays === 0) {
-          // Date = date du rapport
-          if (hasCheckoutTime) {
-            return { status: 'checkout', cleaningType: 'a_blanc' };
-          }
-          const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
-          if (hasOccupancy) {
-            return { status: 'stayover', cleaningType: 'recouche' };
-          }
-          return { status: 'dirty', cleaningType: 'a_blanc' };
-        } else if (diffDays > 0) {
-          // Date dans le passé → client en séjour
-          if (hasCheckoutTime) {
-            return { status: 'checkout', cleaningType: 'a_blanc' };
-          }
-          return { status: 'stayover', cleaningType: 'recouche' };
+        // Si date de départ <= date du rapport → C/O déjà fait ou du jour → À BLANC
+        if (departureDateNorm <= reportDateNorm) {
+          console.log(`🔍 Chambre avec départ ${dateMatch[0]} <= rapport ${reportDate.toLocaleDateString('fr-FR')} → À blanc`);
+          return { status: 'checkout', cleaningType: 'a_blanc' };
         } else {
-          // Date dans le futur → arrivée prévue
-          return { status: 'arrival', cleaningType: 'a_blanc' };
+          // Date de départ dans le futur → client reste → RECOUCHE
+          console.log(`🔍 Chambre avec départ ${dateMatch[0]} > rapport ${reportDate.toLocaleDateString('fr-FR')} → Recouche`);
+          return { status: 'stayover', cleaningType: 'recouche' };
         }
       }
       
