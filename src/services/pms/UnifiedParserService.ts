@@ -616,44 +616,26 @@ class UnifiedParserService {
           }
         }
         
-        // 2) Utiliser la date de départ vs date du rapport
-        // Mews affiche généralement la date d'arrivée dans le format "DD/MM/YYYY"
+        // 2) Utiliser la date comme date de DÉPART (C/O)
+        // Si date <= date du rapport → départ passé ou du jour → À BLANC
+        // Si date > date du rapport → client reste → RECOUCHE
         const dateMatch = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
         if (dateMatch && reportDate) {
           const [, day, month, year] = dateMatch;
-          const foundDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          const departureDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
           
-          // Calculer la différence en jours
-          const diffDays = Math.floor((reportDate.getTime() - foundDate.getTime()) / (1000 * 60 * 60 * 24));
+          // Normaliser les dates (ignorer l'heure)
+          const reportDateNorm = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+          const departureDateNorm = new Date(departureDate.getFullYear(), departureDate.getMonth(), departureDate.getDate());
           
-          // Si la date trouvée est AVANT la date du rapport (client arrivé il y a X jours)
-          // ET il n'y a pas d'heure de départ explicite → recouche
-          // Si date == date du rapport → a_blanc (arrivée ou départ du jour)
-          
-          // Heuristique heure de départ: une heure en fin de ligne comme "12:00"
-          const hasCheckoutTime = /\d{2}:\d{2}\s*$/.test(line.trim());
-          
-          if (diffDays === 0) {
-            // Date = date du rapport → départ ou arrivée du jour
-            if (hasCheckoutTime) {
-              return { status: 'checkout', cleaningType: 'a_blanc', reason: `SAL + Date=${dateMatch[0]} (départ jour) + heure départ` };
-            }
-            // Date d'arrivée le jour même → recouche si client présent, sinon a_blanc
-            const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
-            if (hasOccupancy && !hasCheckoutTime) {
-              return { status: 'stayover', cleaningType: 'recouche', reason: `SAL + Date=${dateMatch[0]} (arrivée jour) + occupation` };
-            }
-            return { status: 'dirty', cleaningType: 'a_blanc', reason: `SAL + Date=${dateMatch[0]} (jour même)` };
-          } else if (diffDays > 0) {
-            // Date dans le passé → client en séjour (arrivé il y a X jours)
-            if (hasCheckoutTime) {
-              // Heure de départ présente → c'est un checkout prévu
-              return { status: 'checkout', cleaningType: 'a_blanc', reason: `SAL + Date passée + heure départ → À blanc` };
-            }
-            return { status: 'stayover', cleaningType: 'recouche', reason: `SAL + Arrivée ${dateMatch[0]} (il y a ${diffDays}j) → Recouche` };
+          // Si date de départ <= date du rapport → C/O déjà fait ou du jour → À BLANC
+          if (departureDateNorm <= reportDateNorm) {
+            this.log(`🔍 Chambre avec départ ${dateMatch[0]} <= rapport → À blanc`);
+            return { status: 'checkout', cleaningType: 'a_blanc', reason: `SAL + Départ ${dateMatch[0]} ≤ ${reportDate.toLocaleDateString('fr-FR')} → À blanc` };
           } else {
-            // Date dans le futur → arrivée prévue
-            return { status: 'arrival', cleaningType: 'a_blanc', reason: `SAL + Arrivée future ${dateMatch[0]} → À blanc` };
+            // Date de départ dans le futur → client reste → RECOUCHE
+            this.log(`🔍 Chambre avec départ ${dateMatch[0]} > rapport → Recouche`);
+            return { status: 'stayover', cleaningType: 'recouche', reason: `SAL + Départ ${dateMatch[0]} > ${reportDate.toLocaleDateString('fr-FR')} → Recouche` };
           }
         }
         
