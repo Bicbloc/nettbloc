@@ -36,13 +36,14 @@ const CLEANING_LABELS: Record<string, { label: string; color: string }> = {
 
 // Labels pour les statuts séjour
 const STATUS_LABELS: Record<string, { label: string; icon: string; description: string }> = {
-  'checkout': { label: 'Départ', icon: '🚪', description: 'C/O (heure de départ)' },
-  'checkout_arrival': { label: 'Départ → Arrivée', icon: '🔄', description: 'C/O + C/I ou C/O + SAL (à blanc)' },
-  'stayover': { label: 'Recouche', icon: '🛏️', description: 'En séjour (dates arrivée/départ, pas d\'horaire - Mews)' },
-  'arrival': { label: 'En arrivée', icon: '📥', description: 'C/I (heure d\'arrivée)' },
-  'occupied': { label: 'Occupé', icon: '👤', description: 'Chambre occupée' },
-  'dirty': { label: 'Sale', icon: '🧹', description: 'SAL ou SALE (à nettoyer)' },
-  'unknown': { label: 'Inconnu', icon: '❓', description: 'Statut non reconnu' },
+  'checkout': { label: 'Départ', icon: '🚪', description: 'C/O = Check-Out (heure de départ client). Nettoyage: À blanc.' },
+  'checkout_arrival': { label: 'Départ → Arrivée', icon: '🔄', description: 'C/O + C/I = Départ puis arrivée même jour. Nettoyage: À blanc.' },
+  'stayover': { label: 'Recouche', icon: '🛏️', description: 'Client reste. Mews: dates arrivée/départ sans horaire. Nettoyage: Recouche.' },
+  'arrival': { label: 'En arrivée', icon: '📥', description: 'C/I = Check-In (heure d\'arrivée). Chambre doit être prête.' },
+  'occupied': { label: 'Occupé', icon: '👤', description: 'Chambre occupée, client présent.' },
+  'dirty': { label: 'Sale', icon: '🧹', description: 'SAL/SALE = Chambre sale. Par défaut: À blanc (nettoyage complet).' },
+  'clean': { label: 'Propre', icon: '✨', description: 'INS/PRO = Chambre propre ou inspectée. Pas de nettoyage.' },
+  'unknown': { label: 'Inconnu', icon: '❓', description: 'Statut non reconnu - vérifiez manuellement.' },
 };
 
 export const TrainingStep2Annotate = ({

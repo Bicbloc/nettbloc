@@ -51,9 +51,24 @@ function normalizeStatusToken(token: string): string {
 }
 
 function buildStatusNote(er: ExtractedRoom): string | undefined {
+  const parts: string[] = [];
+  
+  // Statuts bruts
   if (er.rawStatuses && er.rawStatuses.length > 0) {
     const pretty = er.rawStatuses.map(normalizeStatusToken).join(' + ');
-    return `Statut: ${pretty}`;
+    parts.push(`Statut: ${pretty}`);
+  }
+  
+  // Horaires
+  if (er.departureTime) {
+    parts.push(`Départ: ${er.departureTime}`);
+  }
+  if (er.arrivalTime) {
+    parts.push(`Arrivée: ${er.arrivalTime}`);
+  }
+  
+  if (parts.length > 0) {
+    return parts.join(' | ');
   }
 
   if (er.inferenceReason) return er.inferenceReason;

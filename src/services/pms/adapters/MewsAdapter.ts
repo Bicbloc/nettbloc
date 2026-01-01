@@ -160,6 +160,11 @@ export class MewsAdapter extends PmsAdapter {
       const rawLine = r.debugInfo?.rawLine || r.originalText || '';
       const upper = rawLine.toUpperCase();
 
+      // Extraire les horaires de la ligne
+      const timePositions = this.extractTimePositions(rawLine);
+      if (timePositions.departureTime) r.departureTime = timePositions.departureTime;
+      if (timePositions.arrivalTime) r.arrivalTime = timePositions.arrivalTime;
+
       // Détecter checkout+arrival sur la même ligne (priorité)
       const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);
       const hasArr = /\bARR\b/.test(upper);
@@ -185,7 +190,7 @@ export class MewsAdapter extends PmsAdapter {
       }
 
       // Normalisation défensive (éviter undefined)
-      if (!r.cleaningType) r.cleaningType = 'recouche';
+      if (!r.cleaningType) r.cleaningType = 'a_blanc';  // Défaut: à blanc pour SAL
       if (!r.status) r.status = 'unknown';
     }
 
@@ -418,8 +423,9 @@ export class MewsAdapter extends PmsAdapter {
         return { status: 'stayover', cleaningType: 'recouche' };
       }
       
-      // Default SAL sans horaire ni occupation → recouche (plus conservateur)
-      return { status: 'dirty', cleaningType: 'recouche' };
+      // Default SAL sans horaire ni occupation → À BLANC (car SAL = sale = nettoyage complet)
+      // C'est la demande utilisateur: SAL/SALE doit toujours être "À blanc"
+      return { status: 'dirty', cleaningType: 'a_blanc' };
     }
     
     // DIR (dirty) = recouche par défaut
