@@ -35,14 +35,14 @@ const CLEANING_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 // Labels pour les statuts séjour
-const STATUS_LABELS: Record<string, { label: string; icon: string }> = {
-  'checkout': { label: 'Départ', icon: '🚪' },
-  'checkout_arrival': { label: 'Départ → Arrivée', icon: '🔄' },
-  'stayover': { label: 'Recouche', icon: '🛏️' },
-  'arrival': { label: 'En arrivée', icon: '📥' },
-  'occupied': { label: 'Occupé', icon: '👤' },
-  'dirty': { label: 'Sale', icon: '🧹' },
-  'unknown': { label: 'Inconnu', icon: '❓' },
+const STATUS_LABELS: Record<string, { label: string; icon: string; description: string }> = {
+  'checkout': { label: 'Départ', icon: '🚪', description: 'C/O (heure de départ)' },
+  'checkout_arrival': { label: 'Départ → Arrivée', icon: '🔄', description: 'C/O + C/I ou C/O + SAL (à blanc)' },
+  'stayover': { label: 'Recouche', icon: '🛏️', description: 'En séjour (dates arrivée/départ, pas d\'horaire - Mews)' },
+  'arrival': { label: 'En arrivée', icon: '📥', description: 'C/I (heure d\'arrivée)' },
+  'occupied': { label: 'Occupé', icon: '👤', description: 'Chambre occupée' },
+  'dirty': { label: 'Sale', icon: '🧹', description: 'SAL ou SALE (à nettoyer)' },
+  'unknown': { label: 'Inconnu', icon: '❓', description: 'Statut non reconnu' },
 };
 
 export const TrainingStep2Annotate = ({
@@ -56,6 +56,7 @@ export const TrainingStep2Annotate = ({
   const [rooms, setRooms] = useState<ExtractedRoom[]>(trainingData.extractedRooms);
   const [mergingMode, setMergingMode] = useState(false);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
+  const [editingTimeRoom, setEditingTimeRoom] = useState<number | null>(null);
   const [newRoom, setNewRoom] = useState({ roomNumber: "", cleaningType: "full" as const });
 
   const copyRawText = () => {
@@ -501,30 +502,79 @@ export const TrainingStep2Annotate = ({
                         </div>
                       </div>
 
-                      {/* Details row - guest info, dates */}
-                      {(room.guestName || room.arrivalDate || room.departureDate || room.rawStatuses) && (
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pl-[50px]">
-                          {room.guestName && (
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {room.guestName}
-                            </span>
-                          )}
-                          {(room.arrivalDate || room.departureDate) && (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {room.arrivalDate && <span>{room.arrivalDate}</span>}
-                              {room.arrivalDate && room.departureDate && <ArrowRight className="w-3 h-3" />}
-                              {room.departureDate && <span>{room.departureDate}</span>}
-                            </span>
-                          )}
-                          {room.rawStatuses && room.rawStatuses.length > 0 && (
-                            <span className="text-xs opacity-70">
-                              ({room.rawStatuses.join(' + ')})
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {/* Details row - guest info, dates, times */}
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pl-[50px]">
+                        {room.guestName && (
+                          <span className="flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            {room.guestName}
+                          </span>
+                        )}
+                        
+                        {/* Time inputs for departure/arrival */}
+                        {editingTimeRoom === index ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">Départ:</span>
+                              <Input
+                                type="time"
+                                className="h-6 w-20 text-xs"
+                                value={room.departureTime || ''}
+                                onChange={(e) => updateRoom(index, 'departureTime' as keyof ExtractedRoom, e.target.value)}
+                                placeholder="HH:MM"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">Arrivée:</span>
+                              <Input
+                                type="time"
+                                className="h-6 w-20 text-xs"
+                                value={room.arrivalTime || ''}
+                                onChange={(e) => updateRoom(index, 'arrivalTime' as keyof ExtractedRoom, e.target.value)}
+                                placeholder="HH:MM"
+                              />
+                            </div>
+                            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setEditingTimeRoom(null)}>
+                              <Check className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 px-1 text-xs"
+                            onClick={() => setEditingTimeRoom(index)}
+                          >
+                            {(room.departureTime || room.arrivalTime) ? (
+                              <span className="flex items-center gap-1">
+                                {room.departureTime && <span>🚪{room.departureTime}</span>}
+                                {room.arrivalTime && <span>📥{room.arrivalTime}</span>}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">+ Horaires</span>
+                            )}
+                          </Button>
+                        )}
+
+                        {(room.arrivalDate || room.departureDate) && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {room.arrivalDate && <span>{room.arrivalDate}</span>}
+                            {room.arrivalDate && room.departureDate && <ArrowRight className="w-3 h-3" />}
+                            {room.departureDate && <span>{room.departureDate}</span>}
+                          </span>
+                        )}
+                        {room.rawStatuses && room.rawStatuses.length > 0 && (
+                          <span className="text-xs opacity-70">
+                            ({room.rawStatuses.join(' + ')})
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Status description tooltip */}
+                      <div className="pl-[50px] text-xs text-muted-foreground/70 italic">
+                        {statusInfo.description}
+                      </div>
                     </div>
                   </Card>
                 );
