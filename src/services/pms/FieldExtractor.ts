@@ -302,15 +302,38 @@ class FieldExtractor {
    */
   private extractStatuses(line: string): string[] {
     const upper = line.toUpperCase();
-    const found: string[] = [];
-    
+    const found = new Set<string>();
+
+    // Tokens courts: éviter les faux positifs via \b...\b et normaliser
+    if (/\bC\s*[\/\-]\s*O\b/i.test(line) || /\bCO\b/i.test(line)) {
+      found.add('C/O');
+    }
+    if (/\bC\s*[\/\-]\s*I\b/i.test(line) || /\bCI\b/i.test(line)) {
+      found.add('C/I');
+    }
+
+    if (/\bSALE\b/i.test(line)) found.add('SALE');
+    else if (/\bSAL\b/i.test(line)) found.add('SAL');
+
+    const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     for (const keyword of PATTERNS.STATUS_KEYWORDS) {
-      if (upper.includes(keyword.toUpperCase())) {
-        found.push(keyword);
+      const k = keyword.toUpperCase();
+
+      // Déjà géré ci-dessus (et on évite CO/CI en "substring")
+      if (k === 'CO' || k === 'C/O' || k === 'CI' || k === 'C/I' || k === 'SAL' || k === 'SALE') {
+        continue;
+      }
+
+      if (k.length <= 3) {
+        const re = new RegExp(`\\b${escapeRegExp(k)}\\b`, 'i');
+        if (re.test(line)) found.add(k);
+      } else {
+        if (upper.includes(k)) found.add(k);
       }
     }
-    
-    return found;
+
+    return Array.from(found);
   }
   
   /**
