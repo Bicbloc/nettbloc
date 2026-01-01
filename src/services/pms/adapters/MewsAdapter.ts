@@ -149,6 +149,43 @@ export class MewsAdapter extends PmsAdapter {
     // 1) Extraction standard via le moteur commun (regex + FieldExtractor)
     const baseRooms = super.extractRooms(processedText);
 
+    // 1.b) IMPORTANT: Mews utilise souvent les codes "PRO/SAL/INS/...".
+    // FieldExtractor ne détecte pas toujours "PRO" (abréviation), donc on ré-applique ici
+    // la règle de statut/nettoyage du PMS pour garantir des résultats corrects.
+    for (const r of baseRooms) {
+      const rawLine = r.debugInfo?.rawLine || r.originalText || '';
+      const upper = rawLine.toUpperCase();
+
+      // Détecter checkout+arrival sur la même ligne (priorité)
+      const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);
+      const hasArr = /\bARR\b/.test(upper);
+      if (hasDepOrDirty && hasArr) {
+        r.status = 'checkout_arrival';
+        r.cleaningType = 'a_blanc';
+      } else {
+        const local = this.detectStatus(rawLine);
+        if (local.status !== 'unknown') {
+          r.status = local.status;
+          r.cleaningType = local.cleaning;
+        }
+      }
+
+      // Ajustement recouche vs départ via nuit X/Y quand c'est sale
+      if (r.status === 'dirty' && r.currentNight && r.totalNights) {
+        if (r.currentNight < r.totalNights) {
+          r.status = 'stayover';
+          r.cleaningType = 'recouche';
+        } else if (r.currentNight === r.totalNights) {
+          r.status = 'checkout';
+          r.cleaningType = 'a_blanc';
+        }
+      }
+
+      // Normalisation défensive (éviter undefined)
+      if (!r.cleaningType) r.cleaningType = 'none';
+      if (!r.status) r.status = 'unknown';
+    }
+
     // 2) Fusion des chambres liées (ex: "107+108") en un seul groupe
     const lines = processedText.split('\n');
     const linkedRegex = /(\d{2,4})\s*\+\s*(\d{2,4})/g;

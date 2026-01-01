@@ -47,25 +47,32 @@ export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(fa
  * Convertit ExtractedRoom[] du service unifié vers Room[] de l'application
  */
 function convertExtractedRoomsToRooms(extractedRooms: ExtractedRoom[]): Room[] {
-  return extractedRooms.map(er => {
-    const cleaningType: Room['cleaningType'] = er.cleaningType === 'full' ? 'a_blanc' : 
-                         er.cleaningType === 'quick' ? 'recouche' : 'none';
-    
-    const priority: Room['priority'] = er.cleaningType === 'full' ? 'high' : 
-                     er.cleaningType === 'quick' ? 'medium' : 'low';
-    
-    return {
-      number: er.roomNumber,
-      status: mapStatus(er.status),
-      cleaningType,
-      priority,
-      isUrgent: er.cleaningType === 'full',
-      notUrgent: er.cleaningType === 'none',
-      floor: getRoomFloor(er.roomNumber),
-      linkedRooms: er.linkedRooms,
-      notes: er.originalText ? `Statut: ${er.status}` : undefined
-    } as Room;
-  }).filter(room => room.number && room.number.length > 0);
+  return extractedRooms
+    .map((er) => {
+      // Le système PMS supporte 2 formats: ancien (full/quick) et nouveau (a_blanc/recouche)
+      const cleaningType: Room['cleaningType'] =
+        er.cleaningType === 'a_blanc' || er.cleaningType === 'full'
+          ? 'a_blanc'
+          : er.cleaningType === 'recouche' || er.cleaningType === 'quick'
+            ? 'recouche'
+            : 'none';
+
+      const priority: Room['priority'] =
+        cleaningType === 'a_blanc' ? 'high' : cleaningType === 'recouche' ? 'medium' : 'low';
+
+      return {
+        number: er.roomNumber,
+        status: mapStatus(er.status),
+        cleaningType,
+        priority,
+        isUrgent: cleaningType === 'a_blanc',
+        notUrgent: cleaningType === 'none',
+        floor: getRoomFloor(er.roomNumber),
+        linkedRooms: er.linkedRooms,
+        notes: er.originalText ? `Statut: ${er.status}` : undefined,
+      } as Room;
+    })
+    .filter((room) => room.number && room.number.length > 0);
 }
 
 /**
