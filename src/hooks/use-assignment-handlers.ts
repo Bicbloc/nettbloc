@@ -17,6 +17,7 @@ interface UseAssignmentHandlersProps {
   setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
   housekeepers: Housekeeper[];
   refreshHousekeepers?: () => void;
+  setIsAssigning?: (value: boolean) => void;
 }
 
 export const useAssignmentHandlers = ({
@@ -24,11 +25,15 @@ export const useAssignmentHandlers = ({
   rooms,
   setRooms,
   housekeepers,
-  refreshHousekeepers
+  refreshHousekeepers,
+  setIsAssigning
 }: UseAssignmentHandlersProps) => {
   
   const handleManualAssign = useCallback(async (housekeeperName: string, selectedRooms: Room[]) => {
     console.log('🔄 Assignation manuelle:', { housekeeperName, roomCount: selectedRooms.length, hotelId });
+    
+    // Bloquer le rechargement automatique pendant l'assignation
+    setIsAssigning?.(true);
     
     if (!hotelId) {
       console.error('❌ hotelId est null dans handleManualAssign!');
@@ -37,6 +42,7 @@ export const useAssignmentHandlers = ({
         title: "Erreur de configuration",
         description: "Aucun hôtel sélectionné"
       });
+      setIsAssigning?.(false);
       return;
     }
     
@@ -120,18 +126,25 @@ export const useAssignmentHandlers = ({
     
     setRooms(updatedRooms);
     
+    // Débloquer après un délai pour s'assurer que la DB est synchronisée
+    setTimeout(() => setIsAssigning?.(false), 2000);
+    
     toast({
       title: "Assignation manuelle",
       description: `${selectedRooms.length} chambre(s) ont été assignées à ${housekeeperName}.`
     });
-  }, [hotelId, rooms, setRooms, housekeepers, refreshHousekeepers]);
+  }, [hotelId, rooms, setRooms, housekeepers, refreshHousekeepers, setIsAssigning]);
 
   const handleDirectRoomAssignment = useCallback(async (roomNumber: string, housekeeperName: string) => {
     console.log('🔄 Tentative assignation directe:', { roomNumber, housekeeperName, hotelId });
     
+    // Bloquer le rechargement automatique pendant l'assignation
+    setIsAssigning?.(true);
+    
     if (!hotelId) {
       console.error('❌ hotelId est null!');
       toast({ variant: "destructive", title: "Erreur", description: "Hôtel non configuré" });
+      setIsAssigning?.(false);
       return;
     }
     
@@ -214,11 +227,14 @@ export const useAssignmentHandlers = ({
     
     setRooms(updatedRooms);
     
+    // Débloquer après un délai pour s'assurer que la DB est synchronisée
+    setTimeout(() => setIsAssigning?.(false), 2000);
+    
     toast({
       title: "Chambre assignée",
       description: `Chambre ${roomNumber} assignée à ${housekeeperName}.`
     });
-  }, [hotelId, rooms, setRooms, housekeepers, refreshHousekeepers]);
+  }, [hotelId, rooms, setRooms, housekeepers, refreshHousekeepers, setIsAssigning]);
 
   return {
     handleManualAssign,
