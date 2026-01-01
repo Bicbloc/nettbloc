@@ -1,11 +1,10 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link2, Settings, Database, AlertCircle } from "lucide-react";
 import { ConnectedRoomRulesManager } from "@/components/ConnectedRoomRulesManager";
 import { PmsRulesManager } from "@/components/PmsRulesManager";
 import { PmsPatternManager } from "@/components/PmsPatternManager";
 import { ErrorAnalysisDashboard } from "@/components/ErrorAnalysisDashboard";
+import { Link2, Settings, Brain, Activity } from "lucide-react";
 
 interface AdvancedSettingsDrawerProps {
   open: boolean;
@@ -13,59 +12,65 @@ interface AdvancedSettingsDrawerProps {
   hotelId: string;
 }
 
-export const AdvancedSettingsDrawer = ({
-  open,
-  onOpenChange,
-  hotelId,
-}: AdvancedSettingsDrawerProps) => {
+export const AdvancedSettingsDrawer = ({ open, onOpenChange, hotelId }: AdvancedSettingsDrawerProps) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Options avancées
-          </SheetTitle>
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader className="pb-4">
+          <SheetTitle>Paramètres avancés</SheetTitle>
+          <SheetDescription>
+            Configurez les règles de détection et les modèles d'apprentissage
+          </SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className="h-[calc(100vh-100px)] mt-6 pr-4">
-          <Tabs defaultValue="connected" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
-              <TabsTrigger value="connected" className="text-xs">
-                <Link2 className="w-3 h-3 mr-1" />
-                Connexions
-              </TabsTrigger>
-              <TabsTrigger value="rules" className="text-xs">
-                <Settings className="w-3 h-3 mr-1" />
-                Règles PMS
-              </TabsTrigger>
-              <TabsTrigger value="patterns" className="text-xs">
-                <Database className="w-3 h-3 mr-1" />
-                Modèles
-              </TabsTrigger>
-              <TabsTrigger value="analysis" className="text-xs">
-                <AlertCircle className="w-3 h-3 mr-1" />
-                Analyse
-              </TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="connected" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsTrigger value="connected" className="flex items-center gap-1.5 text-xs">
+              <Link2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Chambres</span>
+            </TabsTrigger>
+            <TabsTrigger value="rules" className="flex items-center gap-1.5 text-xs">
+              <Settings className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Nettoyage</span>
+            </TabsTrigger>
+            <TabsTrigger value="patterns" className="flex items-center gap-1.5 text-xs">
+              <Brain className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Modèles IA</span>
+            </TabsTrigger>
+            <TabsTrigger value="analysis" className="flex items-center gap-1.5 text-xs">
+              <Activity className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Diagnostic</span>
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="connected">
-              <ConnectedRoomRulesManager hotelId={hotelId} />
-            </TabsContent>
+          <TabsContent value="connected" className="space-y-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              Définissez quelles chambres sont connectées entre elles (suites, communicantes)
+            </div>
+            <ConnectedRoomRulesManager hotelId={hotelId} />
+          </TabsContent>
 
-            <TabsContent value="rules">
-              <PmsRulesManager hotelId={hotelId} />
-            </TabsContent>
+          <TabsContent value="rules" className="space-y-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              Personnalisez les règles de détection du type de nettoyage
+            </div>
+            <PmsRulesManager hotelId={hotelId} />
+          </TabsContent>
 
-            <TabsContent value="patterns">
-              <PmsPatternManager hotelId={hotelId} />
-            </TabsContent>
+          <TabsContent value="patterns" className="space-y-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              Gérez les modèles d'apprentissage pour la reconnaissance de vos rapports
+            </div>
+            <PmsPatternManager hotelId={hotelId} />
+          </TabsContent>
 
-            <TabsContent value="analysis">
-              <ErrorAnalysisDashboard hotelId={hotelId} />
-            </TabsContent>
-          </Tabs>
-        </ScrollArea>
+          <TabsContent value="analysis" className="space-y-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              Analysez les erreurs de détection pour améliorer la précision
+            </div>
+            <ErrorAnalysisDashboard hotelId={hotelId} />
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );

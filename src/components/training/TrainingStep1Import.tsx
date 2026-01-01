@@ -2,15 +2,32 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Sparkles, AlertTriangle, RefreshCw, Edit2 } from "lucide-react";
+import { Upload, FileText, Sparkles, AlertTriangle, Edit2, Building2 } from "lucide-react";
 import { pmsAdapterFactory, ExtractedRoom } from "@/services/pms";
 import { TrainingData } from "./TrainingWizard";
 import { useExistingTraining } from "./TrainingHistory";
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// User-friendly PMS descriptions
+const getPmsOptions = () => [
+  { value: 'mews', label: 'Mews', description: 'Interface moderne, rapports avec codes SAL/PRO/INS' },
+  { value: 'opera', label: 'Opera (Oracle)', description: 'Grands hôtels, chaînes internationales' },
+  { value: 'protel', label: 'Protel', description: 'Hôtels indépendants, format classique' },
+  { value: 'fidelio', label: 'Fidelio', description: 'Suite Oracle, format similaire à Opera' },
+  { value: 'apaleo', label: 'Apaleo', description: 'Solution cloud moderne' },
+  { value: 'medialog', label: 'Medialog', description: 'PMS français, hôtels indépendants' },
+  { value: 'generic', label: 'Autre / Inconnu', description: 'Si votre système n\'est pas listé' },
+];
 
 interface TrainingStep1ImportProps {
   hotelId: string;
@@ -279,37 +296,20 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
           
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-background rounded-lg p-4 border">
-              <p className="text-sm text-muted-foreground mb-1">PMS détecté</p>
+              <p className="text-sm text-muted-foreground mb-1">Type de rapport</p>
               <div className="flex items-center gap-2">
-                {showPmsSelector ? (
-                  <Select value={selectedPmsType || detectedPmsType || ''} onValueChange={handlePmsChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Sélectionner un PMS" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availablePmsTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type.toUpperCase()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <>
-                    <Badge variant="secondary" className="text-base px-3 py-1">
-                      {(selectedPmsType || detectedPmsType)?.toUpperCase()}
-                    </Badge>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 gap-1"
-                      onClick={() => setShowPmsSelector(true)}
-                    >
-                      <Edit2 className="h-3 w-3" />
-                      Modifier
-                    </Button>
-                  </>
-                )}
+                <Badge variant="secondary" className="text-base px-3 py-1">
+                  {(selectedPmsType || detectedPmsType)?.toUpperCase()}
+                </Badge>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 gap-1 text-primary"
+                  onClick={() => setShowPmsSelector(true)}
+                >
+                  <Edit2 className="h-3 w-3" />
+                  Ce n'est pas le bon ?
+                </Button>
               </div>
             </div>
             
@@ -325,7 +325,7 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Aucune chambre détectée. Essayez de <strong>modifier le PMS</strong> ci-dessus 
+                Aucune chambre détectée. Essayez de <strong>changer le type de rapport</strong> ci-dessus 
                 ou ajoutez les chambres manuellement à l'étape suivante.
               </AlertDescription>
             </Alert>
@@ -335,11 +335,49 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Peu de chambres détectées. Si ce n'est pas normal, essayez de <strong>modifier le PMS</strong> ci-dessus.
+                Peu de chambres détectées. Si ce n'est pas normal, essayez de <strong>changer le type de rapport</strong>.
               </AlertDescription>
             </Alert>
           )}
         </div>
+        
+        {/* PMS Selection Dialog - Simple and User-Friendly */}
+        <Dialog open={showPmsSelector} onOpenChange={setShowPmsSelector}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Quel logiciel hôtelier utilisez-vous ?</DialogTitle>
+              <DialogDescription>
+                Sélectionnez le système correspondant à votre hôtel pour une meilleure détection
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2 py-4">
+              {getPmsOptions().map((pms) => (
+                <button
+                  key={pms.value}
+                  onClick={() => handlePmsChange(pms.value)}
+                  className={`flex items-start gap-3 p-4 rounded-lg border text-left transition-all hover:border-primary hover:bg-primary/5 ${
+                    (selectedPmsType || detectedPmsType) === pms.value 
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-border'
+                  }`}
+                >
+                  <div className="p-2 rounded-lg bg-muted">
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{pms.label}</span>
+                      {(selectedPmsType || detectedPmsType) === pms.value && (
+                        <Badge variant="secondary" className="text-xs">Actuel</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{pms.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
         
         <div className="flex justify-center">
           <Button onClick={handleContinueNew} className="gap-2" size="lg">
