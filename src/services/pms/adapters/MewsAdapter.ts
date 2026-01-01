@@ -308,7 +308,61 @@ export class MewsAdapter extends PmsAdapter {
   }
 
   /**
+   * Extrait les positions des horaires dans une ligne
+   * - Horaire à DROITE (après le nom du client) = heure de DÉPART
+   * - Horaire à GAUCHE (après email/tiret, avant client) = heure d'ARRIVÉE
+   */
+  private extractTimePositions(line: string): { 
+    arrivalTime: string | null; 
+    departureTime: string | null;
+    hasDeparture: boolean;
+    hasArrival: boolean;
+  } {
+    // Pattern pour trouver les horaires HH:MM (pas les dates DD/MM/YYYY)
+    const timePattern = /(?<!\d\/)\b(\d{1,2}:\d{2})\b(?!\/\d)/g;
+    const times: { time: string; index: number }[] = [];
+    
+    let match;
+    while ((match = timePattern.exec(line)) !== null) {
+      times.push({ time: match[1], index: match.index });
+    }
+    
+    if (times.length === 0) {
+      return { arrivalTime: null, departureTime: null, hasDeparture: false, hasArrival: false };
+    }
+    
+    const lineLength = line.length;
+    
+    if (times.length === 1) {
+      const timeMatch = times[0];
+      // Si l'horaire est dans la dernière partie de la ligne (après 60%) → départ
+      // Sinon → arrivée
+      const isRightSide = timeMatch.index > lineLength * 0.6;
+      
+      console.log(`⏰ MEWS Time: "${timeMatch.time}" at pos ${timeMatch.index}/${lineLength} (${(timeMatch.index/lineLength*100).toFixed(0)}%) → ${isRightSide ? 'DÉPART' : 'ARRIVÉE'}`);
+      
+      return isRightSide 
+        ? { arrivalTime: null, departureTime: timeMatch.time, hasDeparture: true, hasArrival: false }
+        : { arrivalTime: timeMatch.time, departureTime: null, hasDeparture: false, hasArrival: true };
+    }
+    
+    // 2+ horaires : le premier est arrivée, le dernier est départ
+    console.log(`⏰ MEWS Times: ${times.length} found - first="${times[0].time}" (arrivée), last="${times[times.length - 1].time}" (départ)`);
+    
+    return {
+      arrivalTime: times[0].time,
+      departureTime: times[times.length - 1].time,
+      hasDeparture: true,
+      hasArrival: true
+    };
+  }
+
+  /**
    * Analyse une ligne avec la date du rapport pour déterminer à blanc vs recouche
+   * LOGIQUE PRINCIPALE:
+   * - Horaire à DROITE = départ → À blanc
+   * - Horaire à GAUCHE = arrivée seule → Recouche (turnover géré ailleurs)
+   * - Pas d'horaire = client reste → Recouche
    */
   private analyzeLineWithDate(line: string, reportDate: Date | null): { status: string; cleaningType: CleaningType } {
     const upper = line.toUpperCase();
@@ -323,12 +377,12 @@ export class MewsAdapter extends PmsAdapter {
       return { status: 'inspected', cleaningType: 'none' };
     }
     
-    // DEP = départ
+    // DEP = départ explicite
     if (/\b(DEP|CHECKOUT|DÉPART)\b/.test(upper)) {
       return { status: 'checkout', cleaningType: 'a_blanc' };
     }
     
-    // SAL = logique améliorée avec date
+    // SAL = logique améliorée basée sur la POSITION des horaires
     if (/\bSAL\b/.test(upper)) {
       // 1) Vérifier Nuit X/Y pour stayover vs checkout
       const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
@@ -343,42 +397,28 @@ export class MewsAdapter extends PmsAdapter {
         }
       }
       
-      // 2) Utiliser la date comme date de DÉPART (C/O)
-      // Si date <= date du rapport → départ passé ou du jour → À BLANC
-      // Si date > date du rapport → client reste → RECOUCHE
-      const dateMatch = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-      if (dateMatch && reportDate) {
-        const [, day, month, year] = dateMatch;
-        const departureDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        
-        // Normaliser les dates (ignorer l'heure)
-        const reportDateNorm = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
-        const departureDateNorm = new Date(departureDate.getFullYear(), departureDate.getMonth(), departureDate.getDate());
-        
-        // Si date de départ <= date du rapport → C/O déjà fait ou du jour → À BLANC
-        if (departureDateNorm <= reportDateNorm) {
-          console.log(`🔍 Chambre avec départ ${dateMatch[0]} <= rapport ${reportDate.toLocaleDateString('fr-FR')} → À blanc`);
-          return { status: 'checkout', cleaningType: 'a_blanc' };
-        } else {
-          // Date de départ dans le futur → client reste → RECOUCHE
-          console.log(`🔍 Chambre avec départ ${dateMatch[0]} > rapport ${reportDate.toLocaleDateString('fr-FR')} → Recouche`);
-          return { status: 'stayover', cleaningType: 'recouche' };
-        }
-      }
+      // 2) NOUVELLE LOGIQUE: Position des horaires
+      const { hasDeparture, hasArrival } = this.extractTimePositions(line);
       
-      // 3) Heuristique: heure en fin de ligne = checkout prévu
-      const hasCheckoutTime = /\d{2}:\d{2}\s*$/.test(line.trim());
-      if (hasCheckoutTime) {
+      if (hasDeparture) {
+        // Horaire à droite = départ → À blanc
+        console.log(`🔍 MEWS: Départ détecté (horaire droite) → À blanc`);
         return { status: 'checkout', cleaningType: 'a_blanc' };
       }
       
-      // 4) Heuristique: occupation sans heure = recouche
+      if (hasArrival && !hasDeparture) {
+        // Horaire à gauche uniquement = arrivée sans départ → Recouche (client déjà là)
+        console.log(`🔍 MEWS: Arrivée seule (horaire gauche) → Recouche`);
+        return { status: 'stayover', cleaningType: 'recouche' };
+      }
+      
+      // 3) Pas d'horaire mais occupation → Recouche
       const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
       if (hasOccupancy) {
         return { status: 'stayover', cleaningType: 'recouche' };
       }
       
-      // Default SAL → recouche (plus conservateur)
+      // Default SAL sans horaire ni occupation → recouche (plus conservateur)
       return { status: 'dirty', cleaningType: 'recouche' };
     }
     
