@@ -388,7 +388,7 @@ class LocalRoomParser {
   }
 
   /**
-   * Extrait les statuts - priorité au C/O si heure de départ détectée
+   * Extrait les statuts - détecte C/O, C/I, SAL ensemble
    */
   private extractStatuses(line: string): string[] {
     const statuses: string[] = [];
@@ -401,23 +401,39 @@ class LocalRoomParser {
     // Tokens checkout possibles dans les rapports
     const hasCheckoutToken = /\bC\s*\/\s*O\b|\bC\s*-\s*O\b|\bCO\b/i.test(line);
     const hasCheckoutKeyword = STATUS_KEYWORDS.checkout.some(k => lineLower.includes(k));
+    const hasCheckout = hasCheckoutToken || hasCheckoutKeyword;
+
+    // Tokens checkin possibles
+    const hasCheckinToken = /\bC\s*\/\s*I\b|\bC\s*-\s*I\b|\bCI\b/i.test(line);
+    const hasCheckinKeyword = STATUS_KEYWORDS.arrival.some(k => lineLower.includes(k));
+    const hasCheckin = hasCheckinToken || hasCheckinKeyword;
 
     // Sale: SAL ou SALE (fr/en)
     const hasSaleToken = /\bSAL(?:E)?\b|\bDIRTY\b/i.test(line);
 
-    // Cas demandé: CO/C-O/C/O + SALE => À blanc (checkout)
-    if (hasCheckoutToken && hasSaleToken) {
+    // Cas C/O + C/I + SAL → checkout + arrival + sal (sera traité comme checkout_arrival = À blanc)
+    if (hasCheckout && hasCheckin) {
       statuses.push('checkout');
-      if (/\bSAL\b/i.test(line) || /\bSALE\b/i.test(line)) statuses.push('sal');
+      statuses.push('arrival');
+      if (hasSaleToken) statuses.push('sal');
+      this.log(`C/O + C/I détecté → checkout_arrival (${statuses.join(' + ')})`);
+      return statuses;
+    }
+
+    // Cas C/O + SAL (sans C/I) => À blanc (checkout)
+    if (hasCheckout && hasSaleToken) {
+      statuses.push('checkout');
+      statuses.push('sal');
       this.log(`CO + SALE détecté → checkout (${statuses.join(' + ')})`);
       return statuses;
     }
 
-    // Si heure + checkout → forcer checkout et ignorer l'arrivée
-    if (hasTime && (hasCheckoutToken || hasCheckoutKeyword)) {
+    // Si heure + checkout → forcer checkout
+    if (hasTime && hasCheckout) {
       statuses.push('checkout');
-      if (/\bSAL\b/i.test(line) || /\bSALE\b/i.test(line)) statuses.push('sal');
-      this.log(`Heure détectée → priorité checkout (${statuses.join(' + ')})`);
+      if (hasSaleToken) statuses.push('sal');
+      if (hasCheckin) statuses.push('arrival');
+      this.log(`Heure détectée → checkout (${statuses.join(' + ')})`);
       return statuses;
     }
 
@@ -428,6 +444,12 @@ class LocalRoomParser {
         statuses.push(keyword);
       }
     }
+    
+    // Ajouter les tokens détectés manuellement s'ils ne sont pas déjà présents
+    if (hasCheckoutToken && !statuses.includes('checkout')) statuses.push('checkout');
+    if (hasCheckinToken && !statuses.includes('arrival')) statuses.push('arrival');
+    if (hasSaleToken && !statuses.includes('sal')) statuses.push('sal');
+    
     return statuses;
   }
 
