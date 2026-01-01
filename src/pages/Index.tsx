@@ -139,19 +139,6 @@ const Index = () => {
     setReportHousekeeper,
   } = useDashboardDialogs();
   
-  // Assignment handlers
-  const { handleManualAssign, handleDirectRoomAssignment } = useAssignmentHandlers({
-    hotelId: currentHotelId,
-    rooms,
-    setRooms,
-    housekeepers,
-    refreshHousekeepers
-  });
-  
-  // Room stats
-  const roomStats = useRoomStats(rooms, cleaningConfig);
-  const { getHousekeeperRooms, getUnassignedRooms, getCleanRooms, calculateHousekeeperLoad } = useRoomHelpers(rooms);
-  
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
   const { email, setEmail } = useReportEmail();
   const [reportCustomFields, setReportCustomFields] = useState<CustomReportFields>({ toDoItems: [], toKnowItems: [] });
@@ -161,6 +148,21 @@ const Index = () => {
   const [userEmail, setUserEmail] = useState<string>("");
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  
+  // Assignment handlers
+  const { handleManualAssign, handleDirectRoomAssignment } = useAssignmentHandlers({
+    hotelId: currentHotelId,
+    rooms,
+    setRooms,
+    housekeepers,
+    refreshHousekeepers,
+    setIsAssigning
+  });
+  
+  // Room stats
+  const roomStats = useRoomStats(rooms, cleaningConfig);
+  const { getHousekeeperRooms, getUnassignedRooms, getCleanRooms, calculateHousekeeperLoad } = useRoomHelpers(rooms);
 
   // Setup wizard effect
   useEffect(() => {
@@ -252,7 +254,8 @@ const Index = () => {
   // Load rooms from database
   useEffect(() => {
     const loadRoomsFromDatabase = async () => {
-      if (!currentHotelId || isImporting) return;
+      // Ne pas recharger si une opération est en cours
+      if (!currentHotelId || isImporting || isAssigning) return;
       
       try {
         const { data: roomsData, error } = await supabase
@@ -262,6 +265,7 @@ const Index = () => {
 
         if (error || !roomsData) return;
 
+        // Récupérer les assignations actives
         const { data: assignmentsData } = await supabase
           .from('assignments')
           .select('room_id, housekeeper_name')
@@ -316,9 +320,10 @@ const Index = () => {
     };
 
     loadRoomsFromDatabase();
-    const interval = setInterval(loadRoomsFromDatabase, 120000);
+    // Augmenter l'intervalle pour éviter les conflits
+    const interval = setInterval(loadRoomsFromDatabase, 180000);
     return () => clearInterval(interval);
-  }, [currentHotelId, isImporting, setRooms, setIsDistributed]);
+  }, [currentHotelId, isImporting, isAssigning, setRooms, setIsDistributed]);
 
   // PDF processing handler
   const handlePdfProcessed = async (data: Room[], housekeeperNamesParam?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
