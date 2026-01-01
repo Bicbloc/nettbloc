@@ -340,8 +340,25 @@ class UnifiedParserService {
       this.log(`✅ Parsing local avec adapter ${adapter.name} (confiance: ${detection.confidence.toFixed(1)}%)`);
       
       let rooms = adapter.extractRooms(text);
+      this.log(`🔍 Adapter a extrait: ${rooms.length} chambres`);
       
-      // Appliquer les patterns appris en priorité
+      // ======= PATTERN-FIRST LOGIC =======
+      // Si l'adapter extrait peu/aucune chambre MAIS qu'on a des patterns validés,
+      // utiliser les patterns comme référence et chercher les numéros dans le texte
+      const patternsExist = this.learnedPatterns.size > 0;
+      const adapterFoundFew = rooms.length < 5;
+      
+      if (patternsExist && adapterFoundFew) {
+        this.log(`🎯 PATTERN-FIRST: Adapter n'a trouvé que ${rooms.length} chambres mais ${this.learnedPatterns.size} patterns existent`);
+        const patternBasedRooms = this.extractFromPatterns(text, detection.pmsType);
+        
+        if (patternBasedRooms.length > rooms.length) {
+          this.log(`✅ Pattern-first a trouvé ${patternBasedRooms.length} chambres (vs ${rooms.length} de l'adapter)`);
+          rooms = patternBasedRooms;
+        }
+      }
+      
+      // Appliquer les patterns appris (filtrage)
       rooms = this.applyLearnedPatterns(rooms);
       
       // Appliquer les mappings personnalisés
@@ -360,6 +377,15 @@ class UnifiedParserService {
     this.log(`⚠️ Confiance faible (${detection.confidence.toFixed(1)}%), utilisation adapter générique`);
     const genericAdapter = pmsAdapterFactory.getAdapter('generic');
     let rooms = genericAdapter.extractRooms(text);
+    
+    // Pattern-first pour générique aussi
+    if (this.learnedPatterns.size > 0 && rooms.length < 5) {
+      const patternBasedRooms = this.extractFromPatterns(text, 'generic');
+      if (patternBasedRooms.length > rooms.length) {
+        rooms = patternBasedRooms;
+      }
+    }
+    
     rooms = this.applyLearnedPatterns(rooms);
     rooms = this.applyCustomMappings(rooms, text);
 
@@ -370,6 +396,141 @@ class UnifiedParserService {
       usedAi: false,
       usedLearnedPatterns: this.learnedPatterns.size > 0
     };
+  }
+
+  /**
+   * PATTERN-FIRST: Extrait les chambres en utilisant les patterns validés comme référence
+   * Pour chaque numéro de chambre validé, cherche dans le texte et détermine le statut/cleaningType
+   */
+  private extractFromPatterns(text: string, pmsType: string): ExtractedRoom[] {
+    const rooms: ExtractedRoom[] = [];
+    const lines = text.split('\n');
+    
+    this.log(`🔎 Pattern-first: Recherche de ${this.learnedPatterns.size} numéros dans ${lines.length} lignes`);
+    
+    // Pour chaque numéro de chambre validé dans les patterns
+    for (const [normalizedNumber, pattern] of this.learnedPatterns) {
+      const roomNumber = pattern.roomNumber;
+      
+      // Chercher ce numéro dans le texte
+      for (const line of lines) {
+        // Regex pour trouver le numéro de chambre dans la ligne
+        // Gère les formats: "100", "100+101", "100-101", etc.
+        const roomRegex = new RegExp(`\\b${this.escapeRegex(roomNumber)}\\b|\\b${this.escapeRegex(normalizedNumber)}\\b`, 'i');
+        
+        if (roomRegex.test(line)) {
+          // Déterminer le statut et type de nettoyage à partir du contexte de la ligne
+          const { status, cleaningType } = this.analyzeLineContext(line, pmsType);
+          
+          rooms.push({
+            roomNumber,
+            status,
+            cleaningType,
+            confidence: 90,
+            validated: true,
+            originalText: line.trim(),
+            debugInfo: {
+              rawLine: line,
+              cleanedLine: line.trim(),
+              detectedKeywords: [],
+              source: 'pattern' as const,
+              confidence: 90,
+              appliedRule: `Pattern-first extraction: ${roomNumber}`
+            }
+          });
+          
+          break; // Ne prendre que la première occurrence
+        }
+      }
+    }
+    
+    this.log(`🎯 Pattern-first: ${rooms.length}/${this.learnedPatterns.size} chambres trouvées dans le texte`);
+    return rooms;
+  }
+
+  /**
+   * Analyse le contexte d'une ligne pour déterminer le statut et type de nettoyage
+   */
+  private analyzeLineContext(line: string, pmsType: string): { status: string; cleaningType: CleaningType } {
+    const upper = line.toUpperCase();
+    
+    // Règles Mews spécifiques
+    if (pmsType === 'mews') {
+      // Checkout + Arrival (même ligne) = a_blanc prioritaire
+      const hasDepOrDirty = /\b(DEP|DIR|DIRTY)\b/.test(upper);
+      const hasArr = /\bARR\b/.test(upper);
+      if (hasDepOrDirty && hasArr) {
+        return { status: 'checkout_arrival', cleaningType: 'a_blanc' };
+      }
+      
+      // PRO = propre, pas de nettoyage
+      if (/\bPRO\b/.test(upper)) {
+        return { status: 'clean', cleaningType: 'none' };
+      }
+      
+      // INS = inspecté, pas de nettoyage
+      if (/\bINS\b/.test(upper)) {
+        return { status: 'inspected', cleaningType: 'none' };
+      }
+      
+      // SAL = sale, stayover (recouche par défaut)
+      if (/\bSAL\b/.test(upper)) {
+        // Vérifier si c'est un stayover via Nuit X/Y
+        const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
+                          upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+        if (nightMatch) {
+          const currentNight = parseInt(nightMatch[1]);
+          const totalNights = parseInt(nightMatch[2]);
+          if (currentNight < totalNights) {
+            return { status: 'stayover', cleaningType: 'recouche' };
+          } else {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+        }
+        return { status: 'dirty', cleaningType: 'recouche' };
+      }
+      
+      // DEP seul = départ, a_blanc
+      if (/\b(DEP|CHECKOUT|DÉPART)\b/.test(upper)) {
+        return { status: 'checkout', cleaningType: 'a_blanc' };
+      }
+      
+      // DIR (dirty) = sale
+      if (/\bDIR\b/.test(upper)) {
+        return { status: 'dirty', cleaningType: 'recouche' };
+      }
+    }
+    
+    // Règles génériques
+    // Checkout/Départ
+    if (/\b(CHECKOUT|DÉPART|DEPARTURE|DEP|C\/O)\b/.test(upper)) {
+      return { status: 'checkout', cleaningType: 'a_blanc' };
+    }
+    
+    // Stayover/Recouche
+    if (/\b(STAYOVER|RECOUCHE|STAY|OCC|OCCUPIED)\b/.test(upper)) {
+      return { status: 'stayover', cleaningType: 'recouche' };
+    }
+    
+    // Propre/Clean
+    if (/\b(CLEAN|PROPRE|READY|INSPECTED|PRO|INS)\b/.test(upper)) {
+      return { status: 'clean', cleaningType: 'none' };
+    }
+    
+    // Sale/Dirty
+    if (/\b(DIRTY|SALE|SAL|DIR)\b/.test(upper)) {
+      return { status: 'dirty', cleaningType: 'recouche' };
+    }
+    
+    // Par défaut, considérer comme "à nettoyer" (a_blanc)
+    return { status: 'unknown', cleaningType: 'a_blanc' };
+  }
+
+  /**
+   * Échappe les caractères spéciaux pour une regex
+   */
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   /**
