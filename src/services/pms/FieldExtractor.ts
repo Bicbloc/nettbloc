@@ -9,6 +9,8 @@ export interface ExtractedFields {
   roomNumber: string;
   arrivalDate: string | null;
   departureDate: string | null;
+  arrivalTime: string | null;    // HH:MM format
+  departureTime: string | null;  // HH:MM format
   nightInfo: string | null;  // "2/3" ou "Night 2 of 3"
   currentNight: number | null;
   totalNights: number | null;
@@ -82,6 +84,8 @@ class FieldExtractor {
       roomNumber,
       arrivalDate: null,
       departureDate: null,
+      arrivalTime: null,
+      departureTime: null,
       nightInfo: null,
       currentNight: null,
       totalNights: null,
@@ -103,6 +107,11 @@ class FieldExtractor {
       // Une seule date - contexte nécessaire pour déterminer
       fields.arrivalDate = dates[0];
     }
+    
+    // Extraire les horaires (HH:MM, HHhMM, HH.MM)
+    const times = this.extractTimes(line);
+    if (times.arrivalTime) fields.arrivalTime = times.arrivalTime;
+    if (times.departureTime) fields.departureTime = times.departureTime;
     
     // Extraire les nuits
     const nightInfo = this.extractNightInfo(line);
@@ -237,6 +246,63 @@ class FieldExtractor {
     }
     
     return null;
+  }
+  
+  /**
+   * Extrait les horaires d'une ligne (HH:MM, HHhMM, HH.MM)
+   * Utilise la position pour différencier arrivée (gauche) vs départ (droite)
+   */
+  private extractTimes(line: string): { arrivalTime: string | null; departureTime: string | null } {
+    // Patterns pour trouver les horaires (pas les dates DD/MM/YYYY)
+    const timePatterns = [
+      /(?<!\d\/)\b(\d{1,2}):(\d{2})\b(?!\/\d)/g,    // HH:MM
+      /\b(\d{1,2})h(\d{2})\b/gi,                     // HHhMM  
+      /(?<!\d\/)\b(\d{1,2})\.(\d{2})\b(?!\/\d)/g,   // HH.MM (attention aux dates)
+    ];
+    
+    const times: { time: string; index: number }[] = [];
+    
+    for (const pattern of timePatterns) {
+      let match;
+      while ((match = pattern.exec(line)) !== null) {
+        const hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        
+        // Valider que c'est une heure valide
+        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+          const normalizedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          times.push({ time: normalizedTime, index: match.index });
+        }
+      }
+    }
+    
+    if (times.length === 0) {
+      return { arrivalTime: null, departureTime: null };
+    }
+    
+    // Dédupliquer par position
+    const uniqueTimes = times.filter((t, i, arr) => 
+      arr.findIndex(x => Math.abs(x.index - t.index) < 3) === i
+    );
+    
+    const lineLength = line.length;
+    
+    if (uniqueTimes.length === 1) {
+      const timeMatch = uniqueTimes[0];
+      // Si l'horaire est dans la dernière partie de la ligne (après 60%) → départ
+      const isRightSide = timeMatch.index > lineLength * 0.6;
+      
+      return isRightSide 
+        ? { arrivalTime: null, departureTime: timeMatch.time }
+        : { arrivalTime: timeMatch.time, departureTime: null };
+    }
+    
+    // 2+ horaires : le premier est arrivée, le dernier est départ
+    uniqueTimes.sort((a, b) => a.index - b.index);
+    return {
+      arrivalTime: uniqueTimes[0].time,
+      departureTime: uniqueTimes[uniqueTimes.length - 1].time
+    };
   }
   
   /**
@@ -377,10 +443,11 @@ class FieldExtractor {
       return { cleaningType: 'recouche', status: 'stayover', reason: 'Recouche', confidence: 85 };
     }
 
-    // Dirty
+    // Dirty / SAL / SALE → Toujours À BLANC (nettoyage complet)
+    // Correction demandée: SAL/SALE = chambre sale = à blanc par défaut
     const hasDirty = upper.some(s => ['SALE', 'DIRTY', 'DIR', 'SAL', 'VD'].includes(s));
     if (hasDirty) {
-      return { cleaningType: 'a_blanc', status: 'dirty', reason: 'Sale', confidence: 80 };
+      return { cleaningType: 'a_blanc', status: 'dirty', reason: 'Sale → À blanc', confidence: 85 };
     }
 
     // Clean

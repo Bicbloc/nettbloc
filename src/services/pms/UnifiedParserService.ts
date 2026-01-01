@@ -686,8 +686,8 @@ class UnifiedParserService {
           return { status: 'stayover', cleaningType: 'recouche', reason: 'SAL + occupation (Adultes) → Recouche' };
         }
         
-        // Default SAL sans horaire ni occupation → recouche (plus conservateur)
-        return { status: 'dirty', cleaningType: 'recouche', reason: 'SAL (défaut) → Recouche' };
+        // Default SAL sans horaire ni occupation → À BLANC (SAL = sale = nettoyage complet)
+        return { status: 'dirty', cleaningType: 'a_blanc', reason: 'SAL (défaut) → À blanc' };
       }
       
       // DEP seul = départ, a_blanc

@@ -60,6 +60,8 @@ interface SimpleRule {
   priority: number;
   isActive: boolean;
   customKeywords?: string;
+  // Synonymes multi-langues pour l'état chambre
+  roomStateSynonyms?: string;
 }
 
 interface SimplifiedRulesManagerProps {
@@ -124,11 +126,11 @@ const CLIENT_STATUS_OPTIONS = [
   { value: 'custom', label: 'Personnalisé', icon: <Wand2 className="h-4 w-4" />, keywords: [] },
 ];
 
-// Labels pour état chambre
+// Labels pour état chambre avec synonymes multi-langues
 const ROOM_STATE_OPTIONS = [
-  { value: 'dirty', label: 'Sale', description: 'SAL, SALE, VD, DIRTY', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { value: 'clean', label: 'Propre', description: 'INS, PROPRE, CLEAN', color: 'bg-green-100 text-green-800 border-green-200' },
-  { value: 'any', label: 'Peu importe', description: 'Quel que soit l\'état', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+  { value: 'dirty', label: 'Sale', description: 'SAL, SALE, VD, DIRTY, SUCIO, SPORCO', color: 'bg-orange-100 text-orange-800 border-orange-200', defaultSynonyms: 'SUCIO, SPORCO, SCHMUTZIG' },
+  { value: 'clean', label: 'Propre', description: 'INS, PROPRE, CLEAN, LIMPIO', color: 'bg-green-100 text-green-800 border-green-200', defaultSynonyms: 'LIMPIO, PULITO, SAUBER' },
+  { value: 'any', label: 'Peu importe', description: 'Quel que soit l\'état', color: 'bg-gray-100 text-gray-800 border-gray-200', defaultSynonyms: '' },
 ];
 
 const CLEANING_OPTIONS = [
@@ -166,8 +168,11 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
         let clientStatus: SimpleRule['clientStatus'] = 'any';
         let roomState: SimpleRule['roomState'] = 'any';
         let customKeywords: string | undefined;
+        let roomStateSynonyms: string | undefined;
 
         const conditions = (dbRule.conditions as any[]) || [];
+        const synonyms: string[] = [];
+        
         for (const cond of conditions) {
           if (cond?.type === 'status') {
             const value = String(cond.value || '').toLowerCase();
@@ -178,14 +183,24 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
             else if (value === 'clean') roomState = 'clean';
           }
           if (cond?.type === 'keyword') {
-            clientStatus = 'custom';
-            const kw = conditions
-              .filter(c => c?.type === 'keyword')
-              .map(c => String(c.value || '').trim())
-              .filter(Boolean)
-              .join(', ');
-            customKeywords = kw;
+            if (cond.isSynonym) {
+              // C'est un synonyme pour l'état chambre
+              synonyms.push(String(cond.value || '').trim());
+            } else {
+              // C'est un mot-clé personnalisé pour la situation client
+              clientStatus = 'custom';
+              const kw = conditions
+                .filter(c => c?.type === 'keyword' && !c.isSynonym)
+                .map(c => String(c.value || '').trim())
+                .filter(Boolean)
+                .join(', ');
+              customKeywords = kw;
+            }
           }
+        }
+        
+        if (synonyms.length > 0) {
+          roomStateSynonyms = synonyms.join(', ');
         }
 
         return {
@@ -198,6 +213,7 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
           priority: dbRule.priority,
           isActive: dbRule.is_active,
           customKeywords,
+          roomStateSynonyms,
         };
       });
 
@@ -244,9 +260,20 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
         conditions.push({ type: 'status', operator: 'equals', value: statusMap[rule.clientStatus] || rule.clientStatus });
       }
 
-      // Condition 2: État chambre
+      // Condition 2: État chambre + synonymes
       if (rule.roomState !== 'any') {
         conditions.push({ type: 'status', operator: 'equals', value: rule.roomState });
+        
+        // Ajouter les synonymes comme conditions keyword
+        if (rule.roomStateSynonyms) {
+          const synonyms = rule.roomStateSynonyms
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+          for (const syn of synonyms) {
+            conditions.push({ type: 'keyword', operator: 'contains', value: syn, isSynonym: true });
+          }
+        }
       }
 
       const dbRule = {
@@ -344,12 +371,22 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
           clientMatch = kws.some(k => textUpper.includes(k));
         }
 
-        // Vérifier roomState
+        // Vérifier roomState + synonymes
         let roomMatch = rule.roomState === 'any';
         if (rule.roomState === 'dirty') {
           roomMatch = /\bSAL(?:E)?\b|\bDIRTY\b|\bVD\b/.test(textUpper);
+          // Vérifier aussi les synonymes
+          if (!roomMatch && rule.roomStateSynonyms) {
+            const syns = rule.roomStateSynonyms.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+            roomMatch = syns.some(syn => textUpper.includes(syn));
+          }
         } else if (rule.roomState === 'clean') {
           roomMatch = /\bPROPRE\b|\bCLEAN\b|\bINS\b/.test(textUpper);
+          // Vérifier aussi les synonymes
+          if (!roomMatch && rule.roomStateSynonyms) {
+            const syns = rule.roomStateSynonyms.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+            roomMatch = syns.some(syn => textUpper.includes(syn));
+          }
         }
 
         if (clientMatch && roomMatch) {
@@ -551,7 +588,11 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setEditingRule({ ...editingRule, roomState: opt.value as any })}
+                      onClick={() => setEditingRule({ 
+                        ...editingRule, 
+                        roomState: opt.value as any,
+                        roomStateSynonyms: opt.defaultSynonyms || editingRule.roomStateSynonyms
+                      })}
                       className={cn(
                         "p-3 rounded-lg border-2 transition-all text-center",
                         editingRule.roomState === opt.value
@@ -564,6 +605,24 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
                     </button>
                   ))}
                 </div>
+
+                {/* Synonymes multi-langues */}
+                {editingRule.roomState !== 'any' && (
+                  <div className="mt-3">
+                    <Label className="text-xs text-muted-foreground">
+                      Synonymes / termes équivalents (multi-langues, séparés par virgule)
+                    </Label>
+                    <Input
+                      value={editingRule.roomStateSynonyms || ''}
+                      onChange={(e) => setEditingRule({ ...editingRule, roomStateSynonyms: e.target.value })}
+                      placeholder="Ex: SUCIO, SPORCO, SCHMUTZIG, DIRTY"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ajoutez des termes dans d'autres langues (ES, IT, DE, EN) pour détecter ce statut.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Flèche */}
