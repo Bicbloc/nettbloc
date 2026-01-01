@@ -55,8 +55,8 @@ const PATTERNS = {
   
   // Statuts à détecter
   STATUS_KEYWORDS: [
-    'PARTI', 'DEPART', 'CHECKOUT', 'CHECK-OUT', 'DEP', 'CO', 'DUE OUT',
-    'ARRIVÉE', 'ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'ARR', 'CI', 'DUE IN', 'EN ARRIVÉE',
+    'PARTI', 'DEPART', 'CHECKOUT', 'CHECK-OUT', 'DEP', 'CO', 'C/O', 'DUE OUT',
+    'ARRIVÉE', 'ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'ARR', 'CI', 'C/I', 'DUE IN', 'EN ARRIVÉE',
     'RECOUCHE', 'STAYOVER', 'STAY', 'OCCUPIED',
     'SALE', 'DIRTY', 'DIR', 'SAL', 'VD', 'OD',
     'PROPRE', 'CLEAN', 'INS', 'VC', 'OC',
@@ -125,17 +125,40 @@ class FieldExtractor {
     fields.roomType = this.extractRoomType(line);
     
     // Extraire les statuts bruts
+    const hasDepartureTime = /\b([01]?\d|2[0-3])(?:[:hH\.]?)([0-5]\d)\b|\b([01]?\d|2[0-3])\s*h\s*([0-5]\d)\b/i.test(line);
     fields.rawStatuses = this.extractStatuses(line);
-    
+
+    // Si une heure est présente (souvent une heure de départ), on privilégie C/O
+    if (hasDepartureTime) {
+      const checkoutSignals = new Set([
+        'PARTI', 'DEPART', 'CHECKOUT', 'CHECK-OUT', 'DEP', 'CO', 'C/O', 'DUE OUT'
+      ]);
+      const arrivalSignals = new Set([
+        'ARRIVÉE', 'ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'ARR', 'CI', 'C/I', 'DUE IN', 'EN ARRIVÉE'
+      ]);
+
+      const hasCheckoutStatus = fields.rawStatuses.some(s => checkoutSignals.has(s.toUpperCase()));
+      if (hasCheckoutStatus) {
+        fields.rawStatuses = fields.rawStatuses
+          .map(s => {
+            const u = s.toUpperCase();
+            if (u === 'CO') return 'C/O';
+            if (u === 'CI') return 'C/I';
+            return s;
+          })
+          .filter(s => !arrivalSignals.has(s.toUpperCase()));
+      }
+    }
+
     // Inférer le type de nettoyage depuis les données
     const inference = inferCleaningFromDates(
       fields.arrivalDate,
       fields.departureDate,
       fields.nightInfo
     );
-    
+
     // Ajuster avec les statuts détectés
-    const statusBasedInference = this.inferFromStatuses(fields.rawStatuses);
+    const statusBasedInference = this.inferFromStatuses(fields.rawStatuses, hasDepartureTime);
     
     // Combiner les deux inférences (statuts ont priorité si présents)
     let finalCleaning = inference.cleaningType;
@@ -293,21 +316,29 @@ class FieldExtractor {
   /**
    * Infère le nettoyage depuis les statuts détectés
    */
-  private inferFromStatuses(statuses: string[]): { cleaningType: CleaningType; status: string; reason: string; confidence: number } {
+  private inferFromStatuses(
+    statuses: string[],
+    hasDepartureTime: boolean = false
+  ): { cleaningType: CleaningType; status: string; reason: string; confidence: number } {
     const upper = statuses.map(s => s.toUpperCase());
-    
+
     // Checkout + Arrival = à blanc (full clean)
-    const hasCheckout = upper.some(s => ['PARTI', 'DEPART', 'CHECKOUT', 'CHECK-OUT', 'DEP', 'CO', 'DUE OUT'].includes(s));
-    const hasArrival = upper.some(s => ['ARRIVÉE', 'ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'ARR', 'CI', 'DUE IN', 'EN ARRIVÉE'].includes(s));
-    
+    const hasCheckout = upper.some(s => ['PARTI', 'DEPART', 'CHECKOUT', 'CHECK-OUT', 'DEP', 'CO', 'C/O', 'DUE OUT'].includes(s));
+    const hasArrival = upper.some(s => ['ARRIVÉE', 'ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'ARR', 'CI', 'C/I', 'DUE IN', 'EN ARRIVÉE'].includes(s));
+
+    // Si une heure est présente, on considère qu'il s'agit d'un départ effectif → checkout (pas checkout_arrival)
+    if (hasCheckout && hasArrival && hasDepartureTime) {
+      return { cleaningType: 'a_blanc', status: 'checkout', reason: 'Départ (heure détectée)', confidence: 92 };
+    }
+
     if (hasCheckout && hasArrival) {
       return { cleaningType: 'a_blanc', status: 'checkout_arrival', reason: 'Départ + Arrivée', confidence: 90 };
     }
-    
+
     if (hasCheckout) {
       return { cleaningType: 'a_blanc', status: 'checkout', reason: 'Départ', confidence: 85 };
     }
-    
+
     if (hasArrival) {
       // Arrivée seule - vérifier si clean ou à préparer
       const hasClean = upper.some(s => ['PROPRE', 'CLEAN', 'INS', 'VC', 'A CONTROLER', 'A CONTRÔLER'].includes(s));
@@ -316,31 +347,31 @@ class FieldExtractor {
       }
       return { cleaningType: 'a_blanc', status: 'arrival', reason: 'Arrivée', confidence: 80 };
     }
-    
+
     // Stayover/Recouche
     const hasStayover = upper.some(s => ['RECOUCHE', 'STAYOVER', 'STAY', 'OD', 'OCCUPIED DIRTY'].includes(s));
     if (hasStayover) {
       return { cleaningType: 'recouche', status: 'stayover', reason: 'Recouche', confidence: 85 };
     }
-    
+
     // Dirty
     const hasDirty = upper.some(s => ['SALE', 'DIRTY', 'DIR', 'SAL', 'VD'].includes(s));
     if (hasDirty) {
       return { cleaningType: 'a_blanc', status: 'dirty', reason: 'Sale', confidence: 80 };
     }
-    
+
     // Clean
     const hasClean = upper.some(s => ['PROPRE', 'CLEAN', 'INS', 'VC', 'OC'].includes(s));
     if (hasClean) {
       return { cleaningType: 'none', status: 'clean', reason: 'Propre', confidence: 80 };
     }
-    
+
     // Out of order
     const hasOOO = upper.some(s => ['HS', 'OOO', 'OUT OF ORDER', 'MAINTENANCE'].includes(s));
     if (hasOOO) {
       return { cleaningType: 'none', status: 'out-of-order', reason: 'Hors service', confidence: 90 };
     }
-    
+
     return { cleaningType: 'a_blanc', status: 'unknown', reason: 'Pas de statut clair', confidence: 40 };
   }
 }
