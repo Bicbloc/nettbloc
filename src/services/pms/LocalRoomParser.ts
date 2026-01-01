@@ -55,9 +55,10 @@ const NIGHT_REGEX = /(?:Nuit|Night|N)\s*(\d+)\s*[\/\\-]\s*(\d+)/i;
 
 // Status keywords
 const STATUS_KEYWORDS = {
-  checkout: ['parti', 'départ', 'checkout', 'check-out', 'dep', 'dir', 'out', 'leaving'],
-  arrival: ['arrivée', 'arrival', 'arr', 'en arrivée', 'coming', 'check-in'],
-  stayover: ['recouche', 'stayover', 'sal', 'séjour', 'stay', 'occupied'],
+  // NB: on évite "co" (trop ambigu), mais on accepte "c/o"
+  checkout: ['parti', 'départ', 'checkout', 'check-out', 'dep', 'c/o', 'c-o', 'dir', 'out', 'leaving'],
+  arrival: ['arrivée', 'arrival', 'arr', 'en arrivée', 'coming', 'check-in', 'c/i', 'c-i'],
+  stayover: ['recouche', 'stayover', 'séjour', 'stay', 'occupied'],
   clean: ['propre', 'clean', 'ins', 'inspecté', 'a controler', 'contrôlé', 'inspected', 'ready'],
   outOfOrder: ['hs', 'hors service', 'ooo', 'out of order', 'maintenance', 'blocked', 'bloqué']
 };
@@ -190,6 +191,12 @@ class LocalRoomParser {
 
     if (hasCheckout && hasArrival) {
       return { cleaningType: 'a_blanc', status: 'checkout_arrival', reason: 'Départ + Arrivée' };
+    }
+
+    // IMPORTANT: si un départ est explicitement détecté, il est prioritaire
+    // (évite qu'une "Nuit 2/3" force une recouche alors que la ligne est CO/C-O/C/O SALE)
+    if (hasCheckout && !hasArrival) {
+      return { cleaningType: 'a_blanc', status: 'checkout', reason: 'Départ détecté (prioritaire)' };
     }
 
     // Règle 3: CRITIQUE - Nuit X/Y avec date de départ
@@ -391,18 +398,25 @@ class LocalRoomParser {
     const timeRegex = /\b([01]?\d|2[0-3])(?:[:hH\.]?)([0-5]\d)\b|\b([01]?\d|2[0-3])\s*h\s*([0-5]\d)\b/;
     const hasTime = timeRegex.test(line);
 
-    // Tokens checkout possibles dans les rapports (évite d'ajouter "co" dans la liste, trop dangereux)
+    // Tokens checkout possibles dans les rapports
     const hasCheckoutToken = /\bC\s*\/\s*O\b|\bC\s*-\s*O\b|\bCO\b/i.test(line);
     const hasCheckoutKeyword = STATUS_KEYWORDS.checkout.some(k => lineLower.includes(k));
+
+    // Sale: SAL ou SALE (fr/en)
+    const hasSaleToken = /\bSAL(?:E)?\b|\bDIRTY\b/i.test(line);
+
+    // Cas demandé: CO/C-O/C/O + SALE => À blanc (checkout)
+    if (hasCheckoutToken && hasSaleToken) {
+      statuses.push('checkout');
+      if (/\bSAL\b/i.test(line) || /\bSALE\b/i.test(line)) statuses.push('sal');
+      this.log(`CO + SALE détecté → checkout (${statuses.join(' + ')})`);
+      return statuses;
+    }
 
     // Si heure + checkout → forcer checkout et ignorer l'arrivée
     if (hasTime && (hasCheckoutToken || hasCheckoutKeyword)) {
       statuses.push('checkout');
-
-      // Conserver SAL si présent (sale)
-      const hasSal = /\bSAL\b/i.test(line);
-      if (hasSal) statuses.push('sal');
-
+      if (/\bSAL\b/i.test(line) || /\bSALE\b/i.test(line)) statuses.push('sal');
       this.log(`Heure détectée → priorité checkout (${statuses.join(' + ')})`);
       return statuses;
     }
