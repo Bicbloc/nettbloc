@@ -399,14 +399,50 @@ class UnifiedParserService {
   }
 
   /**
+   * Extrait la date du rapport depuis le header Mews
+   * Ex: "Statut des espaces - 01/01/2026" ou "Hôtel ... 01/01/2026 14:09:11"
+   */
+  private extractReportDate(text: string): Date | null {
+    // Pattern 1: "Statut des espaces - DD/MM/YYYY"
+    const pattern1 = /Statut des espaces\s*[-–]\s*(\d{2}\/\d{2}\/\d{4})/i;
+    let match = text.match(pattern1);
+    if (match) {
+      const [day, month, year] = match[1].split('/').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    
+    // Pattern 2: Footer "Hotel ... DD/MM/YYYY HH:MM:SS"
+    const pattern2 = /(?:Hôtel|Hotel)\s+.*?(\d{2}\/\d{2}\/\d{4})\s+\d{2}:\d{2}:\d{2}/i;
+    match = text.match(pattern2);
+    if (match) {
+      const [day, month, year] = match[1].split('/').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    
+    // Pattern 3: Any date at the beginning of the text
+    const pattern3 = /^.*?(\d{2}\/\d{2}\/\d{4})/m;
+    match = text.match(pattern3);
+    if (match) {
+      const [day, month, year] = match[1].split('/').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    
+    return null;
+  }
+
+  /**
    * PATTERN-FIRST: Extrait les chambres en utilisant les patterns validés comme référence
    * Pour chaque numéro de chambre validé, cherche dans le texte et détermine le statut/cleaningType
    */
   private extractFromPatterns(text: string, pmsType: string): ExtractedRoom[] {
     const rooms: ExtractedRoom[] = [];
     const lines = text.split('\n');
+    const reportDate = this.extractReportDate(text);
     
     this.log(`🔎 Pattern-first: Recherche de ${this.learnedPatterns.size} numéros dans ${lines.length} lignes`);
+    if (reportDate) {
+      this.log(`📅 Date du rapport détectée: ${reportDate.toLocaleDateString('fr-FR')}`);
+    }
     
     // Pour chaque numéro de chambre validé dans les patterns
     for (const [normalizedNumber, pattern] of this.learnedPatterns) {
@@ -420,7 +456,7 @@ class UnifiedParserService {
         
         if (roomRegex.test(line)) {
           // Déterminer le statut et type de nettoyage à partir du contexte de la ligne
-          const { status, cleaningType } = this.analyzeLineContext(line, pmsType);
+          const { status, cleaningType, reason } = this.analyzeLineContext(line, pmsType, reportDate);
           
           rooms.push({
             roomNumber,
@@ -435,7 +471,7 @@ class UnifiedParserService {
               detectedKeywords: [],
               source: 'pattern' as const,
               confidence: 90,
-              appliedRule: `Pattern-first extraction: ${roomNumber}`
+              appliedRule: `Pattern-first: ${reason}`
             }
           });
           
@@ -444,86 +480,233 @@ class UnifiedParserService {
       }
     }
     
-    this.log(`🎯 Pattern-first: ${rooms.length}/${this.learnedPatterns.size} chambres trouvées dans le texte`);
-    return rooms;
+    // ====== FUSION DES CHAMBRES LIÉES (107+108) ======
+    const mergedRooms = this.mergeConnectedRooms(rooms, text);
+    
+    this.log(`🎯 Pattern-first: ${mergedRooms.length}/${this.learnedPatterns.size} chambres trouvées (après fusion)`);
+    return mergedRooms;
+  }
+
+  /**
+   * Fusionne les chambres liées (format 107+108) en un seul groupe
+   */
+  private mergeConnectedRooms(rooms: ExtractedRoom[], text: string): ExtractedRoom[] {
+    const lines = text.split('\n');
+    const linkedRegex = /(\d{2,4})\s*\+\s*(\d{2,4})/g;
+    
+    const byNumber = new Map<string, ExtractedRoom>();
+    for (const r of rooms) {
+      byNumber.set(this.normalizeRoomNumber(String(r.roomNumber)), r);
+    }
+    
+    const removed = new Set<string>();
+    const merged: ExtractedRoom[] = [];
+    
+    const pickBest = (a?: ExtractedRoom, b?: ExtractedRoom): { status: string; cleaningType: CleaningType; confidence: number } => {
+      const candidates = [a, b].filter(Boolean) as ExtractedRoom[];
+      if (candidates.length === 0) return { status: 'unknown', cleaningType: 'none', confidence: 60 };
+      
+      // Priorité de nettoyage (du plus important au moins important)
+      const priority: CleaningType[] = ['a_blanc', 'full', 'recouche', 'quick', 'none'];
+      const best = [...candidates].sort((x, y) => priority.indexOf(x.cleaningType) - priority.indexOf(y.cleaningType))[0];
+      
+      return {
+        status: best.status || 'unknown',
+        cleaningType: best.cleaningType || 'none',
+        confidence: Math.max(...candidates.map((c) => c.confidence ?? 70)),
+      };
+    };
+    
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      
+      // Ignorer les lignes d'en-tête
+      if (line.includes('Étage') && line.includes('Espaces')) continue;
+      if (line.includes('Hotel') && /\d{2}\/\d{2}\/\d{4}/.test(line)) continue;
+      if (/^\s*\d\s*$/.test(line)) continue;
+      
+      linkedRegex.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = linkedRegex.exec(line)) !== null) {
+        const aRaw = match[1];
+        const bRaw = match[2];
+        
+        const a = this.normalizeRoomNumber(aRaw);
+        const b = this.normalizeRoomNumber(bRaw);
+        
+        if (!a || !b) continue;
+        if (removed.has(a) || removed.has(b)) continue;
+        
+        const roomA = byNumber.get(a);
+        const roomB = byNumber.get(b);
+        const { status, cleaningType, confidence } = pickBest(roomA, roomB);
+        
+        removed.add(a);
+        removed.add(b);
+        
+        merged.push({
+          roomNumber: `${aRaw}-${bRaw}`,
+          status,
+          cleaningType,
+          originalText: line.trim(),
+          validated: true,
+          confidence: Math.max(85, confidence),
+          isConnected: true,
+          linkedRooms: [aRaw, bRaw],
+          debugInfo: {
+            rawLine: line,
+            cleanedLine: line.trim(),
+            detectedKeywords: [],
+            source: 'pattern' as const,
+            confidence: Math.max(85, confidence),
+            appliedRule: 'Connected rooms merge (+)',
+          },
+        });
+      }
+    }
+    
+    return [
+      ...rooms.filter((r) => !removed.has(this.normalizeRoomNumber(String(r.roomNumber)))),
+      ...merged,
+    ];
   }
 
   /**
    * Analyse le contexte d'une ligne pour déterminer le statut et type de nettoyage
+   * Utilise la date du rapport pour comparer avec les dates de départ
    */
-  private analyzeLineContext(line: string, pmsType: string): { status: string; cleaningType: CleaningType } {
+  private analyzeLineContext(
+    line: string, 
+    pmsType: string,
+    reportDate: Date | null = null
+  ): { status: string; cleaningType: CleaningType; reason: string } {
     const upper = line.toUpperCase();
     
-    // Règles Mews spécifiques
+    // ====== RÈGLES MEWS SPÉCIFIQUES ======
     if (pmsType === 'mews') {
       // Checkout + Arrival (même ligne) = a_blanc prioritaire
       const hasDepOrDirty = /\b(DEP|DIR|DIRTY)\b/.test(upper);
       const hasArr = /\bARR\b/.test(upper);
       if (hasDepOrDirty && hasArr) {
-        return { status: 'checkout_arrival', cleaningType: 'a_blanc' };
+        return { status: 'checkout_arrival', cleaningType: 'a_blanc', reason: 'DEP+ARR' };
       }
       
       // PRO = propre, pas de nettoyage
       if (/\bPRO\b/.test(upper)) {
-        return { status: 'clean', cleaningType: 'none' };
+        return { status: 'clean', cleaningType: 'none', reason: 'PRO (propre)' };
       }
       
       // INS = inspecté, pas de nettoyage
       if (/\bINS\b/.test(upper)) {
-        return { status: 'inspected', cleaningType: 'none' };
+        return { status: 'inspected', cleaningType: 'none', reason: 'INS (inspecté)' };
       }
       
-      // SAL = sale, stayover (recouche par défaut)
+      // ====== LOGIQUE SAL (SALE) - AMÉLIORATION PRINCIPALE ======
       if (/\bSAL\b/.test(upper)) {
-        // Vérifier si c'est un stayover via Nuit X/Y
+        // 1) Vérifier Nuit X/Y pour stayover vs checkout
         const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
                           upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
         if (nightMatch) {
           const currentNight = parseInt(nightMatch[1]);
           const totalNights = parseInt(nightMatch[2]);
           if (currentNight < totalNights) {
-            return { status: 'stayover', cleaningType: 'recouche' };
+            return { status: 'stayover', cleaningType: 'recouche', reason: `SAL + Nuit ${currentNight}/${totalNights} (recouche)` };
           } else {
-            return { status: 'checkout', cleaningType: 'a_blanc' };
+            return { status: 'checkout', cleaningType: 'a_blanc', reason: `SAL + Nuit ${currentNight}/${totalNights} (départ)` };
           }
         }
-        return { status: 'dirty', cleaningType: 'recouche' };
+        
+        // 2) Utiliser la date de départ vs date du rapport
+        // Mews affiche généralement la date d'arrivée dans le format "DD/MM/YYYY"
+        const dateMatch = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (dateMatch && reportDate) {
+          const [, day, month, year] = dateMatch;
+          const foundDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          
+          // Calculer la différence en jours
+          const diffDays = Math.floor((reportDate.getTime() - foundDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Si la date trouvée est AVANT la date du rapport (client arrivé il y a X jours)
+          // ET il n'y a pas d'heure de départ explicite → recouche
+          // Si date == date du rapport → a_blanc (arrivée ou départ du jour)
+          
+          // Heuristique heure de départ: une heure en fin de ligne comme "12:00"
+          const hasCheckoutTime = /\d{2}:\d{2}\s*$/.test(line.trim());
+          
+          if (diffDays === 0) {
+            // Date = date du rapport → départ ou arrivée du jour
+            if (hasCheckoutTime) {
+              return { status: 'checkout', cleaningType: 'a_blanc', reason: `SAL + Date=${dateMatch[0]} (départ jour) + heure départ` };
+            }
+            // Date d'arrivée le jour même → recouche si client présent, sinon a_blanc
+            const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
+            if (hasOccupancy && !hasCheckoutTime) {
+              return { status: 'stayover', cleaningType: 'recouche', reason: `SAL + Date=${dateMatch[0]} (arrivée jour) + occupation` };
+            }
+            return { status: 'dirty', cleaningType: 'a_blanc', reason: `SAL + Date=${dateMatch[0]} (jour même)` };
+          } else if (diffDays > 0) {
+            // Date dans le passé → client en séjour (arrivé il y a X jours)
+            if (hasCheckoutTime) {
+              // Heure de départ présente → c'est un checkout prévu
+              return { status: 'checkout', cleaningType: 'a_blanc', reason: `SAL + Date passée + heure départ → À blanc` };
+            }
+            return { status: 'stayover', cleaningType: 'recouche', reason: `SAL + Arrivée ${dateMatch[0]} (il y a ${diffDays}j) → Recouche` };
+          } else {
+            // Date dans le futur → arrivée prévue
+            return { status: 'arrival', cleaningType: 'a_blanc', reason: `SAL + Arrivée future ${dateMatch[0]} → À blanc` };
+          }
+        }
+        
+        // 3) Heuristique: heure en fin de ligne = checkout prévu
+        const hasCheckoutTimeSimple = /\d{2}:\d{2}\s*$/.test(line.trim());
+        if (hasCheckoutTimeSimple) {
+          return { status: 'checkout', cleaningType: 'a_blanc', reason: 'SAL + heure départ → À blanc' };
+        }
+        
+        // 4) Heuristique: occupation sans heure = recouche
+        const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
+        if (hasOccupancy) {
+          return { status: 'stayover', cleaningType: 'recouche', reason: 'SAL + occupation (Adultes) → Recouche' };
+        }
+        
+        // Default SAL sans plus d'info → recouche (plus conservateur)
+        return { status: 'dirty', cleaningType: 'recouche', reason: 'SAL (défaut) → Recouche' };
       }
       
       // DEP seul = départ, a_blanc
       if (/\b(DEP|CHECKOUT|DÉPART)\b/.test(upper)) {
-        return { status: 'checkout', cleaningType: 'a_blanc' };
+        return { status: 'checkout', cleaningType: 'a_blanc', reason: 'DEP/CHECKOUT' };
       }
       
-      // DIR (dirty) = sale
+      // DIR (dirty) = sale → recouche par défaut (pas a_blanc)
       if (/\bDIR\b/.test(upper)) {
-        return { status: 'dirty', cleaningType: 'recouche' };
+        return { status: 'dirty', cleaningType: 'recouche', reason: 'DIR (sale)' };
       }
     }
     
-    // Règles génériques
+    // ====== RÈGLES GÉNÉRIQUES ======
     // Checkout/Départ
     if (/\b(CHECKOUT|DÉPART|DEPARTURE|DEP|C\/O)\b/.test(upper)) {
-      return { status: 'checkout', cleaningType: 'a_blanc' };
+      return { status: 'checkout', cleaningType: 'a_blanc', reason: 'checkout keyword' };
     }
     
     // Stayover/Recouche
     if (/\b(STAYOVER|RECOUCHE|STAY|OCC|OCCUPIED)\b/.test(upper)) {
-      return { status: 'stayover', cleaningType: 'recouche' };
+      return { status: 'stayover', cleaningType: 'recouche', reason: 'stayover keyword' };
     }
     
     // Propre/Clean
     if (/\b(CLEAN|PROPRE|READY|INSPECTED|PRO|INS)\b/.test(upper)) {
-      return { status: 'clean', cleaningType: 'none' };
+      return { status: 'clean', cleaningType: 'none', reason: 'clean keyword' };
     }
     
     // Sale/Dirty
     if (/\b(DIRTY|SALE|SAL|DIR)\b/.test(upper)) {
-      return { status: 'dirty', cleaningType: 'recouche' };
+      return { status: 'dirty', cleaningType: 'recouche', reason: 'dirty keyword' };
     }
     
-    // Par défaut, considérer comme "à nettoyer" (a_blanc)
-    return { status: 'unknown', cleaningType: 'a_blanc' };
+    // Par défaut, ne pas forcer a_blanc → recouche plus conservateur
+    return { status: 'unknown', cleaningType: 'recouche', reason: 'default' };
   }
 
   /**

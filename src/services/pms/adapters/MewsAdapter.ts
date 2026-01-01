@@ -146,12 +146,16 @@ export class MewsAdapter extends PmsAdapter {
     const processedText = this.preprocessText(text);
     console.log("🔧 Texte pré-traité pour Mews:", processedText.substring(0, 500));
 
+    // Extraire la date du rapport depuis le header
+    const reportDate = this.extractReportDate(processedText);
+    if (reportDate) {
+      console.log(`📅 MewsAdapter: Date du rapport détectée: ${reportDate.toLocaleDateString('fr-FR')}`);
+    }
+
     // 1) Extraction standard via le moteur commun (regex + FieldExtractor)
     const baseRooms = super.extractRooms(processedText);
 
-    // 1.b) IMPORTANT: Mews utilise souvent les codes "PRO/SAL/INS/...".
-    // FieldExtractor ne détecte pas toujours "PRO" (abréviation), donc on ré-applique ici
-    // la règle de statut/nettoyage du PMS pour garantir des résultats corrects.
+    // 1.b) Appliquer les règles Mews améliorées avec la date du rapport
     for (const r of baseRooms) {
       const rawLine = r.debugInfo?.rawLine || r.originalText || '';
       const upper = rawLine.toUpperCase();
@@ -163,11 +167,10 @@ export class MewsAdapter extends PmsAdapter {
         r.status = 'checkout_arrival';
         r.cleaningType = 'a_blanc';
       } else {
-        const local = this.detectStatus(rawLine);
-        if (local.status !== 'unknown') {
-          r.status = local.status;
-          r.cleaningType = local.cleaning;
-        }
+        // Utiliser la nouvelle logique améliorée pour SAL
+        const { status, cleaningType } = this.analyzeLineWithDate(rawLine, reportDate);
+        r.status = status;
+        r.cleaningType = cleaningType;
       }
 
       // Ajustement recouche vs départ via nuit X/Y quand c'est sale
@@ -182,7 +185,7 @@ export class MewsAdapter extends PmsAdapter {
       }
 
       // Normalisation défensive (éviter undefined)
-      if (!r.cleaningType) r.cleaningType = 'none';
+      if (!r.cleaningType) r.cleaningType = 'recouche';
       if (!r.status) r.status = 'unknown';
     }
 
@@ -279,5 +282,121 @@ export class MewsAdapter extends PmsAdapter {
 
     console.log(`🏠 MewsAdapter: ${deduped.length} chambres extraites`);
     return deduped;
+  }
+
+  /**
+   * Extrait la date du rapport depuis le header Mews
+   */
+  private extractReportDate(text: string): Date | null {
+    // Pattern 1: "Statut des espaces - DD/MM/YYYY"
+    const pattern1 = /Statut des espaces\s*[-–]\s*(\d{2}\/\d{2}\/\d{4})/i;
+    let match = text.match(pattern1);
+    if (match) {
+      const [day, month, year] = match[1].split('/').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    
+    // Pattern 2: Footer "Hotel ... DD/MM/YYYY HH:MM:SS"
+    const pattern2 = /(?:Hôtel|Hotel)\s+.*?(\d{2}\/\d{2}\/\d{4})\s+\d{2}:\d{2}:\d{2}/i;
+    match = text.match(pattern2);
+    if (match) {
+      const [day, month, year] = match[1].split('/').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    
+    return null;
+  }
+
+  /**
+   * Analyse une ligne avec la date du rapport pour déterminer à blanc vs recouche
+   */
+  private analyzeLineWithDate(line: string, reportDate: Date | null): { status: string; cleaningType: CleaningType } {
+    const upper = line.toUpperCase();
+    
+    // PRO = propre, pas de nettoyage
+    if (/\bPRO\b/.test(upper)) {
+      return { status: 'clean', cleaningType: 'none' };
+    }
+    
+    // INS = inspecté, pas de nettoyage
+    if (/\bINS\b/.test(upper)) {
+      return { status: 'inspected', cleaningType: 'none' };
+    }
+    
+    // DEP = départ
+    if (/\b(DEP|CHECKOUT|DÉPART)\b/.test(upper)) {
+      return { status: 'checkout', cleaningType: 'a_blanc' };
+    }
+    
+    // SAL = logique améliorée avec date
+    if (/\bSAL\b/.test(upper)) {
+      // 1) Vérifier Nuit X/Y pour stayover vs checkout
+      const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
+                        upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+      if (nightMatch) {
+        const currentNight = parseInt(nightMatch[1]);
+        const totalNights = parseInt(nightMatch[2]);
+        if (currentNight < totalNights) {
+          return { status: 'stayover', cleaningType: 'recouche' };
+        } else {
+          return { status: 'checkout', cleaningType: 'a_blanc' };
+        }
+      }
+      
+      // 2) Utiliser la date vs date du rapport
+      const dateMatch = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (dateMatch && reportDate) {
+        const [, day, month, year] = dateMatch;
+        const foundDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const diffDays = Math.floor((reportDate.getTime() - foundDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Heure de départ en fin de ligne?
+        const hasCheckoutTime = /\d{2}:\d{2}\s*$/.test(line.trim());
+        
+        if (diffDays === 0) {
+          // Date = date du rapport
+          if (hasCheckoutTime) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
+          if (hasOccupancy) {
+            return { status: 'stayover', cleaningType: 'recouche' };
+          }
+          return { status: 'dirty', cleaningType: 'a_blanc' };
+        } else if (diffDays > 0) {
+          // Date dans le passé → client en séjour
+          if (hasCheckoutTime) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        } else {
+          // Date dans le futur → arrivée prévue
+          return { status: 'arrival', cleaningType: 'a_blanc' };
+        }
+      }
+      
+      // 3) Heuristique: heure en fin de ligne = checkout prévu
+      const hasCheckoutTime = /\d{2}:\d{2}\s*$/.test(line.trim());
+      if (hasCheckoutTime) {
+        return { status: 'checkout', cleaningType: 'a_blanc' };
+      }
+      
+      // 4) Heuristique: occupation sans heure = recouche
+      const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
+      if (hasOccupancy) {
+        return { status: 'stayover', cleaningType: 'recouche' };
+      }
+      
+      // Default SAL → recouche (plus conservateur)
+      return { status: 'dirty', cleaningType: 'recouche' };
+    }
+    
+    // DIR (dirty) = recouche par défaut
+    if (/\bDIR\b/.test(upper)) {
+      return { status: 'dirty', cleaningType: 'recouche' };
+    }
+    
+    // Par défaut → recouche (plus conservateur que a_blanc)
+    return { status: 'unknown', cleaningType: 'recouche' };
   }
 }
