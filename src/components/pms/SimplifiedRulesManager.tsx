@@ -100,28 +100,28 @@ const RULE_TEMPLATES: Omit<SimpleRule, 'id'>[] = [
 ];
 
 const TRIGGER_LABELS: Record<string, { label: string; icon: React.ReactNode; keywords: string[] }> = {
-  checkout: { 
-    label: 'Départ client', 
+  checkout: {
+    label: 'Départ client',
     icon: <Home className="h-4 w-4" />,
-    keywords: ['DEPART', 'CHECKOUT', 'CO', 'PARTI', 'DEP']
+    keywords: ['DEPART', 'CHECKOUT', 'C/O', 'C-O', 'CO', 'PARTI', 'DEP', 'DUE OUT']
   },
-  checkin: { 
-    label: 'Arrivée prévue', 
+  checkin: {
+    label: 'Arrivée prévue',
     icon: <UserCheck className="h-4 w-4" />,
-    keywords: ['ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'CI', 'ARR']
+    keywords: ['ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'C/I', 'C-I', 'CI', 'ARR', 'DUE IN']
   },
-  stayover: { 
-    label: 'Client en séjour', 
+  stayover: {
+    label: 'Client en séjour',
     icon: <CalendarCheck className="h-4 w-4" />,
-    keywords: ['RECOUCHE', 'STAYOVER', 'STAY', 'OD']
+    keywords: ['RECOUCHE', 'STAYOVER', 'STAY', 'OD', 'OCCUPIED']
   },
-  dirty: { 
-    label: 'Chambre sale', 
+  dirty: {
+    label: 'Chambre sale',
     icon: <Clock className="h-4 w-4" />,
-    keywords: ['SALE', 'DIRTY', 'VD', 'DIR']
+    keywords: ['SAL', 'SALE', 'DIRTY', 'VD', 'DIR']
   },
-  custom: { 
-    label: 'Personnalisé', 
+  custom: {
+    label: 'Personnalisé',
     icon: <Wand2 className="h-4 w-4" />,
     keywords: []
   },
@@ -161,15 +161,27 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
       const loadedRules: SimpleRule[] = (data || []).map(dbRule => {
         // Détecter le trigger à partir des conditions
         let trigger: SimpleRule['trigger'] = 'custom';
-        const conditions = dbRule.conditions as any[];
-        if (conditions?.length > 0) {
+        let customKeywords: string | undefined;
+
+        const conditions = (dbRule.conditions as any[]) || [];
+        if (conditions.length > 0) {
           const firstCondition = conditions[0];
+
           if (firstCondition?.type === 'status') {
-            const value = firstCondition.value?.toUpperCase() || '';
-            if (value.includes('DEPART') || value.includes('CHECKOUT')) trigger = 'checkout';
-            else if (value.includes('ARRIVEE') || value.includes('ARRIVAL')) trigger = 'checkin';
-            else if (value.includes('RECOUCHE') || value.includes('STAYOVER')) trigger = 'stayover';
-            else if (value.includes('SALE') || value.includes('DIRTY')) trigger = 'dirty';
+            const value = String(firstCondition.value || '').toLowerCase();
+            if (value.includes('checkout') || value.includes('departure')) trigger = 'checkout';
+            else if (value.includes('arrival') || value.includes('checkin')) trigger = 'checkin';
+            else if (value.includes('stayover')) trigger = 'stayover';
+            else if (value.includes('dirty')) trigger = 'dirty';
+          }
+
+          if (firstCondition?.type === 'keyword') {
+            trigger = 'custom';
+            customKeywords = conditions
+              .filter(c => c?.type === 'keyword')
+              .map(c => String(c.value || '').trim())
+              .filter(Boolean)
+              .join(', ');
           }
         }
 
@@ -181,6 +193,7 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
           cleaningType: dbRule.result_cleaning_type as any,
           priority: dbRule.priority,
           isActive: dbRule.is_active,
+          customKeywords,
         };
       });
 
@@ -206,24 +219,49 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
         return;
       }
 
-      // Convertir le trigger en conditions
+      // Convertir le trigger en conditions (compatibles avec cleaningRulesEngine)
       const triggerInfo = TRIGGER_LABELS[rule.trigger];
-      const keywords = rule.trigger === 'custom' && rule.customKeywords 
-        ? rule.customKeywords.split(',').map(k => k.trim())
-        : triggerInfo.keywords;
 
-      const conditions = keywords.length > 0 ? [{
-        type: 'status',
-        operator: 'contains',
-        value: keywords[0],
-      }] : [];
+      const statusValueByTrigger: Record<Exclude<SimpleRule['trigger'], 'custom'>, string> = {
+        checkout: 'checkout',
+        checkin: 'arrival',
+        stayover: 'stayover',
+        dirty: 'dirty',
+      };
+
+      let conditions: any[] = [];
+      let condition_logic: 'AND' | 'OR' = 'AND';
+
+      if (rule.trigger === 'custom') {
+        const keywords = (rule.customKeywords || '')
+          .split(',')
+          .map(k => k.trim())
+          .filter(Boolean);
+
+        conditions = keywords.map(k => ({
+          type: 'keyword',
+          operator: 'contains',
+          value: k,
+        }));
+        condition_logic = conditions.length > 1 ? 'OR' : 'AND';
+      } else {
+        const statusValue = statusValueByTrigger[rule.trigger];
+        conditions = [{
+          type: 'status',
+          operator: 'equals',
+          value: statusValue,
+        }];
+        condition_logic = 'AND';
+      }
 
       const dbRule = {
         hotel_id: hotelId,
         rule_name: rule.name,
         description: rule.description || null,
+        condition_logic,
         conditions: JSON.parse(JSON.stringify(conditions)),
         result_cleaning_type: rule.cleaningType,
+        result_status: rule.trigger === 'custom' ? null : statusValueByTrigger[rule.trigger],
         priority: rule.priority,
         is_active: rule.isActive,
         created_by: user.user.id,
@@ -482,7 +520,7 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
                     <Input
                       value={editingRule.customKeywords || ''}
                       onChange={(e) => setEditingRule({ ...editingRule, customKeywords: e.target.value })}
-                      placeholder="VIP, SUITE, PREMIUM"
+                      placeholder="Ex: C/O, CO, SAL, SALE, VIP"
                       className="mt-1"
                     />
                   </div>
