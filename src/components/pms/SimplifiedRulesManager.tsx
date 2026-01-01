@@ -52,7 +52,10 @@ interface SimpleRule {
   id: string;
   name: string;
   description?: string;
-  trigger: 'checkout' | 'checkin' | 'stayover' | 'dirty' | 'custom';
+  // Situation client
+  clientStatus: 'checkout' | 'stayover' | 'checkin' | 'any' | 'custom';
+  // État chambre
+  roomState: 'dirty' | 'clean' | 'any';
   cleaningType: 'a_blanc' | 'recouche' | 'none';
   priority: number;
   isActive: boolean;
@@ -66,9 +69,19 @@ interface SimplifiedRulesManagerProps {
 // Templates prédéfinis faciles à comprendre
 const RULE_TEMPLATES: Omit<SimpleRule, 'id'>[] = [
   {
+    name: 'Départ + Sale → À Blanc',
+    description: 'Client parti, chambre sale = nettoyage complet',
+    clientStatus: 'checkout',
+    roomState: 'dirty',
+    cleaningType: 'a_blanc',
+    priority: 100,
+    isActive: true,
+  },
+  {
     name: 'Départ → À Blanc',
     description: 'Nettoyage complet après un départ client',
-    trigger: 'checkout',
+    clientStatus: 'checkout',
+    roomState: 'any',
     cleaningType: 'a_blanc',
     priority: 90,
     isActive: true,
@@ -76,7 +89,8 @@ const RULE_TEMPLATES: Omit<SimpleRule, 'id'>[] = [
   {
     name: 'Client en séjour → Recouche',
     description: 'Nettoyage léger pour les clients qui restent',
-    trigger: 'stayover',
+    clientStatus: 'stayover',
+    roomState: 'any',
     cleaningType: 'recouche',
     priority: 70,
     isActive: true,
@@ -84,48 +98,38 @@ const RULE_TEMPLATES: Omit<SimpleRule, 'id'>[] = [
   {
     name: 'Arrivée prévue → À Blanc',
     description: 'Préparer la chambre pour une nouvelle arrivée',
-    trigger: 'checkin',
+    clientStatus: 'checkin',
+    roomState: 'any',
     cleaningType: 'a_blanc',
     priority: 85,
     isActive: true,
   },
   {
-    name: 'Chambre sale → À Blanc',
-    description: 'Nettoyage complet si la chambre est marquée sale',
-    trigger: 'dirty',
-    cleaningType: 'a_blanc',
-    priority: 80,
+    name: 'Chambre propre → Aucun',
+    description: 'Pas de nettoyage si déjà propre',
+    clientStatus: 'any',
+    roomState: 'clean',
+    cleaningType: 'none',
+    priority: 60,
     isActive: true,
   },
 ];
 
-const TRIGGER_LABELS: Record<string, { label: string; icon: React.ReactNode; keywords: string[] }> = {
-  checkout: {
-    label: 'Départ client',
-    icon: <Home className="h-4 w-4" />,
-    keywords: ['DEPART', 'CHECKOUT', 'C/O', 'C-O', 'CO', 'PARTI', 'DEP', 'DUE OUT']
-  },
-  checkin: {
-    label: 'Arrivée prévue',
-    icon: <UserCheck className="h-4 w-4" />,
-    keywords: ['ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'C/I', 'C-I', 'CI', 'ARR', 'DUE IN']
-  },
-  stayover: {
-    label: 'Client en séjour',
-    icon: <CalendarCheck className="h-4 w-4" />,
-    keywords: ['RECOUCHE', 'STAYOVER', 'STAY', 'OD', 'OCCUPIED']
-  },
-  dirty: {
-    label: 'Chambre sale',
-    icon: <Clock className="h-4 w-4" />,
-    keywords: ['SAL', 'SALE', 'DIRTY', 'VD', 'DIR']
-  },
-  custom: {
-    label: 'Personnalisé',
-    icon: <Wand2 className="h-4 w-4" />,
-    keywords: []
-  },
-};
+// Labels pour situation client
+const CLIENT_STATUS_OPTIONS = [
+  { value: 'checkout', label: 'Départ client', icon: <Home className="h-4 w-4" />, keywords: ['DEPART', 'CHECKOUT', 'C/O', 'C-O', 'CO', 'PARTI', 'DEP', 'DUE OUT'] },
+  { value: 'stayover', label: 'Client en séjour', icon: <CalendarCheck className="h-4 w-4" />, keywords: ['RECOUCHE', 'STAYOVER', 'STAY', 'OD', 'OCCUPIED'] },
+  { value: 'checkin', label: 'Arrivée prévue', icon: <UserCheck className="h-4 w-4" />, keywords: ['ARRIVEE', 'ARRIVAL', 'CHECK-IN', 'C/I', 'C-I', 'CI', 'ARR', 'DUE IN'] },
+  { value: 'any', label: 'Peu importe', icon: <Zap className="h-4 w-4" />, keywords: [] },
+  { value: 'custom', label: 'Personnalisé', icon: <Wand2 className="h-4 w-4" />, keywords: [] },
+];
+
+// Labels pour état chambre
+const ROOM_STATE_OPTIONS = [
+  { value: 'dirty', label: 'Sale', description: 'SAL, SALE, VD, DIRTY', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { value: 'clean', label: 'Propre', description: 'INS, PROPRE, CLEAN', color: 'bg-green-100 text-green-800 border-green-200' },
+  { value: 'any', label: 'Peu importe', description: 'Quel que soit l\'état', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+];
 
 const CLEANING_OPTIONS = [
   { value: 'a_blanc', label: 'À Blanc', description: 'Nettoyage complet', color: 'bg-purple-100 text-purple-800 border-purple-200' },
@@ -159,29 +163,28 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
 
       // Convertir les règles DB vers notre format simplifié
       const loadedRules: SimpleRule[] = (data || []).map(dbRule => {
-        // Détecter le trigger à partir des conditions
-        let trigger: SimpleRule['trigger'] = 'custom';
+        let clientStatus: SimpleRule['clientStatus'] = 'any';
+        let roomState: SimpleRule['roomState'] = 'any';
         let customKeywords: string | undefined;
 
         const conditions = (dbRule.conditions as any[]) || [];
-        if (conditions.length > 0) {
-          const firstCondition = conditions[0];
-
-          if (firstCondition?.type === 'status') {
-            const value = String(firstCondition.value || '').toLowerCase();
-            if (value.includes('checkout') || value.includes('departure')) trigger = 'checkout';
-            else if (value.includes('arrival') || value.includes('checkin')) trigger = 'checkin';
-            else if (value.includes('stayover')) trigger = 'stayover';
-            else if (value.includes('dirty')) trigger = 'dirty';
+        for (const cond of conditions) {
+          if (cond?.type === 'status') {
+            const value = String(cond.value || '').toLowerCase();
+            if (value === 'checkout' || value === 'departure') clientStatus = 'checkout';
+            else if (value === 'arrival' || value === 'checkin') clientStatus = 'checkin';
+            else if (value === 'stayover') clientStatus = 'stayover';
+            else if (value === 'dirty') roomState = 'dirty';
+            else if (value === 'clean') roomState = 'clean';
           }
-
-          if (firstCondition?.type === 'keyword') {
-            trigger = 'custom';
-            customKeywords = conditions
+          if (cond?.type === 'keyword') {
+            clientStatus = 'custom';
+            const kw = conditions
               .filter(c => c?.type === 'keyword')
               .map(c => String(c.value || '').trim())
               .filter(Boolean)
               .join(', ');
+            customKeywords = kw;
           }
         }
 
@@ -189,7 +192,8 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
           id: dbRule.id,
           name: dbRule.rule_name,
           description: dbRule.description || undefined,
-          trigger,
+          clientStatus,
+          roomState,
           cleaningType: dbRule.result_cleaning_type as any,
           priority: dbRule.priority,
           isActive: dbRule.is_active,
@@ -219,49 +223,40 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
         return;
       }
 
-      // Convertir le trigger en conditions (compatibles avec cleaningRulesEngine)
-      const triggerInfo = TRIGGER_LABELS[rule.trigger];
+      // Construire les conditions basées sur clientStatus + roomState
+      const conditions: any[] = [];
 
-      const statusValueByTrigger: Record<Exclude<SimpleRule['trigger'], 'custom'>, string> = {
-        checkout: 'checkout',
-        checkin: 'arrival',
-        stayover: 'stayover',
-        dirty: 'dirty',
-      };
-
-      let conditions: any[] = [];
-      let condition_logic: 'AND' | 'OR' = 'AND';
-
-      if (rule.trigger === 'custom') {
+      // Condition 1: Situation client
+      if (rule.clientStatus === 'custom') {
         const keywords = (rule.customKeywords || '')
           .split(',')
           .map(k => k.trim())
           .filter(Boolean);
+        for (const kw of keywords) {
+          conditions.push({ type: 'keyword', operator: 'contains', value: kw });
+        }
+      } else if (rule.clientStatus !== 'any') {
+        const statusMap: Record<string, string> = {
+          checkout: 'checkout',
+          stayover: 'stayover',
+          checkin: 'arrival',
+        };
+        conditions.push({ type: 'status', operator: 'equals', value: statusMap[rule.clientStatus] || rule.clientStatus });
+      }
 
-        conditions = keywords.map(k => ({
-          type: 'keyword',
-          operator: 'contains',
-          value: k,
-        }));
-        condition_logic = conditions.length > 1 ? 'OR' : 'AND';
-      } else {
-        const statusValue = statusValueByTrigger[rule.trigger];
-        conditions = [{
-          type: 'status',
-          operator: 'equals',
-          value: statusValue,
-        }];
-        condition_logic = 'AND';
+      // Condition 2: État chambre
+      if (rule.roomState !== 'any') {
+        conditions.push({ type: 'status', operator: 'equals', value: rule.roomState });
       }
 
       const dbRule = {
         hotel_id: hotelId,
         rule_name: rule.name,
         description: rule.description || null,
-        condition_logic,
+        condition_logic: 'AND',
         conditions: JSON.parse(JSON.stringify(conditions)),
         result_cleaning_type: rule.cleaningType,
-        result_status: rule.trigger === 'custom' ? null : statusValueByTrigger[rule.trigger],
+        result_status: rule.clientStatus !== 'any' && rule.clientStatus !== 'custom' ? rule.clientStatus : null,
         priority: rule.priority,
         is_active: rule.isActive,
         created_by: user.user.id,
@@ -329,21 +324,41 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
 
   const handleTest = () => {
     if (!testText.trim()) return;
-    
-    // Simple test - chercher les chambres et appliquer les règles
+
+    const textUpper = testText.toUpperCase();
     const roomMatches = testText.match(/\b([1-9]\d{2,3}[A-Z]?)\b/g) || [];
     const results = roomMatches.slice(0, 10).map(room => {
-      // Trouver la première règle qui match
       const activeRules = rules.filter(r => r.isActive).sort((a, b) => b.priority - a.priority);
+
       for (const rule of activeRules) {
-        const keywords = TRIGGER_LABELS[rule.trigger]?.keywords || [];
-        if (keywords.some(k => testText.toUpperCase().includes(k))) {
+        // Vérifier clientStatus
+        let clientMatch = rule.clientStatus === 'any';
+        if (rule.clientStatus === 'checkout') {
+          clientMatch = /\bDEPART|CHECKOUT|C\/O|CO\b/.test(textUpper);
+        } else if (rule.clientStatus === 'stayover') {
+          clientMatch = /\bRECOUCHE|STAYOVER|STAY\b/.test(textUpper);
+        } else if (rule.clientStatus === 'checkin') {
+          clientMatch = /\bARRIVEE|ARRIVAL|C\/I|CI\b/.test(textUpper);
+        } else if (rule.clientStatus === 'custom' && rule.customKeywords) {
+          const kws = rule.customKeywords.split(',').map(k => k.trim().toUpperCase());
+          clientMatch = kws.some(k => textUpper.includes(k));
+        }
+
+        // Vérifier roomState
+        let roomMatch = rule.roomState === 'any';
+        if (rule.roomState === 'dirty') {
+          roomMatch = /\bSAL(?:E)?\b|\bDIRTY\b|\bVD\b/.test(textUpper);
+        } else if (rule.roomState === 'clean') {
+          roomMatch = /\bPROPRE\b|\bCLEAN\b|\bINS\b/.test(textUpper);
+        }
+
+        if (clientMatch && roomMatch) {
           return { room, type: rule.cleaningType };
         }
       }
-      return { room, type: 'a_blanc' }; // Default
+      return { room, type: 'a_blanc' };
     });
-    
+
     setTestResults(results);
     toast.success(`${results.length} chambre(s) analysée(s)`);
   };
@@ -352,7 +367,8 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
     setEditingRule({
       id: '',
       name: '',
-      trigger: 'checkout',
+      clientStatus: 'checkout',
+      roomState: 'any',
       cleaningType: 'a_blanc',
       priority: 50,
       isActive: true,
@@ -487,44 +503,67 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
                 />
               </div>
 
-              {/* Déclencheur */}
+              {/* Situation client */}
               <div className="space-y-3">
-                <Label>Quand appliquer ?</Label>
+                <Label>1. Situation client</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(TRIGGER_LABELS).map(([key, info]) => (
+                  {CLIENT_STATUS_OPTIONS.map((opt) => (
                     <button
-                      key={key}
+                      key={opt.value}
                       type="button"
-                      onClick={() => setEditingRule({ ...editingRule, trigger: key as any })}
+                      onClick={() => setEditingRule({ ...editingRule, clientStatus: opt.value as any })}
                       className={cn(
                         "flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left",
-                        editingRule.trigger === key 
-                          ? "border-primary bg-primary/5" 
+                        editingRule.clientStatus === opt.value
+                          ? "border-primary bg-primary/5"
                           : "border-border hover:border-primary/50"
                       )}
                     >
                       <div className={cn(
                         "p-2 rounded-md",
-                        editingRule.trigger === key ? "bg-primary text-primary-foreground" : "bg-muted"
+                        editingRule.clientStatus === opt.value ? "bg-primary text-primary-foreground" : "bg-muted"
                       )}>
-                        {info.icon}
+                        {opt.icon}
                       </div>
-                      <span className="text-sm font-medium">{info.label}</span>
+                      <span className="text-sm font-medium">{opt.label}</span>
                     </button>
                   ))}
                 </div>
 
-                {editingRule.trigger === 'custom' && (
+                {editingRule.clientStatus === 'custom' && (
                   <div className="mt-3">
                     <Label className="text-xs text-muted-foreground">Mots-clés (séparés par virgule)</Label>
                     <Input
                       value={editingRule.customKeywords || ''}
                       onChange={(e) => setEditingRule({ ...editingRule, customKeywords: e.target.value })}
-                      placeholder="Ex: C/O, CO, SAL, SALE, VIP"
+                      placeholder="Ex: C/O, CO, VIP, SUITE"
                       className="mt-1"
                     />
                   </div>
                 )}
+              </div>
+
+              {/* État chambre */}
+              <div className="space-y-3">
+                <Label>2. État de la chambre</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ROOM_STATE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setEditingRule({ ...editingRule, roomState: opt.value as any })}
+                      className={cn(
+                        "p-3 rounded-lg border-2 transition-all text-center",
+                        editingRule.roomState === opt.value
+                          ? `border-primary ${opt.color}`
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <span className="text-sm font-medium block">{opt.label}</span>
+                      <span className="text-xs text-muted-foreground">{opt.description}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Flèche */}
@@ -534,7 +573,7 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
 
               {/* Type de nettoyage */}
               <div className="space-y-3">
-                <Label>Type de nettoyage</Label>
+                <Label>3. Type de nettoyage</Label>
                 <div className="grid grid-cols-3 gap-2">
                   {CLEANING_OPTIONS.map((option) => (
                     <button
@@ -543,8 +582,8 @@ export function SimplifiedRulesManager({ hotelId }: SimplifiedRulesManagerProps)
                       onClick={() => setEditingRule({ ...editingRule, cleaningType: option.value as any })}
                       className={cn(
                         "p-3 rounded-lg border-2 transition-all text-center",
-                        editingRule.cleaningType === option.value 
-                          ? `border-primary ${option.color}` 
+                        editingRule.cleaningType === option.value
+                          ? `border-primary ${option.color}`
                           : "border-border hover:border-primary/50"
                       )}
                     >
@@ -607,7 +646,8 @@ function RuleCard({
   onToggle: (active: boolean) => void;
   onDuplicate: () => void;
 }) {
-  const triggerInfo = TRIGGER_LABELS[rule.trigger];
+  const clientInfo = CLIENT_STATUS_OPTIONS.find(o => o.value === rule.clientStatus);
+  const roomInfo = ROOM_STATE_OPTIONS.find(o => o.value === rule.roomState);
   const cleaningInfo = CLEANING_OPTIONS.find(o => o.value === rule.cleaningType);
 
   return (
@@ -617,9 +657,9 @@ function RuleCard({
     )}>
       <CardContent className="py-4">
         <div className="flex items-center gap-4">
-          {/* Icône du déclencheur */}
+          {/* Icône */}
           <div className="p-2.5 rounded-lg bg-muted shrink-0">
-            {triggerInfo?.icon}
+            {clientInfo?.icon || <Zap className="h-4 w-4" />}
           </div>
 
           {/* Contenu */}
@@ -630,8 +670,14 @@ function RuleCard({
                 <Badge variant="secondary" className="text-xs">Priorité haute</Badge>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-              <span>{triggerInfo?.label}</span>
+            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground flex-wrap">
+              <span>{clientInfo?.label || 'Tout'}</span>
+              {rule.roomState !== 'any' && (
+                <>
+                  <span>+</span>
+                  <Badge variant="outline" className={roomInfo?.color}>{roomInfo?.label}</Badge>
+                </>
+              )}
               <ChevronRight className="h-3 w-3" />
               <Badge variant="outline" className={cleaningInfo?.color}>
                 {cleaningInfo?.label}
