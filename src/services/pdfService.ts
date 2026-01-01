@@ -118,16 +118,44 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
     
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + '\n';
-    }
-    
+     let fullText = '';
+     for (let i = 1; i <= pdf.numPages; i++) {
+       const page = await pdf.getPage(i);
+       const textContent = await page.getTextContent();
+
+       // Reconstruire des lignes à partir des coordonnées (Y puis X)
+       const items = (textContent.items as any[])
+         .map((item) => ({
+           str: String(item.str ?? ''),
+           x: Array.isArray(item.transform) ? Number(item.transform[4]) : 0,
+           y: Array.isArray(item.transform) ? Number(item.transform[5]) : 0,
+         }))
+         .filter((it) => it.str.trim().length > 0);
+
+       // PDF.js: Y décroissant ~ lignes de haut en bas
+       items.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+
+       let lastY: number | null = null;
+       let lineParts: string[] = [];
+
+       const flushLine = () => {
+         const line = lineParts.join(' ').replace(/\s+/g, ' ').trim();
+         if (line) fullText += line + '\n';
+         lineParts = [];
+       };
+
+       for (const it of items) {
+         const currentY = it.y;
+         if (lastY !== null && Math.abs(currentY - lastY) > 3.5) {
+           flushLine();
+         }
+         lineParts.push(it.str);
+         lastY = currentY;
+       }
+       flushLine();
+       fullText += '\n'; // séparateur de page
+     }
+
     // Prétraitement centralisé
     const preprocessResult = textPreprocessor.preprocess(fullText);
     fullText = preprocessResult.text;

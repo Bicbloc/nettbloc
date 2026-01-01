@@ -157,10 +157,12 @@ export function TrainingTab({ currentHotelId }: TrainingTabProps) {
           ) : patterns && patterns.length > 0 ? (
             <div className="space-y-3">
               {patterns.map((pattern: any) => {
-                const extractedData = pattern.extracted_data || {};
-                const roomCount = extractedData.rooms?.length || 0;
-                
-                return (
+                 const extractedData = pattern.extracted_data;
+                 const roomCount = Array.isArray(extractedData)
+                   ? extractedData.length
+                   : extractedData?.rooms?.length || 0;
+                 
+                 return (
                   <div 
                     key={pattern.id}
                     className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
