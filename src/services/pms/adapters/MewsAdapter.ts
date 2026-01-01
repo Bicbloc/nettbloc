@@ -137,219 +137,110 @@ export class MewsAdapter extends PmsAdapter {
 
   /**
    * Extraction spécifique pour Mews avec pré-traitement du texte fragmenté
+   *
+   * IMPORTANT: on s'appuie sur l'extracteur commun (PmsAdapter.extractRooms) pour être robuste
+   * même si le numéro de chambre n'est pas au début de ligne (ex: "SAL SAL 107+108 ...").
+   * Ensuite, on fusionne les chambres connectées au format "100+101".
    */
   extractRooms(text: string): ExtractedRoom[] {
-    // Pré-traiter le texte pour fusionner les lignes fragmentées
     const processedText = this.preprocessText(text);
     console.log("🔧 Texte pré-traité pour Mews:", processedText.substring(0, 500));
-    
-    const rooms: ExtractedRoom[] = [];
+
+    // 1) Extraction standard via le moteur commun (regex + FieldExtractor)
+    const baseRooms = super.extractRooms(processedText);
+
+    // 2) Fusion des chambres liées (ex: "107+108") en un seul groupe
     const lines = processedText.split('\n');
-    const seenRooms = new Set<string>();
-    
-    // Pattern pour extraire les chambres Mews
-    // Format: 001 DBL-C SAL ou 001 DBL-C PRO ou 103+104 FAM SAL
-    const roomLinePattern = /^[^a-z]*?(\d{2,4})(?:-T)?\s+(?:[A-Z]{3,4}-[CS]|[A-Z]{3,4})\s+(SAL|PRO|INS|DIR|DEP|ARR)/i;
-    const linkedRoomPattern = /(\d{3})\+(\d{3})/;
-    const nightPattern = /Nuit\s*(\d+)\s*[\/\\]\s*(\d+)/i;
-    const guestPattern = /(\d+)\s*×\s*Adultes/gi;
-    const hasArrivalPattern = /\d{2}:\d{2}\s+\d+\s*×\s*Adultes.*?\d{2}\/\d{2}\/\d{4}/;
-    
+    const linkedRegex = /(\d{2,4})\s*\+\s*(\d{2,4})/g;
+
+    const byNumber = new Map<string, ExtractedRoom>();
+    for (const r of baseRooms) {
+      byNumber.set(this.normalizeRoomNumber(String(r.roomNumber)), r);
+    }
+
+    const removed = new Set<string>();
+    const merged: ExtractedRoom[] = [];
+
+    const pickBest = (a?: ExtractedRoom, b?: ExtractedRoom): { status: string; cleaningType: CleaningType; confidence: number } => {
+      const candidates = [a, b].filter(Boolean) as ExtractedRoom[];
+      if (candidates.length === 0) return { status: 'unknown', cleaningType: 'none', confidence: 60 };
+
+      // Priorité de nettoyage (du plus important au moins important)
+      const priority: CleaningType[] = ['a_blanc', 'full', 'recouche', 'quick', 'none'];
+      const best = [...candidates].sort((x, y) => priority.indexOf(x.cleaningType) - priority.indexOf(y.cleaningType))[0];
+
+      return {
+        status: best.status || 'unknown',
+        cleaningType: best.cleaningType || 'none',
+        confidence: Math.max(...candidates.map((c) => c.confidence ?? 70)),
+      };
+    };
+
     for (const line of lines) {
       if (!line.trim()) continue;
 
       // Ignorer les lignes d'en-tête
       if (line.includes('Étage') && line.includes('Espaces')) continue;
       if (line.includes('Hotel') && /\d{2}\/\d{2}\/\d{4}/.test(line)) continue;
+      if (/^\s*\d\s*$/.test(line)) continue; // indicateur d'étage seul
 
-      // Ignorer les indicateurs d'étage seuls (juste un chiffre)
-      if (/^\s*\d\s*$/.test(line)) continue;
+      linkedRegex.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = linkedRegex.exec(line)) !== null) {
+        const aRaw = match[1];
+        const bRaw = match[2];
 
-      const lineUpper = line.toUpperCase();
+        const a = this.normalizeRoomNumber(aRaw);
+        const b = this.normalizeRoomNumber(bRaw);
 
-      // 1) Cas des chambres liées au format "100+101"
-      const linkedStart = line.match(/^\s*(\d{2,4})\s*\+\s*(\d{2,4})\b/);
-      if (linkedStart) {
-        const a = linkedStart[1];
-        const b = linkedStart[2];
+        if (!a || !b) continue;
+        if (removed.has(a) || removed.has(b)) continue;
 
-        const normA = a.replace(/^0+/, '') || '0';
-        const normB = b.replace(/^0+/, '') || '0';
-        if (seenRooms.has(normA) || seenRooms.has(normB)) continue;
-        seenRooms.add(normA);
-        seenRooms.add(normB);
+        const roomA = byNumber.get(a);
+        const roomB = byNumber.get(b);
+        const { status, cleaningType, confidence } = pickBest(roomA, roomB);
 
-        // Détecter le code de statut (même logique)
-        let status = 'unknown';
-        let cleaningType: CleaningType = 'none';
+        // Supprimer les entrées individuelles (si elles existent)
+        removed.add(a);
+        removed.add(b);
 
-        if (lineUpper.includes('SAL')) {
-          status = 'dirty';
-          cleaningType = 'a_blanc';
-        } else if (lineUpper.includes('PRO')) {
-          status = 'clean';
-          cleaningType = 'none';
-        } else if (lineUpper.includes('INS')) {
-          status = 'inspected';
-          cleaningType = 'none';
-        } else if (lineUpper.includes('DIR')) {
-          status = 'dirty';
-          cleaningType = 'a_blanc';
-        }
-
-        // Nuit X/Y
-        const nightMatch = line.match(nightPattern);
-        let currentNight: number | undefined;
-        let totalNights: number | undefined;
-
-        if (nightMatch) {
-          currentNight = parseInt(nightMatch[1], 10);
-          totalNights = parseInt(nightMatch[2], 10);
-
-          if (currentNight < totalNights && status === 'dirty') {
-            cleaningType = 'recouche';
-            status = 'stayover';
-          } else if (currentNight === totalNights && status === 'dirty') {
-            cleaningType = 'a_blanc';
-            status = 'checkout';
-          }
-        }
-
-        if (hasArrivalPattern.test(line) && !nightMatch) {
-          cleaningType = 'a_blanc';
-          status = 'checkout_arrival';
-        }
-
-        rooms.push({
-          roomNumber: `${a}-${b}`,
+        merged.push({
+          roomNumber: `${aRaw}-${bRaw}`,
           status,
           cleaningType,
-          currentNight,
-          totalNights,
-          nightInfo: nightMatch ? `Nuit ${currentNight}/${totalNights}` : undefined,
           originalText: line.trim(),
           validated: false,
-          confidence: nightMatch ? 95 : (status !== 'unknown' ? 85 : 60),
+          confidence: Math.max(85, confidence),
           isConnected: true,
-          linkedRooms: [a, b],
+          linkedRooms: [aRaw, bRaw],
           debugInfo: {
             rawLine: line,
             cleanedLine: line.trim(),
             detectedKeywords: [],
             source: 'regex',
-            confidence: nightMatch ? 95 : 85,
+            confidence: Math.max(85, confidence),
+            appliedRule: 'Connected rooms merge (+)',
           },
         });
-
-        continue;
       }
-
-      // 2) Cas standard : une chambre unique
-      const roomMatch = line.match(/^\s*(\d{2,4})(?:-T)?(?:\s|$)/);
-      if (!roomMatch) continue;
-
-      // Garder le numéro original avec les zéros initiaux pour les chambres 001, 002, etc.
-      const roomNumber = roomMatch[1];
-
-      // Éviter les doublons (comparer sans zéros pour éviter 001 vs 1)
-      const normalizedRoom = roomNumber.replace(/^0+/, '') || '0';
-      if (seenRooms.has(normalizedRoom)) continue;
-      seenRooms.add(normalizedRoom);
-
-      // Détecter le code de statut
-      let status = 'unknown';
-      let cleaningType: CleaningType = 'none';
-
-      if (lineUpper.includes('SAL')) {
-        status = 'dirty';
-        cleaningType = 'a_blanc';
-      } else if (lineUpper.includes('PRO')) {
-        status = 'clean';
-        cleaningType = 'none';
-      } else if (lineUpper.includes('INS')) {
-        status = 'inspected';
-        cleaningType = 'none';
-      } else if (lineUpper.includes('DIR')) {
-        status = 'dirty';
-        cleaningType = 'a_blanc';
-      }
-
-      // Détecter si c'est une recouche via "Nuit X/Y"
-      const nightMatch = line.match(nightPattern);
-      let currentNight: number | undefined;
-      let totalNights: number | undefined;
-
-      if (nightMatch) {
-        currentNight = parseInt(nightMatch[1], 10);
-        totalNights = parseInt(nightMatch[2], 10);
-
-        // Client qui reste (pas la dernière nuit) = recouche
-        if (currentNight < totalNights && status === 'dirty') {
-          cleaningType = 'recouche';
-          status = 'stayover';
-        }
-        // Dernière nuit = départ = à blanc
-        else if (currentNight === totalNights && status === 'dirty') {
-          cleaningType = 'a_blanc';
-          status = 'checkout';
-        }
-      }
-
-      // Détecter s'il y a un départ + arrivée (2 blocs d'adultes avec heure entre)
-      // Pattern: "10:04 15:00 2 × Adultes" indique un checkout + checkin
-      if (hasArrivalPattern.test(line) && !nightMatch) {
-        cleaningType = 'a_blanc';
-        status = 'checkout_arrival';
-      }
-
-      // Extraire le type de chambre
-      let roomType: string | undefined;
-      const typeMatch = line.match(/([A-Z]{3,4})-([CS])/i);
-      if (typeMatch) {
-        roomType = `${typeMatch[1]}-${typeMatch[2]}`.toUpperCase();
-      }
-
-      // Extraire le nombre de guests
-      let guestCount: number | undefined;
-      const guestMatches = [...line.matchAll(guestPattern)];
-      if (guestMatches.length > 0) {
-        guestCount = guestMatches.reduce((sum, m) => sum + parseInt(m[1], 10), 0);
-      }
-
-      // Extraire le nom du client
-      let guestName: string | undefined;
-      // Pattern: nom après les adultes, avant la date
-      const nameMatch = line.match(/Adultes\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)*)/);
-      if (nameMatch) {
-        guestName = nameMatch[1].trim();
-      }
-
-      const room: ExtractedRoom = {
-        roomNumber,
-        status,
-        cleaningType,
-        roomType,
-        guestName,
-        guestCount,
-        currentNight,
-        totalNights,
-        nightInfo: nightMatch ? `Nuit ${currentNight}/${totalNights}` : undefined,
-        originalText: line.trim(),
-        validated: false,
-        confidence: nightMatch ? 95 : (status !== 'unknown' ? 85 : 60),
-        debugInfo: {
-          rawLine: line,
-          cleanedLine: line.trim(),
-          detectedKeywords: [],
-          source: 'regex',
-          confidence: nightMatch ? 95 : 85
-        }
-      };
-
-      rooms.push(room);
     }
 
-    console.log(`🏠 MewsAdapter: ${rooms.length} chambres extraites`);
-    return rooms;
+    const finalRooms = [
+      ...baseRooms.filter((r) => !removed.has(this.normalizeRoomNumber(String(r.roomNumber)))),
+      ...merged,
+    ];
+
+    // Dédupliquer par numéro (sécurité)
+    const seen = new Set<string>();
+    const deduped: ExtractedRoom[] = [];
+    for (const r of finalRooms) {
+      const key = r.isConnected ? `grp:${r.roomNumber}` : `rm:${this.normalizeRoomNumber(String(r.roomNumber))}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(r);
+    }
+
+    console.log(`🏠 MewsAdapter: ${deduped.length} chambres extraites`);
+    return deduped;
   }
 }

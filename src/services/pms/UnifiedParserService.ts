@@ -443,13 +443,21 @@ class UnifiedParserService {
     // FILTRER pour ne garder que les chambres qui sont dans les patterns appris
     // En normalisant le numéro pour comparer (001 == 1)
     const filteredRooms = rooms.filter(room => {
-      // Cas des chambres liées (ex: 100+101) : on garde si au moins une des chambres est validée
+      // Cas des chambres liées (ex: 100+101) : on garde si
+      // - le groupe lui-même a été validé (ex: "100-101")
+      // OU
+      // - au moins une des chambres du groupe a été validée individuellement
       if (room.isConnected && Array.isArray(room.linkedRooms) && room.linkedRooms.length > 0) {
-        const anyValid = room.linkedRooms.some((rn) => validRoomNumbers.has(this.normalizeRoomNumber(String(rn))));
-        if (!anyValid) {
-          this.log(`🚫 Groupe ${room.roomNumber} exclu (aucune chambre liée validée dans l'entraînement)`);
+        const normalizedGroup = this.normalizeRoomNumber(String(room.roomNumber));
+        const groupIsValid = validRoomNumbers.has(normalizedGroup);
+
+        const anyPartValid = room.linkedRooms.some((rn) => validRoomNumbers.has(this.normalizeRoomNumber(String(rn))));
+
+        const keep = groupIsValid || anyPartValid;
+        if (!keep) {
+          this.log(`🚫 Groupe ${room.roomNumber} exclu (non validé dans l'entraînement)`);
         }
-        return anyValid;
+        return keep;
       }
 
       const normalizedNumber = this.normalizeRoomNumber(room.roomNumber);
