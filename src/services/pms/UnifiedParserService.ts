@@ -94,8 +94,12 @@ class UnifiedParserService {
   async loadHotelPatterns(hotelId: string): Promise<void> {
     if (this.isLoading) return;
     this.isLoading = true;
-    
+
     try {
+      // IMPORTANT: un nouvel entraînement doit invalider le cache de parsing
+      // sinon un ancien résultat (ex: 0 chambre) peut être réutilisé à l'import.
+      detectionCache.invalidateForHotel(hotelId);
+
       this.hotelId = hotelId;
       this.learnedPatterns.clear();
       this.customStatusMappings.clear();
