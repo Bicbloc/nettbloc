@@ -12,9 +12,10 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Sparkles, FileText, Plug, Clock, ArrowLeft, Zap } from "lucide-react";
+import { FileUp, Sparkles, FileText, Plug, Clock, ArrowLeft, Zap, Trash2 } from "lucide-react";
 import { HousekeeperSetupDialog } from './HousekeeperSetupDialog';
 import { unifiedParserService } from "@/services/pms";
+import { detectionCache } from "@/services/pms/DetectionCache";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -302,6 +303,26 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
           onCheckedChange={setForceAiExtraction}
         />
       </div>
+
+      {/* Bouton Vider le cache */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full text-muted-foreground hover:text-destructive"
+        onClick={() => {
+          if (hotelId) {
+            detectionCache.invalidateForHotel(hotelId);
+            unifiedParserService.invalidateCacheForHotel(hotelId);
+            toast({
+              title: "Cache vidé",
+              description: "Le cache d'analyse a été réinitialisé.",
+            });
+          }
+        }}
+      >
+        <Trash2 className="h-4 w-4 mr-2" />
+        Vider le cache d'analyse
+      </Button>
 
       <div 
         className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"

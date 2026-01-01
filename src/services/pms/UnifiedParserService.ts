@@ -195,7 +195,8 @@ class UnifiedParserService {
     if (!forceAi) {
       const cachedRooms = detectionCache.getParsedRooms(text, hotelId);
       if (cachedRooms) {
-        this.log(`📦 Résultat du cache (${cachedRooms.length} chambres)`);
+        this.log(`📦 [CACHE HIT] ${cachedRooms.length} chambres depuis le cache`);
+        console.log(`📦 [CACHE HIT] ${cachedRooms.length} chambres depuis le cache pour hotel ${hotelId}`);
         return {
           rooms: cachedRooms,
           pmsType: 'cached',
@@ -207,6 +208,8 @@ class UnifiedParserService {
         };
       }
     }
+    
+    this.log(`🔄 [CACHE MISS] Parsing frais pour hotel ${hotelId}`);
     
     // Charger les patterns si nécessaire
     if (this.hotelId !== hotelId) {
