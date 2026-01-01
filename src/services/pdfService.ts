@@ -43,6 +43,24 @@ export const getDefaultCleaningConfig = (isPremium: boolean = false): CleaningCo
 
 export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(false);
 
+function normalizeStatusToken(token: string): string {
+  const u = String(token).trim().toUpperCase();
+  if (u === 'CO') return 'C/O';
+  if (u === 'CI') return 'C/I';
+  return u;
+}
+
+function buildStatusNote(er: ExtractedRoom): string | undefined {
+  if (er.rawStatuses && er.rawStatuses.length > 0) {
+    const pretty = er.rawStatuses.map(normalizeStatusToken).join(' + ');
+    return `Statut: ${pretty}`;
+  }
+
+  if (er.inferenceReason) return er.inferenceReason;
+  if (er.status) return `Statut: ${er.status}`;
+  return undefined;
+}
+
 /**
  * Convertit ExtractedRoom[] du service unifié vers Room[] de l'application
  */
@@ -69,7 +87,7 @@ function convertExtractedRoomsToRooms(extractedRooms: ExtractedRoom[]): Room[] {
         notUrgent: cleaningType === 'none',
         floor: getRoomFloor(er.roomNumber),
         linkedRooms: er.linkedRooms,
-        notes: er.originalText ? `Statut: ${er.status}` : undefined,
+        notes: er.originalText ? buildStatusNote(er) : undefined,
       } as Room;
     })
     .filter((room) => room.number && room.number.length > 0);
