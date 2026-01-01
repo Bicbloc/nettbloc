@@ -157,33 +157,109 @@ export class MewsAdapter extends PmsAdapter {
     
     for (const line of lines) {
       if (!line.trim()) continue;
-      
+
       // Ignorer les lignes d'en-tête
       if (line.includes('Étage') && line.includes('Espaces')) continue;
       if (line.includes('Hotel') && /\d{2}\/\d{2}\/\d{4}/.test(line)) continue;
-      
+
       // Ignorer les indicateurs d'étage seuls (juste un chiffre)
       if (/^\s*\d\s*$/.test(line)) continue;
-      
-      // Chercher un numéro de chambre au début (avec ou sans espace après)
-      // Patterns: "001 DBL-C", "001-T DBL-S", "001   DBL-C PRO"
+
+      const lineUpper = line.toUpperCase();
+
+      // 1) Cas des chambres liées au format "100+101"
+      const linkedStart = line.match(/^\s*(\d{2,4})\s*\+\s*(\d{2,4})\b/);
+      if (linkedStart) {
+        const a = linkedStart[1];
+        const b = linkedStart[2];
+
+        const normA = a.replace(/^0+/, '') || '0';
+        const normB = b.replace(/^0+/, '') || '0';
+        if (seenRooms.has(normA) || seenRooms.has(normB)) continue;
+        seenRooms.add(normA);
+        seenRooms.add(normB);
+
+        // Détecter le code de statut (même logique)
+        let status = 'unknown';
+        let cleaningType: CleaningType = 'none';
+
+        if (lineUpper.includes('SAL')) {
+          status = 'dirty';
+          cleaningType = 'a_blanc';
+        } else if (lineUpper.includes('PRO')) {
+          status = 'clean';
+          cleaningType = 'none';
+        } else if (lineUpper.includes('INS')) {
+          status = 'inspected';
+          cleaningType = 'none';
+        } else if (lineUpper.includes('DIR')) {
+          status = 'dirty';
+          cleaningType = 'a_blanc';
+        }
+
+        // Nuit X/Y
+        const nightMatch = line.match(nightPattern);
+        let currentNight: number | undefined;
+        let totalNights: number | undefined;
+
+        if (nightMatch) {
+          currentNight = parseInt(nightMatch[1], 10);
+          totalNights = parseInt(nightMatch[2], 10);
+
+          if (currentNight < totalNights && status === 'dirty') {
+            cleaningType = 'recouche';
+            status = 'stayover';
+          } else if (currentNight === totalNights && status === 'dirty') {
+            cleaningType = 'a_blanc';
+            status = 'checkout';
+          }
+        }
+
+        if (hasArrivalPattern.test(line) && !nightMatch) {
+          cleaningType = 'a_blanc';
+          status = 'checkout_arrival';
+        }
+
+        rooms.push({
+          roomNumber: `${a}-${b}`,
+          status,
+          cleaningType,
+          currentNight,
+          totalNights,
+          nightInfo: nightMatch ? `Nuit ${currentNight}/${totalNights}` : undefined,
+          originalText: line.trim(),
+          validated: false,
+          confidence: nightMatch ? 95 : (status !== 'unknown' ? 85 : 60),
+          isConnected: true,
+          linkedRooms: [a, b],
+          debugInfo: {
+            rawLine: line,
+            cleanedLine: line.trim(),
+            detectedKeywords: [],
+            source: 'regex',
+            confidence: nightMatch ? 95 : 85,
+          },
+        });
+
+        continue;
+      }
+
+      // 2) Cas standard : une chambre unique
       const roomMatch = line.match(/^\s*(\d{2,4})(?:-T)?(?:\s|$)/);
       if (!roomMatch) continue;
-      
+
       // Garder le numéro original avec les zéros initiaux pour les chambres 001, 002, etc.
       const roomNumber = roomMatch[1];
-      
+
       // Éviter les doublons (comparer sans zéros pour éviter 001 vs 1)
       const normalizedRoom = roomNumber.replace(/^0+/, '') || '0';
       if (seenRooms.has(normalizedRoom)) continue;
       seenRooms.add(normalizedRoom);
-      
+
       // Détecter le code de statut
       let status = 'unknown';
       let cleaningType: CleaningType = 'none';
-      
-      const lineUpper = line.toUpperCase();
-      
+
       if (lineUpper.includes('SAL')) {
         status = 'dirty';
         cleaningType = 'a_blanc';
@@ -197,16 +273,16 @@ export class MewsAdapter extends PmsAdapter {
         status = 'dirty';
         cleaningType = 'a_blanc';
       }
-      
+
       // Détecter si c'est une recouche via "Nuit X/Y"
       const nightMatch = line.match(nightPattern);
       let currentNight: number | undefined;
       let totalNights: number | undefined;
-      
+
       if (nightMatch) {
         currentNight = parseInt(nightMatch[1], 10);
         totalNights = parseInt(nightMatch[2], 10);
-        
+
         // Client qui reste (pas la dernière nuit) = recouche
         if (currentNight < totalNights && status === 'dirty') {
           cleaningType = 'recouche';
@@ -218,28 +294,28 @@ export class MewsAdapter extends PmsAdapter {
           status = 'checkout';
         }
       }
-      
+
       // Détecter s'il y a un départ + arrivée (2 blocs d'adultes avec heure entre)
       // Pattern: "10:04 15:00 2 × Adultes" indique un checkout + checkin
       if (hasArrivalPattern.test(line) && !nightMatch) {
         cleaningType = 'a_blanc';
         status = 'checkout_arrival';
       }
-      
+
       // Extraire le type de chambre
       let roomType: string | undefined;
       const typeMatch = line.match(/([A-Z]{3,4})-([CS])/i);
       if (typeMatch) {
         roomType = `${typeMatch[1]}-${typeMatch[2]}`.toUpperCase();
       }
-      
+
       // Extraire le nombre de guests
       let guestCount: number | undefined;
       const guestMatches = [...line.matchAll(guestPattern)];
       if (guestMatches.length > 0) {
         guestCount = guestMatches.reduce((sum, m) => sum + parseInt(m[1], 10), 0);
       }
-      
+
       // Extraire le nom du client
       let guestName: string | undefined;
       // Pattern: nom après les adultes, avant la date
@@ -247,7 +323,7 @@ export class MewsAdapter extends PmsAdapter {
       if (nameMatch) {
         guestName = nameMatch[1].trim();
       }
-      
+
       const room: ExtractedRoom = {
         roomNumber,
         status,
@@ -269,10 +345,10 @@ export class MewsAdapter extends PmsAdapter {
           confidence: nightMatch ? 95 : 85
         }
       };
-      
+
       rooms.push(room);
     }
-    
+
     console.log(`🏠 MewsAdapter: ${rooms.length} chambres extraites`);
     return rooms;
   }
