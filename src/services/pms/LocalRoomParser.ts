@@ -381,13 +381,31 @@ class LocalRoomParser {
   }
 
   /**
-   * Extrait les statuts
+   * Extrait les statuts - priorité au C/O si heure de départ détectée
    */
   private extractStatuses(line: string): string[] {
     const statuses: string[] = [];
-    const allKeywords = Object.values(STATUS_KEYWORDS).flat();
     const lineLower = line.toLowerCase();
     
+    // Détecter si une heure de départ est présente (format HH:MM à droite)
+    const hasDepTime = /\d{2}:\d{2}\s*$/.test(line.trim()) || 
+                       /départ.*\d{2}:\d{2}|checkout.*\d{2}:\d{2}|\d{2}:\d{2}.*départ/i.test(line);
+    
+    // Si heure de départ détectée, priorité checkout
+    if (hasDepTime) {
+      const hasCheckoutKeyword = STATUS_KEYWORDS.checkout.some(k => lineLower.includes(k));
+      if (hasCheckoutKeyword) {
+        // Retourner uniquement C/O + SALE si présent
+        statuses.push('checkout');
+        if (STATUS_KEYWORDS.stayover.some(k => lineLower.includes(k) && k === 'sal')) {
+          statuses.push('sal');
+        }
+        return statuses;
+      }
+    }
+    
+    // Sinon extraction standard
+    const allKeywords = Object.values(STATUS_KEYWORDS).flat();
     for (const keyword of allKeywords) {
       if (lineLower.includes(keyword)) {
         statuses.push(keyword);

@@ -544,150 +544,102 @@ export const PmsRulesManager = ({ hotelId }: PmsRulesManagerProps) => {
           </Card>
         </TabsContent>
 
-        {/* Onglet avancé */}
+        {/* Onglet avancé - Simplifié avec suggestions */}
         <TabsContent value="advanced" className="space-y-4">
-          <Card className="bg-muted/30">
+          <Card className="bg-primary/5 border-primary/20">
             <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Options avancées pour utilisateurs expérimentés
+              <p className="text-sm flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Gérez les PMS supportés et ajoutez des mots-clés personnalisés
               </p>
             </CardContent>
           </Card>
 
           <div className="space-y-6">
-            {/* Adaptateurs */}
+            {/* PMS Supportés - Affichage simplifié */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
                 <Cpu className="h-5 w-5 text-primary" />
-                Adaptateurs PMS
+                PMS reconnus automatiquement
               </h3>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-wrap gap-2">
                 {availableAdapters.map(pmsType => (
-                  <Card key={pmsType} className="relative overflow-hidden">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <Cpu className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold uppercase">{pmsType}</h4>
-                          <p className="text-xs text-muted-foreground">Adaptateur intégré</p>
-                        </div>
-                      </div>
-                      <Badge variant="secondary" className="mt-3">
-                        <Zap className="h-3 w-3 mr-1" />
-                        Parsing local
-                      </Badge>
-                    </CardContent>
-                  </Card>
+                  <Badge key={pmsType} variant="secondary" className="text-sm py-1 px-3">
+                    <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                    {pmsType.charAt(0).toUpperCase() + pmsType.slice(1)}
+                  </Badge>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Ces systèmes sont détectés automatiquement lors de l'import de rapports
+              </p>
             </div>
 
-            {/* Règles personnalisées */}
+            {/* Suggestions de règles - Plus simple */}
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Règles PMS Personnalisées</h3>
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nouvelle Règle
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Ajouter une Règle PMS</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Type de PMS</Label>
-                        <Select value={newRule.pms_type} onValueChange={v => setNewRule({ ...newRule, pms_type: v })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableAdapters.map(type => (
-                              <SelectItem key={type} value={type}>{type.toUpperCase()}</SelectItem>
-                            ))}
-                            <SelectItem value="custom">Personnalisé</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Nom de la règle</Label>
-                        <Input
-                          value={newRule.rule_name}
-                          onChange={e => setNewRule({ ...newRule, rule_name: e.target.value })}
-                          placeholder="Ex: Règle spécifique hôtel"
-                        />
-                      </div>
-                      <div>
-                        <Label>Mots-clés (séparés par virgule)</Label>
-                        <Input
-                          value={newRule.keywords}
-                          onChange={e => setNewRule({ ...newRule, keywords: e.target.value })}
-                          placeholder="Ex: SAL, RECOUCHE, DEPART"
-                        />
-                      </div>
-                      <div>
-                        <Label>Priorité (1-100)</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={newRule.priority}
-                          onChange={e => setNewRule({ ...newRule, priority: parseInt(e.target.value) || 50 })}
-                        />
-                      </div>
-                      <Button onClick={handleAddRule} className="w-full">
-                        Ajouter
-                      </Button>
+              <h3 className="text-lg font-medium">Ajouter des mots-clés</h3>
+              <p className="text-sm text-muted-foreground">
+                Ajoutez des mots-clés spécifiques à votre hôtel pour améliorer la détection
+              </p>
+              
+              <Card className="border-dashed">
+                <CardContent className="py-4">
+                  <div className="grid gap-4">
+                    <div>
+                      <Label>Mots-clés pour départs</Label>
+                      <Input
+                        value={newRule.keywords}
+                        onChange={e => setNewRule({ ...newRule, keywords: e.target.value, pms_type: 'custom', rule_name: 'Mots-clés personnalisés' })}
+                        placeholder="Ex: PARTI, DEP, LIBRE, VD..."
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Séparez les mots par des virgules
+                      </p>
                     </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                    <Button 
+                      onClick={handleAddRule} 
+                      disabled={!newRule.keywords.trim()}
+                      className="w-full sm:w-auto"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Sauvegarder les mots-clés
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-              {loading ? (
-                <div className="text-center py-8 text-muted-foreground">Chargement...</div>
-              ) : hotelRules.length === 0 ? (
-                <Card className="border-dashed">
-                  <CardContent className="py-8 text-center">
-                    <p className="text-muted-foreground">Aucune règle personnalisée</p>
-                  </CardContent>
-                </Card>
-              ) : (
+            {/* Règles existantes - Simplifié */}
+            {hotelRules.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground">Vos mots-clés personnalisés</h4>
                 <div className="space-y-2">
                   {hotelRules.map(rule => (
-                    <Card key={rule.id}>
-                      <CardContent className="py-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{rule.rule_name}</span>
-                            <Badge variant="outline">{rule.pms_type}</Badge>
-                            <Badge variant="secondary">P{rule.priority}</Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={rule.is_active}
-                              onCheckedChange={v => handleToggleRule(rule.id, v)}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteRule(rule.id, rule.is_default)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div key={rule.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {rule.keywords.map((kw, i) => (
+                          <Badge key={i} variant="outline">{kw}</Badge>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={rule.is_active}
+                          onCheckedChange={v => handleToggleRule(rule.id, v)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteRule(rule.id, rule.is_default)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
