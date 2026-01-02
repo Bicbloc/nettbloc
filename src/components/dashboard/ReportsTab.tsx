@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileDown, AlertTriangle } from "lucide-react";
 import { Room, CleaningConfig } from "@/services/pdfService";
 
@@ -64,49 +65,51 @@ export function ReportsTab({
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {housekeeperNames.map((name) => {
-            const housekeeperRooms = getHousekeeperRooms(name);
-            if (housekeeperRooms.length === 0) return null;
-            
-            return (
-              <Card key={name}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{name}</span>
-                    <Badge variant="secondary">
-                      {housekeeperRooms.length} chambres
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 mb-4">
-                    <div className="text-sm">
-                      <span className="font-medium">À Blanc:</span>{" "}
-                      {housekeeperRooms.filter(r => r.cleaningType === 'full' || r.cleaningType === 'a_blanc').length}
+        <ScrollArea className="h-[calc(100vh-280px)] pr-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {housekeeperNames.map((name) => {
+              const housekeeperRooms = getHousekeeperRooms(name);
+              if (housekeeperRooms.length === 0) return null;
+              
+              return (
+                <Card key={name}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{name}</span>
+                      <Badge variant="secondary">
+                        {housekeeperRooms.length} chambres
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 mb-4">
+                      <div className="text-sm">
+                        <span className="font-medium">À Blanc:</span>{" "}
+                        {housekeeperRooms.filter(r => r.cleaningType === 'full' || r.cleaningType === 'a_blanc').length}
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium">Recouches:</span>{" "}
+                        {housekeeperRooms.filter(r => r.cleaningType === 'quick' || r.cleaningType === 'recouche').length}
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium">Temps estimé:</span>{" "}
+                        {Math.round(calculateHousekeeperLoad(housekeeperRooms) / 60)}h
+                      </div>
                     </div>
-                    <div className="text-sm">
-                      <span className="font-medium">Recouches:</span>{" "}
-                      {housekeeperRooms.filter(r => r.cleaningType === 'quick' || r.cleaningType === 'recouche').length}
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-medium">Temps estimé:</span>{" "}
-                      {Math.round(calculateHousekeeperLoad(housekeeperRooms) / 60)}h
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => onGenerateReport(name, housekeeperRooms)}
-                    className="w-full"
-                    size="sm"
-                  >
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Générer rapport
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                    <Button
+                      onClick={() => onGenerateReport(name, housekeeperRooms)}
+                      className="w-full"
+                      size="sm"
+                    >
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Générer rapport
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </ScrollArea>
       )}
     </div>
   );
