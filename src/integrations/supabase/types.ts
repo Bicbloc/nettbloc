@@ -381,6 +381,84 @@ export type Database = {
           },
         ]
       }
+      governess_hotel_sessions: {
+        Row: {
+          created_at: string | null
+          ended_at: string | null
+          governess_profile_id: string
+          hotel_id: string
+          hotel_name: string | null
+          id: string
+          is_active: boolean | null
+          started_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          ended_at?: string | null
+          governess_profile_id: string
+          hotel_id: string
+          hotel_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          started_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          ended_at?: string | null
+          governess_profile_id?: string
+          hotel_id?: string
+          hotel_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governess_hotel_sessions_governess_profile_id_fkey"
+            columns: ["governess_profile_id"]
+            isOneToOne: false
+            referencedRelation: "governess_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "governess_hotel_sessions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      governess_profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_active: boolean | null
+          name: string
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       hotel_access_sessions: {
         Row: {
           access_code: string
@@ -2146,6 +2224,79 @@ export type Database = {
           },
         ]
       }
+      room_inspections: {
+        Row: {
+          cleanliness_score: number | null
+          created_at: string | null
+          governess_id: string | null
+          governess_name: string
+          hotel_id: string
+          id: string
+          inspected_at: string | null
+          inspection_date: string | null
+          issues: string[] | null
+          notes: string | null
+          photos: string[] | null
+          room_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cleanliness_score?: number | null
+          created_at?: string | null
+          governess_id?: string | null
+          governess_name: string
+          hotel_id: string
+          id?: string
+          inspected_at?: string | null
+          inspection_date?: string | null
+          issues?: string[] | null
+          notes?: string | null
+          photos?: string[] | null
+          room_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cleanliness_score?: number | null
+          created_at?: string | null
+          governess_id?: string | null
+          governess_name?: string
+          hotel_id?: string
+          id?: string
+          inspected_at?: string | null
+          inspection_date?: string | null
+          issues?: string[] | null
+          notes?: string | null
+          photos?: string[] | null
+          room_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_inspections_governess_id_fkey"
+            columns: ["governess_id"]
+            isOneToOne: false
+            referencedRelation: "governess_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_inspections_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_inspections_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_status_updates: {
         Row: {
           created_at: string | null
@@ -2236,6 +2387,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          hotel_id: string
+          id: string
+          invitation_code: string
+          invited_by: string | null
+          name: string
+          role: string
+          sent_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          hotel_id: string
+          id?: string
+          invitation_code: string
+          invited_by?: string | null
+          name: string
+          role: string
+          sent_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          hotel_id?: string
+          id?: string
+          invitation_code?: string
+          invited_by?: string | null
+          name?: string
+          role?: string
+          sent_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_invitations_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
