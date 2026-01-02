@@ -1,7 +1,7 @@
 import { Room, CleaningConfig } from "./pdfService";
 import html2pdf from "html2pdf.js";
 import { getFirstDigitFromRoomNumber } from "@/lib/utils";
-import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
+import { ReportFields as CustomReportFields, LinenInventoryItem } from "@/components/ReportCustomFields";
 import { toast } from "@/hooks/use-toast";
 import { supabaseClient } from "@/lib/supabase";
 
@@ -13,6 +13,7 @@ export interface ReportData extends CustomReportFields {
   currentDate: string;
   config: CleaningConfig;
   startTime?: string; // Heure de début (premier téléchargement)
+  linenInventory?: LinenInventoryItem[];
 }
 
 // Store email in Supabase
@@ -123,7 +124,8 @@ export async function generateReport(
       toKnowItems: customFields?.toKnowItems || [],
       instructions: customFields?.instructions || '',
       generalInstructions: customFields?.generalInstructions || '',
-      housekeeperInstructions: customFields?.housekeeperInstructions || {}
+      housekeeperInstructions: customFields?.housekeeperInstructions || {},
+      linenInventory: customFields?.linenInventory || []
     };
     
     // Generate the HTML for the report
@@ -232,6 +234,40 @@ function generateReportHTML(data: ReportData): string {
       </div>
     `;
   }
+
+  // Process linen inventory if present
+  let linenInventoryHtml = '';
+  const housekeeperLinenItems = (data.linenInventory || []).filter(
+    item => item.assignedTo.length === 0 || item.assignedTo.includes(data.housekeeperName)
+  );
+  
+  if (housekeeperLinenItems.length > 0) {
+    const linenRows = housekeeperLinenItems
+      .filter(item => item.quantity > 0)
+      .map(item => `
+        <tr>
+          <td style="border:1px solid #000; padding:6px;">${item.linenTypeName}</td>
+          <td style="border:1px solid #000; padding:6px; text-align:center;">${item.quantity}</td>
+          <td style="border:1px solid #000; padding:6px;"></td>
+        </tr>
+      `).join('');
+    
+    if (linenRows) {
+      linenInventoryHtml = `
+        <div class="linen-section" style="margin-top:15px; page-break-inside:avoid;">
+          <h3>📦 Inventaire Linge</h3>
+          <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #000;">
+            <tr>
+              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Type de linge</th>
+              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:center; width:100px;">Quantité</th>
+              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Vérifié ✓</th>
+            </tr>
+            ${linenRows}
+          </table>
+        </div>
+      `;
+    }
+  }
   
   // Format current date in a readable format (e.g., "jeudi 15 mai 2025")
   const formattedDate = data.currentDate.split(' ').slice(0, 3).join(' ');
@@ -320,7 +356,7 @@ function generateReportHTML(data: ReportData): string {
       // Determine background color based on cleaning type - support both old and new formats
       const isFullClean = room.cleaningType === 'full' || room.cleaningType === 'a_blanc';
       const bgColor = isFullClean ? '#FEC6A1' : '#F2FCE2'; // Orange for full, Green for quick
-      const cleaningTypeText = isFullClean ? 'À Blanc' : 'Recouche';
+      const cleaningTypeText = isFullClean ? 'À Blanc 🚪' : 'Recouche'; // Door emoji for checkout/à blanc
       const priorityText = room.priority === 'high' ? 'Haute' : 'Normale';
       
       rowsHtml += `
@@ -558,6 +594,7 @@ function generateReportHTML(data: ReportData): string {
         ${instructionsHtml}
         ${todoHtml}
         ${toknowHtml}
+        ${linenInventoryHtml}
       </div>
       
       <h2>Liste des chambres à nettoyer</h2>
@@ -734,7 +771,8 @@ export async function generateCombinedReport(
         toKnowItems: customFields?.toKnowItems || [],
         instructions: customFields?.instructions || '',
         generalInstructions: customFields?.generalInstructions || '',
-        housekeeperInstructions: customFields?.housekeeperInstructions || {}
+        housekeeperInstructions: customFields?.housekeeperInstructions || {},
+        linenInventory: customFields?.linenInventory || []
       };
       
       // Generate complete HTML for this housekeeper
