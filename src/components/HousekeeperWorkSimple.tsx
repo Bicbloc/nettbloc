@@ -56,6 +56,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [showActivityLog, setShowActivityLog] = useState(false);
 
+  // Ref pour accéder à loadWorkData dans le callback
+  const loadWorkDataRef = useRef<() => void>(() => {});
+
   // Fonction pour ajouter au journal d'activité
   const addToActivityLog = useCallback((message: string, type: ActivityLogEntry['type'] = 'info') => {
     setActivityLog(prev => [{
@@ -177,50 +180,68 @@ export const HousekeeperWorkSimple: React.FC = () => {
     return (name || '').trim().toLowerCase();
   };
 
-  // Gestion intelligente des mises à jour temps réel
+  // Gestion intelligente des mises à jour temps réel - SYNC COMPLÈTE avec interface client
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
-    console.log(`📡 Mise à jour temps réel ${table}:`, payload);
+    console.log(`📡 [Housekeeper] Mise à jour temps réel ${table}:`, payload);
     const { eventType, new: newRecord, old: oldRecord } = payload;
     
+    // Vérifier si cela concerne notre hôtel
+    const recordHotelId = newRecord?.hotel_id || oldRecord?.hotel_id;
+    if (recordHotelId && recordHotelId !== hotelId) return;
+    
+    // Collecter tous les identifiants possibles pour la femme de chambre
+    const possibleIds = [
+      housekeeperProfile?.id,
+      housekeeper?.id,
+      housekeeper?.access_code,
+      housekeeper?.user_id
+    ].filter(Boolean);
+    
+    const normalizedMyName = normalizeName(housekeeperProfile?.name || housekeeperName);
+    
+    const isForMe = (record: any) => {
+      if (!record) return false;
+      const normalizedRecordName = normalizeName(record.housekeeper_name);
+      return possibleIds.includes(record.housekeeper_id) || 
+             normalizedRecordName === normalizedMyName ||
+             (normalizedRecordName && normalizedMyName && (
+               normalizedRecordName.includes(normalizedMyName) ||
+               normalizedMyName.includes(normalizedRecordName)
+             ));
+    };
+    
     if (table === 'assignments') {
-      if (eventType === 'INSERT' || eventType === 'UPDATE') {
-        // Vérifier si cette assignation nous concerne avec plusieurs critères
-        const possibleIds = [
-          housekeeperProfile?.id,
-          housekeeper?.id,
-          housekeeper?.access_code,
-          housekeeper?.user_id
-        ].filter(Boolean);
-        
-        const normalizedMyName = normalizeName(housekeeperProfile?.name || housekeeperName);
-        const normalizedRecordName = normalizeName(newRecord.housekeeper_name);
-        
-        const isForMe = possibleIds.includes(newRecord.housekeeper_id) || 
-                        normalizedRecordName === normalizedMyName ||
-                        normalizedRecordName.includes(normalizedMyName) ||
-                        normalizedMyName.includes(normalizedRecordName);
-        const isCorrectHotel = newRecord.hotel_id === hotelId;
-        
-        if (isForMe && isCorrectHotel) {
-          console.log('🆕 Assignation reçue pour moi! Rechargement...');
-          loadWorkData();
-          if (eventType === 'INSERT') {
-            addToActivityLog('🆕 Nouvelle chambre assignée', 'info');
-            setNewRoomsCount(prev => prev + 1);
-            setTimeout(() => setNewRoomsCount(0), 5000);
-          }
+      if (eventType === 'INSERT') {
+        if (isForMe(newRecord)) {
+          console.log('🆕 Nouvelle assignation reçue! Rechargement...');
+          loadWorkDataRef.current();
+          addToActivityLog(`🆕 Nouvelle chambre assignée par le responsable`, 'info');
+          setNewRoomsCount(prev => prev + 1);
+          setTimeout(() => setNewRoomsCount(0), 5000);
+        }
+      } else if (eventType === 'UPDATE') {
+        if (isForMe(newRecord) || isForMe(oldRecord)) {
+          console.log('🔄 Assignation modifiée, rechargement...');
+          loadWorkDataRef.current();
+          addToActivityLog(`🔄 Assignation mise à jour`, 'info');
         }
       } else if (eventType === 'DELETE') {
-        setAssignments(prev => prev.filter(a => a.id !== oldRecord.id));
-        setRooms(prev => prev.filter(r => r.id !== oldRecord.room_id));
+        // Chambre retirée par le responsable ou clôture journée
+        const wasMyAssignment = isForMe(oldRecord);
+        if (wasMyAssignment) {
+          console.log('🗑️ Assignation supprimée par le responsable');
+          setAssignments(prev => prev.filter(a => a.id !== oldRecord.id));
+          setRooms(prev => prev.filter(r => r.id !== oldRecord.room_id));
+          addToActivityLog(`🗑️ Chambre retirée par le responsable`, 'warning');
+        }
       }
     }
     
     if (table === 'rooms') {
-      if (eventType === 'UPDATE' || eventType === 'INSERT') {
-        // Vérifier si cette chambre nous est assignée
+      if (eventType === 'UPDATE') {
         const isMyRoom = rooms.some(r => r.id === newRecord.id);
         
+        // Notification si chambre devient disponible
         if (newRecord.status === 'ready-to-clean' && oldRecord?.status !== 'ready-to-clean') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
           setAvailableRooms(prev => {
@@ -231,19 +252,50 @@ export const HousekeeperWorkSimple: React.FC = () => {
           });
         }
         
+        // Mise à jour locale si c'est ma chambre
         if (isMyRoom) {
           setRooms(prev => prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r));
+          // Si statut changé par le responsable
+          if (newRecord.status !== oldRecord?.status) {
+            addToActivityLog(`🔄 Chambre ${newRecord.room_number} mise à jour par le responsable`, 'info');
+          }
         }
       } else if (eventType === 'DELETE') {
-        setRooms(prev => prev.filter(r => r.id !== oldRecord.id));
+        // Chambre supprimée (clôture journée)
+        const wasMyRoom = rooms.some(r => r.id === oldRecord.id);
+        if (wasMyRoom) {
+          setRooms(prev => prev.filter(r => r.id !== oldRecord.id));
+          addToActivityLog(`🗑️ Chambre supprimée (clôture journée)`, 'warning');
+        }
+      }
+    }
+    
+    // Écouter les suppressions massives (clôture journée) via daily_reports
+    if (table === 'daily_reports') {
+      if (eventType === 'INSERT') {
+        console.log('📊 Rapport journalier créé - Journée clôturée!');
+        addToActivityLog(`📊 Journée clôturée par le responsable`, 'warning');
+        // Réinitialiser l'interface
+        setRooms([]);
+        setAssignments([]);
+        setAvailableRooms([]);
+        setStartTime(null);
+        setEndTime(null);
+        // Nettoyer le cache local
+        if (hotelId && housekeeperProfile?.id) {
+          localStorage.removeItem(`assignments_${hotelId}_${housekeeperProfile.id}`);
+          const today = new Date().toISOString().split('T')[0];
+          localStorage.removeItem(`pointage_start_${today}_${housekeeperName}`);
+          localStorage.removeItem(`pointage_end_${today}_${housekeeperName}`);
+        }
       }
     }
   }, [hotelId, housekeeperName, housekeeperProfile, housekeeper, addToActivityLog, rooms]);
 
-  // Synchronisation en temps réel
+  // Synchronisation en temps réel - écouter TOUTES les tables pertinentes
   const { isConnected } = useRealtimeSync({
     hotelId: hotelId || undefined,
-    tables: ['assignments', 'rooms'],
+    tables: ['assignments', 'rooms', 'daily_reports', 'notifications'],
     onUpdate: handleRealtimeUpdate
   });
 
@@ -460,6 +512,11 @@ export const HousekeeperWorkSimple: React.FC = () => {
       setIsRefreshing(false);
     }
   };
+
+  // Mettre à jour la ref pour le callback realtime
+  useEffect(() => {
+    loadWorkDataRef.current = loadWorkData;
+  });
 
   const handleRoomStatusChange = async (roomId: string, newStatus: string, notes?: string) => {
     try {
