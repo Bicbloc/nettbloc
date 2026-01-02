@@ -228,9 +228,9 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 mt-2">
-          <ScrollArea className="flex-1 h-[60vh] pr-2 sm:pr-4">
-            <div className="space-y-4 sm:space-y-5 pb-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 mt-2 overflow-hidden">
+          <ScrollArea className="flex-1 max-h-[55vh] border rounded-md p-3 bg-muted/20">
+            <div className="space-y-4 sm:space-y-5 pb-2 pr-2">
               <div className="space-y-4 sm:space-y-5">
                 <div>
                   <Label className="font-medium mb-1.5 block text-left text-sm">
