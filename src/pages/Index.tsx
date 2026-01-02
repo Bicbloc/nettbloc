@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain, Archive } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,6 +47,7 @@ import { LinenTab } from "@/components/dashboard/LinenTab";
 import { IncidentsTab } from "@/components/dashboard/IncidentsTab";
 import { ReportsTab } from "@/components/dashboard/ReportsTab";
 import { TrainingTab } from "@/components/dashboard/TrainingTab";
+import { ArchivesTab } from "@/components/dashboard/ArchivesTab";
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
@@ -677,6 +678,9 @@ const Index = () => {
                 <TabsTrigger value="training" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                   <Brain className="h-5 w-5" /><span>Entraînement IA</span>
                 </TabsTrigger>
+                <TabsTrigger value="archives" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <Archive className="h-5 w-5" /><span>Archives</span>
+                </TabsTrigger>
               </TabsList>
             </div>
             
@@ -770,6 +774,10 @@ const Index = () => {
 
               <TabsContent value="training" className="space-y-6">
                 <TrainingTab currentHotelId={currentHotelId} />
+              </TabsContent>
+
+              <TabsContent value="archives" className="space-y-6">
+                <ArchivesTab currentHotelId={currentHotelId} />
               </TabsContent>
             </div>
           </div>
