@@ -455,14 +455,38 @@ class UnifiedParserService {
         const roomRegex = new RegExp(`\\b${this.escapeRegex(roomNumber)}\\b|\\b${this.escapeRegex(normalizedNumber)}\\b`, 'i');
         
         if (roomRegex.test(line)) {
-          // Déterminer le statut et type de nettoyage à partir du contexte de la ligne
-          const { status, cleaningType, reason } = this.analyzeLineContext(line, pmsType, reportDate);
+          // PRIORITÉ AU PATTERN VALIDÉ: Utiliser le cleaningType du pattern si disponible
+          // Sinon, analyser le contexte de la ligne
+          let status = pattern.status;
+          let cleaningType = pattern.cleaningType;
+          let reason = `Pattern validé: ${status}/${cleaningType}`;
+          
+          // Si le pattern n'a pas de cleaningType défini, analyser la ligne
+          if (!cleaningType || cleaningType === 'none') {
+            // Vérifier si c'est vraiment "none" (propre) ou si on doit analyser
+            const analyzed = this.analyzeLineContext(line, pmsType, reportDate);
+            
+            // Si le pattern dit "none" mais l'analyse détecte un besoin de nettoyage,
+            // on garde le pattern car il a été explicitement validé
+            if (pattern.cleaningType === 'none' && analyzed.cleaningType !== 'none') {
+              // Le pattern dit explicitement "pas de nettoyage", on le respecte
+              this.log(`🎯 Chambre ${roomNumber}: Pattern validé dit 'none', analyse dit '${analyzed.cleaningType}' → On garde 'none'`);
+              status = pattern.status || 'clean';
+              cleaningType = 'none';
+              reason = `Pattern validé: propre (override analyse)`;
+            } else if (!pattern.cleaningType) {
+              // Pas de cleaningType dans le pattern, utiliser l'analyse
+              status = analyzed.status;
+              cleaningType = analyzed.cleaningType;
+              reason = analyzed.reason;
+            }
+          }
           
           rooms.push({
             roomNumber,
             status,
             cleaningType,
-            confidence: 90,
+            confidence: 95, // Plus haute confiance car pattern validé
             validated: true,
             originalText: line.trim(),
             debugInfo: {
@@ -470,7 +494,7 @@ class UnifiedParserService {
               cleanedLine: line.trim(),
               detectedKeywords: [],
               source: 'pattern' as const,
-              confidence: 90,
+              confidence: 95,
               appliedRule: `Pattern-first: ${reason}`
             }
           });
@@ -831,12 +855,33 @@ class UnifiedParserService {
 
     this.log(`📊 Résultat filtrage: ${filteredRooms.length}/${rooms.length} chambres conservées`);
 
-    // IMPORTANT: On garde le type de nettoyage DETECTE (pas celui de l'entraînement)
-    // car le rapport du jour peut avoir des statuts différents
+    // IMPORTANT: Respecter le cleaningType du pattern validé pour les chambres "propres" (none)
+    // Pour les autres chambres, on peut utiliser la détection dynamique
     return filteredRooms.map(room => {
+      const normalizedNumber = this.normalizeRoomNumber(room.roomNumber);
+      const learnedPattern = this.learnedPatterns.get(normalizedNumber);
+      
+      // Si le pattern validé dit explicitement "none" (propre), on le respecte
+      if (learnedPattern && learnedPattern.cleaningType === 'none') {
+        this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'none' (propre), on respecte`);
+        return {
+          ...room,
+          cleaningType: 'none' as CleaningType,
+          status: learnedPattern.status || 'clean',
+          confidence: 95,
+          validated: true,
+          debugInfo: {
+            ...room.debugInfo!,
+            source: 'pattern' as const,
+            appliedRule: `Pattern validé: propre (aucun nettoyage)`,
+            confidence: 95
+          }
+        };
+      }
+      
       return {
         ...room,
-        // Le cleaningType et status viennent de la détection dynamique, pas de l'entraînement
+        // Le cleaningType et status viennent de la détection dynamique
         confidence: Math.max(room.confidence || 0, 85),
         validated: true,
         debugInfo: {
@@ -856,6 +901,16 @@ class UnifiedParserService {
     if (this.customStatusMappings.size === 0) return rooms;
 
     return rooms.map(room => {
+      // NE PAS écraser le cleaningType des chambres validées comme "propres"
+      // Si le pattern validé dit "none", on le respecte
+      const normalizedNumber = this.normalizeRoomNumber(room.roomNumber);
+      const learnedPattern = this.learnedPatterns.get(normalizedNumber);
+      
+      if (learnedPattern && learnedPattern.cleaningType === 'none') {
+        // Chambre validée comme propre, ne pas écraser
+        return room;
+      }
+      
       const context = room.originalText || '';
       const contextUpper = context.toUpperCase();
 
