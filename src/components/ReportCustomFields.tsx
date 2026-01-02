@@ -55,28 +55,26 @@ const ReportCustomFields: React.FC<ReportCustomFieldsProps> = ({ onChange }) => 
   };
 
   return (
-    <div className="space-y-6 mt-6">
-      <h3 className="text-lg font-semibold">Informations supplémentaires pour le rapport</h3>
-      
-      <div className="space-y-4">
+    <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex items-center space-x-2">
           <Checkbox 
             id="enable-todo" 
             checked={enableToDo} 
             onCheckedChange={handleToDoToggle} 
           />
-          <Label htmlFor="enable-todo">Ajouter des choses à faire</Label>
+          <Label htmlFor="enable-todo" className="text-sm cursor-pointer">Ajouter des choses à faire</Label>
         </div>
         
         {enableToDo && (
           <div className="space-y-2 pl-6">
             {toDoItems.map((item, index) => (
-              <div key={`todo-${index}`} className="mb-2">
+              <div key={`todo-${index}`}>
                 <Textarea
                   placeholder={`Chose à faire ${index + 1}`}
                   value={item}
                   onChange={(e) => updateToDoItem(index, e.target.value)}
-                  className="resize-none"
+                  className="resize-none min-h-[60px] text-sm"
                 />
               </div>
             ))}
@@ -84,25 +82,25 @@ const ReportCustomFields: React.FC<ReportCustomFieldsProps> = ({ onChange }) => 
         )}
       </div>
       
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex items-center space-x-2">
           <Checkbox 
             id="enable-toknow" 
             checked={enableToKnow} 
             onCheckedChange={handleToKnowToggle} 
           />
-          <Label htmlFor="enable-toknow">Ajouter des choses à savoir</Label>
+          <Label htmlFor="enable-toknow" className="text-sm cursor-pointer">Ajouter des choses à savoir</Label>
         </div>
         
         {enableToKnow && (
           <div className="space-y-2 pl-6">
             {toKnowItems.map((item, index) => (
-              <div key={`toknow-${index}`} className="mb-2">
+              <div key={`toknow-${index}`}>
                 <Textarea
                   placeholder={`Chose à savoir ${index + 1}`}
                   value={item}
                   onChange={(e) => updateToKnowItem(index, e.target.value)}
-                  className="resize-none"
+                  className="resize-none min-h-[60px] text-sm"
                 />
               </div>
             ))}
