@@ -135,13 +135,16 @@ export const useNotifications = (hotelId?: string) => {
     const setupRealtime = async () => {
       try {
         // Connexion au manager centralisé
-        await realtimeManager.connect(effectiveHotelId);
+        const ok = await realtimeManager.connect(effectiveHotelId);
+        if (!ok) {
+          throw new Error('Realtime non connecté');
+        }
 
         // S'abonner aux changements
         subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
           console.log('📨 Nouvelle notification:', payload.eventType);
           realtimeConnected = true;
-          
+
           // Invalider le cache
           notificationCache.delete(effectiveHotelId);
           loadNotifications();
@@ -161,12 +164,14 @@ export const useNotifications = (hotelId?: string) => {
       } catch (error) {
         console.error('❌ Failed to setup realtime:', error);
         realtimeConnected = false;
-        
+
         // Retry with exponential backoff
         if (retryCount < MAX_RETRIES) {
           retryCount++;
           const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-          console.log(`🔄 Retrying realtime connection in ${delay}ms (attempt ${retryCount}/${MAX_RETRIES})`);
+          console.log(
+            `🔄 Retrying realtime connection in ${delay}ms (attempt ${retryCount}/${MAX_RETRIES})`
+          );
           retryTimeout = setTimeout(setupRealtime, delay);
         } else {
           // Fallback sur polling après tous les retries
