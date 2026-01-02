@@ -38,7 +38,7 @@ interface AssignmentTabProps {
   housekeeperMaxRoomsOverrides: Record<string, number>;
   isDistributed: boolean;
   onPdfProcessed: (data: Room[], housekeepers?: string[], method?: 'random' | 'floor' | 'cleaning-type') => void;
-  onRedistribute: (method: RedistributionMethod) => void;
+  onRedistribute: (method: RedistributionMethod, selectedHousekeepers: string[]) => void;
   onRoomUpdate: (room: Room) => void;
   onRoomUnassign: (room: Room) => void;
   onRoomReassign: (room: Room, newHousekeeper: string | null) => void;
@@ -104,8 +104,8 @@ export function AssignmentTab({
     );
   };
 
-  const handleRedistributeMethod = (method: RedistributionMethod) => {
-    onRedistribute(method);
+  const handleRedistributeMethod = (method: RedistributionMethod, selectedHousekeepers: string[]) => {
+    onRedistribute(method, selectedHousekeepers);
     setIsRedistributionDialogOpen(false);
   };
 
@@ -143,6 +143,11 @@ export function AssignmentTab({
         onRedistribute={handleRedistributeMethod}
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.length}
+        housekeeperNames={housekeeperNames}
+        onAddHousekeeper={() => {
+          setIsRedistributionDialogOpen(false);
+          setShowInviteDialog(true);
+        }}
       />
 
       {rooms.length === 0 ? (

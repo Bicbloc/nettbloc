@@ -421,8 +421,12 @@ const Index = () => {
   };
 
   // Redistribution handler
-  const handleRedistribute = async (method: RedistributionMethod) => {
-    if (housekeeperNames.length === 0 || rooms.length === 0) {
+  const handleRedistribute = async (method: RedistributionMethod, selectedHousekeepers?: string[]) => {
+    const housekeepersToUse = selectedHousekeepers && selectedHousekeepers.length > 0 
+      ? selectedHousekeepers 
+      : housekeeperNames;
+    
+    if (housekeepersToUse.length === 0 || rooms.length === 0) {
       toast({ variant: "destructive", title: "Erreur", description: "Données manquantes" });
       return;
     }
@@ -432,7 +436,7 @@ const Index = () => {
     }
 
     try {
-      const redistributedRooms = redistributeRooms(rooms, housekeeperNames, method);
+      const redistributedRooms = redistributeRooms(rooms, housekeepersToUse, method);
       setRooms(redistributedRooms);
       setIsDistributed(true);
       setIsRedistributionDialogOpen(false);
@@ -457,7 +461,7 @@ const Index = () => {
       }
 
       const methodName = method === 'random' ? 'aléatoire' : method === 'floor' ? 'par étage' : 'par type';
-      toast({ title: "Redistribution terminée", description: `Méthode ${methodName}` });
+      toast({ title: "Redistribution terminée", description: `Méthode ${methodName} - ${housekeepersToUse.length} femme${housekeepersToUse.length > 1 ? 's' : ''} de chambre` });
     } catch (error) {
       toast({ variant: "destructive", title: "Erreur", description: "Erreur lors de la redistribution" });
     }
@@ -823,6 +827,12 @@ const Index = () => {
         onRedistribute={handleRedistribute}
         housekeeperCount={housekeeperNames.length}
         roomCount={rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length}
+        housekeeperNames={housekeeperNames}
+        onAddHousekeeper={() => {
+          setIsRedistributionDialogOpen(false);
+          // Navigate to access codes tab to add a housekeeper
+          setActiveTab('access-codes');
+        }}
       />
 
       <DailyActionLogPanel
