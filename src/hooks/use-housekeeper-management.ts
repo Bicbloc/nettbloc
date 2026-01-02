@@ -21,6 +21,22 @@ export function useHousekeeperManagement({
   const [housekeeperMaxRoomsOverrides, setHousekeeperMaxRoomsOverrides] = useState<Record<string, number>>({});
 
   const handleDeleteHousekeeper = useCallback(async (housekeeperName: string) => {
+    // Désassigner les chambres de cette femme de chambre et les remettre dans "non assignées"
+    setRooms(prev => {
+      const roomsToUnassign = prev.filter(room => room.assignedTo === housekeeperName);
+      if (roomsToUnassign.length > 0) {
+        toast({
+          title: "Chambres désassignées",
+          description: `${roomsToUnassign.length} chambre${roomsToUnassign.length > 1 ? 's' : ''} remise${roomsToUnassign.length > 1 ? 's' : ''} dans les chambres non assignées.`
+        });
+      }
+      return prev.map(room => 
+        room.assignedTo === housekeeperName 
+          ? { ...room, assignedTo: undefined } 
+          : room
+      );
+    });
+    
     setHousekeeperNames(prev => prev.filter(name => name !== housekeeperName));
     
     // Désactiver en base de données
@@ -48,7 +64,7 @@ export function useHousekeeperManagement({
       delete updated[housekeeperName];
       return updated;
     });
-  }, [housekeepers, refreshHousekeepers]);
+  }, [housekeepers, refreshHousekeepers, setRooms]);
 
   const handleRenameHousekeeper = useCallback((oldName: string, newName: string) => {
     if (!newName.trim() || (oldName !== newName && housekeeperNames.includes(newName))) {
