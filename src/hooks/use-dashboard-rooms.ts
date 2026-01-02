@@ -168,26 +168,35 @@ export function useDashboardRooms({
           const sessionAssigned = sessionAssignments[r.room_number];
           const assignedTo = assignment?.housekeeper_name || sessionAssigned || undefined;
           
-          // Normalize cleaning type
+          // PRIORITÉ AU cleaningType STOCKÉ EN BASE (appris par l'IA)
           const rawCleaningType = r.cleaning_type;
-          let cleaningType: 'a_blanc' | 'recouche' | 'none' = 'a_blanc';
-          if (rawCleaningType === 'full' || rawCleaningType === 'a_blanc') {
-            cleaningType = 'a_blanc';
-          } else if (rawCleaningType === 'quick' || rawCleaningType === 'recouche') {
-            cleaningType = 'recouche';
-          } else if (rawCleaningType === 'none') {
+          let cleaningType: 'a_blanc' | 'recouche' | 'none';
+          
+          // Si le cleaningType est explicitement stocké, le respecter
+          if (rawCleaningType === 'none') {
             cleaningType = 'none';
+          } else if (rawCleaningType === 'recouche' || rawCleaningType === 'quick') {
+            cleaningType = 'recouche';
+          } else if (rawCleaningType === 'a_blanc' || rawCleaningType === 'full') {
+            cleaningType = 'a_blanc';
+          } else {
+            // Fallback intelligent basé sur le statut
+            cleaningType = r.status === 'clean' ? 'none' : 'a_blanc';
           }
+          
+          // Si cleaningType = 'none', le statut devrait être 'clean'
+          const status = cleaningType === 'none' ? 'clean' : r.status;
+          const notUrgent = cleaningType === 'none';
 
           return {
             number: r.room_number,
-            status: r.status,
+            status: status,
             cleaningType,
             assignedTo,
             floor: r.floor || undefined,
             notes: r.notes || undefined,
             isUrgent: r.cleaning_priority === 10,
-            notUrgent: r.cleaning_priority === 1,
+            notUrgent: notUrgent,
             isTwin: false,
             priority: r.cleaning_priority === 10 ? 'high' as const : undefined
           };
