@@ -111,13 +111,13 @@ export const useAutoSetup = () => {
         console.log('⚡ CACHE HIT - Vérification propriété:', cachedHotel.id.slice(0, 8) + '...');
         
         // Vérifier que l'hôtel existe ET appartient à l'utilisateur connecté
-        const { data: hotelExists } = await supabase
+        const { data: hotelExists, error: hotelExistsError } = await supabase
           .from('hotels')
           .select('id, name, hotel_code')
           .eq('id', cachedHotel.id)
           .eq('user_id', user.id) // IMPORTANT: Vérifier la propriété!
           .maybeSingle();
-        
+
         if (hotelExists) {
           console.log('✅ Cache validé - hôtel appartient à l\'utilisateur');
           setHotel({
@@ -127,13 +127,18 @@ export const useAutoSetup = () => {
           });
           setIsSetupComplete(true);
           setLoading(false);
-          
+
           // Charger le code d'accès en arrière-plan
           getActiveAccessCode(cachedHotel.id).then(code => {
             if (code) setAccessCode(code);
           });
-          
+
           return; // Démarrage rapide!
+        }
+
+        // IMPORTANT: ne pas "déconnecter" sur une erreur réseau/timeout (on laisse Phase 2 rattraper)
+        if (hotelExistsError) {
+          console.warn('⚠️ Vérification cache échouée, on conserve le cache et on continue:', hotelExistsError);
         } else {
           console.log('⚠️ Cache invalide - hôtel n\'appartient pas à l\'utilisateur, nettoyage...');
           storageService.clearHotel();

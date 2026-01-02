@@ -299,33 +299,43 @@ class RealtimeManager {
    */
   private startHeartbeat() {
     this.stopHeartbeat();
-    
+
     this.heartbeatInterval = setInterval(async () => {
       if (!this.channel || !this.isOnline || this.isPaused) return;
-      
+
       try {
-        // Vérifier session auth
+        // 1) Vérifier/rafraîchir la session avant de ping
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log('💔 Heartbeat: Session invalide');
-          this.consecutiveFailures++;
-          if (this.consecutiveFailures >= 2) {
-            this.notifyStatus('AUTH_EXPIRED');
+
+        const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : null;
+        const shouldRefresh = !!expiresAtMs && (expiresAtMs - Date.now() < 2 * 60 * 1000);
+
+        if (!session || shouldRefresh) {
+          const { data, error } = await supabase.auth.refreshSession();
+          if (error || !data.session) {
+            console.log('💔 Heartbeat: Session invalide (refresh échoué)');
+            this.consecutiveFailures++;
+            if (this.consecutiveFailures >= 2) {
+              this.notifyStatus('AUTH_EXPIRED');
+            }
+            return;
           }
-          return;
+          this.lastSuccessfulPing = Date.now();
+          this.consecutiveFailures = 0;
         }
-        
-        // Ping léger
-        const { error } = await supabase
+
+        // 2) Ping léger (tolérer "no rows" comme OK)
+        const { error: pingError } = await supabase
           .from('hotels')
           .select('id')
           .limit(1)
           .maybeSingle();
-        
-        if (error) {
+
+        // PGRST116 = no rows returned (ce n'est pas une panne réseau)
+        if (pingError && (pingError as any).code !== 'PGRST116') {
           this.consecutiveFailures++;
-          console.log('💔 Heartbeat: Échec', this.consecutiveFailures);
-          
+          console.log('💔 Heartbeat: Échec', this.consecutiveFailures, pingError);
+
           if (this.consecutiveFailures >= 3) {
             this.scheduleReconnect();
           }
