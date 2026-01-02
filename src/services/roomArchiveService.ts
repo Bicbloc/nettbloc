@@ -11,10 +11,11 @@ export class RoomArchiveService {
     archived: number;
     reset: number;
     assignmentsCleared: number;
+    linenTasksArchived: number;
   }> {
     const today = new Date().toISOString().split('T')[0];
     
-    console.log('📦 Début de l\'archivage des chambres pour', hotelId);
+    console.log('📦 Début de l\'archivage complet pour', hotelId, 'date:', today);
     
     try {
       // 1. Récupérer les chambres actuelles pour l'archivage
@@ -23,7 +24,10 @@ export class RoomArchiveService {
         .select('*')
         .eq('hotel_id', hotelId);
       
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('❌ Erreur récupération chambres:', fetchError);
+        throw fetchError;
+      }
       
       const roomsCount = currentRooms?.length || 0;
       console.log(`📊 ${roomsCount} chambres à archiver`);
@@ -48,7 +52,7 @@ export class RoomArchiveService {
       
       const assignments = currentAssignments || [];
       const housekeeperNames = [...new Set(assignments.map(a => a.housekeeper_name))];
-      console.log(`👥 ${housekeeperNames.length} femmes de chambre, ${assignments.length} assignations`);
+      console.log(`👥 ${housekeeperNames.length} femme(s) de chambre, ${assignments.length} assignations`);
       
       // 4. Récupérer le journal d'actions du jour
       const { data: todayLogs } = await supabase
@@ -60,7 +64,38 @@ export class RoomArchiveService {
       const actionLogs = todayLogs || [];
       console.log(`📝 ${actionLogs.length} actions du jour`);
       
-      // 5. Archiver dans daily_reports
+      // 5. Récupérer les tâches d'inventaire linge du jour
+      const { data: linenTasks } = await supabase
+        .from('linen_inventory_tasks')
+        .select(`
+          *,
+          linen_inventory_entries (
+            *,
+            linen_types (name, category)
+          )
+        `)
+        .eq('hotel_id', hotelId)
+        .eq('task_date', today);
+      
+      const linenTasksData = linenTasks || [];
+      console.log(`🧺 ${linenTasksData.length} tâches d'inventaire linge du jour`);
+      
+      // Calculer les totaux d'inventaire linge
+      const linenSummary = linenTasksData.reduce((acc, task) => {
+        const entries = (task as any).linen_inventory_entries || [];
+        entries.forEach((entry: any) => {
+          const typeName = entry.linen_types?.name || 'Inconnu';
+          if (!acc[typeName]) {
+            acc[typeName] = { clean: 0, dirty: 0, damaged: 0 };
+          }
+          acc[typeName].clean += entry.quantity_clean || 0;
+          acc[typeName].dirty += entry.quantity_dirty || 0;
+          acc[typeName].damaged += entry.quantity_damaged || 0;
+        });
+        return acc;
+      }, {} as Record<string, { clean: number; dirty: number; damaged: number }>);
+      
+      // 6. Créer le rapport d'archivage complet
       if (currentRooms && currentRooms.length > 0) {
         const archiveData = {
           hotel_id: hotelId,
@@ -69,7 +104,7 @@ export class RoomArchiveService {
           summary: {
             total_rooms: roomsCount,
             clean_rooms: currentRooms.filter(r => r.status === 'clean').length,
-            dirty_rooms: currentRooms.filter(r => r.status === 'dirty').length,
+            dirty_rooms: currentRooms.filter(r => r.status === 'dirty' || r.status === 'needs-cleaning').length,
             in_progress_rooms: currentRooms.filter(r => r.status === 'in-progress').length,
             archived_at: new Date().toISOString(),
             housekeepers: housekeeperNames,
@@ -78,8 +113,11 @@ export class RoomArchiveService {
               const room = currentRooms.find(r => r.id === a.room_id);
               acc[a.housekeeper_name].push({
                 room_number: room?.room_number || 'N/A',
+                room_id: a.room_id,
                 status: a.status,
-                completed_at: a.completed_at
+                started_at: a.started_at,
+                completed_at: a.completed_at,
+                actual_duration: a.actual_duration
               });
               return acc;
             }, {} as Record<string, any[]>),
@@ -99,13 +137,33 @@ export class RoomArchiveService {
             action_log: actionLogs.map(log => ({
               action_type: log.action_type,
               actor_name: log.actor_name,
+              actor_type: log.actor_type,
               room_number: log.room_number,
               description: log.description,
+              details: log.details,
               created_at: log.created_at
-            }))
+            })),
+            linen_inventory: {
+              tasks_count: linenTasksData.length,
+              summary: linenSummary,
+              tasks: linenTasksData.map(task => ({
+                assigned_to: (task as any).assigned_to,
+                status: (task as any).status,
+                started_at: (task as any).started_at,
+                completed_at: (task as any).completed_at,
+                entries: ((task as any).linen_inventory_entries || []).map((e: any) => ({
+                  linen_type: e.linen_types?.name,
+                  category: e.linen_types?.category,
+                  quantity_clean: e.quantity_clean,
+                  quantity_dirty: e.quantity_dirty,
+                  quantity_damaged: e.quantity_damaged,
+                  count_method: e.count_method
+                }))
+              }))
+            }
           },
           total_rooms_cleaned: currentRooms.filter(r => r.status === 'clean').length,
-          notes: `${housekeeperNames.length} femme(s) de chambre, ${remarks.length} commentaire(s), ${actionLogs.length} action(s)`
+          notes: `${housekeeperNames.length} femme(s) de chambre, ${remarks.length} commentaire(s), ${actionLogs.length} action(s), ${linenTasksData.length} inventaire(s) linge`
         };
         
         const { error: archiveError } = await supabase
@@ -119,7 +177,7 @@ export class RoomArchiveService {
         }
       }
       
-      // 3. Supprimer les assignations du jour
+      // 7. Supprimer les assignations du jour
       const { data: deletedAssignments, error: assignmentsError } = await supabase
         .from('assignments')
         .delete()
@@ -134,7 +192,25 @@ export class RoomArchiveService {
         console.log(`🗑️ ${assignmentsCleared} assignations supprimées`);
       }
       
-      // 4. SUPPRIMER les chambres pour vider la page (registre préservé)
+      // 8. Supprimer les entrées d'inventaire linge liées aux tâches du jour
+      const taskIds = linenTasksData.map(t => (t as any).id);
+      if (taskIds.length > 0) {
+        await supabase
+          .from('linen_inventory_entries')
+          .delete()
+          .in('task_id', taskIds);
+        
+        // Supprimer les tâches d'inventaire du jour
+        await supabase
+          .from('linen_inventory_tasks')
+          .delete()
+          .eq('hotel_id', hotelId)
+          .eq('task_date', today);
+        
+        console.log(`🧺 ${taskIds.length} tâches d'inventaire linge supprimées`);
+      }
+      
+      // 9. Supprimer les chambres pour vider la page (registre préservé)
       const { error: deleteError } = await supabase
         .from('rooms')
         .delete()
@@ -145,7 +221,7 @@ export class RoomArchiveService {
         throw deleteError;
       }
       
-      // 5. Supprimer les notifications du jour
+      // 10. Supprimer les notifications du jour
       await supabase
         .from('notifications')
         .delete()
@@ -153,22 +229,23 @@ export class RoomArchiveService {
         .gte('created_at', today + 'T00:00:00')
         .lte('created_at', today + 'T23:59:59');
       
-      // 6. Supprimer le journal d'actions du jour
+      // 11. Supprimer le journal d'actions du jour
       await supabase
         .from('daily_action_logs')
         .delete()
         .eq('hotel_id', hotelId)
         .eq('log_date', today);
       
-      console.log(`✅ ${roomsCount} chambres supprimées, page vidée`);
+      console.log(`✅ Archivage terminé: ${roomsCount} chambres, ${assignmentsCleared} assignations, ${taskIds.length} inventaires linge`);
       
       return {
         archived: roomsCount,
         reset: roomsCount,
-        assignmentsCleared
+        assignmentsCleared,
+        linenTasksArchived: taskIds.length
       };
     } catch (error) {
-      console.error('❌ Erreur archivage chambres:', error);
+      console.error('❌ Erreur archivage complet:', error);
       throw error;
     }
   }
