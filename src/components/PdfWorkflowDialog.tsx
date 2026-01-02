@@ -319,10 +319,24 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         }).filter(r => !!r.room_number);
 
         // Préparer les données pour la table rooms
+        // IMPORTANT: Sauvegarder le cleaningType appris par l'IA
         const roomsForSync = filteredData.map((room: any) => {
           const rawRoomNumber = room.roomNumber || room.room_number || room.number;
           // Normaliser le numéro (05 → 5, 01 → 1, etc.)
           const roomNumber = normalizeRoomNumber(rawRoomNumber);
+          
+          // Mapper le cleaningType pour la base de données
+          let dbCleaningType = 'a_blanc';
+          if (room.cleaningType === 'none' || room.notUrgent === true) {
+            dbCleaningType = 'none';
+          } else if (room.cleaningType === 'recouche' || room.cleaningType === 'quick') {
+            dbCleaningType = 'recouche';
+          } else if (room.cleaningType === 'a_blanc' || room.cleaningType === 'full') {
+            dbCleaningType = 'a_blanc';
+          }
+          
+          console.log(`📝 Chambre ${roomNumber}: cleaningType=${room.cleaningType} → DB=${dbCleaningType}`);
+          
           return {
             hotel_id: effectiveHotelId,
             room_number: roomNumber,
@@ -330,7 +344,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             status: room.status || 'dirty',
             room_type: room.type || room.room_type || null,
             cleaning_priority: room.priority === 'high' ? 2 : 1,
-            notes: room.notes || null
+            notes: room.notes || null,
+            cleaning_type: dbCleaningType // CRUCIAL: Sauvegarder le type de nettoyage IA
           };
         }).filter(r => !!r.room_number);
 

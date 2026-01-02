@@ -287,16 +287,34 @@ export class RoomArchiveService {
       console.log(`🗑️ ${existingCount || 0} anciennes chambres supprimées (registre préservé)`);
       
       // 5. Insérer les nouvelles chambres dans rooms
+      // IMPORTANT: Sauvegarder le cleaningType appris par l'IA
       const roomsForInsert = newRooms.map((room: any) => {
         const roomNumber = room.roomNumber || room.room_number || room.number;
+        
+        // Mapper le cleaningType pour la base de données
+        let dbCleaningType = 'a_blanc';
+        if (room.cleaningType === 'none' || room.notUrgent === true) {
+          dbCleaningType = 'none';
+        } else if (room.cleaningType === 'recouche' || room.cleaningType === 'quick') {
+          dbCleaningType = 'recouche';
+        } else if (room.cleaningType === 'a_blanc' || room.cleaningType === 'full') {
+          dbCleaningType = 'a_blanc';
+        }
+        
+        // Déterminer le statut correct selon le cleaningType
+        const status = dbCleaningType === 'none' ? 'clean' : 'needs-cleaning';
+        
+        console.log(`📝 [Replace] Chambre ${roomNumber}: cleaningType=${room.cleaningType} → DB=${dbCleaningType}, status=${status}`);
+        
         return {
           hotel_id: hotelId,
           room_number: roomNumber,
           floor: room.floor ?? null,
-          status: 'needs-cleaning',
+          status: status,
           room_type: room.type || room.room_type || null,
           cleaning_priority: room.priority === 'high' ? 2 : 1,
-          notes: null
+          notes: null,
+          cleaning_type: dbCleaningType // CRUCIAL: Sauvegarder le type de nettoyage IA
         };
       }).filter(r => !!r.room_number);
       
