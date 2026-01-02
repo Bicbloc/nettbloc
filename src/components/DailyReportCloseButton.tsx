@@ -23,73 +23,74 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
     try {
       console.log('🔚 Début de clôture de la journée pour hotel:', hotelId);
 
-      // 1. Récupérer la session actuelle
+      // 1. Vérifier la session actuelle (optionnel - on continue même sans)
       setClosingStep('Vérification de la session...');
       const currentToken = HotelSessionService.getSessionToken();
-      if (!currentToken) {
-        toast.error('Aucune session active à clôturer');
-        setIsClosing(false);
-        return;
-      }
-
-      const currentSession = await HotelSessionService.getSession(currentToken);
-      if (!currentSession) {
-        toast.error('Session introuvable');
-        setIsClosing(false);
-        return;
-      }
-
-      // 2. Archiver le journal d'actions du jour
+      
+      // 2. Archiver le journal d'actions du jour en premier
       setClosingStep('Archivage du journal d\'actions...');
       console.log('📦 Archivage du journal d\'actions...');
-      const logsArchived = await ActionLogService.archiveDailyLogs(hotelId);
-      if (logsArchived) {
-        console.log('✅ Journal d\'actions archivé');
+      try {
+        const logsArchived = await ActionLogService.archiveDailyLogs(hotelId);
+        if (logsArchived) {
+          console.log('✅ Journal d\'actions archivé');
+        }
+      } catch (logError) {
+        console.warn('⚠️ Erreur archivage logs (non bloquant):', logError);
       }
 
-      // 3. Archiver et réinitialiser les chambres
-      setClosingStep('Archivage des chambres...');
-      console.log('📦 Archivage des chambres...');
+      // 3. Archiver chambres, assignations, inventaire linge et notifications
+      setClosingStep('Archivage des chambres et inventaire...');
+      console.log('📦 Archivage complet en cours...');
       const archiveResult = await RoomArchiveService.archiveAndResetRooms(hotelId);
-      console.log('✅ Chambres archivées:', archiveResult);
+      console.log('✅ Archivage complet terminé:', archiveResult);
 
-      // 4. Archiver le rapport de la journée (legacy)
-      setClosingStep('Finalisation de l\'archivage...');
-      console.log('📦 Archivage du rapport en cours...');
+      // 4. Désactiver la session actuelle si elle existe
+      if (currentToken) {
+        setClosingStep('Fermeture de la session...');
+        console.log('🔒 Désactivation de la session actuelle...');
+        try {
+          await HotelSessionService.deactivateSession(currentToken);
+        } catch (sessionError) {
+          console.warn('⚠️ Erreur désactivation session (non bloquant):', sessionError);
+        }
+      }
 
-      // 5. Désactiver la session actuelle
-      setClosingStep('Fermeture de la session...');
-      console.log('🔒 Désactivation de la session actuelle...');
-      await HotelSessionService.deactivateSession(currentToken);
-
-      // 6. Nettoyer le stockage local
+      // 5. Nettoyer le stockage local
+      setClosingStep('Nettoyage du stockage local...');
       storageService.clearHotel();
       localStorage.removeItem('sessionToken');
       localStorage.removeItem('hotelSessionToken');
-      
-      // Nettoyer les assignations locales
       localStorage.removeItem(`assignments_${hotelId}`);
+      localStorage.removeItem(`housekeepers_${hotelId}`);
 
-      // 7. Créer une nouvelle session pour le lendemain
+      // 6. Créer une nouvelle session pour le lendemain
       setClosingStep('Création de la nouvelle session...');
       console.log('🆕 Création de la nouvelle session...');
-      const newToken = await HotelSessionService.createSession(hotelId);
-
-      if (!newToken) {
-        toast.error('Impossible de créer la nouvelle session');
-        setIsClosing(false);
-        return;
+      let newToken: string | null = null;
+      try {
+        newToken = await HotelSessionService.createSession(hotelId);
+      } catch (newSessionError) {
+        console.warn('⚠️ Erreur création nouvelle session:', newSessionError);
       }
 
-      // 8. Sauvegarder la nouvelle session
-      storageService.saveHotel({
-        id: hotelId,
-        name: '',
-        code: ''
-      });
+      // 7. Sauvegarder la nouvelle session
+      if (newToken) {
+        storageService.saveHotel({
+          id: hotelId,
+          name: '',
+          code: ''
+        });
+      }
 
-      toast.success(`Journée clôturée ! ${archiveResult.archived} chambres archivées, ${archiveResult.assignmentsCleared} assignations effacées.`);
-      console.log('✅ Clôture terminée, nouveau token:', newToken);
+      // 8. Message de succès avec détails
+      const successParts = [
+        `${archiveResult.archived} chambre(s)`,
+        `${archiveResult.assignmentsCleared} assignation(s)`,
+        `${archiveResult.linenTasksArchived} inventaire(s) linge`
+      ];
+      toast.success(`Journée clôturée ! Archivés: ${successParts.join(', ')}`);
+      console.log('✅ Clôture complète terminée');
 
       // 9. Notifier le parent pour rafraîchir l'interface
       if (onReportClosed) {
@@ -103,7 +104,7 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
 
     } catch (error) {
       console.error('❌ Erreur lors de la clôture de journée:', error);
-      toast.error('Erreur lors de la clôture');
+      toast.error(`Erreur lors de la clôture: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setIsClosing(false);
       setClosingStep('');
@@ -130,36 +131,39 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Clôturer la journée ?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Cette action va :
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                Archiver le journal d'actions du jour
-              </li>
-              <li className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                Archiver les chambres et créer un rapport
-              </li>
-              <li className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                Supprimer toutes les affectations du jour
-              </li>
-              <li className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                Réinitialiser les chambres à "à nettoyer"
-              </li>
-              <li className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                Créer une nouvelle session vierge
-              </li>
-            </ul>
-            <p className="mt-4 font-semibold text-destructive">Cette action est irréversible.</p>
+          <AlertDialogDescription asChild>
+            <div>
+              <p className="mb-3">Cette action va archiver toutes les données du jour :</p>
+              <ul className="list-none space-y-2">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span>Rapport des femmes de chambre (assignations et statuts)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span>Journal des actions (nettoyages, remarques, incidents)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span>Inventaire linge (comptages et photos)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span>Notifications et commentaires du jour</span>
+                </li>
+              </ul>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Ensuite, les chambres et assignations seront réinitialisées pour le lendemain.
+              </p>
+              <p className="mt-3 font-semibold text-destructive">
+                ⚠️ Cette action est irréversible. Les données archivées seront accessibles dans les rapports.
+              </p>
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Annuler</AlertDialogCancel>
-          <AlertDialogAction onClick={handleCloseDay}>
+          <AlertDialogAction onClick={handleCloseDay} className="bg-destructive hover:bg-destructive/90">
             Confirmer la clôture
           </AlertDialogAction>
         </AlertDialogFooter>
