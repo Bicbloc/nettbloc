@@ -30,36 +30,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+    let initialSessionLoaded = false;
 
-    // Set up auth state listener
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (!mounted) return;
       
       console.log('🔐 Auth:', event);
+      
+      // Update state synchronously
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      setLoading(false);
+      
+      // Only set loading false after initial session is also checked
+      if (initialSessionLoaded) {
+        setLoading(false);
+      }
 
       if (event === 'SIGNED_OUT') {
         storageService.clearHotel();
       }
     });
 
-    // Get initial session
+    // THEN get initial session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (!mounted) return;
+      initialSessionLoaded = true;
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setLoading(false);
-    });
-
-    // Safety timeout - 5 seconds max
-    const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('⚠️ Auth timeout');
+    }).catch((error) => {
+      console.error('❌ Erreur récupération session:', error);
+      if (mounted) {
+        initialSessionLoaded = true;
         setLoading(false);
       }
-    }, 5000);
+    });
+
+    // Safety timeout - reduced to 3 seconds
+    const timeout = setTimeout(() => {
+      if (mounted && !initialSessionLoaded) {
+        console.warn('⚠️ Auth timeout - forçage fin du chargement');
+        initialSessionLoaded = true;
+        setLoading(false);
+      }
+    }, 3000);
 
     return () => {
       mounted = false;
