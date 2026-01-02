@@ -4,12 +4,20 @@ import { Checkbox } from "./ui/checkbox";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 
+export interface LinenInventoryItem {
+  linenTypeId: string;
+  linenTypeName: string;
+  quantity: number;
+  assignedTo: string[];
+}
+
 export interface ReportFields {
   toDoItems: string[];
   toKnowItems: string[];
   instructions?: string;
   generalInstructions?: string;
   housekeeperInstructions?: Record<string, string>;
+  linenInventory?: LinenInventoryItem[];
 }
 
 interface ReportCustomFieldsProps {

@@ -793,6 +793,7 @@ const Index = () => {
         initialEmail={email}
         housekeeperName={reportAction === "single" ? reportHousekeeper : undefined}
         allHousekeepers={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
+        hotelId={selectedHotel?.id || undefined}
       />
       
       {showDeleteDialog && selectedRoom && (
