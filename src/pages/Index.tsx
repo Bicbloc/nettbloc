@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain, Archive } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain, Archive, Mail, ClipboardCheck } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,7 +48,9 @@ import { IncidentsTab } from "@/components/dashboard/IncidentsTab";
 import { ReportsTab } from "@/components/dashboard/ReportsTab";
 import { TrainingTab } from "@/components/dashboard/TrainingTab";
 import { ArchivesTab } from "@/components/dashboard/ArchivesTab";
+import { StaffInvitationsTab } from "@/components/dashboard/StaffInvitationsTab";
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
+import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
@@ -681,6 +683,12 @@ const Index = () => {
                 <TabsTrigger value="archives" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                   <Archive className="h-5 w-5" /><span>Archives</span>
                 </TabsTrigger>
+                <TabsTrigger value="invitations" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <Mail className="h-5 w-5" /><span>Invitations</span>
+                </TabsTrigger>
+                <TabsTrigger value="inspections" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <ClipboardCheck className="h-5 w-5" /><span>Inspection</span>
+                </TabsTrigger>
               </TabsList>
             </div>
             
@@ -778,6 +786,19 @@ const Index = () => {
 
               <TabsContent value="archives" className="space-y-6">
                 <ArchivesTab currentHotelId={currentHotelId} />
+              </TabsContent>
+
+              <TabsContent value="invitations" className="space-y-6">
+                <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotel?.name} />
+              </TabsContent>
+
+              <TabsContent value="inspections" className="space-y-6">
+                {currentHotelId && (
+                  <GovernessInspectionInterface
+                    hotelId={currentHotelId}
+                    governessName="Gouvernante"
+                  />
+                )}
               </TabsContent>
             </div>
           </div>
