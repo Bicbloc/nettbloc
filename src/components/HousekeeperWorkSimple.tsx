@@ -183,7 +183,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
     
     if (table === 'assignments') {
-      if (eventType === 'INSERT') {
+      if (eventType === 'INSERT' || eventType === 'UPDATE') {
+        // Vérifier si cette assignation nous concerne avec plusieurs critères
         const possibleIds = [
           housekeeperProfile?.id,
           housekeeper?.id,
@@ -191,24 +192,24 @@ export const HousekeeperWorkSimple: React.FC = () => {
           housekeeper?.user_id
         ].filter(Boolean);
         
-        const normalizedMyName = normalizeName(housekeeperName);
+        const normalizedMyName = normalizeName(housekeeperProfile?.name || housekeeperName);
         const normalizedRecordName = normalizeName(newRecord.housekeeper_name);
         
         const isForMe = possibleIds.includes(newRecord.housekeeper_id) || 
-                        normalizedRecordName === normalizedMyName;
+                        normalizedRecordName === normalizedMyName ||
+                        normalizedRecordName.includes(normalizedMyName) ||
+                        normalizedMyName.includes(normalizedRecordName);
         const isCorrectHotel = newRecord.hotel_id === hotelId;
         
         if (isForMe && isCorrectHotel) {
-          console.log('🆕 Nouvelle assignation reçue! Rechargement...');
+          console.log('🆕 Assignation reçue pour moi! Rechargement...');
           loadWorkData();
-          addToActivityLog('🆕 Nouvelle chambre assignée', 'info');
-          setNewRoomsCount(prev => prev + 1);
-          setTimeout(() => setNewRoomsCount(0), 5000);
+          if (eventType === 'INSERT') {
+            addToActivityLog('🆕 Nouvelle chambre assignée', 'info');
+            setNewRoomsCount(prev => prev + 1);
+            setTimeout(() => setNewRoomsCount(0), 5000);
+          }
         }
-      } else if (eventType === 'UPDATE') {
-        setAssignments(prev => prev.map(a => 
-          a.id === newRecord.id ? { ...a, ...newRecord } : a
-        ));
       } else if (eventType === 'DELETE') {
         setAssignments(prev => prev.filter(a => a.id !== oldRecord.id));
         setRooms(prev => prev.filter(r => r.id !== oldRecord.room_id));
@@ -217,6 +218,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
     
     if (table === 'rooms') {
       if (eventType === 'UPDATE' || eventType === 'INSERT') {
+        // Vérifier si cette chambre nous est assignée
+        const isMyRoom = rooms.some(r => r.id === newRecord.id);
+        
         if (newRecord.status === 'ready-to-clean' && oldRecord?.status !== 'ready-to-clean') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
           setAvailableRooms(prev => {
@@ -227,20 +231,14 @@ export const HousekeeperWorkSimple: React.FC = () => {
           });
         }
         
-        setRooms(prev => {
-          const exists = prev.find(r => r.id === newRecord.id);
-          if (exists) {
-            return prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r);
-          } else if (eventType === 'INSERT') {
-            return [...prev, newRecord];
-          }
-          return prev;
-        });
+        if (isMyRoom) {
+          setRooms(prev => prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r));
+        }
       } else if (eventType === 'DELETE') {
         setRooms(prev => prev.filter(r => r.id !== oldRecord.id));
       }
     }
-  }, [hotelId, housekeeperName, housekeeperProfile, housekeeper, addToActivityLog]);
+  }, [hotelId, housekeeperName, housekeeperProfile, housekeeper, addToActivityLog, rooms]);
 
   // Synchronisation en temps réel
   const { isConnected } = useRealtimeSync({
@@ -307,31 +305,58 @@ export const HousekeeperWorkSimple: React.FC = () => {
       setHousekeeper(authResult.user);
 
       const housekeeperId = housekeeperProfile?.id;
+      const profileName = housekeeperProfile?.name;
 
-      let housekeeperTableId = housekeeperId;
+      // Récupérer TOUS les noms possibles associés à cet utilisateur
+      let allPossibleNames: string[] = [];
+      let allPossibleIds: string[] = [];
+      
+      if (profileName) {
+        allPossibleNames.push(profileName.trim());
+        allPossibleNames.push(profileName.trim().toLowerCase());
+      }
+      
       if (housekeeperId) {
+        allPossibleIds.push(housekeeperId);
+        
+        // Chercher toutes les entrées dans la table housekeepers liées à cet utilisateur
         const { data: hkData } = await supabase
           .from('housekeepers')
-          .select('id')
+          .select('id, name, user_id')
           .eq('hotel_id', hotelId)
-          .eq('user_id', housekeeperId)
-          .single();
+          .or(`user_id.eq.${housekeeperId},name.ilike.${profileName || ''}`);
         
-        if (hkData) {
-          housekeeperTableId = hkData.id;
+        if (hkData && hkData.length > 0) {
+          hkData.forEach(hk => {
+            if (hk.id) allPossibleIds.push(hk.id);
+            if (hk.name) {
+              allPossibleNames.push(hk.name.trim());
+            }
+          });
         }
       }
+      
+      // Dédupliquer les noms et IDs
+      allPossibleIds = [...new Set(allPossibleIds.filter(Boolean))];
+      allPossibleNames = [...new Set(allPossibleNames.filter(Boolean))];
+      
+      console.log('🔍 Recherche assignations pour:', { 
+        ids: allPossibleIds, 
+        names: allPossibleNames 
+      });
 
-      const possibleIds = [
-        housekeeperId,
-        housekeeperTableId,
-        housekeeperProfile?.id
-      ].filter(Boolean);
-
-      let orFilter = possibleIds.map(id => `housekeeper_id.eq.${id}`).join(',');
-      if (housekeeperName) {
-        orFilter += `,housekeeper_name.eq.${housekeeperName}`;
-      }
+      // Construire le filtre OR pour inclure tous les IDs et noms possibles
+      let orFilters: string[] = [];
+      allPossibleIds.forEach(id => {
+        orFilters.push(`housekeeper_id.eq.${id}`);
+      });
+      allPossibleNames.forEach(name => {
+        // Utiliser ilike pour ignorer la casse
+        orFilters.push(`housekeeper_name.ilike.${name}`);
+      });
+      
+      const orFilter = orFilters.join(',');
+      console.log('🔍 Filtre assignations:', orFilter);
 
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
@@ -368,7 +393,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
         return;
       }
 
-      // Dédupliquer les assignations
+      console.log('✅ Assignations trouvées:', assignmentsData?.length || 0);
+      
+      // Dédupliquer les assignations (garder la plus récente par chambre)
       const uniqueAssignments = assignmentsData?.reduce((acc: any[], curr: any) => {
         const existingIndex = acc.findIndex(a => a.room_id === curr.room_id);
         if (existingIndex === -1) {
@@ -390,6 +417,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
           cleaning_type: a.rooms.cleaning_type
         }));
 
+      console.log('✅ Chambres extraites:', extractedRooms.length);
+      
       setAssignments(uniqueAssignments);
       setRooms(extractedRooms);
       
