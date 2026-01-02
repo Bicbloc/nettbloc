@@ -711,7 +711,40 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     </>
   );
 
-  const renderHousekeepersStep = () => (
+  // Calculer la recommandation du nombre de femmes de chambre
+  const getHousekeeperRecommendation = () => {
+    if (!pdfData || pdfData.length === 0) return { recommended: 1, totalTime: 0, fullCount: 0, quickCount: 0 };
+    
+    const fullCleaningTime = 30; // minutes
+    const quickCleaningTime = 15; // minutes
+    const averageTimePerHousekeeper = 360; // 6 heures = 360 minutes
+    
+    let fullCount = 0;
+    let quickCount = 0;
+    
+    pdfData.forEach((room: any) => {
+      const cleaningType = room.cleaningType || room.cleaning_type || room.type;
+      if (cleaningType === 'full' || cleaningType === 'a_blanc' || cleaningType === 'départ') {
+        fullCount++;
+      } else if (cleaningType === 'quick' || cleaningType === 'recouche' || cleaningType === 'recoucher') {
+        quickCount++;
+      } else {
+        // Par défaut, considérer comme nettoyage rapide
+        quickCount++;
+      }
+    });
+    
+    const totalTime = (fullCount * fullCleaningTime) + (quickCount * quickCleaningTime);
+    const recommended = Math.max(1, Math.ceil(totalTime / averageTimePerHousekeeper));
+    
+    return { recommended, totalTime, fullCount, quickCount };
+  };
+
+  const renderHousekeepersStep = () => {
+    const recommendation = getHousekeeperRecommendation();
+    const totalSelected = housekeepers.length + selectedExisting.length;
+    
+    return (
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
@@ -724,15 +757,35 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       </DialogHeader>
       
       <div className="space-y-4">
-        {/* Résumé de l'étape précédente */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-green-800">
-            <CheckCircle className="h-4 w-4" />
-            <span className="font-medium">PDF traité avec succès</span>
+        {/* Recommandation basée sur l'analyse */}
+        <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-primary">
+            <Users className="h-5 w-5" />
+            <span className="font-semibold">Recommandation</span>
           </div>
-          <p className="text-green-700 text-sm mt-1">
-            {pdfData?.length} chambres analysées
-          </p>
+          <div className="mt-2 space-y-1">
+            <p className="text-foreground font-medium text-lg">
+              {recommendation.recommended} femme{recommendation.recommended > 1 ? 's' : ''} de chambre recommandée{recommendation.recommended > 1 ? 's' : ''}
+            </p>
+            <div className="text-sm text-muted-foreground space-y-0.5">
+              <p className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5" />
+                Temps total estimé : <strong>{Math.round(recommendation.totalTime / 60)}h{recommendation.totalTime % 60 > 0 ? ` ${recommendation.totalTime % 60}min` : ''}</strong>
+              </p>
+              <p className="text-xs">
+                • {recommendation.fullCount} nettoyage{recommendation.fullCount > 1 ? 's' : ''} complet{recommendation.fullCount > 1 ? 's' : ''} (30 min/ch)
+                {recommendation.quickCount > 0 && ` • ${recommendation.quickCount} recouche${recommendation.quickCount > 1 ? 's' : ''} (15 min/ch)`}
+              </p>
+            </div>
+          </div>
+          {totalSelected > 0 && (
+            <div className={`mt-3 pt-3 border-t border-primary/20 text-sm ${totalSelected >= recommendation.recommended ? 'text-green-600' : 'text-amber-600'}`}>
+              {totalSelected >= recommendation.recommended 
+                ? `✓ ${totalSelected} sélectionnée${totalSelected > 1 ? 's' : ''} - Vous êtes dans la recommandation`
+                : `⚠ ${totalSelected} sélectionnée${totalSelected > 1 ? 's' : ''} - Il en faudrait au moins ${recommendation.recommended}`
+              }
+            </div>
+          )}
         </div>
 
         {/* Barre de recherche */}
@@ -954,6 +1007,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       </DialogFooter>
     </>
   );
+  };
 
   const renderDistributionStep = () => (
     <>
