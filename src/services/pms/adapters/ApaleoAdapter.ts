@@ -32,14 +32,15 @@ export class ApaleoAdapter extends PmsAdapter {
     roomNumberRegex: '(?<![/\\-.:\\d])\\b(\\d{2,4})\\b(?![/\\-.:\\d])',
     statusMappings: {
       // Codes courts Apaleo
+      // RÈGLE: "occupé et sale" ou "arrivé sale" = à blanc
       'DIR': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
       'INS': { status: 'inspected', cleaning: 'none', priority: 10 },
-      'OCC': { status: 'occupied', cleaning: 'recouche', priority: 15 },
+      'OCC': { status: 'occupied', cleaning: 'a_blanc', priority: 15 },  // Occupé sale = à blanc
       'VAC': { status: 'vacant', cleaning: 'a_blanc', priority: 18 },
       'CLN': { status: 'clean', cleaning: 'none', priority: 8 },
       'DIRTY': { status: 'dirty', cleaning: 'a_blanc', priority: 20 },
       'INSPECTED': { status: 'inspected', cleaning: 'none', priority: 10 },
-      'OCCUPIED': { status: 'occupied', cleaning: 'recouche', priority: 15 },
+      'OCCUPIED': { status: 'occupied', cleaning: 'a_blanc', priority: 15 },  // Occupé sale = à blanc
       'VACANT': { status: 'vacant', cleaning: 'a_blanc', priority: 18 },
       'CLEAN': { status: 'clean', cleaning: 'none', priority: 8 },
     },
@@ -223,6 +224,7 @@ export class ApaleoAdapter extends PmsAdapter {
 
   /**
    * Mappe un code de statut vers status/cleaning
+   * RÈGLE: "occupé et sale" ou "arrivé sale" = à blanc (pas recouche)
    */
   private mapStatusCode(code: string): { status: string; cleaning: CleaningType } {
     const mapping = this.config.statusMappings[code];
@@ -240,7 +242,8 @@ export class ApaleoAdapter extends PmsAdapter {
         return { status: 'inspected', cleaning: 'none' };
       case 'OCC':
       case 'OCCUPIED':
-        return { status: 'occupied', cleaning: 'recouche' };
+        // CORRECTION: Occupé = à blanc (chambre occupée et sale)
+        return { status: 'occupied', cleaning: 'a_blanc' };
       case 'VAC':
       case 'VACANT':
         return { status: 'vacant', cleaning: 'a_blanc' };
