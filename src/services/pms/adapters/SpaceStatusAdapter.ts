@@ -118,11 +118,18 @@ export class SpaceStatusAdapter extends PmsAdapter {
     if (statusCode === 'INS') return { status: 'clean', cleaningType: 'none' };
 
     if (statusCode === 'DIR' || statusCode === 'SAL') {
+      // Vérifier checkout/checkin (2 blocs de guests avec horaires)
       if (guestBlocks >= 2) return { status: 'checkout_checkin', cleaningType: 'a_blanc' };
+      
+      // Si info de nuit disponible
       if (nightTotal > 0) {
-        if (nightCurrent >= nightTotal) return { status: 'checkout', cleaningType: 'a_blanc' };
-        if (nightCurrent < nightTotal) return { status: 'occupied', cleaningType: 'recouche' };
+        // CORRECTION: "Dernière nuit" (X/X) = client ENCORE présent cette nuit = RECOUCHE
+        // "Nuit intermédiaire" (X < Y) = client présent = RECOUCHE
+        // Dans les DEUX cas, c'est RECOUCHE car le client dort encore cette nuit
+        return { status: 'stayover', cleaningType: 'recouche' };
       }
+      
+      // Sans info de nuit, c'est une chambre sale à nettoyer à blanc
       return { status: 'dirty', cleaningType: 'a_blanc' };
     }
 
