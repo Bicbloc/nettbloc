@@ -39,12 +39,27 @@ interface PmsRuleFromDb {
   is_default: boolean;
 }
 
+// Règle de combinaison chargée depuis la DB
+interface CombinationRuleDb {
+  id: string;
+  priority: number;
+  status_keywords: string[];
+  arrival_date: 'present' | 'absent' | 'any';
+  departure_date: 'present' | 'absent' | 'any';
+  arrival_time: 'present' | 'absent' | 'any';
+  departure_time: 'present' | 'absent' | 'any';
+  night_info: 'present' | 'absent' | 'any';
+  result_cleaning_type: CleaningType;
+  result_status?: string;
+}
+
 class UnifiedParserService {
   private learnedPatterns: Map<string, LearnedRoomPattern> = new Map();
   private contextPatterns: Map<string, ContextPattern> = new Map(); // NOUVEAU: Patterns contextuels
   private permanentRules: Map<string, LearnedRoomPattern> = new Map(); // NOUVEAU: Règles permanentes
   private customStatusMappings: Map<string, StatusMapping> = new Map();
   private dynamicRules: Map<string, PmsRuleFromDb> = new Map();
+  private combinationRules: CombinationRuleDb[] = []; // NOUVEAU: Règles de combinaison
   private hotelId: string | null = null;
   private debugLogs: string[] = [];
   private isLoading = false;
@@ -95,6 +110,143 @@ class UnifiedParserService {
     } catch (error) {
       this.log(`⚠️ Erreur chargement règles PMS: ${error}`);
     }
+  }
+
+  /**
+   * Charge les règles de combinaison depuis hotel_combination_rules
+   */
+  async loadCombinationRules(hotelId: string): Promise<void> {
+    this.combinationRules = [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('hotel_combination_rules')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .order('priority', { ascending: false });
+
+      if (!error && data) {
+        this.combinationRules = data.map(rule => ({
+          id: rule.id,
+          priority: rule.priority,
+          status_keywords: rule.status_keywords || [],
+          arrival_date: rule.arrival_date as 'present' | 'absent' | 'any',
+          departure_date: rule.departure_date as 'present' | 'absent' | 'any',
+          arrival_time: rule.arrival_time as 'present' | 'absent' | 'any',
+          departure_time: rule.departure_time as 'present' | 'absent' | 'any',
+          night_info: rule.night_info as 'present' | 'absent' | 'any',
+          result_cleaning_type: rule.result_cleaning_type as CleaningType,
+          result_status: rule.result_status
+        }));
+        this.log(`🔧 ${this.combinationRules.length} règles de combinaison chargées`);
+      }
+    } catch (error) {
+      this.log(`⚠️ Erreur chargement règles de combinaison: ${error}`);
+    }
+  }
+
+  /**
+   * Extrait le contexte d'une ligne pour le matching des règles de combinaison
+   */
+  private extractLineContext(line: string): {
+    statusKeywords: string[];
+    hasArrivalDate: boolean;
+    hasDepartureDate: boolean;
+    hasArrivalTime: boolean;
+    hasDepartureTime: boolean;
+    hasNightInfo: boolean;
+  } {
+    const upper = line.toUpperCase();
+    
+    // Extraire les mots-clés de statut
+    const allKeywords = ['SAL', 'DIR', 'DIRTY', 'OCC', 'OCCUPIED', 'DEP', 'DEPART', 'PARTI', 
+                         'CHECKOUT', 'C/O', 'ARR', 'ARRIVAL', 'C/I', 'CHECKIN', 'PRO', 'CLEAN', 'VAC', 'VACANT'];
+    const statusKeywords = allKeywords.filter(kw => new RegExp(`\\b${kw}\\b`).test(upper));
+    
+    // Détecter les dates (format DD/MM/YYYY ou DD-MM-YYYY)
+    const dateMatches = line.match(/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g) || [];
+    const hasArrivalDate = dateMatches.length >= 1;
+    const hasDepartureDate = dateMatches.length >= 2;
+    
+    // Détecter les horaires (format HH:MM)
+    const timeMatches = line.match(/\b\d{1,2}:\d{2}\b/g) || [];
+    
+    // Logique simplifiée: si 2 horaires, on a arrivée + départ
+    // Si 1 horaire, déterminer lequel selon la position ou le contexte
+    let hasArrivalTime = false;
+    let hasDepartureTime = false;
+    
+    if (timeMatches.length >= 2) {
+      hasArrivalTime = true;
+      hasDepartureTime = true;
+    } else if (timeMatches.length === 1) {
+      // Un seul horaire: check le contexte
+      if (/\b(DEP|PARTI|CHECKOUT|C\/O)\b/i.test(upper)) {
+        hasDepartureTime = true;
+      } else if (/\b(ARR|ARRIVAL|C\/I)\b/i.test(upper)) {
+        hasArrivalTime = true;
+      } else {
+        // Par défaut, considérer comme horaire de départ si la date de départ est présente
+        hasDepartureTime = hasDepartureDate;
+      }
+    }
+    
+    // Détecter les infos de nuit (Nuit X/Y, Night X of Y)
+    const hasNightInfo = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line) || 
+                         /\d+\s*[\/\\]\s*\d+\s*(?:nuit|night)/i.test(line);
+    
+    return {
+      statusKeywords,
+      hasArrivalDate,
+      hasDepartureDate,
+      hasArrivalTime,
+      hasDepartureTime,
+      hasNightInfo
+    };
+  }
+
+  /**
+   * Applique les règles de combinaison à une ligne
+   * @returns Le résultat de la première règle qui match, ou null si aucune
+   */
+  private applyCombinationRules(line: string): { cleaningType: CleaningType; status: string; reason: string } | null {
+    if (this.combinationRules.length === 0) return null;
+    
+    const context = this.extractLineContext(line);
+    
+    for (const rule of this.combinationRules) {
+      // Vérifier les mots-clés de statut
+      const statusMatch = rule.status_keywords.length === 0 || 
+                          rule.status_keywords.some(kw => context.statusKeywords.includes(kw));
+      if (!statusMatch) continue;
+      
+      // Vérifier chaque condition
+      const checkCondition = (ruleValue: 'present' | 'absent' | 'any', actualValue: boolean): boolean => {
+        if (ruleValue === 'any') return true;
+        if (ruleValue === 'present') return actualValue;
+        if (ruleValue === 'absent') return !actualValue;
+        return true;
+      };
+      
+      const arrDateMatch = checkCondition(rule.arrival_date, context.hasArrivalDate);
+      const depDateMatch = checkCondition(rule.departure_date, context.hasDepartureDate);
+      const arrTimeMatch = checkCondition(rule.arrival_time, context.hasArrivalTime);
+      const depTimeMatch = checkCondition(rule.departure_time, context.hasDepartureTime);
+      const nightMatch = checkCondition(rule.night_info, context.hasNightInfo);
+      
+      if (arrDateMatch && depDateMatch && arrTimeMatch && depTimeMatch && nightMatch) {
+        const reason = `Règle combinaison #${rule.priority}: ${rule.status_keywords.join('/')} → ${rule.result_cleaning_type}`;
+        this.log(`✅ ${reason}`);
+        return {
+          cleaningType: rule.result_cleaning_type,
+          status: rule.result_status || (rule.result_cleaning_type === 'a_blanc' ? 'checkout' : 'stayover'),
+          reason
+        };
+      }
+    }
+    
+    return null;
   }
 
   /**
@@ -216,7 +368,10 @@ class UnifiedParserService {
         }
       }
 
-      this.log(`📚 Patterns chargés: ${this.learnedPatterns.size} chambres, ${this.contextPatterns.size} patterns contextuels, ${this.permanentRules.size} règles permanentes, ${this.customStatusMappings.size} mappings`);
+      // NOUVEAU: Charger les règles de combinaison
+      await this.loadCombinationRules(hotelId);
+
+      this.log(`📚 Patterns chargés: ${this.learnedPatterns.size} chambres, ${this.contextPatterns.size} patterns contextuels, ${this.permanentRules.size} règles permanentes, ${this.customStatusMappings.size} mappings, ${this.combinationRules.length} règles combinaison`);
     } catch (error) {
       this.log(`❌ Erreur chargement patterns: ${error}`);
     } finally {
@@ -736,7 +891,13 @@ class UnifiedParserService {
     const upper = line.toUpperCase();
     const stayoverNoTimes = this.isStayoverWithoutTimes(line);
 
-    // Priorité: mots-clés de départ explicites → À blanc
+    // PRIORITÉ 1: Règles de combinaison configurées par l'utilisateur
+    const combinationResult = this.applyCombinationRules(line);
+    if (combinationResult) {
+      return combinationResult;
+    }
+
+    // PRIORITÉ 2: mots-clés de départ explicites → À blanc
     // (sinon on risque de tout classer en recouche dès qu'il y a 2 dates).
     if (/\b(PARTI|D[EÉ]PART|DEPART|CHECK\s*OUT|CHECKOUT|C\/O|DEP)\b/i.test(upper)) {
       return {

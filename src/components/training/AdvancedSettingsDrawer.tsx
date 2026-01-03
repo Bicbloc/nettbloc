@@ -4,7 +4,8 @@ import { ConnectedRoomRulesManager } from "@/components/ConnectedRoomRulesManage
 import { PmsRulesManager } from "@/components/PmsRulesManager";
 import { PmsPatternManager } from "@/components/PmsPatternManager";
 import { ErrorAnalysisDashboard } from "@/components/ErrorAnalysisDashboard";
-import { Link2, Settings, Brain, Activity } from "lucide-react";
+import { CleaningCombinationMapper } from "@/components/pms/CleaningCombinationMapper";
+import { Link2, Settings, Brain, Activity, Layers } from "lucide-react";
 
 interface AdvancedSettingsDrawerProps {
   open: boolean;
@@ -23,25 +24,36 @@ export const AdvancedSettingsDrawer = ({ open, onOpenChange, hotelId }: Advanced
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="connected" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+        <Tabs defaultValue="mapping" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
+            <TabsTrigger value="mapping" className="flex items-center gap-1.5 text-xs">
+              <Layers className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Mapping</span>
+            </TabsTrigger>
             <TabsTrigger value="connected" className="flex items-center gap-1.5 text-xs">
               <Link2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Chambres</span>
             </TabsTrigger>
             <TabsTrigger value="rules" className="flex items-center gap-1.5 text-xs">
               <Settings className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Nettoyage</span>
+              <span className="hidden sm:inline">Règles</span>
             </TabsTrigger>
             <TabsTrigger value="patterns" className="flex items-center gap-1.5 text-xs">
               <Brain className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Modèles IA</span>
+              <span className="hidden sm:inline">Modèles</span>
             </TabsTrigger>
             <TabsTrigger value="analysis" className="flex items-center gap-1.5 text-xs">
               <Activity className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Diagnostic</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="mapping" className="space-y-4">
+            <div className="text-sm text-muted-foreground mb-4">
+              Configurez le type de nettoyage selon la combinaison statut + dates + horaires
+            </div>
+            <CleaningCombinationMapper hotelId={hotelId} />
+          </TabsContent>
 
           <TabsContent value="connected" className="space-y-4">
             <div className="text-sm text-muted-foreground mb-4">

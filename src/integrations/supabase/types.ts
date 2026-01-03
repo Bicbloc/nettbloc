@@ -584,6 +584,77 @@ export type Database = {
           },
         ]
       }
+      hotel_combination_rules: {
+        Row: {
+          arrival_date: string
+          arrival_time: string
+          created_at: string
+          created_by: string | null
+          departure_date: string
+          departure_time: string
+          description: string | null
+          hotel_id: string
+          id: string
+          is_active: boolean
+          night_info: string
+          pms_template: string | null
+          priority: number
+          result_cleaning_type: string
+          result_status: string | null
+          rule_name: string
+          status_keywords: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          arrival_date?: string
+          arrival_time?: string
+          created_at?: string
+          created_by?: string | null
+          departure_date?: string
+          departure_time?: string
+          description?: string | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          night_info?: string
+          pms_template?: string | null
+          priority?: number
+          result_cleaning_type: string
+          result_status?: string | null
+          rule_name: string
+          status_keywords?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          arrival_date?: string
+          arrival_time?: string
+          created_at?: string
+          created_by?: string | null
+          departure_date?: string
+          departure_time?: string
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          night_info?: string
+          pms_template?: string | null
+          priority?: number
+          result_cleaning_type?: string
+          result_status?: string | null
+          rule_name?: string
+          status_keywords?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_combination_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_detection_rules: {
         Row: {
           condition: Json
