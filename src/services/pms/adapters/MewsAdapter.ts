@@ -74,6 +74,28 @@ export class MewsAdapter extends PmsAdapter {
     // Pattern: "001   DBL-" suivi d'un saut de ligne puis "C"
     processed = processed.replace(/(\d{2,4})\s+(DBL|SGL|TPL|FAM)-\s*\n\s*([CS])/gi, '$1 $2-$3');
     
+    // NOUVEAU: Fusionner les lignes d'horaires isolés (ex: "11:00" seul sur une ligne)
+    // Pattern: ligne avec chambre + nom client, puis ligne avec juste HH:MM
+    // Exemple: "116 DBL SAL ... JONATHAN PAUL AXON\n11:00" → fusionné en une ligne
+    processed = processed.replace(
+      /(\d{2,4}\s+(?:DBL|SGL|TPL|TRP|TWN|SUI|FAM|QUA)[^\n]*[A-Z]{2,}[^\n]*)\n\s*(\d{1,2}:\d{2})\s*(?=\n|$)/gi,
+      '$1 $2'
+    );
+    
+    // Pattern plus général: ligne avec Adultes/Enfants/nom, puis horaire isolé
+    // Couvre les cas où le type de chambre n'est pas détecté mais le contenu est typique
+    processed = processed.replace(
+      /([^\n]*(?:Adultes|Enfants)[^\n]*[A-Z]{3,}[^\n]*)\n\s*(\d{1,2}:\d{2})\s*(?=\n|$)/gi,
+      '$1 $2'
+    );
+    
+    // Pattern pour horaires multiples sur ligne séparée (ex: "11:00\n15:00")
+    // Fusionner avec la ligne précédente si elle contient un numéro de chambre
+    processed = processed.replace(
+      /(\d{2,4}\s+[^\n]+)\n\s*(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2})\s*(?=\n|$)/gi,
+      '$1 $2 $3'
+    );
+    
     // Normaliser les espaces multiples
     processed = processed.replace(/[ \t]+/g, ' ');
     
