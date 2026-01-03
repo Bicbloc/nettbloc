@@ -7,6 +7,7 @@ import { Plus, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
+import { storageService } from '@/services/storageService';
 
 interface QuickAddHousekeeperButtonProps {
   onAddHousekeeper?: (name: string) => void;
@@ -56,8 +57,8 @@ export function QuickAddHousekeeperButton({ onAddHousekeeper, className }: Quick
     setIsLoading(true);
     
     try {
-      // Récupérer l'ID de l'hôtel sélectionné
-      const selectedHotelId = localStorage.getItem('selectedHotelId');
+      // Récupérer l'ID de l'hôtel via storageService
+      const selectedHotelId = storageService.getHotelId();
       
       if (!selectedHotelId) {
         toast({
