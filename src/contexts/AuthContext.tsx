@@ -102,25 +102,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = useCallback(async () => {
     // Preserve hotel data for reconnection
-    const hotelId = localStorage.getItem('selectedHotelId');
-    const housekeeperNames = localStorage.getItem('housekeeper_names');
-    const assignmentKeys: Record<string, string> = {};
-    
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith('assignments_')) {
-        assignmentKeys[key] = localStorage.getItem(key) || '';
-      }
-    }
+    const hotelData = storageService.getHotel();
 
     await supabase.auth.signOut();
 
-    // Restore after signout
-    if (hotelId) localStorage.setItem('selectedHotelId', hotelId);
-    if (housekeeperNames) localStorage.setItem('housekeeper_names', housekeeperNames);
-    Object.entries(assignmentKeys).forEach(([key, value]) => {
-      if (value) localStorage.setItem(key, value);
-    });
+    // Restore hotel after signout (user may want to reconnect)
+    if (hotelData) {
+      storageService.saveHotel(hotelData);
+    }
   }, []);
 
   return (

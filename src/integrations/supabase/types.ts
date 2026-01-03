@@ -2656,6 +2656,99 @@ export type Database = {
         }
         Relationships: []
       }
+      technician_access_requests: {
+        Row: {
+          created_at: string | null
+          hotel_code: string
+          hotel_id: string | null
+          id: string
+          requested_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          technician_profile_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hotel_code: string
+          hotel_id?: string | null
+          id?: string
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          technician_profile_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hotel_code?: string
+          hotel_id?: string | null
+          id?: string
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          technician_profile_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_access_requests_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_access_requests_technician_profile_id_fkey"
+            columns: ["technician_profile_id"]
+            isOneToOne: false
+            referencedRelation: "technician_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_profiles: {
+        Row: {
+          certifications: Json | null
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          specialties: string[] | null
+          total_hotels_worked: number
+          updated_at: string
+        }
+        Insert: {
+          certifications?: Json | null
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          specialties?: string[] | null
+          total_hotels_worked?: number
+          updated_at?: string
+        }
+        Update: {
+          certifications?: Json | null
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          specialties?: string[] | null
+          total_hotels_worked?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

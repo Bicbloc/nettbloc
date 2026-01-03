@@ -35,6 +35,7 @@ import {
 import { GamificationService } from '@/services/gamificationService';
 import { BadgeDisplay } from '@/components/gamification/BadgeDisplay';
 import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
+import { storageService } from '@/services/storageService';
 
 interface Assignment {
   id: string;
@@ -81,10 +82,9 @@ export default function HousekeeperProfile() {
     performanceByDay: []
   });
 
-  const housekeeperData = localStorage.getItem('housekeeper') 
-    ? JSON.parse(localStorage.getItem('housekeeper')!) 
-    : null;
-  const hotelId = localStorage.getItem('selectedHotelId');
+  const housekeeperSession = storageService.getHousekeeperSession();
+  const housekeeperData = housekeeperSession;
+  const hotelId = storageService.getHotelId();
 
   useEffect(() => {
     checkAuth();
@@ -280,12 +280,13 @@ export default function HousekeeperProfile() {
         phone: editPhone.trim() || null
       });
 
-      // Mettre à jour localStorage si nécessaire
+      // Mettre à jour storageService si nécessaire
       if (housekeeperData) {
-        localStorage.setItem('housekeeper', JSON.stringify({
-          ...housekeeperData,
-          name: editName.trim()
-        }));
+        storageService.saveHousekeeperSession({
+          id: housekeeperData.id,
+          name: editName.trim(),
+          accessCode: housekeeperData.accessCode
+        });
       }
 
       toast({
@@ -308,7 +309,7 @@ export default function HousekeeperProfile() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    localStorage.clear();
+    storageService.clearAll();
     navigate('/housekeeper/auth');
   };
 

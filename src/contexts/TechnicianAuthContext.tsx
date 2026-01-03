@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { storageService } from '@/services/storageService';
 
 interface TechnicianProfile {
   id: string;
@@ -10,6 +11,8 @@ interface TechnicianProfile {
   phone: string | null;
   is_active: boolean;
   total_hotels_worked: number;
+  specialties: string[];
+  certifications: any[];
 }
 
 interface HotelSession {
@@ -83,19 +86,17 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
   const loadTechnicianProfile = async (userId: string) => {
     try {
-      // Utiliser maybeSingle() pour éviter l'erreur PGRST116 si aucun profil n'existe
+      // Use the dedicated technician_profiles table
       const { data: profileData, error: profileError } = await supabase
-        .from('housekeeper_profiles')
+        .from('technician_profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
 
-      // Ignorer l'erreur PGRST116 (aucune ligne trouvée)
       if (profileError && profileError.code !== 'PGRST116') {
-        console.warn('⚠️ Erreur profil technicien (ignorée):', profileError.message);
+        console.warn('⚠️ Erreur profil technicien:', profileError.message);
       }
       
-      // Si pas de profil, ne pas lever d'erreur - l'utilisateur n'est peut-être pas un technicien
       if (!profileData) {
         console.log('ℹ️ Pas de profil technicien pour cet utilisateur');
         setProfile(null);
@@ -103,9 +104,21 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
         return;
       }
       
-      setProfile(profileData);
+      // Map database response to TechnicianProfile interface
+      const mappedProfile: TechnicianProfile = {
+        id: profileData.id,
+        name: profileData.name,
+        email: profileData.email,
+        phone: profileData.phone,
+        is_active: profileData.is_active,
+        total_hotels_worked: profileData.total_hotels_worked,
+        specialties: profileData.specialties || [],
+        certifications: Array.isArray(profileData.certifications) ? profileData.certifications : []
+      };
+      
+      setProfile(mappedProfile);
 
-      // Utiliser maybeSingle() également pour les sessions
+      // Load active hotel session
       const { data: sessionData } = await supabase
         .from('hotel_access_sessions')
         .select(`
@@ -113,22 +126,30 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
           hotel_id,
           access_code,
           is_active,
-          hotels (
-            name
-          )
+          hotels (name)
         `)
         .eq('housekeeper_profile_id', userId)
         .eq('is_active', true)
         .maybeSingle();
 
       if (sessionData) {
-        setCurrentHotelSession({
+        const hotelSession = {
           id: sessionData.id,
           hotel_id: sessionData.hotel_id,
           hotel_name: (sessionData.hotels as any)?.name,
           is_active: sessionData.is_active,
           access_code: sessionData.access_code
-        });
+        };
+        setCurrentHotelSession(hotelSession);
+        
+        // Sync with storageService
+        if (sessionData.hotel_id) {
+          storageService.saveHotel({
+            id: sessionData.hotel_id,
+            name: hotelSession.hotel_name || '',
+            code: ''
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading technician profile:', error);
@@ -146,7 +167,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
         password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: { name, phone }
+          data: { name, phone, role: 'technician' }
         }
       });
 
@@ -154,13 +175,15 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
       if (authData.user) {
         const { error: profileError } = await supabase
-          .from('housekeeper_profiles')
+          .from('technician_profiles')
           .insert({
             id: authData.user.id,
             name,
             email,
             phone: phone || null,
-            is_active: true
+            is_active: true,
+            specialties: [],
+            certifications: []
           });
 
         if (profileError) throw profileError;
@@ -175,10 +198,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       return { error };
     } catch (error: any) {
       return { error };
@@ -193,6 +213,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
       await supabase.auth.signOut();
       setProfile(null);
       setCurrentHotelSession(null);
+      storageService.clearHotel();
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -215,9 +236,9 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
       }
 
       const { error: requestError } = await supabase
-        .from('housekeeper_access_requests')
+        .from('technician_access_requests')
         .insert({
-          housekeeper_profile_id: profile.id,
+          technician_profile_id: profile.id,
           hotel_id: hotel.id,
           hotel_code: hotelCode.toUpperCase(),
           status: 'pending'
@@ -259,16 +280,18 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
         .eq('housekeeper_profile_id', profile.id)
         .eq('hotel_id', hotel.id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (existingSession) {
-        setCurrentHotelSession({
+        const hotelSession = {
           id: existingSession.id,
           hotel_id: hotel.id,
           hotel_name: hotel.name,
           is_active: true,
           access_code: existingSession.access_code
-        });
+        };
+        setCurrentHotelSession(hotelSession);
+        storageService.saveHotel({ id: hotel.id, name: hotel.name, code: hotelCode });
         return { success: true };
       }
 
@@ -292,6 +315,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
         .eq('id', currentHotelSession.id);
 
       setCurrentHotelSession(null);
+      storageService.clearHotel();
 
       toast({
         title: "Déconnexion réussie",
@@ -309,7 +333,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
     try {
       const { error } = await supabase
-        .from('housekeeper_profiles')
+        .from('technician_profiles')
         .update(updates)
         .eq('id', profile.id);
 

@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { storageService } from "@/services/storageService";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -194,17 +195,13 @@ export function IncidentReportDialogSimple({
     mutationFn: async (values: z.infer<typeof incidentSchema>) => {
       const { data: user } = await supabase.auth.getUser();
       
-      const housekeeperData = localStorage.getItem('housekeeper') 
-        ? JSON.parse(localStorage.getItem('housekeeper')!) 
-        : null;
-      const housekeeperProfile = localStorage.getItem('housekeeperProfile')
-        ? JSON.parse(localStorage.getItem('housekeeperProfile')!)
-        : null;
+      const housekeeperSession = storageService.getHousekeeperSession();
+      const housekeeperProfile = storageService.getHousekeeperProfile();
       
       const reportedById = user?.user?.id || housekeeperProfile?.id || null;
       const reportedByName = user?.user?.email 
         || housekeeperProfile?.name 
-        || housekeeperData?.name 
+        || housekeeperSession?.name 
         || 'Femme de chambre';
 
       const { data: item } = await supabase

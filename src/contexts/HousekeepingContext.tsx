@@ -134,10 +134,9 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         // Les rooms sont chargées depuis la table rooms, pas depuis la session
         setIsDistributed(false); // Toujours faux car is_distributed n'existe plus
         
-        // Récupérer l'ID réel de l'hôtel depuis la base de données
+        // Récupérer l'ID réel de l'hôtel depuis storageService (source unique)
         let sessionHotelId = session.hotel_id;
-        const savedHotelCode = localStorage.getItem('selectedHotelCode');
-        const savedHotelId = localStorage.getItem('selectedHotelId');
+        const storedHotel = storageService.getHotel();
         
         // Valider l'UUID
         const isValidUUID = (uuid: string) => {
@@ -146,22 +145,21 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         };
         
         // Priorité au hotelId sauvegardé s'il est valide
-        if (savedHotelId && isValidUUID(savedHotelId)) {
-          sessionHotelId = savedHotelId;
-          console.log('✅ Context - Hotel ID valide récupéré depuis localStorage:', sessionHotelId);
-        } else if (savedHotelCode) {
+        if (storedHotel?.id && isValidUUID(storedHotel.id)) {
+          sessionHotelId = storedHotel.id;
+          console.log('✅ Context - Hotel ID valide récupéré depuis storageService:', sessionHotelId);
+        } else if (storedHotel?.code) {
           // Récupérer l'hôtel réel depuis la base de données par son code
           try {
             const { SupabaseService } = await import('@/services/supabaseService');
-            const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
+            const hotel = await SupabaseService.getHotelByCode(storedHotel.code);
             
             if (hotel) {
               sessionHotelId = hotel.id;
-              localStorage.setItem('selectedHotelId', hotel.id);
-              localStorage.setItem('selectedHotelName', hotel.name);
+              storageService.saveHotel({ id: hotel.id, name: hotel.name, code: storedHotel.code });
               console.log('✅ Context - Hotel ID réel récupéré depuis la base:', sessionHotelId);
             } else {
-              console.error('❌ Context - Hôtel non trouvé pour le code:', savedHotelCode);
+              console.error('❌ Context - Hôtel non trouvé pour le code:', storedHotel.code);
             }
           } catch (error) {
             console.error('❌ Context - Erreur récupération hôtel:', error);
@@ -302,7 +300,7 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
   // Fonction pour générer automatiquement les codes d'accès après distribution
   const generateAccessCodesForAssignedHousekeepers = async (force = false) => {
-    const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
+    const currentHotelId = hotelId || storageService.getHotelId();
     if (!currentHotelId || housekeeperNames.length === 0) {
       console.log('⚠️ Génération codes: Conditions non remplies', { currentHotelId, housekeeperCount: housekeeperNames.length });
       return;
@@ -474,68 +472,34 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
   // Fonction pour valider la connexion hôtel
   const validateHotelConnection = async (): Promise<string | null> => {
-    const savedHotelCode = localStorage.getItem('selectedHotelCode');
-    const savedHotelId = localStorage.getItem('selectedHotelId');
+    const storedHotel = storageService.getHotel();
     
-    if (savedHotelCode && (!savedHotelId || !hotelId)) {
+    if (storedHotel?.code && (!storedHotel.id || !hotelId)) {
       console.log('⚙️ Context - Validation de la connexion hôtel...');
       try {
         const { SupabaseService } = await import('@/services/supabaseService');
-        const hotel = await SupabaseService.getHotelByCode(savedHotelCode);
+        const hotel = await SupabaseService.getHotelByCode(storedHotel.code);
         
         if (hotel) {
-          localStorage.setItem('selectedHotelId', hotel.id);
-          localStorage.setItem('selectedHotelName', hotel.name);
+          storageService.saveHotel({ id: hotel.id, name: hotel.name, code: storedHotel.code });
           setHotelId(hotel.id);
           console.log('✅ Context - Connexion hôtel validée:', hotel.id);
           return hotel.id;
         } else {
-          console.error('❌ Context - Hôtel non trouvé pour le code:', savedHotelCode);
+          console.error('❌ Context - Hôtel non trouvé pour le code:', storedHotel.code);
         }
       } catch (error) {
         console.error('❌ Context - Erreur validation hôtel:', error);
       }
     }
     
-    return hotelId || savedHotelId;
+    return hotelId || storedHotel?.id || null;
   };
 
-  // DÉSACTIVÉ: Vérification périodique automatique des codes d'accès
-  // useEffect(() => {
-  //   const generateAccessCodesForAssignedHousekeepers = async () => {
-  //     if (!hotelId) return;
-      
-  //     try {
-  //       console.log('🔧 Vérification des codes d\'accès manquants...');
-        
-  //       // Forcer la génération de codes pour toutes les femmes de chambre manquantes
-  //       const { CodeGenerationService } = await import('@/services/codeGenerationService');
-  //       const results = await CodeGenerationService.forceGenerateAllMissingCodes();
-        
-  //       if (results.generated > 0) {
-  //         console.log(`✅ ${results.generated} code(s) d'accès généré(s) automatiquement`);
-  //       }
-        
-  //       if (results.errors.length > 0) {
-  //         console.warn('⚠️ Erreurs lors de la génération automatique:', results.errors);
-  //       }
-  //     } catch (error) {
-  //       console.error('❌ Erreur génération codes automatique:', error);
-  //     }
-  //   };
-    
-  //   // Vérifier immédiatement
-  //   generateAccessCodesForAssignedHousekeepers();
-    
-  //   // Puis vérifier toutes les 2 minutes
-  //   const interval = setInterval(generateAccessCodesForAssignedHousekeepers, 120000);
-    
-  //   return () => clearInterval(interval);
-  // }, [hotelId]);
 
   // Rafraîchir la liste des housekeepers depuis la BD - AUTOMATIQUE toutes les 30s
   const refreshHousekeepers = useCallback(async () => {
-    const currentHotelId = hotelId || localStorage.getItem('selectedHotelId');
+    const currentHotelId = hotelId || storageService.getHotelId();
     if (!currentHotelId) return;
     
     try {

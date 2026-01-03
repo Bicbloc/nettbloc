@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2, Clock, MessageSquare, Send, Pencil, Trash2, X, Check } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { storageService } from "@/services/storageService";
 
 interface RoomIncidentsDialogProps {
   open: boolean;
@@ -86,9 +87,8 @@ export function RoomIncidentsDialog({ open, onOpenChange, hotelId, roomNumber }:
     mutationFn: async ({ incidentId, comment }: { incidentId: string; comment: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Récupérer les informations depuis localStorage pour les femmes de chambre
-      const storedHousekeeperName = localStorage.getItem('housekeeper_name');
-      const storedHousekeeperId = localStorage.getItem('housekeeper_id');
+      // Récupérer les informations via storageService
+      const housekeeperSession = storageService.getHousekeeperSession();
       
       // Déterminer le user_id, user_name et user_type
       let userId: string;
@@ -100,10 +100,10 @@ export function RoomIncidentsDialog({ open, onOpenChange, hotelId, roomNumber }:
         userId = user.id;
         userName = user.email || "Admin";
         userType = "admin";
-      } else if (storedHousekeeperId) {
+      } else if (housekeeperSession?.id) {
         // Femme de chambre (non authentifiée via Supabase Auth)
-        userId = storedHousekeeperId;
-        userName = storedHousekeeperName || "Femme de chambre";
+        userId = housekeeperSession.id;
+        userName = housekeeperSession.name || "Femme de chambre";
         userType = "housekeeper";
       } else {
         // Fallback

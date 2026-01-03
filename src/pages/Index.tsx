@@ -28,6 +28,7 @@ import { useAutoSetup } from "@/hooks/use-auto-setup";
 import { cleanupInvalidHotelIds, generateHotelId } from "@/lib/utils";
 import { redistributeRooms } from "@/utils/redistributionUtils";
 import { UpgradeButton } from "@/components/UpgradeButton";
+import { storageService } from "@/services/storageService";
 import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
@@ -65,7 +66,7 @@ const Index = () => {
   
   useSessionTracking();
   
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('nettobloc_admin_tab') || 'overview');
+  const [activeTab, setActiveTab] = useState(() => storageService.getAdminTab());
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   
   const { 
@@ -193,7 +194,7 @@ const Index = () => {
   
   // Persist active tab
   useEffect(() => {
-    localStorage.setItem('nettobloc_admin_tab', activeTab);
+    storageService.saveAdminTab(activeTab);
   }, [activeTab]);
 
   // Cleanup invalid hotel IDs
@@ -506,10 +507,7 @@ const Index = () => {
         return;
       }
 
-      localStorage.setItem('selectedHotelCode', hotelCode);
-      localStorage.setItem('userEmail', userEmail);
-      localStorage.setItem('selectedHotelId', hotel.id);
-      localStorage.setItem('hotelId', hotel.id);
+      storageService.saveHotel({ id: hotel.id, name: hotel.name || `Hôtel ${hotelCode}`, code: hotelCode });
       
       setSelectedHotel(hotel);
       await handleRedistribute('random');
@@ -520,7 +518,7 @@ const Index = () => {
 
   const handleHotelSelection = (hotel: any) => {
     setSelectedHotel(hotel);
-    localStorage.setItem('selectedHotelId', hotel.id);
+    storageService.saveHotel({ id: hotel.id, name: hotel.name, code: hotel.hotel_code || '' });
     setIsHotelSelectionOpen(false);
     toast({ title: "Hôtel sélectionné", description: `${hotel.name} sélectionné` });
     setTimeout(() => handleRedistribute('random'), 500);

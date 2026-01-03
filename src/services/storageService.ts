@@ -9,6 +9,8 @@ const STORAGE_KEYS = {
   USER_PREFERENCES: 'nettobloc_user_prefs',
   ADMIN_TAB: 'nettobloc_admin_tab',
   HOUSEKEEPER_PROFILE: 'nettobloc_hk_profile',
+  HOUSEKEEPER_SESSION: 'nettobloc_hk_session',
+  TECHNICIAN_PROFILE: 'nettobloc_tech_profile',
 } as const;
 
 // Anciennes clés à migrer puis supprimer
@@ -21,6 +23,10 @@ const LEGACY_KEYS = [
   'hotelId',
   'lastSelectedHotelId',
   'housekeeperProfile',
+  'housekeeper',
+  'housekeeper_name',
+  'housekeeper_id',
+  'housekeeperCode',
   'admin_active_tab',
 ] as const;
 
@@ -229,6 +235,60 @@ class StorageService {
     localStorage.removeItem(STORAGE_KEYS.HOUSEKEEPER_PROFILE);
   }
 
+  // ============ HOUSEKEEPER SESSION (for non-auth sessions) ============
+
+  saveHousekeeperSession(data: { id: string; name: string; accessCode?: string }): void {
+    localStorage.setItem(STORAGE_KEYS.HOUSEKEEPER_SESSION, JSON.stringify({
+      ...data,
+      timestamp: Date.now()
+    }));
+  }
+
+  getHousekeeperSession(): { id: string; name: string; accessCode?: string } | null {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.HOUSEKEEPER_SESSION);
+      if (!stored) {
+        // Try legacy keys
+        const legacyHousekeeper = localStorage.getItem('housekeeper');
+        if (legacyHousekeeper) {
+          const parsed = JSON.parse(legacyHousekeeper);
+          return { id: parsed.id, name: parsed.name, accessCode: parsed.access_code };
+        }
+        return null;
+      }
+      return JSON.parse(stored);
+    } catch {
+      return null;
+    }
+  }
+
+  clearHousekeeperSession(): void {
+    localStorage.removeItem(STORAGE_KEYS.HOUSEKEEPER_SESSION);
+    // Also clear legacy
+    localStorage.removeItem('housekeeper');
+    localStorage.removeItem('housekeeper_name');
+    localStorage.removeItem('housekeeper_id');
+  }
+
+  // ============ TECHNICIAN PROFILE ============
+
+  saveTechnicianProfile(profile: { id: string; name: string; email: string }): void {
+    localStorage.setItem(STORAGE_KEYS.TECHNICIAN_PROFILE, JSON.stringify(profile));
+  }
+
+  getTechnicianProfile(): { id: string; name: string; email: string } | null {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.TECHNICIAN_PROFILE);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  clearTechnicianProfile(): void {
+    localStorage.removeItem(STORAGE_KEYS.TECHNICIAN_PROFILE);
+  }
+
   // ============ UTILITY ============
 
   /**
@@ -238,7 +298,10 @@ class StorageService {
     Object.values(STORAGE_KEYS).forEach(key => {
       localStorage.removeItem(key);
     });
-    localStorage.removeItem('selectedHotelId');
+    // Clear remaining legacy keys
+    LEGACY_KEYS.forEach(key => {
+      localStorage.removeItem(key);
+    });
   }
 
   /**
@@ -261,6 +324,16 @@ class StorageService {
     }
 
     return null;
+  }
+
+  /**
+   * Nettoie les clés legacy obsolètes
+   */
+  cleanupLegacyKeys(): void {
+    LEGACY_KEYS.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    console.log('🧹 StorageService: Clés legacy nettoyées');
   }
 }
 
