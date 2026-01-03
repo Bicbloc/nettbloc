@@ -3,7 +3,7 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { RoomCard } from "./RoomCard";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings, FileText, Download, Key } from "lucide-react";
+import { FileCog, Layers, Plus, AlertTriangle, Trash2, Maximize, Minimize, Settings, FileText, Download } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
@@ -446,58 +446,32 @@ export function HousekeeperCard({
                   </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-lg">
-                    {name}
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleNameEdit}
-                    className="h-6 px-2 text-xs opacity-70 hover:opacity-100"
-                    title="Modifier le nom"
-                  >
-                    ✏️
-                  </Button>
-                  {accessCode ? (
-                    <div className="bg-primary/10 px-3 py-2 rounded-lg border border-primary/20">
-                      <div className="flex items-center gap-2">
-                        <Key className="h-4 w-4 text-primary" />
-                        <span className="font-mono font-bold text-primary text-base md:text-sm">
-                          {accessCode}
-                        </span>
-                      </div>
-                      <div className="text-xs text-primary/70 mt-1 md:hidden">
-                        Code d'accès mobile
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onGenerateAccessCode?.(name)}
-                      className="h-8 px-3 text-sm md:h-6 md:px-2 md:text-xs"
-                      title="Générer un code d'accès"
-                    >
-                      <Key className="h-4 w-4 mr-1 md:h-3 md:w-3" />
-                      <span className="md:hidden">Générer Code</span>
-                      <span className="hidden md:inline">Code</span>
-                    </Button>
-                  )}
-                </div>
+                <h3 className="font-bold text-lg">
+                  {name}
+                </h3>
               )}
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={toggleExpand}
-                className="h-6 w-6 p-0"
-                title={expanded ? "Minimiser" : "Maximiser"}
+                size="sm"
+                onClick={handleNameEdit}
+                className="h-6 px-2 text-xs opacity-70 hover:opacity-100"
+                title="Modifier le nom"
               >
-                {expanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                ✏️
               </Button>
             </div>
-            
-            <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleExpand}
+              className="h-6 w-6 p-0"
+              title={expanded ? "Minimiser" : "Maximiser"}
+            >
+              {expanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </Button>
+          </div>
+          
+          <div className="flex gap-1">
               <Popover open={showMaxRoomsSettings} onOpenChange={setShowMaxRoomsSettings}>
                 <PopoverTrigger asChild>
                   <Button 
@@ -569,7 +543,6 @@ export function HousekeeperCard({
                 </Button>
               )}
             </div>
-          </div>
           
           {expanded && (
             <div className="mb-4 mt-3">
@@ -611,17 +584,6 @@ export function HousekeeperCard({
           
         {expanded && (
           <CardContent className="p-4 pt-2">
-            {/* Affichage du code d'accès */}
-            {accessCode && (
-              <div className="bg-muted/50 p-2 rounded text-center mb-4">
-                <div className="text-xs text-muted-foreground">Code d'accès mobile</div>
-                <div className="font-mono font-bold text-lg text-primary">
-                  {accessCode}
-                </div>
-                <div className="text-xs text-muted-foreground">Pour l'interface mobile</div>
-              </div>
-            )}
-            
             {isFloorSelectorOpen && (
               <div className="mb-4 p-3 border rounded-md bg-slate-50">
                 <div className="text-sm font-medium mb-2">Étages à afficher:</div>
