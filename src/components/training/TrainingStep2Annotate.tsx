@@ -23,6 +23,7 @@ interface TrainingStep2AnnotateProps {
   userId: string;
   onComplete: (rooms: ExtractedRoom[]) => void;
   onBack: () => void;
+  onOpenAdvanced?: () => void;
 }
 
 // Labels pour les types de nettoyage
@@ -75,6 +76,7 @@ export const TrainingStep2Annotate = ({
   userId,
   onComplete,
   onBack,
+  onOpenAdvanced,
 }: TrainingStep2AnnotateProps) => {
   const { toast } = useToast();
   const [rooms, setRooms] = useState<ExtractedRoom[]>(trainingData.extractedRooms);
@@ -83,6 +85,9 @@ export const TrainingStep2Annotate = ({
   const [editingTimeRoom, setEditingTimeRoom] = useState<number | null>(null);
   const [newRoom, setNewRoom] = useState({ roomNumber: "", cleaningType: "full" as const });
 
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [cleaningFilter, setCleaningFilter] = useState<'all' | 'a_blanc' | 'recouche' | 'none'>('all');
+
   const copyRawText = () => {
     navigator.clipboard.writeText(trainingData.rawText);
     toast({ title: "Texte copié dans le presse-papiers" });
@@ -90,6 +95,33 @@ export const TrainingStep2Annotate = ({
 
   const validatedCount = rooms.filter((r) => r.validated).length;
   const totalCount = rooms.length;
+
+  const collator = useMemo(() => new Intl.Collator('fr', { numeric: true, sensitivity: 'base' }), []);
+
+  const matchesCleaningFilter = (room: ExtractedRoom) => {
+    if (cleaningFilter === 'all') return true;
+
+    if (cleaningFilter === 'a_blanc') {
+      return room.cleaningType === 'a_blanc' || room.cleaningType === 'full';
+    }
+    if (cleaningFilter === 'recouche') {
+      return room.cleaningType === 'recouche' || room.cleaningType === 'quick';
+    }
+    return room.cleaningType === 'none';
+  };
+
+  const displayedRooms = useMemo(() => {
+    const indexed = rooms.map((room, index) => ({ room, index }));
+
+    const filtered = indexed.filter(({ room }) => matchesCleaningFilter(room));
+
+    filtered.sort((a, b) => {
+      const cmp = collator.compare(a.room.roomNumber, b.room.roomNumber);
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+
+    return filtered;
+  }, [rooms, cleaningFilter, sortOrder, collator]);
 
   // Intelligent highlighting - avoid false positives
   const highlightedText = useMemo(() => {
@@ -340,6 +372,11 @@ export const TrainingStep2Annotate = ({
               <Sparkles className="w-3 h-3" />
               PMS: {trainingData.detectedPmsType.toUpperCase()}
             </Badge>
+            {onOpenAdvanced && (
+              <Button variant="outline" size="sm" onClick={onOpenAdvanced}>
+                Paramètres / parser
+              </Button>
+            )}
           </div>
           <Badge variant={validatedCount === totalCount ? "default" : "secondary"}>
             {validatedCount}/{totalCount} validées
@@ -414,6 +451,41 @@ export const TrainingStep2Annotate = ({
         </Dialog>
       </div>
 
+      {/* Filtres (colonne droite) */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">Tri</Label>
+          <Select value={sortOrder} onValueChange={(v: any) => setSortOrder(v)}>
+            <SelectTrigger className="h-8 w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Chambres ↑</SelectItem>
+              <SelectItem value="desc">Chambres ↓</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">Nettoyage</Label>
+          <Select value={cleaningFilter} onValueChange={(v: any) => setCleaningFilter(v)}>
+            <SelectTrigger className="h-8 w-[170px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              <SelectItem value="a_blanc">À blanc</SelectItem>
+              <SelectItem value="recouche">Recouche</SelectItem>
+              <SelectItem value="none">Aucun</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Badge variant="outline" className="h-8 flex items-center">
+          {displayedRooms.length}/{rooms.length}
+        </Badge>
+      </div>
+
       {/* Rooms list with enhanced display */}
       <TooltipProvider>
         <ScrollArea className="h-[400px] pr-4">
@@ -425,12 +497,18 @@ export const TrainingStep2Annotate = ({
                   Aucune chambre détectée. Utilisez le bouton "Ajouter chambre" pour les ajouter manuellement.
                 </p>
               </Card>
+            ) : displayedRooms.length === 0 ? (
+              <Card className="p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Aucune chambre ne correspond aux filtres sélectionnés.
+                </p>
+              </Card>
             ) : (
-              rooms.map((room, index) => {
+              displayedRooms.map(({ room, index }) => {
                 const cleaningConfig = getCleaningBadge(room.cleaningType);
                 const statusInfo = getStatusInfo(room.status);
                 const lastNightAlert = isLastNightMisdetected(room);
-                
+
                 return (
                   <Card
                     key={index}

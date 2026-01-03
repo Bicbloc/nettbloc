@@ -187,6 +187,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
               userId={currentUserId}
               onComplete={handleAnnotationComplete}
               onBack={() => setCurrentStep(1)}
+              onOpenAdvanced={() => setShowAdvanced(true)}
             />
           )}
 
