@@ -39,6 +39,7 @@ import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
 import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
 import { SupabaseService } from "@/services/supabaseService";
 import { AssignmentService } from "@/services/assignmentService";
+import { GuidedDistributionWizard } from "@/components/GuidedDistributionWizard";
 
 // Dashboard tab components
 import { OverviewTab } from "@/components/dashboard/OverviewTab";
@@ -639,6 +640,9 @@ const Index = () => {
               <div className={`h-2 w-2 rounded-full ${realtimeSync.isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
               {realtimeSync.isConnected ? 'Temps réel actif' : 'Déconnecté'}
             </Badge>
+            <GuidedDistributionWizard 
+              onStartWorkflow={() => setActiveTab('overview')} 
+            />
             <Button asChild><a href="/housekeeper/auth"><UserIcon className="mr-2 h-4 w-4" />Espace Personnel</a></Button>
             <DailyReportCloseButton hotelId={currentHotelId || hotel?.id || ''} onReportClosed={() => window.location.reload()} />
             <NotificationBell />
