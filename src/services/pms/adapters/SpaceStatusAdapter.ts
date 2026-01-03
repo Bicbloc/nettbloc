@@ -52,7 +52,10 @@ export class SpaceStatusAdapter extends PmsAdapter {
     let currentFloor = 0;
     const seenRooms = new Set<string>();
 
-    for (const line of lines) {
+    // AMÉLIORATION: Combiner les lignes pour chaque chambre
+    // Dans le format Mews, la ligne chambre et la ligne Night/guest peuvent être séparées
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       if (!line.trim() || this.isHeaderLine(line)) continue;
 
       const floorMatch = line.match(this.FLOOR_PREFIX_PATTERN);
@@ -60,11 +63,31 @@ export class SpaceStatusAdapter extends PmsAdapter {
         currentFloor = parseInt(floorMatch[1]);
       }
 
-      const roomData = this.extractRoomFromLine(line, currentFloor);
-      
-      if (roomData && !seenRooms.has(roomData.roomNumber)) {
-        seenRooms.add(roomData.roomNumber);
-        rooms.push(roomData);
+      // Vérifier si c'est une ligne de chambre
+      const roomMatch = line.match(this.ROOM_LINE_PATTERN);
+      if (roomMatch) {
+        const roomNumber = roomMatch[1];
+        if (seenRooms.has(roomNumber)) continue;
+        
+        // Combiner avec les lignes suivantes jusqu'à la prochaine chambre (look-ahead)
+        let combinedText = line;
+        for (let j = i + 1; j < lines.length && j < i + 4; j++) {
+          const nextLine = lines[j];
+          if (!nextLine.trim()) continue;
+          // Arrêter si on trouve une autre chambre
+          if (this.ROOM_LINE_PATTERN.test(nextLine)) break;
+          // Arrêter si c'est un en-tête de floor
+          if (/^\s*\d{1,2}\s*$/.test(nextLine)) break;
+          // Ajouter au contexte combiné
+          combinedText += ' ' + nextLine;
+        }
+        
+        const roomData = this.extractRoomFromLine(combinedText, currentFloor, roomNumber);
+        
+        if (roomData) {
+          seenRooms.add(roomNumber);
+          rooms.push(roomData);
+        }
       }
     }
 
@@ -77,37 +100,39 @@ export class SpaceStatusAdapter extends PmsAdapter {
     return headerPatterns.some(p => p.test(line));
   }
 
-  private extractRoomFromLine(line: string, currentFloor: number): ExtractedRoom | null {
-    const match = line.match(this.ROOM_LINE_PATTERN);
+  private extractRoomFromLine(combinedText: string, currentFloor: number, roomNumber?: string): ExtractedRoom | null {
+    const match = combinedText.match(this.ROOM_LINE_PATTERN);
     if (!match) return null;
 
-    const roomNumber = match[1];
+    const extractedRoomNumber = roomNumber || match[1];
     const roomType = match[2].toUpperCase();
     const statusCode = (match[3] || 'DIR').toUpperCase();
 
-    const numValue = parseInt(roomNumber);
-    if (numValue < 10 && !line.match(new RegExp(`\\b${roomNumber}\\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)`, 'i'))) {
+    const numValue = parseInt(extractedRoomNumber);
+    if (numValue < 10 && !combinedText.match(new RegExp(`\\b${extractedRoomNumber}\\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)`, 'i'))) {
       return null;
     }
 
-    const nightMatch = line.match(this.NIGHT_PATTERN);
+    // Chercher Night X/X dans le texte combiné (chambre + lignes suivantes)
+    const nightMatch = combinedText.match(this.NIGHT_PATTERN);
     let nightCurrent = 0, nightTotal = 0;
     if (nightMatch) {
       nightCurrent = parseInt(nightMatch[1]);
       nightTotal = parseInt(nightMatch[2]);
     }
 
-    const guestBlocks = (line.match(this.GUEST_BLOCK_PATTERN) || []).length;
-    const isOutOfOrder = this.OOO_PATTERN.test(line);
+    const guestBlocks = (combinedText.match(this.GUEST_BLOCK_PATTERN) || []).length;
+    const isOutOfOrder = this.OOO_PATTERN.test(combinedText);
 
     const { status, cleaningType } = this.resolveStatusAndCleaning(statusCode, nightCurrent, nightTotal, guestBlocks, isOutOfOrder);
-    const floor = currentFloor || this.inferFloor(roomNumber);
+    const floor = currentFloor || this.inferFloor(extractedRoomNumber);
 
     return {
-      roomNumber,
+      roomNumber: extractedRoomNumber,
       status,
       cleaningType,
-      confidence: this.calculateConfidence(line, statusCode, nightMatch !== null),
+      confidence: this.calculateConfidence(combinedText, statusCode, nightMatch !== null),
+      originalText: combinedText.trim(),
     };
   }
 
