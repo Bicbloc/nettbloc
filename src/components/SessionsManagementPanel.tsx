@@ -19,6 +19,7 @@ interface SessionDetails {
   id: string;
   user_id?: string;
   user_name: string;
+  user_email?: string;
   user_type: string;
   hotel_id?: string;
   hotel_name?: string;
@@ -82,10 +83,13 @@ export function SessionsManagementPanel() {
 
       if (sessionsError) throw sessionsError;
 
-      // Enrichir avec les noms d'hôtels
+      // Enrichir avec les noms d'hôtels et emails
       const enrichedSessions = await Promise.all(
         (sessionsData || []).map(async (session) => {
           let hotelName = 'N/A';
+          let userEmail = '';
+
+          // Récupérer le nom de l'hôtel
           if (session.hotel_id) {
             const { data: hotelData } = await supabase
               .from('hotels')
@@ -98,9 +102,23 @@ export function SessionsManagementPanel() {
             }
           }
 
+          // Récupérer l'email de l'utilisateur si c'est un admin
+          if (session.user_id) {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('id', session.user_id)
+              .single();
+            
+            if (profileData) {
+              userEmail = profileData.email;
+            }
+          }
+
           return {
             ...session,
-            hotel_name: hotelName
+            hotel_name: hotelName,
+            user_email: userEmail
           };
         })
       );
@@ -121,10 +139,11 @@ export function SessionsManagementPanel() {
   const applyFilters = () => {
     let filtered = [...sessions];
 
-    // Filter by search term
+    // Filter by search term (inclut email)
     if (searchTerm) {
       filtered = filtered.filter(session =>
         session.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        session.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         session.hotel_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         session.id.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -293,6 +312,7 @@ export function SessionsManagementPanel() {
             <TableHeader>
               <TableRow>
                 <TableHead>Utilisateur</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Hôtel</TableHead>
                 <TableHead>Connexion</TableHead>
@@ -305,13 +325,13 @@ export function SessionsManagementPanel() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     Chargement...
                   </TableCell>
                 </TableRow>
               ) : filteredSessions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     Aucune session trouvée
                   </TableCell>
                 </TableRow>
@@ -323,6 +343,9 @@ export function SessionsManagementPanel() {
                         <User className="h-4 w-4 text-muted-foreground" />
                         {session.user_name}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {session.user_email || '-'}
                     </TableCell>
                     <TableCell>
                       <Badge variant={session.user_type === 'admin' ? 'default' : 'secondary'}>
@@ -414,6 +437,10 @@ export function SessionsManagementPanel() {
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Utilisateur</Label>
                   <p className="text-sm mt-1">{selectedSession.user_name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                  <p className="text-sm mt-1">{selectedSession.user_email || 'N/A'}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Type</Label>
