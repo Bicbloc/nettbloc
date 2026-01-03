@@ -3,8 +3,62 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { addMonths, differenceInDays } from 'date-fns';
 
+export type PlanType = 'freemium' | 'basic' | 'basic_plus' | 'premium' | 'platinum';
+
+interface PlanConfig {
+  name: string;
+  displayName: string;
+  price: number;
+  maxRooms: number | null;
+  features: {
+    incidents: boolean;
+    linen_inventory: boolean;
+    inspection: boolean;
+    api_access: boolean;
+    unlimited_rooms: boolean;
+  };
+}
+
+export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
+  freemium: {
+    name: 'freemium',
+    displayName: 'Freemium',
+    price: 0,
+    maxRooms: 30,
+    features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
+  },
+  basic: {
+    name: 'basic',
+    displayName: 'Basic',
+    price: 150,
+    maxRooms: 70,
+    features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
+  },
+  basic_plus: {
+    name: 'basic_plus',
+    displayName: 'Basic+',
+    price: 250,
+    maxRooms: 170,
+    features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
+  },
+  premium: {
+    name: 'premium',
+    displayName: 'Premium',
+    price: 200,
+    maxRooms: 150,
+    features: { incidents: true, linen_inventory: true, inspection: true, api_access: false, unlimited_rooms: false }
+  },
+  platinum: {
+    name: 'platinum',
+    displayName: 'Platinum',
+    price: 400,
+    maxRooms: null,
+    features: { incidents: true, linen_inventory: true, inspection: true, api_access: true, unlimited_rooms: true }
+  }
+};
+
 interface SubscriptionState {
-  plan: 'free' | 'premium' | 'trial';
+  plan: PlanType;
   subscribed: boolean;
   loading: boolean;
   subscription_end?: string;
@@ -14,6 +68,7 @@ interface SubscriptionState {
   isInTrial: boolean;
   maxRooms: number;
   featuresEnabled: Record<string, boolean>;
+  planConfig: PlanConfig;
 }
 
 const DEFAULT_FEATURES = {
@@ -21,50 +76,59 @@ const DEFAULT_FEATURES = {
   auto_distribution: true,
   basic_report: true,
   incidents: false,
-  linen: false,
+  linen_inventory: false,
+  inspection: false,
   access_codes: false,
   ai_learning: false,
-  api_access: false
+  api_access: false,
+  linen: false
 };
 
 export function useSubscription() {
   const { user, isAuthenticated } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionState>({
-    plan: 'free',
+    plan: 'freemium',
     subscribed: false,
     loading: true,
     isInTrial: false,
-    maxRooms: 15,
-    featuresEnabled: DEFAULT_FEATURES
+    maxRooms: 30,
+    featuresEnabled: DEFAULT_FEATURES,
+    planConfig: PLAN_CONFIGS.freemium
   });
 
   const checkSubscription = async () => {
     if (!isAuthenticated || !user) {
       setSubscription({ 
-        plan: 'free', 
+        plan: 'freemium', 
         subscribed: false, 
         loading: false,
         isInTrial: false,
-        maxRooms: 15,
-        featuresEnabled: DEFAULT_FEATURES
+        maxRooms: 30,
+        featuresEnabled: DEFAULT_FEATURES,
+        planConfig: PLAN_CONFIGS.freemium
       });
       return;
     }
 
     try {
-      // Fetch profile with new trial fields
       const { data: profile } = await supabase
         .from('profiles')
-        .select('plan, subscription_type, trial_start_date, trial_duration_months, max_rooms, features_enabled, created_at')
+        .select('plan, subscription_type, trial_start_date, trial_duration_months, trial_end_date, max_rooms, features_enabled, created_at')
         .eq('id', user.id)
         .single();
 
-      // Check if user is in trial period
+      // Check trial status
       let isInTrial = false;
       let trialEndDate: Date | undefined;
       let trialDaysRemaining = 0;
 
-      if (profile?.trial_start_date) {
+      if (profile?.trial_end_date) {
+        trialEndDate = new Date(profile.trial_end_date);
+        if (new Date() < trialEndDate) {
+          isInTrial = true;
+          trialDaysRemaining = differenceInDays(trialEndDate, new Date());
+        }
+      } else if (profile?.trial_start_date) {
         const trialStart = new Date(profile.trial_start_date);
         const trialMonths = profile.trial_duration_months || 3;
         trialEndDate = addMonths(trialStart, trialMonths);
@@ -73,75 +137,59 @@ export function useSubscription() {
           isInTrial = true;
           trialDaysRemaining = differenceInDays(trialEndDate, new Date());
         }
-      } else if (profile?.created_at && !profile?.subscription_type) {
-        // New user without trial_start_date - start trial now
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ 
-            trial_start_date: new Date().toISOString(),
-            trial_duration_months: 3,
-            subscription_type: 'trial'
-          })
-          .eq('id', user.id);
-
-        if (!updateError) {
-          isInTrial = true;
-          trialEndDate = addMonths(new Date(), 3);
-          trialDaysRemaining = 90;
-        }
       }
 
-      // Check premium status
-      const isPremiumInProfile = profile?.plan === 'premium' || profile?.subscription_type === 'premium';
-      const isTrialInProfile = profile?.subscription_type === 'trial';
-
-      // Determine features based on plan
-      const featuresEnabled = profile?.features_enabled && typeof profile.features_enabled === 'object'
-        ? profile.features_enabled as Record<string, boolean>
-        : DEFAULT_FEATURES;
-
-      if (isPremiumInProfile) {
-        setSubscription({
-          plan: 'premium',
-          subscribed: true,
-          loading: false,
-          isInTrial: false,
-          maxRooms: profile?.max_rooms || 999999,
-          featuresEnabled: { ...DEFAULT_FEATURES, incidents: true, linen: true, access_codes: true, ai_learning: true }
-        });
-      } else if (isInTrial) {
-        // During trial: full premium access
-        setSubscription({
-          plan: 'trial',
-          subscribed: true,
-          loading: false,
-          isInTrial: true,
-          trialStartDate: profile?.trial_start_date,
-          trialEndDate: trialEndDate?.toISOString(),
-          trialDaysRemaining,
-          maxRooms: 999999, // Unlimited during trial
-          featuresEnabled: { ...DEFAULT_FEATURES, incidents: true, linen: true, access_codes: true, ai_learning: true }
-        });
-      } else {
-        // Free plan
-        setSubscription({
-          plan: 'free',
-          subscribed: false,
-          loading: false,
-          isInTrial: false,
-          maxRooms: profile?.max_rooms || 15,
-          featuresEnabled: DEFAULT_FEATURES
-        });
+      // Determine plan
+      let planType: PlanType = 'freemium';
+      const profilePlan = profile?.plan as string;
+      
+      if (profilePlan && profilePlan in PLAN_CONFIGS) {
+        planType = profilePlan as PlanType;
+      } else if (profile?.subscription_type === 'premium') {
+        planType = 'premium';
+      } else if (profilePlan === 'free') {
+        planType = 'freemium';
       }
+
+      const planConfig = PLAN_CONFIGS[planType];
+      const isPaid = planType !== 'freemium';
+      const isSubscribed = isPaid || isInTrial;
+
+      // Features based on plan
+      const featuresEnabled = {
+        ...DEFAULT_FEATURES,
+        ...planConfig.features
+      };
+
+      // During trial, grant premium features
+      if (isInTrial) {
+        featuresEnabled.incidents = true;
+        featuresEnabled.linen_inventory = true;
+        featuresEnabled.inspection = true;
+      }
+
+      setSubscription({
+        plan: planType,
+        subscribed: isSubscribed,
+        loading: false,
+        isInTrial,
+        trialStartDate: profile?.trial_start_date,
+        trialEndDate: trialEndDate?.toISOString(),
+        trialDaysRemaining,
+        maxRooms: planConfig.maxRooms || 999999,
+        featuresEnabled,
+        planConfig
+      });
     } catch (error) {
       console.error('Error checking subscription:', error);
       setSubscription({
-        plan: 'free',
+        plan: 'freemium',
         subscribed: false,
         loading: false,
         isInTrial: false,
-        maxRooms: 15,
-        featuresEnabled: DEFAULT_FEATURES
+        maxRooms: 30,
+        featuresEnabled: DEFAULT_FEATURES,
+        planConfig: PLAN_CONFIGS.freemium
       });
     }
   };
@@ -158,8 +206,8 @@ export function useSubscription() {
   const canAccessFeature = (feature: string) => {
     if (!isAuthenticated) return false;
     
-    // During trial or premium: all features accessible
-    if (subscription.isInTrial || subscription.plan === 'premium') {
+    // During trial: premium features
+    if (subscription.isInTrial) {
       return true;
     }
     
@@ -176,13 +224,15 @@ export function useSubscription() {
       return true;
     }
 
-    // Check specific feature in featuresEnabled
     return subscription.featuresEnabled[feature] === true;
   };
 
   const hasFeature = (feature: keyof typeof DEFAULT_FEATURES) => {
-    if (subscription.isInTrial || subscription.plan === 'premium') {
-      return true;
+    if (subscription.isInTrial) {
+      // During trial, grant premium features
+      if (['incidents', 'linen_inventory', 'inspection'].includes(feature)) {
+        return true;
+      }
     }
     return subscription.featuresEnabled[feature] === true;
   };
@@ -193,8 +243,11 @@ export function useSubscription() {
     refreshSubscription,
     canAccessFeature,
     hasFeature,
-    isPremium: subscription.plan === 'premium' && subscription.subscribed,
-    isFree: subscription.plan === 'free' && !subscription.isInTrial,
-    isInTrial: subscription.isInTrial
+    isPremium: ['premium', 'platinum'].includes(subscription.plan) && subscription.subscribed,
+    isFree: subscription.plan === 'freemium' && !subscription.isInTrial,
+    isInTrial: subscription.isInTrial,
+    isPlatinum: subscription.plan === 'platinum',
+    isBasic: subscription.plan === 'basic',
+    isBasicPlus: subscription.plan === 'basic_plus'
   };
 }
