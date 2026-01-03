@@ -493,23 +493,40 @@ class UnifiedParserService {
       const roomNumber = pattern.roomNumber;
       
       // Chercher ce numéro dans le texte
-      for (const line of lines) {
-        // Regex pour trouver le numéro de chambre dans la ligne
-        // Gère les formats: "100", "100+101", "100-101", etc.
-        const roomRegex = new RegExp(`\\b${this.escapeRegex(roomNumber)}\\b|\\b${this.escapeRegex(normalizedNumber)}\\b`, 'i');
-        
+      const roomRegex = new RegExp(`\\b${this.escapeRegex(roomNumber)}\\b|\\b${this.escapeRegex(normalizedNumber)}\\b`, 'i');
+      const shouldCombineContext = pmsType === 'mews' || pmsType === 'space_status';
+      const nextRoomStartRegex = /^\s*(\d{1,4}[A-Z]?)\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)\b/i;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
         if (roomRegex.test(line)) {
+          // IMPORTANT (MEWS Space status): la date / Night / Guests peut être sur les lignes suivantes.
+          // Si on ne combine pas, la détection "séjour en cours" ne s'applique pas en mode pattern-first.
+          let contextLine = line;
+          if (shouldCombineContext) {
+            let combined = line;
+            for (let j = i + 1; j < lines.length && j < i + 4; j++) {
+              const nextLine = lines[j];
+              if (!nextLine.trim()) continue;
+              if (nextRoomStartRegex.test(nextLine)) break;
+              if (/^\s*\d{1,2}\s*$/.test(nextLine)) break; // changement d'étage
+              combined += ' ' + nextLine;
+            }
+            contextLine = combined;
+          }
+
           // PRIORITÉ AU PATTERN VALIDÉ: Utiliser le cleaningType du pattern si disponible
           // Sinon, analyser le contexte de la ligne
           let status = pattern.status;
           let cleaningType = pattern.cleaningType;
           let reason = `Pattern validé: ${status}/${cleaningType}`;
-          
+
           // Si le pattern n'a pas de cleaningType défini, analyser la ligne
           if (!cleaningType || cleaningType === 'none') {
             // Vérifier si c'est vraiment "none" (propre) ou si on doit analyser
-            const analyzed = this.analyzeLineContext(line, pmsType, reportDate);
-            
+            const analyzed = this.analyzeLineContext(contextLine, pmsType, reportDate);
+
             // Si le pattern dit "none" mais l'analyse détecte un besoin de nettoyage,
             // on garde le pattern car il a été explicitement validé
             if (pattern.cleaningType === 'none' && analyzed.cleaningType !== 'none') {
@@ -525,24 +542,24 @@ class UnifiedParserService {
               reason = analyzed.reason;
             }
           }
-          
+
           rooms.push({
             roomNumber,
             status,
             cleaningType,
             confidence: 95, // Plus haute confiance car pattern validé
             validated: true,
-            originalText: line.trim(),
+            originalText: contextLine.trim(),
             debugInfo: {
-              rawLine: line,
-              cleanedLine: line.trim(),
+              rawLine: contextLine,
+              cleanedLine: contextLine.trim(),
               detectedKeywords: [],
               source: 'pattern' as const,
               confidence: 95,
               appliedRule: `Pattern-first: ${reason}`
             }
           });
-          
+
           break; // Ne prendre que la première occurrence
         }
       }
@@ -846,13 +863,29 @@ class UnifiedParserService {
     }
     
     // ====== RÈGLES GÉNÉRIQUES ======
+    const hasDirtyKeyword = /\b(DIRTY|SALE|SAL|DIR)\b/.test(upper);
+
     // Checkout/Départ
     if (/\b(CHECKOUT|DÉPART|DEPARTURE|DEP|C\/O)\b/.test(upper)) {
       return { status: 'checkout', cleaningType: 'a_blanc', reason: 'checkout keyword' };
     }
+
+    // Apaleo: arrivée + sale = à blanc
+    if (pmsType === 'apaleo') {
+      const hasArrivalKeyword = /\b(ARR|ARRIVAL|CHECKIN|C\/I|DUE IN)\b/.test(upper);
+      if (hasArrivalKeyword && hasDirtyKeyword) {
+        return { status: 'arrival', cleaningType: 'a_blanc', reason: 'Apaleo: arrivée + sale → À blanc' };
+      }
+    }
     
     // Stayover/Recouche
-    if (/\b(STAYOVER|RECOUCHE|STAY|OCC|OCCUPIED)\b/.test(upper)) {
+    // Important: ne PAS laisser OCC/OCCUPIED écraser une chambre sale (ex: "OCC DIR")
+    // et ne pas interpréter OCC comme stayover pour Apaleo.
+    const allowOccStayover = pmsType !== 'apaleo';
+    if (
+      /\b(STAYOVER|RECOUCHE|STAY)\b/.test(upper) ||
+      (allowOccStayover && !hasDirtyKeyword && /\b(OCC|OCCUPIED)\b/.test(upper))
+    ) {
       return { status: 'stayover', cleaningType: 'recouche', reason: 'stayover keyword' };
     }
     
@@ -862,7 +895,7 @@ class UnifiedParserService {
     }
     
     // Sale/Dirty → À blanc (chambre vide sale)
-    if (/\b(DIRTY|SALE|SAL|DIR)\b/.test(upper)) {
+    if (hasDirtyKeyword) {
       return { status: 'dirty', cleaningType: 'a_blanc', reason: 'dirty keyword → À blanc' };
     }
     
