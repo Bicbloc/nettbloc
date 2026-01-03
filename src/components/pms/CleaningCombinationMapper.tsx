@@ -643,8 +643,12 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                         {trainingLines
                           .filter(line => !lineSearch || line.toLowerCase().includes(lineSearch.toLowerCase()))
                           .map((line, i) => {
-                            // Detect if line has room number pattern
-                            const hasRoom = /\b\d{1,4}[A-Z]?\b/.test(line);
+                            // Detect if line has a valid room number (3 digits at start, not a year)
+                            // Room numbers: 101, 211, etc. NOT: 2025, dates, etc.
+                            const roomMatch = line.match(/^\s*(\d{2,4})\s+(?:TWN|DBL|SGL|SUI|TRP|FAM|STU)/i) ||
+                                              line.match(/^(\d{2,4})\s+[A-Z]{2,4}\s+(?:SAL|DIR|PRO|INS|OCC|DEP)/i);
+                            const hasRoom = !!roomMatch;
+                            const roomNumber = roomMatch ? roomMatch[1] : null;
                             const isSelected = selectedLine === line;
                             
                             return (
@@ -655,13 +659,22 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                                   isSelected ? 'bg-primary/10 border border-primary/30' : ''
                                 } ${hasRoom ? 'text-foreground' : 'text-muted-foreground'}`}
                               >
+                                {hasRoom && roomNumber && (
+                                  <Badge variant="outline" className="mr-2 text-[10px] py-0 px-1">{roomNumber}</Badge>
+                                )}
                                 <span className="text-muted-foreground mr-2">{i + 1}.</span>
-                                {line.length > 100 ? line.substring(0, 100) + '...' : line}
+                                {line.length > 90 ? line.substring(0, 90) + '...' : line}
                               </button>
                             );
                           })}
                       </div>
                     </ScrollArea>
+                    <div className="text-xs text-muted-foreground">
+                      {trainingLines.filter(l => 
+                        /^\s*\d{2,4}\s+(?:TWN|DBL|SGL|SUI|TRP|FAM|STU)/i.test(l) ||
+                        /^\d{2,4}\s+[A-Z]{2,4}\s+(?:SAL|DIR|PRO|INS|OCC|DEP)/i.test(l)
+                      ).length} lignes avec chambres détectées sur {trainingLines.length} total
+                    </div>
                     {selectedLine && (
                       <div className="p-3 bg-muted rounded-md space-y-2">
                         <p className="text-xs font-medium">Ligne sélectionnée:</p>
@@ -672,29 +685,40 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                           className="w-full"
                           onClick={() => {
                             // Pre-fill rule based on selected line
-                            const hasDatePattern = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(selectedLine);
-                            const hasTimePattern = /\d{1,2}:\d{2}/.test(selectedLine);
+                            const dateMatches = selectedLine.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
+                            const timeMatches = selectedLine.match(/\d{1,2}:\d{2}/g) || [];
                             const hasNightPattern = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(selectedLine);
                             const upper = selectedLine.toUpperCase();
                             
                             const keywords: string[] = [];
-                            if (/\bSAL\b|DIR|DIRTY/.test(upper)) keywords.push('SAL');
-                            if (/\bDEP\b|DEPART|PARTI/.test(upper)) keywords.push('DEP');
-                            if (/\bOCC\b|OCCUPIED/.test(upper)) keywords.push('OCC');
+                            if (/\bSAL\b/.test(upper)) keywords.push('SAL');
+                            if (/\bDIR\b/.test(upper)) keywords.push('DIR');
+                            if (/\bDEP\b/.test(upper)) keywords.push('DEP');
+                            if (/\bOCC\b/.test(upper)) keywords.push('OCC');
+                            if (/\bPRO\b/.test(upper)) keywords.push('PRO');
+                            if (/\bINS\b/.test(upper)) keywords.push('INS');
+                            
+                            // Determine cleaning type based on context
+                            const hasTwoTimes = timeMatches.length >= 2;
+                            const hasOneTime = timeMatches.length === 1;
+                            const hasNight = hasNightPattern;
+                            
+                            // If has departure time (2 times) → a_blanc, else recouche
+                            const suggestedCleaningType = hasTwoTimes ? 'a_blanc' : 'recouche';
                             
                             setEditingRule({
                               id: '',
-                              rule_name: 'Nouvelle règle depuis ligne',
+                              rule_name: `Règle ${keywords.join('+')}`,
                               description: selectedLine.substring(0, 50),
                               priority: 50,
                               is_active: true,
                               status_keywords: keywords,
-                              arrival_date: hasDatePattern ? 'present' : 'any',
-                              departure_date: hasDatePattern ? 'present' : 'any',
-                              arrival_time: hasTimePattern ? 'present' : 'any',
-                              departure_time: hasTimePattern ? 'present' : 'any',
-                              night_info: hasNightPattern ? 'present' : 'any',
-                              result_cleaning_type: 'recouche',
+                              arrival_date: dateMatches.length >= 1 ? 'present' : 'any',
+                              departure_date: dateMatches.length >= 2 ? 'present' : 'any',
+                              arrival_time: hasTwoTimes ? 'present' : (hasOneTime ? 'any' : 'absent'),
+                              departure_time: hasTwoTimes ? 'present' : 'absent',
+                              night_info: hasNight ? 'present' : 'any',
+                              result_cleaning_type: suggestedCleaningType,
                             });
                             setDialogOpen(true);
                           }}
