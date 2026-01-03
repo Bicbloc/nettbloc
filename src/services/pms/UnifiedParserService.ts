@@ -522,8 +522,13 @@ class UnifiedParserService {
           let cleaningType = pattern.cleaningType;
           let reason = `Pattern validé: ${status}/${cleaningType}`;
 
-          // Si le pattern n'a pas de cleaningType défini, analyser la ligne
-          if (!cleaningType || cleaningType === 'none') {
+          // RÈGLE MÉTIER: si date d'arrivée + date de départ sont présentes SANS horaire,
+          // le client est encore à l'hôtel → RECOUCHE (peu importe le statut / le pattern).
+          if (this.isStayoverWithoutTimes(contextLine)) {
+            status = 'stayover';
+            cleaningType = 'recouche';
+            reason = 'Séjour (dates sans horaire) → Recouche (override)';
+          } else if (!cleaningType || cleaningType === 'none') {
             // Vérifier si c'est vraiment "none" (propre) ou si on doit analyser
             const analyzed = this.analyzeLineContext(contextLine, pmsType, reportDate);
 
@@ -703,6 +708,23 @@ class UnifiedParserService {
   }
 
   /**
+   * Détecte un séjour "sans horaire": date d'arrivée + date de départ présentes,
+   * mais aucun horaire. Règle métier: sans horaire ⇒ client encore à l'hôtel ⇒ recouche.
+   */
+  private isStayoverWithoutTimes(line: string): boolean {
+    const datePattern = /\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\b/g;
+    const dates = line.match(datePattern) || [];
+    if (dates.length < 2) return false;
+
+    const hasTime =
+      /(?<!\d\/)\b\d{1,2}:\d{2}\b(?!\/\d)/i.test(line) ||
+      /\b\d{1,2}h\d{2}\b/i.test(line) ||
+      /(?<!\d\/)\b\d{1,2}\.\d{2}\b(?!\/\d)/i.test(line);
+
+    return !hasTime;
+  }
+
+  /**
    * Analyse le contexte d'une ligne pour déterminer le statut et type de nettoyage
    * LOGIQUE MEWS BASÉE SUR LA POSITION DES HORAIRES:
    * - Horaire à DROITE = départ → À blanc
@@ -715,8 +737,18 @@ class UnifiedParserService {
     reportDate: Date | null = null
   ): { status: string; cleaningType: CleaningType; reason: string } {
     const upper = line.toUpperCase();
-    
-    // ====== RÈGLE: NUIT X/X (dernière nuit ou intermédiaire) ======
+
+    // RÈGLE MÉTIER (prioritaire): dates arrivée+dép. SANS horaire ⇒ client encore présent ⇒ recouche
+    // (et on ne doit pas déduire un départ uniquement parce qu'une date = date du rapport).
+    if (this.isStayoverWithoutTimes(line)) {
+      return {
+        status: 'stayover',
+        cleaningType: 'recouche',
+        reason: "Dates arrivée + départ sans horaire → Recouche (client présent)",
+      };
+    }
+
+
     // CORRECTION: La dernière nuit (X/X) signifie que le client est ENCORE LÀ cette nuit
     // Donc c'est une RECOUCHE, pas un départ. Le départ sera le lendemain.
     // Supporte "Night" (EN) et "Nuit" (FR)
