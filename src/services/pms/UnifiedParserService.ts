@@ -699,21 +699,37 @@ class UnifiedParserService {
   ): { status: string; cleaningType: CleaningType; reason: string } {
     const upper = line.toUpperCase();
     
-    // ====== RÈGLE PRIORITAIRE: DERNIÈRE NUIT (Nuit X/X où X=X) ======
-    // Quand les deux chiffres sont égaux, c'est la dernière nuit → départ → À blanc
+    // ====== RÈGLE: NUIT X/X (dernière nuit ou intermédiaire) ======
+    // CORRECTION: La dernière nuit (X/X) signifie que le client est ENCORE LÀ cette nuit
+    // Donc c'est une RECOUCHE, pas un départ. Le départ sera le lendemain.
     const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
                            upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
     if (lastNightMatch) {
       const currentNight = parseInt(lastNightMatch[1]);
       const totalNights = parseInt(lastNightMatch[2]);
       
+      // VÉRIFIER D'ABORD si un pattern contextuel appris existe pour DERNIERE_NUIT
+      const learnedDerniereNuit = this.contextPatterns.get('DERNIERE_NUIT');
+      
       if (currentNight === totalNights) {
-        // DERNIÈRE NUIT = DÉPART → À blanc obligatoire
-        this.log(`🎯 Dernière nuit détectée (${currentNight}/${totalNights}) → Départ → À blanc`);
+        // DERNIÈRE NUIT: Par défaut = RECOUCHE (le client dort encore cette nuit)
+        // Mais si un pattern appris dit autrement, on le respecte
+        if (learnedDerniereNuit) {
+          const status = this.inferStatusFromCleaningType(learnedDerniereNuit.cleaningType);
+          this.log(`🎯 Dernière nuit (${currentNight}/${totalNights}) → Pattern appris: ${learnedDerniereNuit.cleaningType}`);
+          return { 
+            status, 
+            cleaningType: learnedDerniereNuit.cleaningType, 
+            reason: `Dernière nuit → Pattern appris: ${learnedDerniereNuit.cleaningType}` 
+          };
+        }
+        
+        // Par défaut: dernière nuit = recouche (le client reste cette nuit)
+        this.log(`🎯 Dernière nuit (${currentNight}/${totalNights}) → Recouche (client présent)`);
         return { 
-          status: 'checkout', 
-          cleaningType: 'a_blanc', 
-          reason: `Dernière nuit (${currentNight}/${totalNights}) → Départ → À blanc` 
+          status: 'stayover', 
+          cleaningType: 'recouche', 
+          reason: `Dernière nuit (${currentNight}/${totalNights}) → Recouche (client présent)` 
         };
       } else if (currentNight < totalNights) {
         // Nuit intermédiaire → recouche

@@ -32,10 +32,17 @@ function extractContextKeywords(text: string): string[] {
     keywords.push('DEPART');
   }
   
-  // Patterns de dernière nuit (→ à blanc)
-  const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/);
+  // Patterns de dernière nuit (X/X où X=X)
+  const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/) ||
+                         upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/);
   if (lastNightMatch && lastNightMatch[1] === lastNightMatch[2]) {
     keywords.push('DERNIERE_NUIT');
+    
+    // NOUVEAU: Vérifier si c'est une nuit SANS horaires (pattern spécifique)
+    const hasTimePattern = /\d{1,2}:\d{2}/.test(text);
+    if (!hasTimePattern) {
+      keywords.push('NUIT_SANS_HORAIRE');
+    }
   }
   
   // Patterns de nuit intermédiaire (→ recouche)
