@@ -655,6 +655,76 @@ class UnifiedParserService {
   ): { status: string; cleaningType: CleaningType; reason: string } {
     const upper = line.toUpperCase();
     
+    // ====== RÈGLE PRIORITAIRE: DERNIÈRE NUIT (Nuit X/X où X=X) ======
+    // Quand les deux chiffres sont égaux, c'est la dernière nuit → départ → À blanc
+    const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
+                           upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+    if (lastNightMatch) {
+      const currentNight = parseInt(lastNightMatch[1]);
+      const totalNights = parseInt(lastNightMatch[2]);
+      
+      if (currentNight === totalNights) {
+        // DERNIÈRE NUIT = DÉPART → À blanc obligatoire
+        this.log(`🎯 Dernière nuit détectée (${currentNight}/${totalNights}) → Départ → À blanc`);
+        return { 
+          status: 'checkout', 
+          cleaningType: 'a_blanc', 
+          reason: `Dernière nuit (${currentNight}/${totalNights}) → Départ → À blanc` 
+        };
+      } else if (currentNight < totalNights) {
+        // Nuit intermédiaire → recouche
+        return { 
+          status: 'stayover', 
+          cleaningType: 'recouche', 
+          reason: `Nuit ${currentNight}/${totalNights} (intermédiaire) → Recouche` 
+        };
+      }
+    }
+    
+    // ====== RÈGLE PRIORITAIRE: COMPARAISON DATE DE DÉPART AVEC DATE DU RAPPORT ======
+    // Si la date de départ présente dans la ligne = date du rapport → c'est un départ
+    if (reportDate) {
+      // Chercher une date au format DD/MM/YYYY dans la ligne
+      const dateMatches = line.match(/(\d{2})\/(\d{2})\/(\d{4})/g);
+      if (dateMatches && dateMatches.length >= 1) {
+        for (const dateStr of dateMatches) {
+          const [day, month, year] = dateStr.split('/').map(Number);
+          const lineDate = new Date(year, month - 1, day);
+          
+          // Si cette date correspond à la date du rapport
+          if (lineDate.getTime() === reportDate.getTime()) {
+            // Vérifier le contexte: est-ce une date de départ?
+            // Si c'est après la date d'arrivée OU si c'est la seule date, c'est un départ
+            const departureKeywords = /D[EÉ]PART|DEP|CHECKOUT|C\/O/i;
+            const arrivalKeywords = /ARRIV[EÉ]E|ARR|CHECKIN|C\/I/i;
+            
+            // Si on trouve un mot-clé de départ, c'est définitivement un départ
+            if (departureKeywords.test(upper)) {
+              this.log(`🎯 Date départ = Date rapport (${dateStr}) + mot-clé départ → À blanc`);
+              return { 
+                status: 'checkout', 
+                cleaningType: 'a_blanc', 
+                reason: `Date départ (${dateStr}) = Date rapport → À blanc` 
+              };
+            }
+            
+            // Si pas de mot-clé d'arrivée et la date est en fin de ligne → probable départ
+            if (!arrivalKeywords.test(upper) && dateMatches.length >= 2) {
+              const lastDate = dateMatches[dateMatches.length - 1];
+              if (lastDate === dateStr) {
+                this.log(`🎯 Date fin (${dateStr}) = Date rapport → Probable départ → À blanc`);
+                return { 
+                  status: 'checkout', 
+                  cleaningType: 'a_blanc', 
+                  reason: `Date fin (${dateStr}) = Date rapport → Départ → À blanc` 
+                };
+              }
+            }
+          }
+        }
+      }
+    }
+    
     // ====== RÈGLES MEWS SPÉCIFIQUES ======
     if (pmsType === 'mews') {
       // Checkout + Arrival (même ligne) = a_blanc prioritaire
@@ -676,19 +746,7 @@ class UnifiedParserService {
       
       // ====== LOGIQUE SAL (SALE) - BASÉE SUR LA POSITION DES HORAIRES ======
       if (/\bSAL\b/.test(upper)) {
-        // 1) Vérifier Nuit X/Y pour stayover vs checkout
-        const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
-                          upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
-        if (nightMatch) {
-          const currentNight = parseInt(nightMatch[1]);
-          const totalNights = parseInt(nightMatch[2]);
-          if (currentNight < totalNights) {
-            return { status: 'stayover', cleaningType: 'recouche', reason: `SAL + Nuit ${currentNight}/${totalNights} (recouche)` };
-          } else {
-            return { status: 'checkout', cleaningType: 'a_blanc', reason: `SAL + Nuit ${currentNight}/${totalNights} (départ)` };
-          }
-        }
-        
+        // 1) Vérifier Nuit X/Y pour stayover vs checkout (déjà géré au-dessus pour dernière nuit)
         // 2) NOUVELLE LOGIQUE: Position des horaires
         const { hasDeparture, hasArrival } = this.extractTimePositions(line);
         
@@ -855,33 +913,77 @@ class UnifiedParserService {
 
     this.log(`📊 Résultat filtrage: ${filteredRooms.length}/${rooms.length} chambres conservées`);
 
-    // IMPORTANT: Respecter le cleaningType du pattern validé pour les chambres "propres" (none)
-    // Pour les autres chambres, on peut utiliser la détection dynamique
+    // PRIORITÉ ABSOLUE AUX PATTERNS VALIDÉS
+    // Si le pattern a un cleaningType explicitement défini lors de l'entraînement,
+    // il a TOUJOURS priorité sur la détection automatique
     return filteredRooms.map(room => {
       const normalizedNumber = this.normalizeRoomNumber(room.roomNumber);
       const learnedPattern = this.learnedPatterns.get(normalizedNumber);
       
-      // Si le pattern validé dit explicitement "none" (propre), on le respecte
-      if (learnedPattern && learnedPattern.cleaningType === 'none') {
-        this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'none' (propre), on respecte`);
-        return {
-          ...room,
-          cleaningType: 'none' as CleaningType,
-          status: learnedPattern.status || 'clean',
-          confidence: 95,
-          validated: true,
-          debugInfo: {
-            ...room.debugInfo!,
-            source: 'pattern' as const,
-            appliedRule: `Pattern validé: propre (aucun nettoyage)`,
-            confidence: 95
-          }
-        };
+      if (learnedPattern) {
+        // PRIORITÉ AU PATTERN VALIDÉ
+        // Si le cleaningType a été explicitement défini lors de l'entraînement
+        const patternCleaningType = learnedPattern.cleaningType;
+        const patternStatus = learnedPattern.status;
+        
+        // Cas 1: Pattern dit "none" (propre) → TOUJOURS respecter
+        if (patternCleaningType === 'none') {
+          this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'none' (propre) → Priorité absolue`);
+          return {
+            ...room,
+            cleaningType: 'none' as CleaningType,
+            status: patternStatus || 'clean',
+            confidence: 95,
+            validated: true,
+            debugInfo: {
+              ...room.debugInfo!,
+              source: 'pattern' as const,
+              appliedRule: `Pattern validé: propre (aucun nettoyage)`,
+              confidence: 95
+            }
+          };
+        }
+        
+        // Cas 2: Pattern dit "a_blanc" ou "full" → TOUJOURS respecter
+        if (patternCleaningType === 'a_blanc' || patternCleaningType === 'full') {
+          this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'a_blanc' → Priorité absolue`);
+          return {
+            ...room,
+            cleaningType: 'a_blanc' as CleaningType,
+            status: patternStatus || 'checkout',
+            confidence: 95,
+            validated: true,
+            debugInfo: {
+              ...room.debugInfo!,
+              source: 'pattern' as const,
+              appliedRule: `Pattern validé: à blanc (nettoyage complet)`,
+              confidence: 95
+            }
+          };
+        }
+        
+        // Cas 3: Pattern dit "recouche" ou "quick" → TOUJOURS respecter
+        if (patternCleaningType === 'recouche' || patternCleaningType === 'quick') {
+          this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'recouche' → Priorité absolue`);
+          return {
+            ...room,
+            cleaningType: 'recouche' as CleaningType,
+            status: patternStatus || 'stayover',
+            confidence: 95,
+            validated: true,
+            debugInfo: {
+              ...room.debugInfo!,
+              source: 'pattern' as const,
+              appliedRule: `Pattern validé: recouche (nettoyage rapide)`,
+              confidence: 95
+            }
+          };
+        }
       }
       
+      // Pas de pattern explicite → utiliser la détection dynamique
       return {
         ...room,
-        // Le cleaningType et status viennent de la détection dynamique
         confidence: Math.max(room.confidence || 0, 85),
         validated: true,
         debugInfo: {

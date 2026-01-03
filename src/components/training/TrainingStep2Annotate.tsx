@@ -46,6 +46,29 @@ const STATUS_LABELS: Record<string, { label: string; icon: string; description: 
   'unknown': { label: 'Inconnu', icon: '❓', description: 'Statut non reconnu - vérifiez manuellement.' },
 };
 
+// Détecte si une chambre est une "dernière nuit" mal détectée
+const isLastNightMisdetected = (room: ExtractedRoom): boolean => {
+  const originalText = room.originalText || '';
+  const upper = originalText.toUpperCase();
+  
+  // Chercher le pattern "Nuit X/X" où les chiffres sont égaux
+  const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
+                         upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+  
+  if (lastNightMatch) {
+    const currentNight = parseInt(lastNightMatch[1]);
+    const totalNights = parseInt(lastNightMatch[2]);
+    
+    // Si c'est la dernière nuit (X/X) mais détecté comme recouche → alerte
+    if (currentNight === totalNights && 
+        (room.cleaningType === 'recouche' || room.cleaningType === 'quick')) {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
 export const TrainingStep2Annotate = ({
   trainingData,
   hotelId,
@@ -406,13 +429,16 @@ export const TrainingStep2Annotate = ({
               rooms.map((room, index) => {
                 const cleaningConfig = getCleaningBadge(room.cleaningType);
                 const statusInfo = getStatusInfo(room.status);
+                const lastNightAlert = isLastNightMisdetected(room);
                 
                 return (
                   <Card
                     key={index}
                     className={`p-3 transition-all ${
                       room.validated ? "border-green-500/50 bg-green-500/5" : "border-muted"
-                    } ${mergingMode && selectedRooms.has(index) ? "ring-2 ring-primary" : ""}`}
+                    } ${mergingMode && selectedRooms.has(index) ? "ring-2 ring-primary" : ""} ${
+                      lastNightAlert ? "border-amber-500/70 bg-amber-500/10" : ""
+                    }`}
                   >
                     <div className="flex flex-col gap-2">
                       {/* Main row */}
@@ -425,8 +451,25 @@ export const TrainingStep2Annotate = ({
                         )}
 
                         {/* Room number */}
-                        <div className="font-bold text-lg min-w-[50px] text-primary">
+                        <div className="font-bold text-lg min-w-[50px] text-primary flex items-center gap-2">
                           {room.roomNumber}
+                          {lastNightAlert && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-50 gap-1 text-xs">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Dernière nuit
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="font-medium">⚠️ Dernière nuit détectée comme recouche</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Cette chambre semble être en dernière nuit (Nuit X/X) mais est marquée comme recouche. 
+                                  Si c'est un départ, changez le type de nettoyage en "À blanc".
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
 
                         {/* Status badge */}
