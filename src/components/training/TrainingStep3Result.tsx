@@ -11,11 +11,97 @@ import {
 } from "lucide-react";
 import { TrainingData } from "./TrainingWizard";
 import { pmsAdapterFactory, unifiedParserService } from "@/services/pms";
+import { CleaningType } from "@/services/pms/types";
 
 interface TrainingStep3ResultProps {
   trainingData: TrainingData;
   hotelId: string;
   onReset: () => void;
+}
+
+/**
+ * Extrait les mots-clés contextuels d'une ligne de texte
+ * Ces mots-clés seront utilisés pour l'apprentissage contextuel
+ */
+function extractContextKeywords(text: string): string[] {
+  const upper = text.toUpperCase();
+  const keywords: string[] = [];
+  
+  // Patterns de départ (→ à blanc)
+  if (/\bDEP\b|DÉPART|DEPARTURE|CHECKOUT|C\/O/.test(upper)) {
+    keywords.push('DEPART');
+  }
+  
+  // Patterns de dernière nuit (→ à blanc)
+  const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/);
+  if (lastNightMatch && lastNightMatch[1] === lastNightMatch[2]) {
+    keywords.push('DERNIERE_NUIT');
+  }
+  
+  // Patterns de nuit intermédiaire (→ recouche)
+  if (lastNightMatch && lastNightMatch[1] !== lastNightMatch[2]) {
+    keywords.push('NUIT_INTERMEDIAIRE');
+  }
+  
+  // Patterns de stayover (→ recouche)
+  if (/\bSTAYOVER|RECOUCHE|STAY|OCC\b/.test(upper)) {
+    keywords.push('STAYOVER');
+  }
+  
+  // Patterns de propre (→ none)
+  if (/\bPRO\b|PROPRE|CLEAN|READY|INS\b/.test(upper)) {
+    keywords.push('PROPRE');
+  }
+  
+  // Patterns de sale (à analyser selon contexte)
+  if (/\bSAL\b|SALE|DIRTY|DIR\b/.test(upper)) {
+    keywords.push('SALE');
+  }
+  
+  // Patterns d'arrivée
+  if (/\bARR\b|ARRIVÉE|ARRIVAL|CHECKIN|C\/I/.test(upper)) {
+    keywords.push('ARRIVEE');
+  }
+  
+  return keywords;
+}
+
+/**
+ * Construit les patterns contextuels à partir des chambres validées
+ * Associe les mots-clés aux types de nettoyage
+ */
+function buildContextPatterns(rooms: any[]): { [keyword: string]: CleaningType } {
+  const patterns: { [keyword: string]: { count: number; cleaningType: CleaningType } } = {};
+  
+  for (const room of rooms) {
+    const keywords = room.contextKeywords || [];
+    const cleaningType = room.cleaningType as CleaningType;
+    
+    for (const keyword of keywords) {
+      if (!patterns[keyword]) {
+        patterns[keyword] = { count: 0, cleaningType };
+      }
+      
+      // Si le même mot-clé est associé au même cleaningType, renforcer
+      if (patterns[keyword].cleaningType === cleaningType) {
+        patterns[keyword].count++;
+      } else {
+        // Conflit: garder le plus fréquent
+        patterns[keyword].count--;
+        if (patterns[keyword].count < 0) {
+          patterns[keyword] = { count: 1, cleaningType };
+        }
+      }
+    }
+  }
+  
+  // Convertir en format simple keyword → cleaningType
+  const result: { [keyword: string]: CleaningType } = {};
+  for (const [keyword, data] of Object.entries(patterns)) {
+    result[keyword] = data.cleaningType;
+  }
+  
+  return result;
 }
 
 export const TrainingStep3Result = ({
@@ -47,10 +133,19 @@ export const TrainingStep3Result = ({
 
       // IMPORTANT: Ne sauvegarder QUE les chambres validées (validated: true)
       // Les chambres non validées ne doivent JAMAIS apparaître dans l'analyse
-      const roomsToSave = validatedRooms.map(r => ({
-        ...r,
-        validated: true // S'assurer que le flag est bien présent
-      }));
+      // NOUVEAU: Extraire les mots-clés contextuels pour un apprentissage intelligent
+      const roomsToSave = validatedRooms.map(r => {
+        const contextKeywords = extractContextKeywords(r.originalText || '');
+        return {
+          ...r,
+          validated: true, // S'assurer que le flag est bien présent
+          contextKeywords, // Mots-clés détectés dans le contexte
+          isPermanentRule: (r as any).isPermanentRule || false, // Si c'est une règle permanente (pas contextuelle)
+        };
+      });
+
+      // Construire les patterns contextuels globaux
+      const contextPatterns = buildContextPatterns(roomsToSave);
 
       const patternData = {
         hotel_id: hotelId,
@@ -65,6 +160,7 @@ export const TrainingStep3Result = ({
           connected_rooms: validatedRooms
             .filter((r) => r.isConnected)
             .map((r) => ({ pattern: r.roomNumber, rooms: r.linkedRooms })),
+          contextPatterns, // NOUVEAU: Patterns contextuels appris
         },
       };
 

@@ -504,6 +504,34 @@ export const TrainingStep2Annotate = ({
                           </SelectContent>
                         </Select>
 
+                        {/* Toggle règle permanente */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1">
+                              <Checkbox
+                                id={`permanent-${index}`}
+                                checked={(room as any).isPermanentRule || false}
+                                onCheckedChange={(checked) => updateRoom(index, 'isPermanentRule' as any, !!checked)}
+                                className="h-4 w-4"
+                              />
+                              <Label 
+                                htmlFor={`permanent-${index}`} 
+                                className="text-xs cursor-pointer text-muted-foreground hover:text-foreground"
+                              >
+                                🔒
+                              </Label>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="font-medium">Règle permanente</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Si coché, cette chambre aura TOUJOURS ce type de nettoyage, 
+                              peu importe le contenu du rapport. Utile pour les chambres 
+                              spéciales (stockage, staff, etc.).
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+
                         {room.isConnected && (
                           <Badge variant="secondary" className="text-xs gap-1">
                             <Link2 className="w-3 h-3" />
