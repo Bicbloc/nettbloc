@@ -702,8 +702,9 @@ class UnifiedParserService {
     // ====== RÈGLE: NUIT X/X (dernière nuit ou intermédiaire) ======
     // CORRECTION: La dernière nuit (X/X) signifie que le client est ENCORE LÀ cette nuit
     // Donc c'est une RECOUCHE, pas un départ. Le départ sera le lendemain.
-    const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
-                           upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+    // Supporte "Night" (EN) et "Nuit" (FR)
+    const lastNightMatch = upper.match(/(?:NIGHT|NUIT)\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
+                           upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*(?:NIGHT|NUIT)/i);
     if (lastNightMatch) {
       const currentNight = parseInt(lastNightMatch[1]);
       const totalNights = parseInt(lastNightMatch[2]);
@@ -1044,8 +1045,8 @@ class UnifiedParserService {
     const upper = text.toUpperCase();
     const keywords: string[] = [];
     
-    // Dernière nuit
-    const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/);
+    // Dernière nuit - supporte "Night" (EN) et "Nuit" (FR)
+    const lastNightMatch = upper.match(/(?:NIGHT|NUIT)\s*(\d+)\s*[\/\\]\s*(\d+)/);
     if (lastNightMatch && lastNightMatch[1] === lastNightMatch[2]) {
       keywords.push('DERNIERE_NUIT');
     } else if (lastNightMatch) {
