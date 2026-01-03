@@ -40,11 +40,14 @@ export class SpaceStatusAdapter extends PmsAdapter {
     dateFormats: ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']
   };
 
-  private readonly ROOM_LINE_PATTERN = /\b(\d{1,4}[A-Z]?)\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)\s+(DIR|INS|SAL|OOO|OOS)?/i;
+  private readonly ROOM_LINE_PATTERN = /\b(\d{1,4}[A-Z]?)\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)\s+(DIR|INS|SAL|PRO|OOO|OOS)?/i;
   private readonly FLOOR_PREFIX_PATTERN = /^\s*(\d{1,2})\s+(\d{2,4})\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)/i;
   private readonly NIGHT_PATTERN = /(?:Night|Nuit|Nacht|Notte|Noche)\s*(\d+)\s*[\/\\]\s*(\d+)/i;
   private readonly GUEST_BLOCK_PATTERN = /(\d+)\s*[×x]\s*(?:Adults?|Adultes?|Erwachsene)/gi;
   private readonly OOO_PATTERN = /Out of (?:order|service)/i;
+  // Pattern pour détecter une date sans horaire (séjour en cours) - ex: "05/05/2025" sans "08:20" ou "15:00"
+  private readonly DATE_PATTERN = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g;
+  private readonly TIME_PATTERN = /\b(\d{1,2}):(\d{2})\b/g;
 
   extractRooms(text: string): ExtractedRoom[] {
     const lines = text.split('\n');
@@ -123,8 +126,13 @@ export class SpaceStatusAdapter extends PmsAdapter {
 
     const guestBlocks = (combinedText.match(this.GUEST_BLOCK_PATTERN) || []).length;
     const isOutOfOrder = this.OOO_PATTERN.test(combinedText);
+    
+    // Détecter si dates présentes SANS horaire (client en séjour = recouche)
+    const dates = combinedText.match(this.DATE_PATTERN) || [];
+    const times = combinedText.match(this.TIME_PATTERN) || [];
+    const hasDateWithoutTime = dates.length > 0 && times.length === 0;
 
-    const { status, cleaningType } = this.resolveStatusAndCleaning(statusCode, nightCurrent, nightTotal, guestBlocks, isOutOfOrder);
+    const { status, cleaningType } = this.resolveStatusAndCleaning(statusCode, nightCurrent, nightTotal, guestBlocks, isOutOfOrder, hasDateWithoutTime);
     const floor = currentFloor || this.inferFloor(extractedRoomNumber);
 
     return {
@@ -137,28 +145,34 @@ export class SpaceStatusAdapter extends PmsAdapter {
   }
 
   private resolveStatusAndCleaning(
-    statusCode: string, nightCurrent: number, nightTotal: number, guestBlocks: number, isOutOfOrder: boolean
+    statusCode: string, 
+    nightCurrent: number, 
+    nightTotal: number, 
+    guestBlocks: number, 
+    isOutOfOrder: boolean,
+    hasDateWithoutTime: boolean = false
   ): { status: string; cleaningType: CleaningType } {
+    // CAS 0: Hors service
     if (isOutOfOrder) return { status: 'out_of_order', cleaningType: 'none' };
-    if (statusCode === 'INS') return { status: 'clean', cleaningType: 'none' };
+    if (statusCode === 'OOO' || statusCode === 'OOS') return { status: 'out_of_order', cleaningType: 'none' };
 
+    // CAS 1: Dates avec horaires (checkout/checkin) → à blanc
+    if (guestBlocks >= 2) return { status: 'checkout_checkin', cleaningType: 'a_blanc' };
+    
+    // CAS 2: Night X/X OU dates SANS horaire (client en séjour) → recouche
+    // Peu importe le statut DIR/INS, c'est recouche car le client est encore là
+    if (nightTotal > 0 || hasDateWithoutTime) {
+      return { status: 'stayover', cleaningType: 'recouche' };
+    }
+    
+    // CAS 3: Pas de séjour/date → regarder le statut
+    if (statusCode === 'INS' || statusCode === 'PRO') {
+      return { status: 'clean', cleaningType: 'none' };
+    }
     if (statusCode === 'DIR' || statusCode === 'SAL') {
-      // Vérifier checkout/checkin (2 blocs de guests avec horaires)
-      if (guestBlocks >= 2) return { status: 'checkout_checkin', cleaningType: 'a_blanc' };
-      
-      // Si info de nuit disponible
-      if (nightTotal > 0) {
-        // CORRECTION: "Dernière nuit" (X/X) = client ENCORE présent cette nuit = RECOUCHE
-        // "Nuit intermédiaire" (X < Y) = client présent = RECOUCHE
-        // Dans les DEUX cas, c'est RECOUCHE car le client dort encore cette nuit
-        return { status: 'stayover', cleaningType: 'recouche' };
-      }
-      
-      // Sans info de nuit, c'est une chambre sale à nettoyer à blanc
       return { status: 'dirty', cleaningType: 'a_blanc' };
     }
 
-    if (statusCode === 'OOO' || statusCode === 'OOS') return { status: 'out_of_order', cleaningType: 'none' };
     return { status: 'unknown', cleaningType: 'a_blanc' };
   }
 
