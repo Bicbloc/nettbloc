@@ -22,6 +22,13 @@ interface LearnedRoomPattern {
   roomNumber: string;
   cleaningType: CleaningType;
   status: string;
+  isPermanentRule?: boolean; // Si true, cette chambre a TOUJOURS ce cleaningType
+}
+
+interface ContextPattern {
+  keyword: string;
+  cleaningType: CleaningType;
+  count: number; // Nombre de fois que ce pattern a été confirmé
 }
 
 interface PmsRuleFromDb {
@@ -34,6 +41,8 @@ interface PmsRuleFromDb {
 
 class UnifiedParserService {
   private learnedPatterns: Map<string, LearnedRoomPattern> = new Map();
+  private contextPatterns: Map<string, ContextPattern> = new Map(); // NOUVEAU: Patterns contextuels
+  private permanentRules: Map<string, LearnedRoomPattern> = new Map(); // NOUVEAU: Règles permanentes
   private customStatusMappings: Map<string, StatusMapping> = new Map();
   private dynamicRules: Map<string, PmsRuleFromDb> = new Map();
   private hotelId: string | null = null;
@@ -102,6 +111,8 @@ class UnifiedParserService {
 
       this.hotelId = hotelId;
       this.learnedPatterns.clear();
+      this.contextPatterns.clear(); // NOUVEAU: Reset patterns contextuels
+      this.permanentRules.clear(); // NOUVEAU: Reset règles permanentes
       this.customStatusMappings.clear();
       this.debugLogs = [];
 
@@ -128,16 +139,49 @@ class UnifiedParserService {
             if (room.roomNumber && room.validated === true) {
               // Normaliser le numéro de chambre (enlever les zéros initiaux)
               const normalizedNumber = this.normalizeRoomNumber(String(room.roomNumber));
-              this.learnedPatterns.set(normalizedNumber, {
-                roomNumber: room.roomNumber, // Garder l'original pour référence
-                cleaningType: room.cleaningType || 'none',
-                status: room.status || 'clean'
-              });
+              
+              // NOUVEAU: Séparer les règles permanentes des patterns contextuels
+              if (room.isPermanentRule === true) {
+                // Règle permanente: cette chambre a TOUJOURS ce cleaningType
+                this.permanentRules.set(normalizedNumber, {
+                  roomNumber: room.roomNumber,
+                  cleaningType: room.cleaningType || 'none',
+                  status: room.status || 'clean',
+                  isPermanentRule: true
+                });
+                this.log(`🔒 Règle permanente: ${room.roomNumber} → ${room.cleaningType}`);
+              } else {
+                // Pattern normal: la chambre existe, mais son cleaningType dépend du contexte
+                this.learnedPatterns.set(normalizedNumber, {
+                  roomNumber: room.roomNumber,
+                  cleaningType: room.cleaningType || 'none',
+                  status: room.status || 'clean'
+                });
+              }
             }
           }
 
-          // Extraire les mappings de statut personnalisés
+          // NOUVEAU: Charger les patterns contextuels (keyword → cleaningType)
           const rules = pattern.detection_rules as any;
+          if (rules?.contextPatterns) {
+            for (const [keyword, cleaningType] of Object.entries(rules.contextPatterns)) {
+              const existing = this.contextPatterns.get(keyword);
+              if (existing) {
+                // Renforcer si même cleaningType, sinon conflit
+                if (existing.cleaningType === cleaningType) {
+                  existing.count++;
+                }
+              } else {
+                this.contextPatterns.set(keyword, {
+                  keyword,
+                  cleaningType: cleaningType as CleaningType,
+                  count: 1
+                });
+              }
+            }
+          }
+
+          // Extraire les mappings de statut personnalisés (ancien système)
           if (rules?.statusKeywords) {
             for (const keyword of rules.statusKeywords) {
               this.customStatusMappings.set(keyword.toUpperCase(), {
@@ -172,7 +216,7 @@ class UnifiedParserService {
         }
       }
 
-      this.log(`📚 Patterns chargés: ${this.learnedPatterns.size} chambres, ${this.customStatusMappings.size} mappings`);
+      this.log(`📚 Patterns chargés: ${this.learnedPatterns.size} chambres, ${this.contextPatterns.size} patterns contextuels, ${this.permanentRules.size} règles permanentes, ${this.customStatusMappings.size} mappings`);
     } catch (error) {
       this.log(`❌ Erreur chargement patterns: ${error}`);
     } finally {
@@ -873,29 +917,25 @@ class UnifiedParserService {
    */
   private applyLearnedPatterns(rooms: ExtractedRoom[]): ExtractedRoom[] {
     // Si aucun pattern appris, retourner tel quel (pas de filtrage)
-    if (this.learnedPatterns.size === 0) {
+    if (this.learnedPatterns.size === 0 && this.permanentRules.size === 0) {
       this.log(`📋 Aucun pattern appris, toutes les chambres conservées`);
       return rooms;
     }
 
     // Créer un Set des numéros de chambres validés lors de l'entraînement (déjà normalisés)
-    const validRoomNumbers = new Set(this.learnedPatterns.keys());
-    this.log(`🎓 Filtrage par patterns appris: ${validRoomNumbers.size} chambres validées`);
+    const validRoomNumbers = new Set([
+      ...this.learnedPatterns.keys(),
+      ...this.permanentRules.keys()
+    ]);
+    this.log(`🎓 Filtrage par patterns appris: ${validRoomNumbers.size} chambres validées (${this.permanentRules.size} règles permanentes)`);
     this.log(`📋 Chambres validées: ${Array.from(validRoomNumbers).slice(0, 20).join(', ')}${validRoomNumbers.size > 20 ? '...' : ''}`);
 
     // FILTRER pour ne garder que les chambres qui sont dans les patterns appris
-    // En normalisant le numéro pour comparer (001 == 1)
     const filteredRooms = rooms.filter(room => {
-      // Cas des chambres liées (ex: 100+101) : on garde si
-      // - le groupe lui-même a été validé (ex: "100-101")
-      // OU
-      // - au moins une des chambres du groupe a été validée individuellement
       if (room.isConnected && Array.isArray(room.linkedRooms) && room.linkedRooms.length > 0) {
         const normalizedGroup = this.normalizeRoomNumber(String(room.roomNumber));
         const groupIsValid = validRoomNumbers.has(normalizedGroup);
-
         const anyPartValid = room.linkedRooms.some((rn) => validRoomNumbers.has(this.normalizeRoomNumber(String(rn))));
-
         const keep = groupIsValid || anyPartValid;
         if (!keep) {
           this.log(`🚫 Groupe ${room.roomNumber} exclu (non validé dans l'entraînement)`);
@@ -913,75 +953,60 @@ class UnifiedParserService {
 
     this.log(`📊 Résultat filtrage: ${filteredRooms.length}/${rooms.length} chambres conservées`);
 
-    // PRIORITÉ ABSOLUE AUX PATTERNS VALIDÉS
-    // Si le pattern a un cleaningType explicitement défini lors de l'entraînement,
-    // il a TOUJOURS priorité sur la détection automatique
+    // NOUVEAU: Appliquer la logique contextuelle
     return filteredRooms.map(room => {
       const normalizedNumber = this.normalizeRoomNumber(room.roomNumber);
-      const learnedPattern = this.learnedPatterns.get(normalizedNumber);
       
-      if (learnedPattern) {
-        // PRIORITÉ AU PATTERN VALIDÉ
-        // Si le cleaningType a été explicitement défini lors de l'entraînement
-        const patternCleaningType = learnedPattern.cleaningType;
-        const patternStatus = learnedPattern.status;
+      // ======= PRIORITÉ 1: RÈGLES PERMANENTES =======
+      // Si cette chambre a une règle permanente, l'appliquer TOUJOURS
+      const permanentRule = this.permanentRules.get(normalizedNumber);
+      if (permanentRule) {
+        this.log(`🔒 Chambre ${room.roomNumber}: Règle permanente = '${permanentRule.cleaningType}'`);
+        return {
+          ...room,
+          cleaningType: permanentRule.cleaningType,
+          status: permanentRule.status,
+          confidence: 98,
+          validated: true,
+          debugInfo: {
+            ...room.debugInfo!,
+            source: 'pattern' as const,
+            appliedRule: `Règle permanente: ${permanentRule.cleaningType}`,
+            confidence: 98
+          }
+        };
+      }
+      
+      // ======= PRIORITÉ 2: PATTERNS CONTEXTUELS =======
+      // Analyser les mots-clés dans le texte de la ligne et utiliser les patterns contextuels appris
+      if (this.contextPatterns.size > 0 && room.originalText) {
+        const lineKeywords = this.extractLineKeywords(room.originalText);
         
-        // Cas 1: Pattern dit "none" (propre) → TOUJOURS respecter
-        if (patternCleaningType === 'none') {
-          this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'none' (propre) → Priorité absolue`);
-          return {
-            ...room,
-            cleaningType: 'none' as CleaningType,
-            status: patternStatus || 'clean',
-            confidence: 95,
-            validated: true,
-            debugInfo: {
-              ...room.debugInfo!,
-              source: 'pattern' as const,
-              appliedRule: `Pattern validé: propre (aucun nettoyage)`,
-              confidence: 95
-            }
-          };
-        }
-        
-        // Cas 2: Pattern dit "a_blanc" ou "full" → TOUJOURS respecter
-        if (patternCleaningType === 'a_blanc' || patternCleaningType === 'full') {
-          this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'a_blanc' → Priorité absolue`);
-          return {
-            ...room,
-            cleaningType: 'a_blanc' as CleaningType,
-            status: patternStatus || 'checkout',
-            confidence: 95,
-            validated: true,
-            debugInfo: {
-              ...room.debugInfo!,
-              source: 'pattern' as const,
-              appliedRule: `Pattern validé: à blanc (nettoyage complet)`,
-              confidence: 95
-            }
-          };
-        }
-        
-        // Cas 3: Pattern dit "recouche" ou "quick" → TOUJOURS respecter
-        if (patternCleaningType === 'recouche' || patternCleaningType === 'quick') {
-          this.log(`🎯 Chambre ${room.roomNumber}: Pattern validé = 'recouche' → Priorité absolue`);
-          return {
-            ...room,
-            cleaningType: 'recouche' as CleaningType,
-            status: patternStatus || 'stayover',
-            confidence: 95,
-            validated: true,
-            debugInfo: {
-              ...room.debugInfo!,
-              source: 'pattern' as const,
-              appliedRule: `Pattern validé: recouche (nettoyage rapide)`,
-              confidence: 95
-            }
-          };
+        // Chercher un pattern contextuel qui correspond
+        for (const keyword of lineKeywords) {
+          const contextPattern = this.contextPatterns.get(keyword);
+          if (contextPattern) {
+            this.log(`🎯 Chambre ${room.roomNumber}: Pattern contextuel '${keyword}' → ${contextPattern.cleaningType}`);
+            return {
+              ...room,
+              cleaningType: contextPattern.cleaningType,
+              status: this.inferStatusFromCleaningType(contextPattern.cleaningType),
+              confidence: 90,
+              validated: true,
+              debugInfo: {
+                ...room.debugInfo!,
+                source: 'pattern' as const,
+                appliedRule: `Pattern contextuel: ${keyword} → ${contextPattern.cleaningType}`,
+                confidence: 90
+              }
+            };
+          }
         }
       }
       
-      // Pas de pattern explicite → utiliser la détection dynamique
+      // ======= PRIORITÉ 3: DÉTECTION DYNAMIQUE EXISTANTE =======
+      // Si la chambre a déjà un cleaningType déterminé par l'analyse, le garder
+      // C'est le résultat de analyzeLineContext() appelé plus tôt
       return {
         ...room,
         confidence: Math.max(room.confidence || 0, 85),
@@ -994,6 +1019,67 @@ class UnifiedParserService {
         }
       };
     });
+  }
+
+  /**
+   * Extrait les mots-clés d'une ligne pour correspondre aux patterns contextuels
+   */
+  private extractLineKeywords(text: string): string[] {
+    const upper = text.toUpperCase();
+    const keywords: string[] = [];
+    
+    // Dernière nuit
+    const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/);
+    if (lastNightMatch && lastNightMatch[1] === lastNightMatch[2]) {
+      keywords.push('DERNIERE_NUIT');
+    } else if (lastNightMatch) {
+      keywords.push('NUIT_INTERMEDIAIRE');
+    }
+    
+    // Départ
+    if (/\bDEP\b|DÉPART|DEPARTURE|CHECKOUT|C\/O/.test(upper)) {
+      keywords.push('DEPART');
+    }
+    
+    // Stayover
+    if (/\bSTAYOVER|RECOUCHE|STAY|OCC\b/.test(upper)) {
+      keywords.push('STAYOVER');
+    }
+    
+    // Propre
+    if (/\bPRO\b|PROPRE|CLEAN|READY|INS\b/.test(upper)) {
+      keywords.push('PROPRE');
+    }
+    
+    // Sale
+    if (/\bSAL\b|SALE|DIRTY|DIR\b/.test(upper)) {
+      keywords.push('SALE');
+    }
+    
+    // Arrivée
+    if (/\bARR\b|ARRIVÉE|ARRIVAL|CHECKIN|C\/I/.test(upper)) {
+      keywords.push('ARRIVEE');
+    }
+    
+    return keywords;
+  }
+
+  /**
+   * Infère le statut depuis le type de nettoyage
+   */
+  private inferStatusFromCleaningType(cleaningType: CleaningType): string {
+    switch (cleaningType) {
+      case 'a_blanc':
+      case 'full':
+        return 'checkout';
+      case 'recouche':
+      case 'quick':
+        return 'stayover';
+      case 'none':
+        return 'clean';
+      default:
+        return 'unknown';
+    }
   }
 
   /**
