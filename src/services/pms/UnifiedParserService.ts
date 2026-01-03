@@ -861,9 +861,9 @@ class UnifiedParserService {
       return { status: 'clean', cleaningType: 'none', reason: 'clean keyword' };
     }
     
-    // Sale/Dirty
+    // Sale/Dirty → À blanc (chambre vide sale)
     if (/\b(DIRTY|SALE|SAL|DIR)\b/.test(upper)) {
-      return { status: 'dirty', cleaningType: 'recouche', reason: 'dirty keyword' };
+      return { status: 'dirty', cleaningType: 'a_blanc', reason: 'dirty keyword → À blanc' };
     }
     
     // Par défaut, ne pas forcer a_blanc → recouche plus conservateur
