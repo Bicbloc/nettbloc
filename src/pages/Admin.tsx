@@ -38,6 +38,7 @@ import { IncidentReportDialog } from '@/components/incident/IncidentReportDialog
 import { RolePermissionsManager } from '@/components/incident/RolePermissionsManager';
 import { SupportTicketsPanel } from '@/components/admin/SupportTicketsPanel';
 import { PromoCodesPanel } from '@/components/admin/PromoCodesPanel';
+import { PricingPlansPanel } from '@/components/admin/PricingPlansPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -825,7 +826,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-11">
+        <TabsList className="grid w-full grid-cols-12">
           <TabsTrigger value="users">
             <User className="h-4 w-4 mr-2" />
             Utilisateurs
@@ -868,6 +869,10 @@ const Admin = () => {
           <TabsTrigger value="promos">
             <Gift className="h-4 w-4 mr-2" />
             Promos
+          </TabsTrigger>
+          <TabsTrigger value="plans">
+            <CreditCard className="h-4 w-4 mr-2" />
+            Plans
           </TabsTrigger>
           <TabsTrigger value="system">
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -1509,6 +1514,10 @@ const Admin = () => {
               <AlertDescription>Aucun hôtel disponible pour l'entraînement IA</AlertDescription>
             </Alert>
           )}
+        </TabsContent>
+
+        <TabsContent value="plans" className="space-y-4">
+          <PricingPlansPanel />
         </TabsContent>
 
         <TabsContent value="tickets" className="space-y-4">
