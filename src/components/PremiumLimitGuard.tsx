@@ -32,7 +32,11 @@ export const PremiumLimitGuard: React.FC<PremiumLimitGuardProps> = ({
     'advanced_mobile_interface',
     'advanced_profile',
     'unlimited_rooms',
-    'advanced_reports'
+    'advanced_reports',
+    'incidents',
+    'inspection',
+    'linen_inventory',
+    'access_codes'
   ];
 
   const requiresPremium = feature && premiumFeatures.includes(feature);

@@ -28,6 +28,7 @@ import { useAutoSetup } from "@/hooks/use-auto-setup";
 import { cleanupInvalidHotelIds, generateHotelId } from "@/lib/utils";
 import { redistributeRooms } from "@/utils/redistributionUtils";
 import { UpgradeButton } from "@/components/UpgradeButton";
+import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HeroHeader } from "@/components/HeroHeader";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
@@ -758,15 +759,33 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="access-codes" className="space-y-6">
-                <AccessCodesTab currentHotelId={currentHotelId} />
+                <PremiumLimitGuard 
+                  feature="access_codes" 
+                  title="Codes d'accès"
+                  description="Gérez les codes d'accès de vos femmes de chambre avec la version Premium."
+                >
+                  <AccessCodesTab currentHotelId={currentHotelId} />
+                </PremiumLimitGuard>
               </TabsContent>
 
               <TabsContent value="linen" className="space-y-6">
-                <LinenTab currentHotelId={currentHotelId} />
+                <PremiumLimitGuard 
+                  feature="linen_inventory" 
+                  title="Inventaire du linge"
+                  description="Gérez l'inventaire du linge de votre établissement avec la version Premium."
+                >
+                  <LinenTab currentHotelId={currentHotelId} />
+                </PremiumLimitGuard>
               </TabsContent>
 
               <TabsContent value="incidents" className="space-y-6">
-                <IncidentsTab currentHotelId={currentHotelId} />
+                <PremiumLimitGuard 
+                  feature="incidents" 
+                  title="Gestion des incidents"
+                  description="Suivez et gérez les incidents de votre établissement avec la version Premium."
+                >
+                  <IncidentsTab currentHotelId={currentHotelId} />
+                </PremiumLimitGuard>
               </TabsContent>
 
               <TabsContent value="reports" className="space-y-6">
@@ -793,12 +812,18 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="inspections" className="space-y-6">
-                {currentHotelId && (
-                  <GovernessInspectionInterface
-                    hotelId={currentHotelId}
-                    governessName="Gouvernante"
-                  />
-                )}
+                <PremiumLimitGuard 
+                  feature="inspection" 
+                  title="Inspection des chambres"
+                  description="Inspectez et validez le nettoyage des chambres avec la version Premium."
+                >
+                  {currentHotelId && (
+                    <GovernessInspectionInterface
+                      hotelId={currentHotelId}
+                      governessName="Gouvernante"
+                    />
+                  )}
+                </PremiumLimitGuard>
               </TabsContent>
             </div>
           </div>
