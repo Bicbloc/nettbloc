@@ -786,15 +786,8 @@ class UnifiedParserService {
       }
     }
     
-    // ====== RÈGLES MEWS SPÉCIFIQUES ======
-    if (pmsType === 'mews') {
-      // Checkout + Arrival (même ligne) = a_blanc prioritaire
-      const hasDepOrDirty = /\b(DEP|DIR|DIRTY)\b/.test(upper);
-      const hasArr = /\bARR\b/.test(upper);
-      if (hasDepOrDirty && hasArr) {
-        return { status: 'checkout_arrival', cleaningType: 'a_blanc', reason: 'DEP+ARR' };
-      }
-      
+    // ====== RÈGLES MEWS/SPACE_STATUS SPÉCIFIQUES ======
+    if (pmsType === 'mews' || pmsType === 'space_status') {
       // PRO = propre, pas de nettoyage
       if (/\bPRO\b/.test(upper)) {
         return { status: 'clean', cleaningType: 'none', reason: 'PRO (propre)' };
@@ -805,42 +798,50 @@ class UnifiedParserService {
         return { status: 'inspected', cleaningType: 'none', reason: 'INS (inspecté)' };
       }
       
-      // ====== LOGIQUE SAL (SALE) - BASÉE SUR LA POSITION DES HORAIRES ======
-      if (/\bSAL\b/.test(upper)) {
-        // 1) Vérifier Nuit X/Y pour stayover vs checkout (déjà géré au-dessus pour dernière nuit)
-        // 2) NOUVELLE LOGIQUE: Position des horaires
+      // Checkout + Arrival (même ligne) = a_blanc prioritaire
+      const hasDepOrDirty = /\b(DEP|DIRTY)\b/.test(upper);
+      const hasArr = /\bARR\b/.test(upper);
+      if (hasDepOrDirty && hasArr) {
+        return { status: 'checkout_arrival', cleaningType: 'a_blanc', reason: 'DEP+ARR' };
+      }
+      
+      // ====== LOGIQUE DIR/SAL - BASÉE SUR PRÉSENCE DE DATES/HORAIRES ======
+      if (/\b(DIR|SAL)\b/.test(upper)) {
         const { hasDeparture, hasArrival } = this.extractTimePositions(line);
         
+        // CAS 1: Horaires présents (checkout/checkin) → À blanc
+        if (hasDeparture && hasArrival) {
+          return { status: 'checkout_checkin', cleaningType: 'a_blanc', reason: 'DIR/SAL + 2 horaires → À blanc' };
+        }
+        
+        // CAS 2: Horaire à droite = départ → À blanc
         if (hasDeparture) {
-          // Horaire à droite = départ → À blanc
           this.log(`🔍 MEWS: Départ détecté (horaire droite) → À blanc`);
-          return { status: 'checkout', cleaningType: 'a_blanc', reason: 'SAL + horaire droite → Départ → À blanc' };
+          return { status: 'checkout', cleaningType: 'a_blanc', reason: 'DIR/SAL + horaire droite → Départ → À blanc' };
         }
         
-        if (hasArrival && !hasDeparture) {
-          // Horaire à gauche uniquement = arrivée sans départ → Recouche
-          this.log(`🔍 MEWS: Arrivée seule (horaire gauche) → Recouche`);
-          return { status: 'stayover', cleaningType: 'recouche', reason: 'SAL + horaire gauche → Arrivée → Recouche' };
+        // CAS 3: Vérifier si dates présentes SANS horaires (client en séjour) → Recouche
+        const datePattern = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g;
+        const dates = line.match(datePattern) || [];
+        const hasOccupancy = /\d+\s*[×x]\s*(Adults?|Adultes?)/i.test(line);
+        
+        if (dates.length > 0 && !hasDeparture) {
+          // Dates présentes SANS horaire de départ = client en séjour = Recouche
+          this.log(`🔍 MEWS: Dates sans horaire départ → Recouche (client en séjour)`);
+          return { status: 'stayover', cleaningType: 'recouche', reason: 'DIR/SAL + dates sans horaire → Recouche' };
         }
         
-        // 3) Pas d'horaire mais occupation → Recouche
-        const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
-        if (hasOccupancy) {
-          return { status: 'stayover', cleaningType: 'recouche', reason: 'SAL + occupation (Adultes) → Recouche' };
+        if (hasOccupancy && !hasDeparture) {
+          return { status: 'stayover', cleaningType: 'recouche', reason: 'DIR/SAL + occupation (Adultes) → Recouche' };
         }
         
-        // Default SAL sans horaire ni occupation → À BLANC (SAL = sale = nettoyage complet)
-        return { status: 'dirty', cleaningType: 'a_blanc', reason: 'SAL (défaut) → À blanc' };
+        // CAS 4: DIR/SAL sans dates ni horaires = chambre vide sale → À blanc
+        return { status: 'dirty', cleaningType: 'a_blanc', reason: 'DIR/SAL sans séjour → À blanc' };
       }
       
       // DEP seul = départ, a_blanc
       if (/\b(DEP|CHECKOUT|DÉPART)\b/.test(upper)) {
         return { status: 'checkout', cleaningType: 'a_blanc', reason: 'DEP/CHECKOUT' };
-      }
-      
-      // DIR (dirty) = sale → recouche par défaut (pas a_blanc)
-      if (/\bDIR\b/.test(upper)) {
-        return { status: 'dirty', cleaningType: 'recouche', reason: 'DIR (sale)' };
       }
     }
     
