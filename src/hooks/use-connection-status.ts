@@ -10,28 +10,25 @@ export function useConnectionStatus() {
   const [consecutiveFailures, setConsecutiveFailures] = useState(0);
   const [lastSuccessfulPing, setLastSuccessfulPing] = useState<Date | null>(null);
 
-  // Test Supabase connection avec gestion intelligente
+  // Test Supabase connection via ping edge function (bypasse RLS)
   const pingSupabase = useCallback(async () => {
     try {
       const start = Date.now();
       
-      // Utiliser hotels au lieu de profiles (plus fiable avec RLS)
-      const { error } = await supabase
-        .from('hotels')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
+      // Utiliser l'edge function ping qui bypasse RLS
+      const { data, error } = await supabase.functions.invoke('ping');
       
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned (OK)
+      if (error || !data?.ok) {
         setConsecutiveFailures(prev => prev + 1);
         // Attendre 2 échecs consécutifs avant de marquer déconnecté
         if (consecutiveFailures >= 1) {
           setIsSupabaseConnected(false);
         }
+        console.log('💔 Ping failed:', error?.message || 'Unknown error');
         return false;
       }
       
-      const pingTime = Date.now() - start;
+      const pingTime = data.latency || (Date.now() - start);
       setLastPingTime(pingTime);
       setIsSupabaseConnected(true);
       setConsecutiveFailures(0);
@@ -42,6 +39,7 @@ export function useConnectionStatus() {
       if (consecutiveFailures >= 1) {
         setIsSupabaseConnected(false);
       }
+      console.log('💔 Ping exception:', error);
       return false;
     }
   }, [consecutiveFailures]);
@@ -70,7 +68,8 @@ export function useConnectionStatus() {
         title: "Connexion rétablie",
         description: "Vous êtes de nouveau en ligne",
       });
-      pingSupabase();
+      // Ping immédiat après retour en ligne
+      setTimeout(() => pingSupabase(), 500);
     };
 
     const handleOffline = () => {
@@ -121,10 +120,11 @@ export function useConnectionStatus() {
     return () => clearInterval(interval);
   }, [isOnline, isSupabaseConnected, consecutiveFailures, lastSuccessfulPing, pingSupabase]);
 
-  // Initial ping
+  // Initial ping (delayed to let edge function deploy)
   useEffect(() => {
-    pingSupabase();
-  }, [pingSupabase]);
+    const timer = setTimeout(() => pingSupabase(), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return {
     isOnline,
