@@ -165,16 +165,10 @@ export class MewsAdapter extends PmsAdapter {
       if (timePositions.departureTime) r.departureTime = timePositions.departureTime;
       if (timePositions.arrivalTime) r.arrivalTime = timePositions.arrivalTime;
 
-      // RÈGLE MÉTIER: si date d'arrivée + date de départ sont présentes SANS horaire,
-      // le client est encore à l'hôtel → RECOUCHE (peu importe le statut).
-      const dateMatches = rawLine.match(/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g) || [];
-      const hasDateRange = dateMatches.length >= 2 || (!!r.arrivalDate && !!r.departureDate);
-      const hasAnyTime = timePositions.hasArrival || timePositions.hasDeparture;
-      if (hasDateRange && !hasAnyTime) {
-        r.status = 'stayover';
-        r.cleaningType = 'recouche';
-        continue;
-      }
+      // Note: ne pas forcer ici un override global "dates sans horaire".
+      // La logique "dates sans horaire" est déjà gérée dans analyzeLineWithDate() (cas SAL)
+      // et dans UnifiedParserService (pattern-first / règles contextuelles).
+
 
       // Détecter checkout+arrival sur la même ligne (priorité)
       const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);

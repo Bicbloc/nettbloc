@@ -18,6 +18,22 @@ describe('MewsAdapter - stayover without times', () => {
     expect(rooms[0].status).toBe('stayover');
   });
 
+  it('should return a_blanc when an explicit DEP/PARTI status is present (even without times)', () => {
+    const adapter = new MewsAdapter();
+
+    const text = [
+      'Statut des espaces - 01/01/2026',
+      // 2 dates mais pas d’horaire, et statut explicite de départ
+      '101 DBL-C DEP 01/01/2026 01/01/2026 Nuit 1/1 2 × Adultes DUPONT Jean',
+    ].join('\n');
+
+    const rooms = adapter.extractRooms(text);
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0].roomNumber).toBe('101');
+    expect(rooms[0].cleaningType).toBe('a_blanc');
+    expect(rooms[0].status).toBe('checkout');
+  });
+
   it('should return a_blanc when a departure time is present', () => {
     const adapter = new MewsAdapter();
 
