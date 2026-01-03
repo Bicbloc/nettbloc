@@ -65,6 +65,23 @@ serve(async (req) => {
       throw new Error(`Invalid plan type: ${planType}`);
     }
 
+    // Validate plan availability (allows temporarily disabling plans)
+    const { data: pricingRow, error: pricingError } = await supabaseClient
+      .from("pricing_config")
+      .select("is_active")
+      .eq("plan_name", planType)
+      .maybeSingle();
+
+    if (!pricingError && pricingRow && pricingRow.is_active === false) {
+      return new Response(
+        JSON.stringify({ error: "PLAN_DISABLED", code: "plan_disabled" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });

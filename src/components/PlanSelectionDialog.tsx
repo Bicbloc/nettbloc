@@ -5,6 +5,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Check, Crown, Gift, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { PLAN_CONFIGS } from '@/hooks/useSubscription';
+import { usePricingConfig } from '@/hooks/use-pricing-config';
+import { checkoutErrorDescription, detectCheckoutErrorKind, extractErrorMessage } from '@/utils/checkoutErrors';
 
 interface PlanSelectionDialogProps {
   isOpen: boolean;
@@ -15,6 +18,9 @@ interface PlanSelectionDialogProps {
 export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSelectionDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium' | null>(null);
+  const { byPlan: pricingByPlan } = usePricingConfig();
+  const premiumActive = pricingByPlan.premium?.is_active ?? true;
+  const premiumPrice = PLAN_CONFIGS.premium.price;
 
   const handlePlanSelect = async (plan: 'free' | 'premium') => {
     setSelectedPlan(plan);
@@ -22,11 +28,22 @@ export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSel
 
     try {
       if (plan === 'premium') {
+        if (!premiumActive) {
+          toast({
+            variant: 'destructive',
+            title: 'Plan indisponible',
+            description: checkoutErrorDescription('plan_disabled') || 'Ce plan est temporairement indisponible.',
+          });
+          return;
+        }
+
         // Redirect to Stripe checkout
-        const { data, error } = await supabase.functions.invoke('create-checkout');
-        
+        const { data, error } = await supabase.functions.invoke('create-checkout', {
+          body: { planType: 'premium' },
+        });
+
         if (error) throw error;
-        
+
         if (data?.url) {
           // Open Stripe checkout in new tab
           window.open(data.url, '_blank');
@@ -77,12 +94,15 @@ export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSel
         onPlanSelected(plan);
         onClose();
       }
-    } catch (error: any) {
+    } catch (error) {
+      const message = extractErrorMessage(error);
       console.error('Erreur sélection plan:', error);
+
+      const kind = detectCheckoutErrorKind(message);
       toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message || "Impossible de sélectionner le plan"
+        variant: 'destructive',
+        title: kind === 'plan_disabled' ? 'Plan indisponible' : 'Paiement indisponible',
+        description: checkoutErrorDescription(kind) || 'Impossible de sélectionner le plan',
       });
     } finally {
       setIsLoading(false);
@@ -164,7 +184,7 @@ export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSel
               </div>
               <CardTitle className="text-center">Plan Premium</CardTitle>
               <div className="text-center">
-                <span className="text-3xl font-bold">100€</span>
+                <span className="text-3xl font-bold">{premiumPrice}€</span>
                 <span className="text-muted-foreground">/mois HT</span>
               </div>
               <CardDescription className="text-center">
@@ -198,9 +218,13 @@ export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSel
               <Button 
                 className="w-full" 
                 onClick={() => handlePlanSelect('premium')}
-                disabled={isLoading}
+                disabled={isLoading || !premiumActive}
               >
-                {selectedPlan === 'premium' && isLoading ? 'Redirection...' : 'Passer au Premium'}
+                {!premiumActive
+                  ? 'Indisponible'
+                  : selectedPlan === 'premium' && isLoading
+                    ? 'Redirection...'
+                    : 'Passer au Premium'}
               </Button>
             </CardContent>
           </Card>

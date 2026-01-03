@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Crown, Star, Diamond, Zap, Check, X, ArrowRight, Gift, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePricingConfig } from '@/hooks/use-pricing-config';
+import { checkoutErrorDescription, detectCheckoutErrorKind, extractErrorMessage } from '@/utils/checkoutErrors';
 
 const PlanSelection = () => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -18,6 +20,7 @@ const PlanSelection = () => {
   const [promoDiscount, setPromoDiscount] = useState<{ type: string; value: number } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const { toast } = useToast();
+  const { byPlan: pricingByPlan } = usePricingConfig();
 
   if (!loading && !isAuthenticated) {
     return <Navigate to="/auth" replace />;
@@ -76,17 +79,27 @@ const PlanSelection = () => {
       return;
     }
 
+    const isPlanActive = pricingByPlan[planType]?.is_active ?? true;
+    if (!isPlanActive) {
+      toast({
+        variant: 'destructive',
+        title: 'Plan indisponible',
+        description: checkoutErrorDescription('plan_disabled') || 'Ce plan est temporairement indisponible.',
+      });
+      return;
+    }
+
     setCheckoutLoading(planType);
     try {
       const planConfig = PLAN_CONFIGS[planType];
       const priceInCents = planConfig.price * 100;
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { 
+        body: {
           planType,
           priceAmount: priceInCents,
-          promoCode: promoDiscount ? promoCode : undefined
-        }
+          promoCode: promoDiscount ? promoCode : undefined,
+        },
       });
 
       if (error) throw error;
@@ -95,17 +108,16 @@ const PlanSelection = () => {
         window.location.href = data.url;
       }
     } catch (error) {
-      const message = (error as any)?.message ? String((error as any).message) : String(error);
+      const message = extractErrorMessage(error);
       console.error('Error creating checkout:', error);
 
-      const isLiveChargesDisabled = message.includes('Your account cannot currently make live charges');
+      const kind = detectCheckoutErrorKind(message);
+      const description = checkoutErrorDescription(kind) || 'Impossible de créer la session de paiement.';
 
       toast({
-        variant: "destructive",
-        title: "Paiement indisponible",
-        description: isLiveChargesDisabled
-          ? "Stripe n'est pas encore activé pour les paiements en mode live. Activez votre compte Stripe (paiements live) ou utilisez une clé de test (sk_test_...) pendant le développement."
-          : "Impossible de créer la session de paiement.",
+        variant: 'destructive',
+        title: kind === 'plan_disabled' ? 'Plan indisponible' : 'Paiement indisponible',
+        description,
       });
     } finally {
       setCheckoutLoading(null);
@@ -192,13 +204,13 @@ const PlanSelection = () => {
             const isCurrentPlan = currentPlan === type;
             const price = config.price;
             const discountedPrice = getDiscountedPrice(price);
-
+            const isPlanActive = pricingByPlan[type]?.is_active ?? true;
             return (
               <Card 
                 key={type} 
                 className={`relative transition-all duration-300 ${
                   popular ? 'ring-2 ring-primary shadow-xl scale-105' : ''
-                } ${isCurrentPlan ? 'ring-2 ring-green-500' : ''}`}
+                } ${isCurrentPlan ? 'ring-2 ring-green-500' : ''} ${!isPlanActive ? 'opacity-70' : ''}`}
               >
                 {popular && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
@@ -252,13 +264,15 @@ const PlanSelection = () => {
                   <Button 
                     className="w-full"
                     variant={isCurrentPlan ? 'outline' : popular ? 'default' : 'secondary'}
-                    disabled={isCurrentPlan || checkoutLoading === type}
+                    disabled={isCurrentPlan || checkoutLoading === type || !isPlanActive}
                     onClick={() => handleSubscribe(type)}
                   >
                     {checkoutLoading === type ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : isCurrentPlan ? (
                       'Plan actuel'
+                    ) : !isPlanActive ? (
+                      'Indisponible'
                     ) : type === 'freemium' ? (
                       'Continuer gratuit'
                     ) : (
