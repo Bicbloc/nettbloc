@@ -135,10 +135,23 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isLiveChargesDisabled = message.includes("Your account cannot currently make live charges");
+
     console.error("Checkout error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+
+    return new Response(
+      JSON.stringify({
+        error: message,
+        code: isLiveChargesDisabled ? "stripe_live_charges_disabled" : "checkout_error",
+        hint: isLiveChargesDisabled
+          ? "Stripe live payments are not enabled for this account yet. Enable your account for live charges in Stripe, or switch STRIPE_SECRET_KEY to a test key (sk_test_...) for development."
+          : undefined,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: isLiveChargesDisabled ? 400 : 500,
+      }
+    );
   }
 });
