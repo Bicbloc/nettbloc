@@ -1235,16 +1235,26 @@ class UnifiedParserService {
         };
       }
       
-      // ======= PRIORITÉ 2: PATTERNS CONTEXTUELS =======
-      // Analyser les mots-clés dans le texte de la ligne et utiliser les patterns contextuels appris
+      // ======= PRIORITÉ 2: PATTERNS CONTEXTUELS (DISCRIMINANTS UNIQUEMENT) =======
+      // N'appliquer QUE les patterns contextuels spécifiques/discriminants:
+      // - DEPART, DERNIERE_NUIT, NUIT_INTERMEDIAIRE, NUIT_SANS_HORAIRE
+      // Ignorer les patterns trop génériques (SALE, STAYOVER, ARRIVEE, PROPRE)
+      // car ils écrasent la détection dynamique correcte
+      const DISCRIMINANT_KEYWORDS = ['DEPART', 'DERNIERE_NUIT', 'NUIT_INTERMEDIAIRE', 'NUIT_SANS_HORAIRE'];
+      
       if (this.contextPatterns.size > 0 && room.originalText) {
         const lineKeywords = this.extractLineKeywords(room.originalText);
         
-        // Chercher un pattern contextuel qui correspond
+        // Chercher un pattern contextuel DISCRIMINANT qui correspond
         for (const keyword of lineKeywords) {
+          // Ignorer les patterns génériques qui ne doivent pas décider du cleaningType
+          if (!DISCRIMINANT_KEYWORDS.includes(keyword)) {
+            continue;
+          }
+          
           const contextPattern = this.contextPatterns.get(keyword);
           if (contextPattern) {
-            this.log(`🎯 Chambre ${room.roomNumber}: Pattern contextuel '${keyword}' → ${contextPattern.cleaningType}`);
+            this.log(`🎯 Chambre ${room.roomNumber}: Pattern contextuel discriminant '${keyword}' → ${contextPattern.cleaningType}`);
             return {
               ...room,
               cleaningType: contextPattern.cleaningType,
