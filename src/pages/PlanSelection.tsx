@@ -95,11 +95,17 @@ const PlanSelection = () => {
         window.location.href = data.url;
       }
     } catch (error) {
+      const message = (error as any)?.message ? String((error as any).message) : String(error);
       console.error('Error creating checkout:', error);
+
+      const isLiveChargesDisabled = message.includes('Your account cannot currently make live charges');
+
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de créer la session de paiement."
+        title: "Paiement indisponible",
+        description: isLiveChargesDisabled
+          ? "Stripe n'est pas encore activé pour les paiements en mode live. Activez votre compte Stripe (paiements live) ou utilisez une clé de test (sk_test_...) pendant le développement."
+          : "Impossible de créer la session de paiement.",
       });
     } finally {
       setCheckoutLoading(null);
