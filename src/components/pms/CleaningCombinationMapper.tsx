@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Trash2, Plus, GripVertical, Check, X, Minus, Copy, Sparkles } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Trash2, Plus, Check, X, Minus, Copy, Sparkles, FileText, ChevronDown, Search, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 type ConditionValue = 'present' | 'absent' | 'any';
@@ -188,6 +190,13 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<CombinationRule | null>(null);
+  
+  // Training report lines state
+  const [trainingLines, setTrainingLines] = useState<string[]>([]);
+  const [linesOpen, setLinesOpen] = useState(false);
+  const [lineSearch, setLineSearch] = useState('');
+  const [selectedLine, setSelectedLine] = useState<string | null>(null);
+  const [loadingLines, setLoadingLines] = useState(false);
 
   const loadRules = async () => {
     setLoading(true);
@@ -208,9 +217,40 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
     }
   };
 
+  const loadTrainingLines = async () => {
+    setLoadingLines(true);
+    try {
+      const { data, error } = await supabase
+        .from('report_training_patterns')
+        .select('raw_text')
+        .eq('hotel_id', hotelId)
+        .eq('validated', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (data?.raw_text) {
+        const lines = data.raw_text.split('\n').filter((l: string) => l.trim());
+        setTrainingLines(lines);
+      }
+    } catch (error) {
+      console.error('Erreur chargement lignes:', error);
+    } finally {
+      setLoadingLines(false);
+    }
+  };
+
   useEffect(() => {
     loadRules();
   }, [hotelId]);
+  
+  useEffect(() => {
+    if (linesOpen && trainingLines.length === 0) {
+      loadTrainingLines();
+    }
+  }, [linesOpen]);
 
   const saveRule = async (rule: Partial<CombinationRule>) => {
     try {
@@ -561,6 +601,115 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
             </div>
           </div>
         )}
+
+        {/* Training Report Lines Panel */}
+        <Collapsible open={linesOpen} onOpenChange={setLinesOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Lignes du rapport d'entraînement
+                {trainingLines.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{trainingLines.length}</Badge>
+                )}
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${linesOpen ? 'rotate-180' : ''}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <Card className="border-dashed">
+              <CardContent className="p-4 space-y-3">
+                {loadingLines ? (
+                  <div className="text-center py-4 text-muted-foreground">Chargement...</div>
+                ) : trainingLines.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground flex flex-col items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    <p>Aucun rapport d'entraînement trouvé</p>
+                    <p className="text-xs">Entraînez d'abord l'IA avec un rapport PDF</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Rechercher dans les lignes..."
+                        className="pl-9"
+                        value={lineSearch}
+                        onChange={(e) => setLineSearch(e.target.value)}
+                      />
+                    </div>
+                    <ScrollArea className="h-64 border rounded-md">
+                      <div className="p-2 space-y-1">
+                        {trainingLines
+                          .filter(line => !lineSearch || line.toLowerCase().includes(lineSearch.toLowerCase()))
+                          .map((line, i) => {
+                            // Detect if line has room number pattern
+                            const hasRoom = /\b\d{1,4}[A-Z]?\b/.test(line);
+                            const isSelected = selectedLine === line;
+                            
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => setSelectedLine(isSelected ? null : line)}
+                                className={`w-full text-left px-2 py-1.5 rounded text-xs font-mono hover:bg-accent transition-colors ${
+                                  isSelected ? 'bg-primary/10 border border-primary/30' : ''
+                                } ${hasRoom ? 'text-foreground' : 'text-muted-foreground'}`}
+                              >
+                                <span className="text-muted-foreground mr-2">{i + 1}.</span>
+                                {line.length > 100 ? line.substring(0, 100) + '...' : line}
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </ScrollArea>
+                    {selectedLine && (
+                      <div className="p-3 bg-muted rounded-md space-y-2">
+                        <p className="text-xs font-medium">Ligne sélectionnée:</p>
+                        <p className="text-xs font-mono break-all">{selectedLine}</p>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => {
+                            // Pre-fill rule based on selected line
+                            const hasDatePattern = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(selectedLine);
+                            const hasTimePattern = /\d{1,2}:\d{2}/.test(selectedLine);
+                            const hasNightPattern = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(selectedLine);
+                            const upper = selectedLine.toUpperCase();
+                            
+                            const keywords: string[] = [];
+                            if (/\bSAL\b|DIR|DIRTY/.test(upper)) keywords.push('SAL');
+                            if (/\bDEP\b|DEPART|PARTI/.test(upper)) keywords.push('DEP');
+                            if (/\bOCC\b|OCCUPIED/.test(upper)) keywords.push('OCC');
+                            
+                            setEditingRule({
+                              id: '',
+                              rule_name: 'Nouvelle règle depuis ligne',
+                              description: selectedLine.substring(0, 50),
+                              priority: 50,
+                              is_active: true,
+                              status_keywords: keywords,
+                              arrival_date: hasDatePattern ? 'present' : 'any',
+                              departure_date: hasDatePattern ? 'present' : 'any',
+                              arrival_time: hasTimePattern ? 'present' : 'any',
+                              departure_time: hasTimePattern ? 'present' : 'any',
+                              night_info: hasNightPattern ? 'present' : 'any',
+                              result_cleaning_type: 'recouche',
+                            });
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Créer une règle depuis cette ligne
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Légende */}
         <div className="text-xs text-muted-foreground flex items-center justify-center gap-6 pt-2">

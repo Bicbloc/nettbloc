@@ -27,6 +27,10 @@ function extractContextKeywords(text: string): string[] {
   const upper = text.toUpperCase();
   const keywords: string[] = [];
   
+  // UNIQUEMENT les patterns DISCRIMINANTS (qui permettent de décider du cleaningType)
+  // Les patterns génériques (SALE, STAYOVER, ARRIVEE, PROPRE) sont IGNORES
+  // car ils ne doivent pas écraser la détection dynamique
+  
   // Patterns de départ (→ à blanc)
   if (/\bDEP\b|DÉPART|DEPARTURE|CHECKOUT|C\/O/.test(upper)) {
     keywords.push('DEPART');
@@ -38,7 +42,7 @@ function extractContextKeywords(text: string): string[] {
   if (lastNightMatch && lastNightMatch[1] === lastNightMatch[2]) {
     keywords.push('DERNIERE_NUIT');
     
-    // NOUVEAU: Vérifier si c'est une nuit SANS horaires (pattern spécifique)
+    // Vérifier si c'est une nuit SANS horaires (pattern spécifique)
     const hasTimePattern = /\d{1,2}:\d{2}/.test(text);
     if (!hasTimePattern) {
       keywords.push('NUIT_SANS_HORAIRE');
@@ -50,25 +54,12 @@ function extractContextKeywords(text: string): string[] {
     keywords.push('NUIT_INTERMEDIAIRE');
   }
   
-  // Patterns de stayover (→ recouche)
-  if (/\bSTAYOVER|RECOUCHE|STAY|OCC\b/.test(upper)) {
-    keywords.push('STAYOVER');
-  }
-  
-  // Patterns de propre (→ none)
-  if (/\bPRO\b|PROPRE|CLEAN|READY|INS\b/.test(upper)) {
-    keywords.push('PROPRE');
-  }
-  
-  // Patterns de sale (à analyser selon contexte)
-  if (/\bSAL\b|SALE|DIRTY|DIR\b/.test(upper)) {
-    keywords.push('SALE');
-  }
-  
-  // Patterns d'arrivée
-  if (/\bARR\b|ARRIVÉE|ARRIVAL|CHECKIN|C\/I/.test(upper)) {
-    keywords.push('ARRIVEE');
-  }
+  // NOTE: Les patterns suivants sont INTENTIONNELLEMENT désactivés
+  // car ils sont trop génériques et écrasent la détection dynamique:
+  // - STAYOVER, RECOUCHE, STAY, OCC → Trop courant, ne pas apprendre
+  // - PROPRE, CLEAN, READY, INS → Trop courant, ne pas apprendre
+  // - SALE, DIRTY, DIR → Trop courant, ne pas apprendre
+  // - ARR, ARRIVEE, ARRIVAL → Trop courant, ne pas apprendre
   
   return keywords;
 }
