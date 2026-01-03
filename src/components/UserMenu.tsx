@@ -13,9 +13,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Shield, Crown, Building2 } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Crown, Building2, MessageCircle, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionBadge } from './SubscriptionBadge';
+import { SupportTicketDialog } from './SupportTicketDialog';
 
 const UserMenu = () => {
   const { user, signOut, isAuthenticated } = useAuth();
@@ -82,6 +83,18 @@ const UserMenu = () => {
           <Building2 className="mr-2 h-4 w-4" />
           <span>Registre des chambres</span>
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/plans')}>
+          <CreditCard className="mr-2 h-4 w-4" />
+          <span>Abonnement</span>
+        </DropdownMenuItem>
+        <SupportTicketDialog 
+          trigger={
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <MessageCircle className="mr-2 h-4 w-4" />
+              <span>Signaler un problème</span>
+            </DropdownMenuItem>
+          }
+        />
         {isSuperAdmin && (
           <DropdownMenuItem onClick={() => navigate('/admin')}>
             <Shield className="mr-2 h-4 w-4" />

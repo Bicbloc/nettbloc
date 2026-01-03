@@ -237,7 +237,7 @@ describe('useSubscription', () => {
       await waitForUpdates();
 
       expect(result.current.hasFeature('incidents')).toBe(true);
-      expect(result.current.hasFeature('linen')).toBe(true);
+      expect(result.current.hasFeature('linen_inventory')).toBe(true);
       expect(result.current.hasFeature('ai_learning')).toBe(true);
     });
   });

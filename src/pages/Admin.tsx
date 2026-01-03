@@ -36,6 +36,8 @@ import { StaffManagement } from '@/components/incident/StaffManagement';
 import { IncidentInventoryManager } from '@/components/incident/IncidentInventoryManager';
 import { IncidentReportDialog } from '@/components/incident/IncidentReportDialog';
 import { RolePermissionsManager } from '@/components/incident/RolePermissionsManager';
+import { SupportTicketsPanel } from '@/components/admin/SupportTicketsPanel';
+import { PromoCodesPanel } from '@/components/admin/PromoCodesPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -823,7 +825,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="grid w-full grid-cols-11">
           <TabsTrigger value="users">
             <User className="h-4 w-4 mr-2" />
             Utilisateurs
@@ -842,7 +844,7 @@ const Admin = () => {
           </TabsTrigger>
           <TabsTrigger value="access-codes">
             <Key className="h-4 w-4 mr-2" />
-            Codes d'accès
+            Codes
           </TabsTrigger>
           <TabsTrigger value="housekeeper-requests" className="relative">
             <Users className="h-4 w-4 mr-2" />
@@ -857,7 +859,15 @@ const Admin = () => {
           </TabsTrigger>
           <TabsTrigger value="training">
             <Database className="h-4 w-4 mr-2" />
-            Entraînement IA
+            IA
+          </TabsTrigger>
+          <TabsTrigger value="tickets">
+            <Bell className="h-4 w-4 mr-2" />
+            Tickets
+          </TabsTrigger>
+          <TabsTrigger value="promos">
+            <Gift className="h-4 w-4 mr-2" />
+            Promos
           </TabsTrigger>
           <TabsTrigger value="system">
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -1499,6 +1509,14 @@ const Admin = () => {
               <AlertDescription>Aucun hôtel disponible pour l'entraînement IA</AlertDescription>
             </Alert>
           )}
+        </TabsContent>
+
+        <TabsContent value="tickets" className="space-y-4">
+          <SupportTicketsPanel />
+        </TabsContent>
+
+        <TabsContent value="promos" className="space-y-4">
+          <PromoCodesPanel />
         </TabsContent>
       </Tabs>
       

@@ -2220,6 +2220,92 @@ export type Database = {
           },
         ]
       }
+      promo_code_uses: {
+        Row: {
+          discount_applied: number | null
+          id: string
+          promo_code_id: string
+          subscription_id: string | null
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          discount_applied?: number | null
+          id?: string
+          promo_code_id: string
+          subscription_id?: string | null
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          discount_applied?: number | null
+          id?: string
+          promo_code_id?: string
+          subscription_id?: string | null
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_code_uses_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promo_codes: {
+        Row: {
+          applicable_plans: string[] | null
+          code: string
+          created_at: string | null
+          created_by: string
+          current_uses: number | null
+          description: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean | null
+          max_uses: number | null
+          updated_at: string | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          applicable_plans?: string[] | null
+          code: string
+          created_at?: string | null
+          created_by: string
+          current_uses?: number | null
+          description?: string | null
+          discount_type: string
+          discount_value: number
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          applicable_plans?: string[] | null
+          code?: string
+          created_at?: string | null
+          created_by?: string
+          current_uses?: number | null
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       report_training_patterns: {
         Row: {
           accuracy_score: number | null
@@ -2656,6 +2742,59 @@ export type Database = {
         }
         Relationships: []
       }
+      support_tickets: {
+        Row: {
+          admin_notes: string | null
+          created_at: string | null
+          hotel_id: string | null
+          id: string
+          message: string
+          priority: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string | null
+          subject: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string | null
+          hotel_id?: string | null
+          id?: string
+          message: string
+          priority?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          subject: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string | null
+          hotel_id?: string | null
+          id?: string
+          message?: string
+          priority?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          subject?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technician_access_requests: {
         Row: {
           created_at: string | null
@@ -3015,6 +3154,15 @@ export type Database = {
       validate_housekeeper_access_code: {
         Args: { p_access_code: string; p_hotel_id: string }
         Returns: boolean
+      }
+      validate_promo_code: {
+        Args: { p_code: string; p_plan: string }
+        Returns: {
+          discount_type: string
+          discount_value: number
+          error_message: string
+          is_valid: boolean
+        }[]
       }
     }
     Enums: {
