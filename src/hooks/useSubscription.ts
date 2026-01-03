@@ -237,6 +237,8 @@ export function useSubscription() {
     return subscription.featuresEnabled[feature] === true;
   };
 
+  const isPaidPlan = ['basic', 'basic_plus', 'premium', 'platinum'].includes(subscription.plan);
+
   return {
     ...subscription,
     checkSubscription,
@@ -248,6 +250,7 @@ export function useSubscription() {
     isInTrial: subscription.isInTrial,
     isPlatinum: subscription.plan === 'platinum',
     isBasic: subscription.plan === 'basic',
-    isBasicPlus: subscription.plan === 'basic_plus'
+    isBasicPlus: subscription.plan === 'basic_plus',
+    isPaidPlan,
   };
 }

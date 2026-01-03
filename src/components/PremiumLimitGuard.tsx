@@ -25,9 +25,12 @@ export const PremiumLimitGuard: React.FC<PremiumLimitGuardProps> = ({
   title = "Fonctionnalité Premium",
   description
 }) => {
-  const { isPremium, isFree, loading } = useSubscription();
+  const { isPremium, isFree, loading, isPaidPlan } = useSubscription() as ReturnType<typeof useSubscription> & { isPaidPlan: boolean };
 
-  // Check if the feature requires premium
+  // Features that require at least a paid plan (basic, basic+, premium, platinum)
+  const paidPlanFeatures = ['access_codes', 'invitations'];
+
+  // Features that require premium only (premium, platinum)
   const premiumFeatures = [
     'advanced_mobile_interface',
     'advanced_profile',
@@ -36,9 +39,9 @@ export const PremiumLimitGuard: React.FC<PremiumLimitGuardProps> = ({
     'incidents',
     'inspection',
     'linen_inventory',
-    'access_codes'
   ];
 
+  const requiresPaidPlan = feature && paidPlanFeatures.includes(feature);
   const requiresPremium = feature && premiumFeatures.includes(feature);
   const exceedsRoomLimit = roomCount > maxFreeRooms && isFree;
 
@@ -49,6 +52,37 @@ export const PremiumLimitGuard: React.FC<PremiumLimitGuardProps> = ({
   // If user has premium access, show content
   if (isPremium) {
     return <>{children}</>;
+  }
+
+  // For paid plan features (access_codes, invitations), check isPaidPlan
+  if (requiresPaidPlan && !isPaidPlan) {
+    return (
+      <Card className="border-premium/20 bg-premium/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-premium" />
+            {title}
+            <Badge variant="secondary" className="bg-gradient-premium text-premium-foreground">
+              <Crown className="h-3 w-3 mr-1" />
+              Abonnement requis
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {description && (
+            <p className="text-muted-foreground">{description}</p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            Cette fonctionnalité est disponible à partir du plan Basic.
+          </p>
+          {showUpgrade && (
+            <div className="pt-4">
+              <UpgradeButton />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
   }
 
   // If feature requires premium or exceeds room limit, show lock
@@ -84,6 +118,11 @@ export const PremiumLimitGuard: React.FC<PremiumLimitGuardProps> = ({
     );
   }
 
-  // Show content for free users
+  // For paid plan features but user has paid plan - show content
+  if (requiresPaidPlan && isPaidPlan) {
+    return <>{children}</>;
+  }
+
+  // Show content for free users (no premium feature required)
   return <>{children}</>;
 };
