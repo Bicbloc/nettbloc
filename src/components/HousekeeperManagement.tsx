@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { UserIcon, Plus, Key, Trash2, RefreshCw, AlertTriangle, CheckCircle, Users, Search } from 'lucide-react';
+import { UserIcon, Plus, Trash2, RefreshCw, AlertTriangle, CheckCircle, Users, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabaseService';
 import { CodeGenerationService } from '@/services/codeGenerationService';
@@ -412,14 +412,6 @@ export const HousekeeperManagement = () => {
                   <RefreshCw className="h-4 w-4" />
                   Actualiser
                 </Button>
-                 <Button
-                   onClick={handleGenerateAllCodes}
-                   disabled={isGeneratingCodes}
-                   className="flex items-center gap-2"
-                 >
-                   <Key className="h-4 w-4" />
-                   {isGeneratingCodes ? 'Génération...' : 'Générer codes manquants'}
-                 </Button>
                 <Button
                   variant="destructive"
                   onClick={handleCleanupAll}
@@ -447,20 +439,7 @@ export const HousekeeperManagement = () => {
                 <div key={housekeeper.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">
                     <UserIcon className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{housekeeper.name}</p>
-                      <div className="flex items-center gap-2">
-                        <div className="bg-primary/10 px-2 py-1 rounded border border-primary/20 flex items-center gap-2">
-                          <Key className="h-4 w-4 text-primary" />
-                          <span className="font-mono font-bold text-primary text-base md:text-sm">
-                            {housekeeper.access_code}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground md:hidden">
-                          Mobile
-                        </span>
-                      </div>
-                    </div>
+                    <p className="font-medium">{housekeeper.name}</p>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -497,20 +476,7 @@ export const HousekeeperManagement = () => {
                 <div key={housekeeper.id} className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
                   <div className="flex items-center gap-3">
                     <UserIcon className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium text-muted-foreground">{housekeeper.name}</p>
-                      <div className="flex items-center gap-2">
-                        <div className="bg-muted px-2 py-1 rounded border flex items-center gap-2">
-                          <Key className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-mono text-muted-foreground text-base md:text-sm">
-                            {housekeeper.access_code}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground md:hidden">
-                          Mobile
-                        </span>
-                      </div>
-                    </div>
+                    <p className="font-medium text-muted-foreground">{housekeeper.name}</p>
                   </div>
                   
                   <div className="flex items-center gap-2">
