@@ -305,6 +305,25 @@ class StorageService {
   }
 
   /**
+   * Nettoie les données volatiles (session, tokens) sans toucher à l'auth
+   */
+  clearVolatile(): void {
+    const volatileKeys = [
+      STORAGE_KEYS.HOTEL_SESSION,
+      STORAGE_KEYS.HOUSEKEEPER_SESSION,
+      'hotel_session_token',
+      'pendingActions',
+      'sb-rarhqnvvbjzfdevnghnz-auth-token-code-verifier',
+    ];
+    
+    volatileKeys.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    console.log('🧹 StorageService: Données volatiles nettoyées');
+  }
+
+  /**
    * Récupération d'urgence de l'hotel ID
    */
   recoverHotelId(): string | null {
@@ -334,6 +353,36 @@ class StorageService {
       localStorage.removeItem(key);
     });
     console.log('🧹 StorageService: Clés legacy nettoyées');
+  }
+
+  /**
+   * Vérifie si le cache est sain
+   */
+  isHealthy(): { ok: boolean; issues: string[] } {
+    const issues: string[] = [];
+    
+    // Check hotel session
+    const hotel = this.getHotel();
+    if (hotel) {
+      if (!this.isValidUUID(hotel.id)) {
+        issues.push('Hotel ID invalide');
+      }
+      if (Date.now() > hotel.expiresAt) {
+        issues.push('Session hôtel expirée');
+      }
+    }
+    
+    // Check for orphaned legacy keys
+    LEGACY_KEYS.forEach(key => {
+      if (localStorage.getItem(key)) {
+        issues.push(`Clé legacy présente: ${key}`);
+      }
+    });
+    
+    return {
+      ok: issues.length === 0,
+      issues
+    };
   }
 }
 

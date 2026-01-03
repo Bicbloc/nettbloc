@@ -75,15 +75,13 @@ export function ConnectionStatusIndicator() {
 
     try {
       const start = Date.now();
-      const { error } = await supabase
-        .from('hotels')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
       
-      const latency = Date.now() - start;
+      // Utiliser l'edge function ping qui bypasse RLS
+      const { data, error } = await supabase.functions.invoke('ping');
       
-      if (error && error.code !== 'PGRST116') {
+      const latency = data?.latency || (Date.now() - start);
+      
+      if (error || !data?.ok) {
         setHttpOk(false);
         setConsecutiveFailures(prev => prev + 1);
         if (consecutiveFailures >= 2) {

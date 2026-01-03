@@ -9,6 +9,10 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  // Inject build ID for cache invalidation on new deployments
+  define: {
+    __BUILD_ID__: JSON.stringify(`${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+  },
   plugins: [
     react(),
     mode === 'development' &&

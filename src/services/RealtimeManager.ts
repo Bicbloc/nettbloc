@@ -434,7 +434,7 @@ class RealtimeManager {
   }
 
   /**
-   * Heartbeat avec vérification session auth (45s)
+   * Heartbeat avec ping edge function (bypassant RLS) et refresh session
    */
   private startHeartbeat() {
     this.stopHeartbeat();
@@ -462,17 +462,12 @@ class RealtimeManager {
           }
         }
 
-        // 2) Ping léger
-        const { error: pingError } = await supabase
-          .from('hotels')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
+        // 2) Ping via edge function (bypasse RLS)
+        const { data, error: pingError } = await supabase.functions.invoke('ping');
 
-        // PGRST116 = no rows returned - c'est OK
-        if (pingError && (pingError as any).code !== 'PGRST116') {
+        if (pingError || !data?.ok) {
           this.consecutiveFailures++;
-          console.log('💔 Heartbeat: Échec', this.consecutiveFailures);
+          console.log('💔 Heartbeat: Échec ping edge function', this.consecutiveFailures, pingError?.message);
 
           if (this.consecutiveFailures >= 3) {
             this.scheduleReconnect();
