@@ -165,6 +165,17 @@ export class MewsAdapter extends PmsAdapter {
       if (timePositions.departureTime) r.departureTime = timePositions.departureTime;
       if (timePositions.arrivalTime) r.arrivalTime = timePositions.arrivalTime;
 
+      // RÈGLE MÉTIER: si date d'arrivée + date de départ sont présentes SANS horaire,
+      // le client est encore à l'hôtel → RECOUCHE (peu importe le statut).
+      const dateMatches = rawLine.match(/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g) || [];
+      const hasDateRange = dateMatches.length >= 2 || (!!r.arrivalDate && !!r.departureDate);
+      const hasAnyTime = timePositions.hasArrival || timePositions.hasDeparture;
+      if (hasDateRange && !hasAnyTime) {
+        r.status = 'stayover';
+        r.cleaningType = 'recouche';
+        continue;
+      }
+
       // Détecter checkout+arrival sur la même ligne (priorité)
       const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);
       const hasArr = /\bARR\b/.test(upper);
@@ -178,19 +189,20 @@ export class MewsAdapter extends PmsAdapter {
         r.cleaningType = cleaningType;
       }
 
-      // Ajustement recouche vs départ via nuit X/Y quand c'est sale
-      if (r.status === 'dirty' && r.currentNight && r.totalNights) {
-        if (r.currentNight < r.totalNights) {
-          r.status = 'stayover';
-          r.cleaningType = 'recouche';
-        } else if (r.currentNight === r.totalNights) {
+      // Ajustement recouche vs départ via nuit X/Y quand la chambre est sale:
+      // sans heure de départ, même "4/4" reste une recouche (client encore présent).
+      if (r.currentNight && r.totalNights && (r.status === 'dirty' || r.status === 'stayover')) {
+        if (r.departureTime) {
           r.status = 'checkout';
           r.cleaningType = 'a_blanc';
+        } else {
+          r.status = 'stayover';
+          r.cleaningType = 'recouche';
         }
       }
 
       // Normalisation défensive (éviter undefined)
-      if (!r.cleaningType) r.cleaningType = 'a_blanc';  // Défaut: à blanc pour SAL
+      if (!r.cleaningType) r.cleaningType = 'a_blanc';
       if (!r.status) r.status = 'unknown';
     }
 
@@ -387,47 +399,46 @@ export class MewsAdapter extends PmsAdapter {
       return { status: 'checkout', cleaningType: 'a_blanc' };
     }
     
-    // SAL = logique améliorée basée sur la POSITION des horaires
+    // SAL = logique améliorée basée sur la POSITION des horaires + dates sans horaire
     if (/\bSAL\b/.test(upper)) {
-      // 1) Vérifier Nuit X/Y pour stayover vs checkout
-      const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
-                        upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
-      if (nightMatch) {
-        const currentNight = parseInt(nightMatch[1]);
-        const totalNights = parseInt(nightMatch[2]);
-        if (currentNight < totalNights) {
-          return { status: 'stayover', cleaningType: 'recouche' };
-        } else {
-          return { status: 'checkout', cleaningType: 'a_blanc' };
-        }
-      }
-      
-      // 2) NOUVELLE LOGIQUE: Position des horaires
       const { hasDeparture, hasArrival } = this.extractTimePositions(line);
-      
+
+      // 1) Horaire à droite = départ → À blanc
       if (hasDeparture) {
-        // Horaire à droite = départ → À blanc
         console.log(`🔍 MEWS: Départ détecté (horaire droite) → À blanc`);
         return { status: 'checkout', cleaningType: 'a_blanc' };
       }
-      
+
+      // 2) Dates arrivée+dép. SANS horaire → client encore présent → Recouche (peu importe la nuit)
+      const dateMatches = line.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g) || [];
+      const hasDateRangeNoTime = dateMatches.length >= 2 && !hasArrival && !hasDeparture;
+      if (hasDateRangeNoTime) {
+        return { status: 'stayover', cleaningType: 'recouche' };
+      }
+
+      // 3) Nuit X/Y (y compris X/X) → recouche tant qu'il n'y a pas d'heure de départ
+      const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+        upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+      if (nightMatch) {
+        return { status: 'stayover', cleaningType: 'recouche' };
+      }
+
+      // 4) Arrivée seule (horaire gauche) → Recouche
       if (hasArrival && !hasDeparture) {
-        // Horaire à gauche uniquement = arrivée sans départ → Recouche (client déjà là)
         console.log(`🔍 MEWS: Arrivée seule (horaire gauche) → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
-      
-      // 3) Pas d'horaire mais occupation → Recouche
+
+      // 5) Occupation (adultes) sans départ → Recouche
       const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
       if (hasOccupancy) {
         return { status: 'stayover', cleaningType: 'recouche' };
       }
-      
-      // Default SAL sans horaire ni occupation → À BLANC (car SAL = sale = nettoyage complet)
-      // C'est la demande utilisateur: SAL/SALE doit toujours être "À blanc"
+
+      // Default SAL sans horaire/date/occupation → À BLANC (chambre vide sale)
       return { status: 'dirty', cleaningType: 'a_blanc' };
     }
-    
+
     // DIR (dirty) = recouche par défaut
     if (/\bDIR\b/.test(upper)) {
       return { status: 'dirty', cleaningType: 'recouche' };
