@@ -806,7 +806,13 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="invitations" className="space-y-6">
-                <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotel?.name} />
+                <PremiumLimitGuard 
+                  feature="invitations" 
+                  title="Invitations du personnel"
+                  description="Gérez les invitations de votre personnel avec un abonnement payant."
+                >
+                  <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotel?.name} />
+                </PremiumLimitGuard>
               </TabsContent>
 
               <TabsContent value="inspections" className="space-y-6">
