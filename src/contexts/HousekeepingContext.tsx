@@ -299,38 +299,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   }, [isDistributed, isInitialized]);
 
-  // DÉSACTIVÉ: Vérification périodique automatique des codes manquants
-  // useEffect(() => {
-  //   if (!isInitialized || !hotelId || housekeeperNames.length === 0) return;
-
-  //   const checkMissingCodes = async () => {
-  //     try {
-  //       const { supabase } = await import('@/integrations/supabase/client');
-        
-  //       const { data: existingHousekeepers } = await supabase
-  //         .from('housekeepers')
-  //         .select('name')
-  //         .eq('hotel_id', hotelId)
-  //         .eq('is_active', true);
-
-  //       const existingNames = existingHousekeepers?.map(h => h.name) || [];
-  //       const missingHousekeepers = housekeeperNames.filter(name => !existingNames.includes(name));
-        
-  //       if (missingHousekeepers.length > 0) {
-  //         console.log('🔍 Femmes de chambre sans codes détectées:', missingHousekeepers);
-  //         generateAccessCodesForAssignedHousekeepers(true); // Force la génération
-  //       }
-  //     } catch (error) {
-  //       console.error('❌ Erreur vérification codes manquants:', error);
-  //     }
-  //   };
-
-  //   // Vérifier immédiatement puis toutes les 30 secondes
-  //   checkMissingCodes();
-  //   const interval = setInterval(checkMissingCodes, 30000);
-    
-  //   return () => clearInterval(interval);
-  // }, [isInitialized, hotelId, housekeeperNames]);
 
   // Fonction pour générer automatiquement les codes d'accès après distribution
   const generateAccessCodesForAssignedHousekeepers = async (force = false) => {
