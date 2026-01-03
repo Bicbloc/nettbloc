@@ -161,40 +161,52 @@ class UnifiedParserService {
     
     // Extraire les mots-clés de statut
     const allKeywords = ['SAL', 'DIR', 'DIRTY', 'OCC', 'OCCUPIED', 'DEP', 'DEPART', 'PARTI', 
-                         'CHECKOUT', 'C/O', 'ARR', 'ARRIVAL', 'C/I', 'CHECKIN', 'PRO', 'CLEAN', 'VAC', 'VACANT'];
+                         'CHECKOUT', 'C/O', 'ARR', 'ARRIVAL', 'C/I', 'CHECKIN', 'PRO', 'CLEAN', 'VAC', 'VACANT', 'INS'];
     const statusKeywords = allKeywords.filter(kw => new RegExp(`\\b${kw}\\b`).test(upper));
     
-    // Détecter les dates (format DD/MM/YYYY ou DD-MM-YYYY)
+    // Détecter les dates (format DD/MM/YYYY ou DD-MM-YYYY ou DD.MM.YYYY)
     const dateMatches = line.match(/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g) || [];
     const hasArrivalDate = dateMatches.length >= 1;
     const hasDepartureDate = dateMatches.length >= 2;
     
-    // Détecter les horaires (format HH:MM)
-    const timeMatches = line.match(/\b\d{1,2}:\d{2}\b/g) || [];
+    // Détecter les horaires - formats multiples: HH:MM, HHhMM, HH.MM
+    const timePattern = /(?<!\d[\/\-\.])\b(\d{1,2}):(\d{2})\b(?![\/\-\.]\d)|(?<!\d[\/\-\.])\b(\d{1,2})h(\d{2})\b|(?<!\d[\/\-\.])\b(\d{1,2})\.(\d{2})\b(?![\/\-\.]\d)/gi;
+    const timeMatches: string[] = [];
+    let match;
+    while ((match = timePattern.exec(line)) !== null) {
+      // Exclure les années (2025, 2024, etc.) et les valeurs > 23:59
+      const hour = parseInt(match[1] || match[3] || match[5], 10);
+      if (hour <= 23) {
+        timeMatches.push(match[0]);
+      }
+    }
     
-    // Logique simplifiée: si 2 horaires, on a arrivée + départ
-    // Si 1 horaire, déterminer lequel selon la position ou le contexte
+    // Logique: 2+ horaires = checkout + checkin (départ + arrivée) = à blanc
+    // 1 horaire = soit départ soit arrivée selon le contexte
     let hasArrivalTime = false;
     let hasDepartureTime = false;
     
     if (timeMatches.length >= 2) {
+      // IMPORTANT: 2 horaires = départ puis arrivée = c'est un checkout+checkin = à blanc
       hasArrivalTime = true;
       hasDepartureTime = true;
+      this.log(`⏰ ${timeMatches.length} horaires détectés (${timeMatches.join(', ')}) → checkout+checkin`);
     } else if (timeMatches.length === 1) {
-      // Un seul horaire: check le contexte
-      if (/\b(DEP|PARTI|CHECKOUT|C\/O)\b/i.test(upper)) {
+      // Un seul horaire: déterminer lequel selon le contexte
+      if (/\b(DEP|PARTI|CHECKOUT|C\/O|DEPART)\b/i.test(upper)) {
         hasDepartureTime = true;
-      } else if (/\b(ARR|ARRIVAL|C\/I)\b/i.test(upper)) {
+      } else if (/\b(ARR|ARRIVAL|C\/I|CHECKIN)\b/i.test(upper)) {
         hasArrivalTime = true;
-      } else {
-        // Par défaut, considérer comme horaire de départ si la date de départ est présente
-        hasDepartureTime = hasDepartureDate;
+      } else if (hasDepartureDate) {
+        // Si 2 dates mais 1 seul horaire, c'est probablement l'heure de départ
+        hasDepartureTime = true;
       }
     }
     
-    // Détecter les infos de nuit (Nuit X/Y, Night X of Y)
+    // Détecter les infos de nuit (Nuit X/Y, Night X of Y, ou format , Nuit 2/3)
     const hasNightInfo = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line) || 
-                         /\d+\s*[\/\\]\s*\d+\s*(?:nuit|night)/i.test(line);
+                         /\d+\s*[\/\\]\s*\d+\s*(?:nuit|night)/i.test(line) ||
+                         /,\s*Nuit\s+\d+\/\d+/i.test(line);
     
     return {
       statusKeywords,
@@ -214,6 +226,7 @@ class UnifiedParserService {
     if (this.combinationRules.length === 0) return null;
     
     const context = this.extractLineContext(line);
+    this.log(`🔍 Context: dates=${context.hasArrivalDate}/${context.hasDepartureDate}, times=${context.hasArrivalTime}/${context.hasDepartureTime}, night=${context.hasNightInfo}, keywords=${context.statusKeywords.join(',')}`);
     
     for (const rule of this.combinationRules) {
       // Vérifier les mots-clés de statut
@@ -235,6 +248,8 @@ class UnifiedParserService {
       const depTimeMatch = checkCondition(rule.departure_time, context.hasDepartureTime);
       const nightMatch = checkCondition(rule.night_info, context.hasNightInfo);
       
+      this.log(`📋 Rule #${rule.priority} (${rule.status_keywords.join('/')}): arrDate=${arrDateMatch}, depDate=${depDateMatch}, arrTime=${arrTimeMatch}, depTime=${depTimeMatch}, night=${nightMatch}`);
+      
       if (arrDateMatch && depDateMatch && arrTimeMatch && depTimeMatch && nightMatch) {
         const reason = `Règle combinaison #${rule.priority}: ${rule.status_keywords.join('/')} → ${rule.result_cleaning_type}`;
         this.log(`✅ ${reason}`);
@@ -246,6 +261,7 @@ class UnifiedParserService {
       }
     }
     
+    this.log(`⚠️ Aucune règle de combinaison n'a matché`);
     return null;
   }
 
@@ -555,6 +571,46 @@ class UnifiedParserService {
           this.log(`✅ Pattern-first a trouvé ${patternBasedRooms.length} chambres (vs ${rooms.length} de l'adapter)`);
           rooms = patternBasedRooms;
         }
+      }
+      
+      // ======= APPLIQUER LES RÈGLES DE COMBINAISON SUR LES RÉSULTATS DE L'ADAPTER =======
+      // Si des règles de combinaison existent, les utiliser pour réanalyser chaque chambre
+      if (this.combinationRules.length > 0 && rooms.length > 0) {
+        this.log(`🔧 Application des ${this.combinationRules.length} règles de combinaison aux ${rooms.length} chambres`);
+        const reportDate = this.extractReportDate(text);
+        rooms = rooms.map(room => {
+          if (!room.originalText) return room;
+          
+          // Essayer les règles de combinaison
+          const combinationResult = this.applyCombinationRules(room.originalText);
+          if (combinationResult) {
+            return {
+              ...room,
+              cleaningType: combinationResult.cleaningType,
+              status: combinationResult.status,
+              debugInfo: {
+                ...room.debugInfo,
+                source: 'combination' as const,
+                appliedRule: combinationResult.reason,
+                confidence: 90
+              }
+            };
+          }
+          
+          // Sinon, analyser le contexte de la ligne
+          const analyzed = this.analyzeLineContext(room.originalText, detection.pmsType, reportDate);
+          return {
+            ...room,
+            cleaningType: analyzed.cleaningType,
+            status: analyzed.status,
+            debugInfo: {
+              ...room.debugInfo,
+              source: 'context' as const,
+              appliedRule: analyzed.reason,
+              confidence: 85
+            }
+          };
+        });
       }
       
       // Appliquer les patterns appris (filtrage)
