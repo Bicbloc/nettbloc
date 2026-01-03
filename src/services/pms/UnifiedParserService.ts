@@ -522,13 +522,10 @@ class UnifiedParserService {
           let cleaningType = pattern.cleaningType;
           let reason = `Pattern validé: ${status}/${cleaningType}`;
 
-          // RÈGLE MÉTIER: si date d'arrivée + date de départ sont présentes SANS horaire,
-          // le client est encore à l'hôtel → RECOUCHE (peu importe le statut / le pattern).
-          if (this.isStayoverWithoutTimes(contextLine)) {
-            status = 'stayover';
-            cleaningType = 'recouche';
-            reason = 'Séjour (dates sans horaire) → Recouche (override)';
-          } else if (!cleaningType || cleaningType === 'none') {
+          // Analyser le contexte si le pattern n'impose pas un cleaningType (ou si "none")
+          // NB: on ne force plus ici un override global vers "recouche".
+          // Les règles (dates/nuit/horaire + patterns contextuels) sont gérées dans analyzeLineContext().
+          if (!cleaningType || cleaningType === 'none') {
             // Vérifier si c'est vraiment "none" (propre) ou si on doit analyser
             const analyzed = this.analyzeLineContext(contextLine, pmsType, reportDate);
 
@@ -737,14 +734,15 @@ class UnifiedParserService {
     reportDate: Date | null = null
   ): { status: string; cleaningType: CleaningType; reason: string } {
     const upper = line.toUpperCase();
+    const stayoverNoTimes = this.isStayoverWithoutTimes(line);
 
-    // RÈGLE MÉTIER (prioritaire): dates arrivée+dép. SANS horaire ⇒ client encore présent ⇒ recouche
-    // (et on ne doit pas déduire un départ uniquement parce qu'une date = date du rapport).
-    if (this.isStayoverWithoutTimes(line)) {
+    // Priorité: mots-clés de départ explicites → À blanc
+    // (sinon on risque de tout classer en recouche dès qu'il y a 2 dates).
+    if (/\b(PARTI|D[EÉ]PART|DEPART|CHECK\s*OUT|CHECKOUT|C\/O|DEP)\b/i.test(upper)) {
       return {
-        status: 'stayover',
-        cleaningType: 'recouche',
-        reason: "Dates arrivée + départ sans horaire → Recouche (client présent)",
+        status: 'checkout',
+        cleaningType: 'a_blanc',
+        reason: 'Mot-clé départ explicite → À blanc',
       };
     }
 
@@ -793,6 +791,8 @@ class UnifiedParserService {
     
     // ====== RÈGLE PRIORITAIRE: COMPARAISON DATE DE DÉPART AVEC DATE DU RAPPORT ======
     // Si la date de départ présente dans la ligne = date du rapport → c'est un départ
+    // IMPORTANT: si la ligne a une paire arrivée+dép. SANS horaire, on évite de déduire
+    // un départ "probable" sans mot-clé explicite.
     if (reportDate) {
       // Chercher une date au format DD/MM/YYYY dans la ligne
       const dateMatches = line.match(/(\d{2})\/(\d{2})\/(\d{4})/g);
@@ -800,33 +800,38 @@ class UnifiedParserService {
         for (const dateStr of dateMatches) {
           const [day, month, year] = dateStr.split('/').map(Number);
           const lineDate = new Date(year, month - 1, day);
-          
+
           // Si cette date correspond à la date du rapport
           if (lineDate.getTime() === reportDate.getTime()) {
             // Vérifier le contexte: est-ce une date de départ?
             // Si c'est après la date d'arrivée OU si c'est la seule date, c'est un départ
-            const departureKeywords = /D[EÉ]PART|DEP|CHECKOUT|C\/O/i;
+            const departureKeywords = /D[EÉ]PART|DEP|CHECKOUT|C\/O|PARTI/i;
             const arrivalKeywords = /ARRIV[EÉ]E|ARR|CHECKIN|C\/I/i;
-            
+
             // Si on trouve un mot-clé de départ, c'est définitivement un départ
             if (departureKeywords.test(upper)) {
               this.log(`🎯 Date départ = Date rapport (${dateStr}) + mot-clé départ → À blanc`);
-              return { 
-                status: 'checkout', 
-                cleaningType: 'a_blanc', 
-                reason: `Date départ (${dateStr}) = Date rapport → À blanc` 
+              return {
+                status: 'checkout',
+                cleaningType: 'a_blanc',
+                reason: `Date départ (${dateStr}) = Date rapport → À blanc`,
               };
             }
-            
+
+            // Si la ligne ressemble à un séjour (dates sans horaire), ne pas forcer un départ
+            if (stayoverNoTimes) {
+              continue;
+            }
+
             // Si pas de mot-clé d'arrivée et la date est en fin de ligne → probable départ
             if (!arrivalKeywords.test(upper) && dateMatches.length >= 2) {
               const lastDate = dateMatches[dateMatches.length - 1];
               if (lastDate === dateStr) {
                 this.log(`🎯 Date fin (${dateStr}) = Date rapport → Probable départ → À blanc`);
-                return { 
-                  status: 'checkout', 
-                  cleaningType: 'a_blanc', 
-                  reason: `Date fin (${dateStr}) = Date rapport → Départ → À blanc` 
+                return {
+                  status: 'checkout',
+                  cleaningType: 'a_blanc',
+                  reason: `Date fin (${dateStr}) = Date rapport → Départ → À blanc`,
                 };
               }
             }
@@ -834,7 +839,16 @@ class UnifiedParserService {
         }
       }
     }
-    
+
+    // RÈGLE MÉTIER (fallback): dates arrivée+dép. SANS horaire ⇒ client encore présent ⇒ recouche
+    if (stayoverNoTimes) {
+      return {
+        status: 'stayover',
+        cleaningType: 'recouche',
+        reason: 'Dates arrivée + départ sans horaire → Recouche (client présent)',
+      };
+    }
+
     // ====== RÈGLES MEWS/SPACE_STATUS SPÉCIFIQUES ======
     if (pmsType === 'mews' || pmsType === 'space_status') {
       // PRO = propre, pas de nettoyage
