@@ -211,6 +211,10 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     if (hotelId) {
       console.log(`🔄 Parsing avec unifiedParserService pour hôtel ${hotelId}...`);
       
+      // IMPORTANT: Charger explicitement les patterns appris pour cet hôtel
+      // avant le parsing (sinon la logique "recouche vs a_blanc" ne sera pas utilisée)
+      await unifiedParserService.loadHotelPatterns(hotelId);
+      
       const result = await unifiedParserService.parseReport(fullText, hotelId, forceAi);
       
       console.log(`✅ PMS: ${result.pmsType} (confiance: ${result.confidence.toFixed(1)}%)`);
@@ -236,6 +240,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       const result = await unifiedParserService.parseReport(fullText, 'default', forceAi);
       rooms = convertExtractedRoomsToRooms(result.rooms);
     }
+
     
     toast({
       title: "PDF Processed",
