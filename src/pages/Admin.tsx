@@ -270,12 +270,12 @@ const Admin = () => {
 
       if (hotelUsersError) throw hotelUsersError;
 
-      // Combiner les données
+      // Combiner les données et trier par date d'inscription (plus récent d'abord)
       const usersWithRoles = usersData?.map(user => ({
         ...user,
         role: rolesData?.find(role => role.user_id === user.id)?.role || 'user',
         hotel_name: hotelUsersData?.find(hu => hu.user_id === user.id)?.hotels?.name || 'Aucun'
-      })) || [];
+      })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [];
 
       setUsers(usersWithRoles);
 
@@ -1084,25 +1084,46 @@ const Admin = () => {
                                      Type actuel: {userItem.subscription_type || 'free'}
                                    </AlertDialogDescription>
                                  </AlertDialogHeader>
-                                 <div className="grid grid-cols-2 gap-2 my-4">
-                                   <Button
-                                     variant="outline"
-                                     onClick={() => changeSubscriptionType(userItem.id, 'free')}
-                                     className="w-full"
-                                   >
-                                     Gratuit
-                                   </Button>
-                                   <Button
-                                     variant="outline"
-                                     onClick={() => changeSubscriptionType(userItem.id, 'premium')}
-                                     className="w-full"
-                                   >
-                                     Premium
-                                   </Button>
-                                 </div>
-                                 <AlertDialogFooter>
-                                   <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                 </AlertDialogFooter>
+                                  <div className="grid grid-cols-2 gap-2 my-4">
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => changeSubscriptionType(userItem.id, 'free')}
+                                      className="w-full"
+                                    >
+                                      Gratuit
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => changeSubscriptionType(userItem.id, 'basic')}
+                                      className="w-full"
+                                    >
+                                      Basic
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => changeSubscriptionType(userItem.id, 'basic_plus')}
+                                      className="w-full bg-blue-50 hover:bg-blue-100"
+                                    >
+                                      Basic+
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => changeSubscriptionType(userItem.id, 'premium')}
+                                      className="w-full bg-amber-50 hover:bg-amber-100"
+                                    >
+                                      Premium
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => changeSubscriptionType(userItem.id, 'platinum')}
+                                      className="w-full col-span-2 bg-purple-50 hover:bg-purple-100"
+                                    >
+                                      Platinum
+                                    </Button>
+                                  </div>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                  </AlertDialogFooter>
                                </AlertDialogContent>
                              </AlertDialog>
 

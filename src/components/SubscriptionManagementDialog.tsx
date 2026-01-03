@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Clock, Crown, Gift } from 'lucide-react';
+import { Clock, Crown, Gift, CreditCard } from 'lucide-react';
 
 interface SubscriptionManagementDialogProps {
   isOpen: boolean;
@@ -149,7 +149,10 @@ export function SubscriptionManagementDialog({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'trial': return <Clock className="h-4 w-4" />;
-      case 'premium': return <Crown className="h-4 w-4" />;
+      case 'premium': return <Crown className="h-4 w-4 text-amber-500" />;
+      case 'platinum': return <Crown className="h-4 w-4 text-purple-500" />;
+      case 'basic': return <CreditCard className="h-4 w-4" />;
+      case 'basic_plus': return <CreditCard className="h-4 w-4 text-blue-500" />;
       case 'free': return <Gift className="h-4 w-4" />;
       default: return null;
     }
@@ -159,6 +162,9 @@ export function SubscriptionManagementDialog({
     switch (status) {
       case 'trial': return 'Période d\'essai';
       case 'premium': return 'Premium';
+      case 'platinum': return 'Platinum';
+      case 'basic': return 'Basic';
+      case 'basic_plus': return 'Basic+';
       case 'free': return 'Gratuit';
       default: return status;
     }
@@ -248,10 +254,28 @@ export function SubscriptionManagementDialog({
                         Période d'essai
                       </div>
                     </SelectItem>
+                    <SelectItem value="basic">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Basic
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="basic_plus">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-blue-500" />
+                        Basic+
+                      </div>
+                    </SelectItem>
                     <SelectItem value="premium">
                       <div className="flex items-center gap-2">
-                        <Crown className="h-4 w-4" />
+                        <Crown className="h-4 w-4 text-amber-500" />
                         Premium
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="platinum">
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-purple-500" />
+                        Platinum
                       </div>
                     </SelectItem>
                   </SelectContent>
