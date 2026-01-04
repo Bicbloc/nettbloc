@@ -426,10 +426,9 @@ class UnifiedParserService {
     
     this.log(`🔄 [CACHE MISS] Parsing frais pour hotel ${hotelId}`);
     
-    // Charger les patterns si nécessaire
-    if (this.hotelId !== hotelId) {
-      await this.loadHotelPatterns(hotelId);
-    }
+    // TOUJOURS recharger les patterns pour s'assurer d'avoir les dernières données d'entraînement
+    // (un nouvel entraînement peut avoir été fait entre deux parsings)
+    await this.loadHotelPatterns(hotelId);
 
     // Prétraiter le texte (centralisé)
     const preprocessResult = textPreprocessor.preprocess(text);
@@ -1227,7 +1226,7 @@ class UnifiedParserService {
   /**
    * Applique les patterns appris aux chambres extraites
    * IMPORTANT: Si des patterns existent, on FILTRE pour ne garder que les chambres validées
-   * MAIS on garde le type de nettoyage détecté dynamiquement (pas celui de l'entraînement)
+   * ET on applique le cleaningType appris lors de l'entraînement IA (PRIORITÉ sur la détection dynamique)
    */
   private applyLearnedPatterns(rooms: ExtractedRoom[]): ExtractedRoom[] {
     // Si aucun pattern appris, retourner tel quel (pas de filtrage)
@@ -1241,7 +1240,7 @@ class UnifiedParserService {
       ...this.learnedPatterns.keys(),
       ...this.permanentRules.keys()
     ]);
-    this.log(`🎓 Filtrage par patterns appris: ${validRoomNumbers.size} chambres validées (${this.permanentRules.size} règles permanentes)`);
+    this.log(`🎓 Filtrage par patterns appris: ${validRoomNumbers.size} chambres validées (${this.permanentRules.size} règles permanentes, ${this.learnedPatterns.size} patterns)`);
     this.log(`📋 Chambres validées: ${Array.from(validRoomNumbers).slice(0, 20).join(', ')}${validRoomNumbers.size > 20 ? '...' : ''}`);
 
     // FILTRER pour ne garder que les chambres qui sont dans les patterns appris
@@ -1267,7 +1266,7 @@ class UnifiedParserService {
 
     this.log(`📊 Résultat filtrage: ${filteredRooms.length}/${rooms.length} chambres conservées`);
 
-    // NOUVEAU: Appliquer la logique contextuelle
+    // Appliquer les cleaningTypes appris (PRIORITÉ: pattern appris > détection dynamique)
     return filteredRooms.map(room => {
       const normalizedNumber = this.normalizeRoomNumber(room.roomNumber);
       
@@ -1328,9 +1327,34 @@ class UnifiedParserService {
         }
       }
       
+      // ======= PRIORITÉ 2.5: PATTERN APPRIS (cleaningType de l'entraînement IA) =======
+      // Si cette chambre a un pattern appris avec un cleaningType défini, L'UTILISER
+      // C'est le cleaningType validé par l'utilisateur lors de l'entraînement
+      const learnedPattern = this.learnedPatterns.get(normalizedNumber);
+      if (learnedPattern && learnedPattern.cleaningType) {
+        // Log si le pattern appris diffère de la détection dynamique
+        if (room.cleaningType !== learnedPattern.cleaningType) {
+          this.log(`🎓 Chambre ${room.roomNumber}: Pattern IA appris '${learnedPattern.cleaningType}' (override détection dynamique: '${room.cleaningType}')`);
+        } else {
+          this.log(`✅ Chambre ${room.roomNumber}: Pattern IA confirme '${learnedPattern.cleaningType}'`);
+        }
+        return {
+          ...room,
+          cleaningType: learnedPattern.cleaningType,
+          status: learnedPattern.status || this.inferStatusFromCleaningType(learnedPattern.cleaningType),
+          confidence: 92,
+          validated: true,
+          debugInfo: {
+            ...room.debugInfo!,
+            source: 'pattern' as const,
+            appliedRule: `Pattern IA appris: ${learnedPattern.cleaningType}`,
+            confidence: 92
+          }
+        };
+      }
+      
       // ======= PRIORITÉ 3: DÉTECTION DYNAMIQUE EXISTANTE =======
-      // Si la chambre a déjà un cleaningType déterminé par l'analyse, le garder
-      // C'est le résultat de analyzeLineContext() appelé plus tôt
+      // Si aucun pattern appris, utiliser la détection dynamique
       return {
         ...room,
         confidence: Math.max(room.confidence || 0, 85),
