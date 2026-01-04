@@ -60,6 +60,14 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
         // Always update build ID
         localStorage.setItem(BUILD_ID_KEY, currentBuildId);
 
+        // Nettoyage safe à CHAQUE démarrage (évite les états "ça marche en navigation privée")
+        storageService.cleanupLegacyKeys();
+        const health = storageService.isHealthy();
+        if (!health.ok) {
+          console.warn('🩺 AppBoot: Storage unhealthy, clearing volatile cache:', health.issues);
+          storageService.clearVolatile();
+        }
+
         // Check for corrupted auth state
         const authToken = localStorage.getItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
         if (authToken) {

@@ -92,43 +92,84 @@ export class HotelSessionService {
         return null;
       }
 
-      // PHASE FIX: Récupérer les assignations de la session active AVANT de la désactiver
+      // 3) Réutiliser une session active existante (évite de casser d'autres onglets/appareils)
+      const nowIso = new Date().toISOString();
+      const { data: existingSession, error: existingError } = await supabase
+        .from('hotel_sessions')
+        .select('*')
+        .eq('hotel_id', effectiveHotelId)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .gt('expires_at', nowIso)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingSession?.session_token) {
+        console.log('♻️ Session existante réutilisée:', existingSession.id);
+        this.setSessionToken(existingSession.session_token);
+
+        // S'assurer que l'hôtel est bien présent en cache pour le reste de l'app
+        storageService.saveHotel({
+          id: effectiveHotelId,
+          name: '',
+          code: '',
+        });
+
+        return existingSession.session_token;
+      } else if (existingError) {
+        console.warn(
+          '⚠️ Vérification session existante échouée (non bloquant):',
+          existingError
+        );
+      }
+
+      // 4) Récupérer les assignations d'une session active (si existe) pour préserver l'état
       let previousAssignments: Record<string, string> = {};
       let previousHousekeeperNames: string[] = [];
-      
+
       const { data: activeSession } = await supabase
         .from('hotel_sessions')
         .select('housekeeper_assignments, housekeeper_names')
         .eq('hotel_id', effectiveHotelId)
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
-      
+
       if (activeSession) {
-        previousAssignments = typeof activeSession.housekeeper_assignments === 'object' && activeSession.housekeeper_assignments 
-          ? activeSession.housekeeper_assignments as Record<string, string> 
-          : {};
-        previousHousekeeperNames = Array.isArray(activeSession.housekeeper_names) 
-          ? activeSession.housekeeper_names as string[] 
+        previousAssignments =
+          typeof activeSession.housekeeper_assignments === 'object' &&
+          activeSession.housekeeper_assignments
+            ? (activeSession.housekeeper_assignments as Record<string, string>)
+            : {};
+        previousHousekeeperNames = Array.isArray(activeSession.housekeeper_names)
+          ? (activeSession.housekeeper_names as string[])
           : [];
-        console.log('✅ Assignations récupérées de l\'ancienne session:', Object.keys(previousAssignments).length, 'chambres');
+        console.log(
+          "✅ Assignations récupérées de l'ancienne session:",
+          Object.keys(previousAssignments).length,
+          'chambres'
+        );
       }
 
-      // Phase 2: ALWAYS deactivate all previous active sessions for this hotel
-      console.log('🔄 Désactivation TOUTES anciennes sessions pour hôtel:', effectiveHotelId);
+      // 5) Désactiver seulement les sessions actives de CET utilisateur pour cet hôtel
+      console.log('🔄 Désactivation des anciennes sessions (user) pour hôtel:', effectiveHotelId);
       const { error: deactivateError } = await supabase
         .from('hotel_sessions')
         .update({ is_active: false })
         .eq('hotel_id', effectiveHotelId)
+        .eq('user_id', user.id)
         .eq('is_active', true);
 
       if (deactivateError) {
         console.error('⚠️ Erreur désactivation anciennes sessions:', deactivateError);
       }
 
-      // 4. Générer un token unique
+      // 6) Générer un token unique
       const sessionToken = this.generateSessionToken();
 
-      // 5. Créer la NOUVELLE session unique avec les assignations de l'ancienne
+      // 7) Créer la nouvelle session avec les assignations/noms existants
       const { data, error } = await supabase
         .from('hotel_sessions')
         .insert({
@@ -148,20 +189,18 @@ export class HotelSessionService {
         return null;
       }
 
-      console.log('✅ Session unique créée:', data.id);
-      
-      // Phase 4: Store session token explicitly
+      console.log('✅ Session créée:', data.id);
+
+      // Store session token explicitly
       this.setSessionToken(sessionToken);
-      
+
       // Sauvegarder via storageService
-      if (effectiveHotelId) {
-        storageService.saveHotel({
-          id: effectiveHotelId,
-          name: '',
-          code: ''
-        });
-      }
-      
+      storageService.saveHotel({
+        id: effectiveHotelId,
+        name: '',
+        code: '',
+      });
+
       return sessionToken;
     } catch (error) {
       console.error('Erreur createSession:', error);
@@ -188,22 +227,76 @@ export class HotelSessionService {
   // Récupérer une session par token
   static async getSession(token?: string): Promise<HotelSession | null> {
     const sessionToken = token || this.getSessionToken();
-    if (!sessionToken) return null;
 
     try {
-      const { data, error } = await supabase
-        .from('hotel_sessions')
-        .select('*')
-        .eq('session_token', sessionToken)
-        .eq('is_active', true)
-        .maybeSingle();
+      // 1) Tentative via session_token (rapide)
+      if (sessionToken) {
+        const { data, error } = await supabase
+          .from('hotel_sessions')
+          .select('*')
+          .eq('session_token', sessionToken)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
 
-      if (error) {
-        console.error('Erreur récupération session:', error);
+        if (!error && data) {
+          return this.transformSession(data as unknown as HotelSessionRaw);
+        }
+
+        if (error) {
+          console.warn(
+            '⚠️ getSession: échec via session_token, fallback via hotel_id:',
+            error
+          );
+        }
+      }
+
+      // 2) Fallback robuste via hotel_id (utile après nettoyage cache / multi-onglets)
+      const hotelId =
+        storageService.getHotelId() ||
+        localStorage.getItem('selectedHotelId') ||
+        localStorage.getItem('currentHotelId') ||
+        localStorage.getItem('hotelId');
+
+      if (!hotelId) return null;
+
+      // Préférer la session active de l'utilisateur courant si possible
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const fetchFallback = async (filterByUser: boolean) => {
+        let query = supabase
+          .from('hotel_sessions')
+          .select('*')
+          .eq('hotel_id', hotelId)
+          .eq('is_active', true);
+
+        if (filterByUser && user?.id) {
+          query = query.eq('user_id', user.id);
+        }
+
+        return query.order('created_at', { ascending: false }).limit(1).maybeSingle();
+      };
+
+      // 1er essai: session de l'utilisateur
+      let { data: fallback, error: fallbackError } = await fetchFallback(true);
+
+      // 2e essai: n'importe quelle session active (si pas trouvé)
+      if (!fallback && user?.id) {
+        ({ data: fallback, error: fallbackError } = await fetchFallback(false));
+      }
+
+      if (fallbackError) {
+        console.error('Erreur récupération session (fallback):', fallbackError);
         return null;
       }
 
-      return this.transformSession(data as unknown as HotelSessionRaw);
+      if (fallback?.session_token) {
+        this.setSessionToken(fallback.session_token);
+      }
+
+      return this.transformSession(fallback as unknown as HotelSessionRaw);
     } catch (err) {
       console.error('Erreur getSession:', err);
       return null;

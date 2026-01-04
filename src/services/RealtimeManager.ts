@@ -200,20 +200,26 @@ class RealtimeManager {
       return true;
     }
 
+    // Mémoriser le dernier hotelId demandé (même si l'auth n'est pas encore prête)
+    const previousHotelId = this.hotelId;
+    this.hotelId = hotelId;
+
     // Éviter les boucles sur /auth : pas de session => pas de realtime
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
     if (!session) {
-      console.log('🔐 RealtimeManager: Pas de session, realtime désactivé');
+      console.log('🔐 RealtimeManager: Pas de session, realtime en attente');
       this.isSubscribed = false;
+      this.stopHeartbeat();
+      await this.cleanupChannel();
       this.notifyStatus('AUTH_REQUIRED');
       return false;
     }
 
     // Changement d'hôtel - déconnecter proprement
-    if (this.hotelId && this.hotelId !== hotelId) {
+    if (previousHotelId && previousHotelId !== hotelId) {
       console.log("🔄 RealtimeManager: Changement d'hôtel");
       await this.cleanupChannel();
     }
