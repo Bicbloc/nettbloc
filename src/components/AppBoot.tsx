@@ -71,7 +71,9 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
           storageService.clearVolatile();
         }
 
-        // ===== RÉCUPÉRATION AUTH INTELLIGENTE =====
+        // ===== VÉRIFICATION AUTH NON-BLOQUANTE =====
+        // On ne fait PAS de refresh ici pour éviter les conflits avec AuthContext
+        // AuthContext gère le refresh de manière fiable
         const authTokenKey = 'sb-rarhqnvvbjzfdevnghnz-auth-token';
         const authToken = localStorage.getItem(authTokenKey);
         
@@ -80,27 +82,13 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
             const parsed = JSON.parse(authToken);
             const expiresAtMs = parsed.expires_at ? parsed.expires_at * 1000 : null;
             
-            if (expiresAtMs && expiresAtMs < Date.now()) {
-              console.log('🔐 AppBoot: Token expiré, tentative de refresh...');
-              
-              // Tentative de refresh avant de supprimer
-              const { error } = await supabase.auth.refreshSession();
-              
-              if (error) {
-                console.log('🔐 AppBoot: Refresh échoué, nettoyage token:', error.message);
-                localStorage.removeItem(authTokenKey);
-                storageService.clearVolatile();
-              } else {
-                console.log('✅ AppBoot: Token récupéré par refresh');
-              }
-            } else if (expiresAtMs) {
-              // Token valide mais proche de l'expiration (< 5 min)
-              const timeToExpiry = expiresAtMs - Date.now();
-              if (timeToExpiry < 5 * 60 * 1000) {
-                console.log('🔐 AppBoot: Token bientôt expiré, refresh préventif...');
-                await supabase.auth.refreshSession();
-              }
+            // Seulement nettoyer si token clairement expiré depuis longtemps (>1 jour)
+            if (expiresAtMs && expiresAtMs < Date.now() - 24 * 60 * 60 * 1000) {
+              console.log('🔐 AppBoot: Token expiré depuis longtemps, nettoyage...');
+              localStorage.removeItem(authTokenKey);
+              storageService.clearVolatile();
             }
+            // Sinon, laisser AuthContext gérer le refresh
           } catch {
             // Invalid JSON, clear it
             console.log('🔐 AppBoot: Token corrompu, nettoyage...');

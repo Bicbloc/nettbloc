@@ -47,6 +47,15 @@ const Auth = () => {
     }
   }, [toast]);
 
+  // Rediriger vers / quand authentifié (après connexion réussie)
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      console.log('✅ Auth: Utilisateur authentifié, redirection vers /');
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, loading, navigate]);
+
+  // Si déjà authentifié au chargement, afficher loading puis rediriger
   if (!loading && isAuthenticated) {
     return <Navigate to="/" replace />;
   }
@@ -69,10 +78,12 @@ const Auth = () => {
     try {
       switch (mode) {
         case 'hotel-signin': {
-          const { error } = await signIn(formData.email, formData.password);
+          const { error, success } = await signIn(formData.email, formData.password);
           if (error) throw error;
-          toast({ title: "Connexion réussie" });
-          navigate('/');
+          if (success) {
+            toast({ title: "Connexion réussie" });
+            // La navigation sera gérée par le useEffect qui observe isAuthenticated
+          }
           break;
         }
         case 'hotel-signup': {
@@ -126,9 +137,8 @@ const Auth = () => {
         title: "Erreur",
         description: error.message === "Invalid login credentials" ? "Email ou mot de passe incorrect" : error.message
       });
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const resetForm = () => {

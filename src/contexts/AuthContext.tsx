@@ -8,7 +8,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string, companyName?: string) => Promise<{ error: AuthError | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null; success: boolean }>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   refreshSession: () => Promise<boolean>;
@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef(false);
+  const isSigningInRef = useRef(false);
 
   /**
    * Rafraîchit la session - retourne true si succès
@@ -116,7 +117,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
-      if (initialSessionLoaded) {
+      // Ne pas passer loading à false si on est en train de signer in
+      if (initialSessionLoaded && !isSigningInRef.current) {
         setLoading(false);
       }
 
@@ -127,6 +129,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
           detail: { userId: currentSession.user.id } 
         }));
+        // Connexion confirmée - arrêter le loading
+        if (isSigningInRef.current) {
+          isSigningInRef.current = false;
+          setLoading(false);
+        }
       } else if (event === 'SIGNED_OUT') {
         stopTokenRefresh();
         storageService.clearHotel();
@@ -174,14 +181,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initSession();
 
-    // Safety timeout réduit à 2 secondes
+    // Safety timeout augmenté à 5 secondes
     const timeout = setTimeout(() => {
       if (mounted && !initialSessionLoaded) {
         console.warn('⚠️ Auth timeout - forçage fin du chargement');
         initialSessionLoaded = true;
         setLoading(false);
       }
-    }, 2000);
+    }, 5000);
 
     return () => {
       mounted = false;
@@ -206,15 +213,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = useCallback(async (email: string, password: string) => {
     // Nettoyer le cache avant connexion pour éviter les conflits
     storageService.cleanupLegacyKeys();
+    isSigningInRef.current = true;
     
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
-    if (!error) {
-      // Connexion réussie - démarrer le refresh
-      startTokenRefresh();
+    if (error) {
+      isSigningInRef.current = false;
+      return { error, success: false };
     }
     
-    return { error };
+    // Connexion réussie - mettre à jour l'état immédiatement
+    if (data.session) {
+      setSession(data.session);
+      setUser(data.user);
+      startTokenRefresh();
+      
+      // Attendre un court instant pour que l'état se propage
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      isSigningInRef.current = false;
+      console.log('✅ Connexion réussie, session prête');
+    }
+    
+    return { error: null, success: true };
   }, [startTokenRefresh]);
 
   const signOut = useCallback(async () => {

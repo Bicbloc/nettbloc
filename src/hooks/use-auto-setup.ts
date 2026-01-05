@@ -270,6 +270,7 @@ export const useAutoSetup = () => {
       setLastUserId(user.id);
     }
 
+    // Lancer le setup sans délai pour une connexion fluide
     if (!hasAttemptedSetup.current) {
       setupHotel();
     }
