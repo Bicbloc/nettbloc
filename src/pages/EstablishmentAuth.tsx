@@ -12,10 +12,9 @@ import { Loader2, Building, Users, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const EstablishmentAuth = () => {
-  const { signIn, signUp, isAuthenticated, loading } = useAuth();
+  const { signIn, signUp, isAuthenticated, loading, isInitialized } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
-  const [showRetry, setShowRetry] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -26,14 +25,6 @@ const EstablishmentAuth = () => {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => setShowRetry(true), 3000);
-      return () => clearTimeout(timer);
-    }
-    setShowRetry(false);
-  }, [loading]);
 
   // Handle password reset from URL
   useEffect(() => {
