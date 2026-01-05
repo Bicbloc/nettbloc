@@ -25,6 +25,8 @@ export interface Room {
   notes?: string;
   remark?: string;
   linkedRooms?: string[];
+  inspectedAt?: string;
+  inspectedBy?: string;
 }
 
 export interface CleaningConfig {
