@@ -61,10 +61,9 @@ import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 const Index = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loading: authLoading, isInitialized } = useAuth();
-  const { hotelId, hotelName, hotelCode: contextHotelCode, isHotelReady, isLoading: hotelLoading } = useHotel();
+  const { isHotelReady } = useHotel();
   const isGuestMode = searchParams.get('mode') === 'guest';
-  const navigate = useNavigate();
-  
+
   // Attendre initialisation auth
   if (!isInitialized || authLoading) {
     return (
@@ -76,12 +75,12 @@ const Index = () => {
       </div>
     );
   }
-  
+
   // Redirection si pas authentifié
   if (!isAuthenticated && !isGuestMode) {
     return <Navigate to="/auth" replace />;
   }
-  
+
   // Attendre que l'hôtel soit prêt (pour les utilisateurs authentifiés)
   if (isAuthenticated && !isHotelReady) {
     return (
@@ -93,10 +92,20 @@ const Index = () => {
       </div>
     );
   }
-  
+
+  // IMPORTANT: Ne pas conditionner les hooks dans ce composant (évite l'erreur React #310)
+  return <IndexDashboard />;
+};
+
+const IndexDashboard = () => {
+  const [searchParams] = useSearchParams();
+  const { isAuthenticated } = useAuth();
+  const { hotelId, hotelName, hotelCode: contextHotelCode } = useHotel();
+  const isGuestMode = searchParams.get('mode') === 'guest';
+  const navigate = useNavigate();
+
   // Utiliser hotelId du contexte
   const currentHotelId = hotelId;
-  
   const { isPremium, isFree, loading: subscriptionLoading } = useSubscription();
   
   useSessionTracking();

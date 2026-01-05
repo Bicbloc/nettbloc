@@ -13,7 +13,7 @@ import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
 const Auth = () => {
-  const { signIn, signUp, isAuthenticated, loading, isInitialized } = useAuth();
+  const { signIn, signUp, isAuthenticated } = useAuth();
   const { signIn: housekeeperSignIn, signUp: housekeeperSignUp } = useHousekeeperAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<AuthMode>('select');
