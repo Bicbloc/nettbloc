@@ -302,6 +302,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                         toKnowItems: fields.toKnowItems,
                       }));
                     }}
+                    hotelId={hotelId}
                   />
                 </div>
               </section>
