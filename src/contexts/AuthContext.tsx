@@ -37,7 +37,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef(false);
-  const isSigningInRef = useRef(false);
 
   /**
    * Rafraîchit la session - retourne true si succès
@@ -51,10 +50,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.warn('⚠️ Refresh session failed:', error.message);
-        
-        // Si le token est corrompu/expiré, forcer la déconnexion propre
         if (error.message.includes('invalid') || error.message.includes('expired')) {
-          console.log('🔄 Token corrompu détecté, nettoyage...');
           storageService.clearVolatile();
           setSession(null);
           setUser(null);
@@ -66,7 +62,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(data.session);
         setUser(data.user);
         window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SESSION_REFRESHED));
-        console.log('✅ Session rafraîchie');
         return true;
       }
       
@@ -86,13 +81,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
     }
-    
-    // Refresh toutes les 10 minutes pour éviter expiration
     refreshIntervalRef.current = setInterval(() => {
       refreshSession();
     }, 10 * 60 * 1000);
-    
-    console.log('🔄 Auto-refresh token activé');
   }, [refreshSession]);
 
   /**
@@ -107,92 +98,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
-    let initialSessionLoaded = false;
 
-    const handleAuthChange = (event: string, currentSession: Session | null) => {
+    // 1. Configurer le listener EN PREMIER
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        if (!mounted) return;
+        
+        console.log('🔐 Auth event:', event);
+        
+        // Mise à jour synchrone de l'état
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        setLoading(false);
+
+        if (event === 'SIGNED_IN' && currentSession) {
+          startTokenRefresh();
+          window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
+            detail: { userId: currentSession.user.id } 
+          }));
+        } else if (event === 'SIGNED_OUT') {
+          stopTokenRefresh();
+          storageService.clearHotel();
+          window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_OUT));
+        }
+      }
+    );
+
+    // 2. Vérifier la session existante
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (!mounted) return;
-      
-      console.log('🔐 Auth:', event);
       
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      setLoading(false);
       
-      // Ne pas passer loading à false si on est en train de signer in
-      if (initialSessionLoaded && !isSigningInRef.current) {
-        setLoading(false);
-      }
-
-      // Gérer les événements spécifiques
-      if (event === 'SIGNED_IN' && currentSession) {
+      if (currentSession) {
         startTokenRefresh();
-        // Émettre événement global pour RealtimeManager
-        window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
-          detail: { userId: currentSession.user.id } 
-        }));
-        // Connexion confirmée - arrêter le loading
-        if (isSigningInRef.current) {
-          isSigningInRef.current = false;
-          setLoading(false);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        stopTokenRefresh();
-        storageService.clearHotel();
-        window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_OUT));
-      } else if (event === 'TOKEN_REFRESHED' && currentSession) {
-        // Supabase a auto-refresh le token
-        console.log('🔄 Token auto-refresh par Supabase');
       }
-    };
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
-
-    // Get initial session with retry logic
-    const initSession = async () => {
-      try {
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.warn('⚠️ Erreur getSession:', error.message);
-          
-          // Tentative de récupération avec refresh
-          if (error.message.includes('invalid') || error.message.includes('expired')) {
-            console.log('🔄 Tentative de récupération par refresh...');
-            const refreshed = await refreshSession();
-            if (!refreshed && mounted) {
-              // Échec total - nettoyer et continuer
-              storageService.clearVolatile();
-            }
-          }
-        } else if (currentSession && mounted) {
-          setSession(currentSession);
-          setUser(currentSession.user);
-          startTokenRefresh();
-        }
-      } catch (error) {
-        console.error('❌ Erreur init session:', error);
-      } finally {
-        if (mounted) {
-          initialSessionLoaded = true;
-          setLoading(false);
-        }
-      }
-    };
-
-    initSession();
-
-    // Safety timeout augmenté à 5 secondes
-    const timeout = setTimeout(() => {
-      if (mounted && !initialSessionLoaded) {
-        console.warn('⚠️ Auth timeout - forçage fin du chargement');
-        initialSessionLoaded = true;
-        setLoading(false);
-      }
-    }, 5000);
+    });
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
       stopTokenRefresh();
       subscription.unsubscribe();
     };
@@ -211,42 +157,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    // Nettoyer le cache avant connexion pour éviter les conflits
     storageService.cleanupLegacyKeys();
-    isSigningInRef.current = true;
     
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error) {
-      isSigningInRef.current = false;
       return { error, success: false };
     }
     
-    // Connexion réussie - mettre à jour l'état immédiatement
-    if (data.session) {
-      setSession(data.session);
-      setUser(data.user);
-      startTokenRefresh();
-      
-      // Attendre un court instant pour que l'état se propage
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      isSigningInRef.current = false;
-      console.log('✅ Connexion réussie, session prête');
-    }
-    
+    // Le callback onAuthStateChange va automatiquement mettre à jour session/user
     return { error: null, success: true };
-  }, [startTokenRefresh]);
+  }, []);
 
   const signOut = useCallback(async () => {
     stopTokenRefresh();
-    
-    // Preserve hotel data for reconnection
     const hotelData = storageService.getHotel();
-
     await supabase.auth.signOut();
-
-    // Restore hotel after signout (user may want to reconnect)
     if (hotelData) {
       storageService.saveHotel(hotelData);
     }
