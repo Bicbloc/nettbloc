@@ -2306,6 +2306,50 @@ export type Database = {
         }
         Relationships: []
       }
+      report_templates: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          is_default: boolean | null
+          name: string
+          template_type: string
+          updated_at: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          hotel_id: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          template_type: string
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          hotel_id?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          template_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_templates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report_training_patterns: {
         Row: {
           accuracy_score: number | null
