@@ -5,6 +5,7 @@ import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useHotel } from "@/contexts/HotelContext";
 import UserMenu from "@/components/UserMenu";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { Room, CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
@@ -24,7 +25,6 @@ import { DailyActionLogPanel } from "@/components/DailyActionLogPanel";
 import { NotificationSound } from "@/components/NotificationSound";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
-import { useAutoSetup } from "@/hooks/use-auto-setup";
 import { cleanupInvalidHotelIds, generateHotelId } from "@/lib/utils";
 import { redistributeRooms } from "@/utils/redistributionUtils";
 import { UpgradeButton } from "@/components/UpgradeButton";
@@ -60,26 +60,42 @@ import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading: authLoading, isInitialized } = useAuth();
+  const { hotelId, hotelName, hotelCode: contextHotelCode, isHotelReady, isLoading: hotelLoading } = useHotel();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
   
-  // Redirection immédiate si pas authentifié (après fin du loading auth)
-  if (!loading && !isAuthenticated && !isGuestMode) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  // Loading screen uniquement pendant vérification auth initiale
-  if (loading) {
+  // Attendre initialisation auth
+  if (!isInitialized || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Chargement...</p>
+          <p className="text-muted-foreground text-sm">Vérification...</p>
         </div>
       </div>
     );
   }
+  
+  // Redirection si pas authentifié
+  if (!isAuthenticated && !isGuestMode) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  // Attendre que l'hôtel soit prêt (pour les utilisateurs authentifiés)
+  if (isAuthenticated && !isHotelReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground text-sm">Chargement de votre établissement...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Utiliser hotelId du contexte
+  const currentHotelId = hotelId;
   
   const { isPremium, isFree, loading: subscriptionLoading } = useSubscription();
   
@@ -99,8 +115,8 @@ const Index = () => {
     refreshHousekeepers
   } = useHousekeeping();
   
-  const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
-  const currentHotelId = hotel?.id || null;
+  // hotelId est maintenant fourni par le contexte - pas besoin de useAutoSetup
+  // const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
   
   const { needsSetup, loading: setupCheckLoading } = useFirstTimeSetup(currentHotelId);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
@@ -232,12 +248,12 @@ const Index = () => {
     cleanupInvalidHotelIds();
   }, []);
 
-  // Sync hotel code
+  // Sync hotel code from context
   useEffect(() => {
-    if (hotel?.hotel_code) {
-      setHotelCode(hotel.hotel_code);
+    if (contextHotelCode) {
+      setHotelCode(contextHotelCode);
     }
-  }, [hotel?.hotel_code]);
+  }, [contextHotelCode]);
   
   // Realtime handler - IGNORER pendant import pour éviter désassignation
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
@@ -512,32 +528,16 @@ const Index = () => {
     }
   };
 
-  // Auth redirect - avec grace period pour éviter les redirections prématurées
-  if (!isAuthenticated && !isGuestMode) {
-    // Attendre que le chargement soit terminé avant de rediriger
-    if (loading || setupLoading) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-          <div className="text-center space-y-4">
-            <div className="p-3 rounded-xl bg-primary/10 inline-block">
-              <Building className="h-8 w-8 text-primary animate-pulse" />
-            </div>
-            <p className="text-muted-foreground">Chargement...</p>
-          </div>
-        </div>
-      );
-    }
-    return <Navigate to="/auth" replace />;
-  }
+  // Note: Auth check is now done at the top of the component
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {hotel && (
+      {currentHotelId && (
         <FirstTimeSetupWizard
           isOpen={showSetupWizard}
           onComplete={handleSetupComplete}
-          hotelCode={hotel.hotel_code || ''}
-          hotelId={hotel.id}
+          hotelCode={contextHotelCode || ''}
+          hotelId={currentHotelId}
           isPremium={isPremium}
         />
       )}
@@ -564,7 +564,7 @@ const Index = () => {
                       {isPremium ? "Premium" : "Freemium"}
                     </Badge>
                   )}
-                  {hotel && <span className="text-xs text-muted-foreground">{hotel.name} • {hotel.hotel_code}</span>}
+                  {hotelName && <span className="text-xs text-muted-foreground">{hotelName} • {contextHotelCode}</span>}
                 </div>
               </div>
             </div>
@@ -580,14 +580,14 @@ const Index = () => {
               onStartWorkflow={() => setActiveTab('overview')} 
             />
             <Button asChild><a href="/housekeeper/auth"><UserIcon className="mr-2 h-4 w-4" />Espace Personnel</a></Button>
-            <DailyReportCloseButton hotelId={currentHotelId || hotel?.id || ''} onReportClosed={() => window.location.reload()} />
+            <DailyReportCloseButton hotelId={currentHotelId || ''} onReportClosed={() => window.location.reload()} />
             <NotificationBell />
             <UserMenu />
           </div>
         </div>
 
         <NotificationSound />
-        <HeroHeader hotelName={hotel?.name} isPremium={isPremium} />
+        <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" orientation="vertical">
           <div className="flex gap-6">
@@ -752,7 +752,7 @@ const Index = () => {
                   title="Invitations du personnel"
                   description="Gérez les invitations de votre personnel avec un abonnement payant."
                 >
-                  <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotel?.name} />
+                  <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotelName || undefined} />
                 </PremiumLimitGuard>
               </TabsContent>
 

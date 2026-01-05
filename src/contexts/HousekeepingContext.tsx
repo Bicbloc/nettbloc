@@ -3,6 +3,7 @@ import { Room } from '@/services/pdfService';
 import { useNotifications, type Notification } from '@/hooks/use-notifications';
 import { HotelSessionService } from '@/services/hotelSessionService';
 import { supabase } from '@/integrations/supabase/client';
+import { useHotel } from '@/contexts/HotelContext';
 import { storageService } from '@/services/storageService';
 
 interface HousekeepingContextType {
@@ -41,65 +42,38 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const [isDistributed, setIsDistributed] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
-  const [hotelId, setHotelId] = useState<string | null>(null);
+  // Utiliser HotelContext comme source de vérité pour hotelId
+  const { hotelId: contextHotelId, isHotelReady } = useHotel();
+  const hotelId = contextHotelId;
+  
   const [housekeepers, setHousekeepers] = useState<Array<{id: string, name: string, access_code: string, user_id: string}>>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   
-  // Hook notifications APRÈS les autres états pour éviter les problèmes de montage
+  // Hook notifications utilise hotelId du contexte
   const notificationsHook = useNotifications(hotelId || undefined);
   const notifications = notificationsHook?.notifications || [];
   const addNotificationFn = notificationsHook?.addNotification;
 
-  // Phase 5: Simplified initialization - load from storageService (source unique)
+  // Initialisation basée sur HotelContext
   useEffect(() => {
-    const initializeFromStorage = () => {
-      const hotelData = storageService.getHotel();
-      console.log('🔍 HousekeepingContext: Lecture cache hotel', hotelData?.id?.slice(0, 8) + '...');
-      
-      if (hotelData?.id && hotelData.id.length > 30) {
-        setHotelId(hotelData.id);
-        console.log('✅ HousekeepingContext: Hotel ID chargé depuis storage:', hotelData.id.slice(0, 8) + '...');
-        setIsInitialized(true);
-      } else {
-        console.log('⚠️ HousekeepingContext: Pas de hotel dans le cache');
-      }
-    };
-    
-    initializeFromStorage();
-    
-    // Listen for storage changes (when hotel is set by useAutoSetup)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'nettobloc_hotel_session' || e.key === 'selectedHotelId') {
-        console.log('🔄 HousekeepingContext: Storage change détecté');
-        initializeFromStorage();
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    if (isHotelReady && hotelId) {
+      console.log('✅ HousekeepingContext: Hotel prêt via HotelContext:', hotelId.slice(0, 8) + '...');
+      setIsInitialized(true);
+    } else if (isHotelReady && !hotelId) {
+      // Pas d'hôtel (mode invité ou pas connecté)
+      console.log('⚠️ HousekeepingContext: Pas d\'hôtel disponible');
+      setIsInitialized(true);
+    }
+  }, [isHotelReady, hotelId]);
 
-  // Synchronisation temps réel ROBUSTE avec sauvegarde continue (réduit à 15s)
+  // Synchronisation temps réel simplifiée - hotelId vient de HotelContext
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || !hotelId) return;
 
     const interval = setInterval(async () => {
       try {
         const session = await HotelSessionService.getSession();
         if (session) {
-          if (session.hotel_id) {
-            // Utiliser storageService pour éviter les conflits de clés
-            const hotelData = storageService.getHotel();
-            if (!hotelData || hotelData.id !== session.hotel_id) {
-              storageService.saveHotel({
-                id: session.hotel_id,
-                name: hotelData?.name || '',
-                code: hotelData?.code || ''
-              });
-            }
-            setHotelId(session.hotel_id);
-          }
-
           // Mettre à jour les données si elles ont changé
           setHousekeeperNames(prev => {
             const newNames = session.housekeeper_names || [];
@@ -107,83 +81,35 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
           });
 
           // Rafraîchir les femmes de chambre moins fréquemment
-          if (session.hotel_id && Math.random() < 0.1) {
+          if (Math.random() < 0.1) {
             refreshHousekeepers();
           }
         }
       } catch (error) {
         console.error('⚠️ Erreur synchronisation:', error);
-        
-        // Récupération via storageService
-        const recoveredId = storageService.recoverHotelId();
-        if (recoveredId && !hotelId) {
-          setHotelId(recoveredId);
-        }
       }
-    }, 15000); // Réduit à 15 secondes pour moins de charge
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [isInitialized, hotelId, rooms.length, housekeeperNames.length]);
+  }, [isInitialized, hotelId]);
 
-  // Charger les données de la session
+  // Charger les données de la session - simplifié car hotelId vient de HotelContext
   const loadSessionData = async () => {
+    if (!hotelId) return;
+    
     try {
       const session = await HotelSessionService.getSession();
       if (session) {
         setHousekeeperNames(session.housekeeper_names || []);
-        // Les rooms sont chargées depuis la table rooms, pas depuis la session
-        setIsDistributed(false); // Toujours faux car is_distributed n'existe plus
+        setIsDistributed(false);
         
-        // Récupérer l'ID réel de l'hôtel depuis storageService (source unique)
-        let sessionHotelId = session.hotel_id;
-        const storedHotel = storageService.getHotel();
-        
-        // Valider l'UUID
-        const isValidUUID = (uuid: string) => {
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-          return uuidRegex.test(uuid);
-        };
-        
-        // Priorité au hotelId sauvegardé s'il est valide
-        if (storedHotel?.id && isValidUUID(storedHotel.id)) {
-          sessionHotelId = storedHotel.id;
-          console.log('✅ Context - Hotel ID valide récupéré depuis storageService:', sessionHotelId);
-        } else if (storedHotel?.code) {
-          // Récupérer l'hôtel réel depuis la base de données par son code
-          try {
-            const { SupabaseService } = await import('@/services/supabaseService');
-            const hotel = await SupabaseService.getHotelByCode(storedHotel.code);
-            
-            if (hotel) {
-              sessionHotelId = hotel.id;
-              storageService.saveHotel({ id: hotel.id, name: hotel.name, code: storedHotel.code });
-              console.log('✅ Context - Hotel ID réel récupéré depuis la base:', sessionHotelId);
-            } else {
-              console.error('❌ Context - Hôtel non trouvé pour le code:', storedHotel.code);
-            }
-          } catch (error) {
-            console.error('❌ Context - Erreur récupération hôtel:', error);
-          }
-        }
-        
-        // Assurer qu'on a un hotelId valide
-        if (sessionHotelId && isValidUUID(sessionHotelId)) {
-          setHotelId(sessionHotelId);
-          console.log('✅ Context - Hotel ID valide défini pour les notifications:', sessionHotelId);
-        } else {
-          console.warn('⚠️ Context - Aucun hotelId valide trouvé - notifications désactivées');
-        }
-        
-        // Charger les vraies femmes de chambre depuis la base
-        if (sessionHotelId) {
-          await refreshHousekeepers();
-        }
+        // Charger les femmes de chambre depuis la base
+        await refreshHousekeepers();
         
         setIsInitialized(true);
         console.log('Données de session chargées:', {
           housekeepers: session.housekeeper_names?.length || 0,
-          distributed: false,
-          hotelId: sessionHotelId
+          hotelId: hotelId.slice(0, 8) + '...'
         });
       }
     } catch (error) {
@@ -471,29 +397,10 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   };
 
   // Fonction pour valider la connexion hôtel
+  // Validation simplifiée - hotelId vient de HotelContext
   const validateHotelConnection = async (): Promise<string | null> => {
-    const storedHotel = storageService.getHotel();
-    
-    if (storedHotel?.code && (!storedHotel.id || !hotelId)) {
-      console.log('⚙️ Context - Validation de la connexion hôtel...');
-      try {
-        const { SupabaseService } = await import('@/services/supabaseService');
-        const hotel = await SupabaseService.getHotelByCode(storedHotel.code);
-        
-        if (hotel) {
-          storageService.saveHotel({ id: hotel.id, name: hotel.name, code: storedHotel.code });
-          setHotelId(hotel.id);
-          console.log('✅ Context - Connexion hôtel validée:', hotel.id);
-          return hotel.id;
-        } else {
-          console.error('❌ Context - Hôtel non trouvé pour le code:', storedHotel.code);
-        }
-      } catch (error) {
-        console.error('❌ Context - Erreur validation hôtel:', error);
-      }
-    }
-    
-    return hotelId || storedHotel?.id || null;
+    // Le hotelId est maintenant géré par HotelContext
+    return hotelId || null;
   };
 
 

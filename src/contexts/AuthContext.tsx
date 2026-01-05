@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isInitialized: boolean;
   signUp: (email: string, password: string, companyName?: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null; success: boolean }>;
   signOut: () => Promise<void>;
@@ -35,6 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef(false);
 
@@ -157,6 +159,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } finally {
         if (mounted) {
           setLoading(false);
+          setIsInitialized(true);
         }
       }
     };
@@ -195,6 +198,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (data.session) {
       setSession(data.session);
       setUser(data.session.user);
+      setLoading(false);
       startTokenRefresh();
       window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
         detail: { userId: data.session.user.id } 
@@ -218,6 +222,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       user,
       session,
       loading,
+      isInitialized,
       signUp,
       signIn,
       signOut,

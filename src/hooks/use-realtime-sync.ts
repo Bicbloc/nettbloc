@@ -44,10 +44,11 @@ export const useRealtimeSync = ({
   }, []);
 
   useEffect(() => {
-    const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId') || localStorage.getItem('currentHotelId');
+    // Utiliser hotelId passé en props (fourni par HotelContext via le composant parent)
+    const effectiveHotelId = hotelId;
     
     if (!effectiveHotelId || effectiveHotelId.length < 10) {
-      console.log('⚠️ useRealtimeSync: hotelId invalide');
+      console.log('⚠️ useRealtimeSync: hotelId invalide ou manquant');
       return;
     }
 

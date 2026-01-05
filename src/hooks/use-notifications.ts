@@ -40,23 +40,19 @@ export const useNotifications = (hotelId?: string) => {
     return uuidV4Regex.test(id) || uuidGenericRegex.test(id) || customHotelRegex.test(id);
   }, []);
 
-  // Récupération via source unique (HotelStorageService)
+  // Récupération directe via props (HotelContext passe hotelId)
   const getEffectiveHotelId = useCallback((): string | null => {
     if (hotelId && isValidHotelId(hotelId)) {
       return hotelId;
     }
 
-    // Fallback vers HotelStorageService (source unique de vérité)
+    // Fallback temporaire vers localStorage (pour compatibilité)
     const stored = localStorage.getItem('selectedHotelId');
     if (stored && isValidHotelId(stored)) {
-      console.log('✅ HotelId trouvé via selectedHotelId:', stored.slice(0, 8) + '...');
+      console.log('⚠️ useNotifications: Fallback localStorage:', stored.slice(0, 8) + '...');
       return stored;
     }
 
-    console.log('❌ Aucun hotelId valide trouvé');
-    return null;
-
-    console.log('❌ Aucun hotelId valide trouvé');
     return null;
   }, [hotelId, isValidHotelId]);
 
