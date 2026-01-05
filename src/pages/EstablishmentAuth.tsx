@@ -204,11 +204,6 @@ const EstablishmentAuth = () => {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground">Vérification de l'authentification...</p>
-        {showRetry && (
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Rafraîchir la page
-          </Button>
-        )}
       </div>
     );
   }
