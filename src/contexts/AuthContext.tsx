@@ -105,23 +105,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         if (!mounted) return;
-        
+
         console.log('🔐 Auth event:', event);
-        
-        // IGNORER INITIAL_SESSION pour le loading - getSession() gère ça
-        if (event === 'INITIAL_SESSION') {
-          return;
-        }
-        
-        // Mise à jour synchrone de l'état
+
+        // Mise à jour synchrone de l'état (y compris INITIAL_SESSION)
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         setLoading(false);
+        setIsInitialized(true);
 
         if (event === 'SIGNED_IN' && currentSession) {
           startTokenRefresh();
-          window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
-            detail: { userId: currentSession.user.id } 
+          window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, {
+            detail: { userId: currentSession.user.id }
           }));
         } else if (event === 'SIGNED_OUT') {
           stopTokenRefresh();

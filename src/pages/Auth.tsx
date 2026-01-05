@@ -13,7 +13,7 @@ import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
 const Auth = () => {
-  const { signIn, signUp, isAuthenticated, loading } = useAuth();
+  const { signIn, signUp, isAuthenticated, loading, isInitialized } = useAuth();
   const { signIn: housekeeperSignIn, signUp: housekeeperSignUp } = useHousekeeperAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<AuthMode>('select');
@@ -33,7 +33,7 @@ const Auth = () => {
     const accessToken = hashParams.get('access_token');
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
-    
+
     if (accessToken && refreshToken && type === 'recovery') {
       supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
         .then(({ error }) => {
@@ -52,15 +52,13 @@ const Auth = () => {
     return <Navigate to="/" replace />;
   }
 
-  // Afficher loading pendant vérification auth OU après soumission réussie
-  if (loading || isLoading) {
+  // Afficher loading uniquement pendant la soumission
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground text-sm">
-            {isLoading ? 'Connexion en cours...' : 'Chargement...'}
-          </p>
+          <p className="text-muted-foreground text-sm">Connexion en cours...</p>
         </div>
       </div>
     );
@@ -161,7 +159,8 @@ const Auth = () => {
           {/* Options */}
           <div className="space-y-3">
             <button
-              onClick={() => setMode('hotel-signin')}
+              type="button"
+              onClick={() => navigate('/auth/establishment')}
               className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
             >
               <div className="flex items-center justify-between">
@@ -179,7 +178,8 @@ const Auth = () => {
             </button>
 
             <button
-              onClick={() => setMode('housekeeper-signin')}
+              type="button"
+              onClick={() => navigate('/housekeeper/auth')}
               className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
             >
               <div className="flex items-center justify-between">
