@@ -204,13 +204,13 @@ export function usePdfWorkflow({
         description: "Erreur lors du traitement du PDF"
       });
     } finally {
-      // Disable flag after delay
+      // Disable flag after longer delay to ensure all DB operations complete
       setTimeout(async () => {
         setIsImporting(false);
         const { realtimeManager } = await import('@/services/RealtimeManager');
         realtimeManager.resume();
-        console.log('✅ Import terminé, rechargement automatique réactivé');
-      }, 3000);
+        console.log('✅ Import terminé, rechargement automatique réactivé après 5s');
+      }, 5000); // Augmenté à 5 secondes pour éviter conflits
     }
   }, [hotelId, housekeepers, setRooms, setHousekeeperNames, setIsDistributed, setAvailableFloors]);
 

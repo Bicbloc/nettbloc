@@ -40,6 +40,7 @@ import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
 import { SupabaseService } from "@/services/supabaseService";
 import { AssignmentService } from "@/services/assignmentService";
 import { GuidedDistributionWizard } from "@/components/GuidedDistributionWizard";
+import { usePdfWorkflow } from "@/hooks/use-pdf-workflow";
 
 // Dashboard tab components
 import { OverviewTab } from "@/components/dashboard/OverviewTab";
@@ -153,8 +154,19 @@ const Index = () => {
   const [hotelCode, setHotelCode] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  
+  // PDF workflow hook - gère tout (pause realtime, sync DB, assignations)
+  const { isImporting, handlePdfProcessed } = usePdfWorkflow({
+    hotelId: currentHotelId,
+    cleaningConfig,
+    housekeepers,
+    setRooms,
+    setHousekeeperNames,
+    setIsDistributed,
+    setAvailableFloors,
+    refreshHousekeepers
+  });
   
   // Assignment handlers
   const { handleManualAssign, handleDirectRoomAssignment } = useAssignmentHandlers({
@@ -210,8 +222,14 @@ const Index = () => {
     }
   }, [hotel?.hotel_code]);
   
-  // Realtime handler
+  // Realtime handler - IGNORER pendant import pour éviter désassignation
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
+    // Ignorer les updates realtime pendant l'import
+    if (isImporting) {
+      console.log('⏸️ Realtime ignoré pendant import:', table);
+      return;
+    }
+    
     const { eventType, new: newRecord, old: oldRecord } = payload;
     
     if (table === 'rooms' && (eventType === 'UPDATE' || eventType === 'INSERT')) {
@@ -226,6 +244,7 @@ const Index = () => {
             } else if (newRecord.cleaning_type === 'quick' || newRecord.cleaning_type === 'recouche') {
               normalizedCleaningType = 'recouche';
             }
+            // IMPORTANT: Préserver assignedTo pour éviter désassignation
             return { 
               ...r, 
               status: newRecord.status,
@@ -249,7 +268,7 @@ const Index = () => {
     if (table === 'assignments' && newRecord?.status === 'completed' && currentHotelId) {
       setTimeout(() => refreshHousekeepers?.(), 500);
     }
-  }, [currentHotelId, refreshHousekeepers, setRooms]);
+  }, [currentHotelId, refreshHousekeepers, setRooms, isImporting]);
 
   const realtimeSync = useRealtimeSync({
     hotelId: currentHotelId || undefined,
@@ -331,100 +350,7 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [currentHotelId, isImporting, isAssigning, setRooms, setIsDistributed]);
 
-  // PDF processing handler
-  const handlePdfProcessed = async (data: Room[], housekeeperNamesParam?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => {
-    setIsImporting(true);
-    
-    try {
-      const floors = new Set<number>();
-      data.forEach(room => {
-        const floor = room.number.length > 0 ? parseInt(room.number[0]) : 0;
-        floors.add(floor);
-        room.floor = floor;
-        room.isTwin = false;
-      });
-      setAvailableFloors(Array.from(floors).sort((a, b) => a - b));
-      
-      const sortedData = [...data].sort((a, b) => 
-        a.number.localeCompare(b.number, undefined, { numeric: true })
-      );
-
-      if (housekeeperNamesParam && housekeeperNamesParam.length > 0) {
-        setHousekeeperNames(housekeeperNamesParam);
-      }
-
-      // Sync to Supabase
-      if (currentHotelId) {
-        for (const room of sortedData) {
-          let normalizedCleaningType: string | null = null;
-          if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
-            normalizedCleaningType = 'full';
-          } else if (room.cleaningType === 'quick' || room.cleaningType === 'recouche') {
-            normalizedCleaningType = 'quick';
-          } else if (room.cleaningType === 'none') {
-            normalizedCleaningType = 'none';
-          }
-          
-          await supabase.from('rooms').upsert({
-            hotel_id: currentHotelId,
-            room_number: room.number,
-            floor: room.floor || null,
-            status: room.status || 'needs-cleaning',
-            cleaning_type: normalizedCleaningType,
-            cleaning_priority: room.isUrgent ? 10 : (room.notUrgent ? 1 : 5),
-            notes: room.notes || null
-          }, { 
-            onConflict: 'hotel_id,room_number',
-            ignoreDuplicates: false 
-          });
-        }
-      }
-
-      // Auto-distribute if method specified
-      if (distributionMethod && housekeeperNamesParam && housekeeperNamesParam.length > 0) {
-        const roomsPerHousekeeper = Math.ceil(sortedData.length / housekeeperNamesParam.length);
-        const updatedRooms = sortedData.map((room, index) => {
-          const housekeeperIndex = Math.floor(index / roomsPerHousekeeper);
-          const assignedHousekeeper = housekeeperNamesParam[housekeeperIndex] || housekeeperNamesParam[0];
-          return { ...room, assignedTo: assignedHousekeeper };
-        });
-        setRooms(updatedRooms);
-        setIsDistributed(true);
-        
-        // Persist assignments
-        if (currentHotelId && housekeepers.length > 0) {
-          for (const room of updatedRooms) {
-            if (room.assignedTo) {
-              const hk = housekeepers.find(h => h.name === room.assignedTo);
-              const { data: roomData } = await supabase
-                .from('rooms')
-                .select('id')
-                .eq('hotel_id', currentHotelId)
-                .eq('room_number', room.number)
-                .single();
-              
-              const housekeeperId = hk?.user_id && hk.user_id !== 'null' ? hk.user_id : 
-                                    hk?.id && hk.id !== 'null' ? hk.id : null;
-              
-              if (roomData?.id && housekeeperId) {
-                await AssignmentService.assignRoom(currentHotelId, roomData.id, housekeeperId, room.assignedTo);
-              }
-            }
-          }
-        }
-      } else {
-        setRooms(sortedData);
-        setIsDistributed(false);
-      }
-      
-      toast({
-        title: "PDF traité avec succès",
-        description: `${data.length} chambres importées${distributionMethod ? ` et distribuées (${distributionMethod})` : ''}`
-      });
-    } finally {
-      setTimeout(() => setIsImporting(false), 3000);
-    }
-  };
+  // handlePdfProcessed is now provided by usePdfWorkflow hook
 
   // Redistribution handler
   const handleRedistribute = async (method: RedistributionMethod, selectedHousekeepers?: string[]) => {
