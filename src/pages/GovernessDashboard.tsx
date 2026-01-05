@@ -146,23 +146,38 @@ export default function GovernessDashboard() {
   };
 
   const handleRequestHotelAccess = async () => {
-    const hotelCode = prompt("Entrez le code de l'hôtel :");
+    const hotelCode = prompt("Entrez le code de l'hôtel (ex: HTL056) :");
     if (!hotelCode || !profile) return;
 
     try {
-      // Trouver l'hôtel
+      // Trouver l'hôtel avec maybeSingle pour éviter erreur si non trouvé
       const { data: hotel, error: hotelError } = await supabase
         .from('hotels')
         .select('id, name, hotel_code')
-        .eq('hotel_code', hotelCode.toUpperCase())
-        .single();
+        .eq('hotel_code', hotelCode.toUpperCase().trim())
+        .maybeSingle();
 
-      if (hotelError || !hotel) {
-        toast({
-          variant: "destructive",
-          title: "Hôtel non trouvé",
-          description: "Vérifiez le code et réessayez"
-        });
+      if (hotelError) {
+        alert("Erreur lors de la recherche : " + hotelError.message);
+        return;
+      }
+
+      if (!hotel) {
+        alert("❌ Hôtel non trouvé !\n\nLe code \"" + hotelCode.toUpperCase().trim() + "\" n'existe pas.\n\nVérifiez le code auprès de l'établissement.");
+        return;
+      }
+
+      // Vérifier si déjà associé
+      const { data: existingSession } = await supabase
+        .from('governess_hotel_sessions')
+        .select('id')
+        .eq('governess_profile_id', profile.id)
+        .eq('hotel_id', hotel.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingSession) {
+        alert("ℹ️ Vous avez déjà accès à cet hôtel !");
         return;
       }
 
@@ -177,21 +192,16 @@ export default function GovernessDashboard() {
           started_at: new Date().toISOString()
         });
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        alert("Erreur lors de l'ajout : " + sessionError.message);
+        return;
+      }
 
-      toast({
-        title: "Hôtel ajouté !",
-        description: `Vous avez maintenant accès à ${hotel.name}`
-      });
-
+      alert("✅ Succès !\n\nVous avez maintenant accès à \"" + hotel.name + "\"");
       loadHotels(profile.id);
     } catch (error: any) {
       console.error('Erreur ajout hôtel:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message
-      });
+      alert("❌ Erreur inattendue :\n" + error.message);
     }
   };
 
