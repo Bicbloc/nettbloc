@@ -2548,6 +2548,8 @@ export type Database = {
           floor: number | null
           hotel_id: string
           id: string
+          inspected_at: string | null
+          inspected_by: string | null
           last_cleaned_at: string | null
           notes: string | null
           room_number: string
@@ -2563,6 +2565,8 @@ export type Database = {
           floor?: number | null
           hotel_id: string
           id?: string
+          inspected_at?: string | null
+          inspected_by?: string | null
           last_cleaned_at?: string | null
           notes?: string | null
           room_number: string
@@ -2578,6 +2582,8 @@ export type Database = {
           floor?: number | null
           hotel_id?: string
           id?: string
+          inspected_at?: string | null
+          inspected_by?: string | null
           last_cleaned_at?: string | null
           notes?: string | null
           room_number?: string

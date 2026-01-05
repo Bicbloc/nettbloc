@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -204,6 +204,14 @@ export function RoomCard({
           {room.status === 'clean' && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
               <Check className="h-2 w-2" /> Propre
+            </span>
+          )}
+          {room.status === 'clean' && room.inspectedAt && (
+            <span 
+              className="text-xs bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 border border-emerald-400"
+              title={`Inspectée par ${room.inspectedBy || 'gouvernante'}`}
+            >
+              <ShieldCheck className="h-2.5 w-2.5" /> OK
             </span>
           )}
           {isInProgress && (

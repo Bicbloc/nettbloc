@@ -176,11 +176,27 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
           .insert(inspectionRecord);
       }
 
+      // Si validée, marquer la chambre comme inspectée
+      if (status === 'passed') {
+        await supabase
+          .from('rooms')
+          .update({ 
+            inspected_at: new Date().toISOString(),
+            inspected_by: governessName 
+          })
+          .eq('id', selectedRoom.id);
+      }
+      
       // Si refusée ou à reprendre, mettre à jour le statut de la chambre
       if (status === 'failed' || status === 'needs_rework') {
         await supabase
           .from('rooms')
-          .update({ status: 'needs-cleaning', notes: `Inspection: ${inspectionData.notes}` })
+          .update({ 
+            status: 'needs-cleaning', 
+            notes: `Inspection: ${inspectionData.notes}`,
+            inspected_at: null,
+            inspected_by: null
+          })
           .eq('id', selectedRoom.id);
       }
 
