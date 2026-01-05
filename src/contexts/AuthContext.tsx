@@ -106,6 +106,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         console.log('🔐 Auth event:', event);
         
+        // IGNORER INITIAL_SESSION pour le loading - getSession() gère ça
+        if (event === 'INITIAL_SESSION') {
+          return;
+        }
+        
         // Mise à jour synchrone de l'état
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
@@ -124,18 +129,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // 2. Vérifier la session existante
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (!mounted) return;
-      
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setLoading(false);
-      
-      if (currentSession) {
-        startTokenRefresh();
+    // 2. Vérifier la session existante avec try/catch/finally
+    const initSession = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.warn('⚠️ getSession error:', error.message);
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          if (currentSession) {
+            startTokenRefresh();
+          }
+        }
+      } catch (err) {
+        console.error('❌ getSession exception:', err);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    });
+    };
+    
+    initSession();
 
     return () => {
       mounted = false;
@@ -159,15 +185,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = useCallback(async (email: string, password: string) => {
     storageService.cleanupLegacyKeys();
     
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error) {
       return { error, success: false };
     }
     
-    // Le callback onAuthStateChange va automatiquement mettre à jour session/user
+    // Mise à jour IMMÉDIATE sans attendre onAuthStateChange
+    if (data.session) {
+      setSession(data.session);
+      setUser(data.session.user);
+      startTokenRefresh();
+      window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
+        detail: { userId: data.session.user.id } 
+      }));
+    }
+    
     return { error: null, success: true };
-  }, []);
+  }, [startTokenRefresh]);
 
   const signOut = useCallback(async () => {
     stopTokenRefresh();

@@ -64,6 +64,23 @@ const Index = () => {
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
   
+  // Redirection immédiate si pas authentifié (après fin du loading auth)
+  if (!loading && !isAuthenticated && !isGuestMode) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  // Loading screen uniquement pendant vérification auth initiale
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground text-sm">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+  
   const { isPremium, isFree, loading: subscriptionLoading } = useSubscription();
   
   useSessionTracking();
