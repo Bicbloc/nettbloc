@@ -16,16 +16,19 @@ function shuffleArray<T>(array: T[]): T[] {
 function distributeRandomly(rooms: Room[], housekeeperNames: string[]): Room[] {
   if (housekeeperNames.length === 0) return rooms;
   
-  const shuffledRooms = shuffleArray(rooms);
-  const result = [...shuffledRooms];
+  // Exclure les chambres propres de l'assignation
+  const roomsToAssign = rooms.filter(room => 
+    room.cleaningType !== 'none' && room.status !== 'maintenance' && room.status !== 'clean'
+  );
+  
+  const shuffledRooms = shuffleArray(roomsToAssign);
+  const result = [...rooms];
   
   shuffledRooms.forEach((room, index) => {
-    if (room.cleaningType !== 'none' && room.status !== 'maintenance') {
-      const housekeeperIndex = index % housekeeperNames.length;
-      const assignedRoom = result.find(r => r.number === room.number);
-      if (assignedRoom) {
-        assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
-      }
+    const housekeeperIndex = index % housekeeperNames.length;
+    const assignedRoom = result.find(r => r.number === room.number);
+    if (assignedRoom) {
+      assignedRoom.assignedTo = housekeeperNames[housekeeperIndex];
     }
   });
   
@@ -38,10 +41,10 @@ function distributeByFloor(rooms: Room[], housekeeperNames: string[]): Room[] {
   
   const result = [...rooms];
   
-  // Grouper par étage et trier
+  // Grouper par étage et trier (exclure chambres propres)
   const roomsByFloor: Record<number, Room[]> = {};
   rooms.forEach(room => {
-    if (room.cleaningType !== 'none' && room.status !== 'maintenance') {
+    if (room.cleaningType !== 'none' && room.status !== 'maintenance' && room.status !== 'clean') {
       const floor = parseInt(room.number[0]) || 0;
       if (!roomsByFloor[floor]) roomsByFloor[floor] = [];
       roomsByFloor[floor].push(room);
@@ -91,12 +94,12 @@ function distributeByCleaningType(rooms: Room[], housekeeperNames: string[]): Ro
   
   const result = [...rooms];
   
-  // Séparer par type de nettoyage
+  // Séparer par type de nettoyage (exclure chambres propres)
   const fullCleaningRooms = rooms.filter(r => 
-    r.cleaningType === 'full' && r.status !== 'maintenance'
+    (r.cleaningType === 'full' || r.cleaningType === 'a_blanc') && r.status !== 'maintenance' && r.status !== 'clean'
   );
   const quickCleaningRooms = rooms.filter(r => 
-    r.cleaningType === 'quick' && r.status !== 'maintenance'
+    (r.cleaningType === 'quick' || r.cleaningType === 'recouche') && r.status !== 'maintenance' && r.status !== 'clean'
   );
   
   console.log(`🔴 ${fullCleaningRooms.length} chambres rouge (nettoyage complet)`);
