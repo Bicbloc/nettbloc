@@ -26,6 +26,8 @@ import HousekeeperProfile from "./pages/HousekeeperProfile";
 import TechnicianLogin from "./pages/TechnicianLogin";
 import TechnicianSignup from "./pages/TechnicianSignup";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
+import GovernessAuth from "./pages/GovernessAuth";
+import GovernessDashboard from "./pages/GovernessDashboard";
 import { TechnicianAuthProvider } from "./contexts/TechnicianAuthContext";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
 import { NotificationProvider } from "./contexts/NotificationContext";
@@ -72,6 +74,8 @@ const App = () => (
                             <Route path="/technician/signup" element={<TechnicianSignup />} />
                             <Route path="/technician/login" element={<TechnicianLogin />} />
                             <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
+                            <Route path="/governess/auth" element={<GovernessAuth />} />
+                            <Route path="/governess/dashboard" element={<GovernessDashboard />} />
                             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                             <Route path="*" element={<NotFound />} />
                           </Routes>

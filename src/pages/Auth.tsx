@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 
@@ -190,6 +190,25 @@ const Auth = () => {
                   <div>
                     <p className="font-medium">Équipe</p>
                     <p className="text-xs text-muted-foreground">Femme/valet de chambre</p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/governess/auth')}
+              className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                    <Crown className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Gouvernante</p>
+                    <p className="text-xs text-muted-foreground">Inspection & incidents</p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />

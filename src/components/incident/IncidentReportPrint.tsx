@@ -213,7 +213,7 @@ export function IncidentReportPrint({ hotelId }: IncidentReportPrintProps) {
           </table>
 
           <div class="footer">
-            <p>Ce rapport a été généré automatiquement par HotelFlow</p>
+            <p>Ce rapport a été généré automatiquement par Nettobloc</p>
           </div>
         </body>
       </html>
