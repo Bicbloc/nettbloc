@@ -151,18 +151,37 @@ export function usePdfWorkflow({
       // Auto-distribute if method specified
       if (distributionMethod && housekeeperNames && housekeeperNames.length > 0) {
         console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
-        const roomsPerHousekeeper = Math.ceil(sortedData.length / housekeeperNames.length);
-        const updatedRooms = sortedData.map((room, index) => {
+        
+        // Séparer les chambres propres (ne pas les assigner) des chambres à nettoyer
+        const cleanRooms = sortedData.filter(room => 
+          room.status === 'clean' || room.cleaningType === 'none'
+        );
+        const roomsToAssign = sortedData.filter(room => 
+          room.status !== 'clean' && room.cleaningType !== 'none'
+        );
+        
+        console.log(`📋 ${cleanRooms.length} chambres propres exclues, ${roomsToAssign.length} à assigner`);
+        
+        // Distribuer uniquement les chambres à nettoyer
+        const roomsPerHousekeeper = Math.ceil(roomsToAssign.length / housekeeperNames.length);
+        const assignedRooms = roomsToAssign.map((room, index) => {
           const housekeeperIndex = Math.floor(index / roomsPerHousekeeper);
           const assignedHousekeeper = housekeeperNames[housekeeperIndex] || housekeeperNames[0];
           return { ...room, assignedTo: assignedHousekeeper };
         });
+        
+        // Combiner: chambres propres (sans assignation) + chambres assignées
+        const updatedRooms = [
+          ...cleanRooms.map(room => ({ ...room, assignedTo: undefined })),
+          ...assignedRooms
+        ].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+        
         setRooms(updatedRooms);
         setIsDistributed(true);
         
-        // Persist assignments in Supabase
+        // Persist assignments in Supabase (uniquement pour les chambres à nettoyer)
         if (hotelId && housekeepers.length > 0) {
-          for (const room of updatedRooms) {
+          for (const room of assignedRooms) {
             if (room.assignedTo) {
               const hk = housekeepers.find(h => h.name === room.assignedTo);
               const { data: roomData } = await supabase
