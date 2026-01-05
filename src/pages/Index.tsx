@@ -495,29 +495,22 @@ const Index = () => {
     }
   };
 
-  // Auth redirect
-  if (!loading && !isAuthenticated && !isGuestMode) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">NettoBloc</CardTitle>
-            <CardDescription>Accès nécessaire pour continuer</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-center">
-            <p className="text-muted-foreground">Vous devez être connecté pour accéder à l'interface de gestion.</p>
-            <div className="space-y-2">
-              <Button onClick={() => navigate("/auth")} className="w-full">Se connecter / S'inscrire</Button>
-              <Button variant="outline" onClick={() => navigate("/housekeeper-login")} className="w-full">Accès Femme de Chambre</Button>
+  // Auth redirect - avec grace period pour éviter les redirections prématurées
+  if (!isAuthenticated && !isGuestMode) {
+    // Attendre que le chargement soit terminé avant de rediriger
+    if (loading || setupLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+          <div className="text-center space-y-4">
+            <div className="p-3 rounded-xl bg-primary/10 inline-block">
+              <Building className="h-8 w-8 text-primary animate-pulse" />
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+            <p className="text-muted-foreground">Chargement...</p>
+          </div>
+        </div>
+      );
+    }
+    return <Navigate to="/auth" replace />;
   }
 
   return (
