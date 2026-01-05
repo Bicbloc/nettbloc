@@ -9,6 +9,13 @@ interface Subscription {
   callback: RealtimeCallback;
 }
 
+// Événements auth globaux (définis dans AuthContext)
+const AUTH_EVENTS = {
+  SIGNED_IN: 'auth:signed_in',
+  SIGNED_OUT: 'auth:signed_out',
+  SESSION_REFRESHED: 'auth:session_refreshed',
+};
+
 /**
  * Singleton pour gérer UNE SEULE connexion temps réel pour toute l'app
  * Avec heartbeat actif, reconnexion rapide et gestion de session auth
@@ -23,7 +30,7 @@ class RealtimeManager {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
   private lastConnectionAttempt = 0;
-  private minTimeBetweenAttempts = 1000; // Réduit de 2000ms à 1000ms
+  private minTimeBetweenAttempts = 1000;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private statusCallbacks: Set<StatusCallback> = new Set();
   private isOnline = true;
@@ -32,8 +39,9 @@ class RealtimeManager {
   private authListenerUnsubscribe: (() => void) | null = null;
   private consecutiveFailures = 0;
   private isForceReconnecting = false;
+  private pendingHotelId: string | null = null; // Hôtel en attente de connexion auth
 
-  // état réel du canal (évite "channel !== null" qui est trompeur)
+  // état réel du canal
   private isSubscribed = false;
   private lastStatus: string = 'DISCONNECTED';
 
@@ -42,16 +50,15 @@ class RealtimeManager {
       window.addEventListener('online', () => this.handleOnline());
       window.addEventListener('offline', () => this.handleOffline());
 
+      // Écouter les événements globaux d'auth
+      this.setupGlobalAuthListener();
+
       // Réduire l'agressivité de visibility change
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && this.hotelId) {
-          // Vérifier seulement si déconnecté depuis longtemps
           const timeSinceLastPing = Date.now() - this.lastSuccessfulPing;
           if (timeSinceLastPing > 60000) {
-            // 1 minute sans ping
-            console.log(
-              '👁️ RealtimeManager: Page visible, reconnexion après inactivité'
-            );
+            console.log('👁️ RealtimeManager: Page visible, reconnexion après inactivité');
             this.softReconnect();
           }
         }
@@ -68,23 +75,54 @@ class RealtimeManager {
     return RealtimeManager.instance;
   }
 
+  /**
+   * Écoute les événements auth globaux émis par AuthContext
+   * (plus fiable que onAuthStateChange pour la synchronisation)
+   */
+  private setupGlobalAuthListener() {
+    window.addEventListener(AUTH_EVENTS.SIGNED_IN, ((event: CustomEvent) => {
+      console.log('🔐 RealtimeManager: AUTH_EVENTS.SIGNED_IN reçu');
+      
+      // Reset compteurs
+      this.reconnectAttempts = 0;
+      this.consecutiveFailures = 0;
+      
+      // Si on a un hôtel en attente, se connecter maintenant
+      const targetHotel = this.pendingHotelId || this.hotelId;
+      if (targetHotel) {
+        console.log('🔗 RealtimeManager: Connexion post-login...');
+        setTimeout(() => this.connect(targetHotel), 500);
+      }
+    }) as EventListener);
+
+    window.addEventListener(AUTH_EVENTS.SIGNED_OUT, () => {
+      console.log('🔐 RealtimeManager: AUTH_EVENTS.SIGNED_OUT reçu');
+      this.disconnect();
+      this.pendingHotelId = null;
+    });
+
+    window.addEventListener(AUTH_EVENTS.SESSION_REFRESHED, () => {
+      console.log('🔐 RealtimeManager: Session refreshed');
+      this.lastSuccessfulPing = Date.now();
+      this.consecutiveFailures = 0;
+      
+      // Si déconnecté mais avec un hôtel, tenter reconnexion
+      if (!this.isSubscribed && this.hotelId) {
+        this.softReconnect();
+      }
+    });
+  }
+
   private setupAuthListener() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      // Ignorer les événements répétitifs
       if (event === 'INITIAL_SESSION') return;
 
-      console.log('🔐 RealtimeManager: Auth event:', event);
+      console.log('🔐 RealtimeManager: Supabase auth event:', event);
 
       if (event === 'SIGNED_OUT') {
-        console.log('🔐 RealtimeManager: Déconnexion détectée, nettoyage...');
         this.disconnect();
-      } else if (event === 'SIGNED_IN' && this.hotelId) {
-        console.log('🔐 RealtimeManager: Connexion détectée, reconnexion...');
-        this.reconnectAttempts = 0;
-        this.consecutiveFailures = 0;
-        setTimeout(() => this.softReconnect(), 1000);
       } else if (event === 'TOKEN_REFRESHED') {
         this.lastSuccessfulPing = Date.now();
         this.consecutiveFailures = 0;
@@ -200,23 +238,28 @@ class RealtimeManager {
       return true;
     }
 
-    // Mémoriser le dernier hotelId demandé (même si l'auth n'est pas encore prête)
+    // Mémoriser le dernier hotelId demandé
     const previousHotelId = this.hotelId;
     this.hotelId = hotelId;
 
-    // Éviter les boucles sur /auth : pas de session => pas de realtime
+    // Vérifier session auth
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
     if (!session) {
-      console.log('🔐 RealtimeManager: Pas de session, realtime en attente');
+      console.log('🔐 RealtimeManager: Pas de session, mémorisation hôtel pour après login');
+      this.pendingHotelId = hotelId; // Mémoriser pour connexion post-login
       this.isSubscribed = false;
+      this.isConnecting = false;
       this.stopHeartbeat();
       await this.cleanupChannel();
       this.notifyStatus('AUTH_REQUIRED');
       return false;
     }
+    
+    // Session OK - effacer pending
+    this.pendingHotelId = null;
 
     // Changement d'hôtel - déconnecter proprement
     if (previousHotelId && previousHotelId !== hotelId) {
