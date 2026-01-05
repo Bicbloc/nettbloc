@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2 } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { RoomIncidentsDialog } from "@/components/incident/RoomIncidentsDialog";
+import { EditRoomNoteDialog } from "@/components/EditRoomNoteDialog";
 
 interface RoomCardProps {
   room: Room;
@@ -55,6 +56,7 @@ export function RoomCard({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showIncidentsDialog, setShowIncidentsDialog] = useState(false);
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Add animation effect when dragging
@@ -223,11 +225,29 @@ export function RoomCard({
           <span className="text-xs text-muted-foreground font-medium flex-shrink-0 ml-auto">{floorDisplay}</span>
         </div>
         
-        {/* Afficher les notes/commentaires de la femme de chambre - bien visible pour l'admin */}
-        {room.notes && (
-          <div className="text-xs bg-purple-100 text-purple-800 border border-purple-300 px-2 py-1.5 rounded-lg" title={room.notes}>
+        {/* Afficher les notes/commentaires de la femme de chambre - cliquable pour modifier */}
+        {room.notes ? (
+          <button 
+            className="text-xs bg-purple-100 text-purple-800 border border-purple-300 px-2 py-1.5 rounded-lg text-left w-full hover:bg-purple-200 transition-colors cursor-pointer" 
+            title="Cliquer pour modifier"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNoteDialog(true);
+            }}
+          >
             <span className="font-semibold">💬 Commentaire:</span> {room.notes}
-          </div>
+          </button>
+        ) : showActions && (
+          <button
+            className="text-xs text-muted-foreground hover:text-purple-600 hover:bg-purple-50 px-2 py-1 rounded flex items-center gap-1 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNoteDialog(true);
+            }}
+          >
+            <MessageSquare className="h-3 w-3" />
+            Ajouter un commentaire
+          </button>
         )}
         
         {/* Boutons de changement rapide et menu réassignation */}
@@ -409,6 +429,18 @@ export function RoomCard({
             onOpenChange={setShowIncidentsDialog}
             hotelId={hotelId}
             roomNumber={room.number}
+          />
+        )}
+
+        {showNoteDialog && hotelId && (
+          <EditRoomNoteDialog
+            open={showNoteDialog}
+            onOpenChange={setShowNoteDialog}
+            room={room}
+            hotelId={hotelId}
+            onNoteUpdated={(r, newNote) => {
+              onUpdate({ ...r, notes: newNote || undefined });
+            }}
           />
         )}
       </div>
