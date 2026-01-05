@@ -47,25 +47,20 @@ const Auth = () => {
     }
   }, [toast]);
 
-  // Rediriger vers / quand authentifié (après connexion réussie)
-  useEffect(() => {
-    if (!loading && isAuthenticated) {
-      console.log('✅ Auth: Utilisateur authentifié, redirection vers /');
-      navigate('/', { replace: true });
-    }
-  }, [isAuthenticated, loading, navigate]);
-
-  // Si déjà authentifié au chargement, afficher loading puis rediriger
-  if (!loading && isAuthenticated) {
+  // Si authentifié, rediriger immédiatement
+  if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 
-  if (loading) {
+  // Afficher loading pendant vérification auth OU après soumission réussie
+  if (loading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground text-sm">Chargement...</p>
+          <p className="text-muted-foreground text-sm">
+            {isLoading ? 'Connexion en cours...' : 'Chargement...'}
+          </p>
         </div>
       </div>
     );
@@ -78,13 +73,12 @@ const Auth = () => {
     try {
       switch (mode) {
         case 'hotel-signin': {
-          const { error, success } = await signIn(formData.email, formData.password);
+          const { error } = await signIn(formData.email, formData.password);
           if (error) throw error;
-          if (success) {
-            toast({ title: "Connexion réussie" });
-            // La navigation sera gérée par le useEffect qui observe isAuthenticated
-          }
-          break;
+          // isLoading reste true - onAuthStateChange va déclencher isAuthenticated
+          // qui va causer le Navigate vers /
+          toast({ title: "Connexion réussie" });
+          return; // Ne pas reset isLoading, laisser le redirect se faire
         }
         case 'hotel-signup': {
           if (!formData.companyName.trim()) throw new Error("Nom de l'établissement requis");
@@ -137,8 +131,8 @@ const Auth = () => {
         title: "Erreur",
         description: error.message === "Invalid login credentials" ? "Email ou mot de passe incorrect" : error.message
       });
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   const resetForm = () => {
