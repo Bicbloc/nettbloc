@@ -64,6 +64,18 @@ const Index = () => {
   const { isHotelReady } = useHotel();
   const isGuestMode = searchParams.get('mode') === 'guest';
 
+  // Fallback timeout - doit être AVANT les returns conditionnels pour respecter les règles des hooks
+  useEffect(() => {
+    if (isAuthenticated && !isHotelReady && isInitialized && !authLoading) {
+      const timeout = setTimeout(() => {
+        console.warn('⚠️ Hotel loading timeout (8s), forcing refresh');
+        window.location.reload();
+      }, 8000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isAuthenticated, isHotelReady, isInitialized, authLoading]);
+
   // Attendre initialisation auth
   if (!isInitialized || authLoading) {
     return (
@@ -82,18 +94,6 @@ const Index = () => {
   }
 
   // Attendre que l'hôtel soit prêt (pour les utilisateurs authentifiés)
-  // Avec fallback timeout de 8 secondes pour forcer le refresh si bloqué
-  useEffect(() => {
-    if (isAuthenticated && !isHotelReady) {
-      const timeout = setTimeout(() => {
-        console.warn('⚠️ Hotel loading timeout (8s), forcing refresh');
-        window.location.reload();
-      }, 8000);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [isAuthenticated, isHotelReady]);
-
   if (isAuthenticated && !isHotelReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
