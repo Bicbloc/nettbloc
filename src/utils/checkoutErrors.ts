@@ -10,18 +10,15 @@ export function extractErrorMessage(error: unknown): string {
   }
 }
 
-export type CheckoutErrorKind = "stripe_live_charges_disabled" | "plan_disabled" | null;
+export type CheckoutErrorKind = "gocardless_error" | "plan_disabled" | null;
 
 export function detectCheckoutErrorKind(message: string): CheckoutErrorKind {
-  if (
-    message.includes("stripe_live_charges_disabled") ||
-    message.includes("Your account cannot currently make live charges")
-  ) {
-    return "stripe_live_charges_disabled";
-  }
-
   if (message.includes("plan_disabled") || message.includes("PLAN_DISABLED")) {
     return "plan_disabled";
+  }
+
+  if (message.includes("GoCardless") || message.includes("gocardless")) {
+    return "gocardless_error";
   }
 
   return null;
@@ -29,8 +26,8 @@ export function detectCheckoutErrorKind(message: string): CheckoutErrorKind {
 
 export function checkoutErrorDescription(kind: CheckoutErrorKind): string | null {
   switch (kind) {
-    case "stripe_live_charges_disabled":
-      return "Stripe n'est pas encore activé pour les paiements en mode live. Activez votre compte Stripe (paiements live) ou utilisez une clé de test (sk_test_...) pendant le développement.";
+    case "gocardless_error":
+      return "Une erreur s'est produite avec le service de paiement GoCardless. Veuillez réessayer ou contacter le support.";
     case "plan_disabled":
       return "Ce plan est temporairement indisponible. Contactez votre administrateur ou choisissez un autre plan.";
     default:
