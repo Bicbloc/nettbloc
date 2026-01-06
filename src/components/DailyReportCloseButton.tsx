@@ -7,6 +7,8 @@ import { HotelSessionService } from '@/services/hotelSessionService';
 import { storageService } from '@/services/storageService';
 import { ActionLogService } from '@/services/actionLogService';
 import { RoomArchiveService } from '@/services/roomArchiveService';
+import { generateAndUploadDailyReportPdf } from '@/services/dailyReportPdfService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DailyReportCloseButtonProps {
   hotelId: string;
@@ -19,15 +21,62 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
 
   const handleCloseDay = async () => {
     setIsClosing(true);
+    const today = new Date().toISOString().split('T')[0];
 
     try {
       console.log('🔚 Début de clôture de la journée pour hotel:', hotelId);
 
-      // 1. Vérifier la session actuelle (optionnel - on continue même sans)
+      // 0. Récupérer les données AVANT archivage pour le PDF
+      setClosingStep('Préparation des données...');
+      
+      const { data: currentRooms } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('hotel_id', hotelId);
+      
+      const { data: currentAssignments } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('hotel_id', hotelId);
+      
+      const { data: todayLogs } = await supabase
+        .from('daily_action_logs')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('log_date', today);
+
+      const { data: hotelData } = await supabase
+        .from('hotels')
+        .select('name')
+        .eq('id', hotelId)
+        .single();
+
+      // 1. Générer et uploader le PDF de clôture
+      setClosingStep('Génération du rapport PDF...');
+      console.log('📄 Génération du rapport PDF...');
+      
+      let pdfUrl: string | null = null;
+      try {
+        pdfUrl = await generateAndUploadDailyReportPdf(
+          hotelId,
+          today,
+          currentRooms || [],
+          currentAssignments || [],
+          todayLogs || [],
+          hotelData?.name
+        );
+        if (pdfUrl) {
+          console.log('✅ Rapport PDF généré et uploadé');
+        }
+      } catch (pdfError) {
+        console.warn('⚠️ Erreur génération PDF (non bloquant):', pdfError);
+      }
+
+      // 2. Vérifier la session actuelle (optionnel - on continue même sans)
       setClosingStep('Vérification de la session...');
       const currentToken = HotelSessionService.getSessionToken();
       
-      // 2. Archiver le journal d'actions du jour en premier
+      // 3. Archiver le journal d'actions du jour en premier
       setClosingStep('Archivage du journal d\'actions...');
       console.log('📦 Archivage du journal d\'actions...');
       try {
@@ -39,11 +88,31 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         console.warn('⚠️ Erreur archivage logs (non bloquant):', logError);
       }
 
-      // 3. Archiver chambres, assignations, inventaire linge et notifications
+      // 4. Archiver chambres, assignations, inventaire linge et notifications
       setClosingStep('Archivage des chambres et inventaire...');
       console.log('📦 Archivage complet en cours...');
       const archiveResult = await RoomArchiveService.archiveAndResetRooms(hotelId);
       console.log('✅ Archivage complet terminé:', archiveResult);
+
+      // 5. Mettre à jour le rapport daily_reports avec l'URL du PDF
+      if (pdfUrl) {
+        await supabase
+          .from('daily_reports')
+          .update({ pdf_url: pdfUrl })
+          .eq('hotel_id', hotelId)
+          .eq('report_date', today);
+      }
+
+      // 6. Désactiver la session actuelle si elle existe
+      if (currentToken) {
+        setClosingStep('Fermeture de la session...');
+        console.log('🔒 Désactivation de la session actuelle...');
+        try {
+          await HotelSessionService.deactivateSession(currentToken);
+        } catch (sessionError) {
+          console.warn('⚠️ Erreur désactivation session (non bloquant):', sessionError);
+        }
+      }
 
       // 4. Désactiver la session actuelle si elle existe
       if (currentToken) {
