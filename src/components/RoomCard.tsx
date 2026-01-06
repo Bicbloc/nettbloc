@@ -269,9 +269,9 @@ export function RoomCard({
                 e.stopPropagation();
                 setCleaningType('a_blanc');
               }}
-              title="À Blanc"
+              title={t.rooms.fullClean}
             >
-              B
+              CO
             </button>
             <button 
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors font-semibold text-xs"
@@ -279,9 +279,9 @@ export function RoomCard({
                 e.stopPropagation();
                 setCleaningType('recouche');
               }}
-              title="Recouche"
+              title={t.rooms.quickClean}
             >
-              R
+              SO
             </button>
             <button
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
