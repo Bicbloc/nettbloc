@@ -19,6 +19,8 @@ type TranslationSchema = {
     password: string;
     name: string;
     phone: string;
+    verification: string;
+    loadingEstablishment: string;
   };
   auth: {
     login: string;
@@ -72,6 +74,7 @@ type TranslationSchema = {
     requestAccess: string;
     hotelCode: string;
     pendingRequests: string;
+    staffArea: string;
   };
   rooms: {
     room: string;
@@ -110,6 +113,28 @@ type TranslationSchema = {
     roomsCleaned: string;
     roomsPending: string;
     activeHousekeepers: string;
+    assignment: string;
+    accessCodes: string;
+    training: string;
+    invitations: string;
+    inspections: string;
+    guestMode: string;
+    realtimeActive: string;
+    disconnected: string;
+    linenInventory: string;
+    aiTraining: string;
+  };
+  stats: {
+    totalRooms: string;
+    toClean: string;
+    cleaned: string;
+    activeStaff: string;
+  };
+  hero: {
+    welcome: string;
+    subtitle: string;
+    realtime: string;
+    completeSolution: string;
   };
   plans: {
     title: string;
@@ -145,6 +170,16 @@ type TranslationSchema = {
     forbidden: string;
     serverError: string;
   };
+  toasts: {
+    roomCleaned: string;
+    roomCleanedDesc: string;
+    redistributionDone: string;
+    hotelSelected: string;
+    reportSent: string;
+    reportsCreated: string;
+    missingData: string;
+    missingInfo: string;
+  };
 };
 
 export const translations: Record<'fr' | 'en', TranslationSchema> = {
@@ -169,6 +204,8 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       password: "Mot de passe",
       name: "Nom",
       phone: "Téléphone",
+      verification: "Vérification...",
+      loadingEstablishment: "Chargement de votre établissement...",
     },
     
     // Auth
@@ -228,6 +265,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       requestAccess: "Demander l'accès",
       hotelCode: "Code de l'hôtel",
       pendingRequests: "Demandes en attente",
+      staffArea: "Espace Personnel",
     },
     
     // Rooms
@@ -270,6 +308,32 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       roomsCleaned: "Chambres nettoyées",
       roomsPending: "Chambres en attente",
       activeHousekeepers: "Femmes de chambre actives",
+      assignment: "Affectation",
+      accessCodes: "Codes d'accès",
+      training: "Entraînement IA",
+      invitations: "Invitations",
+      inspections: "Inspections",
+      guestMode: "Mode Invité",
+      realtimeActive: "Temps réel actif",
+      disconnected: "Déconnecté",
+      linenInventory: "Inventaire Linge",
+      aiTraining: "Entraînement IA",
+    },
+    
+    // Stats
+    stats: {
+      totalRooms: "Chambres totales",
+      toClean: "À nettoyer",
+      cleaned: "Nettoyées",
+      activeStaff: "Personnel actif",
+    },
+    
+    // Hero
+    hero: {
+      welcome: "Bienvenue",
+      subtitle: "Gérez votre établissement avec efficacité. Assignation automatique, suivi en temps réel, et rapports détaillés.",
+      realtime: "Temps réel",
+      completeSolution: "Solution complète",
     },
     
     // Plans
@@ -311,6 +375,18 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       forbidden: "Accès interdit",
       serverError: "Erreur serveur",
     },
+    
+    // Toasts
+    toasts: {
+      roomCleaned: "Chambre nettoyée",
+      roomCleanedDesc: "Chambre {room} marquée propre",
+      redistributionDone: "Redistribution terminée",
+      hotelSelected: "Hôtel sélectionné",
+      reportSent: "Rapport envoyé",
+      reportsCreated: "Rapports créés",
+      missingData: "Données manquantes",
+      missingInfo: "Informations manquantes",
+    },
   },
   
   en: {
@@ -334,6 +410,8 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       password: "Password",
       name: "Name",
       phone: "Phone",
+      verification: "Verifying...",
+      loadingEstablishment: "Loading your establishment...",
     },
     
     // Auth
@@ -393,6 +471,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       requestAccess: "Request access",
       hotelCode: "Hotel code",
       pendingRequests: "Pending requests",
+      staffArea: "Staff Area",
     },
     
     // Rooms
@@ -435,6 +514,32 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       roomsCleaned: "Rooms cleaned",
       roomsPending: "Rooms pending",
       activeHousekeepers: "Active housekeepers",
+      assignment: "Assignment",
+      accessCodes: "Access Codes",
+      training: "AI Training",
+      invitations: "Invitations",
+      inspections: "Inspections",
+      guestMode: "Guest Mode",
+      realtimeActive: "Realtime active",
+      disconnected: "Disconnected",
+      linenInventory: "Linen Inventory",
+      aiTraining: "AI Training",
+    },
+    
+    // Stats
+    stats: {
+      totalRooms: "Total rooms",
+      toClean: "To clean",
+      cleaned: "Cleaned",
+      activeStaff: "Active staff",
+    },
+    
+    // Hero
+    hero: {
+      welcome: "Welcome",
+      subtitle: "Manage your establishment efficiently. Automatic assignment, real-time tracking, and detailed reports.",
+      realtime: "Real-time",
+      completeSolution: "Complete solution",
     },
     
     // Plans
@@ -475,6 +580,18 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       unauthorized: "Unauthorized",
       forbidden: "Access forbidden",
       serverError: "Server error",
+    },
+    
+    // Toasts
+    toasts: {
+      roomCleaned: "Room cleaned",
+      roomCleanedDesc: "Room {room} marked clean",
+      redistributionDone: "Redistribution complete",
+      hotelSelected: "Hotel selected",
+      reportSent: "Report sent",
+      reportsCreated: "Reports created",
+      missingData: "Missing data",
+      missingInfo: "Missing information",
     },
   },
 };

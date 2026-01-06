@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Bed, Users, CheckCircle2, Clock, TrendingUp } from "lucide-react";
 import { Room } from "@/services/pdfService";
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface StatsOverviewProps {
   rooms: Room[];
@@ -42,6 +43,7 @@ function AnimatedNumber({ value, duration = 800 }: { value: number; duration?: n
 }
 
 export function StatsOverview({ rooms, housekeeperCount }: StatsOverviewProps) {
+  const { t } = useLanguage();
   const totalRooms = rooms.length;
   const roomsToClean = rooms.filter(r => r.cleaningType !== 'none' && r.status !== 'maintenance').length;
   const cleanedRooms = rooms.filter(r => r.status === 'completed' || r.status === 'clean').length;
@@ -51,7 +53,7 @@ export function StatsOverview({ rooms, housekeeperCount }: StatsOverviewProps) {
   
   const stats = [
     {
-      label: "Chambres totales",
+      label: t.stats.totalRooms,
       value: totalRooms,
       icon: Bed,
       gradient: "from-primary/20 to-primary/5",
@@ -59,7 +61,7 @@ export function StatsOverview({ rooms, housekeeperCount }: StatsOverviewProps) {
       iconColor: "text-primary"
     },
     {
-      label: "À nettoyer",
+      label: t.stats.toClean,
       value: roomsToClean,
       icon: Clock,
       gradient: "from-warning/20 to-warning/5",
@@ -67,7 +69,7 @@ export function StatsOverview({ rooms, housekeeperCount }: StatsOverviewProps) {
       iconColor: "text-warning"
     },
     {
-      label: "Nettoyées",
+      label: t.stats.cleaned,
       value: cleanedRooms,
       icon: CheckCircle2,
       gradient: "from-success/20 to-success/5",
@@ -76,7 +78,7 @@ export function StatsOverview({ rooms, housekeeperCount }: StatsOverviewProps) {
       badge: progressPercent > 0 ? `${progressPercent}%` : null
     },
     {
-      label: "Personnel actif",
+      label: t.stats.activeStaff,
       value: housekeeperCount,
       icon: Users,
       gradient: "from-info/20 to-info/5",
