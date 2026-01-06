@@ -1,5 +1,6 @@
 import { Building2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface HeroHeaderProps {
   hotelName?: string;
@@ -7,6 +8,8 @@ interface HeroHeaderProps {
 }
 
 export function HeroHeader({ hotelName, isPremium }: HeroHeaderProps) {
+  const { t } = useLanguage();
+  
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-border/50 mb-8">
       {/* Background decoration */}
@@ -25,23 +28,23 @@ export function HeroHeader({ hotelName, isPremium }: HeroHeaderProps) {
           
           {/* Title */}
           <h1 className="text-5xl md:text-6xl font-display font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            {hotelName || "Bienvenue"}
+            {hotelName || t.hero.welcome}
           </h1>
           
           {/* Subtitle */}
           <p className="text-xl text-muted-foreground max-w-2xl leading-relaxed">
-            Gérez votre établissement avec efficacité. Assignation automatique, suivi en temps réel, et rapports détaillés.
+            {t.hero.subtitle}
           </p>
           
           {/* Stats */}
           <div className="flex gap-8 mt-8">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-              <span className="text-sm text-muted-foreground">Temps réel</span>
+              <span className="text-sm text-muted-foreground">{t.hero.realtime}</span>
             </div>
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">Solution complète</span>
+              <span className="text-sm text-muted-foreground">{t.hero.completeSolution}</span>
             </div>
           </div>
         </div>

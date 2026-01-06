@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHotel } from "@/contexts/HotelContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import UserMenu from "@/components/UserMenu";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { Room, CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
@@ -62,6 +63,7 @@ const Index = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loading: authLoading, isInitialized } = useAuth();
   const { isHotelReady } = useHotel();
+  const { t } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
 
   // Attendre initialisation auth
@@ -70,7 +72,7 @@ const Index = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Vérification...</p>
+          <p className="text-muted-foreground text-sm">{t.common.verification}</p>
         </div>
       </div>
     );
@@ -91,6 +93,8 @@ const Index = () => {
 
 // Composant séparé pour éviter les problèmes de hooks
 const HotelLoadingScreen = () => {
+  const { t } = useLanguage();
+  
   useEffect(() => {
     const timeout = setTimeout(() => {
       console.warn('⚠️ Hotel loading timeout (8s), forcing refresh');
@@ -104,7 +108,7 @@ const HotelLoadingScreen = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
       <div className="text-center space-y-4">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-muted-foreground text-sm">Chargement de votre établissement...</p>
+        <p className="text-muted-foreground text-sm">{t.common.loadingEstablishment}</p>
       </div>
     </div>
   );
@@ -114,6 +118,7 @@ const IndexDashboard = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { hotelId, hotelName, hotelCode: contextHotelCode } = useHotel();
+  const { t } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
   const navigate = useNavigate();
 
@@ -577,7 +582,7 @@ const IndexDashboard = () => {
                   Nettobloc
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
-                  {isGuestMode && <Badge variant="outline" className="text-xs">Mode Invité</Badge>}
+                  {isGuestMode && <Badge variant="outline" className="text-xs">{t.dashboard.guestMode}</Badge>}
                   {!subscriptionLoading && (
                     <Badge 
                       variant="secondary"
@@ -596,12 +601,12 @@ const IndexDashboard = () => {
           <div className="flex items-center space-x-4">
             <Badge variant={realtimeSync.isConnected ? "default" : "destructive"} className="h-8 gap-2">
               <div className={`h-2 w-2 rounded-full ${realtimeSync.isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              {realtimeSync.isConnected ? 'Temps réel actif' : 'Déconnecté'}
+              {realtimeSync.isConnected ? t.dashboard.realtimeActive : t.dashboard.disconnected}
             </Badge>
             <GuidedDistributionWizard 
               onStartWorkflow={() => setActiveTab('overview')} 
             />
-            <Button asChild><a href="/housekeeper/auth"><UserIcon className="mr-2 h-4 w-4" />Espace Personnel</a></Button>
+            <Button asChild><a href="/housekeeper/auth"><UserIcon className="mr-2 h-4 w-4" />{t.housekeeper.staffArea}</a></Button>
             <DailyReportCloseButton hotelId={currentHotelId || ''} onReportClosed={() => window.location.reload()} />
             <NotificationBell />
             <UserMenu />
@@ -617,38 +622,38 @@ const IndexDashboard = () => {
             <div className="hidden md:flex flex-col w-56 shrink-0">
               <TabsList className="flex flex-col h-auto bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl p-2 sticky top-4 shadow-lg">
                 <TabsTrigger value="overview" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Layers className="h-5 w-5" /><span>Vue d'ensemble</span>
+                  <Layers className="h-5 w-5" /><span>{t.dashboard.overview}</span>
                 </TabsTrigger>
                 <TabsTrigger value="rooms" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Bed className="h-5 w-5" /><span>Chambres</span>
+                  <Bed className="h-5 w-5" /><span>{t.dashboard.rooms}</span>
                 </TabsTrigger>
                 <TabsTrigger value="assignment" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <UserIcon className="h-5 w-5" /><span>Affectation</span>
+                  <UserIcon className="h-5 w-5" /><span>{t.dashboard.assignment}</span>
                 </TabsTrigger>
                 <TabsTrigger value="access-codes" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all relative">
-                  <Key className="h-5 w-5" /><span>Codes d'accès</span>
+                  <Key className="h-5 w-5" /><span>{t.dashboard.accessCodes}</span>
                   <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">!</Badge>
                 </TabsTrigger>
                 <TabsTrigger value="linen" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <span className="text-lg">🧺</span><span>Inventaire Linge</span>
+                  <span className="text-lg">🧺</span><span>{t.dashboard.linenInventory}</span>
                 </TabsTrigger>
                 <TabsTrigger value="incidents" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <AlertTriangle className="h-5 w-5" /><span>Incidents</span>
+                  <AlertTriangle className="h-5 w-5" /><span>{t.dashboard.incidents}</span>
                 </TabsTrigger>
                 <TabsTrigger value="reports" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <FileText className="h-5 w-5" /><span>Rapports</span>
+                  <FileText className="h-5 w-5" /><span>{t.dashboard.reports}</span>
                 </TabsTrigger>
                 <TabsTrigger value="training" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Brain className="h-5 w-5" /><span>Entraînement IA</span>
+                  <Brain className="h-5 w-5" /><span>{t.dashboard.aiTraining}</span>
                 </TabsTrigger>
                 <TabsTrigger value="archives" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Archive className="h-5 w-5" /><span>Archives</span>
+                  <Archive className="h-5 w-5" /><span>{t.dashboard.archives}</span>
                 </TabsTrigger>
                 <TabsTrigger value="invitations" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Mail className="h-5 w-5" /><span>Invitations</span>
+                  <Mail className="h-5 w-5" /><span>{t.dashboard.invitations}</span>
                 </TabsTrigger>
                 <TabsTrigger value="inspections" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <ClipboardCheck className="h-5 w-5" /><span>Inspection</span>
+                  <ClipboardCheck className="h-5 w-5" /><span>{t.dashboard.inspections}</span>
                 </TabsTrigger>
               </TabsList>
             </div>
