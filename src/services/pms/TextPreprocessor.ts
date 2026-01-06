@@ -9,6 +9,7 @@ export interface PreprocessingResult {
     originalLength: number;
     processedLength: number;
     linesAdded: number;
+    linesMerged: number;
     patternsApplied: string[];
   };
 }
@@ -101,6 +102,7 @@ class TextPreprocessor {
     let processed = text;
     const patternsApplied: string[] = [];
     let linesAdded = 0;
+    let linesMerged = 0;
 
     // Appliquer les patterns de séparation
     for (const { name, pattern, replacement } of PREPROCESSING_PATTERNS) {
@@ -108,7 +110,35 @@ class TextPreprocessor {
       processed = processed.replace(pattern, replacement);
       if (before !== processed) {
         patternsApplied.push(name);
+        // Ici on compte uniquement les lignes AJOUTÉES par séparation
         linesAdded += (processed.match(/\n/g) || []).length - (before.match(/\n/g) || []).length;
+      }
+    }
+
+    // Fusionner des statuts isolés sur la ligne suivante (PDF fragmenté)
+    // Exemple: "402 CLA" \n "INS"  → "402 CLA INS"
+    const MERGE_PATTERNS: Array<{ name: string; pattern: RegExp; replacement: string }> = [
+      {
+        name: 'merge_roomtype_status_next_line',
+        pattern: /(\b\d{2,4}\b\s+[A-Z]{2,8}(?:-[A-Z])?)\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        replacement: '$1 $2',
+      },
+      {
+        name: 'merge_room_status_next_line',
+        pattern: /(\b\d{2,4}\b)\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        replacement: '$1 $2',
+      },
+    ];
+
+    for (const { name, pattern, replacement } of MERGE_PATTERNS) {
+      const before = processed;
+      processed = processed.replace(pattern, replacement);
+      if (before !== processed) {
+        patternsApplied.push(name);
+        const beforeLines = (before.match(/\n/g) || []).length;
+        const afterLines = (processed.match(/\n/g) || []).length;
+        const merged = Math.max(0, beforeLines - afterLines);
+        linesMerged += merged;
       }
     }
 
@@ -125,6 +155,7 @@ class TextPreprocessor {
         originalLength: text.length,
         processedLength: processed.length,
         linesAdded,
+        linesMerged,
         patternsApplied
       }
     };
