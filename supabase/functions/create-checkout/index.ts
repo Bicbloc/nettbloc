@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -7,30 +6,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GOCARDLESS_API_URL = "https://api.gocardless.com";
+
 // Plan prices in cents (HT)
-const PLAN_PRICES: Record<string, { amount: number; name: string; description: string; trialDays?: number }> = {
+const PLAN_PRICES: Record<string, { amount: number; name: string; description: string; trialDays?: number; interval: string }> = {
   basic: { 
     amount: 15000, // 150€ HT
     name: "Plan Basic Nettobloc",
     description: "70 chambres max, PDF, distribution, rapports",
-    trialDays: 90
+    trialDays: 90,
+    interval: "monthly"
   },
   basic_plus: { 
     amount: 25000, // 250€ HT
     name: "Plan Basic+ Nettobloc",
-    description: "170 chambres max, PDF, distribution, rapports"
+    description: "170 chambres max, PDF, distribution, rapports",
+    interval: "monthly"
   },
   premium: { 
     amount: 20000, // 200€ HT
     name: "Plan Premium Nettobloc",
     description: "150 chambres, incidents, inventaire linge, inspection",
-    trialDays: 90
+    trialDays: 90,
+    interval: "monthly"
   },
   platinum: { 
     amount: 40000, // 400€ HT
     name: "Plan Platinum Nettobloc",
-    description: "Chambres illimitées, toutes fonctionnalités, API"
+    description: "Chambres illimitées, toutes fonctionnalités, API",
+    interval: "monthly"
   }
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -39,6 +49,12 @@ serve(async (req) => {
   }
 
   try {
+    logStep("Function started");
+
+    const gcToken = Deno.env.get("GOCARDLESS_ACCESS_TOKEN");
+    if (!gcToken) throw new Error("GOCARDLESS_ACCESS_TOKEN is not set");
+    logStep("GoCardless token verified");
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -53,19 +69,20 @@ serve(async (req) => {
     if (!user?.email) {
       throw new Error("User not authenticated");
     }
+    logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Parse request body
     const body = await req.json().catch(() => ({}));
     const planType = body.planType || 'premium';
-    const promoCode = body.promoCode;
 
     // Get plan configuration
     const planConfig = PLAN_PRICES[planType];
     if (!planConfig) {
       throw new Error(`Invalid plan type: ${planType}`);
     }
+    logStep("Plan config", { planType, amount: planConfig.amount });
 
-    // Validate plan availability (allows temporarily disabling plans)
+    // Validate plan availability
     const { data: pricingRow, error: pricingError } = await supabaseClient
       .from("pricing_config")
       .select("is_active")
@@ -82,92 +99,103 @@ serve(async (req) => {
       );
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
+    const origin = req.headers.get("origin") || "http://localhost:3000";
+
+    // Create a GoCardless Billing Request Flow
+    // This creates a hosted checkout page for mandate setup
+    const billingRequestResponse = await fetch(`${GOCARDLESS_API_URL}/billing_requests`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${gcToken}`,
+        "GoCardless-Version": "2015-07-06",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        billing_requests: {
+          mandate_request: {
+            scheme: "sepa_core",
+            currency: "EUR",
+            verify: "when_available"
+          },
+          metadata: {
+            user_id: user.id,
+            user_email: user.email,
+            plan_type: planType,
+          }
+        }
+      })
     });
 
-    // Check if customer exists
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
+    if (!billingRequestResponse.ok) {
+      const errorData = await billingRequestResponse.json();
+      logStep("Billing request error", errorData);
+      throw new Error(`GoCardless error: ${JSON.stringify(errorData)}`);
     }
 
-    // Create checkout session
-    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      customer: customerId,
-      customer_email: customerId ? undefined : user.email,
-      line_items: [
-        {
-          price_data: {
-            currency: "eur",
-            product_data: { 
-              name: planConfig.name,
-              description: planConfig.description
-            },
-            unit_amount: planConfig.amount,
-            recurring: { interval: "month" },
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "subscription",
-      success_url: `${req.headers.get("origin")}/success?session_id={CHECKOUT_SESSION_ID}&plan=${planType}`,
-      cancel_url: `${req.headers.get("origin")}/plans?canceled=true`,
-      metadata: {
-        user_id: user.id,
-        plan_type: planType,
+    const billingRequestData = await billingRequestResponse.json();
+    const billingRequestId = billingRequestData.billing_requests.id;
+    logStep("Billing request created", { billingRequestId });
+
+    // Create a Billing Request Flow (hosted checkout page)
+    const flowResponse = await fetch(`${GOCARDLESS_API_URL}/billing_request_flows`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${gcToken}`,
+        "GoCardless-Version": "2015-07-06",
+        "Content-Type": "application/json",
       },
-    };
-
-    // Add trial period if applicable
-    if (planConfig.trialDays) {
-      sessionConfig.subscription_data = {
-        trial_period_days: planConfig.trialDays,
-        metadata: {
-          user_id: user.id,
-          plan_type: planType,
+      body: JSON.stringify({
+        billing_request_flows: {
+          redirect_uri: `${origin}/success?billing_request_id=${billingRequestId}&plan=${planType}`,
+          exit_uri: `${origin}/plans?canceled=true`,
+          links: {
+            billing_request: billingRequestId
+          },
+          prefilled_customer: {
+            email: user.email,
+          },
+          lock_customer_details: false,
+          lock_bank_account: false,
+          show_redirect_buttons: true,
+          show_success_redirect_button: true,
         }
-      };
+      })
+    });
+
+    if (!flowResponse.ok) {
+      const errorData = await flowResponse.json();
+      logStep("Flow creation error", errorData);
+      throw new Error(`GoCardless flow error: ${JSON.stringify(errorData)}`);
     }
 
-    // Apply promo code if provided
-    if (promoCode) {
-      try {
-        // Try to find the coupon in Stripe
-        const coupons = await stripe.coupons.list({ limit: 100 });
-        const matchingCoupon = coupons.data.find(c => c.name?.toUpperCase() === promoCode.toUpperCase());
-        if (matchingCoupon) {
-          sessionConfig.discounts = [{ coupon: matchingCoupon.id }];
-        }
-      } catch (e) {
-        console.log("Promo code not found in Stripe:", promoCode);
-      }
-    }
+    const flowData = await flowResponse.json();
+    const authorisationUrl = flowData.billing_request_flows.authorisation_url;
+    logStep("Billing request flow created", { url: authorisationUrl });
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
+    // Store pending subscription in database
+    await supabaseClient.from("pending_subscriptions").upsert({
+      user_id: user.id,
+      billing_request_id: billingRequestId,
+      plan_type: planType,
+      amount: planConfig.amount,
+      status: "pending",
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
 
-    return new Response(JSON.stringify({ url: session.url }), {
+    return new Response(JSON.stringify({ url: authorisationUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const isLiveChargesDisabled = message.includes("Your account cannot currently make live charges");
-
+    logStep("ERROR", { message });
     console.error("Checkout error:", error);
 
     return new Response(
-      JSON.stringify({
-        error: message,
-        code: isLiveChargesDisabled ? "stripe_live_charges_disabled" : "checkout_error",
-        hint: isLiveChargesDisabled
-          ? "Stripe live payments are not enabled for this account yet. Enable your account for live charges in Stripe, or switch STRIPE_SECRET_KEY to a test key (sk_test_...) for development."
-          : undefined,
-      }),
+      JSON.stringify({ error: message, code: "checkout_error" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: isLiveChargesDisabled ? 400 : 500,
+        status: 500,
       }
     );
   }
