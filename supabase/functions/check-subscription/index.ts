@@ -129,6 +129,12 @@ serve(async (req) => {
 
             const planConfig = PLAN_PRICES[pending.plan_type] || PLAN_PRICES.premium;
             
+            // Calculate start_date: 1st of next month for end-of-month billing
+            const now = new Date();
+            const startDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const startDateStr = startDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
+            logStep("Subscription will start on", { startDate: startDateStr });
+            
             const subResponse = await fetch(`${GOCARDLESS_API_URL}/subscriptions`, {
               method: "POST",
               headers: {
@@ -143,6 +149,8 @@ serve(async (req) => {
                   name: planConfig?.name || "Abonnement Nettobloc",
                   interval_unit: "monthly",
                   interval: 1,
+                  day_of_month: 1, // Prélèvement le 1er de chaque mois
+                  start_date: startDateStr, // Premier prélèvement le 1er du mois prochain
                   metadata: {
                     user_id: user.id,
                     plan_type: pending.plan_type,
