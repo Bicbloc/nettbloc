@@ -482,7 +482,7 @@ export function RoomCard({
           </Badge>
           {room.status === 'needs-attention' && room.remark && (
             <Badge variant="outline" className="bg-red-100 text-red-800">
-              <AlertCircle className="h-3 w-3 mr-1" /> Remarque
+              <AlertCircle className="h-3 w-3 mr-1" /> {t.rooms.remark}
             </Badge>
           )}
         </div>
@@ -492,35 +492,35 @@ export function RoomCard({
         </div>
       </div>
       
-      {/* Afficher les notes/commentaires de la femme de chambre */}
+      {/* Display housekeeper notes/comments */}
       {room.notes && (
         <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-md">
           <div className="flex items-start gap-2">
             <span className="text-lg">💬</span>
             <div>
-              <p className="text-sm font-medium text-purple-800">Commentaire femme de chambre :</p>
+              <p className="text-sm font-medium text-purple-800">{t.rooms.housekeeperComment}:</p>
               <p className="text-sm text-purple-700 mt-1">{room.notes}</p>
             </div>
           </div>
         </div>
       )}
       
-      {/* Afficher la remarque si présente */}
+      {/* Display remark if present */}
       {room.status === 'needs-attention' && room.remark && (
         <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md">
           <div className="flex items-start gap-2">
             <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-red-800">Remarque signalée :</p>
+              <p className="text-sm font-medium text-red-800">{t.rooms.remarkReported}:</p>
               <p className="text-sm text-red-700 mt-1">{room.remark}</p>
             </div>
           </div>
         </div>
       )}
       
-      {/* New Cleaning Type Selection */}
+      {/* Cleaning Type Selection */}
       <div className="mb-3 mt-2 p-2 border border-gray-200 rounded-md bg-gray-50">
-        <p className="text-xs font-medium mb-2 text-gray-700">Type de nettoyage:</p>
+        <p className="text-xs font-medium mb-2 text-gray-700">{t.rooms.cleaningTypeLabel}:</p>
         <RadioGroup 
           value={room.cleaningType === 'full' ? 'a_blanc' : room.cleaningType === 'quick' ? 'recouche' : room.cleaningType} 
           className="flex gap-2"
@@ -532,7 +532,7 @@ export function RoomCard({
               htmlFor={`a_blanc-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-purple-800"
             >
-              🚪 À Blanc
+              🚪 {t.rooms.fullClean}
             </Label>
           </div>
           <div className="flex items-center space-x-1">
@@ -541,7 +541,7 @@ export function RoomCard({
               htmlFor={`recouche-${room.number}`}
               className="flex items-center text-xs gap-1 cursor-pointer text-blue-800"
             >
-              🛏️ Recouche
+              🛏️ {t.rooms.quickClean}
             </Label>
           </div>
         </RadioGroup>
@@ -572,7 +572,7 @@ export function RoomCard({
             htmlFor={`urgent-${room.number}`}
             className="text-sm font-medium flex items-center gap-1 cursor-pointer text-red-500"
           >
-            Prioritaire <AlertCircle className="h-4 w-4" />
+            {t.rooms.priority} <AlertCircle className="h-4 w-4" />
           </label>
         </div>
         
@@ -586,16 +586,16 @@ export function RoomCard({
             htmlFor={`noturgent-${room.number}`}
             className="text-sm font-medium flex items-center gap-1 cursor-pointer text-green-500"
           >
-            Pas urgent <Clock className="h-4 w-4" />
+            {t.rooms.notUrgent} <Clock className="h-4 w-4" />
           </label>
         </div>
       </div>
 
-      {/* Boutons de gestion des chambres */}
+      {/* Room management buttons */}
       <div className="flex gap-2 mt-4 pt-3 border-t border-gray-200">
         {room.linkedRooms && room.linkedRooms.length > 0 && (
           <div className="flex-1">
-            <p className="text-xs text-muted-foreground mb-1">Chambres liées:</p>
+            <p className="text-xs text-muted-foreground mb-1">{t.rooms.linkedRooms}:</p>
             <div className="flex flex-wrap gap-1">
               {room.linkedRooms.map(linkedRoom => (
                 <Badge key={linkedRoom} variant="secondary" className="text-xs">
@@ -607,7 +607,7 @@ export function RoomCard({
         )}
         
         <div className="flex gap-1 flex-wrap">
-          {/* Bouton incidents en mode non-compact */}
+          {/* Incidents button in non-compact mode */}
           {hotelId && (
             <Button
               variant="outline"
@@ -621,10 +621,10 @@ export function RoomCard({
                   ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300' 
                   : ''
               }`}
-              title={incidentCount > 0 ? `${incidentCount} incident(s)` : "Voir les incidents"}
+              title={incidentCount > 0 ? `${incidentCount} incident(s)` : t.rooms.viewIncidents}
             >
               <Wrench className="h-3 w-3" />
-              Incidents
+              {t.rooms.incidents}
               {incidentCount > 0 && (
                 <Badge className="ml-1 bg-orange-500 text-white text-[10px] px-1.5 py-0">
                   {incidentCount}
@@ -642,10 +642,10 @@ export function RoomCard({
                 setShowLinkDialog(true);
               }}
               className="flex items-center gap-1"
-              title="Lier avec d'autres chambres"
+              title={t.rooms.linkWithRooms}
             >
               <Link className="h-3 w-3" />
-              Lier
+              {t.rooms.link}
             </Button>
           )}
           
@@ -658,10 +658,10 @@ export function RoomCard({
                 setShowDeleteDialog(true);
               }}
               className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-              title="Supprimer la chambre"
+              title={t.rooms.deleteRoom}
             >
               <Trash2 className="h-3 w-3" />
-              Supprimer
+              {t.rooms.delete}
             </Button>
           )}
         </div>

@@ -82,6 +82,7 @@ type TranslationSchema = {
     roomNumber: string;
     status: string;
     cleaningType: string;
+    cleaningTypeLabel: string;
     fullClean: string;
     fullCleanShort: string;
     quickClean: string;
@@ -101,6 +102,44 @@ type TranslationSchema = {
     addNote: string;
     inProgress: string;
     completed: string;
+    remark: string;
+    housekeeperComment: string;
+    remarkReported: string;
+    priority: string;
+    priorityHigh: string;
+    priorityMedium: string;
+    priorityLow: string;
+    notUrgent: string;
+    linkedRooms: string;
+    incidents: string;
+    viewIncidents: string;
+    link: string;
+    linkWithRooms: string;
+    deleteRoom: string;
+    delete: string;
+    addRoom: string;
+    editRoom: string;
+    floor: string;
+    twinRoom: string;
+    urgent: string;
+    noCleaning: string;
+    notesPlaceholder: string;
+    selectStatus: string;
+    selectPriority: string;
+    roomExists: string;
+    roomAdded: string;
+    roomModified: string;
+    modifyRoom: string;
+    createRoom: string;
+    saveChanges: string;
+    addComment: string;
+    comment: string;
+    markAsClean: string;
+    readyToClean: string;
+    guestOut: string;
+    unassign: string;
+    reassignTo: string;
+    reassignmentOptions: string;
   };
   dashboard: {
     title: string;
@@ -279,6 +318,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       roomNumber: "Numéro de chambre",
       status: "Statut",
       cleaningType: "Type de nettoyage",
+      cleaningTypeLabel: "Type de nettoyage",
       fullClean: "À blanc",
       fullCleanShort: "CO",
       quickClean: "Recouche",
@@ -298,6 +338,44 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       addNote: "Ajouter une note",
       inProgress: "En cours",
       completed: "Terminée",
+      remark: "Remarque",
+      housekeeperComment: "Commentaire femme de chambre",
+      remarkReported: "Remarque signalée",
+      priority: "Prioritaire",
+      priorityHigh: "Haute",
+      priorityMedium: "Moyenne",
+      priorityLow: "Basse",
+      notUrgent: "Pas urgent",
+      linkedRooms: "Chambres liées",
+      incidents: "Incidents",
+      viewIncidents: "Voir les incidents",
+      link: "Lier",
+      linkWithRooms: "Lier avec d'autres chambres",
+      deleteRoom: "Supprimer la chambre",
+      delete: "Supprimer",
+      addRoom: "Ajouter une chambre",
+      editRoom: "Modifier la chambre",
+      floor: "Étage",
+      twinRoom: "Chambre twin",
+      urgent: "Urgent",
+      noCleaning: "Aucun nettoyage",
+      notesPlaceholder: "Remarques ou informations supplémentaires...",
+      selectStatus: "Sélectionnez le statut",
+      selectPriority: "Sélectionnez la priorité",
+      roomExists: "Une chambre avec ce numéro existe déjà",
+      roomAdded: "Chambre ajoutée avec succès",
+      roomModified: "Chambre modifiée avec succès",
+      modifyRoom: "Modifiez les détails de cette chambre",
+      createRoom: "Créez une nouvelle chambre si les données PDF ne sont pas correctement récupérées",
+      saveChanges: "Sauvegarder les modifications",
+      addComment: "Ajouter un commentaire",
+      comment: "Commentaire",
+      markAsClean: "Marquer comme propre",
+      readyToClean: "Prêt à nettoyer",
+      guestOut: "Client sorti - Prêt à nettoyer",
+      unassign: "Désassigner",
+      reassignTo: "Réassigner à",
+      reassignmentOptions: "Options de réassignation",
     },
     
     // Dashboard
@@ -489,6 +567,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       roomNumber: "Room number",
       status: "Status",
       cleaningType: "Cleaning type",
+      cleaningTypeLabel: "Cleaning type",
       fullClean: "Check-out cleaning",
       fullCleanShort: "CO",
       quickClean: "Stayover cleaning",
@@ -508,6 +587,44 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       addNote: "Add note",
       inProgress: "In progress",
       completed: "Completed",
+      remark: "Remark",
+      housekeeperComment: "Housekeeper comment",
+      remarkReported: "Reported remark",
+      priority: "Priority",
+      priorityHigh: "High",
+      priorityMedium: "Medium",
+      priorityLow: "Low",
+      notUrgent: "Not urgent",
+      linkedRooms: "Linked rooms",
+      incidents: "Incidents",
+      viewIncidents: "View incidents",
+      link: "Link",
+      linkWithRooms: "Link with other rooms",
+      deleteRoom: "Delete room",
+      delete: "Delete",
+      addRoom: "Add a room",
+      editRoom: "Edit room",
+      floor: "Floor",
+      twinRoom: "Twin room",
+      urgent: "Urgent",
+      noCleaning: "No cleaning",
+      notesPlaceholder: "Remarks or additional information...",
+      selectStatus: "Select status",
+      selectPriority: "Select priority",
+      roomExists: "A room with this number already exists",
+      roomAdded: "Room added successfully",
+      roomModified: "Room modified successfully",
+      modifyRoom: "Modify room details",
+      createRoom: "Create a new room if PDF data is not correctly retrieved",
+      saveChanges: "Save changes",
+      addComment: "Add a comment",
+      comment: "Comment",
+      markAsClean: "Mark as clean",
+      readyToClean: "Ready to clean",
+      guestOut: "Guest out - Ready to clean",
+      unassign: "Unassign",
+      reassignTo: "Reassign to",
+      reassignmentOptions: "Reassignment options",
     },
     
     // Dashboard

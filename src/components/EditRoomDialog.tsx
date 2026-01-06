@@ -31,15 +31,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Room } from "@/services/pdfService";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const formSchema = z.object({
-  number: z.string().min(1, "Le numéro de chambre est requis"),
-  status: z.string().min(1, "Le statut est requis"),
+  number: z.string().min(1, "Room number is required"),
+  status: z.string().min(1, "Status is required"),
   cleaningType: z.enum(['a_blanc', 'recouche', 'none', 'full', 'quick'], {
-    required_error: "Le type de nettoyage est requis",
+    required_error: "Cleaning type is required",
   }),
   priority: z.enum(['high', 'medium', 'low'], {
-    required_error: "La priorité est requise",
+    required_error: "Priority is required",
   }),
   floor: z.string().optional(),
   isTwin: z.boolean().default(false),
@@ -59,6 +60,7 @@ interface EditRoomDialogProps {
 }
 
 export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingRooms }: EditRoomDialogProps) {
+  const { t } = useLanguage();
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -75,15 +77,15 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
   });
 
   const onSubmit = (data: FormData) => {
-    // Vérifier si le nouveau numéro existe déjà (sauf pour la chambre actuelle)
+    // Check if the new number already exists (except for the current room)
     const roomExists = existingRooms.some(existingRoom => 
       existingRoom.number === data.number && existingRoom.number !== room.number
     );
     
     if (roomExists) {
       toast({
-        title: "Erreur",
-        description: "Une chambre avec ce numéro existe déjà",
+        title: t.common.cancel,
+        description: t.rooms.roomExists,
         variant: "destructive",
       });
       return;
@@ -105,31 +107,31 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
     onEditRoom(updatedRoom);
     
     toast({
-      title: "Succès",
-      description: `Chambre ${data.number} modifiée avec succès`,
+      title: t.common.save,
+      description: `${t.rooms.room} ${data.number} ${t.rooms.roomModified}`,
     });
 
     onOpenChange(false);
   };
 
   const statusOptions = [
-    { value: 'DIRTY', label: 'Sale' },
-    { value: 'CLEAN', label: 'Propre' },
+    { value: 'DIRTY', label: t.rooms.dirty },
+    { value: 'CLEAN', label: t.rooms.clean },
     { value: 'MAINTENANCE', label: 'Maintenance' },
-    { value: 'OOO', label: 'Hors service' },
-    { value: 'DEPARTURE', label: 'Départ' },
-    { value: 'ARRIVAL', label: 'Arrivée' },
-    { value: 'STAY', label: 'Occupée' },
-    { value: 'VACANT', label: 'Libre' },
+    { value: 'OOO', label: t.rooms.vacant },
+    { value: 'DEPARTURE', label: t.rooms.departure },
+    { value: 'ARRIVAL', label: t.rooms.arrival },
+    { value: 'STAY', label: t.rooms.occupied },
+    { value: 'VACANT', label: t.rooms.vacant },
   ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Modifier la chambre {room.number}</DialogTitle>
+          <DialogTitle>{t.rooms.editRoom} {room.number}</DialogTitle>
           <DialogDescription>
-            Modifiez les détails de cette chambre.
+            {t.rooms.modifyRoom}
           </DialogDescription>
         </DialogHeader>
         
@@ -141,7 +143,7 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
                 name="number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numéro de chambre *</FormLabel>
+                    <FormLabel>{t.rooms.roomNumber} *</FormLabel>
                     <FormControl>
                       <Input placeholder="ex: 101" {...field} />
                     </FormControl>
@@ -155,7 +157,7 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
                 name="floor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Étage</FormLabel>
+                    <FormLabel>{t.rooms.floor}</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="ex: 1" {...field} />
                     </FormControl>
@@ -171,11 +173,11 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Statut *</FormLabel>
+                    <FormLabel>{t.rooms.status} *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionnez le statut" />
+                          <SelectValue placeholder={t.rooms.selectStatus} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -196,17 +198,17 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
                 name="cleaningType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Type de nettoyage *</FormLabel>
+                    <FormLabel>{t.rooms.cleaningType} *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Type de nettoyage" />
+                          <SelectValue placeholder={t.rooms.cleaningType} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="a_blanc">À Blanc (départ)</SelectItem>
-                        <SelectItem value="recouche">Recouche (client reste)</SelectItem>
-                        <SelectItem value="none">Aucun nettoyage</SelectItem>
+                        <SelectItem value="a_blanc">🚪 {t.rooms.fullClean} (CO)</SelectItem>
+                        <SelectItem value="recouche">🛏️ {t.rooms.quickClean} (SO)</SelectItem>
+                        <SelectItem value="none">{t.rooms.noCleaning}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -220,17 +222,17 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
               name="priority"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Priorité *</FormLabel>
+                  <FormLabel>{t.rooms.priority} *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionnez la priorité" />
+                        <SelectValue placeholder={t.rooms.selectPriority} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="high">Haute</SelectItem>
-                      <SelectItem value="medium">Moyenne</SelectItem>
-                      <SelectItem value="low">Basse</SelectItem>
+                      <SelectItem value="high">{t.rooms.priorityHigh}</SelectItem>
+                      <SelectItem value="medium">{t.rooms.priorityMedium}</SelectItem>
+                      <SelectItem value="low">{t.rooms.priorityLow}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -251,7 +253,7 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Chambre twin</FormLabel>
+                      <FormLabel>{t.rooms.twinRoom}</FormLabel>
                     </div>
                   </FormItem>
                 )}
@@ -269,7 +271,7 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Urgent</FormLabel>
+                      <FormLabel>{t.rooms.urgent}</FormLabel>
                     </div>
                   </FormItem>
                 )}
@@ -287,7 +289,7 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Non urgent</FormLabel>
+                      <FormLabel>{t.rooms.notUrgent}</FormLabel>
                     </div>
                   </FormItem>
                 )}
@@ -299,10 +301,10 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (optionnel)</FormLabel>
+                  <FormLabel>{t.rooms.notes}</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Remarques ou informations supplémentaires..."
+                      placeholder={t.rooms.notesPlaceholder}
                       {...field} 
                     />
                   </FormControl>
@@ -313,10 +315,10 @@ export function EditRoomDialog({ open, onOpenChange, room, onEditRoom, existingR
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Annuler
+                {t.common.cancel}
               </Button>
               <Button type="submit">
-                Sauvegarder les modifications
+                {t.rooms.saveChanges}
               </Button>
             </DialogFooter>
           </form>
