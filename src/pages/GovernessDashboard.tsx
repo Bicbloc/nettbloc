@@ -4,9 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Crown, LogOut, Building2, CheckCircle, AlertTriangle, Eye, Loader2, ClipboardList, RefreshCw } from 'lucide-react';
+import { Crown, LogOut, Building2, CheckCircle, AlertTriangle, Eye, Loader2, RefreshCw } from 'lucide-react';
 import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
 import { IncidentList } from '@/components/incident/IncidentList';
@@ -34,6 +37,13 @@ export default function GovernessDashboard() {
     inspectedRooms: 0,
     pendingIncidents: 0
   });
+  
+  // Dialog state for hotel code input
+  const [isHotelDialogOpen, setIsHotelDialogOpen] = useState(false);
+  const [hotelCodeInput, setHotelCodeInput] = useState('');
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
+  const [hotelCodeError, setHotelCodeError] = useState<string | null>(null);
+  
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -51,7 +61,6 @@ export default function GovernessDashboard() {
 
   const loadHotels = async (profileId: string) => {
     try {
-      // Charger les sessions d'hôtel actives pour cette gouvernante
       const { data: sessions, error } = await supabase
         .from('governess_hotel_sessions')
         .select(`
@@ -73,7 +82,6 @@ export default function GovernessDashboard() {
           .filter((h): h is Hotel => h !== null);
         setHotels(uniqueHotels);
         
-        // Sélectionner le premier hôtel par défaut
         if (uniqueHotels.length > 0 && !selectedHotel) {
           setSelectedHotel(uniqueHotels[0]);
         }
@@ -91,20 +99,17 @@ export default function GovernessDashboard() {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      // Chambres totales
       const { count: totalRooms } = await supabase
         .from('rooms')
         .select('*', { count: 'exact', head: true })
         .eq('hotel_id', selectedHotel.id);
 
-      // Chambres propres
       const { count: cleanRooms } = await supabase
         .from('rooms')
         .select('*', { count: 'exact', head: true })
         .eq('hotel_id', selectedHotel.id)
         .eq('status', 'clean');
 
-      // Chambres inspectées aujourd'hui
       const { count: inspectedRooms } = await supabase
         .from('room_inspections')
         .select('*', { count: 'exact', head: true })
@@ -112,7 +117,6 @@ export default function GovernessDashboard() {
         .eq('inspection_date', today)
         .eq('status', 'passed');
 
-      // Incidents en cours
       const { count: pendingIncidents } = await supabase
         .from('incidents')
         .select('*', { count: 'exact', head: true })
@@ -145,63 +149,64 @@ export default function GovernessDashboard() {
     navigate('/governess/auth');
   };
 
-  const handleRequestHotelAccess = async () => {
-    const hotelCode = prompt("Entrez le code de l'hôtel (ex: HTL056) :");
-    if (!hotelCode || !profile) return;
+  const openHotelAccessDialog = () => {
+    setHotelCodeInput('');
+    setHotelCodeError(null);
+    setIsHotelDialogOpen(true);
+  };
+
+  const handleSubmitHotelCode = async () => {
+    if (!hotelCodeInput.trim() || !profile) return;
+
+    setIsSubmittingCode(true);
+    setHotelCodeError(null);
 
     try {
-      // Trouver l'hôtel avec maybeSingle pour éviter erreur si non trouvé
-      const { data: hotel, error: hotelError } = await supabase
-        .from('hotels')
-        .select('id, name, hotel_code')
-        .eq('hotel_code', hotelCode.toUpperCase().trim())
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke('governess-request-hotel-access', {
+        body: { 
+          hotelCode: hotelCodeInput.trim(),
+          governessProfileId: profile.id
+        }
+      });
 
-      if (hotelError) {
-        alert("Erreur lors de la recherche : " + hotelError.message);
+      if (error) {
+        console.error('Erreur edge function:', error);
+        setHotelCodeError("Erreur de connexion au serveur");
         return;
       }
 
-      if (!hotel) {
-        alert("❌ Hôtel non trouvé !\n\nLe code \"" + hotelCode.toUpperCase().trim() + "\" n'existe pas.\n\nVérifiez le code auprès de l'établissement.");
+      if (data.error === 'hotel_not_found') {
+        setHotelCodeError(`Code "${hotelCodeInput.toUpperCase().trim()}" introuvable. Vérifiez auprès de l'établissement.`);
         return;
       }
 
-      // Vérifier si déjà associé
-      const { data: existingSession } = await supabase
-        .from('governess_hotel_sessions')
-        .select('id')
-        .eq('governess_profile_id', profile.id)
-        .eq('hotel_id', hotel.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (existingSession) {
-        alert("ℹ️ Vous avez déjà accès à cet hôtel !");
+      if (data.error) {
+        setHotelCodeError(data.details || data.error);
         return;
       }
 
-      // Créer une session
-      const { error: sessionError } = await supabase
-        .from('governess_hotel_sessions')
-        .insert({
-          governess_profile_id: profile.id,
-          hotel_id: hotel.id,
-          hotel_name: hotel.name,
-          is_active: true,
-          started_at: new Date().toISOString()
+      if (data.status === 'already_has_access') {
+        toast({
+          title: "Déjà accès",
+          description: `Vous avez déjà accès à "${data.hotel.name}"`
         });
-
-      if (sessionError) {
-        alert("Erreur lors de l'ajout : " + sessionError.message);
+        setIsHotelDialogOpen(false);
         return;
       }
 
-      alert("✅ Succès !\n\nVous avez maintenant accès à \"" + hotel.name + "\"");
-      loadHotels(profile.id);
+      if (data.status === 'added') {
+        toast({
+          title: "Accès accordé !",
+          description: `Vous avez maintenant accès à "${data.hotel.name}"`
+        });
+        setIsHotelDialogOpen(false);
+        loadHotels(profile.id);
+      }
     } catch (error: any) {
       console.error('Erreur ajout hôtel:', error);
-      alert("❌ Erreur inattendue :\n" + error.message);
+      setHotelCodeError("Erreur inattendue. Réessayez.");
+    } finally {
+      setIsSubmittingCode(false);
     }
   };
 
@@ -249,7 +254,6 @@ export default function GovernessDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Sélection d'hôtel si plusieurs */}
         {hotels.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
@@ -258,7 +262,7 @@ export default function GovernessDashboard() {
               <p className="text-muted-foreground mb-4">
                 Demandez l'accès à un hôtel pour commencer
               </p>
-              <Button onClick={handleRequestHotelAccess}>
+              <Button onClick={openHotelAccessDialog}>
                 <Building2 className="h-4 w-4 mr-2" />
                 Demander l'accès à un hôtel
               </Button>
@@ -406,7 +410,7 @@ export default function GovernessDashboard() {
 
             {/* Bouton ajouter hôtel */}
             <div className="text-center">
-              <Button variant="outline" onClick={handleRequestHotelAccess}>
+              <Button variant="outline" onClick={openHotelAccessDialog}>
                 <Building2 className="h-4 w-4 mr-2" />
                 Demander accès à un autre hôtel
               </Button>
@@ -414,6 +418,69 @@ export default function GovernessDashboard() {
           </>
         )}
       </main>
+
+      {/* Dialog intégré pour le code hôtel */}
+      <Dialog open={isHotelDialogOpen} onOpenChange={setIsHotelDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-amber-600" />
+              Accès à un hôtel
+            </DialogTitle>
+            <DialogDescription>
+              Entrez le code de l'hôtel fourni par l'établissement
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="hotel-code">Code hôtel</Label>
+              <Input
+                id="hotel-code"
+                placeholder="Ex: HTL630"
+                value={hotelCodeInput}
+                onChange={(e) => {
+                  setHotelCodeInput(e.target.value.toUpperCase());
+                  setHotelCodeError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isSubmittingCode) {
+                    handleSubmitHotelCode();
+                  }
+                }}
+                className="uppercase"
+                autoFocus
+              />
+              {hotelCodeError && (
+                <p className="text-sm text-destructive">{hotelCodeError}</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsHotelDialogOpen(false)}
+              disabled={isSubmittingCode}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSubmitHotelCode}
+              disabled={!hotelCodeInput.trim() || isSubmittingCode}
+            >
+              {isSubmittingCode ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Vérification...
+                </>
+              ) : (
+                'Valider'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
