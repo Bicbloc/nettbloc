@@ -70,6 +70,13 @@ export class MewsAdapter extends PmsAdapter {
     // Fusionner DBL-C/S avec le statut sur la ligne suivante
     processed = processed.replace(/([A-Z]{3}-[CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi, '$1 $2');
     
+    // IMPORTANT: Fusionner un type de chambre custom (ex: CLA) avec le statut sur la ligne suivante
+    // Exemple: "402 CLA\nINS" → "402 CLA INS"
+    processed = processed.replace(
+      /(\d{2,4})\s+((?!(?:SAL|PRO|INS|DIR|DEP|ARR)\b)[A-Z]{3,8})\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+      '$1 $2 $3'
+    );
+    
     // Fusionner le numéro de chambre avec le type de chambre fragmenté
     // Pattern: "001   DBL-" suivi d'un saut de ligne puis "C"
     processed = processed.replace(/(\d{2,4})\s+(DBL|SGL|TPL|FAM)-\s*\n\s*([CS])/gi, '$1 $2-$3');
