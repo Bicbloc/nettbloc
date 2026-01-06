@@ -381,6 +381,63 @@ export type Database = {
           },
         ]
       }
+      governess_access_requests: {
+        Row: {
+          created_at: string | null
+          governess_profile_id: string
+          hotel_code: string
+          hotel_id: string
+          id: string
+          rejection_reason: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          governess_profile_id: string
+          hotel_code: string
+          hotel_id: string
+          id?: string
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          governess_profile_id?: string
+          hotel_code?: string
+          hotel_id?: string
+          id?: string
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governess_access_requests_governess_profile_id_fkey"
+            columns: ["governess_profile_id"]
+            isOneToOne: false
+            referencedRelation: "governess_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "governess_access_requests_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       governess_hotel_sessions: {
         Row: {
           created_at: string | null

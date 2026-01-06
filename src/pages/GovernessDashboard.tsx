@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Crown, LogOut, Building2, CheckCircle, AlertTriangle, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Crown, LogOut, Building2, CheckCircle, AlertTriangle, Eye, Loader2, RefreshCw, Clock, XCircle } from 'lucide-react';
 import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
 import { IncidentList } from '@/components/incident/IncidentList';
@@ -26,9 +26,21 @@ interface Hotel {
   hotel_code: string;
 }
 
+interface PendingRequest {
+  id: string;
+  hotel_id: string;
+  hotel_code: string;
+  status: string;
+  requested_at: string;
+  hotels: {
+    name: string;
+  } | null;
+}
+
 export default function GovernessDashboard() {
   const [profile, setProfile] = useState<GovernessProfile | null>(null);
   const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -57,6 +69,7 @@ export default function GovernessDashboard() {
     const parsedProfile = JSON.parse(storedProfile);
     setProfile(parsedProfile);
     loadHotels(parsedProfile.id);
+    loadPendingRequests(parsedProfile.id);
   }, [navigate]);
 
   const loadHotels = async (profileId: string) => {
@@ -90,6 +103,31 @@ export default function GovernessDashboard() {
       console.error('Erreur chargement hôtels:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadPendingRequests = async (profileId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('governess_access_requests')
+        .select(`
+          id,
+          hotel_id,
+          hotel_code,
+          status,
+          requested_at,
+          hotels:hotel_id (
+            name
+          )
+        `)
+        .eq('governess_profile_id', profileId)
+        .in('status', ['pending', 'rejected'])
+        .order('requested_at', { ascending: false });
+
+      if (error) throw error;
+      setPendingRequests(data || []);
+    } catch (error) {
+      console.error('Erreur chargement demandes:', error);
     }
   };
 
@@ -194,13 +232,23 @@ export default function GovernessDashboard() {
         return;
       }
 
-      if (data.status === 'added') {
+      if (data.status === 'request_pending') {
         toast({
-          title: "Accès accordé !",
-          description: `Vous avez maintenant accès à "${data.hotel.name}"`
+          title: "Demande déjà en cours",
+          description: `Votre demande pour "${data.hotel.name}" est en attente de validation.`
         });
         setIsHotelDialogOpen(false);
-        loadHotels(profile.id);
+        loadPendingRequests(profile.id);
+        return;
+      }
+
+      if (data.status === 'request_submitted') {
+        toast({
+          title: "Demande envoyée !",
+          description: `Votre demande d'accès à "${data.hotel.name}" a été soumise. L'établissement doit la valider.`
+        });
+        setIsHotelDialogOpen(false);
+        loadPendingRequests(profile.id);
       }
     } catch (error: any) {
       console.error('Erreur ajout hôtel:', error);
@@ -254,7 +302,64 @@ export default function GovernessDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        {hotels.length === 0 ? (
+        {/* Demandes en attente */}
+        {pendingRequests.length > 0 && (
+          <Card className="border-amber-200 bg-amber-50/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-600" />
+                Demandes en attente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {pendingRequests.filter(r => r.status === 'pending').map(request => (
+                <div 
+                  key={request.id}
+                  className="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200"
+                >
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    <div>
+                      <p className="font-medium">{request.hotels?.name || request.hotel_code}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Demandé le {new Date(request.requested_at).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">
+                    En attente
+                  </Badge>
+                </div>
+              ))}
+              {pendingRequests.filter(r => r.status === 'rejected').map(request => (
+                <div 
+                  key={request.id}
+                  className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200"
+                >
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    <div>
+                      <p className="font-medium">{request.hotels?.name || request.hotel_code}</p>
+                      <p className="text-xs text-muted-foreground">Demande refusée</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setHotelCodeInput(request.hotel_code);
+                      setIsHotelDialogOpen(true);
+                    }}
+                  >
+                    Refaire une demande
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {hotels.length === 0 && pendingRequests.filter(r => r.status === 'pending').length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
               <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
@@ -268,9 +373,22 @@ export default function GovernessDashboard() {
               </Button>
             </CardContent>
           </Card>
+        ) : hotels.length === 0 ? (
+          <Card className="text-center py-8">
+            <CardContent>
+              <Clock className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+              <h2 className="text-lg font-semibold mb-2">Demandes en cours</h2>
+              <p className="text-muted-foreground mb-4">
+                Vos demandes sont en attente de validation par les établissements.
+              </p>
+              <Button variant="outline" onClick={openHotelAccessDialog}>
+                <Building2 className="h-4 w-4 mr-2" />
+                Demander accès à un autre hôtel
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <>
-            {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="p-4">
                 <div className="flex items-center gap-3">
