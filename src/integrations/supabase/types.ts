@@ -338,6 +338,7 @@ export type Database = {
           housekeeper_id: string | null
           id: string
           notes: string | null
+          pdf_url: string | null
           report_date: string
           room_data: Json | null
           summary: Json | null
@@ -351,6 +352,7 @@ export type Database = {
           housekeeper_id?: string | null
           id?: string
           notes?: string | null
+          pdf_url?: string | null
           report_date?: string
           room_data?: Json | null
           summary?: Json | null
@@ -364,6 +366,7 @@ export type Database = {
           housekeeper_id?: string | null
           id?: string
           notes?: string | null
+          pdf_url?: string | null
           report_date?: string
           room_data?: Json | null
           summary?: Json | null
