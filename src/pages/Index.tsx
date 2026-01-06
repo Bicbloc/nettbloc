@@ -64,18 +64,6 @@ const Index = () => {
   const { isHotelReady } = useHotel();
   const isGuestMode = searchParams.get('mode') === 'guest';
 
-  // Fallback timeout - doit être AVANT les returns conditionnels pour respecter les règles des hooks
-  useEffect(() => {
-    if (isAuthenticated && !isHotelReady && isInitialized && !authLoading) {
-      const timeout = setTimeout(() => {
-        console.warn('⚠️ Hotel loading timeout (8s), forcing refresh');
-        window.location.reload();
-      }, 8000);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [isAuthenticated, isHotelReady, isInitialized, authLoading]);
-
   // Attendre initialisation auth
   if (!isInitialized || authLoading) {
     return (
@@ -95,18 +83,31 @@ const Index = () => {
 
   // Attendre que l'hôtel soit prêt (pour les utilisateurs authentifiés)
   if (isAuthenticated && !isHotelReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground text-sm">Chargement de votre établissement...</p>
-        </div>
-      </div>
-    );
+    return <HotelLoadingScreen />;
   }
 
-  // IMPORTANT: Ne pas conditionner les hooks dans ce composant (évite l'erreur React #310)
   return <IndexDashboard />;
+};
+
+// Composant séparé pour éviter les problèmes de hooks
+const HotelLoadingScreen = () => {
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.warn('⚠️ Hotel loading timeout (8s), forcing refresh');
+      window.location.reload();
+    }, 8000);
+    
+    return () => clearTimeout(timeout);
+  }, []);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
+      <div className="text-center space-y-4">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-muted-foreground text-sm">Chargement de votre établissement...</p>
+      </div>
+    </div>
+  );
 };
 
 const IndexDashboard = () => {
