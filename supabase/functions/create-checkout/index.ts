@@ -8,33 +8,23 @@ const corsHeaders = {
 
 const GOCARDLESS_API_URL = "https://api.gocardless.com";
 
-// Plan prices in cents (HT)
-const PLAN_PRICES: Record<string, { amount: number; name: string; description: string; trialDays?: number; interval: string }> = {
+// Plan display names (amounts come from pricing_config table)
+const PLAN_NAMES: Record<string, { name: string; description: string }> = {
   basic: { 
-    amount: 15000, // 150€ HT
     name: "Plan Basic Nettobloc",
-    description: "70 chambres max, PDF, distribution, rapports",
-    trialDays: 90,
-    interval: "monthly"
+    description: "70 chambres max, PDF, distribution, rapports"
   },
   basic_plus: { 
-    amount: 25000, // 250€ HT
     name: "Plan Basic+ Nettobloc",
-    description: "170 chambres max, PDF, distribution, rapports",
-    interval: "monthly"
+    description: "170 chambres max, PDF, distribution, rapports"
   },
   premium: { 
-    amount: 20000, // 200€ HT
     name: "Plan Premium Nettobloc",
-    description: "150 chambres, incidents, inventaire linge, inspection",
-    trialDays: 90,
-    interval: "monthly"
+    description: "150 chambres, incidents, inventaire linge, inspection"
   },
   platinum: { 
-    amount: 40000, // 400€ HT
     name: "Plan Platinum Nettobloc",
-    description: "Chambres illimitées, toutes fonctionnalités, API",
-    interval: "monthly"
+    description: "Chambres illimitées, toutes fonctionnalités, API"
   }
 };
 
@@ -75,21 +65,29 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const planType = body.planType || 'premium';
 
-    // Get plan configuration
-    const planConfig = PLAN_PRICES[planType];
-    if (!planConfig) {
+    // Get plan configuration from pricing_config table
+    const planNames = PLAN_NAMES[planType];
+    if (!planNames) {
       throw new Error(`Invalid plan type: ${planType}`);
     }
-    logStep("Plan config", { planType, amount: planConfig.amount });
 
-    // Validate plan availability
+    // Fetch price and availability from database
     const { data: pricingRow, error: pricingError } = await supabaseClient
       .from("pricing_config")
-      .select("is_active")
+      .select("price_monthly, is_active")
       .eq("plan_name", planType)
       .maybeSingle();
 
-    if (!pricingError && pricingRow && pricingRow.is_active === false) {
+    if (pricingError) {
+      logStep("Error fetching pricing config", pricingError);
+      throw new Error("Unable to fetch plan pricing");
+    }
+
+    if (!pricingRow) {
+      throw new Error(`Plan ${planType} not found in pricing configuration`);
+    }
+
+    if (pricingRow.is_active === false) {
       return new Response(
         JSON.stringify({ error: "PLAN_DISABLED", code: "plan_disabled" }),
         {
@@ -98,6 +96,10 @@ serve(async (req) => {
         }
       );
     }
+
+    // Convert price from euros to cents
+    const amountInCents = Math.round(Number(pricingRow.price_monthly) * 100);
+    logStep("Plan config from DB", { planType, amountInCents, priceMonthly: pricingRow.price_monthly });
 
     const origin = req.headers.get("origin") || "http://localhost:3000";
 
@@ -177,7 +179,7 @@ serve(async (req) => {
       user_id: user.id,
       billing_request_id: billingRequestId,
       plan_type: planType,
-      amount: planConfig.amount,
+      amount: amountInCents,
       status: "pending",
       created_at: new Date().toISOString(),
     }, { onConflict: 'user_id' });

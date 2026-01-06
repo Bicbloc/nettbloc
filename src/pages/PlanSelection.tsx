@@ -168,6 +168,9 @@ const PlanSelection = () => {
               `Vous êtes en période d'essai. Choisissez un plan pour continuer après l'essai.` :
               'Basic et Premium: 3 mois offerts sans engagement'}
           </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Premier prélèvement le 1er {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+          </p>
         </div>
 
         {/* Code promo */}
