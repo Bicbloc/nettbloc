@@ -9,6 +9,7 @@ import { QuickActionsCard } from "@/components/dashboard/QuickActionsCard";
 import { PlanningSummaryCard } from "@/components/dashboard/PlanningSummaryCard";
 import { PersonnelSection } from "@/components/dashboard/PersonnelSection";
 import { ActiveUsersPanel } from "@/components/ActiveUsersPanel";
+import { GovernessAccessRequests } from "@/components/GovernessAccessRequests";
 
 interface OverviewTabProps {
   rooms: Room[];
@@ -45,6 +46,9 @@ export function OverviewTab({
         rooms={rooms}
         housekeeperCount={housekeeperNames.length}
       />
+
+      {/* Demandes d'accès gouvernantes */}
+      <GovernessAccessRequests />
 
       <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         <QuickActionsCard

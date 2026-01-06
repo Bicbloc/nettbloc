@@ -56,7 +56,7 @@ serve(async (req) => {
 
     console.log(`✅ Hôtel trouvé: ${hotel.name} (${hotel.id})`);
 
-    // Vérifier si session existe déjà
+    // Vérifier si session existe déjà (accès déjà accordé)
     const { data: existingSession } = await supabaseAdmin
       .from('governess_hotel_sessions')
       .select('id')
@@ -66,7 +66,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingSession) {
-      console.log(`ℹ️ Session déjà active pour gouvernante ${governessProfileId}`);
+      console.log(`ℹ️ Accès déjà accordé pour gouvernante ${governessProfileId}`);
       return new Response(
         JSON.stringify({ 
           status: 'already_has_access', 
@@ -76,30 +76,82 @@ serve(async (req) => {
       );
     }
 
-    // Créer la session
+    // Vérifier si une demande existe déjà
+    const { data: existingRequest } = await supabaseAdmin
+      .from('governess_access_requests')
+      .select('id, status')
+      .eq('governess_profile_id', governessProfileId)
+      .eq('hotel_id', hotel.id)
+      .maybeSingle();
+
+    if (existingRequest) {
+      if (existingRequest.status === 'pending') {
+        console.log(`ℹ️ Demande déjà en attente pour gouvernante ${governessProfileId}`);
+        return new Response(
+          JSON.stringify({ 
+            status: 'request_pending', 
+            hotel: { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (existingRequest.status === 'rejected') {
+        // Permettre de refaire une demande si rejetée précédemment
+        const { error: updateError } = await supabaseAdmin
+          .from('governess_access_requests')
+          .update({
+            status: 'pending',
+            requested_at: new Date().toISOString(),
+            reviewed_at: null,
+            reviewed_by: null,
+            rejection_reason: null
+          })
+          .eq('id', existingRequest.id);
+
+        if (updateError) {
+          console.error('Erreur mise à jour demande:', updateError);
+          return new Response(
+            JSON.stringify({ error: 'Erreur mise à jour demande', details: updateError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log(`✅ Demande renouvelée pour gouvernante ${governessProfileId} → hôtel ${hotel.name}`);
+        return new Response(
+          JSON.stringify({ 
+            status: 'request_submitted', 
+            hotel: { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Créer une nouvelle demande d'accès (pas d'accès direct)
     const { error: insertError } = await supabaseAdmin
-      .from('governess_hotel_sessions')
+      .from('governess_access_requests')
       .insert({
         governess_profile_id: governessProfileId,
         hotel_id: hotel.id,
-        hotel_name: hotel.name,
-        is_active: true,
-        started_at: new Date().toISOString()
+        hotel_code: cleanCode,
+        status: 'pending',
+        requested_at: new Date().toISOString()
       });
 
     if (insertError) {
-      console.error('Erreur création session:', insertError);
+      console.error('Erreur création demande:', insertError);
       return new Response(
-        JSON.stringify({ error: 'Erreur création session', details: insertError.message }),
+        JSON.stringify({ error: 'Erreur création demande', details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`✅ Session créée pour gouvernante ${governessProfileId} → hôtel ${hotel.name}`);
+    console.log(`✅ Demande d'accès créée pour gouvernante ${governessProfileId} → hôtel ${hotel.name}`);
 
     return new Response(
       JSON.stringify({ 
-        status: 'added', 
+        status: 'request_submitted', 
         hotel: { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } 
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
