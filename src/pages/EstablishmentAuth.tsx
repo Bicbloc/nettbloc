@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHotel } from '@/contexts/HotelContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,8 +14,10 @@ import { supabase } from '@/integrations/supabase/client';
 
 const EstablishmentAuth = () => {
   const { signIn, signUp, isAuthenticated, loading, isInitialized } = useAuth();
+  const { refreshHotel, isHotelReady } = useHotel();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
+  const [isWaitingForHotel, setIsWaitingForHotel] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -68,15 +71,30 @@ const EstablishmentAuth = () => {
         title: "Erreur de connexion",
         description: error.message
       });
-    } else {
-      toast({
-        title: "Connexion réussie",
-        description: "Vous êtes maintenant connecté."
-      });
+      setIsLoading(false);
+      return;
+    }
+    
+    toast({
+      title: "Connexion réussie",
+      description: "Chargement de votre établissement..."
+    });
+    
+    // Attendre que l'hôtel soit chargé avant de naviguer
+    setIsWaitingForHotel(true);
+    try {
+      await refreshHotel();
+      // Petit délai pour laisser React mettre à jour l'état
+      await new Promise(resolve => setTimeout(resolve, 150));
+      navigate('/');
+    } catch (err) {
+      console.error('Erreur chargement hôtel:', err);
+      // Naviguer quand même, Index.tsx gérera le chargement
       navigate('/');
     }
     
     setIsLoading(false);
+    setIsWaitingForHotel(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
