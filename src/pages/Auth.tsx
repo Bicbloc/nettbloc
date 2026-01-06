@@ -9,6 +9,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
+import { useTranslation } from '@/contexts/LanguageContext';
 
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
@@ -26,6 +27,7 @@ const Auth = () => {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { translations: t, language } = useTranslation();
 
   // Handle password reset link
   useEffect(() => {
@@ -38,14 +40,18 @@ const Auth = () => {
       supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
         .then(({ error }) => {
           if (error) {
-            toast({ variant: "destructive", title: "Lien expiré", description: "Veuillez demander un nouveau lien." });
+            toast({ 
+              variant: "destructive", 
+              title: language === 'en' ? "Link expired" : "Lien expiré", 
+              description: language === 'en' ? "Please request a new link." : "Veuillez demander un nouveau lien." 
+            });
           } else {
             setMode('new-password');
             window.history.replaceState({}, '', '/auth');
           }
         });
     }
-  }, [toast]);
+  }, [toast, language]);
 
   // Si authentifié, rediriger immédiatement
   if (isAuthenticated) {
@@ -58,7 +64,7 @@ const Auth = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground text-sm">Connexion en cours...</p>
+          <p className="text-muted-foreground text-sm">{t.common.loading}</p>
         </div>
       </div>
     );
@@ -73,34 +79,35 @@ const Auth = () => {
         case 'hotel-signin': {
           const { error } = await signIn(formData.email, formData.password);
           if (error) throw error;
-          // isLoading reste true - onAuthStateChange va déclencher isAuthenticated
-          // qui va causer le Navigate vers /
-          toast({ title: "Connexion réussie" });
-          return; // Ne pas reset isLoading, laisser le redirect se faire
+          toast({ title: t.auth.loginSuccess });
+          return;
         }
         case 'hotel-signup': {
-          if (!formData.companyName.trim()) throw new Error("Nom de l'établissement requis");
-          if (formData.password !== formData.confirmPassword) throw new Error("Les mots de passe ne correspondent pas");
+          if (!formData.companyName.trim()) throw new Error(language === 'en' ? "Establishment name required" : "Nom de l'établissement requis");
+          if (formData.password !== formData.confirmPassword) throw new Error(t.auth.passwordMismatch);
           const { error } = await signUp(formData.email, formData.password, formData.companyName);
           if (error) throw error;
-          toast({ title: "Compte créé !" });
+          toast({ title: t.auth.signupSuccess });
           navigate('/plan-selection');
           break;
         }
         case 'housekeeper-signin': {
           const { error } = await housekeeperSignIn(formData.email, formData.password);
           if (error) throw error;
-          toast({ title: "Bienvenue !" });
+          toast({ title: language === 'en' ? "Welcome!" : "Bienvenue !" });
           navigate('/housekeeper/hotels');
           break;
         }
         case 'housekeeper-signup': {
-          if (!formData.name.trim()) throw new Error("Nom requis");
-          if (formData.password !== formData.confirmPassword) throw new Error("Les mots de passe ne correspondent pas");
-          if (formData.password.length < 6) throw new Error("6 caractères minimum");
+          if (!formData.name.trim()) throw new Error(language === 'en' ? "Name required" : "Nom requis");
+          if (formData.password !== formData.confirmPassword) throw new Error(t.auth.passwordMismatch);
+          if (formData.password.length < 6) throw new Error(t.auth.passwordTooShort);
           const { error } = await housekeeperSignUp(formData.email, formData.password, formData.name);
           if (error) throw error;
-          toast({ title: "Inscription réussie !", description: "Vous pouvez vous connecter" });
+          toast({ 
+            title: t.auth.signupSuccess, 
+            description: language === 'en' ? "You can now log in" : "Vous pouvez vous connecter" 
+          });
           setMode('housekeeper-signin');
           break;
         }
@@ -109,16 +116,19 @@ const Auth = () => {
             redirectTo: `${window.location.origin}/auth`
           });
           if (error) throw error;
-          toast({ title: "Email envoyé", description: "Vérifiez votre boîte mail" });
+          toast({ 
+            title: language === 'en' ? "Email sent" : "Email envoyé", 
+            description: language === 'en' ? "Check your inbox" : "Vérifiez votre boîte mail" 
+          });
           setMode('hotel-signin');
           break;
         }
         case 'new-password': {
-          if (formData.password !== formData.confirmPassword) throw new Error("Les mots de passe ne correspondent pas");
-          if (formData.password.length < 6) throw new Error("6 caractères minimum");
+          if (formData.password !== formData.confirmPassword) throw new Error(t.auth.passwordMismatch);
+          if (formData.password.length < 6) throw new Error(t.auth.passwordTooShort);
           const { error } = await supabase.auth.updateUser({ password: formData.password });
           if (error) throw error;
-          toast({ title: "Mot de passe mis à jour" });
+          toast({ title: language === 'en' ? "Password updated" : "Mot de passe mis à jour" });
           navigate('/');
           break;
         }
@@ -126,8 +136,8 @@ const Auth = () => {
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: error.message === "Invalid login credentials" ? "Email ou mot de passe incorrect" : error.message
+        title: t.auth.loginError,
+        description: error.message === "Invalid login credentials" ? t.auth.invalidCredentials : error.message
       });
     }
     setIsLoading(false);
@@ -153,7 +163,9 @@ const Auth = () => {
               <Building className="h-8 w-8 text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-bold">Nettobloc</h1>
-            <p className="text-muted-foreground text-sm">Gestion hôtelière simplifiée</p>
+            <p className="text-muted-foreground text-sm">
+              {language === 'en' ? 'Simplified hotel management' : 'Gestion hôtelière simplifiée'}
+            </p>
           </div>
 
           {/* Options */}
@@ -169,8 +181,10 @@ const Auth = () => {
                     <Building className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium">Établissement</p>
-                    <p className="text-xs text-muted-foreground">Gérant, responsable</p>
+                    <p className="font-medium">{language === 'en' ? 'Establishment' : 'Établissement'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'en' ? 'Manager, supervisor' : 'Gérant, responsable'}
+                    </p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -188,8 +202,10 @@ const Auth = () => {
                     <Users className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium">Équipe</p>
-                    <p className="text-xs text-muted-foreground">Femme/valet de chambre</p>
+                    <p className="font-medium">{language === 'en' ? 'Team' : 'Équipe'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'en' ? 'Housekeeper' : 'Femme/valet de chambre'}
+                    </p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -207,8 +223,10 @@ const Auth = () => {
                     <Crown className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium">Gouvernante</p>
-                    <p className="text-xs text-muted-foreground">Inspection & incidents</p>
+                    <p className="font-medium">{language === 'en' ? 'Governess' : 'Gouvernante'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'en' ? 'Inspection & incidents' : 'Inspection & incidents'}
+                    </p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -217,7 +235,7 @@ const Auth = () => {
           </div>
 
           <p className="text-center text-xs text-muted-foreground pt-4">
-            En continuant, vous acceptez nos conditions
+            {language === 'en' ? 'By continuing, you accept our terms' : 'En continuant, vous acceptez nos conditions'}
           </p>
         </div>
       </div>
@@ -228,17 +246,53 @@ const Auth = () => {
   const getFormConfig = () => {
     switch (mode) {
       case 'hotel-signin':
-        return { title: 'Connexion établissement', subtitle: 'Accédez à votre tableau de bord', switchText: 'Pas encore de compte ?', switchAction: () => setMode('hotel-signup'), switchLabel: "S'inscrire" };
+        return { 
+          title: language === 'en' ? 'Establishment login' : 'Connexion établissement', 
+          subtitle: language === 'en' ? 'Access your dashboard' : 'Accédez à votre tableau de bord', 
+          switchText: t.auth.noAccount, 
+          switchAction: () => setMode('hotel-signup'), 
+          switchLabel: t.auth.signUp 
+        };
       case 'hotel-signup':
-        return { title: 'Créer un compte', subtitle: 'Inscrivez votre établissement', switchText: 'Déjà un compte ?', switchAction: () => setMode('hotel-signin'), switchLabel: 'Se connecter' };
+        return { 
+          title: t.auth.signup, 
+          subtitle: language === 'en' ? 'Register your establishment' : 'Inscrivez votre établissement', 
+          switchText: t.auth.hasAccount, 
+          switchAction: () => setMode('hotel-signin'), 
+          switchLabel: t.auth.signIn 
+        };
       case 'housekeeper-signin':
-        return { title: 'Connexion équipe', subtitle: 'Accédez à vos chambres', switchText: 'Pas encore inscrit ?', switchAction: () => setMode('housekeeper-signup'), switchLabel: "S'inscrire" };
+        return { 
+          title: language === 'en' ? 'Team login' : 'Connexion équipe', 
+          subtitle: language === 'en' ? 'Access your rooms' : 'Accédez à vos chambres', 
+          switchText: t.auth.noAccount, 
+          switchAction: () => setMode('housekeeper-signup'), 
+          switchLabel: t.auth.signUp 
+        };
       case 'housekeeper-signup':
-        return { title: 'Créer un profil', subtitle: 'Rejoignez votre équipe', switchText: 'Déjà un profil ?', switchAction: () => setMode('housekeeper-signin'), switchLabel: 'Se connecter' };
+        return { 
+          title: language === 'en' ? 'Create profile' : 'Créer un profil', 
+          subtitle: language === 'en' ? 'Join your team' : 'Rejoignez votre équipe', 
+          switchText: t.auth.hasAccount, 
+          switchAction: () => setMode('housekeeper-signin'), 
+          switchLabel: t.auth.signIn 
+        };
       case 'reset-password':
-        return { title: 'Mot de passe oublié', subtitle: 'Recevez un lien par email', switchText: '', switchAction: () => {}, switchLabel: '' };
+        return { 
+          title: t.auth.forgotPassword, 
+          subtitle: language === 'en' ? 'Receive a link by email' : 'Recevez un lien par email', 
+          switchText: '', 
+          switchAction: () => {}, 
+          switchLabel: '' 
+        };
       case 'new-password':
-        return { title: 'Nouveau mot de passe', subtitle: 'Définissez votre nouveau mot de passe', switchText: '', switchAction: () => {}, switchLabel: '' };
+        return { 
+          title: language === 'en' ? 'New password' : 'Nouveau mot de passe', 
+          subtitle: language === 'en' ? 'Set your new password' : 'Définissez votre nouveau mot de passe', 
+          switchText: '', 
+          switchAction: () => {}, 
+          switchLabel: '' 
+        };
       default:
         return { title: '', subtitle: '', switchText: '', switchAction: () => {}, switchLabel: '' };
     }
@@ -266,12 +320,14 @@ const Auth = () => {
               {/* Hotel signup: company name */}
               {mode === 'hotel-signup' && (
                 <div className="space-y-2">
-                  <Label htmlFor="company">Nom de l'établissement</Label>
+                  <Label htmlFor="company">
+                    {language === 'en' ? 'Establishment name' : "Nom de l'établissement"}
+                  </Label>
                   <div className="relative">
                     <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="company"
-                      placeholder="Mon Hôtel"
+                      placeholder={language === 'en' ? "My Hotel" : "Mon Hôtel"}
                       value={formData.companyName}
                       onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                       className="pl-10 h-11"
@@ -284,12 +340,12 @@ const Auth = () => {
               {/* Housekeeper signup: name */}
               {mode === 'housekeeper-signup' && (
                 <div className="space-y-2">
-                  <Label htmlFor="name">Votre nom</Label>
+                  <Label htmlFor="name">{language === 'en' ? 'Your name' : 'Votre nom'}</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="name"
-                      placeholder="Prénom Nom"
+                      placeholder={t.auth.namePlaceholder}
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       className="pl-10 h-11"
@@ -302,13 +358,13 @@ const Auth = () => {
               {/* Email */}
               {mode !== 'new-password' && (
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t.common.email}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="vous@exemple.com"
+                      placeholder={t.auth.emailPlaceholder}
                       value={formData.email}
                       onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                       className="pl-10 h-11"
@@ -321,7 +377,11 @@ const Auth = () => {
               {/* Password */}
               {mode !== 'reset-password' && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">{mode === 'new-password' ? 'Nouveau mot de passe' : 'Mot de passe'}</Label>
+                  <Label htmlFor="password">
+                    {mode === 'new-password' 
+                      ? (language === 'en' ? 'New password' : 'Nouveau mot de passe') 
+                      : t.common.password}
+                  </Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -341,7 +401,7 @@ const Auth = () => {
               {/* Confirm password */}
               {(mode === 'hotel-signup' || mode === 'housekeeper-signup' || mode === 'new-password') && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirm">Confirmer</Label>
+                  <Label htmlFor="confirm">{t.auth.confirmPassword}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -359,7 +419,13 @@ const Auth = () => {
 
               <Button type="submit" className="w-full h-11" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {mode === 'reset-password' ? 'Envoyer le lien' : mode.includes('signup') ? "S'inscrire" : mode === 'new-password' ? 'Confirmer' : 'Se connecter'}
+                {mode === 'reset-password' 
+                  ? (language === 'en' ? 'Send link' : 'Envoyer le lien') 
+                  : mode.includes('signup') 
+                    ? t.auth.signUp 
+                    : mode === 'new-password' 
+                      ? t.common.confirm 
+                      : t.auth.signIn}
               </Button>
 
               {/* Forgot password link */}
@@ -369,7 +435,7 @@ const Auth = () => {
                   onClick={() => setMode('reset-password')}
                   className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Mot de passe oublié ?
+                  {t.auth.forgotPassword}
                 </button>
               )}
             </form>
