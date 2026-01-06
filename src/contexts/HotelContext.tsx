@@ -163,6 +163,11 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         // Créer/restaurer la session hôtel
         await HotelSessionService.createSession(hotelResult.id);
         console.log('✅ HotelContext: Hôtel prêt:', hotelResult.id.slice(0, 8) + '...');
+        
+        // Émettre un événement pour signaler que l'hôtel est prêt
+        window.dispatchEvent(new CustomEvent('hotel:ready', { 
+          detail: { hotelId: hotelResult.id } 
+        }));
       }
     } catch (error) {
       console.error('❌ HotelContext: Erreur chargement hôtel:', error);

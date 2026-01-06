@@ -82,6 +82,18 @@ const Index = () => {
   }
 
   // Attendre que l'hôtel soit prêt (pour les utilisateurs authentifiés)
+  // Avec fallback timeout de 8 secondes pour forcer le refresh si bloqué
+  useEffect(() => {
+    if (isAuthenticated && !isHotelReady) {
+      const timeout = setTimeout(() => {
+        console.warn('⚠️ Hotel loading timeout (8s), forcing refresh');
+        window.location.reload();
+      }, 8000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isAuthenticated, isHotelReady]);
+
   if (isAuthenticated && !isHotelReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
