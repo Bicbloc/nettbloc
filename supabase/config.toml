@@ -49,3 +49,6 @@ verify_jwt = false
 
 [functions.ping]
 verify_jwt = false
+
+[functions.governess-request-hotel-access]
+verify_jwt = false
