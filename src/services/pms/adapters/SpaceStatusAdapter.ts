@@ -20,7 +20,7 @@ export class SpaceStatusAdapter extends PmsAdapter {
   
   readonly keywords = [
     'Space status',
-    'SGL', 'DBL', 'DBS', 'TWS', 'JSU', 'TRP', 'QUA', 'SUI', 'APT',
+    'SGL', 'DBL', 'DBS', 'TWS', 'JSU', 'TRP', 'QUA', 'SUI', 'APT', 'STU', 'CLA',
     'DIR', 'INS', 'SAL', 'OOO', 'OOS',
     'Night', 'Nuit',
     'Adults', 'Children', 'Extra beds',
@@ -40,8 +40,8 @@ export class SpaceStatusAdapter extends PmsAdapter {
     dateFormats: ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']
   };
 
-  private readonly ROOM_LINE_PATTERN = /\b(\d{1,4}[A-Z]?)\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)\s+(DIR|INS|SAL|PRO|OOO|OOS)?/i;
-  private readonly FLOOR_PREFIX_PATTERN = /^\s*(\d{1,2})\s+(\d{2,4})\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU)/i;
+  private readonly ROOM_LINE_PATTERN = /\b(\d{1,4}[A-Z]?)\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU|CLA)\s+(DIR|INS|SAL|PRO|OOO|OOS)?/i;
+  private readonly FLOOR_PREFIX_PATTERN = /^\s*(\d{1,2})\s+(\d{2,4})\s+(SGL|DBL|DBS|TWS|JSU|TRP|QUA|SUI|APT|STU|CLA)/i;
   private readonly NIGHT_PATTERN = /(?:Night|Nuit|Nacht|Notte|Noche)\s*(\d+)\s*[\/\\]\s*(\d+)/i;
   private readonly GUEST_BLOCK_PATTERN = /(\d+)\s*[×x]\s*(?:Adults?|Adultes?|Erwachsene)/gi;
   private readonly OOO_PATTERN = /Out of (?:order|service)/i;
@@ -156,21 +156,20 @@ export class SpaceStatusAdapter extends PmsAdapter {
     if (isOutOfOrder) return { status: 'out_of_order', cleaningType: 'none' };
     if (statusCode === 'OOO' || statusCode === 'OOS') return { status: 'out_of_order', cleaningType: 'none' };
 
-    // CAS 1: Dates avec horaires (checkout/checkin) → à blanc
+    // CAS 1: Départ + Arrivée (2 blocs) → à blanc
     if (guestBlocks >= 2) return { status: 'checkout_checkin', cleaningType: 'a_blanc' };
-    
-    // CAS 2: Night X/X OU dates SANS horaire (client en séjour) → recouche
-    // Peu importe le statut DIR/INS, c'est recouche car le client est encore là
-    if (nightTotal > 0 || hasDateWithoutTime) {
-      return { status: 'stayover', cleaningType: 'recouche' };
-    }
-    
-    // CAS 3: Pas de séjour/date → regarder le statut
+
+    // CAS 2: Statuts explicites (toujours prioritaires)
     if (statusCode === 'INS' || statusCode === 'PRO') {
       return { status: 'clean', cleaningType: 'none' };
     }
     if (statusCode === 'DIR' || statusCode === 'SAL') {
       return { status: 'dirty', cleaningType: 'a_blanc' };
+    }
+
+    // CAS 3: Séjour en cours (Night/date sans horaire) → recouche
+    if (nightTotal > 0 || hasDateWithoutTime) {
+      return { status: 'stayover', cleaningType: 'recouche' };
     }
 
     return { status: 'unknown', cleaningType: 'a_blanc' };
