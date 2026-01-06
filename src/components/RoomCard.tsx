@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck, Star } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -211,9 +211,17 @@ export function RoomCard({
           {room.status === 'clean' && room.inspectedAt && (
             <span 
               className="text-xs bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 border border-emerald-400"
-              title={`${t.rooms.inspected}`}
+              title={`Inspectée ✓`}
             >
-              <ShieldCheck className="h-2.5 w-2.5" /> OK
+              <Star className="h-2.5 w-2.5 fill-emerald-600 text-emerald-600" /> OK
+            </span>
+          )}
+          {room.status === 'needs-cleaning' && room.inspectedAt === null && room.remark && (
+            <span 
+              className="text-xs bg-red-200 text-red-800 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 border border-red-400"
+              title="Inspection échouée"
+            >
+              <Star className="h-2.5 w-2.5 fill-red-600 text-red-600" /> KO
             </span>
           )}
           {isInProgress && (

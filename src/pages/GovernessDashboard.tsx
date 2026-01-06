@@ -9,11 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Crown, LogOut, Building2, CheckCircle, AlertTriangle, Eye, Loader2, RefreshCw, Clock, XCircle } from 'lucide-react';
+import { Crown, LogOut, Building2, CheckCircle, AlertTriangle, Eye, Loader2, RefreshCw, Clock, XCircle, Home, Users, FileText } from 'lucide-react';
 import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
+import { GovernessRoomManagement } from '@/components/governess/GovernessRoomManagement';
+import { GovernessStaffPanel } from '@/components/governess/GovernessStaffPanel';
+import { GovernessActionLog } from '@/components/governess/GovernessActionLog';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
 import { IncidentList } from '@/components/incident/IncidentList';
-
 interface GovernessProfile {
   id: string;
   name: string;
@@ -464,17 +466,60 @@ export default function GovernessDashboard() {
 
             {/* Tabs principal */}
             {selectedHotel && (
-              <Tabs defaultValue="inspection" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-2">
+              <Tabs defaultValue="rooms" className="space-y-4">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="rooms" className="gap-2">
+                    <Home className="h-4 w-4" />
+                    <span className="hidden sm:inline">Chambres</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="staff" className="gap-2">
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Personnel</span>
+                  </TabsTrigger>
                   <TabsTrigger value="inspection" className="gap-2">
                     <Eye className="h-4 w-4" />
-                    Inspections
+                    <span className="hidden sm:inline">Inspections</span>
                   </TabsTrigger>
                   <TabsTrigger value="incidents" className="gap-2">
                     <AlertTriangle className="h-4 w-4" />
-                    Incidents
+                    <span className="hidden sm:inline">Incidents</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="logs" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span className="hidden sm:inline">Journal</span>
                   </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="rooms">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Gestion des chambres</CardTitle>
+                      <CardDescription>
+                        Visualisez, assignez et suivez toutes les chambres
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <GovernessRoomManagement
+                        hotelId={selectedHotel.id}
+                        governessName={profile.name}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="staff">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Personnel</CardTitle>
+                      <CardDescription>
+                        Suivez l'activité de toutes les femmes de chambre
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <GovernessStaffPanel hotelId={selectedHotel.id} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
                 <TabsContent value="inspection">
                   <Card>
@@ -520,6 +565,20 @@ export default function GovernessDashboard() {
                     </CardHeader>
                     <CardContent>
                       <IncidentList hotelId={selectedHotel.id} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="logs">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Journal d'actions</CardTitle>
+                      <CardDescription>
+                        Historique des actions des femmes de chambre
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <GovernessActionLog hotelId={selectedHotel.id} />
                     </CardContent>
                   </Card>
                 </TabsContent>
