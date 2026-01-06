@@ -117,16 +117,27 @@ class TextPreprocessor {
 
     // Fusionner des statuts isolés sur la ligne suivante (PDF fragmenté)
     // Exemple: "402 CLA" \n "INS"  → "402 CLA INS"
+    // Exemple: "407 B SUP" \n "SAL ..." → "407 B SUP SAL ..."
+    // Exemple: "407 B SUP" \n "BLC" \n "SAL ..." → "407 B SUP BLC SAL ..."
     const MERGE_PATTERNS: Array<{ name: string; pattern: RegExp; replacement: string }> = [
       {
-        name: 'merge_roomtype_status_next_line',
-        pattern: /(\b\d{2,4}\b\s+[A-Z]{2,8}(?:-[A-Z])?)\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        // Cas général: une ligne avec numéro de chambre + 1..4 tokens (type, bâtiment, etc.)
+        // suivie d'un code statut sur la ligne suivante
+        name: 'merge_room_tokens_status_next_line',
+        pattern: /(\b\d{2,4}\b(?:\s+(?!(?:SAL|PRO|INS|DIR|DEP|ARR)\b)[A-Z]{1,8}(?:-[A-Z])?){1,4})\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
         replacement: '$1 $2',
       },
       {
+        // Cas simple: numéro seul puis statut sur la ligne suivante
         name: 'merge_room_status_next_line',
         pattern: /(\b\d{2,4}\b)\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
         replacement: '$1 $2',
+      },
+      {
+        // Cas "3 lignes": code intermédiaire isolé (ex: BLC) entre la chambre et le statut
+        name: 'merge_room_code_then_status_third_line',
+        pattern: /(\b\d{2,4}\b[^\n]*)\s*\n\s*([A-Z]{2,4})\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b([^\n]*)/gi,
+        replacement: '$1 $2 $3$4',
       },
     ];
 

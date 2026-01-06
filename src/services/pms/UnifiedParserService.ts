@@ -433,7 +433,9 @@ class UnifiedParserService {
     // Prétraiter le texte (centralisé)
     const preprocessResult = textPreprocessor.preprocess(text);
     const preprocessedText = preprocessResult.text;
-    this.log(`📝 Prétraitement: ${preprocessResult.stats.linesAdded} lignes ajoutées, patterns: ${preprocessResult.stats.patternsApplied.join(', ')}`);
+    this.log(
+      `📝 Prétraitement: ${preprocessResult.stats.linesAdded} lignes ajoutées, ${preprocessResult.stats.linesMerged} lignes fusionnées, patterns: ${preprocessResult.stats.patternsApplied.join(', ')}`
+    );
 
     // Étape 1: Parsing local
     const localResult = await this.parseReportLocal(preprocessedText);
