@@ -28,6 +28,10 @@ class DetectionCache {
    * Génère une clé de cache à partir du texte
    */
   private generateKey(text: string): string {
+    // IMPORTANT: versionner la clé pour invalider automatiquement le cache
+    // quand la logique de parsing change.
+    const CACHE_VERSION = '2';
+
     // Utiliser les premiers caractères + longueur + hash simple
     const prefix = text.substring(0, 200).replace(/\s+/g, ' ');
     const length = text.length;
@@ -38,7 +42,7 @@ class DetectionCache {
       hash = ((hash << 5) - hash) + text.charCodeAt(i);
       hash |= 0;
     }
-    return `${prefix}_${length}_${hash}`;
+    return `v${CACHE_VERSION}_${prefix}_${length}_${hash}`;
   }
 
   /**
