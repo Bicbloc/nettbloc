@@ -33,15 +33,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Room } from "@/services/pdfService";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const formSchema = z.object({
-  number: z.string().min(1, "Le numéro de chambre est requis"),
-  status: z.string().min(1, "Le statut est requis"),
+  number: z.string().min(1, "Room number is required"),
+  status: z.string().min(1, "Status is required"),
   cleaningType: z.enum(['a_blanc', 'recouche', 'none', 'full', 'quick'], {
-    required_error: "Le type de nettoyage est requis",
+    required_error: "Cleaning type is required",
   }),
   priority: z.enum(['high', 'medium', 'low'], {
-    required_error: "La priorité est requise",
+    required_error: "Priority is required",
   }),
   floor: z.string().optional(),
   isTwin: z.boolean().default(false),
@@ -60,6 +61,7 @@ interface AddRoomDialogProps {
 
 export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) {
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -78,12 +80,12 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
   });
 
   const onSubmit = (data: FormData) => {
-    // Vérifier si la chambre existe déjà
+    // Check if the room already exists
     const roomExists = existingRooms.some(room => room.number === data.number);
     if (roomExists) {
       toast({
-        title: "Erreur",
-        description: "Une chambre avec ce numéro existe déjà",
+        title: t.common.cancel,
+        description: t.rooms.roomExists,
         variant: "destructive",
       });
       return;
@@ -105,8 +107,8 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
     onAddRoom(newRoom);
     
     toast({
-      title: "Succès",
-      description: `Chambre ${data.number} ajoutée avec succès. Elle apparaît maintenant dans l'interface et sera incluse dans tous les rapports.`,
+      title: t.common.save,
+      description: `${t.rooms.room} ${data.number} ${t.rooms.roomAdded}`,
     });
 
     form.reset();
@@ -114,14 +116,14 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
   };
 
   const statusOptions = [
-    { value: 'DIRTY', label: 'Sale' },
-    { value: 'CLEAN', label: 'Propre' },
+    { value: 'DIRTY', label: t.rooms.dirty },
+    { value: 'CLEAN', label: t.rooms.clean },
     { value: 'MAINTENANCE', label: 'Maintenance' },
-    { value: 'OOO', label: 'Hors service' },
-    { value: 'DEPARTURE', label: 'Départ' },
-    { value: 'ARRIVAL', label: 'Arrivée' },
-    { value: 'STAY', label: 'Occupée' },
-    { value: 'VACANT', label: 'Libre' },
+    { value: 'OOO', label: t.rooms.vacant },
+    { value: 'DEPARTURE', label: t.rooms.departure },
+    { value: 'ARRIVAL', label: t.rooms.arrival },
+    { value: 'STAY', label: t.rooms.occupied },
+    { value: 'VACANT', label: t.rooms.vacant },
   ];
 
   return (
@@ -129,14 +131,14 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
-          Ajouter une chambre
+          {t.rooms.addRoom}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Ajouter une chambre manuellement</DialogTitle>
+          <DialogTitle>{t.rooms.addRoom}</DialogTitle>
           <DialogDescription>
-            Créez une nouvelle chambre si les données PDF ne sont pas correctement récupérées.
+            {t.rooms.createRoom}
           </DialogDescription>
         </DialogHeader>
         
@@ -148,7 +150,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                 name="number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Numéro de chambre *</FormLabel>
+                    <FormLabel>{t.rooms.roomNumber} *</FormLabel>
                     <FormControl>
                       <Input placeholder="ex: 101" {...field} />
                     </FormControl>
@@ -162,7 +164,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                 name="floor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Étage</FormLabel>
+                    <FormLabel>{t.rooms.floor}</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="ex: 1" {...field} />
                     </FormControl>
@@ -178,11 +180,11 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Statut *</FormLabel>
+                    <FormLabel>{t.rooms.status} *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Sélectionnez le statut" />
+                          <SelectValue placeholder={t.rooms.selectStatus} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -203,17 +205,17 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                 name="cleaningType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Type de nettoyage *</FormLabel>
+                    <FormLabel>{t.rooms.cleaningType} *</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Type de nettoyage" />
+                          <SelectValue placeholder={t.rooms.cleaningType} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="a_blanc">À Blanc (départ)</SelectItem>
-                        <SelectItem value="recouche">Recouche (client reste)</SelectItem>
-                        <SelectItem value="none">Aucun nettoyage</SelectItem>
+                        <SelectItem value="a_blanc">🚪 {t.rooms.fullClean} (CO)</SelectItem>
+                        <SelectItem value="recouche">🛏️ {t.rooms.quickClean} (SO)</SelectItem>
+                        <SelectItem value="none">{t.rooms.noCleaning}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -227,17 +229,17 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
               name="priority"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Priorité *</FormLabel>
+                  <FormLabel>{t.rooms.priority} *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionnez la priorité" />
+                        <SelectValue placeholder={t.rooms.selectPriority} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="high">Haute</SelectItem>
-                      <SelectItem value="medium">Moyenne</SelectItem>
-                      <SelectItem value="low">Basse</SelectItem>
+                      <SelectItem value="high">{t.rooms.priorityHigh}</SelectItem>
+                      <SelectItem value="medium">{t.rooms.priorityMedium}</SelectItem>
+                      <SelectItem value="low">{t.rooms.priorityLow}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -258,7 +260,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Chambre twin</FormLabel>
+                      <FormLabel>{t.rooms.twinRoom}</FormLabel>
                     </div>
                   </FormItem>
                 )}
@@ -276,7 +278,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Urgent</FormLabel>
+                      <FormLabel>{t.rooms.urgent}</FormLabel>
                     </div>
                   </FormItem>
                 )}
@@ -294,7 +296,7 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Non urgent</FormLabel>
+                      <FormLabel>{t.rooms.notUrgent}</FormLabel>
                     </div>
                   </FormItem>
                 )}
@@ -306,10 +308,10 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (optionnel)</FormLabel>
+                  <FormLabel>{t.rooms.notes}</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Remarques ou informations supplémentaires..."
+                      placeholder={t.rooms.notesPlaceholder}
                       {...field} 
                     />
                   </FormControl>
@@ -320,10 +322,10 @@ export function AddRoomDialog({ onAddRoom, existingRooms }: AddRoomDialogProps) 
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Annuler
+                {t.common.cancel}
               </Button>
               <Button type="submit">
-                Ajouter la chambre
+                {t.rooms.addRoom}
               </Button>
             </DialogFooter>
           </form>
