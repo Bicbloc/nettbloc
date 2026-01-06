@@ -12,6 +12,7 @@ import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { RoomIncidentsDialog } from "@/components/incident/RoomIncidentsDialog";
 import { EditRoomNoteDialog } from "@/components/EditRoomNoteDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface RoomCardProps {
   room: Room;
@@ -52,6 +53,7 @@ export function RoomCard({
   hotelId,
   incidentCount = 0
 }: RoomCardProps) {
+  const { t } = useLanguage();
   const [dragging, setDragging] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
@@ -90,13 +92,13 @@ export function RoomCard({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'needs-cleaning':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">À Nettoyer</Badge>;
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">{t.rooms.dirty}</Badge>;
       case 'ready-to-clean':
-        return <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">Prêt à Nettoyer</Badge>;
+        return <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">{t.rooms.departure}</Badge>;
       case 'clean':
-        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">Propre</Badge>;
+        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">{t.rooms.clean}</Badge>;
       case 'occupied':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Occupé</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">{t.rooms.occupied}</Badge>;
       case 'maintenance':
         return <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">Maintenance</Badge>;
       default:
@@ -108,10 +110,10 @@ export function RoomCard({
     switch (type) {
       case 'full':
       case 'a_blanc':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">🚪 À Blanc</Badge>;
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800">🚪 {t.rooms.fullClean}</Badge>;
       case 'quick':
       case 'recouche':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">🛏️ Recouche</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">🛏️ {t.rooms.quickClean}</Badge>;
       case 'none':
         return null;
       default:
@@ -158,7 +160,7 @@ export function RoomCard({
     });
     
     toast({
-      description: `Chambre ${room.number} : ${type === 'a_blanc' ? '🚪 À Blanc' : '🛏️ Recouche'}`
+      description: `${t.rooms.room} ${room.number} : ${type === 'a_blanc' ? `🚪 ${t.rooms.fullClean}` : `🛏️ ${t.rooms.quickClean}`}`
     });
   };
 
@@ -193,30 +195,30 @@ export function RoomCard({
           <span className="font-semibold text-sm whitespace-nowrap">{room.number}</span>
           {(room.cleaningType === 'full' || room.cleaningType === 'a_blanc') && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-purple-100 text-purple-700 border border-purple-200">
-              À BLANC
+              {t.rooms.fullCleanShort}
             </span>
           )}
           {(room.cleaningType === 'quick' || room.cleaningType === 'recouche') && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-blue-100 text-blue-700 border border-blue-200">
-              RECOUCHE
+              {t.rooms.quickCleanShort}
             </span>
           )}
           {room.status === 'clean' && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
-              <Check className="h-2 w-2" /> Propre
+              <Check className="h-2 w-2" /> {t.rooms.clean}
             </span>
           )}
           {room.status === 'clean' && room.inspectedAt && (
             <span 
               className="text-xs bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 border border-emerald-400"
-              title={`Inspectée par ${room.inspectedBy || 'gouvernante'}`}
+              title={`${t.rooms.inspected}`}
             >
               <ShieldCheck className="h-2.5 w-2.5" /> OK
             </span>
           )}
           {isInProgress && (
             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 animate-badge-pulse">
-              <Loader2 className="h-2 w-2 animate-spin" /> En cours
+              <Loader2 className="h-2 w-2 animate-spin" /> {t.rooms.inProgress}
             </span>
           )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
