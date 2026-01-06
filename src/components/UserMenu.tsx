@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAdminRole } from '@/hooks/use-admin-role';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Shield, Crown, Building2, MessageCircle, CreditCard } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Crown, Building2, MessageCircle, CreditCard, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import { SupportTicketDialog } from './SupportTicketDialog';
@@ -22,8 +23,13 @@ const UserMenu = () => {
   const { user, signOut, isAuthenticated } = useAuth();
   const { isSuperAdmin } = useAdminRole();
   const { plan, subscribed, isPremium, isInTrial, trialDaysRemaining } = useSubscription();
+  const { language, setLanguage } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const toggleLanguage = () => {
+    setLanguage(language === 'fr' ? 'en' : 'fr');
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -102,13 +108,17 @@ const UserMenu = () => {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={toggleLanguage}>
+          <Globe className="mr-2 h-4 w-4" />
+          <span>{language === 'fr' ? 'English' : 'Français'}</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate('/auth?force=true')}>
           <User className="mr-2 h-4 w-4" />
-          <span>Changer de compte</span>
+          <span>{language === 'fr' ? 'Changer de compte' : 'Switch account'}</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Se déconnecter</span>
+          <span>{language === 'fr' ? 'Se déconnecter' : 'Sign out'}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
