@@ -10,12 +10,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Check, X, ChevronLeft, Link2, Unlink, Plus, 
-  AlertTriangle, Sparkles, Save, Calendar, User, ArrowRight, Copy, FileText
+  AlertTriangle, Sparkles, Save, Calendar, User, ArrowRight, Copy, FileText, Wand2
 } from "lucide-react";
 import { ExtractedRoom, CLEANING_TYPE_LABELS } from "@/services/pms";
 import { TrainingData } from "./TrainingWizard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { LinePatternRuleDialog } from "./LinePatternRuleDialog";
 
 interface TrainingStep2AnnotateProps {
   trainingData: TrainingData;
@@ -84,6 +85,7 @@ export const TrainingStep2Annotate = ({
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [editingTimeRoom, setEditingTimeRoom] = useState<number | null>(null);
   const [newRoom, setNewRoom] = useState({ roomNumber: "", cleaningType: "full" as const });
+  const [ruleDialogRoom, setRuleDialogRoom] = useState<ExtractedRoom | null>(null);
 
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [cleaningFilter, setCleaningFilter] = useState<'all' | 'a_blanc' | 'recouche' | 'none'>('all');
@@ -628,6 +630,24 @@ export const TrainingStep2Annotate = ({
 
                         {/* Action buttons */}
                         <div className="flex items-center gap-1">
+                          {/* Bouton créer règle depuis exemple */}
+                          {room.originalText && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setRuleDialogRoom(room)}
+                                  className="h-8 w-8 text-primary hover:text-primary"
+                                >
+                                  <Wand2 className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Créer une règle depuis cet exemple</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                           {room.isConnected && (
                             <Button size="icon" variant="ghost" onClick={() => splitRoom(index)} className="h-8 w-8">
                               <Unlink className="w-4 h-4" />
@@ -740,6 +760,20 @@ export const TrainingStep2Annotate = ({
             <Save className="w-4 h-4" />
             Sauvegarder et terminer
           </Button>
+        {/* Dialog création de règle */}
+        {ruleDialogRoom && (
+          <LinePatternRuleDialog
+            open={!!ruleDialogRoom}
+            onOpenChange={(open) => !open && setRuleDialogRoom(null)}
+            room={ruleDialogRoom}
+            allRooms={rooms}
+            hotelId={hotelId}
+            onRuleCreated={(updatedRooms) => {
+              setRooms(updatedRooms);
+              setRuleDialogRoom(null);
+            }}
+          />
+        )}
         </div>
       </div>
     </div>
