@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { HousekeeperGuestMode } from '@/components/HousekeeperGuestMode';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building, Key, ArrowRight } from 'lucide-react';
 import BackButton from '@/components/BackButton';
+import { useTranslation } from '@/contexts/LanguageContext';
 
 /**
  * Page unifiée pour le mode invité
@@ -14,6 +14,7 @@ import BackButton from '@/components/BackButton';
 const GuestMode = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { translations: t, language } = useTranslation();
   const accessCode = searchParams.get('code');
 
   // Si un code d'accès est fourni, afficher l'interface femme de chambre
@@ -30,9 +31,13 @@ const GuestMode = () => {
           <div className="flex items-center gap-4">
             <BackButton />
             <div>
-              <h1 className="text-4xl font-bold">Mode Invité</h1>
+              <h1 className="text-4xl font-bold">
+                {language === 'en' ? 'Guest Mode' : 'Mode Invité'}
+              </h1>
               <p className="text-muted-foreground mt-2">
-                Accédez rapidement à votre espace de travail
+                {language === 'en' 
+                  ? 'Quickly access your workspace' 
+                  : 'Accédez rapidement à votre espace de travail'}
               </p>
             </div>
           </div>
@@ -44,15 +49,17 @@ const GuestMode = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building className="h-6 w-6 text-primary" />
-                  Gestionnaire d'hôtel
+                  {t.guestMode.hotelManager}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground">
-                  Gérez vos hôtels, chambres et équipes depuis votre tableau de bord
+                  {language === 'en' 
+                    ? 'Manage your hotels, rooms and teams from your dashboard'
+                    : 'Gérez vos hôtels, chambres et équipes depuis votre tableau de bord'}
                 </p>
                 <Button className="w-full" onClick={() => navigate('/auth')}>
-                  Se connecter
+                  {t.auth.signIn}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardContent>
@@ -63,15 +70,17 @@ const GuestMode = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Key className="h-6 w-6 text-primary" />
-                  Femme de chambre
+                  {t.guestMode.housekeeper}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground">
-                  Accédez à vos tâches quotidiennes avec votre code d'accès
+                  {language === 'en'
+                    ? 'Access your daily tasks with your access code'
+                    : 'Accédez à vos tâches quotidiennes avec votre code d\'accès'}
                 </p>
                 <Button className="w-full" onClick={() => navigate('/housekeeper/login')}>
-                  Entrer le code
+                  {language === 'en' ? 'Enter code' : 'Entrer le code'}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardContent>
@@ -82,9 +91,13 @@ const GuestMode = () => {
           <Card className="bg-muted/50">
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground text-center">
-                Le mode invité vous permet d'accéder rapidement à votre espace sans créer de compte.
+                {language === 'en' 
+                  ? 'Guest mode allows you to quickly access your workspace without creating an account.'
+                  : 'Le mode invité vous permet d\'accéder rapidement à votre espace sans créer de compte.'}
                 <br />
-                Pour un accès complet et sécurisé, veuillez vous connecter.
+                {language === 'en'
+                  ? 'For full and secure access, please log in.'
+                  : 'Pour un accès complet et sécurisé, veuillez vous connecter.'}
               </p>
             </CardContent>
           </Card>

@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Lock, Loader2, LogIn, UserPlus, Sparkles, Shield, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Loader2, UserPlus, Sparkles, Shield, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
 import { retryQuery } from '@/services/queryUtils';
+import { useTranslation } from '@/contexts/LanguageContext';
 
 export default function HousekeeperAuth() {
   const [email, setEmail] = useState('');
@@ -16,6 +17,7 @@ export default function HousekeeperAuth() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { translations: t, language } = useTranslation();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,8 +25,10 @@ export default function HousekeeperAuth() {
     if (!email || !password) {
       toast({
         variant: "destructive",
-        title: "Champs requis",
-        description: "Veuillez remplir votre email et mot de passe"
+        title: t.auth.requiredFields,
+        description: language === 'en' 
+          ? "Please enter your email and password" 
+          : "Veuillez remplir votre email et mot de passe"
       });
       return;
     }
@@ -57,21 +61,23 @@ export default function HousekeeperAuth() {
           localStorage.setItem('housekeeper_profile', JSON.stringify(profileResult.data));
           
           toast({
-            title: "Connexion réussie",
-            description: `Bienvenue ${profileResult.data.name}`
+            title: t.auth.loginSuccess,
+            description: `${language === 'en' ? 'Welcome' : 'Bienvenue'} ${profileResult.data.name}`
           });
           navigate('/housekeeper/hotels');
         } else {
-          throw new Error("Profil femme de chambre non trouvé. Créez d'abord un compte.");
+          throw new Error(language === 'en' 
+            ? "Housekeeper profile not found. Please create an account first."
+            : "Profil femme de chambre non trouvé. Créez d'abord un compte.");
         }
       }
     } catch (error: any) {
       console.error('Erreur connexion:', error);
       toast({
         variant: "destructive",
-        title: "Erreur de connexion",
+        title: t.auth.loginError,
         description: error.message === "Invalid login credentials" 
-          ? "Email ou mot de passe incorrect" 
+          ? t.auth.invalidCredentials
           : error.message
       });
     } finally {
@@ -98,18 +104,22 @@ export default function HousekeeperAuth() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-4 shadow-2xl border border-white/30">
             <Sparkles className="h-10 w-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Espace Personnel</h1>
-          <p className="text-white/80">Connectez-vous pour accéder à vos hôtels</p>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            {language === 'en' ? 'Personal Space' : 'Espace Personnel'}
+          </h1>
+          <p className="text-white/80">
+            {language === 'en' ? 'Log in to access your hotels' : 'Connectez-vous pour accéder à vos hôtels'}
+          </p>
         </div>
 
         <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-semibold text-center flex items-center justify-center gap-2">
               <Shield className="h-5 w-5 text-primary" />
-              Connexion sécurisée
+              {language === 'en' ? 'Secure login' : 'Connexion sécurisée'}
             </CardTitle>
             <CardDescription className="text-center">
-              Entrez vos identifiants pour continuer
+              {language === 'en' ? 'Enter your credentials to continue' : 'Entrez vos identifiants pour continuer'}
             </CardDescription>
           </CardHeader>
 
@@ -118,12 +128,12 @@ export default function HousekeeperAuth() {
               <div className="space-y-2">
                 <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  Adresse email
+                  {language === 'en' ? 'Email address' : 'Adresse email'}
                 </Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="exemple@email.com"
+                  placeholder={t.auth.emailPlaceholder}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="h-12 text-base bg-muted/50 border-muted-foreground/20 focus:border-primary focus:ring-primary"
@@ -134,7 +144,7 @@ export default function HousekeeperAuth() {
               <div className="space-y-2">
                 <Label htmlFor="password" className="flex items-center gap-2 text-sm font-medium">
                   <Lock className="h-4 w-4 text-muted-foreground" />
-                  Mot de passe
+                  {t.common.password}
                 </Label>
                 <Input
                   id="password"
@@ -155,11 +165,11 @@ export default function HousekeeperAuth() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Connexion en cours...
+                    {t.common.loading}
                   </>
                 ) : (
                   <>
-                    Se connecter
+                    {t.auth.signIn}
                     <ArrowRight className="h-5 w-5 ml-2" />
                   </>
                 )}
@@ -172,7 +182,7 @@ export default function HousekeeperAuth() {
                   <span className="w-full border-t border-muted-foreground/20" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">Ou</span>
+                  <span className="bg-white px-2 text-muted-foreground">{t.common.or}</span>
                 </div>
               </div>
 
@@ -183,12 +193,12 @@ export default function HousekeeperAuth() {
                   className="w-full h-11 border-2 hover:bg-primary/5 hover:border-primary transition-all"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
-                  Créer un nouveau compte
+                  {t.auth.signup}
                 </Button>
                 
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground mb-2">
-                    Code d'accès fourni par votre hôtel ?
+                    {language === 'en' ? 'Access code provided by your hotel?' : "Code d'accès fourni par votre hôtel ?"}
                   </p>
                   <Button
                     variant="link"
@@ -196,7 +206,7 @@ export default function HousekeeperAuth() {
                     onClick={() => navigate('/housekeeper/hotels')}
                     className="text-primary hover:text-primary/80 font-medium"
                   >
-                    Connexion rapide avec code
+                    {language === 'en' ? 'Quick login with code' : 'Connexion rapide avec code'}
                     <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
                 </div>
@@ -207,7 +217,7 @@ export default function HousekeeperAuth() {
 
         {/* Footer */}
         <p className="text-center text-white/60 text-xs mt-6">
-          Vos données sont protégées et sécurisées
+          {language === 'en' ? 'Your data is protected and secure' : 'Vos données sont protégées et sécurisées'}
         </p>
       </div>
     </div>
