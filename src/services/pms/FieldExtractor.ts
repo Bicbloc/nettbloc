@@ -67,6 +67,13 @@ const PATTERNS = {
     'LIBRE', 'VACANT', 'FREE'
   ],
   
+  // Types de chambres à ignorer (codes configurés par les hôtels)
+  // Ces codes ne sont PAS des statuts, ils indiquent le type de chambre
+  ROOM_TYPE_CODES: [
+    'CLA', 'DBL', 'SGL', 'TWN', 'TPL', 'TRP', 'QUA', 'FAM', 'SUI', 'STD', 'SUP',
+    'JUN', 'KING', 'QUEEN', 'DELUXE', 'STANDARD', 'SUPERIOR', 'CLASSIC', 'CLASSIQUE'
+  ],
+  
   // Mots à ignorer comme noms (staff, headers, etc.)
   IGNORE_NAMES: [
     'staff', 'superviseur', 'manager', 'admin', 'maintenance', 'housekeeping',
@@ -364,7 +371,17 @@ class FieldExtractor {
   }
   
   /**
+   * Vérifie si un token est un code de type de chambre (pas un statut)
+   */
+  private isRoomTypeCode(token: string): boolean {
+    return PATTERNS.ROOM_TYPE_CODES.some(
+      code => code.toUpperCase() === token.toUpperCase()
+    );
+  }
+  
+  /**
    * Extrait les statuts bruts présents dans la ligne
+   * IMPORTANT: Filtre les types de chambres (CLA, DBL, etc.) qui ne sont PAS des statuts
    */
   private extractStatuses(line: string): string[] {
     const upper = line.toUpperCase();
@@ -388,6 +405,11 @@ class FieldExtractor {
 
       // Déjà géré ci-dessus (et on évite CO/CI en "substring")
       if (k === 'CO' || k === 'C/O' || k === 'CI' || k === 'C/I' || k === 'SAL' || k === 'SALE') {
+        continue;
+      }
+      
+      // IMPORTANT: Ignorer les codes de type de chambre
+      if (this.isRoomTypeCode(k)) {
         continue;
       }
 

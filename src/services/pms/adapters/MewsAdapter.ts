@@ -390,38 +390,66 @@ export class MewsAdapter extends PmsAdapter {
     };
   }
 
+  // Types de chambres configurés par les hôtels (à ignorer lors de l'analyse de statut)
+  private readonly roomTypeCodes = [
+    'CLA', 'DBL', 'SGL', 'TWN', 'TPL', 'TRP', 'QUA', 'FAM', 'SUI', 'STD', 'SUP',
+    'JUN', 'KING', 'QUEEN', 'DELUXE', 'STANDARD', 'SUPERIOR', 'CLASSIC', 'CLASSIQUE'
+  ];
+  
+  /**
+   * Vérifie si un token est un code de type de chambre (pas un statut)
+   */
+  private isRoomTypeCode(token: string): boolean {
+    return this.roomTypeCodes.some(
+      code => code.toUpperCase() === token.toUpperCase()
+    );
+  }
+  
   /**
    * Analyse une ligne avec la date du rapport pour déterminer à blanc vs recouche
-   * LOGIQUE PRINCIPALE:
-   * - Horaire à DROITE = départ → À blanc
-   * - Horaire à GAUCHE = arrivée seule → Recouche (turnover géré ailleurs)
-   * - Pas d'horaire = client reste → Recouche
+   * LOGIQUE PRINCIPALE (par ordre de priorité):
+   * 1. Codes explicites: INS, PRO → pas de nettoyage (ignorer les types de chambre comme CLA)
+   * 2. DEP = départ explicite → à blanc
+   * 3. SAL = sale → logique basée sur horaires/dates
+   * 
+   * IMPORTANT: Les types de chambres (CLA, DBL, etc.) sont IGNORÉS car ce ne sont pas des statuts
    */
   private analyzeLineWithDate(line: string, reportDate: Date | null): { status: string; cleaningType: CleaningType } {
     const upper = line.toUpperCase();
     
-    // PRO = propre, pas de nettoyage
-    if (/\bPRO\b/.test(upper)) {
+    // Extraire les tokens de la ligne pour analyse
+    const tokens = upper.split(/[\s,;]+/).filter(t => t.length >= 2);
+    
+    // Filtrer les types de chambre pour ne garder que les vrais statuts
+    const statusTokens = tokens.filter(t => !this.isRoomTypeCode(t));
+    
+    console.log(`🔍 MEWS analyzeLineWithDate: tokens=[${tokens.join(', ')}], statusTokens=[${statusTokens.join(', ')}]`);
+    
+    // PRIORITÉ 1: PRO = propre, pas de nettoyage
+    if (statusTokens.some(t => t === 'PRO' || t === 'PROPRE')) {
+      console.log(`✅ MEWS: PRO détecté → Propre, aucun nettoyage`);
       return { status: 'clean', cleaningType: 'none' };
     }
     
-    // INS = inspecté, pas de nettoyage
-    if (/\bINS\b/.test(upper)) {
+    // PRIORITÉ 2: INS = inspecté, pas de nettoyage
+    if (statusTokens.some(t => t === 'INS' || t === 'INSPECTED' || t === 'INSPECTÉ')) {
+      console.log(`✅ MEWS: INS détecté → Inspecté, aucun nettoyage`);
       return { status: 'inspected', cleaningType: 'none' };
     }
     
-    // DEP = départ explicite
-    if (/\b(DEP|CHECKOUT|DÉPART)\b/.test(upper)) {
+    // PRIORITÉ 3: DEP = départ explicite
+    if (statusTokens.some(t => t === 'DEP' || t === 'CHECKOUT' || t === 'DÉPART' || t === 'DEPART')) {
+      console.log(`✅ MEWS: DEP détecté → Départ, à blanc`);
       return { status: 'checkout', cleaningType: 'a_blanc' };
     }
     
-    // SAL = logique améliorée basée sur la POSITION des horaires + dates sans horaire
-    if (/\bSAL\b/.test(upper)) {
+    // PRIORITÉ 4: SAL = logique améliorée basée sur la POSITION des horaires + dates sans horaire
+    if (statusTokens.some(t => t === 'SAL' || t === 'SALE' || t === 'DIRTY' || t === 'DIR')) {
       const { hasDeparture, hasArrival } = this.extractTimePositions(line);
 
       // 1) Horaire à droite = départ → À blanc
       if (hasDeparture) {
-        console.log(`🔍 MEWS: Départ détecté (horaire droite) → À blanc`);
+        console.log(`✅ MEWS: SAL + Départ détecté (horaire droite) → À blanc`);
         return { status: 'checkout', cleaningType: 'a_blanc' };
       }
 
@@ -429,6 +457,7 @@ export class MewsAdapter extends PmsAdapter {
       const dateMatches = line.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g) || [];
       const hasDateRangeNoTime = dateMatches.length >= 2 && !hasArrival && !hasDeparture;
       if (hasDateRangeNoTime) {
+        console.log(`✅ MEWS: SAL + Dates sans horaire → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
@@ -436,31 +465,30 @@ export class MewsAdapter extends PmsAdapter {
       const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
         upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
       if (nightMatch) {
+        console.log(`✅ MEWS: SAL + Nuit X/Y → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
       // 4) Arrivée seule (horaire gauche) → Recouche
       if (hasArrival && !hasDeparture) {
-        console.log(`🔍 MEWS: Arrivée seule (horaire gauche) → Recouche`);
+        console.log(`✅ MEWS: SAL + Arrivée seule (horaire gauche) → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
       // 5) Occupation (adultes) sans départ → Recouche
       const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
       if (hasOccupancy) {
+        console.log(`✅ MEWS: SAL + Occupation → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
       // Default SAL sans horaire/date/occupation → À BLANC (chambre vide sale)
+      console.log(`✅ MEWS: SAL seul → Sale, à blanc`);
       return { status: 'dirty', cleaningType: 'a_blanc' };
     }
 
-    // DIR (dirty) = recouche par défaut
-    if (/\bDIR\b/.test(upper)) {
-      return { status: 'dirty', cleaningType: 'recouche' };
-    }
-    
-    // Par défaut → recouche (plus conservateur que a_blanc)
-    return { status: 'unknown', cleaningType: 'recouche' };
+    // Default: unknown
+    console.log(`⚠️ MEWS: Aucun statut reconnu → unknown, à blanc par défaut`);
+    return { status: 'unknown', cleaningType: 'a_blanc' };
   }
 }
