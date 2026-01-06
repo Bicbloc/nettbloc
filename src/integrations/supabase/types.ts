@@ -2102,6 +2102,39 @@ export type Database = {
           },
         ]
       }
+      pending_subscriptions: {
+        Row: {
+          amount: number
+          billing_request_id: string
+          created_at: string
+          id: string
+          plan_type: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          billing_request_id: string
+          created_at?: string
+          id?: string
+          plan_type?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          billing_request_id?: string
+          created_at?: string
+          id?: string
+          plan_type?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pms_rules: {
         Row: {
           combination_rules: Json | null
@@ -2815,6 +2848,9 @@ export type Database = {
           created_at: string | null
           current_period_end: string | null
           current_period_start: string | null
+          gocardless_customer_id: string | null
+          gocardless_mandate_id: string | null
+          gocardless_subscription_id: string | null
           id: string
           plan: string
           status: string | null
@@ -2827,6 +2863,9 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
+          gocardless_customer_id?: string | null
+          gocardless_mandate_id?: string | null
+          gocardless_subscription_id?: string | null
           id?: string
           plan?: string
           status?: string | null
@@ -2839,6 +2878,9 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
+          gocardless_customer_id?: string | null
+          gocardless_mandate_id?: string | null
+          gocardless_subscription_id?: string | null
           id?: string
           plan?: string
           status?: string | null

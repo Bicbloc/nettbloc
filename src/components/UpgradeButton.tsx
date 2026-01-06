@@ -61,8 +61,8 @@ export function UpgradeButton({ variant = 'default', size = 'default', className
       const kind = detectCheckoutErrorKind(message);
       toast({
         variant: 'destructive',
-        title: kind === 'plan_disabled' ? 'Plan indisponible' : 'Paiement indisponible',
-        description: checkoutErrorDescription(kind) || "Impossible d'accéder au paiement",
+        title: kind === 'plan_disabled' ? 'Plan indisponible' : 'Erreur de paiement',
+        description: checkoutErrorDescription(kind) || "Impossible d'accéder au paiement. Veuillez réessayer.",
       });
     } finally {
       setIsLoading(false);
