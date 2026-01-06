@@ -83,7 +83,9 @@ type TranslationSchema = {
     status: string;
     cleaningType: string;
     fullClean: string;
+    fullCleanShort: string;
     quickClean: string;
+    quickCleanShort: string;
     noClean: string;
     dirty: string;
     clean: string;
@@ -97,6 +99,8 @@ type TranslationSchema = {
     unassigned: string;
     notes: string;
     addNote: string;
+    inProgress: string;
+    completed: string;
   };
   dashboard: {
     title: string;
@@ -276,7 +280,9 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       status: "Statut",
       cleaningType: "Type de nettoyage",
       fullClean: "À blanc",
+      fullCleanShort: "CO",
       quickClean: "Recouche",
+      quickCleanShort: "SO",
       noClean: "Aucun",
       dirty: "Sale",
       clean: "Propre",
@@ -290,6 +296,8 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       unassigned: "Non assignée",
       notes: "Notes",
       addNote: "Ajouter une note",
+      inProgress: "En cours",
+      completed: "Terminée",
     },
     
     // Dashboard
@@ -481,8 +489,10 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       roomNumber: "Room number",
       status: "Status",
       cleaningType: "Cleaning type",
-      fullClean: "Full clean",
-      quickClean: "Quick clean",
+      fullClean: "Check-out cleaning",
+      fullCleanShort: "CO",
+      quickClean: "Stayover cleaning",
+      quickCleanShort: "SO",
       noClean: "None",
       dirty: "Dirty",
       clean: "Clean",
@@ -496,6 +506,8 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       unassigned: "Unassigned",
       notes: "Notes",
       addNote: "Add note",
+      inProgress: "In progress",
+      completed: "Completed",
     },
     
     // Dashboard

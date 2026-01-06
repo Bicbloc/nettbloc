@@ -4,6 +4,7 @@ import { getFirstDigitFromRoomNumber } from "@/lib/utils";
 import { ReportFields as CustomReportFields, LinenInventoryItem } from "@/components/ReportCustomFields";
 import { toast } from "@/hooks/use-toast";
 import { supabaseClient } from "@/lib/supabase";
+import { getCurrentReportLanguage, getReportTranslations, ReportTranslations } from "./reportTranslations";
 
 // Renamed to avoid conflict
 export interface ReportData extends CustomReportFields {
@@ -81,10 +82,15 @@ export async function generateReport(
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
-    // Get today's date in French locale
+    // Get language and translations
+    const lang = getCurrentReportLanguage();
+    const t = getReportTranslations(lang);
+    const locale = lang === 'en' ? 'en-US' : 'fr-FR';
+    
+    // Get today's date in localized format
     const today = new Date();
     const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const currentDate = today.toLocaleDateString('fr-FR', dateOptions as any);
+    const currentDate = today.toLocaleDateString(locale, dateOptions as any);
     
     // Get or set start time (first download of the day)
     const todayKey = today.toISOString().split('T')[0];
@@ -92,7 +98,7 @@ export async function generateReport(
     let startTime = localStorage.getItem(startTimeKey);
     
     if (!startTime) {
-      startTime = today.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      startTime = today.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
       localStorage.setItem(startTimeKey, startTime);
     }
     
@@ -129,12 +135,12 @@ export async function generateReport(
     };
     
     // Generate the HTML for the report
-    const html = generateReportHTML(reportData);
+    const html = generateReportHTML(reportData, t);
     
     // Generate PDF using html2pdf library with improved table handling
     const pdfOptions = {
       margin: [10, 10, 10, 10],
-      filename: `rapport-${housekeeper.replace(/\s+/g, '-')}.pdf`,
+      filename: `${lang === 'en' ? 'report' : 'rapport'}-${housekeeper.replace(/\s+/g, '-')}.pdf`,
       image: { type: 'jpeg', quality: 1 },
       html2canvas: { 
         scale: 2, 
@@ -161,8 +167,8 @@ export async function generateReport(
     await html2pdf().from(html).set(pdfOptions).save();
     
     toast({
-      title: "Rapport généré",
-      description: `Le rapport pour ${housekeeper} a été téléchargé.`
+      title: t.reportGenerated,
+      description: t.reportDownloaded
     });
     
     // Archive the report for the Reports page (best-effort)
@@ -175,9 +181,10 @@ export async function generateReport(
     return true;
   } catch (error) {
     console.error('Error generating PDF:', error);
+    const t = getReportTranslations(getCurrentReportLanguage());
     toast({
-      title: "Erreur de génération",
-      description: "Une erreur est survenue lors de la génération du rapport.",
+      title: t.errorGenerating,
+      description: t.errorMessage,
       variant: "destructive"
     });
     return false;
@@ -185,7 +192,7 @@ export async function generateReport(
 }
 
 // Generate HTML for report - Enhanced to match the provided template with improved tables
-function generateReportHTML(data: ReportData): string {
+function generateReportHTML(data: ReportData, t: ReportTranslations): string {
   // Instructions section - use specific housekeeper instructions if available
   const housekeeperInstructions = data.housekeeperInstructions?.[data.housekeeperName] || data.instructions || '';
   const generalInstructions = data.generalInstructions || '';
@@ -197,7 +204,7 @@ function generateReportHTML(data: ReportData): string {
   if (combinedInstructions) {
     instructionsHtml = `
       <div class="instructions-section">
-        <h3>Instructions</h3>
+        <h3>${t.instructions}</h3>
         <div>${combinedInstructions}</div>
       </div>
     `;
@@ -213,7 +220,7 @@ function generateReportHTML(data: ReportData): string {
       
     todoHtml = `
       <div class="todo-section">
-        <h3>À faire</h3>
+        <h3>${t.toDo}</h3>
         <ul>${todoItems}</ul>
       </div>
     `;
@@ -229,7 +236,7 @@ function generateReportHTML(data: ReportData): string {
       
     toknowHtml = `
       <div class="toknow-section">
-        <h3>À savoir</h3>
+        <h3>${t.toKnow}</h3>
         <ul>${toknowItems}</ul>
       </div>
     `;
@@ -255,12 +262,12 @@ function generateReportHTML(data: ReportData): string {
     if (linenRows) {
       linenInventoryHtml = `
         <div class="linen-section" style="margin-top:15px; page-break-inside:avoid;">
-          <h3>📦 Inventaire Linge</h3>
+          <h3>📦 ${t.linenInventory}</h3>
           <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #000;">
             <tr>
-              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Type de linge</th>
-              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:center; width:100px;">Quantité</th>
-              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Vérifié ✓</th>
+              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.linenType}</th>
+              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:center; width:100px;">${t.quantity}</th>
+              <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.verified}</th>
             </tr>
             ${linenRows}
           </table>
@@ -280,45 +287,45 @@ function generateReportHTML(data: ReportData): string {
   const estimatedTime = fullCleanCount * data.config.fullCleaningTime + 
                        quickCleanCount * data.config.quickCleaningTime;
   
-  // Time tracking table (Pointage)
+  // Time tracking table
   const timeTrackingHtml = `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:15px; border:1px solid #000;">
       <tr>
-        <th colspan="2" style="background-color:#e3e3e3; border:1px solid #000; text-align:center; font-weight:bold;">Pointage</th>
+        <th colspan="2" style="background-color:#e3e3e3; border:1px solid #000; text-align:center; font-weight:bold;">${t.timeTracking}</th>
       </tr>
       <tr>
-        <td style="border:1px solid #000; width:50%;">Heure de début</td>
+        <td style="border:1px solid #000; width:50%;">${t.startTime}</td>
         <td style="border:1px solid #000; font-weight:bold;">${data.startTime || '___:___'}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #000;">Heure de fin</td>
+        <td style="border:1px solid #000;">${t.endTime}</td>
         <td style="border:1px solid #000; height:25px;"></td>
       </tr>
     </table>
   `;
 
-  // Summary table with improved styling - removed title "Résumé des chambres"
+  // Summary table with improved styling
   const summaryTableHtml = `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:20px; border:1px solid #000;">
       <tr>
-        <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Type de nettoyage</th>
-        <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Nombre de chambres</th>
+        <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.cleaningType}</th>
+        <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.numberOfRooms}</th>
       </tr>
       <tr style="background-color:#FEC6A1;">
-        <td style="border:1px solid #000;">À Blanc</td>
+        <td style="border:1px solid #000;">${t.fullClean} (${t.fullCleanShort})</td>
         <td style="border:1px solid #000;">${fullCleanCount}</td>
       </tr>
       <tr style="background-color:#F2FCE2;">
-        <td style="border:1px solid #000;">Recouche</td>
+        <td style="border:1px solid #000;">${t.quickClean} (${t.quickCleanShort})</td>
         <td style="border:1px solid #000;">${quickCleanCount}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #000; font-weight:bold;">Total</td>
+        <td style="border:1px solid #000; font-weight:bold;">${t.total}</td>
         <td style="border:1px solid #000; font-weight:bold;">${data.rooms.length}</td>
       </tr>
       <tr>
-        <td style="border:1px solid #000;">Temps estimé</td>
-        <td style="border:1px solid #000;">${estimatedTime} minutes</td>
+        <td style="border:1px solid #000;">${t.estimatedTime}</td>
+        <td style="border:1px solid #000;">${estimatedTime} ${t.minutes}</td>
       </tr>
     </table>
   `;
@@ -356,14 +363,14 @@ function generateReportHTML(data: ReportData): string {
       // Determine background color based on cleaning type - support both old and new formats
       const isFullClean = room.cleaningType === 'full' || room.cleaningType === 'a_blanc';
       const bgColor = isFullClean ? '#FEC6A1' : '#F2FCE2'; // Orange for full, Green for quick
-      const cleaningTypeText = isFullClean ? 'À Blanc 🚪' : 'Recouche'; // Door emoji for checkout/à blanc
-      const priorityText = room.priority === 'high' ? 'Haute' : 'Normale';
+      const cleaningTypeText = isFullClean ? `${t.fullClean} 🚪` : t.quickClean;
+      const priorityText = room.priority === 'high' ? t.high : t.normal;
       
       rowsHtml += `
         <tr style="background-color:${bgColor};">
           <td style="border:1px solid #000;">${room.number}</td>
           <td style="border:1px solid #000;">${cleaningTypeText}</td>
-          <td style="border:1px solid #000;">${room.isTwin ? 'Oui' : 'Non'}</td>
+          <td style="border:1px solid #000;">${room.isTwin ? t.yes : t.no}</td>
           <td style="border:1px solid #000;">${priorityText}</td>
           <td style="border:1px solid #000;">${room.notes || '-'}</td>
           <td style="border:1px solid #000;"></td>
@@ -375,16 +382,16 @@ function generateReportHTML(data: ReportData): string {
     roomsTablesByFloor += `
       <div class="floor-section" style="margin-top:20px;">
         <div class="floor-heading" style="font-weight:bold; background-color:#eee; padding:5px; margin-bottom:5px;">
-          Étage ${floor === 0 ? 'RDC' : floor}
+          ${t.floor} ${floor === 0 ? t.groundFloor : floor}
         </div>
         <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:20px; border:1px solid #000;">
           <tr>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Chambre</th>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Type</th>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Twin</th>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Priorité</th>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Notes</th>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Remarques</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.room}</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.type}</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.twin}</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.priority}</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.notes}</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${t.remarks}</th>
           </tr>
           ${rowsHtml}
         </table>
@@ -393,13 +400,14 @@ function generateReportHTML(data: ReportData): string {
   });
   
   // Complete HTML with improved styling optimized for printing
+  const lang = getCurrentReportLanguage();
   return `
     <!DOCTYPE html>
-    <html lang="fr">
+    <html lang="${lang}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Rapport - ${data.housekeeperName}</title>
+      <title>${t.report} - ${data.housekeeperName}</title>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
       <style>
         body { 
@@ -578,10 +586,10 @@ function generateReportHTML(data: ReportData): string {
         <div class="date">Date: ${formattedDate}</div>
       </div>
       
-      <h2>Rapport de Nettoyage</h2>
+      <h2>${t.report}</h2>
       
       <div class="housekeeper-row">
-        <span style="margin-right: 8px;">Nom:</span>
+        <span style="margin-right: 8px;">${t.room === 'Room' ? 'Name' : 'Nom'}:</span>
         <div class="housekeeperName">${data.housekeeperName}</div>
       </div>
       
@@ -597,11 +605,11 @@ function generateReportHTML(data: ReportData): string {
         ${linenInventoryHtml}
       </div>
       
-      <h2>Liste des chambres à nettoyer</h2>
+      <h2>${lang === 'en' ? 'Rooms to clean' : 'Liste des chambres à nettoyer'}</h2>
       ${roomsTablesByFloor}
       
       <div class="signature">
-        Signature
+        ${t.signature}
       </div>
       
       <div class="footer">
@@ -727,13 +735,18 @@ export async function generateCombinedReport(
   customFields?: CustomReportFields
 ): Promise<boolean> {
   try {
+    // Get language and translations
+    const lang = getCurrentReportLanguage();
+    const t = getReportTranslations(lang);
+    const locale = lang === 'en' ? 'en-US' : 'fr-FR';
+    
     // Filter out housekeepers with no rooms
     const validHousekeepers = housekeeperRooms.filter(item => item.rooms.length > 0);
     
     if (validHousekeepers.length === 0) {
       toast({
-        title: "Aucune chambre assignée",
-        description: "Il n'y a pas de chambres assignées aux femmes de chambre.",
+        title: lang === 'en' ? "No rooms assigned" : "Aucune chambre assignée",
+        description: lang === 'en' ? "There are no rooms assigned to housekeepers." : "Il n'y a pas de chambres assignées aux femmes de chambre.",
         variant: "destructive"
       });
       return false;
@@ -743,10 +756,10 @@ export async function generateCombinedReport(
     const housekeeperHTMLs: string[] = [];
 
     for (const { name, rooms } of validHousekeepers) {
-      // Get today's date in French locale
+      // Get today's date in localized format
       const today = new Date();
       const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-      const currentDate = today.toLocaleDateString('fr-FR', dateOptions as any);
+      const currentDate = today.toLocaleDateString(locale, dateOptions as any);
       
       // Sort rooms by floor and then room number
       const sortedRooms = [...rooms].sort((a, b) => {
@@ -776,7 +789,7 @@ export async function generateCombinedReport(
       };
       
       // Generate complete HTML for this housekeeper
-      const housekeeperHTML = generateReportHTML(reportData);
+      const housekeeperHTML = generateReportHTML(reportData, t);
       housekeeperHTMLs.push(housekeeperHTML);
     }
     
@@ -787,7 +800,7 @@ export async function generateCombinedReport(
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Rapports de Nettoyage</title>
+        <title>${lang === 'en' ? 'Cleaning Reports' : 'Rapports de Nettoyage'}</title>
         <style>
           .report-container {
             page-break-after: always !important;
