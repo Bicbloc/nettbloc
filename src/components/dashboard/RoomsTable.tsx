@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Link, Trash2 } from "lucide-react";
 import { RoomCard } from "@/components/RoomCard";
 import { Room } from "@/services/pdfService";
+import { getCleaningTypeLabel, normalizeCleaningType } from "@/utils/cleaningTypeUtils";
 
 interface RoomsTableProps {
   rooms: Room[];
@@ -32,15 +33,18 @@ const getStatusBadge = (status: string) => {
 };
 
 const getCleaningTypeBadge = (type: string) => {
-  switch (type) {
-    case 'full':
-      return <Badge variant="outline" className="bg-red-100 text-red-800">À blanc</Badge>;
-    case 'quick':
-      return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
+  const normalized = normalizeCleaningType(type);
+  const label = getCleaningTypeLabel(type);
+  
+  switch (normalized) {
+    case 'a_blanc':
+      return <Badge variant="outline" className="bg-red-100 text-red-800">{label}</Badge>;
+    case 'recouche':
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800">{label}</Badge>;
     case 'none':
-      return <Badge variant="outline" className="bg-gray-100 text-gray-800">Aucun</Badge>;
+      return <Badge variant="outline" className="bg-gray-100 text-gray-800">{label}</Badge>;
     default:
-      return <Badge variant="outline">{type}</Badge>;
+      return <Badge variant="outline">{label}</Badge>;
   }
 };
 
