@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
   Search, Check, X, ArrowLeft, Save, Trash2, RefreshCw, 
-  Eye, EyeOff, Filter, Layers, Sparkles, AlertCircle, Info
+  Eye, EyeOff, Filter, Layers, Sparkles, AlertCircle, Info, Ban, Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fieldExtractor, ExtractedFields } from '@/services/pms/FieldExtractor';
@@ -50,14 +50,30 @@ const PATTERN_COLORS: Record<string, string> = {
   'none': 'bg-gray-100 border-gray-300 text-gray-600',
 };
 
-function extractPatternFromLine(line: string): LinePattern {
-  const dateMatches = line.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
-  const timeMatches = line.match(/\d{1,2}:\d{2}/g) || [];
-  const hasNightPattern = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line);
+// Termes exclus par défaut du pattern matching (types de chambres, etc.)
+const DEFAULT_EXCLUDED_TERMS = [
+  'SGL', 'DBL', 'TWN', 'TWIN', 'TRIPLE', 'QUAD', 'KING', 'QUEEN',
+  'CLA', 'SUP', 'DLX', 'STD', 'FAM', 'COC', 'PMR', 'JUN', 'STE',
+  'Twinable', 'BLC', 'VIP', 'ECO', 'LUX', 'EXE'
+];
+
+function extractPatternFromLine(line: string, excludedTerms: string[] = []): LinePattern {
+  // Nettoyer la ligne en retirant les termes exclus
+  let cleanedLine = line;
+  excludedTerms.forEach(term => {
+    // Créer un regex qui matche le terme comme mot complet (insensible à la casse)
+    const regex = new RegExp(`\\b${term}\\b`, 'gi');
+    cleanedLine = cleanedLine.replace(regex, ' ');
+  });
   
-  const upper = line.toUpperCase();
+  const dateMatches = cleanedLine.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
+  const timeMatches = cleanedLine.match(/\d{1,2}:\d{2}/g) || [];
+  const hasNightPattern = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(cleanedLine);
+  
+  const upper = cleanedLine.toUpperCase();
   const statusCodes: string[] = [];
   
+  // Seuls les vrais codes de statut, pas les types de chambres
   if (/\bSAL\b/.test(upper)) statusCodes.push('SAL');
   if (/\bDIR\b/.test(upper)) statusCodes.push('DIR');
   if (/\bDEP\b/.test(upper)) statusCodes.push('DEP');
@@ -65,6 +81,9 @@ function extractPatternFromLine(line: string): LinePattern {
   if (/\bPRO\b/.test(upper)) statusCodes.push('PRO');
   if (/\bINS\b/.test(upper)) statusCodes.push('INS');
   if (/\bARR\b/.test(upper)) statusCodes.push('ARR');
+  if (/\bNET\b/.test(upper)) statusCodes.push('NET');
+  if (/\bLIB\b/.test(upper)) statusCodes.push('LIB');
+  if (/\bBLQ\b/.test(upper)) statusCodes.push('BLQ');
   
   const hasArrivalDate = dateMatches.length >= 1;
   const hasDepartureDate = dateMatches.length >= 2;
@@ -123,6 +142,41 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
   const [showOnlyRooms, setShowOnlyRooms] = useState(true);
   const [patternRules, setPatternRules] = useState<Map<string, 'a_blanc' | 'recouche' | 'none'>>(new Map());
   const [saving, setSaving] = useState(false);
+  
+  // Gestion des termes exclus
+  const [excludedTerms, setExcludedTerms] = useState<string[]>(DEFAULT_EXCLUDED_TERMS);
+  const [newExcludedTerm, setNewExcludedTerm] = useState('');
+  const [showExcludedPanel, setShowExcludedPanel] = useState(false);
+  const [rawReportText, setRawReportText] = useState<string>('');
+
+  // Parser les lignes avec les termes exclus actuels
+  const parseLines = useCallback((rawText: string) => {
+    const rawLines = rawText.split('\n').filter((l: string) => l.trim());
+    const parsedLines: LineData[] = rawLines.map((raw: string, index: number) => {
+      const roomNumber = extractRoomNumber(raw);
+      const isHeader = isHeaderLine(raw);
+      const pattern = extractPatternFromLine(raw, excludedTerms);
+      
+      let fields: ExtractedFields | null = null;
+      if (roomNumber && !isHeader) {
+        const result = fieldExtractor.extractFromLine(raw, roomNumber);
+        fields = result.fields;
+      }
+      
+      return {
+        index,
+        raw,
+        roomNumber,
+        fields,
+        pattern,
+        cleaningType: null,
+        isHeader,
+      };
+    });
+    
+    setLines(parsedLines);
+    return parsedLines;
+  }, [excludedTerms]);
 
   // Charger les lignes du rapport d'entraînement
   const loadLines = async () => {
@@ -140,30 +194,8 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
       if (error) throw error;
 
       if (data?.raw_text) {
-        const rawLines = data.raw_text.split('\n').filter((l: string) => l.trim());
-        const parsedLines: LineData[] = rawLines.map((raw: string, index: number) => {
-          const roomNumber = extractRoomNumber(raw);
-          const isHeader = isHeaderLine(raw);
-          const pattern = extractPatternFromLine(raw);
-          
-          let fields: ExtractedFields | null = null;
-          if (roomNumber && !isHeader) {
-            const result = fieldExtractor.extractFromLine(raw, roomNumber);
-            fields = result.fields;
-          }
-          
-          return {
-            index,
-            raw,
-            roomNumber,
-            fields,
-            pattern,
-            cleaningType: null,
-            isHeader,
-          };
-        });
-        
-        setLines(parsedLines);
+        setRawReportText(data.raw_text);
+        parseLines(data.raw_text);
       }
     } catch (error) {
       console.error('Erreur chargement:', error);
@@ -171,6 +203,37 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
     } finally {
       setLoading(false);
     }
+  };
+
+  // Réanalyser quand les termes exclus changent
+  const reanalyzeWithExclusions = useCallback(() => {
+    if (rawReportText) {
+      parseLines(rawReportText);
+      setSelectedLine(null);
+      toast.success('Rapport réanalysé avec les nouveaux termes exclus');
+    }
+  }, [rawReportText, parseLines]);
+
+  // Ajouter un terme exclu
+  const addExcludedTerm = () => {
+    const term = newExcludedTerm.trim().toUpperCase();
+    if (term && !excludedTerms.includes(term)) {
+      setExcludedTerms(prev => [...prev, term]);
+      setNewExcludedTerm('');
+      toast.success(`"${term}" ajouté aux exclusions`);
+    }
+  };
+
+  // Supprimer un terme exclu
+  const removeExcludedTerm = (term: string) => {
+    setExcludedTerms(prev => prev.filter(t => t !== term));
+    toast.success(`"${term}" retiré des exclusions`);
+  };
+
+  // Réinitialiser les termes exclus
+  const resetExcludedTerms = () => {
+    setExcludedTerms(DEFAULT_EXCLUDED_TERMS);
+    toast.success('Exclusions réinitialisées');
   };
 
   // Charger les règles existantes
@@ -403,12 +466,67 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
           <Badge variant="outline" className="gap-1">
             {filteredLines.filter(l => l.roomNumber).length} chambres
           </Badge>
+          <Button
+            variant={showExcludedPanel ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowExcludedPanel(!showExcludedPanel)}
+          >
+            <Ban className="h-4 w-4 mr-1" />
+            Exclusions ({excludedTerms.length})
+          </Button>
           <Button onClick={saveRules} disabled={saving || patternRules.size === 0}>
             <Save className="h-4 w-4 mr-2" />
             {saving ? 'Sauvegarde...' : 'Sauvegarder les règles'}
           </Button>
         </div>
       </div>
+
+      {/* Excluded Terms Panel */}
+      {showExcludedPanel && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Ban className="h-4 w-4 text-orange-600" />
+              Termes exclus du pattern matching
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Ces termes (types de chambre, etc.) sont ignorés lors de la détection des combinaisons
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-1 mb-3">
+              {excludedTerms.map(term => (
+                <Badge key={term} variant="secondary" className="bg-orange-100 hover:bg-orange-200 text-xs">
+                  {term}
+                  <button onClick={() => removeExcludedTerm(term)} className="ml-1 hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Ajouter un terme..."
+                value={newExcludedTerm}
+                onChange={(e) => setNewExcludedTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addExcludedTerm()}
+                className="max-w-[200px] h-8 text-sm"
+              />
+              <Button size="sm" onClick={addExcludedTerm} disabled={!newExcludedTerm.trim()}>
+                <Plus className="h-3 w-3 mr-1" />
+                Ajouter
+              </Button>
+              <Button size="sm" variant="outline" onClick={resetExcludedTerms}>
+                Réinitialiser
+              </Button>
+              <Button size="sm" variant="secondary" onClick={reanalyzeWithExclusions} disabled={!rawReportText}>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Réanalyser
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="p-3">
