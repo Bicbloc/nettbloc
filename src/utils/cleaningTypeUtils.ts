@@ -53,10 +53,10 @@ export function getCleaningTypeLabel(type: string | undefined): string {
 export function getCleaningTypeShortLabel(type: string | undefined): string {
   const normalized = normalizeCleaningType(type);
   switch (normalized) {
-    case 'a_blanc': return 'Blanc';
-    case 'recouche': return 'Rec.';
+    case 'a_blanc': return 'B';
+    case 'recouche': return 'R';
     case 'none': return '-';
-    default: return 'Blanc';
+    default: return 'B';
   }
 }
 
