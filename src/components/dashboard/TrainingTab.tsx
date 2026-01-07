@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, History, CheckCircle, AlertCircle, FileText, Sparkles } from "lucide-react";
+import { Brain, History, CheckCircle, AlertCircle, FileText, Sparkles, Settings2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TrainingWizard } from "@/components/training/TrainingWizard";
+import { CleaningTypeMapperPage } from "@/components/pms/CleaningTypeMapperPage";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -15,7 +16,7 @@ interface TrainingTabProps {
 
 export function TrainingTab({ currentHotelId }: TrainingTabProps) {
   const [showWizard, setShowWizard] = useState(false);
-
+  const [showMapper, setShowMapper] = useState(false);
   // Fetch training patterns for this hotel
   const { data: patterns, isLoading } = useQuery({
     queryKey: ['training-patterns', currentHotelId],
@@ -45,6 +46,15 @@ export function TrainingTab({ currentHotelId }: TrainingTabProps) {
           </p>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (showMapper) {
+    return (
+      <CleaningTypeMapperPage 
+        hotelId={currentHotelId} 
+        onBack={() => setShowMapper(false)} 
+      />
     );
   }
 
@@ -83,10 +93,16 @@ export function TrainingTab({ currentHotelId }: TrainingTabProps) {
                 </CardDescription>
               </div>
             </div>
-            <Button onClick={() => setShowWizard(true)} size="lg" className="gap-2">
-              <Brain className="h-5 w-5" />
-              Nouvel entraînement
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setShowMapper(true)} variant="outline" size="lg" className="gap-2">
+                <Settings2 className="h-5 w-5" />
+                Mapping nettoyage
+              </Button>
+              <Button onClick={() => setShowWizard(true)} size="lg" className="gap-2">
+                <Brain className="h-5 w-5" />
+                Nouvel entraînement
+              </Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
