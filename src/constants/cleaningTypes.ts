@@ -8,8 +8,8 @@ export const CLEANING_TYPES = {
 export type CleaningType = typeof CLEANING_TYPES[keyof typeof CLEANING_TYPES];
 
 export const CLEANING_TYPE_LABELS = {
-  full: { fr: 'À blanc', en: 'Full clean', short: 'Blanc' },
-  quick: { fr: 'Recouche', en: 'Quick clean', short: 'Rec.' },
+  full: { fr: 'À blanc', en: 'Full clean', short: 'B' },
+  quick: { fr: 'Recouche', en: 'Quick clean', short: 'R' },
   none: { fr: 'Aucun', en: 'None', short: '-' }
 } as const;
 
