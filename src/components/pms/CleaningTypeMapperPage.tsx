@@ -605,13 +605,13 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                   <p className="text-xs text-muted-foreground mb-2">
                     Assigner ce pattern ({similarLines.size} chambres)
                   </p>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             size="sm"
-                            className="flex-1 bg-red-500 hover:bg-red-600"
+                            className="bg-red-500 hover:bg-red-600"
                             onClick={() => assignCleaningType(selectedLine.pattern.patternKey, 'a_blanc')}
                           >
                             <span className="font-bold mr-1">B</span> À blanc
@@ -628,7 +628,7 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                         <TooltipTrigger asChild>
                           <Button
                             size="sm"
-                            className="flex-1 bg-blue-500 hover:bg-blue-600"
+                            className="bg-blue-500 hover:bg-blue-600"
                             onClick={() => assignCleaningType(selectedLine.pattern.patternKey, 'recouche')}
                           >
                             <span className="font-bold mr-1">R</span> Recouche
@@ -636,6 +636,24 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Nettoyage rapide (client reste)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-700"
+                            onClick={() => assignCleaningType(selectedLine.pattern.patternKey, 'none')}
+                          >
+                            <span className="font-bold mr-1">—</span> Propre
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Pas de nettoyage (chambre propre/inspectée)</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -649,9 +667,15 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                     <Badge className={
                       patternRules.get(selectedLine.pattern.patternKey) === 'a_blanc'
                         ? 'bg-red-500'
-                        : 'bg-blue-500'
+                        : patternRules.get(selectedLine.pattern.patternKey) === 'recouche'
+                          ? 'bg-blue-500'
+                          : 'bg-gray-500'
                     }>
-                      {patternRules.get(selectedLine.pattern.patternKey) === 'a_blanc' ? 'À blanc' : 'Recouche'}
+                      {patternRules.get(selectedLine.pattern.patternKey) === 'a_blanc' 
+                        ? 'À blanc' 
+                        : patternRules.get(selectedLine.pattern.patternKey) === 'recouche' 
+                          ? 'Recouche' 
+                          : 'Propre'}
                     </Badge>
                     <Button
                       variant="ghost"
@@ -736,11 +760,15 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
         <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-red-500"></div>
-            <span className="font-bold">B</span> = À blanc (nettoyage complet)
+            <span className="font-bold">B</span> = À blanc (complet)
           </span>
           <span className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-blue-500"></div>
-            <span className="font-bold">R</span> = Recouche (nettoyage rapide)
+            <span className="font-bold">R</span> = Recouche (rapide)
+          </span>
+          <span className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded bg-gray-500"></div>
+            <span className="font-bold">—</span> = Propre (aucun)
           </span>
           <span className="flex items-center gap-1">
             <Sparkles className="h-3 w-3 text-yellow-500" />
