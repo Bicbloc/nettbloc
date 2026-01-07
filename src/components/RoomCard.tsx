@@ -279,7 +279,7 @@ export function RoomCard({
               }}
               title={t.rooms.fullClean}
             >
-              CO
+              {t.rooms.fullCleanShort}
             </button>
             <button 
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors font-semibold text-xs"
@@ -289,7 +289,7 @@ export function RoomCard({
               }}
               title={t.rooms.quickClean}
             >
-              SO
+              {t.rooms.quickCleanShort}
             </button>
             <button
               className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
