@@ -27,6 +27,7 @@ interface LineData {
   pattern: LinePattern;
   cleaningType: 'a_blanc' | 'recouche' | 'none' | null;
   isHeader: boolean;
+  defaultCleaningType: 'a_blanc' | 'recouche' | 'none'; // Type calculé par défaut
 }
 
 interface LinePattern {
@@ -37,6 +38,8 @@ interface LinePattern {
   hasNightInfo: boolean;
   statusCodes: string[];
   patternKey: string;
+  detectedDates: string[];
+  detectedTimes: string[];
 }
 
 interface CleaningTypeMapperPageProps {
@@ -61,7 +64,6 @@ function extractPatternFromLine(line: string, excludedTerms: string[] = []): Lin
   // Nettoyer la ligne en retirant les termes exclus
   let cleanedLine = line;
   excludedTerms.forEach(term => {
-    // Créer un regex qui matche le terme comme mot complet (insensible à la casse)
     const regex = new RegExp(`\\b${term}\\b`, 'gi');
     cleanedLine = cleanedLine.replace(regex, ' ');
   });
@@ -73,7 +75,7 @@ function extractPatternFromLine(line: string, excludedTerms: string[] = []): Lin
   const upper = cleanedLine.toUpperCase();
   const statusCodes: string[] = [];
   
-  // Seuls les vrais codes de statut, pas les types de chambres
+  // Codes de statut PMS
   if (/\bSAL\b/.test(upper)) statusCodes.push('SAL');
   if (/\bDIR\b/.test(upper)) statusCodes.push('DIR');
   if (/\bDEP\b/.test(upper)) statusCodes.push('DEP');
@@ -90,7 +92,6 @@ function extractPatternFromLine(line: string, excludedTerms: string[] = []): Lin
   const hasArrivalTime = timeMatches.length >= 1;
   const hasDepartureTime = timeMatches.length >= 2;
   
-  // Créer une clé unique pour ce pattern
   const patternKey = [
     statusCodes.sort().join('+') || 'NO_STATUS',
     hasArrivalDate ? 'ARR_DATE' : '',
@@ -108,7 +109,48 @@ function extractPatternFromLine(line: string, excludedTerms: string[] = []): Lin
     hasNightInfo: hasNightPattern,
     statusCodes,
     patternKey,
+    detectedDates: dateMatches,
+    detectedTimes: timeMatches,
   };
+}
+
+/**
+ * Calcule le type de nettoyage par défaut basé sur le pattern
+ * Logique standard: 2 horaires ou DEP = à blanc, sinon recouche
+ */
+function getDefaultCleaningType(pattern: LinePattern): 'a_blanc' | 'recouche' | 'none' {
+  // INS/PRO/NET = propre, aucun nettoyage
+  if (pattern.statusCodes.some(c => ['INS', 'PRO', 'NET'].includes(c))) {
+    return 'none';
+  }
+  
+  // DEP explicite = à blanc
+  if (pattern.statusCodes.includes('DEP')) {
+    return 'a_blanc';
+  }
+  
+  // 2 horaires = checkout + checkin = à blanc
+  if (pattern.hasDepartureTime) {
+    return 'a_blanc';
+  }
+  
+  // 2 dates mais pas d'horaires = séjour en cours = recouche
+  if (pattern.hasDepartureDate && !pattern.hasDepartureTime) {
+    return 'recouche';
+  }
+  
+  // Info nuit présente = séjour = recouche
+  if (pattern.hasNightInfo) {
+    return 'recouche';
+  }
+  
+  // SAL/DIR/OCC sans contexte = recouche par défaut (client en place)
+  if (pattern.statusCodes.some(c => ['SAL', 'DIR', 'OCC'].includes(c))) {
+    return 'recouche';
+  }
+  
+  // Fallback
+  return 'a_blanc';
 }
 
 function extractRoomNumber(line: string): string | null {
@@ -163,6 +205,9 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
         fields = result.fields;
       }
       
+      // Calculer le type de nettoyage par défaut
+      const defaultCleaningType = getDefaultCleaningType(pattern);
+      
       return {
         index,
         raw,
@@ -171,6 +216,7 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
         pattern,
         cleaningType: null,
         isHeader,
+        defaultCleaningType,
       };
     });
     
@@ -411,28 +457,62 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
     return patternRules.get(line.pattern.patternKey) || null;
   };
 
-  const renderPatternBadges = (pattern: LinePattern) => {
+  const renderPatternBadges = (pattern: LinePattern, showDetails: boolean = false) => {
     return (
       <div className="flex flex-wrap gap-1">
         {pattern.statusCodes.map(code => (
-          <Badge key={code} variant="outline" className="text-[10px] py-0 px-1">
+          <Badge key={code} variant="outline" className="text-[10px] py-0 px-1 font-bold">
             {code}
           </Badge>
         ))}
-        {pattern.hasArrivalDate && (
-          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-green-100">Date↓</Badge>
+        {pattern.detectedDates.length > 0 && (
+          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-green-100">
+            {pattern.detectedDates.length} date{pattern.detectedDates.length > 1 ? 's' : ''}
+            {showDetails && `: ${pattern.detectedDates.join(', ')}`}
+          </Badge>
         )}
-        {pattern.hasDepartureDate && (
-          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-orange-100">Date↑</Badge>
-        )}
-        {pattern.hasArrivalTime && (
-          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-blue-100">H↓</Badge>
-        )}
-        {pattern.hasDepartureTime && (
-          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-purple-100">H↑</Badge>
+        {pattern.detectedTimes.length > 0 && (
+          <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-blue-100">
+            {pattern.detectedTimes.length} horaire{pattern.detectedTimes.length > 1 ? 's' : ''}
+            {showDetails && `: ${pattern.detectedTimes.join(', ')}`}
+          </Badge>
         )}
         {pattern.hasNightInfo && (
           <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-indigo-100">Nuit</Badge>
+        )}
+      </div>
+    );
+  };
+
+  // Affiche le type par défaut avec possibilité de le remplacer
+  const renderDefaultTypeIndicator = (line: LineData) => {
+    const assigned = patternRules.get(line.pattern.patternKey);
+    const isOverridden = assigned && assigned !== line.defaultCleaningType;
+    
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-muted-foreground">Défaut:</span>
+        <Badge 
+          variant="outline" 
+          className={`${
+            line.defaultCleaningType === 'a_blanc' 
+              ? 'border-red-300 text-red-600' 
+              : line.defaultCleaningType === 'recouche' 
+                ? 'border-blue-300 text-blue-600' 
+                : 'border-gray-300 text-gray-600'
+          } ${isOverridden ? 'line-through opacity-50' : ''}`}
+        >
+          {line.defaultCleaningType === 'a_blanc' ? 'À blanc' : line.defaultCleaningType === 'recouche' ? 'Recouche' : 'Propre'}
+        </Badge>
+        {isOverridden && (
+          <>
+            <span className="text-muted-foreground">→</span>
+            <Badge className={
+              assigned === 'a_blanc' ? 'bg-red-500' : assigned === 'recouche' ? 'bg-blue-500' : 'bg-gray-500'
+            }>
+              {assigned === 'a_blanc' ? 'À blanc' : assigned === 'recouche' ? 'Recouche' : 'Propre'}
+            </Badge>
+          </>
         )}
       </div>
     );
@@ -674,7 +754,16 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                 {/* Pattern visualization */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Éléments détectés</p>
-                  {renderPatternBadges(selectedLine.pattern)}
+                  {renderPatternBadges(selectedLine.pattern, true)}
+                </div>
+
+                {/* Default cleaning type */}
+                <div className="p-3 bg-muted/50 rounded-lg border">
+                  {renderDefaultTypeIndicator(selectedLine)}
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Basé sur: {selectedLine.pattern.detectedTimes.length} horaire(s), {selectedLine.pattern.detectedDates.length} date(s)
+                    {selectedLine.pattern.statusCodes.length > 0 && `, codes: ${selectedLine.pattern.statusCodes.join(', ')}`}
+                  </p>
                 </div>
 
                 {/* Full line */}
@@ -685,46 +774,12 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                   </p>
                 </div>
 
-                {/* Fields extracted */}
-                {selectedLine.fields && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Champs extraits</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      {selectedLine.fields.arrivalDate && (
-                        <div className="bg-green-50 p-2 rounded">
-                          <span className="text-muted-foreground">Arrivée:</span> {selectedLine.fields.arrivalDate}
-                        </div>
-                      )}
-                      {selectedLine.fields.departureDate && (
-                        <div className="bg-orange-50 p-2 rounded">
-                          <span className="text-muted-foreground">Départ:</span> {selectedLine.fields.departureDate}
-                        </div>
-                      )}
-                      {selectedLine.fields.arrivalTime && (
-                        <div className="bg-blue-50 p-2 rounded">
-                          <span className="text-muted-foreground">H. Arrivée:</span> {selectedLine.fields.arrivalTime}
-                        </div>
-                      )}
-                      {selectedLine.fields.departureTime && (
-                        <div className="bg-purple-50 p-2 rounded">
-                          <span className="text-muted-foreground">H. Départ:</span> {selectedLine.fields.departureTime}
-                        </div>
-                      )}
-                      {selectedLine.fields.nightInfo && (
-                        <div className="bg-indigo-50 p-2 rounded col-span-2">
-                          <span className="text-muted-foreground">Nuit:</span> {selectedLine.fields.nightInfo}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 <Separator />
 
                 {/* Assignment buttons */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Assigner ce pattern ({similarLines.size} chambres)
+                    Remplacer le type par défaut ({similarLines.size} chambres avec ce pattern)
                   </p>
                   <div className="grid grid-cols-3 gap-2">
                     <TooltipProvider>
@@ -836,11 +891,14 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                 <div className="space-y-2">
                   {Array.from(patternGroups.entries()).map(([key, group]) => {
                     const assigned = patternRules.get(key);
+                    const firstLine = group.lines[0];
+                    const defaultType = firstLine?.defaultCleaningType;
+                    const isOverridden = assigned && assigned !== defaultType;
+                    
                     return (
                       <button
                         key={key}
                         onClick={() => {
-                          const firstLine = group.lines[0];
                           if (firstLine) setSelectedLine(firstLine);
                         }}
                         className={`w-full text-left p-2 rounded border transition-all ${
@@ -855,13 +913,25 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
                           <Badge variant="secondary" className="text-xs">
                             {group.count} chambres
                           </Badge>
-                          {assigned && (
-                            <Badge className={
-                              assigned === 'a_blanc' ? 'bg-red-500' : 'bg-blue-500'
-                            }>
-                              {assigned === 'a_blanc' ? 'B' : 'R'}
+                          <div className="flex items-center gap-1">
+                            {/* Type par défaut (barré si remplacé) */}
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[10px] ${isOverridden ? 'line-through opacity-40' : ''} ${
+                                defaultType === 'a_blanc' ? 'border-red-300' : defaultType === 'recouche' ? 'border-blue-300' : 'border-gray-300'
+                              }`}
+                            >
+                              {defaultType === 'a_blanc' ? 'B' : defaultType === 'recouche' ? 'R' : '-'}
                             </Badge>
-                          )}
+                            {/* Type assigné (si différent) */}
+                            {isOverridden && (
+                              <Badge className={
+                                assigned === 'a_blanc' ? 'bg-red-500' : assigned === 'recouche' ? 'bg-blue-500' : 'bg-gray-500'
+                              }>
+                                {assigned === 'a_blanc' ? 'B' : assigned === 'recouche' ? 'R' : '-'}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 truncate">
                           {group.example}
@@ -881,19 +951,20 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
         <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-red-500"></div>
-            <span className="font-bold">B</span> = À blanc (complet)
+            <span className="font-bold">B</span> = À blanc
           </span>
           <span className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-blue-500"></div>
-            <span className="font-bold">R</span> = Recouche (rapide)
+            <span className="font-bold">R</span> = Recouche
           </span>
           <span className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-gray-500"></div>
-            <span className="font-bold">—</span> = Propre (aucun)
+            <span className="font-bold">—</span> = Propre
           </span>
           <span className="flex items-center gap-1">
-            <Sparkles className="h-3 w-3 text-yellow-500" />
-            = Lignes similaires
+            <Badge variant="outline" className="text-[10px] py-0 px-1 line-through opacity-50">B</Badge>
+            <Badge className="text-[10px] py-0 px-1 bg-blue-500">R</Badge>
+            = Remplacé
           </span>
         </div>
       </Card>
