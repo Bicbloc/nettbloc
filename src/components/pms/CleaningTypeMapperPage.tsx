@@ -361,7 +361,7 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
         .eq('hotel_id', hotelId)
         .like('rule_name', 'Auto_%');
 
-      // Créer les nouvelles règles
+      // Créer les nouvelles règles avec logique 'present' vs 'absent'
       const rulesToInsert: any[] = [];
       let priority = 100;
       
@@ -370,18 +370,21 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
         const statusPart = parts[0];
         const statusCodes = statusPart !== 'NO_STATUS' ? statusPart.split('+') : [];
         
+        // IMPORTANT: Si un élément est dans le pattern → 'present'
+        // Si un élément n'est PAS dans le pattern → 'absent' (pas 'any')
+        // Cela permet un matching exact du pattern
         rulesToInsert.push({
           hotel_id: hotelId,
           rule_name: `Auto_${patternKey.replace(/\|/g, '_').substring(0, 30)}`,
-          description: `Règle générée automatiquement`,
+          description: `Pattern: ${patternKey}`,
           priority: priority--,
           is_active: true,
           status_keywords: statusCodes,
-          arrival_date: parts.includes('ARR_DATE') ? 'present' : 'any',
-          departure_date: parts.includes('DEP_DATE') ? 'present' : 'any',
-          arrival_time: parts.includes('ARR_TIME') ? 'present' : 'any',
-          departure_time: parts.includes('DEP_TIME') ? 'present' : 'any',
-          night_info: parts.includes('NIGHT') ? 'present' : 'any',
+          arrival_date: parts.includes('ARR_DATE') ? 'present' : 'absent',
+          departure_date: parts.includes('DEP_DATE') ? 'present' : 'absent',
+          arrival_time: parts.includes('ARR_TIME') ? 'present' : 'absent',
+          departure_time: parts.includes('DEP_TIME') ? 'present' : 'absent',
+          night_info: parts.includes('NIGHT') ? 'present' : 'absent',
           result_cleaning_type: cleaningType,
         });
       });
@@ -394,7 +397,7 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
         if (error) throw error;
       }
 
-      toast.success(`${rulesToInsert.length} règles enregistrées`);
+      toast.success(`${rulesToInsert.length} règles enregistrées - Elles seront utilisées au prochain import PDF`);
     } catch (error) {
       console.error('Erreur sauvegarde:', error);
       toast.error('Erreur lors de la sauvegarde');

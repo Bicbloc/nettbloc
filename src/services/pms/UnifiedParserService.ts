@@ -148,6 +148,7 @@ class UnifiedParserService {
 
   /**
    * Extrait le contexte d'une ligne pour le matching des règles de combinaison
+   * Compatible avec le format généré par CleaningTypeMapperPage
    */
   private extractLineContext(line: string): {
     statusKeywords: string[];
@@ -159,13 +160,14 @@ class UnifiedParserService {
   } {
     const upper = line.toUpperCase();
     
-    // Extraire les mots-clés de statut
+    // Extraire les mots-clés de statut (codes PMS courants)
     const allKeywords = ['SAL', 'DIR', 'DIRTY', 'OCC', 'OCCUPIED', 'DEP', 'DEPART', 'PARTI', 
-                         'CHECKOUT', 'C/O', 'ARR', 'ARRIVAL', 'C/I', 'CHECKIN', 'PRO', 'CLEAN', 'VAC', 'VACANT', 'INS'];
+                         'CHECKOUT', 'C/O', 'ARR', 'ARRIVAL', 'C/I', 'CHECKIN', 'PRO', 'CLEAN', 
+                         'VAC', 'VACANT', 'INS', 'NET', 'LIB', 'BLQ'];
     const statusKeywords = allKeywords.filter(kw => new RegExp(`\\b${kw}\\b`).test(upper));
     
     // Détecter les dates (format DD/MM/YYYY ou DD-MM-YYYY ou DD.MM.YYYY)
-    const dateMatches = line.match(/\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b/g) || [];
+    const dateMatches = line.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
     const hasArrivalDate = dateMatches.length >= 1;
     const hasDepartureDate = dateMatches.length >= 2;
     
@@ -174,36 +176,16 @@ class UnifiedParserService {
     const timeMatches: string[] = [];
     let match;
     while ((match = timePattern.exec(line)) !== null) {
-      // Exclure les années (2025, 2024, etc.) et les valeurs > 23:59
       const hour = parseInt(match[1] || match[3] || match[5], 10);
       if (hour <= 23) {
         timeMatches.push(match[0]);
       }
     }
     
-    // Logique: 2+ horaires = checkout + checkin (départ + arrivée) = à blanc
-    // 1 horaire = soit départ soit arrivée selon le contexte
-    let hasArrivalTime = false;
-    let hasDepartureTime = false;
+    const hasArrivalTime = timeMatches.length >= 1;
+    const hasDepartureTime = timeMatches.length >= 2;
     
-    if (timeMatches.length >= 2) {
-      // IMPORTANT: 2 horaires = départ puis arrivée = c'est un checkout+checkin = à blanc
-      hasArrivalTime = true;
-      hasDepartureTime = true;
-      this.log(`⏰ ${timeMatches.length} horaires détectés (${timeMatches.join(', ')}) → checkout+checkin`);
-    } else if (timeMatches.length === 1) {
-      // Un seul horaire: déterminer lequel selon le contexte
-      if (/\b(DEP|PARTI|CHECKOUT|C\/O|DEPART)\b/i.test(upper)) {
-        hasDepartureTime = true;
-      } else if (/\b(ARR|ARRIVAL|C\/I|CHECKIN)\b/i.test(upper)) {
-        hasArrivalTime = true;
-      } else if (hasDepartureDate) {
-        // Si 2 dates mais 1 seul horaire, c'est probablement l'heure de départ
-        hasDepartureTime = true;
-      }
-    }
-    
-    // Détecter les infos de nuit (Nuit X/Y, Night X of Y, ou format , Nuit 2/3)
+    // Détecter les infos de nuit (Nuit X/Y, Night X of Y)
     const hasNightInfo = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line) || 
                          /\d+\s*[\/\\]\s*\d+\s*(?:nuit|night)/i.test(line) ||
                          /,\s*Nuit\s+\d+\/\d+/i.test(line);
@@ -219,26 +201,32 @@ class UnifiedParserService {
   }
 
   /**
-   * Applique les règles de combinaison à une ligne
-   * @returns Le résultat de la première règle qui match, ou null si aucune
+   * Applique les règles de combinaison (du mapper) à une ligne
+   * Les règles utilisent 'present', 'absent', ou 'any' pour chaque condition
    */
   private applyCombinationRules(line: string): { cleaningType: CleaningType; status: string; reason: string } | null {
     if (this.combinationRules.length === 0) return null;
     
     const context = this.extractLineContext(line);
-    this.log(`🔍 Context: dates=${context.hasArrivalDate}/${context.hasDepartureDate}, times=${context.hasArrivalTime}/${context.hasDepartureTime}, night=${context.hasNightInfo}, keywords=${context.statusKeywords.join(',')}`);
+    this.log(`🔍 Contexte ligne: keywords=[${context.statusKeywords.join(',')}], arrDate=${context.hasArrivalDate}, depDate=${context.hasDepartureDate}, arrTime=${context.hasArrivalTime}, depTime=${context.hasDepartureTime}, night=${context.hasNightInfo}`);
     
     for (const rule of this.combinationRules) {
       // Vérifier les mots-clés de statut
-      const statusMatch = rule.status_keywords.length === 0 || 
-                          rule.status_keywords.some(kw => context.statusKeywords.includes(kw));
-      if (!statusMatch) continue;
+      // Si la règle a des keywords, au moins un doit matcher
+      const hasRuleKeywords = rule.status_keywords && rule.status_keywords.length > 0;
+      const statusMatch = !hasRuleKeywords || 
+                          rule.status_keywords.some(kw => 
+                            context.statusKeywords.some(sk => sk.toUpperCase() === kw.toUpperCase())
+                          );
+      if (!statusMatch) {
+        continue;
+      }
       
-      // Vérifier chaque condition
+      // Vérifier chaque condition (present/absent/any)
       const checkCondition = (ruleValue: 'present' | 'absent' | 'any', actualValue: boolean): boolean => {
         if (ruleValue === 'any') return true;
-        if (ruleValue === 'present') return actualValue;
-        if (ruleValue === 'absent') return !actualValue;
+        if (ruleValue === 'present') return actualValue === true;
+        if (ruleValue === 'absent') return actualValue === false;
         return true;
       };
       
@@ -248,10 +236,8 @@ class UnifiedParserService {
       const depTimeMatch = checkCondition(rule.departure_time, context.hasDepartureTime);
       const nightMatch = checkCondition(rule.night_info, context.hasNightInfo);
       
-      this.log(`📋 Rule #${rule.priority} (${rule.status_keywords.join('/')}): arrDate=${arrDateMatch}, depDate=${depDateMatch}, arrTime=${arrTimeMatch}, depTime=${depTimeMatch}, night=${nightMatch}`);
-      
       if (arrDateMatch && depDateMatch && arrTimeMatch && depTimeMatch && nightMatch) {
-        const reason = `Règle combinaison #${rule.priority}: ${rule.status_keywords.join('/')} → ${rule.result_cleaning_type}`;
+        const reason = `Règle mapper: ${rule.status_keywords?.join('/')} → ${rule.result_cleaning_type}`;
         this.log(`✅ ${reason}`);
         return {
           cleaningType: rule.result_cleaning_type,
@@ -261,7 +247,6 @@ class UnifiedParserService {
       }
     }
     
-    this.log(`⚠️ Aucune règle de combinaison n'a matché`);
     return null;
   }
 
