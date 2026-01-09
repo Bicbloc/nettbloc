@@ -12,6 +12,7 @@ import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { storageService } from '@/services/storageService';
+import { ReportLostItemDialog } from './lost-and-found/ReportLostItemDialog';
 
 interface Room {
   id: string;
@@ -761,7 +762,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         {activeTab === 'rooms' ? (
           <>
             {/* Actions rapides */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button 
                 variant="outline" 
                 className="flex-1"
@@ -771,10 +772,23 @@ export const HousekeeperWorkSimple: React.FC = () => {
                 {isRefreshing ? 'Actualisation...' : 'Actualiser'}
               </Button>
               {hotelId && (
-                <IncidentReportDialogSimple 
-                  hotelId={hotelId}
-                  userType="housekeeper"
-                />
+                <>
+                  <IncidentReportDialogSimple 
+                    hotelId={hotelId}
+                    userType="housekeeper"
+                  />
+                  <ReportLostItemDialog
+                    hotelId={hotelId}
+                    reporterName={housekeeperName}
+                    reporterType="housekeeper"
+                    trigger={
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Package className="h-4 w-4" />
+                        Objet trouvé
+                      </Button>
+                    }
+                  />
+                </>
               )}
             </div>
 
