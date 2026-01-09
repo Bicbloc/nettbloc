@@ -808,6 +808,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
                     key={room.id}
                     room={room}
                     hotelId={hotelId || ''}
+                    housekeeperName={housekeeperName}
                     onUpdateStatus={handleRoomStatusChange}
                     onUnassign={(roomId, roomNumber) => {
                       console.log('Unassign room:', roomId, roomNumber);
