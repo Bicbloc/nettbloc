@@ -236,12 +236,12 @@ export function SubscriptionCard() {
 
           {/* Actions */}
           <div className="flex gap-2 pt-2">
-            {isFree ? (
+            {isFree || isInTrial ? (
               <UpgradeButton 
                 variant="default" 
                 className="flex-1 bg-gradient-premium hover:bg-gradient-premium/90" 
               />
-            ) : (
+            ) : isPremium ? (
               <Button 
                 onClick={handleManageSubscription}
                 disabled={isLoading}
@@ -251,7 +251,7 @@ export function SubscriptionCard() {
                 <Settings className="mr-2 h-4 w-4" />
                 {isLoading ? 'Chargement...' : 'Gérer l\'abonnement'}
               </Button>
-            )}
+            ) : null}
           </div>
         </CardContent>
       </Card>
