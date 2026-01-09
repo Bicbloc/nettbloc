@@ -2,8 +2,9 @@ import { useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight } from 'lucide-react';
+import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package } from 'lucide-react';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
+import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ActionLogService } from '@/services/actionLogService';
@@ -302,13 +303,26 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
               )}
             </div>
 
-            {/* Incident button */}
+            {/* Action buttons */}
             {room.status !== 'clean' && (
-              <IncidentReportDialogSimple 
-                hotelId={hotelId} 
-                userType="housekeeper"
-                defaultLocation={room.room_number}
-              />
+              <div className="flex flex-col gap-2">
+                <IncidentReportDialogSimple 
+                  hotelId={hotelId} 
+                  userType="housekeeper"
+                  defaultLocation={room.room_number}
+                />
+                <ReportLostItemDialog
+                  hotelId={hotelId}
+                  reporterName="Femme de chambre"
+                  reporterType="housekeeper"
+                  roomNumber={room.room_number}
+                  trigger={
+                    <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un objet trouvé">
+                      <Package className="h-5 w-5" />
+                    </Button>
+                  }
+                />
+              </div>
             )}
           </div>
 

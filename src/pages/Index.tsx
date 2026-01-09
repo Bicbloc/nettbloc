@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain, Archive, Mail, ClipboardCheck } from "lucide-react";
+import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain, Archive, Mail, ClipboardCheck, Package } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,6 +56,7 @@ import { ArchivesTab } from "@/components/dashboard/ArchivesTab";
 import { StaffInvitationsTab } from "@/components/dashboard/StaffInvitationsTab";
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
+import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
@@ -655,6 +656,9 @@ const IndexDashboard = () => {
                 <TabsTrigger value="inspections" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
                   <ClipboardCheck className="h-5 w-5" /><span>{t.dashboard.inspections}</span>
                 </TabsTrigger>
+                <TabsTrigger value="lost-found" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
+                  <Package className="h-5 w-5" /><span>Objets Trouvés</span>
+                </TabsTrigger>
               </TabsList>
             </div>
             
@@ -795,6 +799,16 @@ const IndexDashboard = () => {
                       governessName="Gouvernante"
                     />
                   )}
+                </PremiumLimitGuard>
+              </TabsContent>
+
+              <TabsContent value="lost-found" className="space-y-6">
+                <PremiumLimitGuard 
+                  feature="lost_found" 
+                  title="Objets Trouvés"
+                  description="Gérez les objets trouvés et leur restitution aux clients avec la version Premium."
+                >
+                  <LostAndFoundTab currentHotelId={currentHotelId} />
                 </PremiumLimitGuard>
               </TabsContent>
             </div>
