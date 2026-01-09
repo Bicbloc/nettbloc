@@ -12,6 +12,7 @@ import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
 import RoomRegistry from "./pages/RoomRegistry";
+import Invoices from "./pages/Invoices";
 import PlanSelection from "./pages/PlanSelection";
 import Success from "./pages/Success";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
@@ -66,6 +67,7 @@ const App = () => (
                               <Route path="/reports" element={<Reports />} />
                               <Route path="/admin" element={<Admin />} />
                               <Route path="/room-registry" element={<RoomRegistry />} />
+                              <Route path="/invoices" element={<Invoices />} />
                               <Route path="/housekeeper/login" element={<Navigate to="/housekeeper/auth" replace />} />
                               <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
                               <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />

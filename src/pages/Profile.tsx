@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut } from 'lucide-react';
+import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +30,7 @@ interface UserProfile {
 const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { plan, subscribed, canAccessFeature, isInTrial, trialDaysRemaining } = useSubscription();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -169,10 +171,14 @@ const Profile = () => {
 
         {/* Onglets */}
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Profil
+            </TabsTrigger>
+            <TabsTrigger value="billing" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Facturation
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -323,6 +329,27 @@ const Profile = () => {
                 <SubscriptionCard />
               </div>
             </div>
+          </TabsContent>
+
+          {/* Onglet Facturation */}
+          <TabsContent value="billing" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Facturation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Gérez vos informations de facturation et consultez vos factures.
+                </p>
+                <Button onClick={() => navigate('/invoices')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Voir mes factures
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Onglet Paramètres */}

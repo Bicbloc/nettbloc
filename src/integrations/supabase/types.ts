@@ -1713,6 +1713,96 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          amount_ht: number
+          amount_ttc: number
+          created_at: string
+          customer_address: string | null
+          customer_billing_email: string | null
+          customer_company_name: string | null
+          customer_email: string
+          customer_siret: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          payment_method: string | null
+          payment_reference: string | null
+          pdf_url: string | null
+          period_end: string | null
+          period_start: string | null
+          plan_name: string
+          plan_type: string
+          seller_address: string
+          seller_email: string
+          seller_name: string
+          seller_siret: string
+          status: string
+          tva_amount: number
+          tva_rate: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_ht: number
+          amount_ttc: number
+          created_at?: string
+          customer_address?: string | null
+          customer_billing_email?: string | null
+          customer_company_name?: string | null
+          customer_email: string
+          customer_siret?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          pdf_url?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          plan_name: string
+          plan_type: string
+          seller_address?: string
+          seller_email?: string
+          seller_name?: string
+          seller_siret?: string
+          status?: string
+          tva_amount: number
+          tva_rate?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_ht?: number
+          amount_ttc?: number
+          created_at?: string
+          customer_address?: string | null
+          customer_billing_email?: string | null
+          customer_company_name?: string | null
+          customer_email?: string
+          customer_siret?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          pdf_url?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          plan_name?: string
+          plan_type?: string
+          seller_address?: string
+          seller_email?: string
+          seller_name?: string
+          seller_siret?: string
+          status?: string
+          tva_amount?: number
+          tva_rate?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       linen_inventory_entries: {
         Row: {
           ai_confidence: number | null
@@ -2241,6 +2331,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          billing_address: string | null
+          billing_email: string | null
+          billing_siret: string | null
           company_name: string | null
           created_at: string
           current_hotel_id: string | null
@@ -2262,6 +2355,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_address?: string | null
+          billing_email?: string | null
+          billing_siret?: string | null
           company_name?: string | null
           created_at?: string
           current_hotel_id?: string | null
@@ -2283,6 +2379,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_address?: string | null
+          billing_email?: string | null
+          billing_siret?: string | null
           company_name?: string | null
           created_at?: string
           current_hotel_id?: string | null
