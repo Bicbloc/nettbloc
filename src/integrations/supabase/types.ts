@@ -2017,6 +2017,136 @@ export type Database = {
           },
         ]
       }
+      lost_and_found: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          guest_check_in: string | null
+          guest_check_out: string | null
+          guest_email: string | null
+          guest_first_name: string | null
+          guest_name: string | null
+          guest_phone: string | null
+          hotel_id: string
+          id: string
+          image_url: string | null
+          location_details: string | null
+          location_type: string
+          object_category: string | null
+          object_description: string
+          reported_at: string
+          reported_by: string
+          reported_by_type: string
+          room_number: string | null
+          shipping_address: string | null
+          status: string
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          guest_check_in?: string | null
+          guest_check_out?: string | null
+          guest_email?: string | null
+          guest_first_name?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          hotel_id: string
+          id?: string
+          image_url?: string | null
+          location_details?: string | null
+          location_type: string
+          object_category?: string | null
+          object_description: string
+          reported_at?: string
+          reported_by: string
+          reported_by_type: string
+          room_number?: string | null
+          shipping_address?: string | null
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          guest_check_in?: string | null
+          guest_check_out?: string | null
+          guest_email?: string | null
+          guest_first_name?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          hotel_id?: string
+          id?: string
+          image_url?: string | null
+          location_details?: string | null
+          location_type?: string
+          object_category?: string | null
+          object_description?: string
+          reported_at?: string
+          reported_by?: string
+          reported_by_type?: string
+          room_number?: string | null
+          shipping_address?: string | null
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lost_and_found_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lost_and_found_history: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          lost_item_id: string
+          new_status: string | null
+          notes: string | null
+          old_status: string | null
+          performed_by: string
+          performed_by_type: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          lost_item_id: string
+          new_status?: string | null
+          notes?: string | null
+          old_status?: string | null
+          performed_by: string
+          performed_by_type: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          lost_item_id?: string
+          new_status?: string | null
+          notes?: string | null
+          old_status?: string | null
+          performed_by?: string
+          performed_by_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lost_and_found_history_lost_item_id_fkey"
+            columns: ["lost_item_id"]
+            isOneToOne: false
+            referencedRelation: "lost_and_found"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
