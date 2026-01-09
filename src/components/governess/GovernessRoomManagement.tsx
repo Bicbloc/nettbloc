@@ -11,8 +11,9 @@ import { toast } from '@/hooks/use-toast';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { 
   Home, Loader2, RefreshCw, Search, User, UserX, Clock, Check, 
-  MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX
+  MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX, Package
 } from 'lucide-react';
+import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 
 interface GovernessRoomManagementProps {
   hotelId: string;
@@ -481,6 +482,17 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
                     >
                       <MessageSquare className="h-4 w-4" />
                     </Button>
+                    <ReportLostItemDialog
+                      hotelId={hotelId}
+                      reporterName={governessName}
+                      reporterType="governess"
+                      roomNumber={room.room_number}
+                      trigger={
+                        <Button variant="outline" size="sm">
+                          <Package className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
                   </div>
                 </CardContent>
               </Card>
