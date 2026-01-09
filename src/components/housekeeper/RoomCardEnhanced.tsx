@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package } from 'lucide-react';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
-import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
+import { ReportLostItemDialog, GuestInfo } from '@/components/lost-and-found/ReportLostItemDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ActionLogService } from '@/services/actionLogService';
@@ -16,16 +16,21 @@ interface Room {
   notes?: string;
   cleaning_priority?: number;
   cleaning_type?: string;
+  // Guest info from PMS data
+  guest_arrival?: GuestInfo;
+  guest_departure?: GuestInfo;
+  guest_staying?: GuestInfo;
 }
 
 interface RoomCardEnhancedProps {
   room: Room;
   hotelId: string;
+  housekeeperName?: string;
   onUpdateStatus: (roomId: string, status: string, notes?: string) => void;
   onUnassign: (roomId: string, roomNumber: string) => void;
 }
 
-export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: RoomCardEnhancedProps) => {
+export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de chambre', onUpdateStatus, onUnassign }: RoomCardEnhancedProps) => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [notes, setNotes] = useState('');
@@ -153,17 +158,14 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
         }
       }
 
-      // Récupérer le nom de la femme de chambre depuis le localStorage
-      const housekeeperProfile = localStorage.getItem('housekeeperProfile');
-      const housekeeperName = housekeeperProfile 
-        ? JSON.parse(housekeeperProfile).name 
-        : 'Femme de chambre';
+      // Récupérer le nom de la femme de chambre
+      const reporterName = housekeeperName || 'Femme de chambre';
 
       // Enregistrer dans le journal des actions
       await ActionLogService.logRoomRemark(
         hotelId, 
         room.room_number, 
-        housekeeperName, 
+        reporterName, 
         notes.trim()
       );
 
@@ -313,9 +315,12 @@ export const RoomCardEnhanced = ({ room, hotelId, onUpdateStatus, onUnassign }: 
                 />
                 <ReportLostItemDialog
                   hotelId={hotelId}
-                  reporterName="Femme de chambre"
+                  reporterName={housekeeperName}
                   reporterType="housekeeper"
                   roomNumber={room.room_number}
+                  guestArrival={room.guest_arrival}
+                  guestDeparture={room.guest_departure}
+                  guestStaying={room.guest_staying}
                   trigger={
                     <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un objet trouvé">
                       <Package className="h-5 w-5" />
