@@ -6,9 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Clock, Eye, Star, Loader2, Home, RefreshCw, Package } from 'lucide-react';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
-
+import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 interface GovernessInspectionInterfaceProps {
   hotelId: string;
   governessName: string;
@@ -386,6 +386,22 @@ export const GovernessInspectionInterface: React.FC<GovernessInspectionInterface
                 rows={3}
               />
             </div>
+          </div>
+
+          {/* Report Lost Item */}
+          <div className="border-t pt-4">
+            <ReportLostItemDialog
+              hotelId={hotelId}
+              reporterName={governessName}
+              reporterType="governess"
+              roomNumber={selectedRoom?.room_number}
+              trigger={
+                <Button variant="outline" className="w-full gap-2">
+                  <Package className="h-4 w-4" />
+                  Signaler un objet trouvé
+                </Button>
+              }
+            />
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
