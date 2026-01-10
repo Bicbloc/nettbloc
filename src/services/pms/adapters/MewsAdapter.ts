@@ -103,6 +103,12 @@ export class MewsAdapter extends PmsAdapter {
       '$1 $2 $3'
     );
     
+    // NOUVEAU: Fusionner les chambres liées (FAM/DUP) avec leurs sous-chambres
+    // Format: "003+004   DUP   SAL   003   DBL-S   INS   -"
+    //         "004-T   DBL-C   INS   -   15:00   2 × Adultes   Oksana Varenytska   14/01/2026"
+    // La deuxième ligne (004-T) contient les infos client → fusionner avec la ligne 003+004
+    processed = this.mergeConnectedRoomLines(processed);
+    
     // Normaliser les espaces multiples
     processed = processed.replace(/[ \t]+/g, ' ');
     
@@ -110,6 +116,78 @@ export class MewsAdapter extends PmsAdapter {
     processed = processed.replace(/\n{3,}/g, '\n\n');
     
     return processed;
+  }
+  
+  /**
+   * Fusionne les lignes des chambres liées (FAM/DUP) avec les infos client des sous-chambres
+   */
+  private mergeConnectedRoomLines(text: string): string {
+    const lines = text.split('\n');
+    const result: string[] = [];
+    let i = 0;
+    
+    while (i < lines.length) {
+      const line = lines[i];
+      
+      // Détecter une ligne de chambre liée (ex: "003+004 DUP SAL" ou "103+104 FAM SAL")
+      const linkedMatch = line.match(/^(\d{2,4})\s*\+\s*(\d{2,4})\s+(DUP|FAM)\s+(SAL|PRO|INS|DIR)/i);
+      
+      if (linkedMatch) {
+        const room1 = linkedMatch[1];
+        const room2 = linkedMatch[2];
+        let mergedLine = line;
+        let guestInfo = '';
+        
+        // Chercher les sous-lignes suivantes qui appartiennent à ce groupe
+        let j = i + 1;
+        while (j < lines.length) {
+          const subLine = lines[j];
+          
+          // Si c'est une sous-chambre (ex: "003 DBL-S", "004-T DBL-C", "103-T DBL-C", "104 DBL-C")
+          const subRoomMatch = subLine.match(/^(\d{2,4})(?:-T)?\s+(DBL|SGL|TPL)-[CS]/i);
+          if (subRoomMatch) {
+            const subRoom = subRoomMatch[1];
+            // Vérifier si c'est une sous-chambre du groupe
+            if (subRoom === room1 || subRoom === room2 || 
+                subRoom.replace(/^0+/, '') === room1.replace(/^0+/, '') ||
+                subRoom.replace(/^0+/, '') === room2.replace(/^0+/, '')) {
+              
+              // Extraire les infos client de cette ligne (dates, adultes, nom)
+              const clientInfo = subLine.match(/(\d{2}\/\d{2}\/\d{4}|(?:\d+\s*×\s*(?:Adultes|Enfants))|(?:\d{1,2}:\d{2})|(?:[A-Z][a-zéèêëàâäôöùûü]+\s*(?:[A-Z][a-zéèêëàâäôöùûü]*)?(?:\s+[A-Z][a-zéèêëàâäôöùûü]+)*))/gi);
+              if (clientInfo && clientInfo.length > 0) {
+                // Garder les infos les plus complètes (celles avec dates, noms, etc.)
+                const hasGuestData = /\d+\s*×\s*Adultes|[A-Z][a-z]+\s+[A-Z][a-z]+|\d{2}\/\d{2}\/\d{4}/i.test(subLine);
+                if (hasGuestData && guestInfo.length < subLine.length) {
+                  guestInfo = ' ' + subLine.replace(/^\d{2,4}(?:-T)?\s+\w+-\w+\s+\w+\s*/, '').trim();
+                }
+              }
+              j++;
+              continue;
+            }
+          }
+          
+          // Si on rencontre une nouvelle chambre principale, arrêter
+          if (/^\d{2,4}(?:\+\d{2,4})?\s+(?:DUP|FAM|DBL|SGL|TPL)/i.test(subLine)) {
+            break;
+          }
+          
+          j++;
+        }
+        
+        // Fusionner les infos client avec la ligne principale
+        if (guestInfo.trim()) {
+          mergedLine = line + guestInfo;
+        }
+        
+        result.push(mergedLine);
+        i = j;
+      } else {
+        result.push(line);
+        i++;
+      }
+    }
+    
+    return result.join('\n');
   }
 
   /**
