@@ -58,62 +58,75 @@ export class MewsAdapter extends PmsAdapter {
 
   /**
    * Pré-traite le texte pour fusionner les lignes fragmentées du PDF
+   * CRITIQUE: Le PDF MEWS fragmente souvent les données sur plusieurs lignes
    */
   private preprocessText(text: string): string {
     let processed = text;
     
-    // Fusionner les lignes fragmentées comme "DBL-" + "C" ou "SGL-" + "C"
-    // Pattern: une ligne finit par "DBL-", "SGL-", "TPL-" et la suivante commence par C ou S seul
-    processed = processed.replace(/([A-Z]{3})-\s*\n\s*([CS])\s*\n/gi, '$1-$2\n');
-    processed = processed.replace(/([A-Z]{3})-\s*\n\s*([CS])\b/gi, '$1-$2');
+    // ========== PHASE 1: Fusion agressive des fragments de type de chambre ==========
+    // Appliquer en plusieurs passes pour gérer les cas imbriqués
+    for (let pass = 0; pass < 3; pass++) {
+      // Pattern 1: "DBL-" seul en fin de ligne, "C" ou "S" seul sur la ligne suivante
+      processed = processed.replace(/([A-Z]{3})-\s*\n\s*([CS])\s*(?=\n|$)/gi, '$1-$2');
+      
+      // Pattern 2: Idem mais avec contenu après "C"/"S"
+      processed = processed.replace(/([A-Z]{3})-\s*\n\s*([CS])\s*\n/gi, '$1-$2\n');
+      processed = processed.replace(/([A-Z]{3})-\s*\n\s*([CS])\b/gi, '$1-$2');
+      
+      // Pattern 3: Ligne avec juste "C" ou "S" seul (fragment isolé)
+      // Fusionner avec la ligne précédente si elle finit par un tiret
+      processed = processed.replace(/(-)\s*\n\s*([CS])\s*\n/gi, '$1$2\n');
+      
+      // Pattern 4: "DBL-C" complet, statut sur ligne suivante
+      processed = processed.replace(/([A-Z]{3}-[CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi, '$1 $2');
+      
+      // Pattern 5: Numéro + type fragmenté: "001   DBL-" \n "C"
+      processed = processed.replace(/(\d{2,4})\s+(DBL|SGL|TPL|FAM)-\s*\n\s*([CS])/gi, '$1 $2-$3');
+      
+      // Pattern 6: Numéro + type complet + statut sur ligne suivante
+      processed = processed.replace(/(\d{2,4}\s+[A-Z]{3}-[CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi, '$1 $2');
+      
+      // Pattern 7: Type custom (ex: CLA) + statut sur ligne suivante
+      processed = processed.replace(
+        /(\d{2,4})\s+((?!(?:SAL|PRO|INS|DIR|DEP|ARR)\b)[A-Z]{3,8})\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        '$1 $2 $3'
+      );
+      
+      // Pattern 8: Numéro seul + statut sur ligne suivante (cas minimal)
+      processed = processed.replace(/(\d{2,4})\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi, '$1 $2');
+    }
     
-    // Fusionner DBL-C/S avec le statut sur la ligne suivante
-    processed = processed.replace(/([A-Z]{3}-[CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi, '$1 $2');
-    
-    // IMPORTANT: Fusionner un type de chambre custom (ex: CLA) avec le statut sur la ligne suivante
-    // Exemple: "402 CLA\nINS" → "402 CLA INS"
-    processed = processed.replace(
-      /(\d{2,4})\s+((?!(?:SAL|PRO|INS|DIR|DEP|ARR)\b)[A-Z]{3,8})\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
-      '$1 $2 $3'
-    );
-    
-    // Fusionner le numéro de chambre avec le type de chambre fragmenté
-    // Pattern: "001   DBL-" suivi d'un saut de ligne puis "C"
-    processed = processed.replace(/(\d{2,4})\s+(DBL|SGL|TPL|FAM)-\s*\n\s*([CS])/gi, '$1 $2-$3');
-    
-    // NOUVEAU: Fusionner les lignes d'horaires isolés (ex: "11:00" seul sur une ligne)
+    // ========== PHASE 2: Fusion des lignes d'horaires isolés ==========
     // Pattern: ligne avec chambre + nom client, puis ligne avec juste HH:MM
-    // Exemple: "116 DBL SAL ... JONATHAN PAUL AXON\n11:00" → fusionné en une ligne
     processed = processed.replace(
       /(\d{2,4}\s+(?:DBL|SGL|TPL|TRP|TWN|SUI|FAM|QUA)[^\n]*[A-Z]{2,}[^\n]*)\n\s*(\d{1,2}:\d{2})\s*(?=\n|$)/gi,
       '$1 $2'
     );
     
-    // Pattern plus général: ligne avec Adultes/Enfants/nom, puis horaire isolé
-    // Couvre les cas où le type de chambre n'est pas détecté mais le contenu est typique
+    // Pattern général: ligne avec Adultes/Enfants/nom, puis horaire isolé
     processed = processed.replace(
       /([^\n]*(?:Adultes|Enfants)[^\n]*[A-Z]{3,}[^\n]*)\n\s*(\d{1,2}:\d{2})\s*(?=\n|$)/gi,
       '$1 $2'
     );
     
-    // Pattern pour horaires multiples sur ligne séparée (ex: "11:00\n15:00")
-    // Fusionner avec la ligne précédente si elle contient un numéro de chambre
+    // Pattern pour horaires multiples sur ligne séparée
     processed = processed.replace(
       /(\d{2,4}\s+[^\n]+)\n\s*(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2})\s*(?=\n|$)/gi,
       '$1 $2 $3'
     );
     
-    // NOUVEAU: Fusionner les chambres liées (FAM/DUP) avec leurs sous-chambres
-    // Format: "003+004   DUP   SAL   003   DBL-S   INS   -"
-    //         "004-T   DBL-C   INS   -   15:00   2 × Adultes   Oksana Varenytska   14/01/2026"
-    // La deuxième ligne (004-T) contient les infos client → fusionner avec la ligne 003+004
+    // ========== PHASE 3: Fusion des chambres liées (FAM/DUP) ==========
     processed = this.mergeConnectedRoomLines(processed);
     
+    // ========== PHASE 4: Nettoyage final ==========
     // Normaliser les espaces multiples
     processed = processed.replace(/[ \t]+/g, ' ');
     
     // Supprimer les sauts de ligne excessifs
     processed = processed.replace(/\n{3,}/g, '\n\n');
+    
+    // Log pour debug
+    console.log("🔧 MewsAdapter preprocessText: lignes fusionnées");
     
     return processed;
   }
