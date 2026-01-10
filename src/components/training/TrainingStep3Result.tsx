@@ -17,6 +17,7 @@ interface TrainingStep3ResultProps {
   trainingData: TrainingData;
   hotelId: string;
   onReset: () => void;
+  onContinueToMapping?: () => void;
 }
 
 /**
@@ -106,6 +107,7 @@ export const TrainingStep3Result = ({
   trainingData,
   hotelId,
   onReset,
+  onContinueToMapping,
 }: TrainingStep3ResultProps) => {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
@@ -347,15 +349,24 @@ export const TrainingStep3Result = ({
       </Card>
 
       {/* Actions */}
-      <div className="flex justify-between">
+      <div className="flex flex-wrap justify-between gap-2">
         <Button variant="outline" onClick={onReset} className="gap-2">
           <RefreshCw className="w-4 h-4" />
           Nouvel entraînement
         </Button>
-        <Button variant="ghost" onClick={onReset} className="gap-2">
-          Retour au tableau de bord
-          <ArrowRight className="w-4 h-4" />
-        </Button>
+        
+        <div className="flex gap-2">
+          {saved && onContinueToMapping && (
+            <Button onClick={onContinueToMapping} className="gap-2">
+              <ArrowRight className="w-4 h-4" />
+              Configurer le mapping des nettoyages
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onReset} className="gap-2">
+            Retour au tableau de bord
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
