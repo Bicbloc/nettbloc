@@ -86,6 +86,9 @@ export const TrainingStep2Annotate = ({
   const [editingTimeRoom, setEditingTimeRoom] = useState<number | null>(null);
   const [newRoom, setNewRoom] = useState({ roomNumber: "", cleaningType: "full" as const });
   const [ruleDialogRoom, setRuleDialogRoom] = useState<ExtractedRoom | null>(null);
+  const [clickedLine, setClickedLine] = useState<{ text: string; index: number } | null>(null);
+  const [lineRoomNumber, setLineRoomNumber] = useState("");
+  const [lineCleaningType, setLineCleaningType] = useState<"a_blanc" | "recouche" | "none">("a_blanc");
 
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [cleaningFilter, setCleaningFilter] = useState<'all' | 'a_blanc' | 'recouche' | 'none'>('all');
@@ -93,6 +96,63 @@ export const TrainingStep2Annotate = ({
   const copyRawText = () => {
     navigator.clipboard.writeText(trainingData.rawText);
     toast({ title: "Texte copié dans le presse-papiers" });
+  };
+
+  // Parse les lignes du texte brut pour affichage interactif
+  const rawLines = useMemo(() => {
+    return trainingData.rawText.split('\n').map((text, index) => {
+      const trimmed = text.trim();
+      if (!trimmed) return null;
+      
+      // Chercher si cette ligne correspond à une chambre détectée
+      const matchingRoom = rooms.find(r => {
+        const roomNum = r.roomNumber.replace(/-T$/, '');
+        // Vérifier si le numéro de chambre apparaît au début de la ligne
+        return new RegExp(`^${roomNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`).test(trimmed) ||
+               trimmed.includes(` ${roomNum} `) ||
+               trimmed.startsWith(roomNum + ' ');
+      });
+      
+      return {
+        index,
+        text: trimmed,
+        isDetected: !!matchingRoom,
+        roomNumber: matchingRoom?.roomNumber || null,
+      };
+    }).filter(Boolean) as { index: number; text: string; isDetected: boolean; roomNumber: string | null }[];
+  }, [trainingData.rawText, rooms]);
+
+  // Ajouter une chambre depuis une ligne cliquée
+  const addRoomFromLine = () => {
+    if (!clickedLine || !lineRoomNumber.trim()) {
+      toast({ title: "Entrez un numéro de chambre", variant: "destructive" });
+      return;
+    }
+
+    // Détecter automatiquement le type de nettoyage basé sur le texte
+    const upper = clickedLine.text.toUpperCase();
+    let autoCleaningType = lineCleaningType;
+    
+    if (/\bINS\b|\bPRO\b/.test(upper)) autoCleaningType = 'none';
+    else if (/\bSAL\b.*\d{1,2}:\d{2}.*\d{1,2}:\d{2}/.test(upper)) autoCleaningType = 'a_blanc';
+    else if (/\bDEP\b|\bDIR\b/.test(upper)) autoCleaningType = 'a_blanc';
+
+    setRooms([
+      ...rooms,
+      {
+        roomNumber: lineRoomNumber.trim(),
+        status: "unknown",
+        cleaningType: autoCleaningType,
+        arrivalDate: "",
+        departureDate: "",
+        validated: true,
+        originalText: clickedLine.text,
+      },
+    ]);
+    
+    toast({ title: `Chambre ${lineRoomNumber} ajoutée` });
+    setClickedLine(null);
+    setLineRoomNumber("");
   };
 
   const validatedCount = rooms.filter((r) => r.validated).length;
@@ -329,36 +389,109 @@ export const TrainingStep2Annotate = ({
 
   return (
     <div className="flex gap-4 h-[600px]">
-      {/* Left panel - Raw PDF text */}
+      {/* Left panel - Raw PDF text with clickable lines */}
       <div className="w-1/2 flex flex-col">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-sm">Texte brut du PDF</span>
+            <Badge variant="outline" className="text-xs">
+              Cliquez sur une ligne pour l'ajouter
+            </Badge>
           </div>
           <Button variant="ghost" size="sm" onClick={copyRawText}>
             <Copy className="w-4 h-4 mr-1" />
             Copier
           </Button>
         </div>
-        <Card className="flex-1 p-4 overflow-hidden">
+        <Card className="flex-1 p-2 overflow-hidden">
           <ScrollArea className="h-full">
-            <div className="font-mono text-xs whitespace-pre-wrap leading-relaxed">
-              {highlightedText.map((seg, i) =>
-                seg.isRoom ? (
-                  <mark key={i} className="bg-primary/20 text-primary px-1 rounded font-bold">
-                    {seg.text}
-                  </mark>
-                ) : (
-                  <span key={i}>{seg.text}</span>
-                )
-              )}
+            <div className="space-y-0.5">
+              {rawLines.map((line) => (
+                <div
+                  key={line.index}
+                  onClick={() => {
+                    if (!line.isDetected) {
+                      // Essayer d'extraire un numéro de chambre automatiquement
+                      const match = line.text.match(/^(\d{2,4}(?:-?T)?)/);
+                      setLineRoomNumber(match ? match[1] : "");
+                      setClickedLine(line);
+                      
+                      // Auto-détecter le type de nettoyage
+                      const upper = line.text.toUpperCase();
+                      if (/\bINS\b|\bPRO\b/.test(upper)) setLineCleaningType('none');
+                      else if (/\bSAL\b/.test(upper)) setLineCleaningType('a_blanc');
+                      else setLineCleaningType('a_blanc');
+                    }
+                  }}
+                  className={`px-2 py-1 rounded text-xs font-mono cursor-pointer transition-all ${
+                    line.isDetected 
+                      ? "bg-green-100 dark:bg-green-900/30 border-l-2 border-green-500" 
+                      : "hover:bg-amber-100 dark:hover:bg-amber-900/30 hover:border-l-2 hover:border-amber-500"
+                  } ${clickedLine?.index === line.index ? "ring-2 ring-primary" : ""}`}
+                >
+                  <div className="flex items-start gap-2">
+                    {line.isDetected ? (
+                      <Check className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <Plus className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0 opacity-50" />
+                    )}
+                    <span className={line.isDetected ? "text-muted-foreground" : ""}>
+                      {line.text.length > 100 ? line.text.substring(0, 100) + "..." : line.text}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </ScrollArea>
         </Card>
-        <p className="text-xs text-muted-foreground mt-2">
-          Les numéros de chambres détectés sont surlignés en couleur.
-        </p>
+        
+        {/* Mini form when a line is clicked */}
+        {clickedLine && (
+          <Card className="mt-2 p-3 border-primary bg-primary/5">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <span className="text-sm font-medium">Ajouter cette ligne comme chambre</span>
+            </div>
+            <p className="text-xs font-mono bg-muted p-2 rounded mb-2 truncate">
+              {clickedLine.text}
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                value={lineRoomNumber}
+                onChange={(e) => setLineRoomNumber(e.target.value)}
+                placeholder="N° chambre"
+                className="h-8 w-24"
+              />
+              <Select
+                value={lineCleaningType}
+                onValueChange={(v: any) => setLineCleaningType(v)}
+              >
+                <SelectTrigger className="h-8 w-[110px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="a_blanc">À blanc</SelectItem>
+                  <SelectItem value="recouche">Recouche</SelectItem>
+                  <SelectItem value="none">Aucun</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button size="sm" onClick={addRoomFromLine} className="h-8">
+                <Plus className="w-4 h-4 mr-1" />
+                Ajouter
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setClickedLine(null)} className="h-8">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </Card>
+        )}
+        
+        {!clickedLine && (
+          <p className="text-xs text-muted-foreground mt-2">
+            ✅ Lignes vertes = détectées | Cliquez sur une ligne non détectée pour l'ajouter
+          </p>
+        )}
       </div>
 
       {/* Right panel - Room list */}
