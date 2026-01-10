@@ -160,10 +160,15 @@ class LocalRoomParser {
     const num = parseInt(roomNum.replace(/[A-Za-z]/g, ''), 10);
     if (num >= 100 && num <= 9999) return true;
     
-    // Accepter les numéros < 100 si le contexte suggère une chambre
+    // Accepter les numéros < 100 (001, 002, etc.) si :
+    // - Il y a un contexte de chambre explicite
+    // - OU la ligne contient des indicateurs Mews (DBL-, SGL-, SAL, PRO, INS, etc.)
+    // - OU le numéro est au format 001, 002, 003 (3 chiffres avec zéro initial)
     if (num < 100 && num > 0) {
       const hasRoomContext = /chambre|room|ch\./i.test(line);
-      return hasRoomContext;
+      const hasMewsIndicators = /\b(DBL|SGL|TPL|FAM|DUP|SAL|PRO|INS|DIR|DEP|ARR)\b/i.test(line);
+      const hasLeadingZero = /^0\d{2}$/.test(roomNum);
+      return hasRoomContext || hasMewsIndicators || hasLeadingZero;
     }
 
     return true;
