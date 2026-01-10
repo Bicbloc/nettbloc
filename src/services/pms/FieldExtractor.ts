@@ -78,7 +78,15 @@ const PATTERNS = {
   IGNORE_NAMES: [
     'staff', 'superviseur', 'manager', 'admin', 'maintenance', 'housekeeping',
     'reception', 'chambre', 'room', 'type', 'statut', 'status', 'date',
-    'arrival', 'departure', 'guest', 'client', 'name', 'nom', 'arrivée', 'départ'
+    'arrival', 'departure', 'guest', 'client', 'name', 'nom', 'arrivée', 'départ',
+    'hotel', 'cardinal', 'étage', 'espaces', 'responsable'
+  ],
+  
+  // Noms de responsables HK connus (pattern: nom + prénom entre statut et date/heure)
+  // Ces noms apparaissent dans la colonne "Responsable" du rapport Mews
+  HOUSEKEEPER_NAMES: [
+    'axel merle', 'benoît piel', 'benoit piel', 'maly teychenne', 
+    'ibrahima assoumani', 'cécile rosset', 'cecile rosset', 'chiara mirante'
   ]
 };
 
@@ -326,24 +334,110 @@ class FieldExtractor {
   }
   
   /**
-   * Extrait le nom du client
+   * Extrait le nom du client (PAS le responsable HK)
+   * 
+   * Dans les rapports Mews, la structure est:
+   * ROOM TYPE STATUS HOUSEKEEPER [DATE] [TIME] [GUESTS] CLIENT_NAME [DATE]
+   * 
+   * Le nom du client apparaît APRÈS:
+   * - Les dates (DD/MM/YYYY)
+   * - Les heures (HH:MM)
+   * - "X × Adultes" / "X × Enfants"
    */
   private extractGuestName(line: string): string | null {
+    // D'abord, vérifier si la ligne contient des infos client après "Adultes/Enfants"
+    // Pattern: "2 × Adultes NOM_CLIENT" ou après une heure "15:00 NOM_CLIENT"
+    
+    // Trouver la position après laquelle on cherche le nom du client
+    const clientNameStartPatterns = [
+      /\d+\s*×\s*(?:Adultes|Enfants)\s+/gi,  // Après "2 × Adultes"
+      /\d{1,2}:\d{2}\s+(?=\d*\s*×\s*(?:Adultes|Enfants)|[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç])/gi,  // Après l'heure
+      /,\s*Nuit\s+\d+\/\d+\s+/gi,  // Après ", Nuit 3/4"
+    ];
+    
+    let searchStartIndex = 0;
+    for (const pattern of clientNameStartPatterns) {
+      let match;
+      while ((match = pattern.exec(line)) !== null) {
+        const potentialStart = match.index + match[0].length;
+        if (potentialStart > searchStartIndex) {
+          searchStartIndex = potentialStart;
+        }
+      }
+    }
+    
+    // Si on a trouvé un point de départ, chercher le nom après
+    if (searchStartIndex > 0) {
+      const lineAfterMarker = line.substring(searchStartIndex);
+      
+      // Chercher un nom (Prénom Nom ou NOM Prénom) dans cette portion
+      // Pattern plus flexible pour les noms avec accents
+      const namePatterns = [
+        // Pattern: Prénom NOM (ex: "Thierry VIARD", "Ludovica Perillo")
+        /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+)\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+)/,
+        // Pattern: NOM, Prénom (ex: "Alojayan, Noof Fahad")
+        /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+),\s*([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+(?:\s+[A-Za-z]+)*)/,
+      ];
+      
+      for (const pattern of namePatterns) {
+        const match = lineAfterMarker.match(pattern);
+        if (match) {
+          const name = match[0].replace(/,\s*/, ' ').trim();
+          if (!this.isIgnoredName(name) && !this.isHousekeeperName(name)) {
+            return name;
+          }
+        }
+      }
+    }
+    
+    // Fallback: chercher dans toute la ligne mais filtrer les HK
     // Essayer le pattern Prénom NOM
     let match = line.match(PATTERNS.NAME_PATTERN);
     if (match) {
       const name = `${match[1]} ${match[2]}`;
-      if (!this.isIgnoredName(name)) return name;
+      if (!this.isIgnoredName(name) && !this.isHousekeeperName(name)) {
+        return name;
+      }
     }
     
     // Essayer le pattern NOM Prénom
     match = line.match(PATTERNS.NAME_PATTERN_ALT);
     if (match) {
       const name = `${match[1]} ${match[2]}`;
-      if (!this.isIgnoredName(name)) return name;
+      if (!this.isIgnoredName(name) && !this.isHousekeeperName(name)) {
+        return name;
+      }
     }
     
     return null;
+  }
+  
+  /**
+   * Vérifie si un nom est un responsable housekeeping (pas un client)
+   * 
+   * Heuristiques:
+   * 1. Noms connus dans HOUSEKEEPER_NAMES
+   * 2. Noms qui apparaissent juste après le statut (SAL/PRO/INS) et avant les dates
+   * 3. Noms sans informations client associées (pas de "Adultes", pas de dates de séjour)
+   */
+  private isHousekeeperName(name: string): boolean {
+    const lower = name.toLowerCase().trim();
+    
+    // Vérifier les noms connus de HK
+    if (PATTERNS.HOUSEKEEPER_NAMES.some(hk => {
+      // Normaliser les accents pour la comparaison
+      const normalizedHk = hk.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const normalizedName = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return normalizedName.includes(normalizedHk) || normalizedHk.includes(normalizedName);
+    })) {
+      return true;
+    }
+    
+    // Le tiret dans le nom de famille est rare pour les HK mais courant pour les clients
+    // Les noms de HK sont généralement simples: Prénom Nom
+    // Mais ce n'est pas suffisant pour distinguer
+    
+    return false;
   }
   
   /**
