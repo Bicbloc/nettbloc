@@ -3,15 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Upload, Tag, CheckCircle, Settings, Wand2, Map } from "lucide-react";
+import { Brain, Upload, Tag, CheckCircle, Settings, Map } from "lucide-react";
 import { TrainingStep1Import } from "./TrainingStep1Import";
 import { TrainingStep2Annotate } from "./TrainingStep2Annotate";
 import { TrainingStep3Result } from "./TrainingStep3Result";
 import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 import { TrainingHistory } from "./TrainingHistory";
-import { UndetectedLinesAnnotator } from "./UndetectedLinesAnnotator";
 import { CleaningTypeMapperPage } from "@/components/pms/CleaningTypeMapperPage";
-import { pmsAdapterFactory, unifiedParserService, ExtractedRoom } from "@/services/pms";
+import { unifiedParserService, ExtractedRoom } from "@/services/pms";
 
 interface TrainingWizardProps {
   hotelId: string;
@@ -26,7 +25,7 @@ export interface TrainingData {
   existingPatternId?: string;
 }
 
-// Étapes simplifiées pour l'affichage (sans 1.5)
+// Étapes du workflow
 const DISPLAY_STEPS = [
   { id: 1, label: "Importer", icon: Upload },
   { id: 2, label: "Annoter", icon: Tag },
@@ -40,7 +39,6 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showUndetectedStep, setShowUndetectedStep] = useState(false);
 
   useEffect(() => {
     unifiedParserService.loadHotelPatterns(hotelId);
@@ -51,27 +49,6 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
   const handleImportComplete = (data: TrainingData) => {
     setTrainingData(data);
-    // Aller à l'étape des lignes non détectées si rawText disponible
-    if (data.rawText) {
-      setShowUndetectedStep(true);
-    } else {
-      setCurrentStep(2);
-    }
-  };
-
-  const handleUndetectedComplete = (newRooms: ExtractedRoom[]) => {
-    if (trainingData) {
-      setTrainingData({
-        ...trainingData,
-        extractedRooms: [...trainingData.extractedRooms, ...newRooms],
-      });
-    }
-    setShowUndetectedStep(false);
-    setCurrentStep(2);
-  };
-
-  const handleSkipUndetected = () => {
-    setShowUndetectedStep(false);
     setCurrentStep(2);
   };
 
@@ -89,14 +66,12 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
   const handleReset = () => {
     setTrainingData(null);
     setCurrentStep(1);
-    setShowUndetectedStep(false);
     setRefreshKey(prev => prev + 1);
   };
 
   const goToStep = (step: number) => {
     if (step < currentStep) {
       setCurrentStep(step);
-      setShowUndetectedStep(false);
     }
   };
 
@@ -144,7 +119,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
             <div>
               <h2 className="text-xl font-semibold">Entraîner l'IA</h2>
               <p className="text-sm text-muted-foreground">
-                Apprenez au système à reconnaître vos rapports en 4 étapes
+                Apprenez au système à reconnaître vos rapports
               </p>
             </div>
           </div>
@@ -176,9 +151,9 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
         <div className="flex items-center justify-center gap-2 md:gap-4 mb-8 flex-wrap">
           {DISPLAY_STEPS.map((step, index) => {
             const Icon = step.icon;
-            const isActive = currentStep === step.id || (showUndetectedStep && step.id === 1);
-            const isCompleted = currentStep > step.id && !showUndetectedStep;
-            const isClickable = step.id < currentStep && !showUndetectedStep;
+            const isActive = currentStep === step.id;
+            const isCompleted = currentStep > step.id;
+            const isClickable = step.id < currentStep;
 
             return (
               <div key={step.id} className="flex items-center">
@@ -210,23 +185,14 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
         {/* Step Content */}
         <div className="min-h-[400px]">
-          {currentStep === 1 && !showUndetectedStep && (
+          {currentStep === 1 && (
             <TrainingStep1Import
               hotelId={hotelId}
               onComplete={handleImportComplete}
             />
           )}
 
-          {showUndetectedStep && trainingData && (
-            <UndetectedLinesAnnotator
-              rawText={trainingData.rawText}
-              detectedRooms={trainingData.extractedRooms}
-              onAddRooms={handleUndetectedComplete}
-              onSkip={handleSkipUndetected}
-            />
-          )}
-
-          {currentStep === 2 && !showUndetectedStep && trainingData && (
+          {currentStep === 2 && trainingData && (
             <TrainingStep2Annotate
               trainingData={trainingData}
               hotelId={hotelId}
