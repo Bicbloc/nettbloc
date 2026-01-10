@@ -115,10 +115,64 @@ class TextPreprocessor {
       }
     }
 
-    // Fusionner des statuts isolés sur la ligne suivante (PDF fragmenté)
+    // PHASE 1: Fusionner les fragments de type de chambre (ex: "DBL-" + "C" + "PRO")
+    // Ceci est CRITIQUE pour les rapports MEWS fragmentés par l'extraction PDF
+    const FRAGMENT_MERGE_PATTERNS: Array<{ name: string; pattern: RegExp; replacement: string }> = [
+      {
+        // "DBL-" ou "SGL-" ou "TPL-" seul sur une ligne, suivi de "C" ou "S" seul
+        name: 'merge_room_type_letter',
+        pattern: /([A-Z]{3})-\s*\n\s*([CS])\s*(?=\n|$)/gi,
+        replacement: '$1-$2',
+      },
+      {
+        // Idem mais la lettre est suivie du statut sur la même ligne
+        name: 'merge_room_type_letter_inline',
+        pattern: /([A-Z]{3})-\s*\n\s*([CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        replacement: '$1-$2 $3',
+      },
+      {
+        // "DBL-C" ou "SGL-S" seul, suivi du statut sur ligne suivante
+        name: 'merge_type_status',
+        pattern: /([A-Z]{3}-[CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        replacement: '$1 $2',
+      },
+      {
+        // Numéro de chambre + type fragmenté: "001   DBL-" \n "C"
+        name: 'merge_room_number_type_fragment',
+        pattern: /(\d{2,4})\s+(DBL|SGL|TPL|FAM)-\s*\n\s*([CS])/gi,
+        replacement: '$1 $2-$3',
+      },
+      {
+        // Numéro + type complet, statut sur ligne suivante: "001 DBL-C" \n "PRO"
+        name: 'merge_room_complete_status_next',
+        pattern: /(\d{2,4}\s+[A-Z]{3}-[CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        replacement: '$1 $2',
+      },
+      {
+        // Ligne avec juste "C" seul entre deux lignes
+        name: 'merge_isolated_C_or_S',
+        pattern: /\n\s*([CS])\s*\n\s*(SAL|PRO|INS|DIR|DEP|ARR)\b/gi,
+        replacement: ' $1 $2\n',
+      },
+    ];
+
+    // Appliquer les patterns de fusion de fragments en plusieurs passes
+    for (let pass = 0; pass < 3; pass++) {
+      for (const { name, pattern, replacement } of FRAGMENT_MERGE_PATTERNS) {
+        const before = processed;
+        processed = processed.replace(pattern, replacement);
+        if (before !== processed && pass === 0) {
+          patternsApplied.push(name);
+          const beforeLines = (before.match(/\n/g) || []).length;
+          const afterLines = (processed.match(/\n/g) || []).length;
+          linesMerged += Math.max(0, beforeLines - afterLines);
+        }
+      }
+    }
+
+    // PHASE 2: Fusionner des statuts isolés sur la ligne suivante (PDF fragmenté)
     // Exemple: "402 CLA" \n "INS"  → "402 CLA INS"
     // Exemple: "407 B SUP" \n "SAL ..." → "407 B SUP SAL ..."
-    // Exemple: "407 B SUP" \n "BLC" \n "SAL ..." → "407 B SUP BLC SAL ..."
     const MERGE_PATTERNS: Array<{ name: string; pattern: RegExp; replacement: string }> = [
       {
         // Cas général: une ligne avec numéro de chambre + 1..4 tokens (type, bâtiment, etc.)
