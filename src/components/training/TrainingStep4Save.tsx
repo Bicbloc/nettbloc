@@ -128,11 +128,11 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
   };
 
   const aBlancCount = trainingData.extractedRooms.filter(r => 
-    r.cleaningType === 'checkout'
+    r.cleaningType === 'a_blanc' || r.cleaningType === 'full'
   ).length;
   
   const recoucheCount = trainingData.extractedRooms.filter(r => 
-    r.cleaningType === 'occupied'
+    r.cleaningType === 'recouche' || r.cleaningType === 'quick'
   ).length;
 
   return (

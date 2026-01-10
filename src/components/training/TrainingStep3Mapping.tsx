@@ -37,7 +37,7 @@ export const TrainingStep3Mapping: React.FC<TrainingStep3MappingProps> = ({
     const keywords = new Set<string>();
     
     extractedRooms.forEach(room => {
-      const rawLine = room.rawLine?.toUpperCase() || '';
+      const rawLine = room.originalText?.toUpperCase() || room.status?.toUpperCase() || '';
       PMS_STATUS_KEYWORDS.forEach(keyword => {
         if (rawLine.includes(keyword)) {
           keywords.add(keyword);
@@ -76,7 +76,7 @@ export const TrainingStep3Mapping: React.FC<TrainingStep3MappingProps> = ({
   // Apply mapping to rooms for preview
   const mappedRooms = useMemo(() => {
     return extractedRooms.map(room => {
-      const rawLine = room.rawLine?.toUpperCase() || '';
+      const rawLine = room.originalText?.toUpperCase() || room.status?.toUpperCase() || '';
       let mappedType = 'recouche'; // default
       
       for (const keyword of Object.keys(mapping)) {
