@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,13 +10,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Check, X, ChevronLeft, Link2, Unlink, Plus, 
-  AlertTriangle, Sparkles, Save, Calendar, User, ArrowRight, Copy, FileText, Wand2
+  AlertTriangle, Sparkles, Save, Calendar, User, ArrowRight, Copy, FileText, Wand2, RefreshCw
 } from "lucide-react";
 import { ExtractedRoom, CLEANING_TYPE_LABELS } from "@/services/pms";
 import { TrainingData } from "./TrainingWizard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { LinePatternRuleDialog } from "./LinePatternRuleDialog";
+import { ExclusionListManager } from "./ExclusionListManager";
+import { parseRoomLines, RoomLine, DEFAULT_EXCLUDE_LIST } from "@/services/pms/RoomLineParser";
 
 interface TrainingStep2AnnotateProps {
   trainingData: TrainingData;
@@ -86,12 +88,100 @@ export const TrainingStep2Annotate = ({
   const [editingTimeRoom, setEditingTimeRoom] = useState<number | null>(null);
   const [newRoom, setNewRoom] = useState({ roomNumber: "", cleaningType: "full" as const });
   const [ruleDialogRoom, setRuleDialogRoom] = useState<ExtractedRoom | null>(null);
-  const [clickedLine, setClickedLine] = useState<{ text: string; index: number } | null>(null);
+  const [clickedLine, setClickedLine] = useState<{ text: string; index: number; roomLine?: RoomLine } | null>(null);
   const [lineRoomNumber, setLineRoomNumber] = useState("");
   const [lineCleaningType, setLineCleaningType] = useState<"a_blanc" | "recouche" | "none">("a_blanc");
+  const [showExclusionPanel, setShowExclusionPanel] = useState(false);
+  
+  // Liste d'exclusion dynamique (noms de responsables HK à ignorer)
+  const [excludeList, setExcludeList] = useState<string[]>(() => {
+    // Charger depuis localStorage si disponible
+    const saved = localStorage.getItem(`training_exclude_${hotelId}`);
+    return saved ? JSON.parse(saved) : [...DEFAULT_EXCLUDE_LIST];
+  });
 
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [cleaningFilter, setCleaningFilter] = useState<'all' | 'a_blanc' | 'recouche' | 'none'>('all');
+  
+  // Sauvegarder la liste d'exclusion
+  useEffect(() => {
+    localStorage.setItem(`training_exclude_${hotelId}`, JSON.stringify(excludeList));
+  }, [excludeList, hotelId]);
+  
+  // Parser les lignes logiques (d'un numéro de chambre au suivant)
+  const roomLines = useMemo(() => {
+    return parseRoomLines(trainingData.rawText, excludeList);
+  }, [trainingData.rawText, excludeList]);
+  
+  // Détecter les noms potentiels de responsables (pour suggestions)
+  const detectedNames = useMemo(() => {
+    const names: string[] = [];
+    const namePattern = /([A-ZÀ-ÿ][a-zà-ÿ]+)\s+([A-ZÀ-ÿ][a-zà-ÿ]+)/g;
+    let match;
+    while ((match = namePattern.exec(trainingData.rawText)) !== null) {
+      const fullName = `${match[1]} ${match[2]}`;
+      if (!names.includes(fullName) && names.length < 50) {
+        names.push(fullName);
+      }
+    }
+    return names;
+  }, [trainingData.rawText]);
+  
+  // Re-parser les chambres avec la nouvelle liste d'exclusion
+  const reparseRooms = () => {
+    const newRooms: ExtractedRoom[] = roomLines.map(line => {
+      // Déterminer le type de nettoyage basé sur le statut
+      let cleaningType: ExtractedRoom['cleaningType'] = 'a_blanc';
+      if (line.statusCode) {
+        const code = line.statusCode.toUpperCase();
+        if (code === 'INS' || code === 'PRO') cleaningType = 'none';
+        else if (code === 'SAL') {
+          // SAL avec deux horaires = départ/arrivée = à blanc
+          // SAL seul ou avec info Nuit = recouche possible
+          if (line.isLastNight) cleaningType = 'a_blanc';
+          else if (line.dates.checkOutTime && line.dates.checkInTime) cleaningType = 'a_blanc';
+          else cleaningType = 'recouche';
+        }
+      }
+      
+      return {
+        roomNumber: line.roomNumber,
+        status: mapStatusCode(line.statusCode),
+        cleaningType,
+        guestName: line.guestName,
+        arrivalDate: line.dates.arrival || '',
+        departureDate: line.dates.departure || '',
+        arrivalTime: line.dates.checkInTime,
+        departureTime: line.dates.checkOutTime,
+        roomType: line.roomType,
+        originalText: line.fullText,
+        validated: false,
+        isConnected: !!line.linkedRoom,
+        linkedRooms: line.linkedRoom ? [line.roomNumber.split('+')[0], line.linkedRoom] : undefined,
+      };
+    });
+    
+    setRooms(newRooms);
+    toast({ 
+      title: "Re-analyse effectuée", 
+      description: `${newRooms.length} chambres détectées avec la nouvelle liste d'exclusion` 
+    });
+  };
+  
+  // Mapper le code statut vers le type interne
+  const mapStatusCode = (code?: string): ExtractedRoom['status'] => {
+    if (!code) return 'unknown';
+    const upper = code.toUpperCase();
+    switch (upper) {
+      case 'SAL': return 'dirty';
+      case 'INS': 
+      case 'PRO': return 'clean';
+      case 'ARR': return 'arrival';
+      case 'DEP': return 'checkout';
+      case 'OCC': return 'occupied';
+      default: return 'unknown';
+    }
+  };
 
   const copyRawText = () => {
     navigator.clipboard.writeText(trainingData.rawText);
@@ -388,60 +478,140 @@ export const TrainingStep2Annotate = ({
   };
 
   return (
-    <div className="flex gap-4 h-[600px]">
-      {/* Left panel - Raw PDF text with clickable lines */}
+    <div className="flex gap-4 h-[650px]">
+      {/* Left panel - Parsed room lines */}
       <div className="w-1/2 flex flex-col">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-muted-foreground" />
-            <span className="font-medium text-sm">Texte brut du PDF</span>
+            <span className="font-medium text-sm">Lignes logiques ({roomLines.length})</span>
             <Badge variant="outline" className="text-xs">
-              Cliquez sur une ligne pour l'ajouter
+              1 ligne = 1 chambre
             </Badge>
           </div>
-          <Button variant="ghost" size="sm" onClick={copyRawText}>
-            <Copy className="w-4 h-4 mr-1" />
-            Copier
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant={showExclusionPanel ? "secondary" : "outline"} 
+              size="sm" 
+              onClick={() => setShowExclusionPanel(!showExclusionPanel)}
+            >
+              <User className="w-4 h-4 mr-1" />
+              Exclusions
+            </Button>
+            <Button variant="outline" size="sm" onClick={reparseRooms}>
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Re-parser
+            </Button>
+            <Button variant="ghost" size="sm" onClick={copyRawText}>
+              <Copy className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
+        
+        {/* Exclusion list panel */}
+        {showExclusionPanel && (
+          <div className="mb-2">
+            <ExclusionListManager
+              excludeList={excludeList}
+              onChange={setExcludeList}
+              detectedNames={detectedNames}
+            />
+          </div>
+        )}
+        
         <Card className="flex-1 p-2 overflow-hidden">
           <ScrollArea className="h-full">
-            <div className="space-y-0.5">
-              {rawLines.map((line) => (
-                <div
-                  key={line.index}
-                  onClick={() => {
-                    if (!line.isDetected) {
-                      // Essayer d'extraire un numéro de chambre automatiquement
-                      const match = line.text.match(/^(\d{2,4}(?:-?T)?)/);
-                      setLineRoomNumber(match ? match[1] : "");
-                      setClickedLine(line);
-                      
-                      // Auto-détecter le type de nettoyage
-                      const upper = line.text.toUpperCase();
-                      if (/\bINS\b|\bPRO\b/.test(upper)) setLineCleaningType('none');
-                      else if (/\bSAL\b/.test(upper)) setLineCleaningType('a_blanc');
-                      else setLineCleaningType('a_blanc');
-                    }
-                  }}
-                  className={`px-2 py-1 rounded text-xs font-mono cursor-pointer transition-all ${
-                    line.isDetected 
-                      ? "bg-green-100 dark:bg-green-900/30 border-l-2 border-green-500" 
-                      : "hover:bg-amber-100 dark:hover:bg-amber-900/30 hover:border-l-2 hover:border-amber-500"
-                  } ${clickedLine?.index === line.index ? "ring-2 ring-primary" : ""}`}
-                >
-                  <div className="flex items-start gap-2">
-                    {line.isDetected ? (
-                      <Check className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
-                    ) : (
-                      <Plus className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0 opacity-50" />
-                    )}
-                    <span className={line.isDetected ? "text-muted-foreground" : ""}>
-                      {line.text.length > 100 ? line.text.substring(0, 100) + "..." : line.text}
-                    </span>
-                  </div>
+            <div className="space-y-1">
+              {roomLines.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Aucune chambre détectée dans le texte.</p>
+                  <p className="text-xs mt-1">Vérifiez le format du PDF ou ajoutez les chambres manuellement.</p>
                 </div>
-              ))}
+              ) : (
+                roomLines.map((line, idx) => {
+                  // Vérifier si cette ligne est déjà dans la liste des chambres
+                  const isAlreadyAdded = rooms.some(r => 
+                    r.roomNumber === line.roomNumber || 
+                    r.roomNumber.includes(line.roomNumber)
+                  );
+                  
+                  return (
+                    <div
+                      key={`${line.roomNumber}-${idx}`}
+                      onClick={() => {
+                        if (!isAlreadyAdded) {
+                          setLineRoomNumber(line.roomNumber);
+                          setClickedLine({ text: line.fullText, index: idx, roomLine: line });
+                          
+                          // Auto-détecter le type de nettoyage
+                          if (line.statusCode) {
+                            const code = line.statusCode.toUpperCase();
+                            if (code === 'INS' || code === 'PRO') setLineCleaningType('none');
+                            else if (code === 'SAL') {
+                              if (line.isLastNight || (line.dates.checkOutTime && line.dates.checkInTime)) {
+                                setLineCleaningType('a_blanc');
+                              } else {
+                                setLineCleaningType('recouche');
+                              }
+                            } else {
+                              setLineCleaningType('a_blanc');
+                            }
+                          }
+                        }
+                      }}
+                      className={`px-2 py-2 rounded text-xs cursor-pointer transition-all border ${
+                        isAlreadyAdded 
+                          ? "bg-green-50 dark:bg-green-900/20 border-green-500/50" 
+                          : "border-transparent hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-500/50"
+                      } ${clickedLine?.index === idx ? "ring-2 ring-primary" : ""}`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-shrink-0 w-16">
+                          <span className={`font-bold ${isAlreadyAdded ? 'text-green-600' : 'text-primary'}`}>
+                            {line.roomNumber}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {line.roomType && (
+                              <Badge variant="outline" className="text-[10px] h-4">{line.roomType}</Badge>
+                            )}
+                            {line.statusCode && (
+                              <Badge 
+                                variant={line.statusCode === 'INS' || line.statusCode === 'PRO' ? 'secondary' : 'default'}
+                                className="text-[10px] h-4"
+                              >
+                                {line.statusCode}
+                              </Badge>
+                            )}
+                            {line.isLastNight && (
+                              <Badge variant="destructive" className="text-[10px] h-4">
+                                Dernière nuit
+                              </Badge>
+                            )}
+                            {line.guestName && (
+                              <span className="text-muted-foreground truncate max-w-[120px]">
+                                👤 {line.guestName}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 truncate font-mono">
+                            {line.fullText.substring(0, 80)}...
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {isAlreadyAdded ? (
+                            <Check className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Plus className="w-4 h-4 text-muted-foreground opacity-50" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </ScrollArea>
         </Card>
@@ -451,10 +621,17 @@ export const TrainingStep2Annotate = ({
           <Card className="mt-2 p-3 border-primary bg-primary/5">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <span className="text-sm font-medium">Ajouter cette ligne comme chambre</span>
+              <span className="text-sm font-medium">Ajouter cette chambre</span>
             </div>
-            <p className="text-xs font-mono bg-muted p-2 rounded mb-2 truncate">
-              {clickedLine.text}
+            {clickedLine.roomLine && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                <Badge>{clickedLine.roomLine.roomNumber}</Badge>
+                {clickedLine.roomLine.statusCode && <Badge variant="outline">{clickedLine.roomLine.statusCode}</Badge>}
+                {clickedLine.roomLine.guestName && <Badge variant="secondary">👤 {clickedLine.roomLine.guestName}</Badge>}
+              </div>
+            )}
+            <p className="text-xs font-mono bg-muted p-2 rounded mb-2 line-clamp-2">
+              {clickedLine.text.substring(0, 150)}...
             </p>
             <div className="flex items-center gap-2">
               <Input
@@ -487,9 +664,9 @@ export const TrainingStep2Annotate = ({
           </Card>
         )}
         
-        {!clickedLine && (
+        {!clickedLine && roomLines.length > 0 && (
           <p className="text-xs text-muted-foreground mt-2">
-            ✅ Lignes vertes = détectées | Cliquez sur une ligne non détectée pour l'ajouter
+            ✅ Vert = ajouté | Cliquez sur une chambre pour l'ajouter à la liste
           </p>
         )}
       </div>
