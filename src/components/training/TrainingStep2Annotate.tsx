@@ -131,7 +131,7 @@ export const TrainingStep2Annotate = ({
   const reparseRooms = () => {
     const newRooms: ExtractedRoom[] = roomLines.map(line => {
       // Utiliser le type suggéré par le parser (basé sur les dates)
-      let cleaningType: ExtractedRoom['cleaningType'] = line.suggestedCleaningType;
+      let cleaningType: ExtractedRoom['cleaningType'] = line.cleaningType === 'inspection' ? 'none' : line.cleaningType;
       
       // Déterminer le statut séjour
       let status: ExtractedRoom['status'] = mapStatusCode(line.statusCode);
@@ -599,15 +599,21 @@ export const TrainingStep2Annotate = ({
                           )}
                           {/* Type de nettoyage suggéré */}
                           <Badge 
-                            variant={line.suggestedCleaningType === 'a_blanc' ? 'default' : line.suggestedCleaningType === 'recouche' ? 'secondary' : 'outline'}
+                            variant={line.cleaningType === 'a_blanc' ? 'default' : line.cleaningType === 'recouche' ? 'secondary' : 'outline'}
                             className={`text-[10px] h-4 ${
-                              line.suggestedCleaningType === 'a_blanc' ? 'bg-orange-500' : 
-                              line.suggestedCleaningType === 'recouche' ? 'bg-blue-500 text-white' : ''
+                              line.cleaningType === 'a_blanc' ? 'bg-orange-500' : 
+                              line.cleaningType === 'recouche' ? 'bg-blue-500 text-white' : ''
                             }`}
                           >
-                            {line.suggestedCleaningType === 'a_blanc' ? '🧹 À blanc' : 
-                             line.suggestedCleaningType === 'recouche' ? '🛏️ Recouche' : '⏸️ Aucun'}
+                            {line.cleaningType === 'a_blanc' ? '🧹 À blanc' : 
+                             line.cleaningType === 'recouche' ? '🛏️ Recouche' : '⏸️ Aucun'}
                           </Badge>
+                          {/* Raison du type de nettoyage */}
+                          {line.cleaningReason && (
+                            <span className="text-[9px] text-muted-foreground italic ml-1 hidden sm:inline">
+                              ({line.cleaningReason})
+                            </span>
+                          )}
                           <div className="ml-auto">
                             {isAlreadyAdded ? (
                               <Check className="w-4 h-4 text-green-600" />

@@ -4,8 +4,8 @@ import { ConnectedRoomRulesManager } from "@/components/ConnectedRoomRulesManage
 import { PmsRulesManager } from "@/components/PmsRulesManager";
 import { PmsPatternManager } from "@/components/PmsPatternManager";
 import { ErrorAnalysisDashboard } from "@/components/ErrorAnalysisDashboard";
-import { CleaningCombinationMapper } from "@/components/pms/CleaningCombinationMapper";
-import { Link2, Settings, Brain, Activity, Layers } from "lucide-react";
+import { ExclusionListManager } from "./ExclusionListManager";
+import { Link2, Settings, Brain, Activity, UserX } from "lucide-react";
 
 interface AdvancedSettingsDrawerProps {
   open: boolean;
@@ -24,11 +24,11 @@ export const AdvancedSettingsDrawer = ({ open, onOpenChange, hotelId }: Advanced
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="mapping" className="w-full">
+        <Tabs defaultValue="exclusions" className="w-full">
           <TabsList className="grid w-full grid-cols-5 mb-6">
-            <TabsTrigger value="mapping" className="flex items-center gap-1.5 text-xs">
-              <Layers className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Mapping</span>
+            <TabsTrigger value="exclusions" className="flex items-center gap-1.5 text-xs">
+              <UserX className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Exclusions</span>
             </TabsTrigger>
             <TabsTrigger value="connected" className="flex items-center gap-1.5 text-xs">
               <Link2 className="h-3.5 w-3.5" />
@@ -48,11 +48,11 @@ export const AdvancedSettingsDrawer = ({ open, onOpenChange, hotelId }: Advanced
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="mapping" className="space-y-4">
+          <TabsContent value="exclusions" className="space-y-4">
             <div className="text-sm text-muted-foreground mb-4">
-              Configurez le type de nettoyage selon la combinaison statut + dates + horaires
+              Gérez la liste des noms à ignorer lors de l'extraction des clients
             </div>
-            <CleaningCombinationMapper hotelId={hotelId} />
+            <ExclusionListManager hotelId={hotelId} />
           </TabsContent>
 
           <TabsContent value="connected" className="space-y-4">
