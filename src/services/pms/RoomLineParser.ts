@@ -163,7 +163,14 @@ function parseSection(roomNumber: string, fullText: string, excludeList: string[
   const linkedRooms = linkedMatch ? [linkedMatch[1], linkedMatch[2]] : undefined;
   
   // === SUGGESTED CLEANING TYPE ===
-  const suggestedCleaningType = determineSuggestedCleaningType(statusCode, isLastNight, checkOutTime);
+  const suggestedCleaningType = determineSuggestedCleaningType(
+    statusCode, 
+    isLastNight, 
+    checkOutTime,
+    arrivalDate,
+    departureDate,
+    checkInTime
+  );
   
   return {
     roomNumber,
@@ -236,33 +243,63 @@ function extractGuestName(text: string, excludeList: string[]): string | undefin
 }
 
 /**
- * Détermine le type de nettoyage suggéré basé sur le statut et les infos
+ * Détermine le type de nettoyage suggéré basé sur les dates et infos
+ * RÈGLE PRINCIPALE:
+ * - 2 dates (départ + arrivée) = À blanc
+ * - 1 seule date = Recouche (client reste)
  */
 function determineSuggestedCleaningType(
   statusCode?: string, 
   isLastNight?: boolean,
-  checkOutTime?: string
+  checkOutTime?: string,
+  arrivalDate?: string,
+  departureDate?: string,
+  checkInTime?: string
 ): 'a_blanc' | 'recouche' | 'none' {
   // INS = Inspecté, PRO = Propre -> Pas de ménage
   if (statusCode === 'INS' || statusCode === 'PRO' || statusCode === 'VCI' || statusCode === 'OOO' || statusCode === 'OOS') {
     return 'none';
   }
   
-  // SAL = Sale avec départ ou dernière nuit -> À blanc
-  if (statusCode === 'SAL' || statusCode === 'DEP' || statusCode === 'VCO') {
-    if (isLastNight || checkOutTime) {
-      return 'a_blanc';
-    }
+  // RÈGLE PRINCIPALE: 2 dates = départ + arrivée = À blanc
+  const hasTwoDates = arrivalDate && departureDate && arrivalDate !== departureDate;
+  if (hasTwoDates) {
+    return 'a_blanc';
+  }
+  
+  // 2 horaires (départ + arrivée même jour) = À blanc
+  const hasTwoTimes = checkOutTime && checkInTime;
+  if (hasTwoTimes) {
+    return 'a_blanc';
+  }
+  
+  // Dernière nuit = À blanc (départ le lendemain)
+  if (isLastNight) {
+    return 'a_blanc';
+  }
+  
+  // DEP/VCO = Départ = À blanc
+  if (statusCode === 'DEP' || statusCode === 'VCO') {
+    return 'a_blanc';
+  }
+  
+  // SAL avec horaire de départ seul = À blanc
+  if (statusCode === 'SAL' && checkOutTime && !checkInTime) {
+    return 'a_blanc';
+  }
+  
+  // 1 seule date = client en séjour = Recouche
+  if ((arrivalDate && !departureDate) || (!arrivalDate && departureDate)) {
     return 'recouche';
   }
   
-  // OCC = Occupé -> Recouche
+  // OCC/ARR = Occupé ou arrivée = Recouche
   if (statusCode === 'OCC' || statusCode === 'ARR') {
     return 'recouche';
   }
   
-  // Par défaut, si dernière nuit -> À blanc, sinon recouche
-  return isLastNight ? 'a_blanc' : 'recouche';
+  // Par défaut: SAL sans plus d'info = recouche
+  return 'recouche';
 }
 
 /**
