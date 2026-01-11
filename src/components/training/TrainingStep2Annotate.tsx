@@ -130,23 +130,30 @@ export const TrainingStep2Annotate = ({
   // Re-parser les chambres avec la nouvelle liste d'exclusion
   const reparseRooms = () => {
     const newRooms: ExtractedRoom[] = roomLines.map(line => {
-      // Déterminer le type de nettoyage basé sur le statut
-      let cleaningType: ExtractedRoom['cleaningType'] = 'a_blanc';
-      if (line.statusCode) {
-        const code = line.statusCode.toUpperCase();
-        if (code === 'INS' || code === 'PRO') cleaningType = 'none';
-        else if (code === 'SAL') {
-          // SAL avec deux horaires = départ/arrivée = à blanc
-          // SAL seul ou avec info Nuit = recouche possible
-          if (line.isLastNight) cleaningType = 'a_blanc';
-          else if (line.checkOutTime && line.checkInTime) cleaningType = 'a_blanc';
-          else cleaningType = 'recouche';
-        }
+      // Utiliser le type suggéré par le parser (basé sur les dates)
+      let cleaningType: ExtractedRoom['cleaningType'] = line.suggestedCleaningType;
+      
+      // Déterminer le statut séjour
+      let status: ExtractedRoom['status'] = mapStatusCode(line.statusCode);
+      
+      // Si 2 dates différentes = départ + arrivée
+      const hasTwoDates = line.arrivalDate && line.departureDate && line.arrivalDate !== line.departureDate;
+      if (hasTwoDates) {
+        status = 'checkout_arrival';
+        cleaningType = 'a_blanc';
+      } else if (line.departureDate && !line.arrivalDate) {
+        // Date de départ seule
+        status = 'checkout';
+        cleaningType = 'a_blanc';
+      } else if (line.arrivalDate && !line.departureDate) {
+        // Date d'arrivée seule = client en séjour
+        status = 'stayover';
+        cleaningType = 'recouche';
       }
       
-      return {
+      const room: ExtractedRoom & { nightInfo?: { current: number; total: number }; adults?: number; children?: number } = {
         roomNumber: line.roomNumber,
-        status: mapStatusCode(line.statusCode),
+        status,
         cleaningType,
         guestName: line.guestName,
         arrivalDate: line.arrivalDate || '',
@@ -159,6 +166,13 @@ export const TrainingStep2Annotate = ({
         isConnected: !!line.linkedRooms,
         linkedRooms: line.linkedRooms,
       };
+      
+      // Ajouter les données supplémentaires en tant que propriétés étendues
+      (room as any)._nightInfo = line.nightInfo;
+      (room as any)._adults = line.adults;
+      (room as any)._children = line.children;
+      
+      return room;
     });
     
     setRooms(newRooms);
@@ -567,12 +581,13 @@ export const TrainingStep2Annotate = ({
                       } ${clickedLine?.index === idx ? "ring-2 ring-primary" : ""}`}
                     >
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
+                        {/* Header avec numéro et type suggéré */}
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={`font-bold text-sm ${isAlreadyAdded ? 'text-green-600' : 'text-primary'}`}>
                             {line.roomNumber}
                           </span>
                           {line.roomType && (
-                            <Badge variant="outline" className="text-[10px] h-4">{line.roomType}</Badge>
+                            <Badge variant="outline" className="text-[10px] h-4">{line.roomType}{line.roomCategory ? `-${line.roomCategory}` : ''}</Badge>
                           )}
                           {line.statusCode && (
                             <Badge 
@@ -582,16 +597,17 @@ export const TrainingStep2Annotate = ({
                               {line.statusCode}
                             </Badge>
                           )}
-                          {line.isLastNight && (
-                            <Badge variant="destructive" className="text-[10px] h-4">
-                              Dernière nuit
-                            </Badge>
-                          )}
-                          {line.guestName && (
-                            <Badge variant="secondary" className="text-[10px] h-4">
-                              👤 {line.guestName}
-                            </Badge>
-                          )}
+                          {/* Type de nettoyage suggéré */}
+                          <Badge 
+                            variant={line.suggestedCleaningType === 'a_blanc' ? 'default' : line.suggestedCleaningType === 'recouche' ? 'secondary' : 'outline'}
+                            className={`text-[10px] h-4 ${
+                              line.suggestedCleaningType === 'a_blanc' ? 'bg-orange-500' : 
+                              line.suggestedCleaningType === 'recouche' ? 'bg-blue-500 text-white' : ''
+                            }`}
+                          >
+                            {line.suggestedCleaningType === 'a_blanc' ? '🧹 À blanc' : 
+                             line.suggestedCleaningType === 'recouche' ? '🛏️ Recouche' : '⏸️ Aucun'}
+                          </Badge>
                           <div className="ml-auto">
                             {isAlreadyAdded ? (
                               <Check className="w-4 h-4 text-green-600" />
@@ -600,6 +616,47 @@ export const TrainingStep2Annotate = ({
                             )}
                           </div>
                         </div>
+                        
+                        {/* Données extraites */}
+                        <div className="flex flex-wrap gap-1 text-[10px]">
+                          {line.guestName && (
+                            <Badge variant="secondary" className="text-[10px] h-4 gap-1">
+                              👤 {line.guestName}
+                            </Badge>
+                          )}
+                          {line.arrivalDate && (
+                            <Badge variant="outline" className="text-[10px] h-4 gap-1 bg-green-50 border-green-300">
+                              📥 {line.arrivalDate}
+                            </Badge>
+                          )}
+                          {line.departureDate && (
+                            <Badge variant="outline" className="text-[10px] h-4 gap-1 bg-red-50 border-red-300">
+                              📤 {line.departureDate}
+                            </Badge>
+                          )}
+                          {line.checkInTime && (
+                            <Badge variant="outline" className="text-[10px] h-4">
+                              ⏰ Arr: {line.checkInTime}
+                            </Badge>
+                          )}
+                          {line.checkOutTime && (
+                            <Badge variant="outline" className="text-[10px] h-4">
+                              ⏰ Dép: {line.checkOutTime}
+                            </Badge>
+                          )}
+                          {line.nightInfo && (
+                            <Badge variant={line.isLastNight ? 'destructive' : 'outline'} className="text-[10px] h-4">
+                              🌙 {line.nightInfo.current}/{line.nightInfo.total}
+                            </Badge>
+                          )}
+                          {line.adults && (
+                            <Badge variant="outline" className="text-[10px] h-4">
+                              👥 {line.adults} ad.{line.children ? ` + ${line.children} enf.` : ''}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Texte brut complet */}
                         <div className="text-[11px] text-muted-foreground font-mono whitespace-pre-wrap break-all bg-muted/30 p-2 rounded">
                           {line.fullText}
                         </div>
@@ -978,76 +1035,105 @@ export const TrainingStep2Annotate = ({
                         </div>
                       </div>
 
-                      {/* Details row - guest info, dates, times */}
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground pl-[50px]">
+                      {/* Details row - ALL extracted data */}
+                      <div className="flex flex-wrap items-center gap-2 text-xs pl-[50px]">
+                        {/* Guest name */}
                         {room.guestName && (
-                          <span className="flex items-center gap-1">
+                          <Badge variant="secondary" className="gap-1 text-xs">
                             <User className="w-3 h-3" />
                             {room.guestName}
-                          </span>
+                          </Badge>
                         )}
                         
-                        {/* Time inputs for departure/arrival */}
-                        {editingTimeRoom === index ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1">
-                              <span className="text-muted-foreground">Départ:</span>
-                              <Input
-                                type="time"
-                                className="h-6 w-20 text-xs"
-                                value={room.departureTime || ''}
-                                onChange={(e) => updateRoom(index, 'departureTime' as keyof ExtractedRoom, e.target.value)}
-                                placeholder="HH:MM"
-                              />
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-muted-foreground">Arrivée:</span>
-                              <Input
-                                type="time"
-                                className="h-6 w-20 text-xs"
-                                value={room.arrivalTime || ''}
-                                onChange={(e) => updateRoom(index, 'arrivalTime' as keyof ExtractedRoom, e.target.value)}
-                                placeholder="HH:MM"
-                              />
-                            </div>
-                            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setEditingTimeRoom(null)}>
-                              <Check className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 px-1 text-xs"
-                            onClick={() => setEditingTimeRoom(index)}
+                        {/* Dates */}
+                        {room.arrivalDate && (
+                          <Badge variant="outline" className="gap-1 text-xs bg-green-50 border-green-400">
+                            📥 {room.arrivalDate}
+                          </Badge>
+                        )}
+                        {room.departureDate && (
+                          <Badge variant="outline" className="gap-1 text-xs bg-red-50 border-red-400">
+                            📤 {room.departureDate}
+                          </Badge>
+                        )}
+                        
+                        {/* Times */}
+                        {room.departureTime && (
+                          <Badge variant="outline" className="gap-1 text-xs">
+                            🚪 Dép: {room.departureTime}
+                          </Badge>
+                        )}
+                        {room.arrivalTime && (
+                          <Badge variant="outline" className="gap-1 text-xs">
+                            ⏰ Arr: {room.arrivalTime}
+                          </Badge>
+                        )}
+                        
+                        {/* Night info */}
+                        {(room as any)._nightInfo && (
+                          <Badge 
+                            variant={(room as any)._nightInfo.current === (room as any)._nightInfo.total ? 'destructive' : 'outline'} 
+                            className="gap-1 text-xs"
                           >
-                            {(room.departureTime || room.arrivalTime) ? (
-                              <span className="flex items-center gap-1">
-                                {room.departureTime && <span>🚪{room.departureTime}</span>}
-                                {room.arrivalTime && <span>📥{room.arrivalTime}</span>}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">+ Horaires</span>
-                            )}
-                          </Button>
+                            🌙 Nuit {(room as any)._nightInfo.current}/{(room as any)._nightInfo.total}
+                          </Badge>
                         )}
-
-                        {(room.arrivalDate || room.departureDate) && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {room.arrivalDate && <span>{room.arrivalDate}</span>}
-                            {room.arrivalDate && room.departureDate && <ArrowRight className="w-3 h-3" />}
-                            {room.departureDate && <span>{room.departureDate}</span>}
-                          </span>
+                        
+                        {/* Occupancy */}
+                        {((room as any)._adults || (room as any)._children) && (
+                          <Badge variant="outline" className="gap-1 text-xs">
+                            👥 {(room as any)._adults || 0} ad.{(room as any)._children ? ` + ${(room as any)._children} enf.` : ''}
+                          </Badge>
                         )}
-                        {room.rawStatuses && room.rawStatuses.length > 0 && (
-                          <span className="text-xs opacity-70">
-                            ({room.rawStatuses.join(' + ')})
-                          </span>
+                        
+                        {/* Room type */}
+                        {room.roomType && (
+                          <Badge variant="outline" className="text-xs">
+                            🏠 {room.roomType}
+                          </Badge>
                         )}
+                        
+                        {/* Edit times button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 px-1 text-xs ml-auto"
+                          onClick={() => setEditingTimeRoom(index)}
+                        >
+                          ✏️ Éditer
+                        </Button>
                       </div>
+                      
+                      {/* Time editing row */}
+                      {editingTimeRoom === index && (
+                        <div className="flex items-center gap-2 pl-[50px] pt-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">Départ:</span>
+                            <Input
+                              type="time"
+                              className="h-6 w-20 text-xs"
+                              value={room.departureTime || ''}
+                              onChange={(e) => updateRoom(index, 'departureTime' as keyof ExtractedRoom, e.target.value)}
+                              placeholder="HH:MM"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">Arrivée:</span>
+                            <Input
+                              type="time"
+                              className="h-6 w-20 text-xs"
+                              value={room.arrivalTime || ''}
+                              onChange={(e) => updateRoom(index, 'arrivalTime' as keyof ExtractedRoom, e.target.value)}
+                              placeholder="HH:MM"
+                            />
+                          </div>
+                          <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setEditingTimeRoom(null)}>
+                            <Check className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
 
-                      {/* Status description tooltip */}
+                      {/* Status description */}
                       <div className="pl-[50px] text-xs text-muted-foreground/70 italic">
                         {statusInfo.description}
                       </div>
