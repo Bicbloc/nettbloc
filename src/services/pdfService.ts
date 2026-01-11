@@ -1,15 +1,21 @@
 import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { unifiedParserService, ExtractedRoom, textPreprocessor } from "@/services/pms";
+import { parseRoomLines, RoomLine } from "@/services/pms/RoomLineParser";
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 // Store for last extracted text (for debugging/mismatch detection)
 let lastExtractedText: string = '';
+let lastParsedLines: RoomLine[] = [];
 
 export function getLastExtractedText(): string {
   return lastExtractedText;
+}
+
+export function getLastParsedLines(): RoomLine[] {
+  return lastParsedLines;
 }
 
 export interface Room {
@@ -27,6 +33,17 @@ export interface Room {
   linkedRooms?: string[];
   inspectedAt?: string;
   inspectedBy?: string;
+  // Extended IA data
+  guestName?: string;
+  arrivalDate?: string;
+  departureDate?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  nightInfo?: { current: number; total: number };
+  adults?: number;
+  children?: number;
+  roomType?: string;
+  cleaningReason?: string;
 }
 
 export interface CleaningConfig {
@@ -44,6 +61,77 @@ export const getDefaultCleaningConfig = (isPremium: boolean = false): CleaningCo
 });
 
 export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(false);
+
+/**
+ * Charge la liste d'exclusion depuis localStorage
+ */
+function loadExclusionList(hotelId?: string): string[] {
+  try {
+    const key = hotelId ? `exclusion_list_${hotelId}` : 'exclusion_list';
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Convertit RoomLine du parser intelligent vers Room de l'application
+ */
+function convertRoomLineToRoom(line: RoomLine): Room {
+  // Mapper le cleaningType
+  const cleaningType: Room['cleaningType'] =
+    line.cleaningType === 'a_blanc' ? 'a_blanc' :
+    line.cleaningType === 'recouche' ? 'recouche' :
+    line.cleaningType === 'inspection' ? 'none' :
+    'none';
+
+  // Déterminer la priorité
+  const priority: Room['priority'] =
+    cleaningType === 'a_blanc' ? 'high' :
+    cleaningType === 'recouche' ? 'medium' :
+    'low';
+
+  // Déterminer le statut
+  const status =
+    line.cleaningType === 'inspection' || line.cleaningType === 'none' ? 'clean' :
+    cleaningType === 'a_blanc' ? 'checkout' :
+    'stayover';
+
+  // Parser l'étage
+  const floor = line.floor ? parseInt(line.floor) : undefined;
+
+  // Construire les notes enrichies
+  const noteParts: string[] = [];
+  if (line.cleaningReason) noteParts.push(line.cleaningReason);
+  if (line.statusLabel) noteParts.push(`Statut: ${line.statusLabel}`);
+  if (line.checkOutTime) noteParts.push(`Départ: ${line.checkOutTime}`);
+  if (line.checkInTime) noteParts.push(`Arrivée: ${line.checkInTime}`);
+  if (line.notes && line.notes.length > 0) noteParts.push(...line.notes);
+
+  return {
+    number: line.roomNumber,
+    status,
+    cleaningType,
+    priority,
+    isUrgent: cleaningType === 'a_blanc',
+    notUrgent: cleaningType === 'none',
+    floor,
+    linkedRooms: line.linkedRooms,
+    notes: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
+    // Extended IA data
+    guestName: line.guestName,
+    arrivalDate: line.arrivalDate,
+    departureDate: line.departureDate,
+    checkInTime: line.checkInTime,
+    checkOutTime: line.checkOutTime,
+    nightInfo: line.nightInfo,
+    adults: line.adults,
+    children: line.children,
+    roomType: line.roomType,
+    cleaningReason: line.cleaningReason,
+  };
+}
 
 function normalizeStatusToken(token: string): string {
   const u = String(token).trim().toUpperCase();
@@ -149,79 +237,109 @@ function getRoomFloor(roomNumber: string): number {
 }
 
 /**
- * Process PDF file - utilise le service unifié avec prétraitement centralisé
- * @param file Le fichier PDF à traiter
- * @param hotelId L'identifiant de l'hôtel (optionnel)
- * @param forceAi Force l'utilisation de l'IA même si le parsing local est suffisant
+ * Extract text from PDF file
+ */
+export async function extractPdfText(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+
+    // Reconstruire des lignes à partir des coordonnées (Y puis X)
+    const items = (textContent.items as any[])
+      .map((item) => ({
+        str: String(item.str ?? ''),
+        x: Array.isArray(item.transform) ? Number(item.transform[4]) : 0,
+        y: Array.isArray(item.transform) ? Number(item.transform[5]) : 0,
+      }))
+      .filter((it) => it.str.trim().length > 0);
+
+    // PDF.js: Y décroissant ~ lignes de haut en bas
+    items.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+
+    let lastY: number | null = null;
+    let lineParts: string[] = [];
+
+    const flushLine = () => {
+      const line = lineParts.join(' ').replace(/\s+/g, ' ').trim();
+      if (line) fullText += line + '\n';
+      lineParts = [];
+    };
+
+    for (const it of items) {
+      const currentY = it.y;
+      if (lastY !== null && Math.abs(currentY - lastY) > 3.5) {
+        flushLine();
+      }
+      lineParts.push(it.str);
+      lastY = currentY;
+    }
+    flushLine();
+    fullText += '\n'; // séparateur de page
+  }
+  
+  return fullText;
+}
+
+/**
+ * Process PDF file with intelligent RoomLineParser
+ * Uses the same AI training logic as the training wizard
  */
 export async function processPdf(file: File, hotelId?: string, forceAi: boolean = false): Promise<Room[]> {
   try {
     // Extraire le texte du PDF
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const rawText = await extractPdfText(file);
     
-     let fullText = '';
-     for (let i = 1; i <= pdf.numPages; i++) {
-       const page = await pdf.getPage(i);
-       const textContent = await page.getTextContent();
-
-       // Reconstruire des lignes à partir des coordonnées (Y puis X)
-       const items = (textContent.items as any[])
-         .map((item) => ({
-           str: String(item.str ?? ''),
-           x: Array.isArray(item.transform) ? Number(item.transform[4]) : 0,
-           y: Array.isArray(item.transform) ? Number(item.transform[5]) : 0,
-         }))
-         .filter((it) => it.str.trim().length > 0);
-
-       // PDF.js: Y décroissant ~ lignes de haut en bas
-       items.sort((a, b) => (b.y - a.y) || (a.x - b.x));
-
-       let lastY: number | null = null;
-       let lineParts: string[] = [];
-
-       const flushLine = () => {
-         const line = lineParts.join(' ').replace(/\s+/g, ' ').trim();
-         if (line) fullText += line + '\n';
-         lineParts = [];
-       };
-
-       for (const it of items) {
-         const currentY = it.y;
-         if (lastY !== null && Math.abs(currentY - lastY) > 3.5) {
-           flushLine();
-         }
-         lineParts.push(it.str);
-         lastY = currentY;
-       }
-       flushLine();
-       fullText += '\n'; // séparateur de page
-     }
-
     // Prétraitement centralisé
-    const preprocessResult = textPreprocessor.preprocess(fullText);
-    fullText = preprocessResult.text;
+    const preprocessResult = textPreprocessor.preprocess(rawText);
+    const fullText = preprocessResult.text;
     
     console.log(`📄 PDF extrait: ${preprocessResult.stats.originalLength} → ${preprocessResult.stats.processedLength} chars`);
     console.log(`📝 Patterns appliqués: ${preprocessResult.stats.patternsApplied.join(', ') || 'aucun'}`);
-    if (forceAi) console.log(`🤖 Extraction IA forcée par l'utilisateur`);
+    
     lastExtractedText = fullText;
+    
+    // ===== PHASE 1: Parser intelligent (comme l'entraînement) =====
+    const excludeList = loadExclusionList(hotelId);
+    const roomLines = parseRoomLines(fullText, excludeList);
+    lastParsedLines = roomLines;
+    
+    console.log(`🧠 RoomLineParser: ${roomLines.length} chambres détectées`);
+    
+    if (roomLines.length > 0) {
+      // Statistiques de confiance
+      const avgConfidence = roomLines.reduce((sum, l) => sum + l.confidence, 0) / roomLines.length;
+      const aBlancCount = roomLines.filter(l => l.cleaningType === 'a_blanc').length;
+      const recoucheCount = roomLines.filter(l => l.cleaningType === 'recouche').length;
+      
+      console.log(`📊 Confiance moyenne: ${avgConfidence.toFixed(1)}%`);
+      console.log(`🔵 À blanc: ${aBlancCount} | 🟢 Recouche: ${recoucheCount}`);
+      
+      // Convertir les RoomLines en Rooms
+      const rooms = roomLines.map(convertRoomLineToRoom);
+      
+      toast({
+        title: "Extraction IA réussie",
+        description: `${rooms.length} chambres (${aBlancCount} à blanc, ${recoucheCount} recouches)`,
+      });
+      
+      return rooms;
+    }
+    
+    // ===== PHASE 2: Fallback vers unifiedParserService =====
+    console.log('🔄 Fallback vers unifiedParserService...');
     
     let rooms: Room[] = [];
     
-    // Utiliser le service unifié
     if (hotelId) {
-      console.log(`🔄 Parsing avec unifiedParserService pour hôtel ${hotelId}...`);
-      
-      // IMPORTANT: Charger explicitement les patterns appris pour cet hôtel
-      // avant le parsing (sinon la logique "recouche vs a_blanc" ne sera pas utilisée)
       await unifiedParserService.loadHotelPatterns(hotelId);
-      
       const result = await unifiedParserService.parseReport(fullText, hotelId, forceAi);
       
       console.log(`✅ PMS: ${result.pmsType} (confiance: ${result.confidence.toFixed(1)}%)`);
-      console.log(`📊 ${result.rooms.length} chambres extraites (AI: ${result.usedAi}, Patterns: ${result.usedLearnedPatterns})`);
-      console.log(`⏱️ Temps: ${result.processingTime}ms`);
+      console.log(`📊 ${result.rooms.length} chambres extraites (AI: ${result.usedAi})`);
       
       rooms = convertExtractedRoomsToRooms(result.rooms);
       
@@ -233,34 +351,30 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
         return rooms;
       }
     } else {
-      // Sans hotelId, utiliser la détection simple
-      console.log('🔄 Parsing sans hotelId...');
-      
       const detection = unifiedParserService.detectPmsType(fullText);
       console.log(`🔍 PMS détecté: ${detection.pmsType} (confiance: ${detection.confidence.toFixed(1)}%)`);
       
       const result = await unifiedParserService.parseReport(fullText, 'default', forceAi);
       rooms = convertExtractedRoomsToRooms(result.rooms);
     }
-
     
-    toast({
-      title: "PDF Processed",
-      description: `${rooms.length} chambres traitées depuis ${file.name}`,
-    });
-    
-    // Si aucune chambre trouvée, retourner un tableau vide avec un message explicatif
-    if (rooms.length === 0) {
-      console.log("⚠️ Aucune chambre détectée dans le PDF");
+    if (rooms.length > 0) {
       toast({
-        variant: "destructive",
-        title: "Aucune chambre détectée",
-        description: "Le format du rapport n'est pas reconnu. Utilisez l'onglet 'Entraînement IA' pour apprendre ce format.",
+        title: "PDF traité",
+        description: `${rooms.length} chambres depuis ${file.name}`,
       });
-      return [];
+      return rooms;
     }
     
-    return rooms;
+    // Aucune chambre trouvée
+    console.log("⚠️ Aucune chambre détectée dans le PDF");
+    toast({
+      variant: "destructive",
+      title: "Aucune chambre détectée",
+      description: "Le format du rapport n'est pas reconnu. Utilisez l'entraînement IA pour apprendre ce format.",
+    });
+    return [];
+    
   } catch (error) {
     console.error("❌ Error processing PDF:", error);
     toast({

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,8 +10,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { processPdf } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock } from "lucide-react";
+import { processPdf, getLastParsedLines } from "@/services/pdfService";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { RoomArchiveService } from "@/services/roomArchiveService";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { RoomLine } from "@/services/pms/RoomLineParser";
 import { 
   loadHotelRoomFormat, 
   filterRoomsByFormat, 
@@ -38,8 +40,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'choice' | 'upload' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('choice');
+  const [step, setStep] = useState<'choice' | 'upload' | 'preview' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('choice');
   const [pdfData, setPdfData] = useState<any>(null);
+  const [parsedLines, setParsedLines] = useState<RoomLine[]>([]);
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +57,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [importMode, setImportMode] = useState<'update' | 'replace'>('update');
   const [existingRoomsCount, setExistingRoomsCount] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
-  const [savedPdfData, setSavedPdfData] = useState<any>(null); // Sauvegarde locale pour retry
+  const [savedPdfData, setSavedPdfData] = useState<any>(null);
+  const [previewFilter, setPreviewFilter] = useState<'all' | 'a_blanc' | 'recouche'>('all');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -111,38 +115,27 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setUploadProgress(20);
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Étape 2: Extraction des données avec règles personnalisées
-      setUploadStatus('🔍 Extraction des chambres...');
+      // Étape 2: Extraction IA avec RoomLineParser
+      setUploadStatus('🧠 Analyse IA en cours...');
       setUploadProgress(40);
       const data = await processPdf(selectedFile, hotelId);
+      
+      // Récupérer les lignes parsées pour la prévisualisation
+      const lines = getLastParsedLines();
+      setParsedLines(lines);
       setPdfData(data);
-      setSavedPdfData(data); // Sauvegarder pour retry
+      setSavedPdfData(data);
       
-      // Étape 3: Vérification rapide (estimation)
-      setUploadProgress(55);
+      setUploadProgress(70);
+      setUploadStatus('✅ Extraction terminée');
       
-      let existingCount = 0;
-      if (hotelId) {
-        // Estimation rapide sans bloquer
-        const { count } = await supabase
-          .from('rooms')
-          .select('id', { count: 'estimated', head: true })
-          .eq('hotel_id', hotelId);
-        existingCount = count || 0;
-        setExistingRoomsCount(existingCount);
-      }
-      
-      // Si des chambres existent, demander le mode d'import
-      if (existingCount > 0) {
+      // Aller à l'étape de prévisualisation
+      setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
         setUploadStatus('');
-        setStep('import-mode');
-        return;
-      }
-      
-      // Pas de chambres existantes, continuer directement
-      await saveRoomsToDatabase(data, 'update');
+        setStep('preview');
+      }, 500);
       
     } catch (error) {
       console.error("Erreur traitement PDF:", error);
@@ -471,6 +464,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setSelectedFile(null);
     setPdfData(null);
     setSavedPdfData(null);
+    setParsedLines([]);
     setStep('choice');
     setHousekeepers([]);
     setNewHousekeeperName('');
@@ -482,6 +476,68 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setImportMode('update');
     setExistingRoomsCount(0);
     setRetryCount(0);
+    setPreviewFilter('all');
+  };
+
+  // Statistiques de l'extraction IA
+  const extractionStats = useMemo(() => {
+    if (!parsedLines.length) return null;
+    
+    const aBlancCount = parsedLines.filter(l => l.cleaningType === 'a_blanc').length;
+    const recoucheCount = parsedLines.filter(l => l.cleaningType === 'recouche').length;
+    const noneCount = parsedLines.filter(l => l.cleaningType === 'none' || l.cleaningType === 'inspection').length;
+    const avgConfidence = parsedLines.reduce((sum, l) => sum + l.confidence, 0) / parsedLines.length;
+    const withGuest = parsedLines.filter(l => l.guestName).length;
+    const withDates = parsedLines.filter(l => l.arrivalDate || l.departureDate).length;
+    
+    return {
+      total: parsedLines.length,
+      aBlancCount,
+      recoucheCount,
+      noneCount,
+      avgConfidence,
+      withGuest,
+      withDates
+    };
+  }, [parsedLines]);
+
+  // Lignes filtrées pour la prévisualisation
+  const filteredLines = useMemo(() => {
+    if (previewFilter === 'all') return parsedLines;
+    return parsedLines.filter(l => l.cleaningType === previewFilter);
+  }, [parsedLines, previewFilter]);
+
+  const proceedFromPreview = async () => {
+    if (!hotelId || !pdfData || pdfData.length === 0) {
+      proceedToHousekeepers(pdfData || []);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus('🔍 Vérification des chambres existantes...');
+    setUploadProgress(50);
+
+    try {
+      const { count } = await supabase
+        .from('rooms')
+        .select('id', { count: 'estimated', head: true })
+        .eq('hotel_id', hotelId);
+      
+      const existingCount = count || 0;
+      setExistingRoomsCount(existingCount);
+
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
+
+      if (existingCount > 0) {
+        setStep('import-mode');
+      } else {
+        await saveRoomsToDatabase(pdfData, 'update');
+      }
+    } catch (error) {
+      handleUploadError(error);
+    }
   };
 
   const triggerFileInput = () => {
@@ -634,6 +690,240 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         >
           {isUploading ? "Analyse en cours..." : "Analyser le PDF"}
           <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  const renderPreviewStep = () => (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Brain className="h-5 w-5 text-primary" />
+          <Badge variant="secondary" className="text-xs">Étape 2/4</Badge>
+          Prévisualisation IA
+        </DialogTitle>
+        <DialogDescription>
+          L'IA a analysé votre rapport. Vérifiez les données extraites avant de continuer.
+        </DialogDescription>
+      </DialogHeader>
+      
+      {/* Statistiques */}
+      {extractionStats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="p-3 bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
+            <div className="flex items-center gap-2">
+              <Home className="h-4 w-4 text-blue-600" />
+              <div>
+                <p className="text-2xl font-bold text-blue-700">{extractionStats.total}</p>
+                <p className="text-xs text-blue-600">Chambres</p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="p-3 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-orange-600" />
+              <div>
+                <p className="text-2xl font-bold text-orange-700">{extractionStats.aBlancCount}</p>
+                <p className="text-xs text-orange-600">À blanc</p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="p-3 bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-green-600" />
+              <div>
+                <p className="text-2xl font-bold text-green-700">{extractionStats.recoucheCount}</p>
+                <p className="text-xs text-green-600">Recouches</p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="p-3 bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-purple-600" />
+              <div>
+                <p className="text-2xl font-bold text-purple-700">{extractionStats.avgConfidence.toFixed(0)}%</p>
+                <p className="text-xs text-purple-600">Confiance</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Filtres */}
+      <div className="flex gap-2">
+        <Button
+          variant={previewFilter === 'all' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setPreviewFilter('all')}
+        >
+          Tous ({parsedLines.length})
+        </Button>
+        <Button
+          variant={previewFilter === 'a_blanc' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setPreviewFilter('a_blanc')}
+          className={previewFilter === 'a_blanc' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+        >
+          À blanc ({extractionStats?.aBlancCount || 0})
+        </Button>
+        <Button
+          variant={previewFilter === 'recouche' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setPreviewFilter('recouche')}
+          className={previewFilter === 'recouche' ? 'bg-green-500 hover:bg-green-600' : ''}
+        >
+          Recouches ({extractionStats?.recoucheCount || 0})
+        </Button>
+      </div>
+
+      {/* Liste des chambres */}
+      <ScrollArea className="h-[300px] border rounded-lg">
+        <div className="p-2 space-y-2">
+          {filteredLines.map((line, idx) => (
+            <Card 
+              key={`${line.roomNumber}-${idx}`} 
+              className={`p-3 ${
+                line.cleaningType === 'a_blanc' 
+                  ? 'border-l-4 border-l-orange-500 bg-orange-50/30' 
+                  : line.cleaningType === 'recouche'
+                    ? 'border-l-4 border-l-green-500 bg-green-50/30'
+                    : 'border-l-4 border-l-gray-300'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                {/* Numéro et type */}
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono font-bold text-lg px-3 py-1">
+                    {line.roomNumber}
+                  </Badge>
+                  {line.roomType && (
+                    <Badge variant="secondary" className="text-xs">
+                      {line.roomType}{line.roomCategory ? `-${line.roomCategory}` : ''}
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Type de nettoyage */}
+                <Badge 
+                  className={`${
+                    line.cleaningType === 'a_blanc' 
+                      ? 'bg-orange-500 text-white' 
+                      : line.cleaningType === 'recouche'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-400 text-white'
+                  }`}
+                >
+                  {line.cleaningType === 'a_blanc' ? '🔶 À blanc' : 
+                   line.cleaningType === 'recouche' ? '🔄 Recouche' : 
+                   '⏸️ Aucun'}
+                </Badge>
+              </div>
+              
+              {/* Détails */}
+              <div className="mt-2 flex flex-wrap gap-2">
+                {line.guestName && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    <User className="h-3 w-3 mr-1" />
+                    {line.guestName}
+                  </Badge>
+                )}
+                
+                {line.departureDate && (
+                  <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    Départ: {line.departureDate}
+                  </Badge>
+                )}
+                
+                {line.arrivalDate && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    Arrivée: {line.arrivalDate}
+                  </Badge>
+                )}
+                
+                {line.checkOutTime && (
+                  <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Départ: {line.checkOutTime}
+                  </Badge>
+                )}
+                
+                {line.checkInTime && (
+                  <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Arrivée: {line.checkInTime}
+                  </Badge>
+                )}
+                
+                {line.nightInfo && (
+                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                    Nuit {line.nightInfo.current}/{line.nightInfo.total}
+                  </Badge>
+                )}
+                
+                {(line.adults || line.children) && (
+                  <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                    {line.adults || 0} Ad. {line.children ? `+ ${line.children} Enf.` : ''}
+                  </Badge>
+                )}
+                
+                {line.statusCode && (
+                  <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600">
+                    {line.statusCode}
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Raison du type de nettoyage */}
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                {line.cleaningReason}
+              </p>
+            </Card>
+          ))}
+          
+          {filteredLines.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              Aucune chambre dans cette catégorie
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Avertissement si confiance basse */}
+      {extractionStats && extractionStats.avgConfidence < 70 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            La confiance moyenne est faible ({extractionStats.avgConfidence.toFixed(0)}%). 
+            Utilisez l'entraînement IA pour améliorer la reconnaissance de ce format.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setStep('upload')}>
+          Retour
+        </Button>
+        <Button
+          onClick={proceedFromPreview}
+          disabled={isUploading || !pdfData || pdfData.length === 0}
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {uploadStatus}
+            </>
+          ) : (
+            <>
+              Valider et continuer
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </>
+          )}
         </Button>
       </DialogFooter>
     </>
@@ -1265,6 +1555,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
         {step === 'choice' && renderChoiceStep()}
         {step === 'upload' && renderUploadStep()}
+        {step === 'preview' && renderPreviewStep()}
         {step === 'import-mode' && renderImportModeStep()}
         {step === 'housekeepers' && renderHousekeepersStep()}
         {step === 'distribution' && renderDistributionStep()}
