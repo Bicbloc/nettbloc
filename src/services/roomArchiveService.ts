@@ -288,35 +288,48 @@ export class RoomArchiveService {
       
       // 5. Insérer les nouvelles chambres dans rooms
       // IMPORTANT: Sauvegarder le cleaningType appris par l'IA
-      const roomsForInsert = newRooms.map((room: any) => {
-        const roomNumber = room.roomNumber || room.room_number || room.number;
-        
-        // Mapper le cleaningType pour la base de données
-        let dbCleaningType = 'a_blanc';
-        if (room.cleaningType === 'none' || room.notUrgent === true) {
-          dbCleaningType = 'none';
-        } else if (room.cleaningType === 'recouche' || room.cleaningType === 'quick') {
-          dbCleaningType = 'recouche';
-        } else if (room.cleaningType === 'a_blanc' || room.cleaningType === 'full') {
-          dbCleaningType = 'a_blanc';
-        }
-        
-        // Déterminer le statut correct selon le cleaningType
-        const status = dbCleaningType === 'none' ? 'clean' : 'needs-cleaning';
-        
-        console.log(`📝 [Replace] Chambre ${roomNumber}: cleaningType=${room.cleaningType} → DB=${dbCleaningType}, status=${status}`);
-        
-        return {
-          hotel_id: hotelId,
-          room_number: roomNumber,
-          floor: room.floor ?? null,
-          status: status,
-          room_type: room.type || room.room_type || null,
-          cleaning_priority: room.priority === 'high' ? 2 : 1,
-          notes: null,
-          cleaning_type: dbCleaningType // CRUCIAL: Sauvegarder le type de nettoyage IA
-        };
-      }).filter(r => !!r.room_number);
+      // DÉDUPLICATION: Éviter les doublons de room_number
+      const seenRoomNumbers = new Set<string>();
+      const roomsForInsert = newRooms
+        .map((room: any) => {
+          const roomNumber = room.roomNumber || room.room_number || room.number;
+          
+          // Skip si déjà vu (doublon dans le PDF)
+          if (!roomNumber || seenRoomNumbers.has(roomNumber)) {
+            if (roomNumber) {
+              console.log(`⚠️ Doublon ignoré: chambre ${roomNumber}`);
+            }
+            return null;
+          }
+          seenRoomNumbers.add(roomNumber);
+          
+          // Mapper le cleaningType pour la base de données
+          let dbCleaningType = 'a_blanc';
+          if (room.cleaningType === 'none' || room.notUrgent === true) {
+            dbCleaningType = 'none';
+          } else if (room.cleaningType === 'recouche' || room.cleaningType === 'quick') {
+            dbCleaningType = 'recouche';
+          } else if (room.cleaningType === 'a_blanc' || room.cleaningType === 'full') {
+            dbCleaningType = 'a_blanc';
+          }
+          
+          // Déterminer le statut correct selon le cleaningType
+          const status = dbCleaningType === 'none' ? 'clean' : 'needs-cleaning';
+          
+          console.log(`📝 [Replace] Chambre ${roomNumber}: cleaningType=${room.cleaningType} → DB=${dbCleaningType}, status=${status}`);
+          
+          return {
+            hotel_id: hotelId,
+            room_number: roomNumber,
+            floor: room.floor ?? null,
+            status: status,
+            room_type: room.type || room.room_type || null,
+            cleaning_priority: room.priority === 'high' ? 2 : 1,
+            notes: null,
+            cleaning_type: dbCleaningType // CRUCIAL: Sauvegarder le type de nettoyage IA
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
       
       const { error: insertRoomsError } = await supabase
         .from('rooms')
