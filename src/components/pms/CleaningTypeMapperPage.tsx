@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
-  Search, Check, X, ArrowLeft, Save, Trash2, RefreshCw, 
+  Search, Check, X, ArrowLeft, ArrowRight, Save, Trash2, RefreshCw, 
   Eye, EyeOff, Filter, Layers, Sparkles, AlertCircle, Info, Ban, Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -45,6 +45,7 @@ interface LinePattern {
 interface CleaningTypeMapperPageProps {
   hotelId: string;
   onBack: () => void;
+  onContinue?: () => void;
 }
 
 const PATTERN_COLORS: Record<string, string> = {
@@ -176,7 +177,7 @@ function isHeaderLine(line: string): boolean {
   );
 }
 
-export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPageProps) => {
+export const CleaningTypeMapperPage = ({ hotelId, onBack, onContinue }: CleaningTypeMapperPageProps) => {
   const [lines, setLines] = useState<LineData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -557,10 +558,16 @@ export const CleaningTypeMapperPage = ({ hotelId, onBack }: CleaningTypeMapperPa
             <Ban className="h-4 w-4 mr-1" />
             Exclusions ({excludedTerms.length})
           </Button>
-          <Button onClick={saveRules} disabled={saving || patternRules.size === 0}>
+          <Button onClick={saveRules} disabled={saving || patternRules.size === 0} variant="outline">
             <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Sauvegarde...' : 'Sauvegarder les règles'}
+            {saving ? 'Sauvegarde...' : 'Sauvegarder'}
           </Button>
+          {onContinue && (
+            <Button onClick={onContinue}>
+              Continuer
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          )}
         </div>
       </div>
 

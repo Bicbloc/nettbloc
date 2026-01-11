@@ -139,7 +139,7 @@ export const TrainingStep2Annotate = ({
           // SAL avec deux horaires = départ/arrivée = à blanc
           // SAL seul ou avec info Nuit = recouche possible
           if (line.isLastNight) cleaningType = 'a_blanc';
-          else if (line.dates.checkOutTime && line.dates.checkInTime) cleaningType = 'a_blanc';
+          else if (line.checkOutTime && line.checkInTime) cleaningType = 'a_blanc';
           else cleaningType = 'recouche';
         }
       }
@@ -149,15 +149,15 @@ export const TrainingStep2Annotate = ({
         status: mapStatusCode(line.statusCode),
         cleaningType,
         guestName: line.guestName,
-        arrivalDate: line.dates.arrival || '',
-        departureDate: line.dates.departure || '',
-        arrivalTime: line.dates.checkInTime,
-        departureTime: line.dates.checkOutTime,
+        arrivalDate: line.arrivalDate || '',
+        departureDate: line.departureDate || '',
+        arrivalTime: line.checkInTime,
+        departureTime: line.checkOutTime,
         roomType: line.roomType,
         originalText: line.fullText,
         validated: false,
-        isConnected: !!line.linkedRoom,
-        linkedRooms: line.linkedRoom ? [line.roomNumber.split('+')[0], line.linkedRoom] : undefined,
+        isConnected: !!line.linkedRooms,
+        linkedRooms: line.linkedRooms,
       };
     });
     
@@ -549,7 +549,7 @@ export const TrainingStep2Annotate = ({
                             const code = line.statusCode.toUpperCase();
                             if (code === 'INS' || code === 'PRO') setLineCleaningType('none');
                             else if (code === 'SAL') {
-                              if (line.isLastNight || (line.dates.checkOutTime && line.dates.checkInTime)) {
+                              if (line.isLastNight || (line.checkOutTime && line.checkInTime)) {
                                 setLineCleaningType('a_blanc');
                               } else {
                                 setLineCleaningType('recouche');
