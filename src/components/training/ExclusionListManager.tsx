@@ -1,24 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, Plus, UserMinus, Info } from "lucide-react";
+import { X, Plus, UserMinus, Info, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ExclusionListManagerProps {
-  excludeList: string[];
-  onChange: (list: string[]) => void;
-  detectedNames?: string[]; // Noms détectés dans le rapport pour suggestion
+  excludeList?: string[];
+  onChange?: (list: string[]) => void;
+  detectedNames?: string[];
+  hotelId?: string;
 }
 
 export const ExclusionListManager = ({
-  excludeList,
-  onChange,
-  detectedNames = []
+  excludeList: externalList,
+  onChange: externalOnChange,
+  detectedNames = [],
+  hotelId
 }: ExclusionListManagerProps) => {
   const [newName, setNewName] = useState("");
+  
+  // Gestion interne si hotelId est fourni (mode autonome)
+  const [internalList, setInternalList] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Charger depuis localStorage si en mode autonome
+  useEffect(() => {
+    if (hotelId && !externalList) {
+      const saved = localStorage.getItem(`training_exclude_${hotelId}`);
+      if (saved) {
+        try {
+          setInternalList(JSON.parse(saved));
+        } catch {
+          setInternalList([]);
+        }
+      }
+    }
+  }, [hotelId, externalList]);
+  
+  // Sauvegarder dans localStorage si en mode autonome
+  const saveToStorage = (list: string[]) => {
+    if (hotelId) {
+      localStorage.setItem(`training_exclude_${hotelId}`, JSON.stringify(list));
+    }
+  };
+  
+  // Utiliser la liste externe ou interne
+  const excludeList = externalList ?? internalList;
+  const onChange = externalOnChange ?? ((list: string[]) => {
+    setInternalList(list);
+    saveToStorage(list);
+  });
 
   const addName = (name: string) => {
     const trimmed = name.trim().toLowerCase();
@@ -87,7 +121,7 @@ export const ExclusionListManager = ({
       {/* Liste des noms exclus */}
       {excludeList.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">Noms exclus :</p>
+          <p className="text-xs text-muted-foreground">Noms exclus ({excludeList.length}) :</p>
           <div className="flex flex-wrap gap-2">
             {excludeList.map((name) => (
               <Badge
@@ -108,6 +142,12 @@ export const ExclusionListManager = ({
         </div>
       )}
 
+      {excludeList.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          Aucun nom dans la liste d'exclusion
+        </p>
+      )}
+
       {/* Suggestions de noms détectés */}
       {suggestedNames.length > 0 && (
         <div className="space-y-2 border-t pt-3">
@@ -121,7 +161,7 @@ export const ExclusionListManager = ({
                   key={name}
                   variant="outline"
                   className="cursor-pointer hover:bg-muted transition-colors text-xs"
-                  onClick={() => addName(name.split(' ')[0])} // Ajouter juste le prénom
+                  onClick={() => addName(name.split(' ')[0])}
                 >
                   <Plus className="w-3 h-3 mr-1" />
                   {name}
@@ -131,6 +171,24 @@ export const ExclusionListManager = ({
           </ScrollArea>
         </div>
       )}
+
+      {/* Exemples de noms courants */}
+      <div className="space-y-2 border-t pt-3">
+        <p className="text-xs text-muted-foreground">Exemples de noms à exclure :</p>
+        <div className="flex flex-wrap gap-1">
+          {['gouvernante', 'chef', 'responsable', 'manager', 'supervisor', 'hotel'].map((example) => (
+            <Badge
+              key={example}
+              variant="outline"
+              className="cursor-pointer hover:bg-muted transition-colors text-xs opacity-60"
+              onClick={() => addName(example)}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              {example}
+            </Badge>
+          ))}
+        </div>
+      </div>
     </Card>
   );
 };

@@ -2,14 +2,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Brain, Upload, Tag, CheckCircle, Settings, Map } from "lucide-react";
+import { Brain, Upload, Tag, CheckCircle, Settings } from "lucide-react";
 import { TrainingStep1Import } from "./TrainingStep1Import";
 import { TrainingStep2Annotate } from "./TrainingStep2Annotate";
 import { TrainingStep3Result } from "./TrainingStep3Result";
 import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 import { TrainingHistory } from "./TrainingHistory";
-import { CleaningTypeMapperPage } from "@/components/pms/CleaningTypeMapperPage";
 import { unifiedParserService, ExtractedRoom } from "@/services/pms";
 
 interface TrainingWizardProps {
@@ -25,12 +23,11 @@ export interface TrainingData {
   existingPatternId?: string;
 }
 
-// Étapes du workflow - Mapping AVANT validation/sauvegarde
+// Workflow simplifié en 3 étapes
 const DISPLAY_STEPS = [
   { id: 1, label: "Importer", icon: Upload },
-  { id: 2, label: "Annoter", icon: Tag },
-  { id: 3, label: "Mapping", icon: Map },
-  { id: 4, label: "Sauvegarder", icon: CheckCircle },
+  { id: 2, label: "Vérifier", icon: Tag },
+  { id: 3, label: "Sauvegarder", icon: CheckCircle },
 ];
 
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
@@ -59,15 +56,8 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
         extractedRooms: rooms,
         validatedCount: rooms.filter(r => r.validated).length,
       });
-      // Aller au mapping (étape 3 maintenant)
+      // Aller directement à la sauvegarde
       setCurrentStep(3);
-    }
-  };
-
-  const handleMappingComplete = () => {
-    if (trainingData) {
-      // Aller à la sauvegarde (étape 4)
-      setCurrentStep(4);
     }
   };
 
@@ -104,20 +94,6 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
     });
     setCurrentStep(2);
   };
-
-  // Si on est en mode mapping (étape 3)
-  if (currentStep === 3) {
-    return (
-      <CleaningTypeMapperPage 
-        hotelId={hotelId} 
-        onBack={() => setCurrentStep(2)}
-        onContinue={handleMappingComplete}
-      />
-    );
-  }
-
-  // Étape 4 = sauvegarde (TrainingStep3Result renommé conceptuellement)
-  // On garde le même composant pour la sauvegarde
 
   return (
     <div className="space-y-6">
@@ -160,7 +136,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
       {/* Progress Steps */}
       <Card className="p-6">
-        <div className="flex items-center justify-center gap-2 md:gap-4 mb-8 flex-wrap">
+        <div className="flex items-center justify-center gap-4 md:gap-8 mb-8">
           {DISPLAY_STEPS.map((step, index) => {
             const Icon = step.icon;
             const isActive = currentStep === step.id;
@@ -172,20 +148,20 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
                 <button
                   onClick={() => isClickable && goToStep(step.id)}
                   disabled={!isClickable}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-full transition-all text-sm ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all ${
                     isActive
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground shadow-lg"
                       : isCompleted
                       ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span className="font-medium hidden sm:inline">{step.label}</span>
+                  <Icon className="w-5 h-5" />
+                  <span className="font-medium">{step.label}</span>
                 </button>
                 {index < DISPLAY_STEPS.length - 1 && (
                   <div
-                    className={`w-6 md:w-12 h-0.5 mx-1 md:mx-2 ${
+                    className={`w-12 md:w-20 h-1 mx-2 md:mx-4 rounded-full ${
                       isCompleted ? "bg-primary" : "bg-muted"
                     }`}
                   />
@@ -215,7 +191,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
             />
           )}
 
-          {currentStep === 4 && trainingData && (
+          {currentStep === 3 && trainingData && (
             <TrainingStep3Result
               trainingData={trainingData}
               hotelId={hotelId}
