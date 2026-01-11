@@ -1,93 +1,87 @@
 /**
- * RoomLineParser - Parser intelligent qui découpe le texte en lignes logiques
- * Une ligne logique = du numéro de chambre jusqu'au prochain numéro de chambre
+ * RoomLineParser - Parser intelligent pour découper le texte en lignes logiques par chambre
+ * Chaque ligne = du numéro de chambre au prochain numéro de chambre
  */
 
 export interface RoomLine {
   roomNumber: string;
   fullText: string;
-  startIndex: number;
-  endIndex: number;
-  floor?: string;
-  roomType?: string;
-  statusCode?: string;
+  
+  // Données extraites
+  roomType?: string;        // DBL, SGL, TPL, FAM, DUP...
+  roomCategory?: string;    // C, S (Confort, Standard)
+  statusCode?: string;      // SAL, INS, PRO, VCI, VCO...
+  
+  // Client
   guestName?: string;
-  dates: {
-    arrival?: string;
-    departure?: string;
-    checkInTime?: string;
-    checkOutTime?: string;
-  };
+  
+  // Dates & Horaires
+  arrivalDate?: string;     // Format: JJ/MM/AAAA
+  departureDate?: string;   // Format: JJ/MM/AAAA
+  checkInTime?: string;     // Format: HH:MM
+  checkOutTime?: string;    // Format: HH:MM
+  
+  // Séjour
   nightInfo?: { current: number; total: number };
-  occupancy?: { adults: number; children: number };
-  isLastNight?: boolean;
-  linkedRoom?: string; // Pour les chambres communicantes (ex: 003+004)
+  isLastNight: boolean;
+  isFirstNight: boolean;
+  
+  // Occupation
+  adults?: number;
+  children?: number;
+  
+  // Type de nettoyage suggéré
+  suggestedCleaningType: 'a_blanc' | 'recouche' | 'none';
+  
+  // Métadonnées
+  floor?: string;
+  linkedRooms?: string[];   // Pour 003+004 FAM
 }
 
-// Pattern pour détecter les numéros de chambre au début d'une section
-const ROOM_NUMBER_PATTERNS = [
-  // Chambres communicantes: 003+004, 103+104, 503-504
-  /(\d{2,4})\s*[+\-]\s*(\d{2,4})/,
-  // Chambre avec suffixe: 101-T, 205-T-Balcon, 206-T/ Balcon
-  /(\d{2,4})(?:-T)?(?:-?\s*(?:Balcon|Terrasse))?(?:\s|$)/,
-  // Chambre simple: 001, 102, 612
-  /^(\d{2,4})\s+/,
-];
-
-// Patterns pour les types de chambre
-const ROOM_TYPE_PATTERNS = [
-  /\b(DBL|SGL|TPL|FAM|DUP|STU|SUI|APP|QUA)-?([A-Z])?/i,
-];
-
-// Patterns pour les statuts
-const STATUS_PATTERNS = [
-  /\b(SAL|INS|PRO|VCI|VCO|OCC|ARR|DEP|DND|OOO|OOS)\b/i,
-];
+// Pattern principal pour détecter un numéro de chambre au début d'une section
+const ROOM_START_PATTERN = /(?:^|\n)(\d{2,4}(?:\s*[+\-]\s*\d{2,4})?(?:-T)?(?:-?\s*(?:Balcon|Terrasse))?)\s+/gm;
 
 /**
- * Parse le texte brut et le découpe en lignes logiques par chambre
+ * Parse le texte brut et le découpe en lignes logiques
  */
-export function parseRoomLines(
-  rawText: string,
-  excludeList: string[] = []
-): RoomLine[] {
-  const roomLines: RoomLine[] = [];
-  
-  // Normaliser les noms à exclure
-  const normalizedExcludeList = excludeList.map(name => 
-    name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+export function parseRoomLines(rawText: string, excludeList: string[] = []): RoomLine[] {
+  const normalizedExclude = excludeList.map(n => 
+    n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
   );
   
-  // Prétraitement: fusionner les lignes fragmentées
-  const processedText = preprocessText(rawText);
+  // Prétraiter le texte pour fusionner les lignes fragmentées
+  const text = preprocessText(rawText);
   
-  // Trouver toutes les positions de numéros de chambre
-  const roomPositions = findRoomPositions(processedText);
+  // Trouver toutes les positions de début de chambre
+  const positions: { index: number; roomNumber: string }[] = [];
+  let match: RegExpExecArray | null;
   
-  if (roomPositions.length === 0) {
-    return [];
+  while ((match = ROOM_START_PATTERN.exec(text)) !== null) {
+    const roomNum = match[1].trim();
+    
+    // Ignorer si c'est une date (contient /)
+    if (roomNum.includes('/')) continue;
+    
+    // Ignorer les numéros qui ressemblent à des années
+    if (/^20\d{2}$/.test(roomNum)) continue;
+    
+    positions.push({
+      index: match.index + (match[0].match(/^\n/)?.[0]?.length || 0),
+      roomNumber: roomNum
+    });
   }
   
-  // Découper le texte en sections par chambre
-  for (let i = 0; i < roomPositions.length; i++) {
-    const current = roomPositions[i];
-    const next = roomPositions[i + 1];
+  if (positions.length === 0) return [];
+  
+  // Découper en sections
+  const roomLines: RoomLine[] = [];
+  
+  for (let i = 0; i < positions.length; i++) {
+    const start = positions[i].index;
+    const end = positions[i + 1]?.index || text.length;
+    const fullText = text.substring(start, end).trim();
     
-    const startIndex = current.index;
-    const endIndex = next ? next.index : processedText.length;
-    
-    const fullText = processedText.substring(startIndex, endIndex).trim();
-    
-    // Parser les détails de cette ligne logique
-    const roomLine = parseRoomSection(
-      current.roomNumber, 
-      fullText, 
-      startIndex, 
-      endIndex,
-      normalizedExcludeList,
-      current.linkedRoom
-    );
-    
+    const roomLine = parseSection(positions[i].roomNumber, fullText, normalizedExclude);
     if (roomLine) {
       roomLines.push(roomLine);
     }
@@ -97,282 +91,143 @@ export function parseRoomLines(
 }
 
 /**
- * Prétraitement du texte pour fusionner les lignes fragmentées
+ * Prétraitement du texte
  */
 function preprocessText(text: string): string {
-  // Remplacer les retours à la ligne multiples par un espace
-  // mais garder la structure des sections
-  let processed = text
-    // Fusionner les lignes qui sont clairement fragmentées (ex: "DBL-" suivi de "C")
+  return text
+    // Fusionner DBL- + C sur deux lignes
     .replace(/([A-Z]{2,3})-\s*\n\s*([A-Z])\s*\n/g, '$1-$2 ')
-    // Fusionner les noms fragmentés sur plusieurs lignes
-    .replace(/([A-Z][a-zÀ-ÿ]+)\s*\n\s*([A-Z]+)/g, '$1 $2')
-    // Supprimer les sauts de ligne excessifs
+    // Fusionner noms fragmentés
+    .replace(/([A-ZÀ-ÿ][a-zà-ÿ]+)\s*\n\s*([A-ZÀ-ÿ]{2,})/g, '$1 $2')
+    // Réduire les espaces multiples
+    .replace(/[ \t]{3,}/g, '  ')
+    // Supprimer les lignes vides excessives
     .replace(/\n{3,}/g, '\n\n');
-  
-  return processed;
-}
-
-/**
- * Trouve toutes les positions des numéros de chambre dans le texte
- */
-function findRoomPositions(text: string): Array<{ 
-  index: number; 
-  roomNumber: string; 
-  linkedRoom?: string;
-}> {
-  const positions: Array<{ index: number; roomNumber: string; linkedRoom?: string }> = [];
-  
-  // Pattern pour les chambres communicantes (ex: 003+004, 103+104)
-  const connectedPattern = /(?:^|\s)(\d{2,4})\s*[+\-]\s*(\d{2,4})(?:\s+(?:FAM|DUP))?/gm;
-  let match;
-  
-  while ((match = connectedPattern.exec(text)) !== null) {
-    // Ignorer si c'est clairement une date (contient /)
-    const context = text.substring(Math.max(0, match.index - 5), match.index + match[0].length + 5);
-    if (/\d{2}\/\d{2}\/\d{4}/.test(context)) continue;
-    
-    positions.push({
-      index: match.index + (match[0].startsWith(' ') ? 1 : 0),
-      roomNumber: `${match[1]}+${match[2]}`,
-      linkedRoom: match[2]
-    });
-  }
-  
-  // Pattern pour les chambres simples avec type (ex: 101 DBL-C, 308 SGL-C)
-  const simplePattern = /(?:^|\n|\s{2,})(\d{2,4})(?:-T)?(?:-?\s*(?:Balcon|Terrasse))?\s+(?:DBL|SGL|TPL|FAM|DUP|STU|SUI|APP|QUA)/gm;
-  
-  while ((match = simplePattern.exec(text)) !== null) {
-    const roomNum = match[1];
-    const startPos = match.index + (match[0].match(/^[\n\s]+/)?.[0].length || 0);
-    
-    // Vérifier qu'on n'a pas déjà cette position (chambre communicante)
-    const alreadyExists = positions.some(p => 
-      Math.abs(p.index - startPos) < 5 || 
-      p.roomNumber.includes(roomNum)
-    );
-    
-    if (!alreadyExists) {
-      positions.push({
-        index: startPos,
-        roomNumber: roomNum
-      });
-    }
-  }
-  
-  // Pattern pour les sous-chambres (ex: 003-T, 004-T après 003+004)
-  const subRoomPattern = /(?:^|\n)(\d{2,4})-?T?\s+(?:DBL|SGL|TPL)/gm;
-  
-  while ((match = subRoomPattern.exec(text)) !== null) {
-    const roomNum = match[1];
-    const startPos = match.index + (match[0].startsWith('\n') ? 1 : 0);
-    
-    // Vérifier qu'on n'a pas déjà cette position
-    const alreadyExists = positions.some(p => 
-      Math.abs(p.index - startPos) < 3
-    );
-    
-    if (!alreadyExists) {
-      positions.push({
-        index: startPos,
-        roomNumber: roomNum
-      });
-    }
-  }
-  
-  // Trier par position
-  positions.sort((a, b) => a.index - b.index);
-  
-  // Dédupliquer les positions trop proches
-  const deduplicated = positions.filter((pos, i) => {
-    if (i === 0) return true;
-    return pos.index - positions[i - 1].index > 10;
-  });
-  
-  return deduplicated;
 }
 
 /**
  * Parse une section de texte pour une chambre
  */
-function parseRoomSection(
-  roomNumber: string,
-  fullText: string,
-  startIndex: number,
-  endIndex: number,
-  excludeList: string[],
-  linkedRoom?: string
-): RoomLine | null {
+function parseSection(roomNumber: string, fullText: string, excludeList: string[]): RoomLine | null {
   const upper = fullText.toUpperCase();
   
-  // Extraire le type de chambre
+  // === ROOM TYPE & CATEGORY ===
   const typeMatch = fullText.match(/\b(DBL|SGL|TPL|FAM|DUP|STU|SUI|APP|QUA)-?([A-Z])?/i);
-  const roomType = typeMatch ? typeMatch[0] : undefined;
+  const roomType = typeMatch?.[1]?.toUpperCase();
+  const roomCategory = typeMatch?.[2]?.toUpperCase();
   
-  // Extraire le statut
-  const statusMatch = upper.match(/\b(SAL|INS|PRO|VCI|VCO|OCC|ARR|DEP)\b/);
-  const statusCode = statusMatch ? statusMatch[1] : undefined;
+  // === STATUS CODE ===
+  const statusMatch = upper.match(/\b(SAL|INS|PRO|VCI|VCO|OCC|ARR|DEP|DND|OOO|OOS)\b/);
+  const statusCode = statusMatch?.[1];
   
-  // Extraire les dates
-  const dates = extractDates(fullText);
+  // === DATES ===
+  const dates = fullText.match(/\d{1,2}\/\d{1,2}\/\d{4}/g) || [];
+  const arrivalDate = dates[0];
+  const departureDate = dates[1];
   
-  // Extraire l'info de nuit (ex: "Nuit 3/4")
-  const nightInfo = extractNightInfo(fullText);
+  // === TIMES ===
+  const times = fullText.match(/\b(\d{1,2}:\d{2})\b/g) || [];
+  // Filtrer les heures valides (pas les ratios comme 3/4)
+  const validTimes = times.filter(t => {
+    const hour = parseInt(t.split(':')[0]);
+    return hour >= 6 && hour <= 23;
+  });
+  const checkOutTime = validTimes.find(t => parseInt(t.split(':')[0]) < 14);
+  const checkInTime = validTimes.find(t => parseInt(t.split(':')[0]) >= 14);
   
-  // Extraire l'occupation (ex: "2 × Adultes 1 × Enfants")
-  const occupancy = extractOccupancy(fullText);
+  // === NIGHT INFO ===
+  const nightMatch = fullText.match(/Nuit\s*(\d+)\s*[\/\\]\s*(\d+)/i);
+  const nightInfo = nightMatch ? {
+    current: parseInt(nightMatch[1]),
+    total: parseInt(nightMatch[2])
+  } : undefined;
   
-  // Extraire le nom du client (en excluant les noms de la liste)
+  const isLastNight = nightInfo ? nightInfo.current === nightInfo.total : false;
+  const isFirstNight = nightInfo ? nightInfo.current === 1 : false;
+  
+  // === OCCUPANCY ===
+  const adultsMatch = fullText.match(/(\d+)\s*[×x]\s*Adultes?/i);
+  const childrenMatch = fullText.match(/(\d+)\s*[×x]\s*Enfants?/i);
+  const adults = adultsMatch ? parseInt(adultsMatch[1]) : undefined;
+  const children = childrenMatch ? parseInt(childrenMatch[1]) : undefined;
+  
+  // === GUEST NAME ===
   const guestName = extractGuestName(fullText, excludeList);
   
-  // Déterminer l'étage
-  const floor = roomNumber.length >= 3 ? roomNumber[0] : undefined;
+  // === FLOOR ===
+  const mainRoom = roomNumber.split(/[+\-]/)[0].replace(/\D/g, '');
+  const floor = mainRoom.length >= 3 ? mainRoom[0] : undefined;
+  
+  // === LINKED ROOMS ===
+  const linkedMatch = roomNumber.match(/(\d+)\s*[+\-]\s*(\d+)/);
+  const linkedRooms = linkedMatch ? [linkedMatch[1], linkedMatch[2]] : undefined;
+  
+  // === SUGGESTED CLEANING TYPE ===
+  const suggestedCleaningType = determineSuggestedCleaningType(statusCode, isLastNight, checkOutTime);
   
   return {
     roomNumber,
     fullText,
-    startIndex,
-    endIndex,
-    floor,
     roomType,
+    roomCategory,
     statusCode,
     guestName,
-    dates,
+    arrivalDate,
+    departureDate,
+    checkInTime,
+    checkOutTime,
     nightInfo,
-    occupancy,
-    isLastNight: nightInfo ? nightInfo.current === nightInfo.total : false,
-    linkedRoom
+    isLastNight,
+    isFirstNight,
+    adults,
+    children,
+    suggestedCleaningType,
+    floor,
+    linkedRooms
   };
 }
 
 /**
- * Extraire les dates d'une section
- */
-function extractDates(text: string): RoomLine['dates'] {
-  const dates: RoomLine['dates'] = {};
-  
-  // Pattern pour les dates (ex: 07/01/2026, 11/01/2026)
-  const datePattern = /(\d{1,2})\/(\d{1,2})\/(\d{4})/g;
-  const foundDates: string[] = [];
-  let match;
-  
-  while ((match = datePattern.exec(text)) !== null) {
-    foundDates.push(match[0]);
-  }
-  
-  // Pattern pour les heures (ex: 15:00, 11:00)
-  const timePattern = /(\d{1,2}):(\d{2})/g;
-  const foundTimes: string[] = [];
-  
-  while ((match = timePattern.exec(text)) !== null) {
-    const hour = parseInt(match[1]);
-    // Filtrer les heures valides (pas les minutes d'une date)
-    if (hour >= 0 && hour <= 23) {
-      foundTimes.push(match[0]);
-    }
-  }
-  
-  // Logique d'attribution des dates
-  if (foundDates.length >= 2) {
-    dates.arrival = foundDates[0];
-    dates.departure = foundDates[1];
-  } else if (foundDates.length === 1) {
-    // Une seule date: vérifier le contexte
-    const upper = text.toUpperCase();
-    if (/\bSAL\b/.test(upper) || /\bDEP\b/.test(upper)) {
-      dates.departure = foundDates[0];
-    } else {
-      dates.arrival = foundDates[0];
-    }
-  }
-  
-  // Attribution des heures
-  if (foundTimes.length >= 2) {
-    dates.checkOutTime = foundTimes[0];
-    dates.checkInTime = foundTimes[1];
-  } else if (foundTimes.length === 1) {
-    dates.checkInTime = foundTimes[0];
-  }
-  
-  return dates;
-}
-
-/**
- * Extraire l'info de nuit
- */
-function extractNightInfo(text: string): { current: number; total: number } | undefined {
-  const match = text.match(/Nuit\s*(\d+)\s*[\/\\]\s*(\d+)/i);
-  if (match) {
-    return {
-      current: parseInt(match[1]),
-      total: parseInt(match[2])
-    };
-  }
-  return undefined;
-}
-
-/**
- * Extraire l'occupation
- */
-function extractOccupancy(text: string): { adults: number; children: number } | undefined {
-  const adults = text.match(/(\d+)\s*[×x]\s*Adultes?/i);
-  const children = text.match(/(\d+)\s*[×x]\s*Enfants?/i);
-  
-  if (adults || children) {
-    return {
-      adults: adults ? parseInt(adults[1]) : 0,
-      children: children ? parseInt(children[1]) : 0
-    };
-  }
-  return undefined;
-}
-
-/**
- * Extraire le nom du client en excluant les noms de la liste d'exclusion
+ * Extraction intelligente du nom du client
  */
 function extractGuestName(text: string, excludeList: string[]): string | undefined {
-  // Pattern: rechercher après "Adultes" ou "Enfants"
-  const afterOccupancyMatch = text.match(/(?:\d+\s*[×x]\s*(?:Adultes?|Enfants?)\s+)([A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]*)*)/i);
-  
-  // Pattern: rechercher un nom avec prénom/nom
-  const namePatterns = [
-    // Prénom Nom (ex: "Thierry VIARD")
-    /([A-ZÀ-ÿ][a-zà-ÿ]+)\s+([A-ZÀ-ÿ]{2,})/,
-    // NOM Prénom (ex: "VIARD Thierry")  
-    /([A-ZÀ-ÿ]{2,})\s+([A-ZÀ-ÿ][a-zà-ÿ]+)/,
-    // Nom composé (ex: "Lie' Ayny")
-    /([A-ZÀ-ÿ][a-zà-ÿ']+)\s+([A-ZÀ-ÿ][a-zà-ÿ]+)/,
+  // Mots-clés à ignorer (statuts, termes génériques)
+  const IGNORE_WORDS = [
+    'adultes', 'adulte', 'enfants', 'enfant', 'nuit', 'nettoyer', 
+    'hotel', 'cardinal', 'etage', 'espaces', 'responsable', 'statut',
+    'balcon', 'terrasse', 'sal', 'ins', 'pro', 'dbl', 'sgl', 'tpl', 'fam', 'dup'
   ];
   
-  let candidates: string[] = [];
+  // Pattern 1: Après "X × Adultes" - le nom suit généralement
+  const afterAdultsMatch = text.match(/\d+\s*[×x]\s*(?:Adultes?|Enfants?)\s+([A-ZÀ-ÿ][a-zà-ÿ']+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ']*)*)/i);
   
-  if (afterOccupancyMatch) {
-    candidates.push(afterOccupancyMatch[1].trim());
-  }
+  // Pattern 2: Nom en MAJUSCULES avec prénom
+  const upperNameMatch = text.match(/([A-ZÀ-ÿ][a-zà-ÿ']+)\s+([A-ZÀ-ÿ]{2,}(?:\s+[A-ZÀ-ÿ]{2,})*)/);
   
-  for (const pattern of namePatterns) {
-    const matches = text.matchAll(new RegExp(pattern, 'g'));
-    for (const m of matches) {
-      candidates.push(`${m[1]} ${m[2]}`.trim());
-    }
-  }
+  // Pattern 3: NOM PRENOM format
+  const reverseNameMatch = text.match(/([A-ZÀ-ÿ]{2,})\s+([A-ZÀ-ÿ][a-zà-ÿ']+)/);
+  
+  const candidates: string[] = [];
+  
+  if (afterAdultsMatch?.[1]) candidates.push(afterAdultsMatch[1].trim());
+  if (upperNameMatch) candidates.push(`${upperNameMatch[1]} ${upperNameMatch[2]}`.trim());
+  if (reverseNameMatch) candidates.push(`${reverseNameMatch[1]} ${reverseNameMatch[2]}`.trim());
   
   // Filtrer les candidats
   for (const candidate of candidates) {
     const normalized = candidate.toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
-    // Vérifier si c'est dans la liste d'exclusion
-    const isExcluded = excludeList.some(excluded => 
-      normalized.includes(excluded) || excluded.includes(normalized.split(' ')[0])
+    // Vérifier la liste d'exclusion
+    const isExcluded = excludeList.some(ex => 
+      normalized.includes(ex) || ex.includes(normalized.split(' ')[0])
     );
     
-    // Vérifier que ce n'est pas un mot-clé
-    const keywords = ['adultes', 'enfants', 'nuit', 'nettoyer', 'hotel', 'cardinal', 
-                      'etage', 'espaces', 'responsable', 'statut', 'balcon'];
-    const isKeyword = keywords.some(kw => normalized.includes(kw));
+    // Vérifier les mots-clés à ignorer
+    const isIgnored = IGNORE_WORDS.some(w => normalized.includes(w));
     
-    if (!isExcluded && !isKeyword && candidate.length > 3) {
+    // Doit avoir au moins 4 caractères et contenir un espace (prénom + nom)
+    if (!isExcluded && !isIgnored && candidate.length >= 4) {
       return candidate;
     }
   }
@@ -381,10 +236,36 @@ function extractGuestName(text: string, excludeList: string[]): string | undefin
 }
 
 /**
- * Liste d'exclusion par défaut (à compléter par l'utilisateur)
+ * Détermine le type de nettoyage suggéré basé sur le statut et les infos
  */
-export const DEFAULT_EXCLUDE_LIST = [
-  // Termes génériques à toujours exclure
-  'hotel', 'cardinal', 'étage', 'espaces', 'responsable', 'statut',
-  'adultes', 'enfants', 'nuit', 'nettoyer', 'balcon', 'terrasse'
-];
+function determineSuggestedCleaningType(
+  statusCode?: string, 
+  isLastNight?: boolean,
+  checkOutTime?: string
+): 'a_blanc' | 'recouche' | 'none' {
+  // INS = Inspecté, PRO = Propre -> Pas de ménage
+  if (statusCode === 'INS' || statusCode === 'PRO' || statusCode === 'VCI' || statusCode === 'OOO' || statusCode === 'OOS') {
+    return 'none';
+  }
+  
+  // SAL = Sale avec départ ou dernière nuit -> À blanc
+  if (statusCode === 'SAL' || statusCode === 'DEP' || statusCode === 'VCO') {
+    if (isLastNight || checkOutTime) {
+      return 'a_blanc';
+    }
+    return 'recouche';
+  }
+  
+  // OCC = Occupé -> Recouche
+  if (statusCode === 'OCC' || statusCode === 'ARR') {
+    return 'recouche';
+  }
+  
+  // Par défaut, si dernière nuit -> À blanc, sinon recouche
+  return isLastNight ? 'a_blanc' : 'recouche';
+}
+
+/**
+ * Liste d'exclusion par défaut
+ */
+export const DEFAULT_EXCLUDE_LIST: string[] = [];

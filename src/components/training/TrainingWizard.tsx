@@ -25,12 +25,12 @@ export interface TrainingData {
   existingPatternId?: string;
 }
 
-// Étapes du workflow
+// Étapes du workflow - Mapping AVANT validation/sauvegarde
 const DISPLAY_STEPS = [
   { id: 1, label: "Importer", icon: Upload },
   { id: 2, label: "Annoter", icon: Tag },
-  { id: 3, label: "Valider", icon: CheckCircle },
-  { id: 4, label: "Mapping", icon: Map },
+  { id: 3, label: "Mapping", icon: Map },
+  { id: 4, label: "Sauvegarder", icon: CheckCircle },
 ];
 
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
@@ -59,7 +59,15 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
         extractedRooms: rooms,
         validatedCount: rooms.filter(r => r.validated).length,
       });
+      // Aller au mapping (étape 3 maintenant)
       setCurrentStep(3);
+    }
+  };
+
+  const handleMappingComplete = () => {
+    if (trainingData) {
+      // Aller à la sauvegarde (étape 4)
+      setCurrentStep(4);
     }
   };
 
@@ -97,15 +105,19 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
     setCurrentStep(2);
   };
 
-  // Si on est en mode mapping (étape 4)
-  if (currentStep === 4) {
+  // Si on est en mode mapping (étape 3)
+  if (currentStep === 3) {
     return (
       <CleaningTypeMapperPage 
         hotelId={hotelId} 
-        onBack={() => setCurrentStep(3)} 
+        onBack={() => setCurrentStep(2)}
+        onContinue={handleMappingComplete}
       />
     );
   }
+
+  // Étape 4 = sauvegarde (TrainingStep3Result renommé conceptuellement)
+  // On garde le même composant pour la sauvegarde
 
   return (
     <div className="space-y-6">
@@ -203,12 +215,11 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
             />
           )}
 
-          {currentStep === 3 && trainingData && (
+          {currentStep === 4 && trainingData && (
             <TrainingStep3Result
               trainingData={trainingData}
               hotelId={hotelId}
               onReset={handleReset}
-              onContinueToMapping={() => setCurrentStep(4)}
             />
           )}
         </div>
