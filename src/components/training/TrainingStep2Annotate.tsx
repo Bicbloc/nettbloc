@@ -566,46 +566,42 @@ export const TrainingStep2Annotate = ({
                           : "border-transparent hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-500/50"
                       } ${clickedLine?.index === idx ? "ring-2 ring-primary" : ""}`}
                     >
-                      <div className="flex items-start gap-2">
-                        <div className="flex-shrink-0 w-16">
-                          <span className={`font-bold ${isAlreadyAdded ? 'text-green-600' : 'text-primary'}`}>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold text-sm ${isAlreadyAdded ? 'text-green-600' : 'text-primary'}`}>
                             {line.roomNumber}
                           </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {line.roomType && (
-                              <Badge variant="outline" className="text-[10px] h-4">{line.roomType}</Badge>
-                            )}
-                            {line.statusCode && (
-                              <Badge 
-                                variant={line.statusCode === 'INS' || line.statusCode === 'PRO' ? 'secondary' : 'default'}
-                                className="text-[10px] h-4"
-                              >
-                                {line.statusCode}
-                              </Badge>
-                            )}
-                            {line.isLastNight && (
-                              <Badge variant="destructive" className="text-[10px] h-4">
-                                Dernière nuit
-                              </Badge>
-                            )}
-                            {line.guestName && (
-                              <span className="text-muted-foreground truncate max-w-[120px]">
-                                👤 {line.guestName}
-                              </span>
+                          {line.roomType && (
+                            <Badge variant="outline" className="text-[10px] h-4">{line.roomType}</Badge>
+                          )}
+                          {line.statusCode && (
+                            <Badge 
+                              variant={line.statusCode === 'INS' || line.statusCode === 'PRO' ? 'secondary' : 'default'}
+                              className="text-[10px] h-4"
+                            >
+                              {line.statusCode}
+                            </Badge>
+                          )}
+                          {line.isLastNight && (
+                            <Badge variant="destructive" className="text-[10px] h-4">
+                              Dernière nuit
+                            </Badge>
+                          )}
+                          {line.guestName && (
+                            <Badge variant="secondary" className="text-[10px] h-4">
+                              👤 {line.guestName}
+                            </Badge>
+                          )}
+                          <div className="ml-auto">
+                            {isAlreadyAdded ? (
+                              <Check className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <Plus className="w-4 h-4 text-muted-foreground opacity-50" />
                             )}
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-0.5 truncate font-mono">
-                            {line.fullText.substring(0, 80)}...
-                          </p>
                         </div>
-                        <div className="flex-shrink-0">
-                          {isAlreadyAdded ? (
-                            <Check className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Plus className="w-4 h-4 text-muted-foreground opacity-50" />
-                          )}
+                        <div className="text-[11px] text-muted-foreground font-mono whitespace-pre-wrap break-all bg-muted/30 p-2 rounded">
+                          {line.fullText}
                         </div>
                       </div>
                     </div>
