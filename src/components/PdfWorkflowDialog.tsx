@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf, getLastParsedLines } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles, Map, Zap, Settings2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -40,7 +41,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'choice' | 'upload' | 'preview' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('choice');
+  const [step, setStep] = useState<'choice' | 'upload' | 'preview' | 'mapping' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('choice');
+  const [pmsMapping, setPmsMapping] = useState<Record<string, string>>({});
   const [pdfData, setPdfData] = useState<any>(null);
   const [parsedLines, setParsedLines] = useState<RoomLine[]>([]);
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
@@ -477,6 +479,152 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setExistingRoomsCount(0);
     setRetryCount(0);
     setPreviewFilter('all');
+    setPmsMapping({});
+  };
+
+  // Mots-clés PMS couramment utilisés
+  const PMS_STATUS_KEYWORDS = [
+    'INS', 'PRO', 'SAL', 'DEP', 'DIR', 'DND', 'OOO', 'VAC', 'OCC', 
+    'ARR', 'STAY', 'CHECK-IN', 'CHECK-OUT', 'DIRTY', 'CLEAN', 'DUE OUT',
+    'LIBRE', 'OCCUPE', 'DEPART', 'ARRIVEE', 'RECOUCHE', 'A BLANC'
+  ];
+
+  const CLEANING_TYPES = [
+    { value: 'a_blanc', label: 'À blanc (Départ)', color: 'bg-orange-500' },
+    { value: 'recouche', label: 'Recouche (Occupé)', color: 'bg-green-500' },
+    { value: 'none', label: 'Pas de ménage', color: 'bg-gray-500' },
+  ];
+
+  // Détecter les mots-clés présents dans le rapport
+  const detectedKeywords = useMemo(() => {
+    const keywords = new Set<string>();
+    
+    parsedLines.forEach(line => {
+      const rawLine = (line.fullText || line.statusCode || '').toUpperCase();
+      PMS_STATUS_KEYWORDS.forEach(keyword => {
+        if (rawLine.includes(keyword)) {
+          keywords.add(keyword);
+        }
+      });
+    });
+    
+    return Array.from(keywords);
+  }, [parsedLines]);
+
+  // Initialiser le mapping avec des valeurs par défaut intelligentes
+  const initializeMapping = () => {
+    const initial: Record<string, string> = {};
+    detectedKeywords.forEach(keyword => {
+      if (['DEP', 'DIR', 'SAL', 'CHECK-OUT', 'VAC', 'DIRTY', 'DUE OUT', 'DEPART', 'LIBRE', 'A BLANC'].includes(keyword)) {
+        initial[keyword] = 'a_blanc';
+      } else if (['PRO', 'INS', 'ARR', 'STAY', 'OCC', 'CHECK-IN', 'OCCUPE', 'ARRIVEE', 'RECOUCHE'].includes(keyword)) {
+        initial[keyword] = 'recouche';
+      } else if (['DND', 'OOO'].includes(keyword)) {
+        initial[keyword] = 'none';
+      } else {
+        initial[keyword] = 'recouche';
+      }
+    });
+    return initial;
+  };
+
+  // Appliquer le mapping aux chambres
+  const applyMappingToRooms = (mapping: Record<string, string>) => {
+    if (!pdfData || Object.keys(mapping).length === 0) return pdfData;
+    
+    return pdfData.map((room: any) => {
+      const rawLine = (room.fullText || room.status || '').toUpperCase();
+      let mappedType = room.cleaningType || 'recouche';
+      
+      for (const keyword of Object.keys(mapping)) {
+        if (rawLine.includes(keyword)) {
+          mappedType = mapping[keyword];
+          break;
+        }
+      }
+      
+      return { ...room, cleaningType: mappedType };
+    });
+  };
+
+  // Statistiques avec mapping appliqué
+  const mappingStats = useMemo(() => {
+    if (!pdfData || Object.keys(pmsMapping).length === 0) return null;
+    
+    const mappedRooms = applyMappingToRooms(pmsMapping);
+    const aBlancCount = mappedRooms.filter((r: any) => r.cleaningType === 'a_blanc').length;
+    const recoucheCount = mappedRooms.filter((r: any) => r.cleaningType === 'recouche').length;
+    const noneCount = mappedRooms.filter((r: any) => r.cleaningType === 'none').length;
+    
+    return { aBlancCount, recoucheCount, noneCount, total: mappedRooms.length };
+  }, [pdfData, pmsMapping]);
+
+  const updatePmsMapping = (keyword: string, value: string) => {
+    setPmsMapping(prev => ({ ...prev, [keyword]: value }));
+  };
+
+  const autoMapKeywords = () => {
+    const newMapping = initializeMapping();
+    setPmsMapping(newMapping);
+    toast({
+      title: "✨ Mapping automatique",
+      description: "Les correspondances ont été définies automatiquement.",
+    });
+  };
+
+  const proceedFromMapping = async () => {
+    // Appliquer le mapping final aux données
+    const mappedData = applyMappingToRooms(pmsMapping);
+    setPdfData(mappedData);
+    setSavedPdfData(mappedData);
+    
+    // Mettre à jour les parsedLines aussi pour cohérence
+    const updatedLines = parsedLines.map(line => {
+      const rawLine = (line.fullText || line.statusCode || '').toUpperCase();
+      let mappedType = line.cleaningType || 'recouche';
+      
+      for (const keyword of Object.keys(pmsMapping)) {
+        if (rawLine.includes(keyword)) {
+          mappedType = pmsMapping[keyword] as any;
+          break;
+        }
+      }
+      
+      return { ...line, cleaningType: mappedType };
+    });
+    setParsedLines(updatedLines);
+
+    // Continuer vers import-mode
+    if (!hotelId || !mappedData || mappedData.length === 0) {
+      proceedToHousekeepers(mappedData || []);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus('🔍 Vérification des chambres existantes...');
+    setUploadProgress(50);
+
+    try {
+      const { count } = await supabase
+        .from('rooms')
+        .select('id', { count: 'estimated', head: true })
+        .eq('hotel_id', hotelId);
+      
+      const existingCount = count || 0;
+      setExistingRoomsCount(existingCount);
+
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
+
+      if (existingCount > 0) {
+        setStep('import-mode');
+      } else {
+        await saveRoomsToDatabase(mappedData, 'update');
+      }
+    } catch (error) {
+      handleUploadError(error);
+    }
   };
 
   // Statistiques de l'extraction IA
@@ -507,36 +655,15 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     return parsedLines.filter(l => l.cleaningType === previewFilter);
   }, [parsedLines, previewFilter]);
 
-  const proceedFromPreview = async () => {
-    if (!hotelId || !pdfData || pdfData.length === 0) {
-      proceedToHousekeepers(pdfData || []);
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadStatus('🔍 Vérification des chambres existantes...');
-    setUploadProgress(50);
-
-    try {
-      const { count } = await supabase
-        .from('rooms')
-        .select('id', { count: 'estimated', head: true })
-        .eq('hotel_id', hotelId);
-      
-      const existingCount = count || 0;
-      setExistingRoomsCount(existingCount);
-
-      setIsUploading(false);
-      setUploadProgress(0);
-      setUploadStatus('');
-
-      if (existingCount > 0) {
-        setStep('import-mode');
-      } else {
-        await saveRoomsToDatabase(pdfData, 'update');
-      }
-    } catch (error) {
-      handleUploadError(error);
+  const proceedFromPreview = () => {
+    // Initialiser le mapping automatiquement et passer à l'étape mapping
+    if (detectedKeywords.length > 0) {
+      const initialMapping = initializeMapping();
+      setPmsMapping(initialMapping);
+      setStep('mapping');
+    } else {
+      // Si pas de mots-clés détectés, passer directement à import-mode
+      proceedFromMapping();
     }
   };
 
@@ -921,6 +1048,172 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           ) : (
             <>
               Valider et continuer
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  const renderMappingStep = () => (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Map className="h-5 w-5 text-primary" />
+          <Badge variant="secondary" className="text-xs">Étape 3/5</Badge>
+          Mapping des statuts PMS
+        </DialogTitle>
+        <DialogDescription>
+          Ajustez les correspondances entre les codes PMS détectés et les types de nettoyage.
+        </DialogDescription>
+      </DialogHeader>
+      
+      {/* Statistiques avec mapping appliqué */}
+      {mappingStats && (
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="p-3 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-orange-700">{mappingStats.aBlancCount}</p>
+              <p className="text-xs text-orange-600">À blanc</p>
+            </div>
+          </Card>
+          <Card className="p-3 bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-700">{mappingStats.recoucheCount}</p>
+              <p className="text-xs text-green-600">Recouche</p>
+            </div>
+          </Card>
+          <Card className="p-3 bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-700">{mappingStats.noneCount}</p>
+              <p className="text-xs text-gray-600">Pas de ménage</p>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Configuration du mapping */}
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Settings2 className="h-4 w-4" />
+                Correspondances
+              </h3>
+              <Button size="sm" variant="outline" onClick={autoMapKeywords}>
+                <Zap className="h-4 w-4 mr-1" />
+                Auto
+              </Button>
+            </div>
+            
+            {detectedKeywords.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucun mot-clé de statut détecté dans les chambres.
+              </p>
+            ) : (
+              <ScrollArea className="h-[220px]">
+                <div className="space-y-3 pr-2">
+                  {detectedKeywords.map(keyword => (
+                    <div key={keyword} className="flex items-center justify-between gap-3">
+                      <Badge variant="outline" className="font-mono font-bold">
+                        {keyword}
+                      </Badge>
+                      <Select
+                        value={pmsMapping[keyword] || 'recouche'}
+                        onValueChange={(v) => updatePmsMapping(keyword, v)}
+                      >
+                        <SelectTrigger className="w-36 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CLEANING_TYPES.map(type => (
+                            <SelectItem key={type.value} value={type.value}>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${type.color}`} />
+                                {type.label.split(' ')[0]}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        </Card>
+
+        {/* Aperçu des chambres avec mapping */}
+        <Card>
+          <div className="p-4">
+            <h3 className="font-semibold mb-4">Aperçu avec mapping</h3>
+            <ScrollArea className="h-[220px]">
+              <div className="space-y-2">
+                {pdfData?.slice(0, 20).map((room: any, idx: number) => {
+                  // Appliquer le mapping pour prévisualisation
+                  const rawLine = (room.fullText || room.status || '').toUpperCase();
+                  let mappedType = room.cleaningType || 'recouche';
+                  
+                  for (const keyword of Object.keys(pmsMapping)) {
+                    if (rawLine.includes(keyword)) {
+                      mappedType = pmsMapping[keyword];
+                      break;
+                    }
+                  }
+                  
+                  const typeConfig = CLEANING_TYPES.find(t => t.value === mappedType);
+                  
+                  return (
+                    <div
+                      key={`${room.roomNumber}-${idx}`}
+                      className="flex items-center justify-between p-2 bg-muted rounded"
+                    >
+                      <span className="font-mono font-bold">{room.roomNumber || room.room_number}</span>
+                      <Badge className={`${typeConfig?.color || 'bg-gray-500'} text-white text-xs`}>
+                        {typeConfig?.label.split(' ')[0] || mappedType}
+                      </Badge>
+                    </div>
+                  );
+                })}
+                {(pdfData?.length || 0) > 20 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    ... et {(pdfData?.length || 0) - 20} autres chambres
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </Card>
+      </div>
+
+      {/* Information */}
+      <Alert>
+        <Brain className="h-4 w-4" />
+        <AlertDescription>
+          Le mapping que vous configurez ici sera appliqué aux chambres avant l'enregistrement.
+          Cela permet d'ajuster la détection automatique selon votre PMS.
+        </AlertDescription>
+      </Alert>
+      
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setStep('preview')}>
+          Retour
+        </Button>
+        <Button
+          onClick={proceedFromMapping}
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {uploadStatus}
+            </>
+          ) : (
+            <>
+              Appliquer et continuer
               <ArrowRight className="ml-2 h-4 w-4" />
             </>
           )}
@@ -1556,6 +1849,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         {step === 'choice' && renderChoiceStep()}
         {step === 'upload' && renderUploadStep()}
         {step === 'preview' && renderPreviewStep()}
+        {step === 'mapping' && renderMappingStep()}
         {step === 'import-mode' && renderImportModeStep()}
         {step === 'housekeepers' && renderHousekeepersStep()}
         {step === 'distribution' && renderDistributionStep()}
