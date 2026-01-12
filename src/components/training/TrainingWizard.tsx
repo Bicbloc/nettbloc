@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Upload, Tag, CheckCircle, Settings } from "lucide-react";
+import { Brain, Upload, Map, Tag, CheckCircle, Settings } from "lucide-react";
 import { TrainingStep1Import } from "./TrainingStep1Import";
-import { TrainingStep2Annotate } from "./TrainingStep2Annotate";
-import { TrainingStep3Result } from "./TrainingStep3Result";
+import { TrainingStep2Mapping } from "./TrainingStep2Mapping";
+import { TrainingStep3Annotate } from "./TrainingStep3Annotate";
+import { TrainingStep4Save } from "./TrainingStep4Save";
 import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 import { TrainingHistory } from "./TrainingHistory";
 import { unifiedParserService, ExtractedRoom } from "@/services/pms";
@@ -21,13 +22,17 @@ export interface TrainingData {
   detectedPmsType: string;
   validatedCount: number;
   existingPatternId?: string;
+  // Nouveau: données de mapping
+  statusMapping?: Record<string, string>;
+  exclusionPatterns?: string[];
 }
 
-// Workflow simplifié en 3 étapes
+// Workflow en 4 étapes claires
 const DISPLAY_STEPS = [
   { id: 1, label: "Importer", icon: Upload },
-  { id: 2, label: "Vérifier", icon: Tag },
-  { id: 3, label: "Sauvegarder", icon: CheckCircle },
+  { id: 2, label: "Mapper", icon: Map },
+  { id: 3, label: "Vérifier", icon: Tag },
+  { id: 4, label: "Sauvegarder", icon: CheckCircle },
 ];
 
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
@@ -44,11 +49,30 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
     });
   }, [hotelId]);
 
+  // Étape 1: Import terminé → aller au mapping
   const handleImportComplete = (data: TrainingData) => {
     setTrainingData(data);
-    setCurrentStep(2);
+    setCurrentStep(2); // Aller au mapping
   };
 
+  // Étape 2: Mapping terminé → appliquer le mapping et aller à l'annotation
+  const handleMappingComplete = (
+    mappedRooms: ExtractedRoom[], 
+    statusMapping: Record<string, string>,
+    exclusionPatterns: string[]
+  ) => {
+    if (trainingData) {
+      setTrainingData({
+        ...trainingData,
+        extractedRooms: mappedRooms,
+        statusMapping,
+        exclusionPatterns,
+      });
+      setCurrentStep(3); // Aller à l'annotation
+    }
+  };
+
+  // Étape 3: Annotation terminée → aller à la sauvegarde
   const handleAnnotationComplete = (rooms: ExtractedRoom[]) => {
     if (trainingData) {
       setTrainingData({
@@ -56,8 +80,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
         extractedRooms: rooms,
         validatedCount: rooms.filter(r => r.validated).length,
       });
-      // Aller directement à la sauvegarde
-      setCurrentStep(3);
+      setCurrentStep(4); // Aller à la sauvegarde
     }
   };
 
@@ -92,7 +115,8 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
       validatedCount: rooms.length,
       existingPatternId: pattern.id,
     });
-    setCurrentStep(2);
+    // Aller directement à l'annotation pour les éditions
+    setCurrentStep(3);
   };
 
   return (
@@ -107,7 +131,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
             <div>
               <h2 className="text-xl font-semibold">Entraîner l'IA</h2>
               <p className="text-sm text-muted-foreground">
-                Apprenez au système à reconnaître vos rapports
+                Import → Mapping → Vérification → Sauvegarde
               </p>
             </div>
           </div>
@@ -136,7 +160,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
       {/* Progress Steps */}
       <Card className="p-6">
-        <div className="flex items-center justify-center gap-4 md:gap-8 mb-8">
+        <div className="flex items-center justify-center gap-2 md:gap-6 mb-8 flex-wrap">
           {DISPLAY_STEPS.map((step, index) => {
             const Icon = step.icon;
             const isActive = currentStep === step.id;
@@ -148,7 +172,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
                 <button
                   onClick={() => isClickable && goToStep(step.id)}
                   disabled={!isClickable}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all ${
+                  className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 rounded-full transition-all ${
                     isActive
                       ? "bg-primary text-primary-foreground shadow-lg"
                       : isCompleted
@@ -156,12 +180,12 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{step.label}</span>
+                  <Icon className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="font-medium text-sm md:text-base">{step.label}</span>
                 </button>
                 {index < DISPLAY_STEPS.length - 1 && (
                   <div
-                    className={`w-12 md:w-20 h-1 mx-2 md:mx-4 rounded-full ${
+                    className={`w-6 md:w-12 h-1 mx-1 md:mx-2 rounded-full ${
                       isCompleted ? "bg-primary" : "bg-muted"
                     }`}
                   />
@@ -173,6 +197,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
         {/* Step Content */}
         <div className="min-h-[400px]">
+          {/* Étape 1: Import */}
           {currentStep === 1 && (
             <TrainingStep1Import
               hotelId={hotelId}
@@ -180,19 +205,31 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
             />
           )}
 
+          {/* Étape 2: Mapping (NOUVEAU) */}
           {currentStep === 2 && trainingData && (
-            <TrainingStep2Annotate
+            <TrainingStep2Mapping
+              trainingData={trainingData}
+              hotelId={hotelId}
+              onComplete={handleMappingComplete}
+              onBack={() => setCurrentStep(1)}
+            />
+          )}
+
+          {/* Étape 3: Annotation */}
+          {currentStep === 3 && trainingData && (
+            <TrainingStep3Annotate
               trainingData={trainingData}
               hotelId={hotelId}
               userId={currentUserId}
               onComplete={handleAnnotationComplete}
-              onBack={() => setCurrentStep(1)}
+              onBack={() => setCurrentStep(2)}
               onOpenAdvanced={() => setShowAdvanced(true)}
             />
           )}
 
-          {currentStep === 3 && trainingData && (
-            <TrainingStep3Result
+          {/* Étape 4: Sauvegarde */}
+          {currentStep === 4 && trainingData && (
+            <TrainingStep4Save
               trainingData={trainingData}
               hotelId={hotelId}
               onReset={handleReset}

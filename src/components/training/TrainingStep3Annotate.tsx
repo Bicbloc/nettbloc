@@ -20,7 +20,7 @@ import { LinePatternRuleDialog } from "./LinePatternRuleDialog";
 import { ExclusionListManager } from "./ExclusionListManager";
 import { parseRoomLines, RoomLine, DEFAULT_EXCLUDE_LIST } from "@/services/pms/RoomLineParser";
 
-interface TrainingStep2AnnotateProps {
+interface TrainingStep3AnnotateProps {
   trainingData: TrainingData;
   hotelId: string;
   userId: string;
@@ -28,6 +28,7 @@ interface TrainingStep2AnnotateProps {
   onBack: () => void;
   onOpenAdvanced?: () => void;
 }
+
 
 // Labels pour les types de nettoyage
 const CLEANING_LABELS: Record<string, { label: string; color: string }> = {
@@ -73,14 +74,14 @@ const isLastNightMisdetected = (room: ExtractedRoom): boolean => {
   return false;
 };
 
-export const TrainingStep2Annotate = ({
+export const TrainingStep3Annotate = ({
   trainingData,
   hotelId,
   userId,
   onComplete,
   onBack,
   onOpenAdvanced,
-}: TrainingStep2AnnotateProps) => {
+}: TrainingStep3AnnotateProps) => {
   const { toast } = useToast();
   const [rooms, setRooms] = useState<ExtractedRoom[]>(trainingData.extractedRooms);
   const [mergingMode, setMergingMode] = useState(false);

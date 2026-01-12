@@ -26,6 +26,7 @@ const getPmsOptions = () => [
   { value: 'fidelio', label: 'Fidelio', description: 'Suite Oracle, format similaire à Opera' },
   { value: 'apaleo', label: 'Apaleo', description: 'Solution cloud moderne' },
   { value: 'medialog', label: 'Medialog', description: 'PMS français, hôtels indépendants' },
+  { value: 'misterbooking', label: 'MisterBooking', description: 'PMS cloud français, multi-colonnes' },
   { value: 'generic', label: 'Autre / Inconnu', description: 'Si votre système n\'est pas listé' },
 ];
 
