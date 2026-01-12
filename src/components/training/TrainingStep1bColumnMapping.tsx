@@ -122,6 +122,121 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
     return rows;
   }, [trainingData.rawText]);
 
+  // Patterns pour la détection intelligente des colonnes
+  const COLUMN_PATTERNS = {
+    // Statuts PMS (INS, PRO, SAL, DIR, etc.)
+    status: {
+      patterns: ['ins', 'pro', 'sal', 'dir', 'occ', 'vac', 'dep', 'arr', 'dirty', 'clean', 'inspected', 'departed', 'stayover', 'checkout', 'checkin', 'depart', 'recouche', 'parti', 'occupé', 'libre', 'sale', 'propre'],
+      name: 'Statut'
+    },
+    // Dates (plusieurs formats)
+    date: {
+      patterns: [/\d{2}[\/\-\.]\d{2}[\/\-\.]?\d{0,4}/, /\d{4}[\/\-]\d{2}[\/\-]\d{2}/],
+      name: 'Date'
+    },
+    // Horaires
+    time: {
+      patterns: [/^\d{1,2}[hH:]\d{2}$/, /^\d{1,2}:\d{2}(:\d{2})?$/],
+      name: 'Horaire'
+    },
+    // Types de chambre
+    roomType: {
+      patterns: ['sup', 'fam', 'deluxe', 'standard', 'suite', 'dbl', 'sgl', 'twn', 'twin', 'triple', 'quad', 'king', 'queen', 'single', 'double', 'junior', 'executive', 'prestige', 'comfort', 'classic', 'premium', 'economique', 'superieure', 'familiale'],
+      name: 'Type chambre'
+    },
+    // Noms/prénoms (client)
+    clientName: {
+      patterns: [/^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ][a-zàâäéèêëïîôùûü]+\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ][a-zàâäéèêëïîôùûü]+$/, /^[A-Z]{2,}$/],
+      name: 'Client'
+    },
+    // Nombre de personnes
+    personCount: {
+      patterns: [/^[1-9]$/, /^1[0-2]$/, /^\d+\s*(pax|pers|ad|enf|ch)?$/i],
+      name: 'Nb personnes'
+    },
+    // Numéros de nuits
+    nights: {
+      patterns: [/^\d+\s*(n|nuit|nts|nights?)$/i],
+      name: 'Nb nuits'
+    }
+  };
+
+  // Fonction pour identifier le type de colonne
+  const identifyColumnType = (values: string[]): { name: string; isStatusColumn: boolean } => {
+    const normalizedValues = values.map(v => v.toLowerCase().trim());
+    
+    // Vérifier les patterns de statut (codes PMS)
+    const statusMatches = normalizedValues.filter(v => 
+      COLUMN_PATTERNS.status.patterns.some(p => 
+        typeof p === 'string' ? v === p || v.includes(p) : false
+      )
+    );
+    if (statusMatches.length >= values.length * 0.3) {
+      return { name: 'Statut', isStatusColumn: true };
+    }
+    
+    // Vérifier les dates
+    const dateMatches = values.filter(v => 
+      COLUMN_PATTERNS.date.patterns.some(p => p instanceof RegExp && p.test(v))
+    );
+    if (dateMatches.length >= values.length * 0.5) {
+      return { name: 'Date', isStatusColumn: false };
+    }
+    
+    // Vérifier les horaires
+    const timeMatches = values.filter(v => 
+      COLUMN_PATTERNS.time.patterns.some(p => p instanceof RegExp && p.test(v.trim()))
+    );
+    if (timeMatches.length >= values.length * 0.3) {
+      return { name: 'Horaire', isStatusColumn: false };
+    }
+    
+    // Vérifier les types de chambre
+    const roomTypeMatches = normalizedValues.filter(v => 
+      COLUMN_PATTERNS.roomType.patterns.some(p => 
+        typeof p === 'string' ? v.includes(p) : false
+      )
+    );
+    if (roomTypeMatches.length >= values.length * 0.3) {
+      return { name: 'Type chambre', isStatusColumn: false };
+    }
+    
+    // Vérifier les noms de clients (prénom + nom ou nom seul en majuscules)
+    const clientMatches = values.filter(v => {
+      const trimmed = v.trim();
+      // Nom complet (Prénom Nom) ou nom en majuscules
+      return /^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ][a-zàâäéèêëïîôùûü]+(\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ][a-zàâäéèêëïîôùûü]+)+$/.test(trimmed) ||
+             /^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ]{2,}(\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ]+)*$/.test(trimmed);
+    });
+    if (clientMatches.length >= values.length * 0.4) {
+      return { name: 'Client', isStatusColumn: false };
+    }
+    
+    // Vérifier le nombre de personnes (petits chiffres)
+    const personMatches = values.filter(v => {
+      const trimmed = v.trim();
+      return /^[1-9]$/.test(trimmed) || /^\d+\s*(pax|pers|ad|enf)?$/i.test(trimmed);
+    });
+    if (personMatches.length >= values.length * 0.5) {
+      return { name: 'Nb personnes', isStatusColumn: false };
+    }
+    
+    // Vérifier si c'est une colonne arrivée/départ client
+    const arrDepMatches = normalizedValues.filter(v => 
+      v.includes('arr') || v.includes('dep') || v.includes('in') || v.includes('out')
+    );
+    if (arrDepMatches.length >= values.length * 0.3) {
+      // Vérifier si c'est des dates (arrivée/départ)
+      const hasDateFormat = values.some(v => /\d{2}[\/\-\.]\d{2}/.test(v));
+      if (hasDateFormat) {
+        return { name: 'Date arrivée/départ', isStatusColumn: false };
+      }
+      return { name: 'Statut', isStatusColumn: true };
+    }
+    
+    return { name: `Colonne`, isStatusColumn: false };
+  };
+
   // Détecter les colonnes à partir des données parsées
   const detectedColumns = useMemo(() => {
     if (parsedTable.length === 0) return [];
@@ -134,30 +249,19 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
     for (let i = 0; i < maxCols; i++) {
       const values = parsedTable
         .map(r => r.columns[i] || '')
-        .filter(v => v.trim())
-        .map(v => v.toUpperCase().trim());
+        .filter(v => v.trim());
       
-      const uniqueValues = [...new Set(values)].slice(0, 20);
+      const uniqueValues = [...new Set(values.map(v => v.toUpperCase().trim()))].slice(0, 30);
       
-      // Détecter si c'est une colonne de statut
-      const isStatusColumn = uniqueValues.some(v => {
-        const lower = v.toLowerCase();
-        return [...KNOWN_PATTERNS.departure, ...KNOWN_PATTERNS.stayover, ...KNOWN_PATTERNS.noService]
-          .some(p => lower.includes(p));
-      });
+      // Identifier le type de colonne
+      const { name, isStatusColumn } = identifyColumnType(values);
       
-      // Deviner le nom de la colonne
-      let name = `Colonne ${i + 1}`;
-      if (isStatusColumn) name = 'Statut';
-      else if (uniqueValues.some(v => /\d{2}\/\d{2}/.test(v))) name = 'Date';
-      else if (uniqueValues.some(v => /^\d{1,2}:\d{2}/.test(v))) name = 'Heure';
-      else if (uniqueValues.some(v => /^(DBL|SGL|TWN|TWIN|TRIPLE)/i.test(v))) name = 'Type chambre';
-      else if (uniqueValues.some(v => /^(oui|non|yes|no)$/i.test(v))) name = 'Action';
-      else if (uniqueValues.every(v => /^\d+$/.test(v) && parseInt(v) <= 10)) name = 'Nb nuits/pers';
+      // Ajouter un numéro si le nom est générique
+      const finalName = name === 'Colonne' ? `${name} ${i + 1}` : name;
       
       cols.push({
         index: i,
-        name,
+        name: finalName,
         isIncluded: true,
         isStatusColumn,
         uniqueValues,
