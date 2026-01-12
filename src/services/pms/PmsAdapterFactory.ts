@@ -12,8 +12,7 @@ import {
   MedialogAdapter,
   FidelioAdapter,
   GenericAdapter,
-  SpaceStatusAdapter,
-  MisterBookingAdapter
+  SpaceStatusAdapter
 } from './adapters';
 
 class PmsAdapterFactory {
@@ -27,7 +26,6 @@ class PmsAdapterFactory {
     this.registerAdapter(new OperaAdapter());
     this.registerAdapter(new ProtelAdapter());
     this.registerAdapter(new MedialogAdapter());
-    this.registerAdapter(new MisterBookingAdapter()); // Nouveau PMS
     this.registerAdapter(new FidelioAdapter());
     this.registerAdapter(new GenericAdapter());
   }
