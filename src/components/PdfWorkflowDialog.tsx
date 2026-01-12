@@ -31,6 +31,7 @@ import {
   filterOutInactiveRooms,
   normalizeRoomNumber
 } from "@/utils/roomFormatUtils";
+import { AdvancedMappingStep } from "@/components/training/AdvancedMappingStep";
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -43,8 +44,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'choice' | 'upload' | 'preview' | 'mapping' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('choice');
   const [pmsMapping, setPmsMapping] = useState<Record<string, string>>({});
+  const [exclusionPatterns, setExclusionPatterns] = useState<string[]>([]);
   const [pdfData, setPdfData] = useState<any>(null);
   const [parsedLines, setParsedLines] = useState<RoomLine[]>([]);
+  const [fullPdfText, setFullPdfText] = useState<string>('');
   const [housekeepers, setHousekeepers] = useState<string[]>([]);
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +130,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setParsedLines(lines);
       setPdfData(data);
       setSavedPdfData(data);
+      // Stocker le texte complet pour le mapping avancé
+      setFullPdfText(lines.map(l => l.fullText || '').join('\n'));
       
       setUploadProgress(70);
       setUploadStatus('✅ Extraction terminée');
@@ -480,6 +485,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setRetryCount(0);
     setPreviewFilter('all');
     setPmsMapping({});
+    setExclusionPatterns([]);
+    setFullPdfText('');
   };
 
   // Mots-clés PMS couramment utilisés
@@ -656,14 +663,68 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   }, [parsedLines, previewFilter]);
 
   const proceedFromPreview = () => {
-    // Initialiser le mapping automatiquement et passer à l'étape mapping
-    if (detectedKeywords.length > 0) {
-      const initialMapping = initializeMapping();
-      setPmsMapping(initialMapping);
-      setStep('mapping');
-    } else {
-      // Si pas de mots-clés détectés, passer directement à import-mode
-      proceedFromMapping();
+    // Passer directement à l'étape de mapping avancé
+    setStep('mapping');
+  };
+
+  // Callback pour le composant AdvancedMappingStep
+  const handleAdvancedMappingComplete = async (
+    mappedData: any[], 
+    mapping: Record<string, string>, 
+    exclusions: string[]
+  ) => {
+    // Sauvegarder le mapping et les exclusions
+    setPmsMapping(mapping);
+    setExclusionPatterns(exclusions);
+    setPdfData(mappedData);
+    setSavedPdfData(mappedData);
+    
+    // Mettre à jour les parsedLines avec le mapping
+    const updatedLines = parsedLines.map(line => {
+      const fullText = (line.fullText || line.statusCode || '').toUpperCase();
+      let mappedType = line.cleaningType || 'recouche';
+      
+      for (const keyword of Object.keys(mapping).sort((a, b) => b.length - a.length)) {
+        if (fullText.includes(keyword)) {
+          mappedType = mapping[keyword] as any;
+          break;
+        }
+      }
+      
+      return { ...line, cleaningType: mappedType };
+    });
+    setParsedLines(updatedLines);
+
+    // Continuer vers import-mode ou housekeepers
+    if (!hotelId || !mappedData || mappedData.length === 0) {
+      proceedToHousekeepers(mappedData || []);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadStatus('🔍 Vérification des chambres existantes...');
+    setUploadProgress(50);
+
+    try {
+      const { count } = await supabase
+        .from('rooms')
+        .select('id', { count: 'estimated', head: true })
+        .eq('hotel_id', hotelId);
+      
+      const existingCount = count || 0;
+      setExistingRoomsCount(existingCount);
+
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatus('');
+
+      if (existingCount > 0) {
+        setStep('import-mode');
+      } else {
+        await saveRoomsToDatabase(mappedData, 'update');
+      }
+    } catch (error) {
+      handleUploadError(error);
     }
   };
 
@@ -1062,163 +1123,21 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         <DialogTitle className="flex items-center gap-2">
           <Map className="h-5 w-5 text-primary" />
           <Badge variant="secondary" className="text-xs">Étape 3/5</Badge>
-          Mapping des statuts PMS
+          Mapping avancé des statuts PMS
         </DialogTitle>
         <DialogDescription>
-          Ajustez les correspondances entre les codes PMS détectés et les types de nettoyage.
+          Configurez les correspondances et exclusions pour votre format de rapport PMS.
         </DialogDescription>
       </DialogHeader>
       
-      {/* Statistiques avec mapping appliqué */}
-      {mappingStats && (
-        <div className="grid grid-cols-3 gap-3">
-          <Card className="p-3 bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-orange-700">{mappingStats.aBlancCount}</p>
-              <p className="text-xs text-orange-600">À blanc</p>
-            </div>
-          </Card>
-          <Card className="p-3 bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-700">{mappingStats.recoucheCount}</p>
-              <p className="text-xs text-green-600">Recouche</p>
-            </div>
-          </Card>
-          <Card className="p-3 bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-700">{mappingStats.noneCount}</p>
-              <p className="text-xs text-gray-600">Pas de ménage</p>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Configuration du mapping */}
-        <Card>
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Settings2 className="h-4 w-4" />
-                Correspondances
-              </h3>
-              <Button size="sm" variant="outline" onClick={autoMapKeywords}>
-                <Zap className="h-4 w-4 mr-1" />
-                Auto
-              </Button>
-            </div>
-            
-            {detectedKeywords.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucun mot-clé de statut détecté dans les chambres.
-              </p>
-            ) : (
-              <ScrollArea className="h-[220px]">
-                <div className="space-y-3 pr-2">
-                  {detectedKeywords.map(keyword => (
-                    <div key={keyword} className="flex items-center justify-between gap-3">
-                      <Badge variant="outline" className="font-mono font-bold">
-                        {keyword}
-                      </Badge>
-                      <Select
-                        value={pmsMapping[keyword] || 'recouche'}
-                        onValueChange={(v) => updatePmsMapping(keyword, v)}
-                      >
-                        <SelectTrigger className="w-36 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CLEANING_TYPES.map(type => (
-                            <SelectItem key={type.value} value={type.value}>
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${type.color}`} />
-                                {type.label.split(' ')[0]}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </div>
-        </Card>
-
-        {/* Aperçu des chambres avec mapping */}
-        <Card>
-          <div className="p-4">
-            <h3 className="font-semibold mb-4">Aperçu avec mapping</h3>
-            <ScrollArea className="h-[220px]">
-              <div className="space-y-2">
-                {pdfData?.slice(0, 20).map((room: any, idx: number) => {
-                  // Appliquer le mapping pour prévisualisation
-                  const rawLine = (room.fullText || room.status || '').toUpperCase();
-                  let mappedType = room.cleaningType || 'recouche';
-                  
-                  for (const keyword of Object.keys(pmsMapping)) {
-                    if (rawLine.includes(keyword)) {
-                      mappedType = pmsMapping[keyword];
-                      break;
-                    }
-                  }
-                  
-                  const typeConfig = CLEANING_TYPES.find(t => t.value === mappedType);
-                  
-                  return (
-                    <div
-                      key={`${room.roomNumber}-${idx}`}
-                      className="flex items-center justify-between p-2 bg-muted rounded"
-                    >
-                      <span className="font-mono font-bold">{room.roomNumber || room.room_number}</span>
-                      <Badge className={`${typeConfig?.color || 'bg-gray-500'} text-white text-xs`}>
-                        {typeConfig?.label.split(' ')[0] || mappedType}
-                      </Badge>
-                    </div>
-                  );
-                })}
-                {(pdfData?.length || 0) > 20 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    ... et {(pdfData?.length || 0) - 20} autres chambres
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        </Card>
-      </div>
-
-      {/* Information */}
-      <Alert>
-        <Brain className="h-4 w-4" />
-        <AlertDescription>
-          Le mapping que vous configurez ici sera appliqué aux chambres avant l'enregistrement.
-          Cela permet d'ajuster la détection automatique selon votre PMS.
-        </AlertDescription>
-      </Alert>
-      
-      <DialogFooter>
-        <Button variant="outline" onClick={() => setStep('preview')}>
-          Retour
-        </Button>
-        <Button
-          onClick={proceedFromMapping}
-          disabled={isUploading}
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {uploadStatus}
-            </>
-          ) : (
-            <>
-              Appliquer et continuer
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </>
-          )}
-        </Button>
-      </DialogFooter>
+      <AdvancedMappingStep
+        parsedLines={parsedLines}
+        pdfData={pdfData || []}
+        fullText={fullPdfText}
+        hotelId={hotelId}
+        onComplete={handleAdvancedMappingComplete}
+        onBack={() => setStep('preview')}
+      />
     </>
   );
 
