@@ -6,3 +6,5 @@ export { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 export { TrainingHistory, useExistingTraining } from "./TrainingHistory";
 export { LinePatternMapper } from "./LinePatternMapper";
 export { ExclusionListManager } from "./ExclusionListManager";
+export { ColumnBasedMappingStep } from "./ColumnBasedMappingStep";
+export { AdvancedMappingStep } from "./AdvancedMappingStep";
