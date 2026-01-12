@@ -213,7 +213,7 @@ export const TrainingStep2Mapping: React.FC<TrainingStep2MappingProps> = ({
           if (fullText.includes(keyword)) {
             const mappedValue = keywordMapping[keyword];
             if (mappedValue !== 'exclude') {
-              mappedType = mappedValue;
+              mappedType = mappedValue as 'a_blanc' | 'recouche' | 'none';
               matchedKeyword = keyword;
             }
             break;

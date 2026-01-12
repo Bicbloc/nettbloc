@@ -11,26 +11,18 @@ import { ExtractedRoom } from '@/services/pms/types';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-interface TrainingData {
-  reportName: string;
-  rawText: string;
-  extractedRooms: ExtractedRoom[];
-  pmsType: string;
-  cleaningTypeMapping: Record<string, string>;
-}
+import { TrainingData } from './TrainingWizard';
 
 interface TrainingStep4SaveProps {
   hotelId: string;
   trainingData: TrainingData;
-  onComplete: () => void;
-  onBack: () => void;
+  onReset: () => void;
 }
 
 export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
   hotelId,
   trainingData,
-  onComplete,
-  onBack,
+  onReset,
 }) => {
   const { toast } = useToast();
   const [patternName, setPatternName] = useState(trainingData.reportName || 'Pattern PMS');
@@ -62,12 +54,12 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
           rule_type: 'room_pattern',
           description: description || `Pattern auto-généré depuis ${trainingData.reportName}`,
           condition: {
-            pms_type: trainingData.pmsType,
+            pms_type: trainingData.detectedPmsType,
             patterns: roomPatterns,
             sample_text: trainingData.rawText.substring(0, 500),
           },
           result: {
-            cleaning_type_mapping: trainingData.cleaningTypeMapping,
+            cleaning_type_mapping: trainingData.statusMapping || {},
             rooms_count: trainingData.extractedRooms.length,
           },
           is_active: true,
@@ -82,7 +74,7 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
         description: `Le pattern "${patternName}" a été sauvegardé avec succès.`,
       });
 
-      onComplete();
+      onReset();
     } catch (error) {
       console.error('Error saving pattern:', error);
       toast({
@@ -163,7 +155,7 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
         <Card>
           <CardContent className="pt-4 text-center">
             <Map className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
-            <div className="text-2xl font-bold">{Object.keys(trainingData.cleaningTypeMapping).length}</div>
+            <div className="text-2xl font-bold">{Object.keys(trainingData.statusMapping || {}).length}</div>
             <p className="text-xs text-muted-foreground">Mappings</p>
           </CardContent>
         </Card>
@@ -198,7 +190,7 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
             <div>
               <Label>Type PMS détecté</Label>
               <Badge variant="outline" className="mt-1">
-                {trainingData.pmsType.toUpperCase()}
+                {trainingData.detectedPmsType.toUpperCase()}
               </Badge>
             </div>
           </CardContent>
@@ -212,7 +204,7 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
           <CardContent>
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
-                {Object.entries(trainingData.cleaningTypeMapping).map(([keyword, type]) => (
+                {Object.entries(trainingData.statusMapping || {}).map(([keyword, type]) => (
                   <div key={keyword} className="flex items-center justify-between p-2 bg-muted rounded">
                     <Badge variant="outline" className="font-mono">{keyword}</Badge>
                     <Badge className={
@@ -223,7 +215,7 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
                     </Badge>
                   </div>
                 ))}
-                {Object.keys(trainingData.cleaningTypeMapping).length === 0 && (
+                {Object.keys(trainingData.statusMapping || {}).length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Aucune correspondance configurée
                   </p>
@@ -235,11 +227,7 @@ export const TrainingStep4Save: React.FC<TrainingStep4SaveProps> = ({
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack} disabled={isSaving}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour
-        </Button>
+      <div className="flex justify-end pt-4">
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
