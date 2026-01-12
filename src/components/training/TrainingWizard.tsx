@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Upload, Tag, CheckCircle, Settings } from "lucide-react";
+import { Brain, Upload, Columns, Tag, CheckCircle, Settings } from "lucide-react";
 import { TrainingStep1Import } from "./TrainingStep1Import";
+import { TrainingStep1bColumnMapping, MappingConfig } from "./TrainingStep1bColumnMapping";
 import { TrainingStep2Annotate } from "./TrainingStep2Annotate";
 import { TrainingStep3Result } from "./TrainingStep3Result";
 import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
@@ -21,13 +22,15 @@ export interface TrainingData {
   detectedPmsType: string;
   validatedCount: number;
   existingPatternId?: string;
+  mappingConfig?: MappingConfig;
 }
 
-// Workflow simplifié en 3 étapes
+// Workflow en 4 étapes: Import → Colonnes/Mapping → Vérifier → Sauvegarder
 const DISPLAY_STEPS = [
   { id: 1, label: "Importer", icon: Upload },
-  { id: 2, label: "Vérifier", icon: Tag },
-  { id: 3, label: "Sauvegarder", icon: CheckCircle },
+  { id: 2, label: "Mapping", icon: Columns },
+  { id: 3, label: "Vérifier", icon: Tag },
+  { id: 4, label: "Sauvegarder", icon: CheckCircle },
 ];
 
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
@@ -46,7 +49,15 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
   const handleImportComplete = (data: TrainingData) => {
     setTrainingData(data);
-    setCurrentStep(2);
+    setCurrentStep(2); // Aller au mapping
+  };
+
+  const handleMappingComplete = (updatedData: TrainingData, mappingConfig: MappingConfig) => {
+    setTrainingData({
+      ...updatedData,
+      mappingConfig,
+    });
+    setCurrentStep(3); // Aller à l'annotation
   };
 
   const handleAnnotationComplete = (rooms: ExtractedRoom[]) => {
@@ -56,8 +67,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
         extractedRooms: rooms,
         validatedCount: rooms.filter(r => r.validated).length,
       });
-      // Aller directement à la sauvegarde
-      setCurrentStep(3);
+      setCurrentStep(4); // Aller à la sauvegarde
     }
   };
 
@@ -92,7 +102,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
       validatedCount: rooms.length,
       existingPatternId: pattern.id,
     });
-    setCurrentStep(2);
+    setCurrentStep(3); // Aller directement à l'annotation quand on édite
   };
 
   return (
@@ -181,17 +191,26 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
           )}
 
           {currentStep === 2 && trainingData && (
+            <TrainingStep1bColumnMapping
+              trainingData={trainingData}
+              hotelId={hotelId}
+              onComplete={handleMappingComplete}
+              onBack={() => setCurrentStep(1)}
+            />
+          )}
+
+          {currentStep === 3 && trainingData && (
             <TrainingStep2Annotate
               trainingData={trainingData}
               hotelId={hotelId}
               userId={currentUserId}
               onComplete={handleAnnotationComplete}
-              onBack={() => setCurrentStep(1)}
+              onBack={() => setCurrentStep(2)}
               onOpenAdvanced={() => setShowAdvanced(true)}
             />
           )}
 
-          {currentStep === 3 && trainingData && (
+          {currentStep === 4 && trainingData && (
             <TrainingStep3Result
               trainingData={trainingData}
               hotelId={hotelId}
