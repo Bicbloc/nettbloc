@@ -1,16 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Checkbox } from '@/components/ui/checkbox';
 import { 
-  ArrowLeft, ArrowRight, Zap, Filter, X, Plus, 
-  Info, AlertTriangle, CheckCircle2, Search, 
-  MousePointerClick, Layers, Sparkles, RotateCcw
+  ArrowLeft, ArrowRight, Zap, Check, X, 
+  Layers, Sparkles, RotateCcw, Eye, EyeOff
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { TrainingData } from './TrainingWizard';
@@ -19,37 +15,26 @@ import { cn } from '@/lib/utils';
 
 // Types de nettoyage disponibles
 const CLEANING_TYPES = [
-  { value: 'a_blanc', label: 'À blanc (Départ)', color: 'bg-orange-500', bgLight: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-400', emoji: '🔶' },
-  { value: 'recouche', label: 'Recouche (Occupé)', color: 'bg-green-500', bgLight: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-400', emoji: '🔄' },
-  { value: 'none', label: 'Pas de ménage', color: 'bg-gray-500', bgLight: 'bg-gray-100 dark:bg-gray-900/30', border: 'border-gray-400', emoji: '⏸️' },
-  { value: 'exclude', label: 'Exclure', color: 'bg-red-500', bgLight: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-400', emoji: '🚫' },
-];
+  { value: 'a_blanc', label: 'À blanc', shortLabel: 'Blanc', color: 'bg-orange-500', textColor: 'text-orange-600', bgLight: 'bg-orange-100 dark:bg-orange-900/30', emoji: '🔶' },
+  { value: 'recouche', label: 'Recouche', shortLabel: 'Rec.', color: 'bg-green-500', textColor: 'text-green-600', bgLight: 'bg-green-100 dark:bg-green-900/30', emoji: '🔄' },
+  { value: 'none', label: 'Aucun', shortLabel: 'Non', color: 'bg-gray-500', textColor: 'text-gray-600', bgLight: 'bg-gray-100 dark:bg-gray-900/30', emoji: '⏸️' },
+  { value: 'exclude', label: 'Exclure', shortLabel: 'Excl.', color: 'bg-red-500', textColor: 'text-red-600', bgLight: 'bg-red-100 dark:bg-red-900/30', emoji: '🚫' },
+] as const;
 
-// Patterns d'exclusion par défaut
-const DEFAULT_EXCLUSION_PATTERNS = [
-  'fermé', 'hors service', 'out of order', 'ooo', 'maintenance', 
-  'total', 'page', 'imprimé', 'date :', 'http', 'www.'
-];
-
-interface ParsedLine {
-  id: string;
-  lineNumber: number;
-  rawText: string;
-  normalizedText: string;
-  hasRoomNumber: boolean;
-  roomNumber: string | null;
-  signature: string; // Signature de pattern pour grouper les lignes similaires
-  cleaningType: 'a_blanc' | 'recouche' | 'none' | 'exclude' | null;
-  isExcluded: boolean;
-  matchedPattern: string | null;
-}
+type CleaningTypeValue = typeof CLEANING_TYPES[number]['value'];
 
 interface PatternGroup {
+  id: string;
   signature: string;
-  cleaningType: 'a_blanc' | 'recouche' | 'none' | 'exclude' | null;
-  lines: ParsedLine[];
-  example: string;
   keywords: string[];
+  lines: Array<{
+    lineNumber: number;
+    text: string;
+    roomNumber: string | null;
+    hasRoom: boolean;
+  }>;
+  cleaningType: CleaningTypeValue | null;
+  isCollapsed: boolean;
 }
 
 interface TrainingStep2MappingProps {
@@ -59,6 +44,24 @@ interface TrainingStep2MappingProps {
   onBack: () => void;
 }
 
+// Mots-clés pour l'auto-détection
+const KEYWORD_MAPPING: Record<string, CleaningTypeValue> = {
+  // Départ = À blanc
+  'DÉPART': 'a_blanc', 'DEPART': 'a_blanc', 'CHECKOUT': 'a_blanc', 'CHECK-OUT': 'a_blanc',
+  'C/O': 'a_blanc', 'DEP': 'a_blanc', 'LIBRE': 'a_blanc', 'VACANT': 'a_blanc',
+  'À BLANC': 'a_blanc', 'A BLANC': 'a_blanc', 'SALE': 'a_blanc', 'DIRTY': 'a_blanc', 'SAL': 'a_blanc',
+  // Séjour = Recouche
+  'SÉJOUR': 'recouche', 'SEJOUR': 'recouche', 'RECOUCHE': 'recouche', 'STAYOVER': 'recouche',
+  'OCCUPÉ': 'recouche', 'OCCUPE': 'recouche', 'OCC': 'recouche', 'PROLONGATION': 'recouche',
+  'PRO': 'recouche', 'INS': 'recouche', 'EN COURS': 'recouche',
+  // Pas de ménage
+  'PROPRE': 'none', 'CLEAN': 'none', 'FAIT': 'none', 'OK': 'none', 'TERMINÉ': 'none',
+  'DND': 'none', 'REFUS': 'none', 'NE PAS DÉRANGER': 'none',
+  // Exclusions
+  'MAINTENANCE': 'exclude', 'OOO': 'exclude', 'HORS SERVICE': 'exclude', 'FERMÉ': 'exclude',
+  'TOTAL': 'exclude', 'PAGE': 'exclude', 'HTTP': 'exclude', 'WWW': 'exclude',
+};
+
 export const TrainingStep2Mapping: React.FC<TrainingStep2MappingProps> = ({
   trainingData,
   hotelId,
@@ -66,566 +69,375 @@ export const TrainingStep2Mapping: React.FC<TrainingStep2MappingProps> = ({
   onBack,
 }) => {
   const { toast } = useToast();
-  
-  // États
-  const [parsedLines, setParsedLines] = useState<ParsedLine[]>([]);
-  const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
-  const [exclusionPatterns, setExclusionPatterns] = useState<string[]>([]);
-  const [newExclusion, setNewExclusion] = useState('');
-  const [searchFilter, setSearchFilter] = useState('');
-  const [showOnlyRooms, setShowOnlyRooms] = useState(false);
-  const [currentAssignType, setCurrentAssignType] = useState<'a_blanc' | 'recouche' | 'none' | 'exclude'>('a_blanc');
+  const [patternGroups, setPatternGroups] = useState<PatternGroup[]>([]);
+  const [showOnlyWithRooms, setShowOnlyWithRooms] = useState(true);
 
-  // Extraire la signature de pattern d'une ligne (pour grouper les lignes similaires)
+  // Extraire la signature d'une ligne
   const extractSignature = useCallback((text: string): { signature: string; keywords: string[] } => {
     const normalized = text.toUpperCase().trim();
     const keywords: string[] = [];
     
-    // Remplacer les numéros de chambre par un placeholder
-    let signature = normalized.replace(/\b\d{2,4}[A-Z]?\b/g, '{ROOM}');
-    
-    // Remplacer les dates par un placeholder
-    signature = signature.replace(/\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?/g, '{DATE}');
-    
-    // Remplacer les heures
-    signature = signature.replace(/\d{1,2}[hH:]\d{2}/g, '{TIME}');
-    
-    // Remplacer les noms propres (commençant par majuscule)
-    signature = signature.replace(/\b[A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)?\b/g, '{NAME}');
+    // Remplacer les données variables par des placeholders
+    let signature = normalized
+      .replace(/\b\d{2,4}[A-Z]?\b/g, '{ROOM}')
+      .replace(/\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?/g, '{DATE}')
+      .replace(/\d{1,2}[hH:]\d{2}/g, '{TIME}')
+      .replace(/\b[A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)?\b/g, '{NAME}')
+      .replace(/\s+/g, ' ')
+      .trim();
     
     // Extraire les mots-clés significatifs
-    const keywordPatterns = [
-      'DÉPART', 'DEPART', 'ARRIVÉE', 'ARRIVEE', 'CHECKOUT', 'CHECKIN',
-      'SÉJOUR', 'SEJOUR', 'RECOUCHE', 'OCCUPÉ', 'OCCUPE', 'PROLONGATION',
-      'À BLANC', 'A BLANC', 'LIBRE', 'SALE', 'DIRTY', 'PROPRE', 'CLEAN',
-      'FAIT', 'À FAIRE', 'A FAIRE', 'EN COURS', 'COMPLET', 'REFAIT',
-      'DND', 'REFUS', 'MAINTENANCE', 'OOO', 'OUT', 'VIP', 'OK',
-      // MisterBooking specific
-      'DEP', 'ARR', 'PRO', 'OCC', 'INS', 'SAL', 'VAC', 'RES',
-      // Cases cochées
-      '☑', '☐', '✓', '✗', 'X', '○', '●'
-    ];
-    
-    for (const kw of keywordPatterns) {
+    for (const kw of Object.keys(KEYWORD_MAPPING)) {
       if (normalized.includes(kw)) {
         keywords.push(kw);
       }
     }
     
-    // Simplifier les espaces multiples
-    signature = signature.replace(/\s+/g, ' ').trim();
-    
     return { signature, keywords };
   }, []);
 
-  // Parser le texte brut en lignes analysées
+  // Parser et grouper les lignes
   useEffect(() => {
     const rawText = trainingData.rawText || '';
     const lines = rawText.split('\n');
     const roomPattern = /\b(\d{2,4}[A-Z]?)\b/;
     
-    const parsed: ParsedLine[] = lines.map((line, index) => {
+    const groups: Map<string, PatternGroup> = new Map();
+    
+    lines.forEach((line, index) => {
       const trimmed = line.trim();
+      if (trimmed.length <= 2) return;
+      
       const { signature, keywords } = extractSignature(trimmed);
       const roomMatch = trimmed.match(roomPattern);
       const hasRoom = !!roomMatch && parseInt(roomMatch[1], 10) > 0 && parseInt(roomMatch[1], 10) < 9999;
       
-      return {
-        id: `line-${index}`,
+      const lineData = {
         lineNumber: index + 1,
-        rawText: trimmed,
-        normalizedText: trimmed.toUpperCase(),
-        hasRoomNumber: hasRoom,
+        text: trimmed,
         roomNumber: hasRoom ? roomMatch![1] : null,
-        signature,
-        cleaningType: null,
-        isExcluded: false,
-        matchedPattern: keywords.length > 0 ? keywords[0] : null,
+        hasRoom,
       };
-    }).filter(l => l.rawText.length > 2);
-
-    // Charger les exclusions sauvegardées
-    const savedExclusions = localStorage.getItem(`training_exclusions_${hotelId}`);
-    if (savedExclusions) {
-      try {
-        const exclusions = JSON.parse(savedExclusions);
-        setExclusionPatterns(exclusions);
-        // Appliquer les exclusions
-        parsed.forEach(line => {
-          for (const pattern of exclusions) {
-            if (line.normalizedText.includes(pattern.toUpperCase())) {
-              line.isExcluded = true;
-              break;
-            }
-          }
-        });
-      } catch {
-        setExclusionPatterns([...DEFAULT_EXCLUSION_PATTERNS]);
-      }
-    } else {
-      setExclusionPatterns([...DEFAULT_EXCLUSION_PATTERNS]);
-    }
-
-    setParsedLines(parsed);
-  }, [trainingData.rawText, hotelId, extractSignature]);
-
-  // Grouper les lignes par signature de pattern
-  const patternGroups = useMemo(() => {
-    const groups: Map<string, PatternGroup> = new Map();
-    
-    for (const line of parsedLines) {
-      if (line.isExcluded) continue;
       
-      const existing = groups.get(line.signature);
-      if (existing) {
-        existing.lines.push(line);
+      if (groups.has(signature)) {
+        groups.get(signature)!.lines.push(lineData);
       } else {
-        groups.set(line.signature, {
-          signature: line.signature,
-          cleaningType: line.cleaningType,
-          lines: [line],
-          example: line.rawText,
-          keywords: line.matchedPattern ? [line.matchedPattern] : [],
+        // Auto-détecter le type de nettoyage
+        let autoType: CleaningTypeValue | null = null;
+        for (const kw of keywords) {
+          if (KEYWORD_MAPPING[kw]) {
+            autoType = KEYWORD_MAPPING[kw];
+            break;
+          }
+        }
+        
+        groups.set(signature, {
+          id: `group-${groups.size}`,
+          signature,
+          keywords,
+          lines: [lineData],
+          cleaningType: autoType,
+          isCollapsed: true,
         });
       }
-    }
-    
-    return Array.from(groups.values()).sort((a, b) => b.lines.length - a.lines.length);
-  }, [parsedLines]);
-
-  // Lignes filtrées pour affichage
-  const filteredLines = useMemo(() => {
-    return parsedLines.filter(line => {
-      if (showOnlyRooms && !line.hasRoomNumber) return false;
-      if (searchFilter) {
-        const search = searchFilter.toUpperCase();
-        return line.normalizedText.includes(search) || 
-               line.roomNumber?.includes(search) ||
-               line.signature.includes(search);
-      }
-      return true;
-    });
-  }, [parsedLines, searchFilter, showOnlyRooms]);
-
-  // Sélectionner une ligne et toutes les lignes similaires
-  const handleLineClick = useCallback((line: ParsedLine, addToSelection: boolean = false) => {
-    const newSelection = new Set(addToSelection ? selectedLines : []);
-    
-    // Trouver toutes les lignes avec la même signature
-    const similarLines = parsedLines.filter(l => l.signature === line.signature && !l.isExcluded);
-    
-    if (selectedLines.has(line.id) && selectedLines.size === similarLines.length) {
-      // Désélectionner tout le groupe si déjà sélectionné
-      similarLines.forEach(l => newSelection.delete(l.id));
-    } else {
-      // Sélectionner tout le groupe
-      similarLines.forEach(l => newSelection.add(l.id));
-    }
-    
-    setSelectedLines(newSelection);
-    
-    if (!addToSelection && similarLines.length > 1) {
-      toast({
-        title: `${similarLines.length} lignes similaires sélectionnées`,
-        description: `Pattern: "${line.signature.substring(0, 50)}..."`,
-      });
-    }
-  }, [parsedLines, selectedLines, toast]);
-
-  // Désélectionner une seule ligne
-  const handleDeselectLine = useCallback((lineId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newSelection = new Set(selectedLines);
-    newSelection.delete(lineId);
-    setSelectedLines(newSelection);
-  }, [selectedLines]);
-
-  // Assigner un type de nettoyage aux lignes sélectionnées
-  const assignTypeToSelection = useCallback((type: 'a_blanc' | 'recouche' | 'none' | 'exclude') => {
-    if (selectedLines.size === 0) {
-      toast({ title: "Aucune ligne sélectionnée", variant: "destructive" });
-      return;
-    }
-
-    setParsedLines(prev => prev.map(line => {
-      if (selectedLines.has(line.id)) {
-        return { ...line, cleaningType: type, isExcluded: type === 'exclude' };
-      }
-      return line;
-    }));
-
-    const typeLabel = CLEANING_TYPES.find(t => t.value === type)?.label || type;
-    toast({
-      title: `${selectedLines.size} lignes assignées`,
-      description: `Type: ${typeLabel}`,
     });
     
-    setSelectedLines(new Set());
-  }, [selectedLines, toast]);
+    // Trier par nombre de lignes (plus gros groupes en premier)
+    const sortedGroups = Array.from(groups.values())
+      .sort((a, b) => b.lines.length - a.lines.length);
+    
+    setPatternGroups(sortedGroups);
+  }, [trainingData.rawText, extractSignature]);
 
-  // Auto-mapping intelligent
-  const autoMap = useCallback(() => {
-    const departureKeywords = ['DÉPART', 'DEPART', 'CHECKOUT', 'CHECK-OUT', 'LIBRE', 'VACANT', 'À BLANC', 'A BLANC', 'SALE', 'DIRTY', 'DEP'];
-    const stayoverKeywords = ['SÉJOUR', 'SEJOUR', 'RECOUCHE', 'OCCUPÉ', 'OCCUPE', 'PROLONGATION', 'OCC', 'PRO', 'INS', 'EN COURS'];
-    const noServiceKeywords = ['PROPRE', 'CLEAN', 'FAIT', 'OK', 'DND', 'REFUS', 'TERMINÉ'];
-    const excludeKeywords = ['MAINTENANCE', 'OOO', 'HORS SERVICE', 'FERMÉ', 'TOTAL', 'PAGE'];
-
-    setParsedLines(prev => prev.map(line => {
-      const upper = line.normalizedText;
-      let type: ParsedLine['cleaningType'] = null;
-      
-      // Vérifier les exclusions d'abord
-      for (const kw of excludeKeywords) {
-        if (upper.includes(kw)) {
-          return { ...line, cleaningType: 'exclude', isExcluded: true };
-        }
-      }
-      
-      // Départ = À blanc
-      for (const kw of departureKeywords) {
-        if (upper.includes(kw)) {
-          type = 'a_blanc';
-          break;
-        }
-      }
-      
-      // Séjour = Recouche (si pas déjà assigné)
-      if (!type) {
-        for (const kw of stayoverKeywords) {
-          if (upper.includes(kw)) {
-            type = 'recouche';
-            break;
-          }
-        }
-      }
-      
-      // Pas de ménage
-      if (!type) {
-        for (const kw of noServiceKeywords) {
-          if (upper.includes(kw)) {
-            type = 'none';
-            break;
-          }
-        }
-      }
-      
-      return { ...line, cleaningType: type };
-    }));
-
-    toast({ title: "Auto-mapping appliqué", description: "Revérifiez les assignations." });
-  }, [toast]);
-
-  // Reset le mapping
-  const resetMapping = useCallback(() => {
-    setParsedLines(prev => prev.map(line => ({
-      ...line,
-      cleaningType: null,
-      isExcluded: false,
-    })));
-    setSelectedLines(new Set());
-    toast({ title: "Mapping réinitialisé" });
-  }, [toast]);
-
-  // Ajouter un pattern d'exclusion
-  const addExclusion = useCallback(() => {
-    const trimmed = newExclusion.trim().toLowerCase();
-    if (trimmed && !exclusionPatterns.includes(trimmed)) {
-      const newPatterns = [...exclusionPatterns, trimmed];
-      setExclusionPatterns(newPatterns);
-      localStorage.setItem(`training_exclusions_${hotelId}`, JSON.stringify(newPatterns));
-      
-      // Appliquer l'exclusion
-      setParsedLines(prev => prev.map(line => {
-        if (line.normalizedText.includes(trimmed.toUpperCase())) {
-          return { ...line, isExcluded: true, cleaningType: 'exclude' };
-        }
-        return line;
-      }));
-      
-      setNewExclusion('');
-      toast({ title: "Exclusion ajoutée", description: `"${trimmed}"` });
+  // Filtrer les groupes
+  const filteredGroups = useMemo(() => {
+    if (showOnlyWithRooms) {
+      return patternGroups.filter(g => g.lines.some(l => l.hasRoom));
     }
-  }, [newExclusion, exclusionPatterns, hotelId, toast]);
+    return patternGroups;
+  }, [patternGroups, showOnlyWithRooms]);
 
   // Statistiques
   const stats = useMemo(() => {
-    const withRoom = parsedLines.filter(l => l.hasRoomNumber && !l.isExcluded);
-    const aBlanc = withRoom.filter(l => l.cleaningType === 'a_blanc').length;
-    const recouche = withRoom.filter(l => l.cleaningType === 'recouche').length;
-    const none = withRoom.filter(l => l.cleaningType === 'none').length;
-    const excluded = parsedLines.filter(l => l.isExcluded).length;
-    const unmapped = withRoom.filter(l => !l.cleaningType).length;
+    const roomLines = patternGroups.flatMap(g => g.lines).filter(l => l.hasRoom);
+    const mappedGroups = patternGroups.filter(g => g.cleaningType && g.lines.some(l => l.hasRoom));
+    const aBlanc = patternGroups.filter(g => g.cleaningType === 'a_blanc').flatMap(g => g.lines.filter(l => l.hasRoom)).length;
+    const recouche = patternGroups.filter(g => g.cleaningType === 'recouche').flatMap(g => g.lines.filter(l => l.hasRoom)).length;
+    const none = patternGroups.filter(g => g.cleaningType === 'none').flatMap(g => g.lines.filter(l => l.hasRoom)).length;
+    const excluded = patternGroups.filter(g => g.cleaningType === 'exclude').flatMap(g => g.lines.filter(l => l.hasRoom)).length;
     
-    return { 
-      total: withRoom.length, 
-      aBlanc, 
-      recouche, 
-      none, 
+    return {
+      totalRooms: roomLines.length,
+      mappedGroups: mappedGroups.length,
+      totalGroups: patternGroups.filter(g => g.lines.some(l => l.hasRoom)).length,
+      aBlanc,
+      recouche,
+      none,
       excluded,
-      unmapped,
-      totalLines: parsedLines.length 
+      unmapped: roomLines.length - aBlanc - recouche - none - excluded,
     };
-  }, [parsedLines]);
+  }, [patternGroups]);
 
-  // Générer le mapping et continuer
+  // Assigner un type à un groupe
+  const assignType = useCallback((groupId: string, type: CleaningTypeValue) => {
+    setPatternGroups(prev => prev.map(g => 
+      g.id === groupId ? { ...g, cleaningType: g.cleaningType === type ? null : type } : g
+    ));
+  }, []);
+
+  // Toggle collapse
+  const toggleCollapse = useCallback((groupId: string) => {
+    setPatternGroups(prev => prev.map(g => 
+      g.id === groupId ? { ...g, isCollapsed: !g.isCollapsed } : g
+    ));
+  }, []);
+
+  // Auto-mapper tous les groupes
+  const autoMapAll = useCallback(() => {
+    setPatternGroups(prev => prev.map(g => {
+      if (g.cleaningType) return g;
+      
+      for (const kw of g.keywords) {
+        if (KEYWORD_MAPPING[kw]) {
+          return { ...g, cleaningType: KEYWORD_MAPPING[kw] };
+        }
+      }
+      return g;
+    }));
+    toast({ title: "Auto-mapping appliqué" });
+  }, [toast]);
+
+  // Reset
+  const resetAll = useCallback(() => {
+    setPatternGroups(prev => prev.map(g => ({ ...g, cleaningType: null })));
+    toast({ title: "Mapping réinitialisé" });
+  }, [toast]);
+
+  // Continuer
   const handleContinue = useCallback(() => {
-    // Créer le mapping keyword -> type depuis les lignes assignées
     const mapping: Record<string, string> = {};
-    const seenPatterns = new Set<string>();
+    const exclusions: string[] = [];
     
-    for (const line of parsedLines) {
-      if (line.cleaningType && line.cleaningType !== 'exclude' && line.matchedPattern) {
-        if (!seenPatterns.has(line.matchedPattern)) {
-          mapping[line.matchedPattern] = line.cleaningType;
-          seenPatterns.add(line.matchedPattern);
+    for (const group of patternGroups) {
+      if (group.cleaningType === 'exclude') {
+        exclusions.push(group.signature);
+      }
+      for (const kw of group.keywords) {
+        if (group.cleaningType && group.cleaningType !== 'exclude') {
+          mapping[kw] = group.cleaningType;
         }
       }
     }
+    
+    const rooms: ExtractedRoom[] = patternGroups
+      .filter(g => g.cleaningType && g.cleaningType !== 'exclude')
+      .flatMap(g => g.lines
+        .filter(l => l.hasRoom)
+        .map(l => ({
+          roomNumber: l.roomNumber!,
+          status: g.cleaningType === 'a_blanc' ? 'checkout' : 
+                  g.cleaningType === 'recouche' ? 'stayover' : 'clean',
+          cleaningType: normalizeCleaningType(g.cleaningType as any),
+          originalText: l.text,
+          validated: false,
+          confidence: 80,
+        }))
+      );
+    
+    onComplete(rooms, mapping, exclusions);
+  }, [patternGroups, onComplete]);
 
-    // Convertir les lignes en ExtractedRoom
-    const rooms: ExtractedRoom[] = parsedLines
-      .filter(l => l.hasRoomNumber && !l.isExcluded && l.cleaningType && l.cleaningType !== 'exclude')
-      .map(line => ({
-        roomNumber: line.roomNumber!,
-        status: line.cleaningType === 'a_blanc' ? 'checkout' : 
-                line.cleaningType === 'recouche' ? 'stayover' : 'clean',
-        cleaningType: normalizeCleaningType(line.cleaningType as any),
-        originalText: line.rawText,
-        validated: false,
-        confidence: 80,
-      }));
-
-    onComplete(rooms, mapping, exclusionPatterns);
-  }, [parsedLines, exclusionPatterns, onComplete]);
-
-  const getTypeStyle = (type: string | null) => {
-    const t = CLEANING_TYPES.find(ct => ct.value === type);
-    return t ? t.bgLight : '';
+  const getTypeConfig = (type: CleaningTypeValue | null) => {
+    return CLEANING_TYPES.find(t => t.value === type);
   };
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription className="flex items-center justify-between flex-wrap gap-2">
-          <span>
-            PMS: <Badge variant="secondary">{trainingData.detectedPmsType.toUpperCase()}</Badge>
-            {' '}• {stats.totalLines} lignes • {stats.total} chambres détectées
-          </span>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={autoMap}>
-              <Zap className="h-4 w-4 mr-1" />
-              Auto-mapper
-            </Button>
-            <Button size="sm" variant="ghost" onClick={resetMapping}>
-              <RotateCcw className="h-4 w-4 mr-1" />
-              Reset
-            </Button>
-          </div>
-        </AlertDescription>
-      </Alert>
-
       {/* Stats */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
         <Card className="p-2 text-center">
-          <p className="text-xl font-bold">{stats.total}</p>
+          <p className="text-2xl font-bold">{stats.totalRooms}</p>
           <p className="text-xs text-muted-foreground">Chambres</p>
         </Card>
+        <Card className="p-2 text-center">
+          <p className="text-2xl font-bold">{stats.mappedGroups}/{stats.totalGroups}</p>
+          <p className="text-xs text-muted-foreground">Groupes</p>
+        </Card>
         <Card className="p-2 text-center bg-orange-50 dark:bg-orange-900/20">
-          <p className="text-xl font-bold text-orange-600">{stats.aBlanc}</p>
+          <p className="text-2xl font-bold text-orange-600">{stats.aBlanc}</p>
           <p className="text-xs text-orange-600">À blanc</p>
         </Card>
         <Card className="p-2 text-center bg-green-50 dark:bg-green-900/20">
-          <p className="text-xl font-bold text-green-600">{stats.recouche}</p>
+          <p className="text-2xl font-bold text-green-600">{stats.recouche}</p>
           <p className="text-xs text-green-600">Recouche</p>
         </Card>
         <Card className="p-2 text-center bg-gray-50 dark:bg-gray-900/20">
-          <p className="text-xl font-bold text-gray-600">{stats.none}</p>
+          <p className="text-2xl font-bold text-gray-600">{stats.none}</p>
           <p className="text-xs text-gray-600">Aucun</p>
         </Card>
         <Card className="p-2 text-center bg-red-50 dark:bg-red-900/20">
-          <p className="text-xl font-bold text-red-600">{stats.excluded}</p>
+          <p className="text-2xl font-bold text-red-600">{stats.excluded}</p>
           <p className="text-xs text-red-600">Exclus</p>
         </Card>
         <Card className="p-2 text-center bg-yellow-50 dark:bg-yellow-900/20">
-          <p className="text-xl font-bold text-yellow-600">{stats.unmapped}</p>
+          <p className="text-2xl font-bold text-yellow-600">{stats.unmapped}</p>
           <p className="text-xs text-yellow-600">À mapper</p>
         </Card>
       </div>
 
-      {/* Instructions */}
-      <Card className="p-3 bg-primary/5 border-primary/20">
-        <div className="flex items-start gap-2">
-          <MousePointerClick className="h-5 w-5 text-primary mt-0.5" />
-          <div className="text-sm">
-            <p className="font-medium">Comment mapper :</p>
-            <ol className="list-decimal ml-4 mt-1 text-muted-foreground space-y-0.5">
-              <li>Cliquez sur une ligne - les lignes similaires sont auto-sélectionnées</li>
-              <li>Cliquez sur le ✕ pour désélectionner une ligne individuelle</li>
-              <li>Assignez un type avec les boutons ci-dessous</li>
-            </ol>
-          </div>
-        </div>
-      </Card>
-
-      {/* Boutons d'assignation */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-sm text-muted-foreground">
-          {selectedLines.size > 0 ? `${selectedLines.size} sélectionnée(s) →` : 'Sélectionnez des lignes puis :'}
-        </span>
-        {CLEANING_TYPES.map(type => (
-          <Button
-            key={type.value}
-            size="sm"
-            variant={selectedLines.size > 0 ? "default" : "outline"}
-            className={cn(
-              selectedLines.size > 0 && type.value === 'a_blanc' && 'bg-orange-500 hover:bg-orange-600',
-              selectedLines.size > 0 && type.value === 'recouche' && 'bg-green-500 hover:bg-green-600',
-              selectedLines.size > 0 && type.value === 'none' && 'bg-gray-500 hover:bg-gray-600',
-              selectedLines.size > 0 && type.value === 'exclude' && 'bg-red-500 hover:bg-red-600',
-            )}
-            disabled={selectedLines.size === 0}
-            onClick={() => assignTypeToSelection(type.value as any)}
-          >
-            {type.emoji} {type.label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Filtres */}
-      <div className="flex gap-2 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher dans les lignes..."
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            className="pl-8"
-          />
-        </div>
+      {/* Actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={autoMapAll} className="gap-1">
+          <Zap className="h-4 w-4" />
+          Auto-mapper
+        </Button>
+        <Button size="sm" variant="outline" onClick={resetAll} className="gap-1">
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </Button>
+        <div className="flex-1" />
         <Button
           size="sm"
-          variant={showOnlyRooms ? "secondary" : "outline"}
-          onClick={() => setShowOnlyRooms(!showOnlyRooms)}
+          variant="ghost"
+          onClick={() => setShowOnlyWithRooms(!showOnlyWithRooms)}
+          className="gap-1"
         >
-          <Filter className="h-4 w-4 mr-1" />
-          Chambres uniquement
+          {showOnlyWithRooms ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          {showOnlyWithRooms ? 'Chambres uniquement' : 'Tout afficher'}
         </Button>
       </div>
 
-      {/* Exclusions rapides */}
-      <div className="flex gap-2 items-center">
-        <Input
-          placeholder="Ajouter un pattern d'exclusion..."
-          value={newExclusion}
-          onChange={(e) => setNewExclusion(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addExclusion()}
-          className="flex-1"
-        />
-        <Button size="sm" variant="secondary" onClick={addExclusion}>
-          <Plus className="h-4 w-4 mr-1" />
-          Exclure
-        </Button>
-      </div>
+      {/* Instructions */}
+      <Alert>
+        <Layers className="h-4 w-4" />
+        <AlertDescription>
+          Cliquez sur un type pour l'assigner au groupe. Les lignes similaires sont automatiquement groupées.
+        </AlertDescription>
+      </Alert>
 
-      {/* Liste des lignes */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Layers className="h-4 w-4" />
-            Lignes du rapport ({filteredLines.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[350px]">
-            <div className="divide-y">
-              {filteredLines.map((line) => {
-                const isSelected = selectedLines.has(line.id);
-                const typeStyle = getTypeStyle(line.cleaningType);
-                
-                return (
-                  <div
-                    key={line.id}
-                    onClick={() => !line.isExcluded && handleLineClick(line, false)}
-                    className={cn(
-                      "px-3 py-2 cursor-pointer transition-all text-sm",
-                      line.isExcluded && "opacity-40 cursor-not-allowed bg-red-50 dark:bg-red-900/10",
-                      !line.isExcluded && !isSelected && "hover:bg-muted/50",
-                      isSelected && "bg-primary/10 border-l-4 border-primary",
-                      !isSelected && typeStyle && `${typeStyle} border-l-4 ${CLEANING_TYPES.find(t => t.value === line.cleaningType)?.border || ''}`,
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      {/* Checkbox visuel */}
-                      <div className={cn(
-                        "w-5 h-5 rounded border flex items-center justify-center shrink-0",
-                        isSelected ? "bg-primary border-primary" : "border-muted-foreground/30"
-                      )}>
-                        {isSelected && <CheckCircle2 className="h-4 w-4 text-primary-foreground" />}
-                      </div>
-                      
-                      {/* Numéro de chambre */}
-                      {line.hasRoomNumber && (
-                        <Badge variant="outline" className="shrink-0 font-mono">
-                          {line.roomNumber}
-                        </Badge>
-                      )}
-                      
-                      {/* Texte de la ligne */}
-                      <span className="flex-1 truncate font-mono text-xs">
-                        {line.rawText}
-                      </span>
-                      
-                      {/* Type assigné */}
-                      {line.cleaningType && line.cleaningType !== 'exclude' && (
+      {/* Pattern Groups */}
+      <ScrollArea className="h-[400px] border rounded-lg">
+        <div className="p-2 space-y-2">
+          {filteredGroups.map(group => {
+            const typeConfig = getTypeConfig(group.cleaningType);
+            const roomCount = group.lines.filter(l => l.hasRoom).length;
+            
+            return (
+              <Card 
+                key={group.id} 
+                className={cn(
+                  "overflow-hidden transition-all",
+                  typeConfig?.bgLight,
+                  !group.cleaningType && "border-dashed border-yellow-400"
+                )}
+              >
+                {/* Group Header */}
+                <div 
+                  className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/50"
+                  onClick={() => toggleCollapse(group.id)}
+                >
+                  {/* Type Buttons */}
+                  <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                    {CLEANING_TYPES.map(t => (
+                      <button
+                        key={t.value}
+                        onClick={() => assignType(group.id, t.value)}
+                        className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all",
+                          group.cleaningType === t.value 
+                            ? `${t.color} text-white ring-2 ring-offset-2 ring-${t.color}`
+                            : "bg-muted hover:bg-muted/80"
+                        )}
+                        title={t.label}
+                      >
+                        {group.cleaningType === t.value ? <Check className="h-4 w-4" /> : t.emoji}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="shrink-0">
+                        {roomCount} ch. / {group.lines.length} lignes
+                      </Badge>
+                      {group.keywords.slice(0, 3).map(kw => (
                         <Badge 
-                          variant="secondary" 
+                          key={kw} 
+                          variant="outline" 
                           className={cn(
-                            "shrink-0 text-xs",
-                            line.cleaningType === 'a_blanc' && "bg-orange-100 text-orange-700",
-                            line.cleaningType === 'recouche' && "bg-green-100 text-green-700",
-                            line.cleaningType === 'none' && "bg-gray-100 text-gray-700",
+                            "text-xs",
+                            KEYWORD_MAPPING[kw] === 'a_blanc' && "border-orange-400 text-orange-600",
+                            KEYWORD_MAPPING[kw] === 'recouche' && "border-green-400 text-green-600",
+                            KEYWORD_MAPPING[kw] === 'exclude' && "border-red-400 text-red-600"
                           )}
                         >
-                          {CLEANING_TYPES.find(t => t.value === line.cleaningType)?.emoji}
+                          {kw}
                         </Badge>
-                      )}
-                      
-                      {/* Bouton désélectionner */}
-                      {isSelected && (
-                        <button
-                          onClick={(e) => handleDeselectLine(line.id, e)}
-                          className="p-1 rounded hover:bg-destructive/20 text-destructive"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                      
-                      {/* Indicateur lignes similaires */}
-                      {!line.isExcluded && patternGroups.find(g => g.signature === line.signature)?.lines.length! > 1 && (
-                        <span className="text-xs text-muted-foreground">
-                          ×{patternGroups.find(g => g.signature === line.signature)?.lines.length}
-                        </span>
-                      )}
+                      ))}
                     </div>
+                    <p className="text-xs text-muted-foreground truncate mt-1">
+                      Ex: {group.lines[0]?.text.substring(0, 60)}...
+                    </p>
                   </div>
-                );
-              })}
+
+                  {/* Expand indicator */}
+                  <span className="text-xs text-muted-foreground">
+                    {group.isCollapsed ? '▼' : '▲'}
+                  </span>
+                </div>
+
+                {/* Expanded Lines */}
+                {!group.isCollapsed && (
+                  <div className="border-t bg-muted/30 max-h-48 overflow-y-auto">
+                    {group.lines.slice(0, 20).map((line, idx) => (
+                      <div 
+                        key={idx} 
+                        className={cn(
+                          "px-3 py-1.5 text-xs border-b border-muted/50 last:border-0",
+                          line.hasRoom && "font-medium"
+                        )}
+                      >
+                        {line.hasRoom && (
+                          <Badge variant="secondary" className="mr-2 text-xs">
+                            {line.roomNumber}
+                          </Badge>
+                        )}
+                        <span className="text-muted-foreground">{line.text}</span>
+                      </div>
+                    ))}
+                    {group.lines.length > 20 && (
+                      <p className="px-3 py-2 text-xs text-muted-foreground italic">
+                        ... et {group.lines.length - 20} autres lignes
+                      </p>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+          
+          {filteredGroups.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              Aucun groupe trouvé
             </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </ScrollArea>
 
       {/* Navigation */}
-      <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
+      <div className="flex justify-between pt-4 border-t">
+        <Button variant="outline" onClick={onBack} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
           Retour
         </Button>
-        <Button onClick={handleContinue} disabled={stats.total === 0}>
+        <Button 
+          onClick={handleContinue} 
+          className="gap-2"
+          disabled={stats.unmapped > 0 && stats.mappedGroups === 0}
+        >
           Continuer
-          <ArrowRight className="h-4 w-4 ml-2" />
+          <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
     </div>

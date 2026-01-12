@@ -1,24 +1,18 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Check, X, ChevronLeft, Link2, Unlink, Plus, 
-  AlertTriangle, Sparkles, Save, Calendar, User, ArrowRight, Copy, FileText, Wand2, RefreshCw
+  Check, ChevronLeft, ArrowRight, Plus, 
+  Sparkles, Search, CheckCircle2, Trash2, Edit2
 } from "lucide-react";
-import { ExtractedRoom, CLEANING_TYPE_LABELS } from "@/services/pms";
+import { ExtractedRoom } from "@/services/pms";
 import { TrainingData } from "./TrainingWizard";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { LinePatternRuleDialog } from "./LinePatternRuleDialog";
-import { ExclusionListManager } from "./ExclusionListManager";
-import { parseRoomLines, RoomLine, DEFAULT_EXCLUDE_LIST } from "@/services/pms/RoomLineParser";
+import { cn } from "@/lib/utils";
 
 interface TrainingStep3AnnotateProps {
   trainingData: TrainingData;
@@ -29,50 +23,16 @@ interface TrainingStep3AnnotateProps {
   onOpenAdvanced?: () => void;
 }
 
-
 // Labels pour les types de nettoyage
-const CLEANING_LABELS: Record<string, { label: string; color: string }> = {
-  'a_blanc': { label: 'À blanc', color: 'bg-orange-500' },
-  'full': { label: 'À blanc', color: 'bg-orange-500' },
-  'recouche': { label: 'Recouche', color: 'bg-blue-500' },
-  'quick': { label: 'Recouche', color: 'bg-blue-500' },
-  'none': { label: 'Aucun', color: 'bg-gray-400' },
-};
+const CLEANING_CONFIG = {
+  'a_blanc': { label: 'À blanc', emoji: '🔶', color: 'bg-orange-500', bgLight: 'bg-orange-100 dark:bg-orange-900/30', textColor: 'text-orange-600' },
+  'full': { label: 'À blanc', emoji: '🔶', color: 'bg-orange-500', bgLight: 'bg-orange-100 dark:bg-orange-900/30', textColor: 'text-orange-600' },
+  'recouche': { label: 'Recouche', emoji: '🔄', color: 'bg-green-500', bgLight: 'bg-green-100 dark:bg-green-900/30', textColor: 'text-green-600' },
+  'quick': { label: 'Recouche', emoji: '🔄', color: 'bg-green-500', bgLight: 'bg-green-100 dark:bg-green-900/30', textColor: 'text-green-600' },
+  'none': { label: 'Aucun', emoji: '⏸️', color: 'bg-gray-400', bgLight: 'bg-gray-100 dark:bg-gray-900/30', textColor: 'text-gray-600' },
+} as const;
 
-// Labels pour les statuts séjour
-const STATUS_LABELS: Record<string, { label: string; icon: string; description: string }> = {
-  'checkout': { label: 'Départ', icon: '🚪', description: 'C/O = Check-Out (heure de départ client). Nettoyage: À blanc.' },
-  'checkout_arrival': { label: 'Départ → Arrivée', icon: '🔄', description: 'C/O + C/I = Départ puis arrivée même jour. Nettoyage: À blanc.' },
-  'stayover': { label: 'Recouche', icon: '🛏️', description: 'Client reste. Mews: dates arrivée/départ sans horaire. Nettoyage: Recouche.' },
-  'arrival': { label: 'En arrivée', icon: '📥', description: 'C/I = Check-In (heure d\'arrivée). Chambre doit être prête.' },
-  'occupied': { label: 'Occupé', icon: '👤', description: 'Chambre occupée, client présent.' },
-  'dirty': { label: 'Sale', icon: '🧹', description: 'SAL/SALE = Chambre sale. Par défaut: À blanc (nettoyage complet).' },
-  'clean': { label: 'Propre', icon: '✨', description: 'INS/PRO = Chambre propre ou inspectée. Pas de nettoyage.' },
-  'unknown': { label: 'Inconnu', icon: '❓', description: 'Statut non reconnu - vérifiez manuellement.' },
-};
-
-// Détecte si une chambre est une "dernière nuit" mal détectée
-const isLastNightMisdetected = (room: ExtractedRoom): boolean => {
-  const originalText = room.originalText || '';
-  const upper = originalText.toUpperCase();
-  
-  // Chercher le pattern "Nuit X/X" où les chiffres sont égaux
-  const lastNightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) || 
-                         upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
-  
-  if (lastNightMatch) {
-    const currentNight = parseInt(lastNightMatch[1]);
-    const totalNights = parseInt(lastNightMatch[2]);
-    
-    // Si c'est la dernière nuit (X/X) mais détecté comme recouche → alerte
-    if (currentNight === totalNights && 
-        (room.cleaningType === 'recouche' || room.cleaningType === 'quick')) {
-      return true;
-    }
-  }
-  
-  return false;
-};
+type CleaningType = keyof typeof CLEANING_CONFIG;
 
 export const TrainingStep3Annotate = ({
   trainingData,
@@ -84,1096 +44,311 @@ export const TrainingStep3Annotate = ({
 }: TrainingStep3AnnotateProps) => {
   const { toast } = useToast();
   const [rooms, setRooms] = useState<ExtractedRoom[]>(trainingData.extractedRooms);
-  const [mergingMode, setMergingMode] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
-  const [editingTimeRoom, setEditingTimeRoom] = useState<number | null>(null);
-  const [newRoom, setNewRoom] = useState({ roomNumber: "", cleaningType: "full" as const });
-  const [ruleDialogRoom, setRuleDialogRoom] = useState<ExtractedRoom | null>(null);
-  const [clickedLine, setClickedLine] = useState<{ text: string; index: number; roomLine?: RoomLine } | null>(null);
-  const [lineRoomNumber, setLineRoomNumber] = useState("");
-  const [lineCleaningType, setLineCleaningType] = useState<"a_blanc" | "recouche" | "none">("a_blanc");
-  const [showExclusionPanel, setShowExclusionPanel] = useState(false);
-  
-  // Liste d'exclusion dynamique (noms de responsables HK à ignorer)
-  const [excludeList, setExcludeList] = useState<string[]>(() => {
-    // Charger depuis localStorage si disponible
-    const saved = localStorage.getItem(`training_exclude_${hotelId}`);
-    return saved ? JSON.parse(saved) : [...DEFAULT_EXCLUDE_LIST];
-  });
-
+  const [bulkType, setBulkType] = useState<CleaningType | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [cleaningFilter, setCleaningFilter] = useState<'all' | 'a_blanc' | 'recouche' | 'none'>('all');
-  
-  // Sauvegarder la liste d'exclusion
-  useEffect(() => {
-    localStorage.setItem(`training_exclude_${hotelId}`, JSON.stringify(excludeList));
-  }, [excludeList, hotelId]);
-  
-  // Parser les lignes logiques (d'un numéro de chambre au suivant)
-  const roomLines = useMemo(() => {
-    return parseRoomLines(trainingData.rawText, excludeList);
-  }, [trainingData.rawText, excludeList]);
-  
-  // Détecter les noms potentiels de responsables (pour suggestions)
-  const detectedNames = useMemo(() => {
-    const names: string[] = [];
-    const namePattern = /([A-ZÀ-ÿ][a-zà-ÿ]+)\s+([A-ZÀ-ÿ][a-zà-ÿ]+)/g;
-    let match;
-    while ((match = namePattern.exec(trainingData.rawText)) !== null) {
-      const fullName = `${match[1]} ${match[2]}`;
-      if (!names.includes(fullName) && names.length < 50) {
-        names.push(fullName);
-      }
-    }
-    return names;
-  }, [trainingData.rawText]);
-  
-  // Re-parser les chambres avec la nouvelle liste d'exclusion
-  const reparseRooms = () => {
-    const newRooms: ExtractedRoom[] = roomLines.map(line => {
-      // Utiliser le type suggéré par le parser (basé sur les dates)
-      let cleaningType: ExtractedRoom['cleaningType'] = line.cleaningType === 'inspection' ? 'none' : line.cleaningType;
-      
-      // Déterminer le statut séjour
-      let status: ExtractedRoom['status'] = mapStatusCode(line.statusCode);
-      
-      // Si 2 dates différentes = départ + arrivée
-      const hasTwoDates = line.arrivalDate && line.departureDate && line.arrivalDate !== line.departureDate;
-      if (hasTwoDates) {
-        status = 'checkout_arrival';
-        cleaningType = 'a_blanc';
-      } else if (line.departureDate && !line.arrivalDate) {
-        // Date de départ seule
-        status = 'checkout';
-        cleaningType = 'a_blanc';
-      } else if (line.arrivalDate && !line.departureDate) {
-        // Date d'arrivée seule = client en séjour
-        status = 'stayover';
-        cleaningType = 'recouche';
-      }
-      
-      const room: ExtractedRoom & { nightInfo?: { current: number; total: number }; adults?: number; children?: number } = {
-        roomNumber: line.roomNumber,
-        status,
-        cleaningType,
-        guestName: line.guestName,
-        arrivalDate: line.arrivalDate || '',
-        departureDate: line.departureDate || '',
-        arrivalTime: line.checkInTime,
-        departureTime: line.checkOutTime,
-        roomType: line.roomType,
-        originalText: line.fullText,
-        validated: false,
-        isConnected: !!line.linkedRooms,
-        linkedRooms: line.linkedRooms,
-      };
-      
-      // Ajouter les données supplémentaires en tant que propriétés étendues
-      (room as any)._nightInfo = line.nightInfo;
-      (room as any)._adults = line.adults;
-      (room as any)._children = line.children;
-      
-      return room;
-    });
-    
-    setRooms(newRooms);
-    toast({ 
-      title: "Re-analyse effectuée", 
-      description: `${newRooms.length} chambres détectées avec la nouvelle liste d'exclusion` 
-    });
-  };
-  
-  // Mapper le code statut vers le type interne
-  const mapStatusCode = (code?: string): ExtractedRoom['status'] => {
-    if (!code) return 'unknown';
-    const upper = code.toUpperCase();
-    switch (upper) {
-      case 'SAL': return 'dirty';
-      case 'INS': 
-      case 'PRO': return 'clean';
-      case 'ARR': return 'arrival';
-      case 'DEP': return 'checkout';
-      case 'OCC': return 'occupied';
-      default: return 'unknown';
-    }
-  };
+  const [filterType, setFilterType] = useState<'all' | CleaningType>('all');
 
-  const copyRawText = () => {
-    navigator.clipboard.writeText(trainingData.rawText);
-    toast({ title: "Texte copié dans le presse-papiers" });
-  };
-
-  // Parse les lignes du texte brut pour affichage interactif
-  const rawLines = useMemo(() => {
-    return trainingData.rawText.split('\n').map((text, index) => {
-      const trimmed = text.trim();
-      if (!trimmed) return null;
-      
-      // Chercher si cette ligne correspond à une chambre détectée
-      const matchingRoom = rooms.find(r => {
-        const roomNum = r.roomNumber.replace(/-T$/, '');
-        // Vérifier si le numéro de chambre apparaît au début de la ligne
-        return new RegExp(`^${roomNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`).test(trimmed) ||
-               trimmed.includes(` ${roomNum} `) ||
-               trimmed.startsWith(roomNum + ' ');
-      });
-      
-      return {
-        index,
-        text: trimmed,
-        isDetected: !!matchingRoom,
-        roomNumber: matchingRoom?.roomNumber || null,
-      };
-    }).filter(Boolean) as { index: number; text: string; isDetected: boolean; roomNumber: string | null }[];
-  }, [trainingData.rawText, rooms]);
-
-  // Ajouter une chambre depuis une ligne cliquée
-  const addRoomFromLine = () => {
-    if (!clickedLine || !lineRoomNumber.trim()) {
-      toast({ title: "Entrez un numéro de chambre", variant: "destructive" });
-      return;
-    }
-
-    // Détecter automatiquement le type de nettoyage basé sur le texte
-    const upper = clickedLine.text.toUpperCase();
-    let autoCleaningType = lineCleaningType;
-    
-    if (/\bINS\b|\bPRO\b/.test(upper)) autoCleaningType = 'none';
-    else if (/\bSAL\b.*\d{1,2}:\d{2}.*\d{1,2}:\d{2}/.test(upper)) autoCleaningType = 'a_blanc';
-    else if (/\bDEP\b|\bDIR\b/.test(upper)) autoCleaningType = 'a_blanc';
-
-    setRooms([
-      ...rooms,
-      {
-        roomNumber: lineRoomNumber.trim(),
-        status: "unknown",
-        cleaningType: autoCleaningType,
-        arrivalDate: "",
-        departureDate: "",
-        validated: true,
-        originalText: clickedLine.text,
-      },
-    ]);
-    
-    toast({ title: `Chambre ${lineRoomNumber} ajoutée` });
-    setClickedLine(null);
-    setLineRoomNumber("");
-  };
-
-  const validatedCount = rooms.filter((r) => r.validated).length;
-  const totalCount = rooms.length;
-
+  // Collator pour tri naturel
   const collator = useMemo(() => new Intl.Collator('fr', { numeric: true, sensitivity: 'base' }), []);
 
-  const matchesCleaningFilter = (room: ExtractedRoom) => {
-    if (cleaningFilter === 'all') return true;
-
-    if (cleaningFilter === 'a_blanc') {
-      return room.cleaningType === 'a_blanc' || room.cleaningType === 'full';
-    }
-    if (cleaningFilter === 'recouche') {
-      return room.cleaningType === 'recouche' || room.cleaningType === 'quick';
-    }
-    return room.cleaningType === 'none';
-  };
-
+  // Chambres filtrées et triées
   const displayedRooms = useMemo(() => {
-    const indexed = rooms.map((room, index) => ({ room, index }));
-
-    const filtered = indexed.filter(({ room }) => matchesCleaningFilter(room));
-
+    let filtered = rooms.map((room, index) => ({ room, originalIndex: index }));
+    
+    // Filtre texte
+    if (searchFilter) {
+      const search = searchFilter.toLowerCase();
+      filtered = filtered.filter(({ room }) => 
+        room.roomNumber.toLowerCase().includes(search) ||
+        room.originalText?.toLowerCase().includes(search)
+      );
+    }
+    
+    // Filtre type
+    if (filterType !== 'all') {
+      filtered = filtered.filter(({ room }) => {
+        const type = room.cleaningType;
+        if (filterType === 'a_blanc') return type === 'a_blanc' || type === 'full';
+        if (filterType === 'recouche') return type === 'recouche' || type === 'quick';
+        return type === filterType;
+      });
+    }
+    
+    // Tri
     filtered.sort((a, b) => {
       const cmp = collator.compare(a.room.roomNumber, b.room.roomNumber);
       return sortOrder === 'asc' ? cmp : -cmp;
     });
-
+    
     return filtered;
-  }, [rooms, cleaningFilter, sortOrder, collator]);
+  }, [rooms, searchFilter, filterType, sortOrder, collator]);
 
-  // Intelligent highlighting - avoid false positives
-  const highlightedText = useMemo(() => {
-    const text = trainingData.rawText;
-    const segments: { text: string; isRoom: boolean; roomNum?: string }[] = [];
-    
-    const roomNumbers = rooms.map((r) => r.roomNumber);
-    const sortedRoomNumbers = [...roomNumbers].sort((a, b) => b.length - a.length);
-    
-    const positions: { start: number; end: number; roomNum: string }[] = [];
-    
-    // Process line by line to better identify context
-    const lines = text.split('\n');
-    let currentPos = 0;
-    
-    for (const line of lines) {
-      sortedRoomNumbers.forEach((roomNum) => {
-        const escaped = roomNum.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // Only match room numbers at the start of a line or after significant whitespace
-        const regex = new RegExp(`(?:^|\\s{2,})(${escaped})(?:\\s|$)`, "g");
-        let match;
-        
-        while ((match = regex.exec(line)) !== null) {
-          const matchIndex = match.index + (match[0].indexOf(roomNum));
-          const globalIndex = currentPos + matchIndex;
-          
-          // Skip if this looks like it's part of "X adultes" or time
-          const contextBefore = line.substring(Math.max(0, matchIndex - 15), matchIndex);
-          const contextAfter = line.substring(matchIndex + roomNum.length, matchIndex + roomNum.length + 15);
-          
-          // Skip if preceded by digits (likely part of a larger number)
-          if (/\d$/.test(contextBefore.trim())) continue;
-          
-          // Skip if followed by "adultes", "enfants", or time pattern
-          if (/^\s*(adultes?|enfants?|:\d{2})/i.test(contextAfter)) continue;
-          
-          // Skip if it's clearly part of a date pattern
-          if (/\d{1,2}\/\d{1,2}\/\d{4}/.test(line.substring(matchIndex - 5, matchIndex + roomNum.length + 5))) {
-            // But allow if it's at the very start of the line
-            if (matchIndex > 3) continue;
-          }
-          
-          const overlap = positions.some(
-            (pos) =>
-              (globalIndex >= pos.start && globalIndex < pos.end) ||
-              (globalIndex + roomNum.length > pos.start &&
-                globalIndex + roomNum.length <= pos.end)
-          );
-          
-          if (!overlap) {
-            positions.push({
-              start: globalIndex,
-              end: globalIndex + roomNum.length,
-              roomNum,
-            });
-          }
-        }
-      });
-      currentPos += line.length + 1; // +1 for newline
-    }
-    
-    positions.sort((a, b) => a.start - b.start);
-    
-    let lastIndex = 0;
-    positions.forEach((pos) => {
-      if (pos.start > lastIndex) {
-        segments.push({ text: text.substring(lastIndex, pos.start), isRoom: false });
-      }
-      segments.push({ text: text.substring(pos.start, pos.end), isRoom: true, roomNum: pos.roomNum });
-      lastIndex = pos.end;
+  // Stats
+  const stats = useMemo(() => {
+    const aBlanc = rooms.filter(r => r.cleaningType === 'a_blanc' || r.cleaningType === 'full').length;
+    const recouche = rooms.filter(r => r.cleaningType === 'recouche' || r.cleaningType === 'quick').length;
+    const none = rooms.filter(r => r.cleaningType === 'none').length;
+    const validated = rooms.filter(r => r.validated).length;
+    return { total: rooms.length, aBlanc, recouche, none, validated };
+  }, [rooms]);
+
+  // Changer le type d'une chambre
+  const changeType = useCallback((index: number, type: CleaningType) => {
+    setRooms(prev => prev.map((r, i) => 
+      i === index ? { ...r, cleaningType: type, validated: true } : r
+    ));
+  }, []);
+
+  // Toggle sélection
+  const toggleSelect = useCallback((index: number) => {
+    setSelectedRooms(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
     });
-    
-    if (lastIndex < text.length) {
-      segments.push({ text: text.substring(lastIndex), isRoom: false });
-    }
-    
-    return segments;
-  }, [trainingData.rawText, rooms]);
-  
-  // Get cleaning badge styling
-  const getCleaningBadge = (cleaningType: string) => {
-    const config = CLEANING_LABELS[cleaningType] || CLEANING_LABELS['none'];
-    return config;
-  };
-  
-  // Get status info
-  const getStatusInfo = (status: string) => {
-    return STATUS_LABELS[status] || STATUS_LABELS['unknown'];
-  };
+  }, []);
 
-  const updateRoom = (index: number, field: keyof ExtractedRoom, value: any) => {
-    const updated = [...rooms];
-    updated[index] = { ...updated[index], [field]: value };
-    setRooms(updated);
-  };
-
-  const validateRoom = (index: number) => {
-    const updated = [...rooms];
-    updated[index] = { ...updated[index], validated: !updated[index].validated };
-    setRooms(updated);
-  };
-
-  const validateAll = () => {
-    setRooms(rooms.map((r) => ({ ...r, validated: true })));
-    toast({ title: "Toutes les chambres validées" });
-  };
-
-  const toggleRoomSelection = (index: number) => {
-    const newSelection = new Set(selectedRooms);
-    if (newSelection.has(index)) {
-      newSelection.delete(index);
+  // Sélectionner tout
+  const selectAll = useCallback(() => {
+    if (selectedRooms.size === displayedRooms.length) {
+      setSelectedRooms(new Set());
     } else {
-      newSelection.add(index);
+      setSelectedRooms(new Set(displayedRooms.map(d => d.originalIndex)));
     }
-    setSelectedRooms(newSelection);
-  };
+  }, [displayedRooms, selectedRooms]);
 
-  const mergeSelectedRooms = () => {
-    if (selectedRooms.size < 2) {
-      toast({ title: "Sélectionnez au moins 2 chambres", variant: "destructive" });
+  // Appliquer type en masse
+  const applyBulkType = useCallback((type: CleaningType) => {
+    if (selectedRooms.size === 0) {
+      toast({ title: "Sélectionnez des chambres", variant: "destructive" });
       return;
     }
-
-    const indices = Array.from(selectedRooms).sort((a, b) => a - b);
-    const roomsToMerge = indices.map((i) => rooms[i]);
-    const roomNumbers = roomsToMerge.map((r) => r.roomNumber);
-
-    const merged: ExtractedRoom = {
-      roomNumber: roomNumbers.join("-"),
-      status: roomsToMerge[0].status,
-      cleaningType: roomsToMerge[0].cleaningType,
-      arrivalDate: roomsToMerge[0].arrivalDate,
-      departureDate: roomsToMerge[0].departureDate,
-      validated: true,
-      isConnected: true,
-      linkedRooms: roomNumbers,
-    };
-
-    const updated = rooms.filter((_, i) => !selectedRooms.has(i));
-    updated.push(merged);
-    setRooms(updated);
+    setRooms(prev => prev.map((r, i) => 
+      selectedRooms.has(i) ? { ...r, cleaningType: type, validated: true } : r
+    ));
+    toast({ title: `${selectedRooms.size} chambres modifiées` });
     setSelectedRooms(new Set());
-    setMergingMode(false);
-    toast({ title: "Chambres fusionnées" });
-  };
+  }, [selectedRooms, toast]);
 
-  const splitRoom = (index: number) => {
-    const room = rooms[index];
-    if (!room.isConnected || !room.linkedRooms) return;
+  // Supprimer sélection
+  const deleteSelected = useCallback(() => {
+    if (selectedRooms.size === 0) return;
+    setRooms(prev => prev.filter((_, i) => !selectedRooms.has(i)));
+    toast({ title: `${selectedRooms.size} chambres supprimées` });
+    setSelectedRooms(new Set());
+  }, [selectedRooms, toast]);
 
-    const separated = room.linkedRooms.map((num) => ({
-      roomNumber: num,
-      status: room.status,
-      cleaningType: room.cleaningType,
-      arrivalDate: room.arrivalDate,
-      departureDate: room.departureDate,
-      validated: true,
-    }));
+  // Valider toutes
+  const validateAll = useCallback(() => {
+    setRooms(prev => prev.map(r => ({ ...r, validated: true })));
+    toast({ title: "Toutes les chambres validées" });
+  }, [toast]);
 
-    const updated = [...rooms];
-    updated.splice(index, 1, ...separated);
-    setRooms(updated);
-    toast({ title: "Chambres séparées" });
-  };
+  // Continuer
+  const handleContinue = useCallback(() => {
+    onComplete(rooms.map(r => ({ ...r, validated: true })));
+  }, [rooms, onComplete]);
 
-  const addRoom = () => {
-    if (!newRoom.roomNumber.trim()) {
-      toast({ title: "Entrez un numéro de chambre", variant: "destructive" });
-      return;
-    }
-
-    setRooms([
-      ...rooms,
-      {
-        roomNumber: newRoom.roomNumber.trim(),
-        status: "unknown",
-        cleaningType: newRoom.cleaningType,
-        arrivalDate: "",
-        departureDate: "",
-        validated: true,
-      },
-    ]);
-    setNewRoom({ roomNumber: "", cleaningType: "full" });
-    toast({ title: `Chambre ${newRoom.roomNumber} ajoutée` });
-  };
-
-  const removeRoom = (index: number) => {
-    const updated = rooms.filter((_, i) => i !== index);
-    setRooms(updated);
-  };
-
-  const handleComplete = () => {
-    if (validatedCount === 0) {
-      toast({
-        title: "Aucune chambre validée",
-        description: "Validez au moins une chambre avant de continuer",
-        variant: "destructive",
-      });
-      return;
-    }
-    onComplete(rooms);
+  const getConfig = (type: string) => {
+    return CLEANING_CONFIG[type as CleaningType] || CLEANING_CONFIG['none'];
   };
 
   return (
-    <div className="flex gap-4 h-[650px]">
-      {/* Left panel - Parsed room lines */}
-      <div className="w-1/2 flex flex-col">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-muted-foreground" />
-            <span className="font-medium text-sm">Lignes logiques ({roomLines.length})</span>
-            <Badge variant="outline" className="text-xs">
-              1 ligne = 1 chambre
-            </Badge>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button 
-              variant={showExclusionPanel ? "secondary" : "outline"} 
-              size="sm" 
-              onClick={() => setShowExclusionPanel(!showExclusionPanel)}
-            >
-              <User className="w-4 h-4 mr-1" />
-              Exclusions
-            </Button>
-            <Button variant="outline" size="sm" onClick={reparseRooms}>
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Re-parser
-            </Button>
-            <Button variant="ghost" size="sm" onClick={copyRawText}>
-              <Copy className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-        
-        {/* Exclusion list panel */}
-        {showExclusionPanel && (
-          <div className="mb-2">
-            <ExclusionListManager
-              excludeList={excludeList}
-              onChange={setExcludeList}
-              detectedNames={detectedNames}
-            />
-          </div>
-        )}
-        
-        <Card className="flex-1 p-2 overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="space-y-1">
-              {roomLines.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Aucune chambre détectée dans le texte.</p>
-                  <p className="text-xs mt-1">Vérifiez le format du PDF ou ajoutez les chambres manuellement.</p>
-                </div>
-              ) : (
-                roomLines.map((line, idx) => {
-                  // Vérifier si cette ligne est déjà dans la liste des chambres
-                  const isAlreadyAdded = rooms.some(r => 
-                    r.roomNumber === line.roomNumber || 
-                    r.roomNumber.includes(line.roomNumber)
-                  );
-                  
-                  return (
-                    <div
-                      key={`${line.roomNumber}-${idx}`}
-                      onClick={() => {
-                        if (!isAlreadyAdded) {
-                          setLineRoomNumber(line.roomNumber);
-                          setClickedLine({ text: line.fullText, index: idx, roomLine: line });
-                          
-                          // Auto-détecter le type de nettoyage
-                          if (line.statusCode) {
-                            const code = line.statusCode.toUpperCase();
-                            if (code === 'INS' || code === 'PRO') setLineCleaningType('none');
-                            else if (code === 'SAL') {
-                              if (line.isLastNight || (line.checkOutTime && line.checkInTime)) {
-                                setLineCleaningType('a_blanc');
-                              } else {
-                                setLineCleaningType('recouche');
-                              }
-                            } else {
-                              setLineCleaningType('a_blanc');
-                            }
-                          }
-                        }
-                      }}
-                      className={`px-2 py-2 rounded text-xs cursor-pointer transition-all border ${
-                        isAlreadyAdded 
-                          ? "bg-green-50 dark:bg-green-900/20 border-green-500/50" 
-                          : "border-transparent hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-500/50"
-                      } ${clickedLine?.index === idx ? "ring-2 ring-primary" : ""}`}
-                    >
-                      <div className="flex flex-col gap-1">
-                        {/* Header avec numéro et type suggéré */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-bold text-sm ${isAlreadyAdded ? 'text-green-600' : 'text-primary'}`}>
-                            {line.roomNumber}
-                          </span>
-                          {line.roomType && (
-                            <Badge variant="outline" className="text-[10px] h-4">{line.roomType}{line.roomCategory ? `-${line.roomCategory}` : ''}</Badge>
-                          )}
-                          {line.statusCode && (
-                            <Badge 
-                              variant={line.statusCode === 'INS' || line.statusCode === 'PRO' ? 'secondary' : 'default'}
-                              className="text-[10px] h-4"
-                            >
-                              {line.statusCode}
-                            </Badge>
-                          )}
-                          {/* Type de nettoyage suggéré */}
-                          <Badge 
-                            variant={line.cleaningType === 'a_blanc' ? 'default' : line.cleaningType === 'recouche' ? 'secondary' : 'outline'}
-                            className={`text-[10px] h-4 ${
-                              line.cleaningType === 'a_blanc' ? 'bg-orange-500' : 
-                              line.cleaningType === 'recouche' ? 'bg-blue-500 text-white' : ''
-                            }`}
-                          >
-                            {line.cleaningType === 'a_blanc' ? '🧹 À blanc' : 
-                             line.cleaningType === 'recouche' ? '🛏️ Recouche' : '⏸️ Aucun'}
-                          </Badge>
-                          {/* Raison du type de nettoyage */}
-                          {line.cleaningReason && (
-                            <span className="text-[9px] text-muted-foreground italic ml-1 hidden sm:inline">
-                              ({line.cleaningReason})
-                            </span>
-                          )}
-                          <div className="ml-auto">
-                            {isAlreadyAdded ? (
-                              <Check className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <Plus className="w-4 h-4 text-muted-foreground opacity-50" />
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Données extraites */}
-                        <div className="flex flex-wrap gap-1 text-[10px]">
-                          {line.guestName && (
-                            <Badge variant="secondary" className="text-[10px] h-4 gap-1">
-                              👤 {line.guestName}
-                            </Badge>
-                          )}
-                          {line.arrivalDate && (
-                            <Badge variant="outline" className="text-[10px] h-4 gap-1 bg-green-50 border-green-300">
-                              📥 {line.arrivalDate}
-                            </Badge>
-                          )}
-                          {line.departureDate && (
-                            <Badge variant="outline" className="text-[10px] h-4 gap-1 bg-red-50 border-red-300">
-                              📤 {line.departureDate}
-                            </Badge>
-                          )}
-                          {line.checkInTime && (
-                            <Badge variant="outline" className="text-[10px] h-4">
-                              ⏰ Arr: {line.checkInTime}
-                            </Badge>
-                          )}
-                          {line.checkOutTime && (
-                            <Badge variant="outline" className="text-[10px] h-4">
-                              ⏰ Dép: {line.checkOutTime}
-                            </Badge>
-                          )}
-                          {line.nightInfo && (
-                            <Badge variant={line.isLastNight ? 'destructive' : 'outline'} className="text-[10px] h-4">
-                              🌙 {line.nightInfo.current}/{line.nightInfo.total}
-                            </Badge>
-                          )}
-                          {line.adults && (
-                            <Badge variant="outline" className="text-[10px] h-4">
-                              👥 {line.adults} ad.{line.children ? ` + ${line.children} enf.` : ''}
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        {/* Texte brut complet */}
-                        <div className="text-[11px] text-muted-foreground font-mono whitespace-pre-wrap break-all bg-muted/30 p-2 rounded">
-                          {line.fullText}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </ScrollArea>
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <Card className="p-2 text-center">
+          <p className="text-2xl font-bold">{stats.total}</p>
+          <p className="text-xs text-muted-foreground">Total</p>
         </Card>
-        
-        {/* Mini form when a line is clicked */}
-        {clickedLine && (
-          <Card className="mt-2 p-3 border-primary bg-primary/5">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <span className="text-sm font-medium">Ajouter cette chambre</span>
-            </div>
-            {clickedLine.roomLine && (
-              <div className="flex flex-wrap gap-1 mb-2">
-                <Badge>{clickedLine.roomLine.roomNumber}</Badge>
-                {clickedLine.roomLine.statusCode && <Badge variant="outline">{clickedLine.roomLine.statusCode}</Badge>}
-                {clickedLine.roomLine.guestName && <Badge variant="secondary">👤 {clickedLine.roomLine.guestName}</Badge>}
-              </div>
-            )}
-            <p className="text-xs font-mono bg-muted p-2 rounded mb-2 line-clamp-2">
-              {clickedLine.text.substring(0, 150)}...
-            </p>
-            <div className="flex items-center gap-2">
-              <Input
-                value={lineRoomNumber}
-                onChange={(e) => setLineRoomNumber(e.target.value)}
-                placeholder="N° chambre"
-                className="h-8 w-24"
-              />
-              <Select
-                value={lineCleaningType}
-                onValueChange={(v: any) => setLineCleaningType(v)}
-              >
-                <SelectTrigger className="h-8 w-[110px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="a_blanc">À blanc</SelectItem>
-                  <SelectItem value="recouche">Recouche</SelectItem>
-                  <SelectItem value="none">Aucun</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button size="sm" onClick={addRoomFromLine} className="h-8">
-                <Plus className="w-4 h-4 mr-1" />
-                Ajouter
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setClickedLine(null)} className="h-8">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </Card>
-        )}
-        
-        {!clickedLine && roomLines.length > 0 && (
-          <p className="text-xs text-muted-foreground mt-2">
-            ✅ Vert = ajouté | Cliquez sur une chambre pour l'ajouter à la liste
-          </p>
-        )}
+        <Card 
+          className={cn("p-2 text-center cursor-pointer transition-all", 
+            filterType === 'a_blanc' && "ring-2 ring-orange-500",
+            "bg-orange-50 dark:bg-orange-900/20"
+          )}
+          onClick={() => setFilterType(filterType === 'a_blanc' ? 'all' : 'a_blanc')}
+        >
+          <p className="text-2xl font-bold text-orange-600">{stats.aBlanc}</p>
+          <p className="text-xs text-orange-600">À blanc</p>
+        </Card>
+        <Card 
+          className={cn("p-2 text-center cursor-pointer transition-all",
+            filterType === 'recouche' && "ring-2 ring-green-500",
+            "bg-green-50 dark:bg-green-900/20"
+          )}
+          onClick={() => setFilterType(filterType === 'recouche' ? 'all' : 'recouche')}
+        >
+          <p className="text-2xl font-bold text-green-600">{stats.recouche}</p>
+          <p className="text-xs text-green-600">Recouche</p>
+        </Card>
+        <Card 
+          className={cn("p-2 text-center cursor-pointer transition-all",
+            filterType === 'none' && "ring-2 ring-gray-500",
+            "bg-gray-50 dark:bg-gray-900/20"
+          )}
+          onClick={() => setFilterType(filterType === 'none' ? 'all' : 'none')}
+        >
+          <p className="text-2xl font-bold text-gray-600">{stats.none}</p>
+          <p className="text-xs text-gray-600">Aucun</p>
+        </Card>
+        <Card className="p-2 text-center bg-primary/10">
+          <p className="text-2xl font-bold text-primary">{stats.validated}</p>
+          <p className="text-xs text-primary">Validées</p>
+        </Card>
       </div>
 
-      {/* Right panel - Room list */}
-      <div className="w-1/2 flex flex-col">
-        {/* Header with stats */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Retour
-            </Button>
-            <Badge variant="outline" className="gap-1">
-              <Sparkles className="w-3 h-3" />
-              PMS: {trainingData.detectedPmsType.toUpperCase()}
-            </Badge>
-            {onOpenAdvanced && (
-              <Button variant="outline" size="sm" onClick={onOpenAdvanced}>
-                Paramètres / parser
-              </Button>
-            )}
-          </div>
-          <Badge variant={validatedCount === totalCount ? "default" : "secondary"}>
-            {validatedCount}/{totalCount} validées
-          </Badge>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher..."
+            value={searchFilter}
+            onChange={e => setSearchFilter(e.target.value)}
+            className="pl-8"
+          />
         </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={validateAll} size="sm">
-          <Check className="w-4 h-4 mr-1" />
+        
+        <Button size="sm" variant="outline" onClick={selectAll}>
+          {selectedRooms.size === displayedRooms.length ? 'Désélectionner' : 'Tout sélectionner'}
+        </Button>
+        
+        <Button size="sm" variant="outline" onClick={validateAll} className="gap-1">
+          <CheckCircle2 className="h-4 w-4" />
           Tout valider
         </Button>
-        <Button
-          onClick={() => {
-            setMergingMode(!mergingMode);
-            setSelectedRooms(new Set());
-          }}
-          variant={mergingMode ? "default" : "outline"}
-          size="sm"
+        
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
         >
-          <Link2 className="w-4 h-4 mr-1" />
-          {mergingMode ? "Annuler fusion" : "Fusionner"}
+          {sortOrder === 'asc' ? '↑ A-Z' : '↓ Z-A'}
         </Button>
-        {mergingMode && selectedRooms.size >= 2 && (
-          <Button onClick={mergeSelectedRooms} variant="secondary" size="sm">
-            Confirmer ({selectedRooms.size})
-          </Button>
-        )}
+      </div>
 
-        {/* Add room dialog */}
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Plus className="w-4 h-4 mr-1" />
-              Ajouter chambre
+      {/* Bulk actions */}
+      {selectedRooms.size > 0 && (
+        <Card className="p-3 bg-primary/5 border-primary/20">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium">{selectedRooms.size} sélectionnée(s) :</span>
+            <Button size="sm" className="bg-orange-500 hover:bg-orange-600" onClick={() => applyBulkType('a_blanc')}>
+              🔶 À blanc
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Ajouter une chambre manquante</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Numéro de chambre</Label>
-                <Input
-                  value={newRoom.roomNumber}
-                  onChange={(e) => setNewRoom({ ...newRoom, roomNumber: e.target.value })}
-                  placeholder="Ex: 712, 01, A101..."
-                />
-              </div>
-              <div>
-                <Label>Type de nettoyage</Label>
-                <Select
-                  value={newRoom.cleaningType}
-                  onValueChange={(v: any) => setNewRoom({ ...newRoom, cleaningType: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="full">À blanc (complet)</SelectItem>
-                    <SelectItem value="quick">Recouche (rapide)</SelectItem>
-                    <SelectItem value="none">Aucun</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={addRoom} className="w-full">
-                Ajouter
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Filtres (colonne droite) */}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Label className="text-xs text-muted-foreground">Tri</Label>
-          <Select value={sortOrder} onValueChange={(v: any) => setSortOrder(v)}>
-            <SelectTrigger className="h-8 w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">Chambres ↑</SelectItem>
-              <SelectItem value="desc">Chambres ↓</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Label className="text-xs text-muted-foreground">Nettoyage</Label>
-          <Select value={cleaningFilter} onValueChange={(v: any) => setCleaningFilter(v)}>
-            <SelectTrigger className="h-8 w-[170px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              <SelectItem value="a_blanc">À blanc</SelectItem>
-              <SelectItem value="recouche">Recouche</SelectItem>
-              <SelectItem value="none">Aucun</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Badge variant="outline" className="h-8 flex items-center">
-          {displayedRooms.length}/{rooms.length}
-        </Badge>
-      </div>
-
-      {/* Rooms list with enhanced display */}
-      <TooltipProvider>
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-2">
-            {rooms.length === 0 ? (
-              <Card className="p-8 text-center">
-                <AlertTriangle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  Aucune chambre détectée. Utilisez le bouton "Ajouter chambre" pour les ajouter manuellement.
-                </p>
-              </Card>
-            ) : displayedRooms.length === 0 ? (
-              <Card className="p-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Aucune chambre ne correspond aux filtres sélectionnés.
-                </p>
-              </Card>
-            ) : (
-              displayedRooms.map(({ room, index }) => {
-                const cleaningConfig = getCleaningBadge(room.cleaningType);
-                const statusInfo = getStatusInfo(room.status);
-                const lastNightAlert = isLastNightMisdetected(room);
-
-                return (
-                  <Card
-                    key={index}
-                    className={`p-3 transition-all ${
-                      room.validated ? "border-green-500/50 bg-green-500/5" : "border-muted"
-                    } ${mergingMode && selectedRooms.has(index) ? "ring-2 ring-primary" : ""} ${
-                      lastNightAlert ? "border-amber-500/70 bg-amber-500/10" : ""
-                    }`}
-                  >
-                    <div className="flex flex-col gap-2">
-                      {/* Main row */}
-                      <div className="flex items-center gap-3">
-                        {mergingMode && (
-                          <Checkbox
-                            checked={selectedRooms.has(index)}
-                            onCheckedChange={() => toggleRoomSelection(index)}
-                          />
-                        )}
-
-                        {/* Room number */}
-                        <div className="font-bold text-lg min-w-[50px] text-primary flex items-center gap-2">
-                          {room.roomNumber}
-                          {lastNightAlert && (
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-50 gap-1 text-xs">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  Dernière nuit
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                <p className="font-medium">⚠️ Dernière nuit détectée comme recouche</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Cette chambre semble être en dernière nuit (Nuit X/X) mais est marquée comme recouche. 
-                                  Si c'est un départ, changez le type de nettoyage en "À blanc".
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-
-                        {/* Status badge */}
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Badge variant="outline" className="gap-1">
-                              <span>{statusInfo.icon}</span>
-                              <span className="hidden sm:inline">{statusInfo.label}</span>
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>Statut séjour: {statusInfo.label}</TooltipContent>
-                        </Tooltip>
-
-                        {/* Cleaning type selector */}
-                        <Select
-                          value={room.cleaningType}
-                          onValueChange={(v: any) => updateRoom(index, "cleaningType", v)}
-                        >
-                          <SelectTrigger className={`w-[130px] h-8 ${
-                            room.cleaningType === 'a_blanc' || room.cleaningType === 'full' 
-                              ? 'border-orange-500 text-orange-600' 
-                              : room.cleaningType === 'recouche' || room.cleaningType === 'quick'
-                                ? 'border-blue-500 text-blue-600'
-                                : ''
-                          }`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="a_blanc">🧹 À blanc</SelectItem>
-                            <SelectItem value="recouche">🛏️ Recouche</SelectItem>
-                            <SelectItem value="none">⏸️ Aucun</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        {/* Toggle règle permanente */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1">
-                              <Checkbox
-                                id={`permanent-${index}`}
-                                checked={(room as any).isPermanentRule || false}
-                                onCheckedChange={(checked) => updateRoom(index, 'isPermanentRule' as any, !!checked)}
-                                className="h-4 w-4"
-                              />
-                              <Label 
-                                htmlFor={`permanent-${index}`} 
-                                className="text-xs cursor-pointer text-muted-foreground hover:text-foreground"
-                              >
-                                🔒
-                              </Label>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="font-medium">Règle permanente</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Si coché, cette chambre aura TOUJOURS ce type de nettoyage, 
-                              peu importe le contenu du rapport. Utile pour les chambres 
-                              spéciales (stockage, staff, etc.).
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-
-                        {room.isConnected && (
-                          <Badge variant="secondary" className="text-xs gap-1">
-                            <Link2 className="w-3 h-3" />
-                            Liées
-                          </Badge>
-                        )}
-
-                        {/* Room type if available */}
-                        {room.roomType && (
-                          <span className="text-xs text-muted-foreground hidden md:inline">
-                            {room.roomType}
-                          </span>
-                        )}
-
-                        <div className="flex-1" />
-
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-1">
-                          {/* Bouton créer règle depuis exemple */}
-                          {room.originalText && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={() => setRuleDialogRoom(room)}
-                                  className="h-8 w-8 text-primary hover:text-primary"
-                                >
-                                  <Wand2 className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Créer une règle depuis cet exemple</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                          {room.isConnected && (
-                            <Button size="icon" variant="ghost" onClick={() => splitRoom(index)} className="h-8 w-8">
-                              <Unlink className="w-4 h-4" />
-                            </Button>
-                          )}
-                          <Button
-                            size="icon"
-                            variant={room.validated ? "default" : "outline"}
-                            onClick={() => validateRoom(index)}
-                            className="h-8 w-8"
-                          >
-                            {room.validated ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeRoom(index)}
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Details row - ALL extracted data */}
-                      <div className="flex flex-wrap items-center gap-2 text-xs pl-[50px]">
-                        {/* Guest name */}
-                        {room.guestName && (
-                          <Badge variant="secondary" className="gap-1 text-xs">
-                            <User className="w-3 h-3" />
-                            {room.guestName}
-                          </Badge>
-                        )}
-                        
-                        {/* Dates */}
-                        {room.arrivalDate && (
-                          <Badge variant="outline" className="gap-1 text-xs bg-green-50 border-green-400">
-                            📥 {room.arrivalDate}
-                          </Badge>
-                        )}
-                        {room.departureDate && (
-                          <Badge variant="outline" className="gap-1 text-xs bg-red-50 border-red-400">
-                            📤 {room.departureDate}
-                          </Badge>
-                        )}
-                        
-                        {/* Times */}
-                        {room.departureTime && (
-                          <Badge variant="outline" className="gap-1 text-xs">
-                            🚪 Dép: {room.departureTime}
-                          </Badge>
-                        )}
-                        {room.arrivalTime && (
-                          <Badge variant="outline" className="gap-1 text-xs">
-                            ⏰ Arr: {room.arrivalTime}
-                          </Badge>
-                        )}
-                        
-                        {/* Night info */}
-                        {(room as any)._nightInfo && (
-                          <Badge 
-                            variant={(room as any)._nightInfo.current === (room as any)._nightInfo.total ? 'destructive' : 'outline'} 
-                            className="gap-1 text-xs"
-                          >
-                            🌙 Nuit {(room as any)._nightInfo.current}/{(room as any)._nightInfo.total}
-                          </Badge>
-                        )}
-                        
-                        {/* Occupancy */}
-                        {((room as any)._adults || (room as any)._children) && (
-                          <Badge variant="outline" className="gap-1 text-xs">
-                            👥 {(room as any)._adults || 0} ad.{(room as any)._children ? ` + ${(room as any)._children} enf.` : ''}
-                          </Badge>
-                        )}
-                        
-                        {/* Room type */}
-                        {room.roomType && (
-                          <Badge variant="outline" className="text-xs">
-                            🏠 {room.roomType}
-                          </Badge>
-                        )}
-                        
-                        {/* Edit times button */}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 px-1 text-xs ml-auto"
-                          onClick={() => setEditingTimeRoom(index)}
-                        >
-                          ✏️ Éditer
-                        </Button>
-                      </div>
-                      
-                      {/* Time editing row */}
-                      {editingTimeRoom === index && (
-                        <div className="flex items-center gap-2 pl-[50px] pt-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground">Départ:</span>
-                            <Input
-                              type="time"
-                              className="h-6 w-20 text-xs"
-                              value={room.departureTime || ''}
-                              onChange={(e) => updateRoom(index, 'departureTime' as keyof ExtractedRoom, e.target.value)}
-                              placeholder="HH:MM"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground">Arrivée:</span>
-                            <Input
-                              type="time"
-                              className="h-6 w-20 text-xs"
-                              value={room.arrivalTime || ''}
-                              onChange={(e) => updateRoom(index, 'arrivalTime' as keyof ExtractedRoom, e.target.value)}
-                              placeholder="HH:MM"
-                            />
-                          </div>
-                          <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setEditingTimeRoom(null)}>
-                            <Check className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      )}
-
-                      {/* Status description */}
-                      <div className="pl-[50px] text-xs text-muted-foreground/70 italic">
-                        {statusInfo.description}
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })
-            )}
+            <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => applyBulkType('recouche')}>
+              🔄 Recouche
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => applyBulkType('none')}>
+              ⏸️ Aucun
+            </Button>
+            <Button size="sm" variant="destructive" onClick={deleteSelected}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
-        </ScrollArea>
-      </TooltipProvider>
+        </Card>
+      )}
 
-        {/* Continue button */}
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleComplete} size="lg" className="gap-2">
-            <Save className="w-4 h-4" />
-            Sauvegarder et terminer
-          </Button>
-        {/* Dialog création de règle */}
-        {ruleDialogRoom && (
-          <LinePatternRuleDialog
-            open={!!ruleDialogRoom}
-            onOpenChange={(open) => !open && setRuleDialogRoom(null)}
-            room={ruleDialogRoom}
-            allRooms={rooms}
-            hotelId={hotelId}
-            onRuleCreated={(updatedRooms) => {
-              setRooms(updatedRooms);
-              setRuleDialogRoom(null);
-            }}
-          />
-        )}
+      {/* Rooms List */}
+      <ScrollArea className="h-[350px] border rounded-lg">
+        <div className="p-2 space-y-1">
+          {displayedRooms.map(({ room, originalIndex }) => {
+            const config = getConfig(room.cleaningType || 'none');
+            const isSelected = selectedRooms.has(originalIndex);
+            
+            return (
+              <div
+                key={originalIndex}
+                className={cn(
+                  "flex items-center gap-2 p-2 rounded-lg transition-all",
+                  config.bgLight,
+                  isSelected && "ring-2 ring-primary"
+                )}
+              >
+                {/* Checkbox */}
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => toggleSelect(originalIndex)}
+                />
+                
+                {/* Room number */}
+                <Badge variant="secondary" className="text-base font-bold min-w-[60px] justify-center">
+                  {room.roomNumber}
+                </Badge>
+                
+                {/* Type buttons */}
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => changeType(originalIndex, 'a_blanc')}
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                      (room.cleaningType === 'a_blanc' || room.cleaningType === 'full')
+                        ? "bg-orange-500 text-white ring-2 ring-offset-1 ring-orange-500"
+                        : "bg-muted hover:bg-orange-200"
+                    )}
+                    title="À blanc"
+                  >
+                    {(room.cleaningType === 'a_blanc' || room.cleaningType === 'full') ? <Check className="h-4 w-4" /> : '🔶'}
+                  </button>
+                  <button
+                    onClick={() => changeType(originalIndex, 'recouche')}
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                      (room.cleaningType === 'recouche' || room.cleaningType === 'quick')
+                        ? "bg-green-500 text-white ring-2 ring-offset-1 ring-green-500"
+                        : "bg-muted hover:bg-green-200"
+                    )}
+                    title="Recouche"
+                  >
+                    {(room.cleaningType === 'recouche' || room.cleaningType === 'quick') ? <Check className="h-4 w-4" /> : '🔄'}
+                  </button>
+                  <button
+                    onClick={() => changeType(originalIndex, 'none')}
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                      room.cleaningType === 'none'
+                        ? "bg-gray-500 text-white ring-2 ring-offset-1 ring-gray-500"
+                        : "bg-muted hover:bg-gray-200"
+                    )}
+                    title="Aucun"
+                  >
+                    {room.cleaningType === 'none' ? <Check className="h-4 w-4" /> : '⏸️'}
+                  </button>
+                </div>
+                
+                {/* Original text preview */}
+                <span className="flex-1 text-xs text-muted-foreground truncate">
+                  {room.originalText?.substring(0, 50)}...
+                </span>
+                
+                {/* Validated badge */}
+                {room.validated && (
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                )}
+              </div>
+            );
+          })}
+          
+          {displayedRooms.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              {searchFilter ? 'Aucun résultat' : 'Aucune chambre'}
+            </div>
+          )}
         </div>
+      </ScrollArea>
+
+      {/* Navigation */}
+      <div className="flex justify-between pt-4 border-t">
+        <Button variant="outline" onClick={onBack} className="gap-2">
+          <ChevronLeft className="h-4 w-4" />
+          Retour
+        </Button>
+        <Button onClick={handleContinue} className="gap-2">
+          Sauvegarder
+          <ArrowRight className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
