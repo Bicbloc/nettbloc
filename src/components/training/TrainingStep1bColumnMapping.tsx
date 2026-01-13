@@ -188,7 +188,7 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
                   key={indicator.value}
                   indicator={indicator}
                   mapping={statusMappings[indicator.value] || ''}
-                  onMappingChange={(value) => setStatusMappings(prev => ({ ...prev, [indicator.value]: value }))}
+                  onMappingChange={(value) => setStatusMappings(prev => ({ ...prev, [indicator.value]: value } as StatusMapping))}
                 />
               ))}
               {detection.indicators.length === 0 && (
