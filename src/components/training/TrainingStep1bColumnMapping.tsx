@@ -257,12 +257,14 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-20">Chambre</TableHead>
-                      <TableHead>Indicateur</TableHead>
-                      {analysis.structure.suggestedColumns.slice(0, 6).map((col, idx) => (
-                        <TableHead key={idx} className="text-xs">{col.name}</TableHead>
-                      ))}
-                      <TableHead className="w-32">Type détecté</TableHead>
+                      <TableHead className="w-16">Chambre</TableHead>
+                      <TableHead className="w-16">Type</TableHead>
+                      <TableHead className="w-24">Statut</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead className="w-24">Arrivée</TableHead>
+                      <TableHead className="w-24">Départ</TableHead>
+                      <TableHead className="w-16">Nuit</TableHead>
+                      <TableHead className="w-28">Type nettoyage</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -271,18 +273,18 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
                       return (
                         <TableRow key={idx} className={finalType === 'unknown' ? 'bg-yellow-50' : ''}>
                           <TableCell className="font-mono font-bold">{row.roomNumber}</TableCell>
+                          <TableCell className="text-xs">{row.roomType}</TableCell>
                           <TableCell>
-                            {row.statusIndicator && (
-                              <Badge variant="outline" className="font-mono">
-                                {row.statusIndicator}
-                              </Badge>
-                            )}
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {row.cleaningStatus || row.statusIndicator || '-'}
+                            </Badge>
                           </TableCell>
-                          {row.columns.slice(0, 6).map((col, colIdx) => (
-                            <TableCell key={colIdx} className="text-xs truncate max-w-[100px]" title={col.value}>
-                              {col.value}
-                            </TableCell>
-                          ))}
+                          <TableCell className="text-xs truncate max-w-[120px]" title={row.guestName}>
+                            {row.guestName || '-'}
+                          </TableCell>
+                          <TableCell className="text-xs font-mono">{row.arrivalDate || '-'}</TableCell>
+                          <TableCell className="text-xs font-mono">{row.departureDate || '-'}</TableCell>
+                          <TableCell className="text-xs">{row.nightInfo || '-'}</TableCell>
                           <TableCell>
                             <Badge className={getCleaningBadgeColor(finalType)}>
                               {getCleaningLabel(finalType)}

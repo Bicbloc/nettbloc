@@ -1,6 +1,6 @@
 /**
- * Détecteur de format de rapport PMS v2.0
- * Analyse avancée avec détection multi-colonnes et prévisualisation
+ * Détecteur de format de rapport PMS v3.0
+ * Parser intelligent avec support avancé Mews/Apaleo/Medialog
  */
 
 export interface FormatDetection {
@@ -35,10 +35,24 @@ export interface ParsedReportData {
 export interface ParsedRow {
   rawLine: string;
   roomNumber: string;
+  roomType: string;
+  cleaningStatus: string; // DIR, INS, PRO, SAL, etc.
   columns: ColumnValue[];
   detectedCleaningType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown';
   confidence: number;
   statusIndicator: string;
+  // Données extraites
+  guestName: string;
+  arrivalDate: string;
+  departureDate: string;
+  arrivalTime: string;
+  departureTime: string;
+  nightInfo: string; // "Night 2/3"
+  hasCurrentGuest: boolean;
+  hasDepartingGuest: boolean;
+  hasArrivingGuest: boolean;
+  isOutOfOrder: boolean;
+  assignee: string;
 }
 
 export interface ColumnValue {
@@ -59,6 +73,7 @@ export type ColumnType =
   | 'guest_count'
   | 'assignee' 
   | 'floor'
+  | 'night_info'
   | 'notes' 
   | 'other';
 
@@ -67,7 +82,7 @@ export interface ReportStructure {
   columnCount: number;
   suggestedColumns: ColumnDefinition[];
   roomNumberPattern: string;
-  lineParseStrategy: 'table' | 'fixed-width' | 'delimiter' | 'complex';
+  lineParseStrategy: 'mews' | 'apaleo' | 'medialog' | 'table' | 'generic';
   delimiter: string | null;
 }
 
@@ -80,117 +95,51 @@ export interface ColumnDefinition {
 }
 
 export type ReportFormat = 
-  | 'mews_space_status'     // INS/PRO/SAL/DIR codes
-  | 'apaleo_housekeeping'   // Recouche/Parti/En arrivée
-  | 'medialog_etat'         // PARTI/RECOUCHE/DEPART/DRAPS
-  | 'opera_housekeeping'    // Various Opera formats
-  | 'generic_table'         // Generic tabular format
+  | 'mews_space_status'
+  | 'apaleo_housekeeping'
+  | 'medialog_etat'
+  | 'opera_housekeeping'
+  | 'generic_table'
   | 'unknown';
 
-// =========== RÈGLES DE NETTOYAGE AVANCÉES ===========
-// Ces règles sont utilisées pour mapper les indicateurs vers les types de nettoyage
+// =========== RÈGLES DE NETTOYAGE MEWS ===========
+// Mews utilise DIR/INS/PRO/SAL avec une logique spécifique
 
-interface CleaningRule {
-  patterns: RegExp[];
-  cleaningType: 'full' | 'quick' | 'none' | 'out_of_service' | 'exclude';
-  priority: number;
-  description: string;
-}
-
-const CLEANING_RULES: CleaningRule[] = [
-  // À blanc / Départ (priorité haute)
-  {
-    patterns: [
-      /\b(départ|depart|parti|checkout|check-out|due\s*out|departure|libéré)\b/i,
-      /\bDIR\b/,  // Mews: Dirty
-      /\bSAL\b/,  // Sale
-      /\b(VC|VD)\b/, // Vacant Clean/Dirty
-    ],
-    cleaningType: 'full',
-    priority: 10,
-    description: 'Départ / À blanc'
-  },
-  // Recouche / Séjour
-  {
-    patterns: [
-      /\b(recouche|stayover|stay-over|séjour|occupied|occupé|occ)\b/i,
-      /\bPRO\b/,  // Mews: Propre
-      /\bINS\b/,  // Mews: Inspecté
-      /\b(OC|OD)\b/, // Occupied Clean/Dirty
-      /\bdraps\b/i,
-    ],
-    cleaningType: 'quick',
-    priority: 10,
-    description: 'Recouche / Séjour'
-  },
-  // Arrivée (compte comme à blanc si départ le même jour, sinon aucun)
-  {
-    patterns: [
-      /\b(arrivée|arrival|check-?in|due\s*in)\b/i,
-      /\bARR\b/,
-    ],
-    cleaningType: 'full', // Par défaut à blanc pour une arrivée
-    priority: 5,
-    description: 'Arrivée'
-  },
-  // Aucun nettoyage
-  {
-    patterns: [
-      /\b(no\s*service|refus|dnd|do\s*not\s*disturb|skip|propre)\b/i,
-      /\b(libre|free|vacant\s*clean)\b/i,
-    ],
-    cleaningType: 'none',
-    priority: 8,
-    description: 'Pas de ménage'
-  },
-  // Hors service
-  {
-    patterns: [
-      /\b(ooo|out\s*of\s*order|hors\s*service|h\.?s\.?|maintenance|blocked?|fermé)\b/i,
-    ],
-    cleaningType: 'out_of_service',
-    priority: 15,
-    description: 'Hors service'
-  },
-  // Exclusions (pas des chambres)
-  {
-    patterns: [
-      /\b(total|page|imprimé|literie|ferme.*vente|lit\s*double|lits?\s*simple)\b/i,
-      /^\s*\d+\s+chambre/i,
-      /^(floor|étage)\s+spaces/i,
-    ],
-    cleaningType: 'exclude',
-    priority: 20,
-    description: 'Ligne à exclure'
-  },
-];
+const MEWS_STATUS_MAP: Record<string, { type: 'full' | 'quick' | 'none' | 'out_of_service'; description: string }> = {
+  'DIR': { type: 'full', description: 'Dirty - Chambre sale (départ ou à nettoyer)' },
+  'SAL': { type: 'full', description: 'Sale - Chambre à nettoyer' },
+  'INS': { type: 'quick', description: 'Inspecté - Chambre propre (client en place = recouche)' },
+  'PRO': { type: 'quick', description: 'Propre - Chambre propre (client en place = recouche)' },
+};
 
 // =========== DÉTECTION DE FORMAT ===========
 
 const FORMAT_SIGNATURES: Record<ReportFormat, { patterns: RegExp[]; weight: number }[]> = {
   mews_space_status: [
-    { patterns: [/Space\s+status/i, /Statut\s+des\s+espaces/i], weight: 10 },
-    { patterns: [/\b(INS|PRO|SAL|DIR)\b/], weight: 5 },
+    { patterns: [/Space\s+status/i, /Statut\s+des\s+espaces/i], weight: 15 },
+    { patterns: [/\b(INS|PRO|SAL|DIR)\s+[A-Z][a-z]+/], weight: 8 },
     { patterns: [/Floor\s+Spaces/i, /Étage\s+Espaces/i], weight: 8 },
-    { patterns: [/×\s*Adult/i, /×\s*Adulte/i], weight: 3 },
+    { patterns: [/×\s*Adult/i, /×\s*Adulte/i], weight: 5 },
+    { patterns: [/Night\s+\d+\/\d+/i, /Nuit\s+\d+\/\d+/i], weight: 5 },
+    { patterns: [/\d{3}\s+[A-Z]{2,4}\s+(DIR|INS|PRO|SAL)\b/], weight: 10 },
   ],
   apaleo_housekeeping: [
-    { patterns: [/Rapport\s+Housekeeping/i], weight: 10 },
-    { patterns: [/\b(Recouche|Parti|En\s+arrivée)\b/i], weight: 5 },
-    { patterns: [/A\s+contrôler/i], weight: 3 },
+    { patterns: [/Rapport\s+Housekeeping/i], weight: 15 },
+    { patterns: [/\b(Recouche|Parti|En\s+arrivée)\b/i], weight: 8 },
+    { patterns: [/A\s+contrôler/i], weight: 5 },
     { patterns: [/Type\s+de\s+chambre/i], weight: 3 },
   ],
   medialog_etat: [
-    { patterns: [/L'état\s+des\s+chambres/i, /état\s+des\s+chambres/i], weight: 10 },
-    { patterns: [/\b(PARTI|RECOUCHE|DEPART|DRAPS)\b/], weight: 8 },
-    { patterns: [/Medialog/i], weight: 10 },
+    { patterns: [/L'état\s+des\s+chambres/i, /état\s+des\s+chambres/i], weight: 15 },
+    { patterns: [/\b(PARTI|RECOUCHE|DEPART|DRAPS)\b/], weight: 10 },
+    { patterns: [/Medialog/i], weight: 15 },
     { patterns: [/MEMO\s+GOUVERNANTE/i], weight: 5 },
     { patterns: [/S\s*=\s*Sale/i], weight: 5 },
   ],
   opera_housekeeping: [
-    { patterns: [/Opera/i, /Oracle/i], weight: 8 },
+    { patterns: [/Opera/i, /Oracle/i], weight: 10 },
     { patterns: [/Housekeeping\s+Report/i], weight: 5 },
-    { patterns: [/\b(VD|OD|VC|OC)\b/], weight: 5 },
+    { patterns: [/\b(VD|OD|VC|OC)\b/], weight: 8 },
   ],
   generic_table: [
     { patterns: [/chambre|room/i], weight: 2 },
@@ -205,12 +154,13 @@ const FORMAT_SIGNATURES: Record<ReportFormat, { patterns: RegExp[]; weight: numb
 export function detectReportFormat(text: string): FormatDetection {
   // 1. Détecter le format global
   const format = detectFormat(text);
+  console.log('Detected format:', format);
   
-  // 2. Analyser la structure (colonnes, délimiteurs)
-  const structure = analyzeStructure(text, format);
+  // 2. Parser selon le format spécifique
+  const parsedData = parseReportByFormat(text, format);
   
-  // 3. Parser toutes les lignes avec détection intelligente
-  const parsedData = parseAllLines(text, structure, format);
+  // 3. Construire la structure
+  const structure = buildStructure(parsedData, format);
   
   // 4. Extraire les indicateurs uniques trouvés
   const indicators = extractIndicators(parsedData);
@@ -246,347 +196,486 @@ function detectFormat(text: string): ReportFormat {
   let bestScore = 0;
   
   for (const [format, score] of formatScores.entries()) {
+    console.log(`Format ${format}: score ${score}`);
     if (score > bestScore) {
       bestScore = score;
       bestFormat = format;
     }
   }
   
-  return bestScore >= 5 ? bestFormat : 'generic_table';
+  return bestScore >= 8 ? bestFormat : 'generic_table';
 }
 
-function analyzeStructure(text: string, format: ReportFormat): ReportStructure {
-  const lines = text.split('\n').filter(l => l.trim());
-  
-  // Détecter le délimiteur principal
-  const tabCount = lines.filter(l => l.includes('\t')).length;
-  const pipeCount = lines.filter(l => (l.match(/\|/g) || []).length >= 2).length;
-  const multiSpaceCount = lines.filter(l => /\s{3,}/.test(l)).length;
-  
-  let delimiter: string | null = null;
-  let lineParseStrategy: 'table' | 'fixed-width' | 'delimiter' | 'complex' = 'complex';
-  
-  if (tabCount > lines.length * 0.3) {
-    delimiter = '\t';
-    lineParseStrategy = 'delimiter';
-  } else if (pipeCount > lines.length * 0.3) {
-    delimiter = '|';
-    lineParseStrategy = 'table';
-  } else if (multiSpaceCount > lines.length * 0.3) {
-    delimiter = '  '; // Double space
-    lineParseStrategy = 'fixed-width';
+// =========== PARSING PAR FORMAT ===========
+
+function parseReportByFormat(text: string, format: ReportFormat): ParsedReportData {
+  switch (format) {
+    case 'mews_space_status':
+      return parseMewsReport(text);
+    case 'apaleo_housekeeping':
+      return parseApaleoReport(text);
+    case 'medialog_etat':
+      return parseMedialogReport(text);
+    default:
+      return parseGenericReport(text);
   }
-  
-  // Analyser les colonnes sur les premières lignes de données
-  const suggestedColumns = analyzeColumns(lines, delimiter);
-  
-  return {
-    hasTable: delimiter !== null,
-    columnCount: suggestedColumns.length,
-    suggestedColumns,
-    roomNumberPattern: detectRoomPattern(lines),
-    lineParseStrategy,
-    delimiter,
-  };
 }
 
-function detectRoomPattern(lines: string[]): string {
-  const patterns = [
-    /^(\d{3,4}[A-Z]?)\b/,
-    /^(\d{1,2})\s+(\d{3})/,
-    /^\s*(\d{3,4})\s+/,
-  ];
-  
-  for (const pattern of patterns) {
-    const matches = lines.filter(l => pattern.test(l.trim()));
-    if (matches.length >= 5) {
-      return pattern.source;
-    }
-  }
-  
-  return '^\\d{2,4}';
-}
-
-function analyzeColumns(lines: string[], delimiter: string | null): ColumnDefinition[] {
-  const columns: ColumnDefinition[] = [];
-  
-  // Prendre des lignes de données (skip les premières qui sont souvent headers)
-  const dataLines = lines.slice(3, 25).filter(l => /\d{2,4}/.test(l));
-  
-  if (dataLines.length === 0) return columns;
-  
-  // Split les lignes selon le délimiteur
-  const splitLines = dataLines.map(l => {
-    if (delimiter === '|') {
-      return l.split('|').map(c => c.trim()).filter(c => c);
-    } else if (delimiter === '\t') {
-      return l.split('\t').map(c => c.trim());
-    } else {
-      // Split par espaces multiples
-      return l.split(/\s{2,}/).map(c => c.trim()).filter(c => c);
-    }
-  });
-  
-  const maxCols = Math.max(...splitLines.map(l => l.length));
-  
-  for (let i = 0; i < maxCols; i++) {
-    const values = splitLines.map(l => l[i] || '').filter(v => v.trim());
-    const uniqueValues = [...new Set(values.map(v => v.trim()))].slice(0, 15);
-    
-    const colType = detectColumnType(uniqueValues, i);
-    
-    columns.push({
-      index: i,
-      name: getColumnName(colType, i),
-      type: colType,
-      isRelevantForCleaning: ['status', 'room_number', 'arrival_date', 'departure_date'].includes(colType),
-      sampleValues: uniqueValues.slice(0, 5),
-    });
-  }
-  
-  return columns;
-}
-
-function detectColumnType(values: string[], index: number): ColumnType {
-  if (values.length === 0) return 'other';
-  
-  // Analyse statistique des valeurs
-  const stats = {
-    roomNumbers: values.filter(v => /^\d{2,4}[A-Z]?$/.test(v.trim())).length,
-    dates: values.filter(v => /\d{1,2}[\/\-\.]\d{1,2}([\/\-\.]\d{2,4})?/.test(v)).length,
-    times: values.filter(v => /^\d{1,2}[hH:]\d{2}$/.test(v.trim())).length,
-    names: values.filter(v => /^[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ][a-zàâäéèêëïîôùûü]+(\s+[A-ZÀÂÄÉÈÊËÏÎÔÙÛÜ])?/.test(v) && v.length > 2 && v.length < 40).length,
-    numbers: values.filter(v => /^\d{1,2}$/.test(v.trim())).length,
-    status: 0,
-    roomType: 0,
-  };
-  
-  // Vérifier les statuts
-  const statusKeywords = /\b(ins|pro|sal|dir|occ|vac|dep|arr|dirty|clean|depart|recouche|parti|draps|arrivée|libre|occupé|checkout)\b/i;
-  stats.status = values.filter(v => statusKeywords.test(v)).length;
-  
-  // Vérifier les types de chambre
-  const roomTypeKeywords = /\b(dbl|sgl|twn|twin|triple|quad|suite|fam|deluxe|standard|sup|pmr|chambre|single|double)\b/i;
-  stats.roomType = values.filter(v => roomTypeKeywords.test(v)).length;
-  
-  const threshold = values.length * 0.3;
-  
-  // Priorité de détection
-  if (index === 0 && stats.roomNumbers >= threshold) return 'room_number';
-  if (stats.status >= threshold) return 'status';
-  if (stats.roomType >= threshold) return 'room_type';
-  
-  // Distinguer dates d'arrivée et de départ selon la position
-  if (stats.dates >= threshold) {
-    // Chercher dans les valeurs si on peut distinguer
-    return index <= 3 ? 'arrival_date' : 'departure_date';
-  }
-  
-  if (stats.times >= threshold) return index <= 4 ? 'arrival_time' : 'departure_time';
-  if (stats.names >= threshold) return 'guest_name';
-  if (stats.numbers >= threshold && index > 0) return 'guest_count';
-  if (stats.roomNumbers >= threshold) return 'room_number';
-  
-  // Floor si c'est un chiffre unique en position 0
-  if (index === 0 && values.every(v => /^\d{1,2}$/.test(v.trim()))) return 'floor';
-  
-  return 'other';
-}
-
-function getColumnName(type: ColumnType, index: number): string {
-  const names: Record<ColumnType, string> = {
-    room_number: 'N° Chambre',
-    status: 'Statut',
-    room_type: 'Type',
-    arrival_date: 'Date arrivée',
-    departure_date: 'Date départ',
-    arrival_time: 'Heure arrivée',
-    departure_time: 'Heure départ',
-    guest_name: 'Client',
-    guest_count: 'Nb personnes',
-    assignee: 'Assigné',
-    floor: 'Étage',
-    notes: 'Notes',
-    other: `Col. ${index + 1}`,
-  };
-  return names[type];
-}
-
-// =========== PARSING DES LIGNES ===========
-
-function parseAllLines(text: string, structure: ReportStructure, format: ReportFormat): ParsedReportData {
+/**
+ * Parser spécialisé Mews Space Status
+ * Format: "101 TWS DIR Farid 05/05/2025 1 × Adults Name , Night 2/2 07/05/2025"
+ */
+function parseMewsReport(text: string): ParsedReportData {
   const lines = text.split('\n');
   const rows: ParsedRow[] = [];
   
-  // Extraire les headers potentiels
-  const headers = extractHeaders(lines, structure);
+  // Regex pour extraire les chambres Mews
+  // Format: [Floor] RoomNumber Type Status Assignee [dates et infos client]
+  const roomPattern = /(\d{3,4})\s+([A-Z]{2,5})\s+(DIR|INS|PRO|SAL)\s+([A-Za-z]+)/;
+  const roomPatternAlt = /(\d{3,4})\s+([A-Z]{2,5})\s+(CLA|B|PMR|Twinable)?\s*(DIR|INS|PRO|SAL)\b/i;
   
-  // Parser chaque ligne
+  // Pattern pour "Out of order"
+  const oooPattern = /(\d{3,4})\s+.*Out\s+of\s+order/i;
+  
+  // Pattern pour les noms de clients et dates
+  const guestPattern = /(\d+)\s*×\s*(Adult[se]?|Enfant[s]?)\s+([A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]*)*)/gi;
+  const nightPattern = /Night\s+(\d+)\/(\d+)|Nuit\s+(\d+)\/(\d+)/i;
+  const datePattern = /(\d{2}\/\d{2}\/\d{4})/g;
+  const timePattern = /(\d{2}:\d{2})/g;
+  
   for (const line of lines) {
     const trimmed = line.trim();
     
-    // Skip les lignes vides ou trop courtes
-    if (!trimmed || trimmed.length < 3) continue;
+    // Skip les lignes vides ou headers
+    if (!trimmed || trimmed.length < 5) continue;
+    if (isHeaderLine(trimmed)) continue;
     
-    // Skip les headers et footers
-    if (isHeaderOrFooter(trimmed)) continue;
+    // Vérifier Out of Order d'abord
+    const oooMatch = trimmed.match(oooPattern);
+    if (oooMatch) {
+      rows.push(createMewsRow(line, oooMatch[1], '', 'OOO', '', true));
+      continue;
+    }
     
-    // Essayer de parser comme une chambre
-    const parsed = parseLine(line, trimmed, structure, format);
+    // Essayer le pattern principal
+    let match = trimmed.match(roomPattern);
+    if (!match) {
+      match = trimmed.match(roomPatternAlt);
+    }
     
-    if (parsed && parsed.roomNumber) {
-      rows.push(parsed);
+    if (match) {
+      const roomNumber = match[1];
+      const roomType = match[2];
+      const status = (match[3] === 'CLA' || match[3] === 'B' || match[3] === 'PMR' || match[3] === 'Twinable') 
+        ? match[4]?.toUpperCase() || 'SAL'
+        : match[3].toUpperCase();
+      const assignee = match[4] || '';
+      
+      // Extraire les données supplémentaires
+      const dates = [...trimmed.matchAll(datePattern)].map(m => m[1]);
+      const times = [...trimmed.matchAll(timePattern)].map(m => m[1]);
+      const guests: string[] = [];
+      let guestMatch;
+      const guestRegex = /(\d+)\s*×\s*(Adult[se]?|Enfant[s]?)\s+([A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]*)*)/gi;
+      while ((guestMatch = guestRegex.exec(trimmed)) !== null) {
+        guests.push(guestMatch[3]);
+      }
+      const nightMatch = trimmed.match(nightPattern);
+      
+      // Déterminer le type de nettoyage avec la logique Mews
+      const row = createMewsRow(
+        line,
+        roomNumber,
+        roomType,
+        status,
+        assignee,
+        false,
+        guests,
+        dates,
+        times,
+        nightMatch
+      );
+      
+      rows.push(row);
     }
   }
   
   // Calculer le résumé
   const summary = calculateSummary(rows);
   
-  return { headers, rows, summary };
+  return {
+    headers: ['N° Chambre', 'Type', 'Statut', 'Assigné', 'Client', 'Arrivée', 'Départ', 'Nuit', 'Type nettoyage'],
+    rows,
+    summary,
+  };
 }
 
-function extractHeaders(lines: string[], structure: ReportStructure): string[] {
-  // Chercher la première ligne avec des labels de colonnes
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
-    const line = lines[i].trim();
-    
-    // Vérifier si c'est une ligne de headers
-    const headerKeywords = /\b(room|chambre|statut|status|type|date|arrivée|départ|client|guest|assignee|floor|étage)\b/i;
-    if (headerKeywords.test(line)) {
-      // Split selon le délimiteur
-      if (structure.delimiter === '|') {
-        return line.split('|').map(h => h.trim()).filter(h => h);
-      } else if (structure.delimiter === '\t') {
-        return line.split('\t').map(h => h.trim());
-      } else {
-        return line.split(/\s{2,}/).map(h => h.trim()).filter(h => h);
-      }
+function createMewsRow(
+  rawLine: string,
+  roomNumber: string,
+  roomType: string,
+  status: string,
+  assignee: string,
+  isOOO: boolean,
+  guests: string[] = [],
+  dates: string[] = [],
+  times: string[] = [],
+  nightMatch?: RegExpMatchArray | null
+): ParsedRow {
+  const nightInfo = nightMatch 
+    ? `${nightMatch[1] || nightMatch[3]}/${nightMatch[2] || nightMatch[4]}`
+    : '';
+  
+  // Analyser les dates
+  const arrivalDate = dates[0] || '';
+  const departureDate = dates[1] || dates[0] || '';
+  
+  // Déterminer si c'est une arrivée, un départ ou un client en place
+  const hasNightInfo = !!nightMatch;
+  const currentNight = nightMatch ? parseInt(nightMatch[1] || nightMatch[3] || '1') : 0;
+  const totalNights = nightMatch ? parseInt(nightMatch[2] || nightMatch[4] || '1') : 0;
+  const isLastNight = currentNight === totalNights;
+  
+  // Logique de détermination du type de nettoyage Mews
+  let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
+  let statusIndicator = status;
+  
+  if (isOOO) {
+    detectedType = 'out_of_service';
+    statusIndicator = 'OOO';
+  } else if (status === 'DIR' || status === 'SAL') {
+    // DIR/SAL = chambre sale
+    if (hasNightInfo && !isLastNight) {
+      // Client en place, pas dernier jour = recouche
+      detectedType = 'quick';
+      statusIndicator = `${status} (Recouche)`;
+    } else if (guests.length === 0) {
+      // Pas de client = chambre vacante sale = à blanc
+      detectedType = 'full';
+      statusIndicator = `${status} (Départ)`;
+    } else if (isLastNight) {
+      // Dernier jour du client = départ = à blanc
+      detectedType = 'full';
+      statusIndicator = `${status} (Départ)`;
+    } else {
+      // Client en place = recouche
+      detectedType = 'quick';
+      statusIndicator = `${status} (Recouche)`;
+    }
+  } else if (status === 'INS' || status === 'PRO') {
+    // INS/PRO = chambre propre/inspectée
+    if (guests.length > 0) {
+      // Client en place avec chambre déjà inspectée = recouche
+      detectedType = 'quick';
+      statusIndicator = `${status} (Recouche)`;
+    } else {
+      // Chambre vide et propre = aucun nettoyage
+      detectedType = 'none';
+      statusIndicator = `${status} (Propre)`;
     }
   }
   
-  return structure.suggestedColumns.map(c => c.name);
+  // Créer les colonnes pour l'affichage
+  const columns: ColumnValue[] = [
+    { value: roomNumber, type: 'room_number', confidence: 1 },
+    { value: roomType, type: 'room_type', confidence: 1 },
+    { value: status, type: 'status', confidence: 1 },
+    { value: assignee, type: 'assignee', confidence: 0.8 },
+    { value: guests.join(', '), type: 'guest_name', confidence: 0.9 },
+    { value: arrivalDate, type: 'arrival_date', confidence: 0.8 },
+    { value: departureDate, type: 'departure_date', confidence: 0.8 },
+    { value: nightInfo, type: 'night_info', confidence: 0.9 },
+  ];
+  
+  return {
+    rawLine,
+    roomNumber,
+    roomType,
+    cleaningStatus: status,
+    columns,
+    detectedCleaningType: detectedType,
+    confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
+    statusIndicator,
+    guestName: guests.join(', '),
+    arrivalDate,
+    departureDate,
+    arrivalTime: times[0] || '',
+    departureTime: times[1] || times[0] || '',
+    nightInfo,
+    hasCurrentGuest: guests.length > 0,
+    hasDepartingGuest: isLastNight,
+    hasArrivingGuest: currentNight === 1,
+    isOutOfOrder: isOOO,
+    assignee,
+  };
 }
 
-function isHeaderOrFooter(line: string): boolean {
+/**
+ * Parser Apaleo Housekeeping
+ */
+function parseApaleoReport(text: string): ParsedReportData {
+  const lines = text.split('\n');
+  const rows: ParsedRow[] = [];
+  
+  // Pattern Apaleo: "01 Chambre twin 17/05/2025 15:00 ..."
+  const roomPattern = /^(\d{2,4})\s+(Chambre\s+\w+)/i;
+  const statusPattern = /\b(Recouche|Parti|En\s+arrivée)\b/i;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.length < 5) continue;
+    if (isHeaderLine(trimmed)) continue;
+    
+    const roomMatch = trimmed.match(roomPattern);
+    if (!roomMatch) continue;
+    
+    const roomNumber = roomMatch[1];
+    const roomType = roomMatch[2];
+    
+    const statusMatch = trimmed.match(statusPattern);
+    const status = statusMatch ? statusMatch[1] : '';
+    
+    let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
+    if (/parti/i.test(status)) {
+      detectedType = 'full';
+    } else if (/recouche/i.test(status)) {
+      detectedType = 'quick';
+    } else if (/arrivée/i.test(status)) {
+      detectedType = 'full'; // Arrivée = chambre à préparer
+    }
+    
+    rows.push({
+      rawLine: line,
+      roomNumber,
+      roomType,
+      cleaningStatus: status,
+      columns: [
+        { value: roomNumber, type: 'room_number', confidence: 1 },
+        { value: roomType, type: 'room_type', confidence: 1 },
+        { value: status, type: 'status', confidence: 0.9 },
+      ],
+      detectedCleaningType: detectedType,
+      confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
+      statusIndicator: status,
+      guestName: '',
+      arrivalDate: '',
+      departureDate: '',
+      arrivalTime: '',
+      departureTime: '',
+      nightInfo: '',
+      hasCurrentGuest: /recouche/i.test(status),
+      hasDepartingGuest: /parti/i.test(status),
+      hasArrivingGuest: /arrivée/i.test(status),
+      isOutOfOrder: false,
+      assignee: '',
+    });
+  }
+  
+  return {
+    headers: ['N° Chambre', 'Type', 'Statut', 'Type nettoyage'],
+    rows,
+    summary: calculateSummary(rows),
+  };
+}
+
+/**
+ * Parser Medialog État des chambres
+ */
+function parseMedialogReport(text: string): ParsedReportData {
+  const lines = text.split('\n');
+  const rows: ParsedRow[] = [];
+  
+  // Pattern Medialog: "110 PARTI S SGL 15/05 17/05 2"
+  const roomPattern = /^(\d{3})\s+(PARTI|RECOUCHE|DEPART|DRAPS)/i;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.length < 5) continue;
+    if (isHeaderLine(trimmed)) continue;
+    
+    const roomMatch = trimmed.match(roomPattern);
+    if (!roomMatch) continue;
+    
+    const roomNumber = roomMatch[1];
+    const status = roomMatch[2].toUpperCase();
+    
+    let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
+    if (status === 'PARTI' || status === 'DEPART') {
+      detectedType = 'full';
+    } else if (status === 'RECOUCHE' || status === 'DRAPS') {
+      detectedType = 'quick';
+    }
+    
+    rows.push({
+      rawLine: line,
+      roomNumber,
+      roomType: '',
+      cleaningStatus: status,
+      columns: [
+        { value: roomNumber, type: 'room_number', confidence: 1 },
+        { value: status, type: 'status', confidence: 0.95 },
+      ],
+      detectedCleaningType: detectedType,
+      confidence: 0.9,
+      statusIndicator: status,
+      guestName: '',
+      arrivalDate: '',
+      departureDate: '',
+      arrivalTime: '',
+      departureTime: '',
+      nightInfo: '',
+      hasCurrentGuest: status === 'RECOUCHE' || status === 'DRAPS',
+      hasDepartingGuest: status === 'PARTI' || status === 'DEPART',
+      hasArrivingGuest: false,
+      isOutOfOrder: false,
+      assignee: '',
+    });
+  }
+  
+  return {
+    headers: ['N° Chambre', 'Statut', 'Type nettoyage'],
+    rows,
+    summary: calculateSummary(rows),
+  };
+}
+
+/**
+ * Parser générique
+ */
+function parseGenericReport(text: string): ParsedReportData {
+  const lines = text.split('\n');
+  const rows: ParsedRow[] = [];
+  
+  // Pattern générique pour numéro de chambre
+  const roomPattern = /^(\d{2,4}[A-Z]?)\b/;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.length < 5) continue;
+    if (isHeaderLine(trimmed)) continue;
+    
+    const roomMatch = trimmed.match(roomPattern);
+    if (!roomMatch) continue;
+    
+    const roomNumber = roomMatch[1];
+    
+    // Chercher des indicateurs de statut
+    let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
+    let statusIndicator = '';
+    
+    if (/\b(départ|depart|parti|checkout|libéré)\b/i.test(trimmed)) {
+      detectedType = 'full';
+      statusIndicator = 'Départ';
+    } else if (/\b(recouche|stayover|occupé|occ)\b/i.test(trimmed)) {
+      detectedType = 'quick';
+      statusIndicator = 'Recouche';
+    } else if (/\b(ooo|out\s*of\s*order|hors\s*service|maintenance)\b/i.test(trimmed)) {
+      detectedType = 'out_of_service';
+      statusIndicator = 'H.S.';
+    } else if (/\b(libre|vacant|propre|clean)\b/i.test(trimmed)) {
+      detectedType = 'none';
+      statusIndicator = 'Libre';
+    }
+    
+    rows.push({
+      rawLine: line,
+      roomNumber,
+      roomType: '',
+      cleaningStatus: statusIndicator,
+      columns: [
+        { value: roomNumber, type: 'room_number', confidence: 1 },
+        { value: statusIndicator, type: 'status', confidence: 0.5 },
+      ],
+      detectedCleaningType: detectedType,
+      confidence: detectedType !== 'unknown' ? 0.6 : 0.3,
+      statusIndicator,
+      guestName: '',
+      arrivalDate: '',
+      departureDate: '',
+      arrivalTime: '',
+      departureTime: '',
+      nightInfo: '',
+      hasCurrentGuest: false,
+      hasDepartingGuest: false,
+      hasArrivingGuest: false,
+      isOutOfOrder: false,
+      assignee: '',
+    });
+  }
+  
+  return {
+    headers: ['N° Chambre', 'Statut', 'Type nettoyage'],
+    rows,
+    summary: calculateSummary(rows),
+  };
+}
+
+function isHeaderLine(line: string): boolean {
   const patterns = [
     /^(page|imprimé|total|résumé|summary|printed)/i,
     /^\d+\s+chambre\(s\)/i,
     /^(floor|étage)\s+spaces/i,
     /fermé\s+à\s+la\s+vente/i,
-    /^[-=_]{5,}$/,
-    /^\|[-\s|]+\|$/,
+    /^[-=_|]{5,}$/,
     /literie\s+\d+\s*×/i,
     /\d+\s*×\s*lit/i,
-    /^#\s+ETAT\s+MEMO/i, // Header Medialog
-    /^Ch\.\s+Type\s+Arrivée/i, // Header Apaleo
+    /^#\s+ETAT\s+MEMO/i,
+    /^Ch\.\s+Type\s+Arrivée/i,
+    /^Floor\s+Spaces/i,
+    /^Étage\s+Espaces/i,
+    /Space\s+status\s+-/i,
+    /Statut\s+des\s+espaces\s+-/i,
   ];
   
   return patterns.some(p => p.test(line));
 }
 
-function parseLine(line: string, trimmed: string, structure: ReportStructure, format: ReportFormat): ParsedRow | null {
-  // Extraire le numéro de chambre
-  const roomMatch = trimmed.match(/^(\d{1,2}\s+)?(\d{2,4}[A-Z]?)/);
-  if (!roomMatch) return null;
-  
-  const roomNumber = roomMatch[2] || roomMatch[1]?.trim();
-  if (!roomNumber) return null;
-  
-  // Split la ligne en colonnes
-  let parts: string[];
-  if (structure.delimiter === '|') {
-    parts = line.split('|').map(p => p.trim()).filter(p => p);
-  } else if (structure.delimiter === '\t') {
-    parts = line.split('\t').map(p => p.trim());
-  } else {
-    parts = line.split(/\s{2,}/).map(p => p.trim()).filter(p => p);
-  }
-  
-  // Mapper les colonnes avec leurs types
-  const columns: ColumnValue[] = parts.map((value, idx) => {
-    const colDef = structure.suggestedColumns[idx];
+function buildStructure(parsedData: ParsedReportData, format: ReportFormat): ReportStructure {
+  const columnTypes = parsedData.headers.map((name, index): ColumnDefinition => {
+    const sampleValues = parsedData.rows.slice(0, 10).map(r => r.columns[index]?.value || '').filter(v => v);
     return {
-      value,
-      type: colDef?.type || 'other',
-      confidence: colDef ? 0.8 : 0.3,
+      index,
+      name,
+      type: detectColumnTypeFromValues(sampleValues, name),
+      isRelevantForCleaning: ['Statut', 'Type nettoyage', 'N° Chambre'].some(k => name.includes(k)),
+      sampleValues: [...new Set(sampleValues)].slice(0, 5),
     };
   });
   
-  // Détecter le type de nettoyage
-  const { cleaningType, statusIndicator, confidence } = detectCleaningType(line, columns);
-  
   return {
-    rawLine: line,
-    roomNumber,
-    columns,
-    detectedCleaningType: cleaningType,
-    confidence,
-    statusIndicator,
+    hasTable: true,
+    columnCount: columnTypes.length,
+    suggestedColumns: columnTypes,
+    roomNumberPattern: '^\\d{2,4}',
+    lineParseStrategy: format === 'mews_space_status' ? 'mews' : format === 'apaleo_housekeeping' ? 'apaleo' : format === 'medialog_etat' ? 'medialog' : 'generic',
+    delimiter: null,
   };
 }
 
-function detectCleaningType(line: string, columns: ColumnValue[]): { 
-  cleaningType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown';
-  statusIndicator: string;
-  confidence: number;
-} {
-  // Chercher d'abord dans la colonne status
-  const statusColumn = columns.find(c => c.type === 'status');
-  const searchText = statusColumn?.value || line;
-  
-  let bestMatch: { type: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown'; indicator: string; priority: number } = {
-    type: 'unknown',
-    indicator: '',
-    priority: -1,
-  };
-  
-  for (const rule of CLEANING_RULES) {
-    if (rule.cleaningType === 'exclude') continue; // Ne pas marquer comme excluded ici
-    
-    for (const pattern of rule.patterns) {
-      const match = searchText.match(pattern);
-      if (match && rule.priority > bestMatch.priority) {
-        bestMatch = {
-          type: rule.cleaningType as 'full' | 'quick' | 'none' | 'out_of_service',
-          indicator: match[0],
-          priority: rule.priority,
-        };
-      }
-    }
-  }
-  
-  // Si pas trouvé dans status, chercher dans toute la ligne
-  if (bestMatch.type === 'unknown') {
-    for (const rule of CLEANING_RULES) {
-      if (rule.cleaningType === 'exclude') continue;
-      
-      for (const pattern of rule.patterns) {
-        const match = line.match(pattern);
-        if (match && rule.priority > bestMatch.priority) {
-          bestMatch = {
-            type: rule.cleaningType as 'full' | 'quick' | 'none' | 'out_of_service',
-            indicator: match[0],
-            priority: rule.priority,
-          };
-        }
-      }
-    }
-  }
-  
-  return {
-    cleaningType: bestMatch.type,
-    statusIndicator: bestMatch.indicator,
-    confidence: bestMatch.priority > 0 ? Math.min(0.95, 0.5 + bestMatch.priority * 0.05) : 0.3,
-  };
+function detectColumnTypeFromValues(values: string[], name: string): ColumnType {
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('chambre') || lowerName.includes('room')) return 'room_number';
+  if (lowerName.includes('statut') || lowerName.includes('status')) return 'status';
+  if (lowerName.includes('type')) return 'room_type';
+  if (lowerName.includes('arrivée') || lowerName.includes('arrival')) return 'arrival_date';
+  if (lowerName.includes('départ') || lowerName.includes('departure')) return 'departure_date';
+  if (lowerName.includes('client') || lowerName.includes('guest')) return 'guest_name';
+  if (lowerName.includes('assigné') || lowerName.includes('assignee')) return 'assignee';
+  if (lowerName.includes('nuit') || lowerName.includes('night')) return 'night_info';
+  return 'other';
 }
 
 function extractIndicators(parsedData: ParsedReportData): CleaningIndicator[] {
-  const indicatorMap = new Map<string, { type: 'full' | 'quick' | 'none' | 'out_of_service' | 'exclude' | 'unknown'; count: number; contexts: string[] }>();
+  const indicatorMap = new Map<string, { 
+    type: 'full' | 'quick' | 'none' | 'out_of_service' | 'exclude' | 'unknown'; 
+    count: number; 
+    contexts: string[] 
+  }>();
   
   for (const row of parsedData.rows) {
-    if (!row.statusIndicator) continue;
+    if (!row.cleaningStatus && !row.statusIndicator) continue;
     
-    const key = row.statusIndicator.toUpperCase();
+    const key = (row.cleaningStatus || row.statusIndicator).toUpperCase().substring(0, 20);
     const existing = indicatorMap.get(key);
     
     if (existing) {
@@ -630,8 +719,7 @@ function calculateSummary(rows: ParsedRow[]): ParsedReportData['summary'] {
   for (const row of rows) {
     switch (row.detectedCleaningType) {
       case 'full':
-        // Distinguer départs et arrivées si possible
-        if (/arrivée|arrival|arr/i.test(row.statusIndicator)) {
+        if (row.hasArrivingGuest && !row.hasDepartingGuest) {
           summary.arrivals++;
         } else {
           summary.departures++;
@@ -662,7 +750,7 @@ function calculateConfidence(parsedData: ParsedReportData, format: ReportFormat)
   const knownRatio = known / total;
   
   // Bonus si format reconnu
-  const formatBonus = format !== 'unknown' && format !== 'generic_table' ? 0.1 : 0;
+  const formatBonus = format !== 'unknown' && format !== 'generic_table' ? 0.15 : 0;
   
   return Math.min(100, Math.round((knownRatio + formatBonus) * 100));
 }
@@ -674,27 +762,27 @@ export function getFormatDescription(format: ReportFormat): { name: string; desc
   const descriptions: Record<ReportFormat, { name: string; description: string }> = {
     mews_space_status: {
       name: 'Mews Space Status',
-      description: 'Rapport avec codes INS/PRO/SAL/DIR pour les statuts',
+      description: 'DIR=Sale(départ) • INS/PRO=Propre(recouche si client)',
     },
     apaleo_housekeeping: {
       name: 'Apaleo Housekeeping',
-      description: 'Rapport avec Recouche/Parti/En arrivée',
+      description: 'Parti=Départ • Recouche=Client en place • Arrivée=À préparer',
     },
     medialog_etat: {
       name: 'Medialog État des chambres',
-      description: 'Format français avec PARTI/RECOUCHE/DEPART/DRAPS',
+      description: 'PARTI/DEPART=À blanc • RECOUCHE/DRAPS=Recouche',
     },
     opera_housekeeping: {
       name: 'Opera Housekeeping',
-      description: 'Format Oracle Opera avec codes VD/OD/VC/OC',
+      description: 'VD=Vacant Dirty • OD=Occupied Dirty • VC=Vacant Clean',
     },
     generic_table: {
-      name: 'Tableau générique',
-      description: 'Format tabulaire standard détecté automatiquement',
+      name: 'Format générique',
+      description: 'Format tabulaire détecté automatiquement',
     },
     unknown: {
       name: 'Format inconnu',
-      description: 'Format non reconnu - utilisation du parsing générique',
+      description: 'Parsing générique - vérifiez les mappings manuellement',
     },
   };
   return descriptions[format];
