@@ -265,10 +265,11 @@ function parseMewsReport(text: string): ParsedReportData {
     
     if (match) {
       const roomNumber = match[1];
-      const roomType = match[2];
-      const status = (match[3] === 'CLA' || match[3] === 'B' || match[3] === 'PMR' || match[3] === 'Twinable') 
-        ? match[4]?.toUpperCase() || 'SAL'
-        : match[3].toUpperCase();
+      const roomType = match[2] || '';
+      const rawStatus = match[3] || '';
+      const status = (rawStatus === 'CLA' || rawStatus === 'B' || rawStatus === 'PMR' || rawStatus === 'Twinable') 
+        ? (match[4]?.toUpperCase() || 'SAL')
+        : (rawStatus ? rawStatus.toUpperCase() : 'SAL');
       const assignee = match[4] || '';
       
       // Extraire les données supplémentaires
