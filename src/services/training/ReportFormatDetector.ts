@@ -226,79 +226,210 @@ function parseReportByFormat(text: string, format: ReportFormat): ParsedReportDa
  * Format: "101 TWS DIR Farid 05/05/2025 1 × Adults Name , Night 2/2 07/05/2025"
  */
 function parseMewsReport(text: string): ParsedReportData {
-  const lines = text.split('\n');
   const rows: ParsedRow[] = [];
   
-  // Regex pour extraire les chambres Mews
-  // Format: [Floor] RoomNumber Type Status Assignee [dates et infos client]
-  const roomPattern = /(\d{3,4})\s+([A-Z]{2,5})\s+(DIR|INS|PRO|SAL)\s+([A-Za-z]+)/;
-  const roomPatternAlt = /(\d{3,4})\s+([A-Z]{2,5})\s+(CLA|B|PMR|Twinable)?\s*(DIR|INS|PRO|SAL)\b/i;
+  // Normaliser le texte - joindre les lignes qui font partie d'une même entrée
+  const normalizedText = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\n+/g, '\n');
   
-  // Pattern pour "Out of order"
-  const oooPattern = /(\d{3,4})\s+.*Out\s+of\s+order/i;
+  const lines = normalizedText.split('\n');
   
-  // Pattern pour les noms de clients et dates
-  const guestPattern = /(\d+)\s*×\s*(Adult[se]?|Enfant[s]?)\s+([A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]*)*)/gi;
-  const nightPattern = /Night\s+(\d+)\/(\d+)|Nuit\s+(\d+)\/(\d+)/i;
+  // Pattern principal pour détecter le début d'une chambre
+  // Format: "001   DBL-" ou "101-T   DBL-" ou "003+004   DUP"
+  const roomStartPattern = /^(\d{3,4}(?:-[A-Z])?(?:\+\d{3,4})?)\s+([A-Z]{2,4})/;
+  
+  // Pattern pour les statuts Mews
+  const statusPattern = /\b(DIR|INS|PRO|SAL)\b/;
+  
+  // Pattern pour "Nuit X/Y"
+  const nightPattern = /Nuit\s+(\d+)\/(\d+)/i;
+  
+  // Pattern pour les dates (format DD/MM/YYYY)
   const datePattern = /(\d{2}\/\d{2}\/\d{4})/g;
-  const timePattern = /(\d{2}:\d{2})/g;
   
-  for (const line of lines) {
-    const trimmed = line.trim();
+  // Pattern pour les heures
+  const timePattern = /\b(\d{2}:\d{2})\b/g;
+  
+  // Pattern pour les noms de clients (après "Adultes" ou "Enfants")
+  // Capture les noms en majuscules/minuscules sur plusieurs mots
+  const guestPattern = /(?:Adultes?|Enfants?)\s+([A-ZÀ-Ÿa-zà-ÿ][A-Za-zÀ-ÿ',\.\-\s]*?)(?=\s*(?:,\s*Nuit|\d{2}\/\d{2}\/\d{4}|$|\n))/gi;
+  
+  // Pattern alternatif pour noms en majuscules seuls
+  const capsNamePattern = /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]*)*)\s*$/;
+  
+  // Reconstruire le contenu par chambre - grouper les lignes consécutives
+  let currentRoomData = '';
+  let roomEntries: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.length < 3) continue;
     
-    // Skip les lignes vides ou headers
-    if (!trimmed || trimmed.length < 5) continue;
-    if (isHeaderLine(trimmed)) continue;
+    // Skip les en-têtes
+    if (isHeaderLine(line)) continue;
+    if (/^Étage\s+Espaces/i.test(line)) continue;
+    if (/^Hotel\s+/i.test(line)) continue;
+    if (/^\d+\s*\/\s*\d+$/.test(line)) continue; // Pagination
     
-    // Vérifier Out of Order d'abord
-    const oooMatch = trimmed.match(oooPattern);
-    if (oooMatch) {
-      rows.push(createMewsRow(line, oooMatch[1], '', 'OOO', '', true));
-      continue;
-    }
-    
-    // Essayer le pattern principal
-    let match = trimmed.match(roomPattern);
-    if (!match) {
-      match = trimmed.match(roomPatternAlt);
-    }
-    
-    if (match) {
-      const roomNumber = match[1];
-      const roomType = match[2] || '';
-      const rawStatus = match[3] || '';
-      const status = (rawStatus === 'CLA' || rawStatus === 'B' || rawStatus === 'PMR' || rawStatus === 'Twinable') 
-        ? (match[4]?.toUpperCase() || 'SAL')
-        : (rawStatus ? rawStatus.toUpperCase() : 'SAL');
-      const assignee = match[4] || '';
-      
-      // Extraire les données supplémentaires
-      const dates = [...trimmed.matchAll(datePattern)].map(m => m[1]);
-      const times = [...trimmed.matchAll(timePattern)].map(m => m[1]);
-      const guests: string[] = [];
-      let guestMatch;
-      const guestRegex = /(\d+)\s*×\s*(Adult[se]?|Enfant[s]?)\s+([A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]*)*)/gi;
-      while ((guestMatch = guestRegex.exec(trimmed)) !== null) {
-        guests.push(guestMatch[3]);
+    // Vérifier si c'est le début d'une nouvelle chambre
+    if (roomStartPattern.test(line)) {
+      // Sauvegarder l'entrée précédente si elle existe
+      if (currentRoomData) {
+        roomEntries.push(currentRoomData);
       }
-      const nightMatch = trimmed.match(nightPattern);
-      
-      // Déterminer le type de nettoyage avec la logique Mews
-      const row = createMewsRow(
-        line,
-        roomNumber,
-        roomType,
-        status,
-        assignee,
-        false,
-        guests,
-        dates,
-        times,
-        nightMatch
-      );
-      
-      rows.push(row);
+      currentRoomData = line;
+    } else if (currentRoomData) {
+      // Continuer à accumuler les données de la chambre courante
+      currentRoomData += ' ' + line;
     }
+  }
+  
+  // Ajouter la dernière entrée
+  if (currentRoomData) {
+    roomEntries.push(currentRoomData);
+  }
+  
+  // Maintenant parser chaque entrée de chambre
+  for (const entry of roomEntries) {
+    const roomMatch = entry.match(roomStartPattern);
+    if (!roomMatch) continue;
+    
+    const roomNumber = roomMatch[1];
+    const roomType = roomMatch[2];
+    
+    // Trouver le statut
+    const statusMatch = entry.match(statusPattern);
+    const status = statusMatch ? statusMatch[1].toUpperCase() : '';
+    
+    // Skip si pas de statut valide
+    if (!status) continue;
+    
+    // Extraire les dates
+    const dates = [...entry.matchAll(datePattern)].map(m => m[1]);
+    const arrivalDate = dates.length > 0 ? dates[0] : '';
+    const departureDate = dates.length > 1 ? dates[1] : dates[0] || '';
+    
+    // Extraire les heures
+    const times = [...entry.matchAll(timePattern)].map(m => m[1]);
+    
+    // Extraire le nom du client
+    let guestName = '';
+    const guestMatches = [...entry.matchAll(guestPattern)];
+    if (guestMatches.length > 0) {
+      // Prendre le premier nom trouvé et le nettoyer
+      guestName = guestMatches[0][1].trim();
+    }
+    
+    // Si pas de nom trouvé, chercher un pattern de nom en majuscules après une date
+    if (!guestName) {
+      const afterDatePattern = /\d{2}\/\d{2}\/\d{4}\s+(\d+\s*×\s*(?:Adultes?|Enfants?)\s+)?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]*)*)/gi;
+      const afterDateMatch = afterDatePattern.exec(entry);
+      if (afterDateMatch) {
+        guestName = afterDateMatch[2]?.trim() || '';
+      }
+    }
+    
+    // Chercher aussi les noms après les heures (format "15:00 2 × Adultes NOM")
+    if (!guestName) {
+      const afterTimePattern = /\d{2}:\d{2}\s+\d+\s*×\s*(?:Adultes?|Enfants?)\s+([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\s\-',\.]+?)(?=\s*(?:\d{2}\/|$|Nuit))/gi;
+      const afterTimeMatch = afterTimePattern.exec(entry);
+      if (afterTimeMatch) {
+        guestName = afterTimeMatch[1]?.trim() || '';
+      }
+    }
+    
+    // Nettoyer le nom (enlever les virgules de fin, etc.)
+    guestName = guestName.replace(/,\s*$/, '').replace(/\s+/g, ' ').trim();
+    
+    // Extraire info nuit
+    const nightMatch = entry.match(nightPattern);
+    const nightInfo = nightMatch ? `${nightMatch[1]}/${nightMatch[2]}` : '';
+    
+    // Extraire l'assigné (nom après le statut, avant les données client)
+    let assignee = '';
+    const assigneePattern = new RegExp(`${status}\\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\\s+[A-ZÀ-Ÿ][a-zà-ÿ]*)?)`);
+    const assigneeMatch = entry.match(assigneePattern);
+    if (assigneeMatch) {
+      assignee = assigneeMatch[1].trim();
+    }
+    
+    // Déterminer le type de nettoyage
+    const hasGuest = guestName.length > 0 || times.length > 0 || dates.length > 0;
+    const hasNightInfo = !!nightMatch;
+    const currentNight = nightMatch ? parseInt(nightMatch[1]) : 0;
+    const totalNights = nightMatch ? parseInt(nightMatch[2]) : 0;
+    const isLastNight = hasNightInfo && currentNight === totalNights;
+    
+    // Logique de nettoyage Mews
+    let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
+    let statusIndicator = status;
+    
+    if (status === 'DIR' || status === 'SAL') {
+      // DIR/SAL = chambre sale
+      if (hasNightInfo && !isLastNight) {
+        // Client en place, pas dernier jour = recouche
+        detectedType = 'quick';
+        statusIndicator = `${status} (Recouche)`;
+      } else if (!hasGuest) {
+        // Pas de client = chambre vacante sale = à blanc
+        detectedType = 'full';
+        statusIndicator = `${status} (Vacant)`;
+      } else if (isLastNight) {
+        // Dernier jour du client = départ = à blanc
+        detectedType = 'full';
+        statusIndicator = `${status} (Départ)`;
+      } else {
+        // Client en place = recouche
+        detectedType = 'quick';
+        statusIndicator = `${status} (Recouche)`;
+      }
+    } else if (status === 'INS' || status === 'PRO') {
+      // INS/PRO = chambre propre/inspectée
+      if (hasGuest) {
+        // Client attendu ou en place = recouche probable
+        detectedType = 'quick';
+        statusIndicator = `${status} (Recouche)`;
+      } else {
+        // Chambre vide et propre = aucun nettoyage
+        detectedType = 'none';
+        statusIndicator = `${status} (Propre)`;
+      }
+    }
+    
+    // Créer la ligne
+    const columns: ColumnValue[] = [
+      { value: roomNumber, type: 'room_number', confidence: 1 },
+      { value: roomType, type: 'room_type', confidence: 1 },
+      { value: status, type: 'status', confidence: 1 },
+      { value: assignee, type: 'assignee', confidence: 0.8 },
+      { value: guestName, type: 'guest_name', confidence: 0.9 },
+      { value: arrivalDate, type: 'arrival_date', confidence: 0.8 },
+      { value: departureDate, type: 'departure_date', confidence: 0.8 },
+      { value: nightInfo, type: 'night_info', confidence: 0.9 },
+    ];
+    
+    rows.push({
+      rawLine: entry,
+      roomNumber,
+      roomType,
+      cleaningStatus: status,
+      columns,
+      detectedCleaningType: detectedType,
+      confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
+      statusIndicator,
+      guestName,
+      arrivalDate,
+      departureDate,
+      arrivalTime: times[0] || '',
+      departureTime: times[1] || times[0] || '',
+      nightInfo,
+      hasCurrentGuest: hasGuest,
+      hasDepartingGuest: isLastNight,
+      hasArrivingGuest: currentNight === 1,
+      isOutOfOrder: false,
+      assignee,
+    });
   }
   
   // Calculer le résumé
@@ -308,106 +439,6 @@ function parseMewsReport(text: string): ParsedReportData {
     headers: ['N° Chambre', 'Type', 'Statut', 'Assigné', 'Client', 'Arrivée', 'Départ', 'Nuit', 'Type nettoyage'],
     rows,
     summary,
-  };
-}
-
-function createMewsRow(
-  rawLine: string,
-  roomNumber: string,
-  roomType: string,
-  status: string,
-  assignee: string,
-  isOOO: boolean,
-  guests: string[] = [],
-  dates: string[] = [],
-  times: string[] = [],
-  nightMatch?: RegExpMatchArray | null
-): ParsedRow {
-  const nightInfo = nightMatch 
-    ? `${nightMatch[1] || nightMatch[3]}/${nightMatch[2] || nightMatch[4]}`
-    : '';
-  
-  // Analyser les dates
-  const arrivalDate = dates[0] || '';
-  const departureDate = dates[1] || dates[0] || '';
-  
-  // Déterminer si c'est une arrivée, un départ ou un client en place
-  const hasNightInfo = !!nightMatch;
-  const currentNight = nightMatch ? parseInt(nightMatch[1] || nightMatch[3] || '1') : 0;
-  const totalNights = nightMatch ? parseInt(nightMatch[2] || nightMatch[4] || '1') : 0;
-  const isLastNight = currentNight === totalNights;
-  
-  // Logique de détermination du type de nettoyage Mews
-  let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
-  let statusIndicator = status;
-  
-  if (isOOO) {
-    detectedType = 'out_of_service';
-    statusIndicator = 'OOO';
-  } else if (status === 'DIR' || status === 'SAL') {
-    // DIR/SAL = chambre sale
-    if (hasNightInfo && !isLastNight) {
-      // Client en place, pas dernier jour = recouche
-      detectedType = 'quick';
-      statusIndicator = `${status} (Recouche)`;
-    } else if (guests.length === 0) {
-      // Pas de client = chambre vacante sale = à blanc
-      detectedType = 'full';
-      statusIndicator = `${status} (Départ)`;
-    } else if (isLastNight) {
-      // Dernier jour du client = départ = à blanc
-      detectedType = 'full';
-      statusIndicator = `${status} (Départ)`;
-    } else {
-      // Client en place = recouche
-      detectedType = 'quick';
-      statusIndicator = `${status} (Recouche)`;
-    }
-  } else if (status === 'INS' || status === 'PRO') {
-    // INS/PRO = chambre propre/inspectée
-    if (guests.length > 0) {
-      // Client en place avec chambre déjà inspectée = recouche
-      detectedType = 'quick';
-      statusIndicator = `${status} (Recouche)`;
-    } else {
-      // Chambre vide et propre = aucun nettoyage
-      detectedType = 'none';
-      statusIndicator = `${status} (Propre)`;
-    }
-  }
-  
-  // Créer les colonnes pour l'affichage
-  const columns: ColumnValue[] = [
-    { value: roomNumber, type: 'room_number', confidence: 1 },
-    { value: roomType, type: 'room_type', confidence: 1 },
-    { value: status, type: 'status', confidence: 1 },
-    { value: assignee, type: 'assignee', confidence: 0.8 },
-    { value: guests.join(', '), type: 'guest_name', confidence: 0.9 },
-    { value: arrivalDate, type: 'arrival_date', confidence: 0.8 },
-    { value: departureDate, type: 'departure_date', confidence: 0.8 },
-    { value: nightInfo, type: 'night_info', confidence: 0.9 },
-  ];
-  
-  return {
-    rawLine,
-    roomNumber,
-    roomType,
-    cleaningStatus: status,
-    columns,
-    detectedCleaningType: detectedType,
-    confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
-    statusIndicator,
-    guestName: guests.join(', '),
-    arrivalDate,
-    departureDate,
-    arrivalTime: times[0] || '',
-    departureTime: times[1] || times[0] || '',
-    nightInfo,
-    hasCurrentGuest: guests.length > 0,
-    hasDepartingGuest: isLastNight,
-    hasArrivingGuest: currentNight === 1,
-    isOutOfOrder: isOOO,
-    assignee,
   };
 }
 
