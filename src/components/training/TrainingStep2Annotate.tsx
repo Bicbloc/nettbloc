@@ -48,6 +48,17 @@ const STATUS_LABELS: Record<string, { label: string; icon: string; description: 
   'dirty': { label: 'Sale', icon: '🧹', description: 'SAL/SALE = Chambre sale. Par défaut: À blanc (nettoyage complet).' },
   'clean': { label: 'Propre', icon: '✨', description: 'INS/PRO = Chambre propre ou inspectée. Pas de nettoyage.' },
   'unknown': { label: 'Inconnu', icon: '❓', description: 'Statut non reconnu - vérifiez manuellement.' },
+  // Statuts Mews normalisés
+  'DIR (Départ)': { label: 'Départ', icon: '🚪', description: 'DIR = Dirty, chambre à nettoyer après départ' },
+  'DIR (Recouche)': { label: 'Recouche', icon: '🛏️', description: 'DIR = Dirty, client en place' },
+  'SAL (Départ)': { label: 'Départ', icon: '🚪', description: 'SAL = Sale, départ client' },
+  'SAL (Recouche)': { label: 'Recouche', icon: '🛏️', description: 'SAL = Sale, client en place' },
+  'SAL (Vacant)': { label: 'Vacant sale', icon: '🧹', description: 'SAL = Chambre vacante sale' },
+  'INS (Recouche)': { label: 'Inspecté/Recouche', icon: '✨', description: 'INS = Inspectée, client en place' },
+  'INS (Propre)': { label: 'Propre', icon: '✅', description: 'INS = Inspectée, pas de nettoyage' },
+  'PRO (Recouche)': { label: 'Propre/Recouche', icon: '🛏️', description: 'PRO = Propre, client en place' },
+  'PRO (Propre)': { label: 'Propre', icon: '✅', description: 'PRO = Propre, pas de nettoyage' },
+  'OOO': { label: 'Hors service', icon: '🚫', description: 'Out of Order - Chambre indisponible' },
 };
 
 // Détecte si une chambre est une "dernière nuit" mal détectée
@@ -373,9 +384,40 @@ export const TrainingStep2Annotate = ({
     return config;
   };
   
-  // Get status info
+  // Get status info - with fallback for Mews statuses
   const getStatusInfo = (status: string) => {
-    return STATUS_LABELS[status] || STATUS_LABELS['unknown'];
+    // Direct match
+    if (STATUS_LABELS[status]) {
+      return STATUS_LABELS[status];
+    }
+    
+    // Try to extract base status for Mews format like "INS (Recouche)"
+    const mewsMatch = status?.match(/^(DIR|INS|PRO|SAL|OOO)/i);
+    if (mewsMatch) {
+      const baseStatus = mewsMatch[1].toUpperCase();
+      // Check if it contains cleaning type hint
+      if (status.includes('Départ') || status.includes('Vacant')) {
+        return { label: 'Départ', icon: '🚪', description: 'Nettoyage à blanc requis' };
+      }
+      if (status.includes('Recouche')) {
+        return { label: 'Recouche', icon: '🛏️', description: 'Client en place' };
+      }
+      if (status.includes('Propre')) {
+        return { label: 'Propre', icon: '✅', description: 'Pas de nettoyage' };
+      }
+      // Fallback based on base status
+      if (baseStatus === 'DIR' || baseStatus === 'SAL') {
+        return { label: 'Sale', icon: '🧹', description: 'Chambre à nettoyer' };
+      }
+      if (baseStatus === 'INS' || baseStatus === 'PRO') {
+        return { label: 'Propre', icon: '✨', description: 'Chambre inspectée' };
+      }
+      if (baseStatus === 'OOO') {
+        return { label: 'Hors service', icon: '🚫', description: 'Chambre indisponible' };
+      }
+    }
+    
+    return STATUS_LABELS['unknown'];
   };
 
   const updateRoom = (index: number, field: keyof ExtractedRoom, value: any) => {
@@ -1075,13 +1117,18 @@ export const TrainingStep2Annotate = ({
                           </Badge>
                         )}
                         
-                        {/* Night info */}
-                        {(room as any)._nightInfo && (
+                        {/* Night info - support both string and object format */}
+                        {(room.nightInfo || (room as any)._nightInfo) && (
                           <Badge 
-                            variant={(room as any)._nightInfo.current === (room as any)._nightInfo.total ? 'destructive' : 'outline'} 
+                            variant={
+                              room.currentNight === room.totalNights || 
+                              ((room as any)._nightInfo?.current === (room as any)._nightInfo?.total) 
+                                ? 'destructive' 
+                                : 'outline'
+                            } 
                             className="gap-1 text-xs"
                           >
-                            🌙 Nuit {(room as any)._nightInfo.current}/{(room as any)._nightInfo.total}
+                            🌙 Nuit {room.nightInfo || `${(room as any)._nightInfo?.current}/${(room as any)._nightInfo?.total}`}
                           </Badge>
                         )}
                         

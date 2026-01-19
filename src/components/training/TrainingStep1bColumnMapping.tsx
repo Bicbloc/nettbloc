@@ -148,12 +148,34 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
       .map(row => {
         const finalType = getFinalType(row);
         
+        // Extraire currentNight et totalNights du nightInfo
+        let currentNight: number | undefined;
+        let totalNights: number | undefined;
+        if (row.nightInfo) {
+          const nightMatch = row.nightInfo.match(/(\d+)\/(\d+)/);
+          if (nightMatch) {
+            currentNight = parseInt(nightMatch[1]);
+            totalNights = parseInt(nightMatch[2]);
+          }
+        }
+        
         return {
           roomNumber: row.roomNumber,
           cleaningType: (finalType === 'out_of_service' ? 'none' : finalType === 'unknown' ? 'quick' : finalType) as CleaningType,
-          status: row.statusIndicator || '',
+          status: row.statusIndicator || row.cleaningStatus || '',
           originalText: row.rawLine,
           validated: true,
+          // Passer toutes les données extraites
+          guestName: row.guestName || undefined,
+          arrivalDate: row.arrivalDate || undefined,
+          departureDate: row.departureDate || undefined,
+          arrivalTime: row.arrivalTime || undefined,
+          departureTime: row.departureTime || undefined,
+          nightInfo: row.nightInfo || undefined,
+          currentNight,
+          totalNights,
+          roomType: row.roomType || undefined,
+          confidence: row.confidence,
         };
       });
 
