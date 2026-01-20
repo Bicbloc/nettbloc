@@ -443,70 +443,206 @@ function parseMewsReport(text: string): ParsedReportData {
 }
 
 /**
- * Parser Apaleo Housekeeping
+ * Parser Apaleo Housekeeping - Version améliorée
+ * Gère les doublons (Parti + En arrivée) en priorisant les arrivées
+ * Extrait noms clients, dates, heures
  */
 function parseApaleoReport(text: string): ParsedReportData {
-  const lines = text.split('\n');
-  const rows: ParsedRow[] = [];
+  const normalizedText = text.replace(/\r\n/g, '\n');
+  const lines = normalizedText.split('\n');
+  
+  // Map pour regrouper les entrées par chambre
+  const roomEntriesMap = new Map<string, {
+    departing?: ParsedRow;
+    arriving?: ParsedRow;
+    staying?: ParsedRow;
+  }>();
   
   // Pattern Apaleo: "01 Chambre twin 17/05/2025 15:00 ..."
   const roomPattern = /^(\d{2,4})\s+(Chambre\s+\w+)/i;
-  const statusPattern = /\b(Recouche|Parti|En\s+arrivée)\b/i;
+  const statusPattern = /\b(Recouche|Parti|En\s+arrivée|Arrivé)\b/i;
+  const datePattern = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})/g;
+  
+  // Pattern pour extraire le nom du client
+  // Format: "2 adultes NOM PRENOM" ou "1 adulte NOM"
+  const guestPattern = /\d+\s+adultes?\s*(?:,\s*\d+\s+enfants?\s*(?:\(\d+\))?)?\s+([A-ZÀ-Ÿa-zà-ÿ][A-Za-zÀ-ÿ\-\'\s]+?)(?=\s+(?:Recouche|Parti|En\s+arrivée|Arrivé|$))/i;
+  
+  // Pattern alternatif pour nom après "enfant(s) (age)"
+  const guestPatternAlt = /(?:\d+\s+adultes?(?:,\s*\d+\s+enfants?\s*\(\d+\))?)\s+([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\-\'\s]+?)(?=\s+(?:Recouche|Parti|En\s+arrivée|Arrivé))/i;
+  
+  // Accumuler les lignes pour chaque entrée de chambre
+  let currentEntry = '';
+  let roomEntries: string[] = [];
   
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.length < 5) continue;
+    if (!trimmed || trimmed.length < 3) continue;
     if (isHeaderLine(trimmed)) continue;
+    if (/^Ch\.\s+Type/i.test(trimmed)) continue; // En-tête tableau
+    if (/^\d+\s*$/.test(trimmed)) continue; // Numéro de page seul
+    if (/^Imprimé le/i.test(trimmed)) continue;
     
-    const roomMatch = trimmed.match(roomPattern);
+    // Vérifier si c'est le début d'une nouvelle chambre
+    if (roomPattern.test(trimmed)) {
+      if (currentEntry) {
+        roomEntries.push(currentEntry);
+      }
+      currentEntry = trimmed;
+    } else if (currentEntry) {
+      // Continuer à accumuler les données
+      currentEntry += ' ' + trimmed;
+    }
+  }
+  
+  // Ajouter la dernière entrée
+  if (currentEntry) {
+    roomEntries.push(currentEntry);
+  }
+  
+  // Parser chaque entrée
+  for (const entry of roomEntries) {
+    const roomMatch = entry.match(roomPattern);
     if (!roomMatch) continue;
     
     const roomNumber = roomMatch[1];
     const roomType = roomMatch[2];
     
-    const statusMatch = trimmed.match(statusPattern);
+    // Extraire le statut
+    const statusMatch = entry.match(statusPattern);
     const status = statusMatch ? statusMatch[1] : '';
     
-    let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
-    if (/parti/i.test(status)) {
-      detectedType = 'full';
-    } else if (/recouche/i.test(status)) {
-      detectedType = 'quick';
-    } else if (/arrivée/i.test(status)) {
-      detectedType = 'full'; // Arrivée = chambre à préparer
+    if (!status) continue;
+    
+    // Extraire les dates et heures
+    const dates: { date: string; time: string }[] = [];
+    let dateMatch;
+    const dateRegex = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})/g;
+    while ((dateMatch = dateRegex.exec(entry)) !== null) {
+      dates.push({ date: dateMatch[1], time: dateMatch[2] });
     }
     
-    rows.push({
-      rawLine: line,
+    const arrivalDate = dates.length > 0 ? dates[0].date : '';
+    const arrivalTime = dates.length > 0 ? dates[0].time : '';
+    const departureDate = dates.length > 1 ? dates[1].date : '';
+    const departureTime = dates.length > 1 ? dates[1].time : '';
+    
+    // Extraire le nom du client
+    let guestName = '';
+    const guestMatch = entry.match(guestPattern) || entry.match(guestPatternAlt);
+    if (guestMatch) {
+      guestName = guestMatch[1].trim();
+    } else {
+      // Fallback: chercher le nom entre les adultes et le statut
+      const fallbackPattern = /\d+\s+adultes?[^A-Z]*([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\-\'\s]+?)(?=\s+(?:Recouche|Parti|En|Arrivé))/i;
+      const fallbackMatch = entry.match(fallbackPattern);
+      if (fallbackMatch) {
+        guestName = fallbackMatch[1].trim();
+      }
+    }
+    
+    // Nettoyer le nom
+    guestName = guestName.replace(/\s+/g, ' ').replace(/,\s*$/, '').trim();
+    
+    // Déterminer le type de nettoyage
+    let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
+    let statusIndicator = status;
+    let hasDepartingGuest = false;
+    let hasArrivingGuest = false;
+    let hasCurrentGuest = false;
+    
+    if (/parti/i.test(status)) {
+      detectedType = 'full';
+      statusIndicator = 'Départ';
+      hasDepartingGuest = true;
+    } else if (/en\s+arrivée/i.test(status)) {
+      detectedType = 'full';
+      statusIndicator = 'Arrivée';
+      hasArrivingGuest = true;
+    } else if (/arrivé/i.test(status)) {
+      detectedType = 'quick'; // Arrivé = client en place, recouche
+      statusIndicator = 'Arrivé';
+      hasCurrentGuest = true;
+    } else if (/recouche/i.test(status)) {
+      detectedType = 'quick';
+      statusIndicator = 'Recouche';
+      hasCurrentGuest = true;
+    }
+    
+    const row: ParsedRow = {
+      rawLine: entry,
       roomNumber,
       roomType,
       cleaningStatus: status,
       columns: [
         { value: roomNumber, type: 'room_number', confidence: 1 },
         { value: roomType, type: 'room_type', confidence: 1 },
-        { value: status, type: 'status', confidence: 0.9 },
+        { value: status, type: 'status', confidence: 0.95 },
+        { value: guestName, type: 'guest_name', confidence: 0.9 },
+        { value: arrivalDate, type: 'arrival_date', confidence: 0.9 },
+        { value: departureDate, type: 'departure_date', confidence: 0.9 },
       ],
       detectedCleaningType: detectedType,
-      confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
-      statusIndicator: status,
-      guestName: '',
-      arrivalDate: '',
-      departureDate: '',
-      arrivalTime: '',
-      departureTime: '',
+      confidence: 0.9,
+      statusIndicator,
+      guestName,
+      arrivalDate,
+      departureDate,
+      arrivalTime,
+      departureTime,
       nightInfo: '',
-      hasCurrentGuest: /recouche/i.test(status),
-      hasDepartingGuest: /parti/i.test(status),
-      hasArrivingGuest: /arrivée/i.test(status),
+      hasCurrentGuest,
+      hasDepartingGuest,
+      hasArrivingGuest,
       isOutOfOrder: false,
       assignee: '',
-    });
+    };
+    
+    // Stocker dans la map pour gérer les doublons
+    const existing = roomEntriesMap.get(roomNumber) || {};
+    
+    if (hasDepartingGuest) {
+      existing.departing = row;
+    } else if (hasArrivingGuest) {
+      existing.arriving = row;
+    } else {
+      existing.staying = row;
+    }
+    
+    roomEntriesMap.set(roomNumber, existing);
   }
   
+  // Construire le tableau final en priorisant les arrivées
+  const finalRows: ParsedRow[] = [];
+  
+  for (const [roomNumber, entries] of roomEntriesMap) {
+    // Priorité: Arrivée > Recouche > Départ
+    // Si une chambre a à la fois Parti et En arrivée, on prend En arrivée (= à blanc)
+    if (entries.arriving) {
+      // Si doublon (départ + arrivée), c'est un turnover = à blanc
+      if (entries.departing) {
+        entries.arriving.statusIndicator = 'Départ + Arrivée';
+        entries.arriving.detectedCleaningType = 'full';
+        entries.arriving.hasDepartingGuest = true;
+      }
+      finalRows.push(entries.arriving);
+    } else if (entries.staying) {
+      finalRows.push(entries.staying);
+    } else if (entries.departing) {
+      finalRows.push(entries.departing);
+    }
+  }
+  
+  // Trier par numéro de chambre
+  finalRows.sort((a, b) => {
+    const numA = parseInt(a.roomNumber.replace(/\D/g, ''));
+    const numB = parseInt(b.roomNumber.replace(/\D/g, ''));
+    return numA - numB;
+  });
+  
   return {
-    headers: ['N° Chambre', 'Type', 'Statut', 'Type nettoyage'],
-    rows,
-    summary: calculateSummary(rows),
+    headers: ['N° Chambre', 'Type', 'Statut', 'Client', 'Arrivée', 'Départ', 'Type nettoyage'],
+    rows: finalRows,
+    summary: calculateSummary(finalRows),
   };
 }
 
