@@ -11,6 +11,7 @@ import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { Loader2, Building, Users, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
 
 const EstablishmentAuth = () => {
   const { signIn, signUp, isAuthenticated, loading, isInitialized } = useAuth();
@@ -62,6 +63,18 @@ const EstablishmentAuth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    
+    // Vérifier que l'email est bien un compte établissement
+    const accessCheck = await validateUserAccessToInterface(formData.email, 'establishment');
+    if (!accessCheck.allowed && accessCheck.correctInterface) {
+      toast({
+        variant: "destructive",
+        title: "Mauvaise interface",
+        description: getRedirectMessage(accessCheck.correctInterface, 'fr')
+      });
+      setIsLoading(false);
+      return;
+    }
     
     const { error } = await signIn(formData.email, formData.password);
     
@@ -119,6 +132,18 @@ const EstablishmentAuth = () => {
     }
     
     setIsLoading(true);
+    
+    // Vérifier que l'email n'est pas déjà utilisé sur une autre interface
+    const validation = await validateEmailForUserType(formData.email, 'establishment');
+    if (!validation.isValid) {
+      toast({
+        variant: "destructive",
+        title: "Email déjà utilisé",
+        description: validation.error || "Cette adresse est déjà associée à un autre type de compte."
+      });
+      setIsLoading(false);
+      return;
+    }
     
     const { error } = await signUp(formData.email, formData.password, formData.companyName);
     

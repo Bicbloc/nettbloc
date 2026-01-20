@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
 import { retryQuery } from '@/services/queryUtils';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
 
 export default function HousekeeperAuth() {
   const [email, setEmail] = useState('');
@@ -36,6 +37,18 @@ export default function HousekeeperAuth() {
     setIsLoading(true);
 
     try {
+      // Vérifier que l'email est bien un compte femme de chambre
+      const accessCheck = await validateUserAccessToInterface(email, 'housekeeper');
+      if (!accessCheck.allowed && accessCheck.correctInterface) {
+        toast({
+          variant: "destructive",
+          title: language === 'en' ? "Wrong interface" : "Mauvaise interface",
+          description: getRedirectMessage(accessCheck.correctInterface, language === 'en' ? 'en' : 'fr')
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
