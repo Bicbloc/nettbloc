@@ -59,6 +59,14 @@ const STATUS_LABELS: Record<string, { label: string; icon: string; description: 
   'PRO (Recouche)': { label: 'Propre/Recouche', icon: '🛏️', description: 'PRO = Propre, client en place' },
   'PRO (Propre)': { label: 'Propre', icon: '✅', description: 'PRO = Propre, pas de nettoyage' },
   'OOO': { label: 'Hors service', icon: '🚫', description: 'Out of Order - Chambre indisponible' },
+  // Statuts Apaleo
+  'Départ': { label: 'Départ', icon: '🚪', description: 'Client parti - Nettoyage à blanc' },
+  'Arrivée': { label: 'En arrivée', icon: '📥', description: 'Client arrive - Préparer la chambre à blanc' },
+  'Départ + Arrivée': { label: 'Départ → Arrivée', icon: '🔄', description: 'Départ puis arrivée même jour - À blanc' },
+  'Recouche': { label: 'Recouche', icon: '🛏️', description: 'Client en séjour - Nettoyage rapide' },
+  'Arrivé': { label: 'Client arrivé', icon: '👤', description: 'Client arrivé et présent - Recouche' },
+  'Parti': { label: 'Départ', icon: '🚪', description: 'Client parti - Nettoyage à blanc' },
+  'En arrivée': { label: 'En arrivée', icon: '📥', description: 'Client arrive - Préparer la chambre à blanc' },
 };
 
 // Détecte si une chambre est une "dernière nuit" mal détectée
