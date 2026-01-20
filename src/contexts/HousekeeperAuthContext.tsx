@@ -437,8 +437,21 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         return { success: false, error: "Code d'hôtel invalide ou hôtel introuvable" };
       }
 
-      // Check if request already exists
-      const { data: existingRequest, error: requestError } = await supabase
+      // Check if user already has an active access to this hotel
+      const { data: existingActiveSession } = await supabase
+        .from('hotel_access_sessions')
+        .select('id, is_active')
+        .eq('housekeeper_profile_id', profile.id)
+        .eq('hotel_id', hotel.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingActiveSession) {
+        return { success: false, error: "Vous avez déjà accès à cet hôtel. Allez dans 'Mes Hôtels' pour le voir." };
+      }
+
+      // Check if there's already a pending request
+      const { data: existingPendingRequest } = await supabase
         .from('housekeeper_access_requests')
         .select('id, status')
         .eq('housekeeper_profile_id', profile.id)
@@ -446,7 +459,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         .eq('status', 'pending')
         .maybeSingle();
 
-      if (existingRequest) {
+      if (existingPendingRequest) {
         return { success: false, error: "Une demande d'accès est déjà en cours pour cet hôtel" };
       }
 

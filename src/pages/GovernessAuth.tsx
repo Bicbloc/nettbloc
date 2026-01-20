@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, Loader2, ArrowRight, Crown, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
+import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage, getInterfaceUrl } from '@/services/userTypeValidationService';
 
 export default function GovernessAuth() {
   const [email, setEmail] = useState('');
@@ -41,6 +42,18 @@ export default function GovernessAuth() {
     setIsLoading(true);
 
     try {
+      // Vérifier que l'email est bien un compte gouvernante
+      const accessCheck = await validateUserAccessToInterface(email, 'governess');
+      if (!accessCheck.allowed && accessCheck.correctInterface) {
+        toast({
+          variant: "destructive",
+          title: "Mauvaise interface",
+          description: getRedirectMessage(accessCheck.correctInterface, 'fr')
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -108,6 +121,18 @@ export default function GovernessAuth() {
     setIsLoading(true);
 
     try {
+      // Vérifier que l'email n'est pas déjà utilisé sur une autre interface
+      const validation = await validateEmailForUserType(email, 'governess');
+      if (!validation.isValid) {
+        toast({
+          variant: "destructive",
+          title: "Email déjà utilisé",
+          description: validation.error || "Cette adresse est déjà associée à un autre type de compte."
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,

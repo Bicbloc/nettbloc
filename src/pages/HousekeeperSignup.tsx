@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { UserPlus, Mail, Lock, User, ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
+import { validateEmailForUserType, getInterfaceUrl } from '@/services/userTypeValidationService';
 
 export default function HousekeeperSignup() {
   const [name, setName] = useState('');
@@ -51,6 +52,24 @@ export default function HousekeeperSignup() {
     setIsLoading(true);
 
     try {
+      // Vérifier que l'email n'est pas déjà utilisé sur une autre interface
+      const validation = await validateEmailForUserType(email, 'housekeeper');
+      if (!validation.isValid) {
+        toast({
+          variant: "destructive",
+          title: "Email déjà utilisé",
+          description: validation.error || "Cette adresse est déjà associée à un autre type de compte."
+        });
+        if (validation.existingType) {
+          toast({
+            title: "Redirection",
+            description: `Connectez-vous sur ${validation.existingType === 'establishment' ? "l'interface Établissement" : "l'interface appropriée"}.`
+          });
+        }
+        setIsLoading(false);
+        return;
+      }
+
       // Créer le compte Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
