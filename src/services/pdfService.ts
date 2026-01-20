@@ -2,6 +2,7 @@ import { toast } from "@/components/ui/use-toast";
 import * as pdfjs from 'pdfjs-dist';
 import { unifiedParserService, ExtractedRoom, textPreprocessor } from "@/services/pms";
 import { parseRoomLines, RoomLine } from "@/services/pms/RoomLineParser";
+import { detectReportFormat, ParsedRow, type FormatDetection } from "@/services/training/ReportFormatDetector";
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -130,6 +131,73 @@ function convertRoomLineToRoom(line: RoomLine): Room {
     children: line.children,
     roomType: line.roomType,
     cleaningReason: line.cleaningReason,
+  };
+}
+
+/**
+ * Convertit ParsedRow du ReportFormatDetector (entraînement IA) vers Room
+ * Ceci permet d'utiliser la même logique que l'entraînement IA dans PdfWorkflowDialog
+ */
+function convertParsedRowToRoom(row: ParsedRow): Room {
+  // Mapper le cleaningType
+  let cleaningType: Room['cleaningType'] = 'a_blanc';
+  if (row.detectedCleaningType === 'quick') {
+    cleaningType = 'recouche';
+  } else if (row.detectedCleaningType === 'full') {
+    cleaningType = 'a_blanc';
+  } else if (row.detectedCleaningType === 'none' || row.detectedCleaningType === 'out_of_service') {
+    cleaningType = 'none';
+  }
+
+  // Déterminer la priorité
+  const priority: Room['priority'] =
+    cleaningType === 'a_blanc' ? 'high' :
+    cleaningType === 'recouche' ? 'medium' :
+    'low';
+
+  // Déterminer le statut
+  const status =
+    cleaningType === 'none' ? 'clean' :
+    cleaningType === 'a_blanc' ? 'checkout' :
+    'stayover';
+
+  // Parser l'étage depuis le numéro de chambre
+  const floor = getRoomFloor(row.roomNumber);
+
+  // Construire les notes enrichies
+  const noteParts: string[] = [];
+  if (row.statusIndicator) noteParts.push(`Statut: ${row.statusIndicator}`);
+  if (row.guestName) noteParts.push(`Client: ${row.guestName}`);
+  if (row.departureTime) noteParts.push(`Départ: ${row.departureTime}`);
+  if (row.arrivalTime) noteParts.push(`Arrivée: ${row.arrivalTime}`);
+
+  // Parser nightInfo
+  let nightInfo: { current: number; total: number } | undefined = undefined;
+  if (row.nightInfo) {
+    const match = row.nightInfo.match(/(\d+)\/(\d+)/);
+    if (match) {
+      nightInfo = { current: parseInt(match[1]), total: parseInt(match[2]) };
+    }
+  }
+
+  return {
+    number: row.roomNumber,
+    status,
+    cleaningType,
+    priority,
+    isUrgent: cleaningType === 'a_blanc',
+    notUrgent: cleaningType === 'none',
+    floor,
+    notes: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
+    // Extended IA data from training
+    guestName: row.guestName,
+    arrivalDate: row.arrivalDate,
+    departureDate: row.departureDate,
+    checkInTime: row.arrivalTime,
+    checkOutTime: row.departureTime,
+    nightInfo,
+    roomType: row.roomType,
+    cleaningReason: row.statusIndicator,
   };
 }
 
@@ -285,8 +353,9 @@ export async function extractPdfText(file: File): Promise<string> {
 }
 
 /**
- * Process PDF file with intelligent RoomLineParser
- * Uses the same AI training logic as the training wizard
+ * Process PDF file with intelligent parsing
+ * PRIORITÉ: Utilise ReportFormatDetector (entraînement IA) pour Apaleo/Mews
+ * Fallback: RoomLineParser puis UnifiedParserService
  */
 export async function processPdf(file: File, hotelId?: string, forceAi: boolean = false): Promise<Room[]> {
   try {
@@ -302,7 +371,61 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     
     lastExtractedText = fullText;
     
-    // ===== PHASE 1: Parser intelligent (comme l'entraînement) =====
+    // ===== PHASE 0: Détection du format avec ReportFormatDetector (COMME ENTRAÎNEMENT IA) =====
+    const formatDetection = detectReportFormat(fullText);
+    console.log(`🔍 Format détecté: ${formatDetection.format} (confiance: ${formatDetection.confidence}%)`);
+    
+    // Si format Apaleo/Mews détecté avec bonne confiance, utiliser le parser dédié
+    if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat'].includes(formatDetection.format) && 
+        formatDetection.confidence >= 50 && 
+        formatDetection.parsedData.rows.length > 0) {
+      
+      console.log(`🎯 Utilisation du parser ${formatDetection.format} (comme entraînement IA)`);
+      
+      const parsedRows = formatDetection.parsedData.rows;
+      const rooms = parsedRows.map(convertParsedRowToRoom);
+      
+      // Statistiques
+      const aBlancCount = rooms.filter(r => r.cleaningType === 'a_blanc').length;
+      const recoucheCount = rooms.filter(r => r.cleaningType === 'recouche').length;
+      const noneCount = rooms.filter(r => r.cleaningType === 'none').length;
+      
+      console.log(`📊 Résultat: ${rooms.length} chambres`);
+      console.log(`🔵 À blanc: ${aBlancCount} | 🟢 Recouche: ${recoucheCount} | ⚪ Aucun: ${noneCount}`);
+      
+      // Créer des RoomLines synthétiques pour la prévisualisation
+      lastParsedLines = parsedRows.map(row => ({
+        roomNumber: row.roomNumber,
+        rawText: row.rawLine,
+        fullText: row.rawLine,
+        cleaningType: row.detectedCleaningType === 'full' ? 'a_blanc' : 
+                      row.detectedCleaningType === 'quick' ? 'recouche' : 
+                      row.detectedCleaningType === 'none' ? 'none' : 'a_blanc',
+        cleaningReason: row.statusIndicator,
+        statusCode: row.cleaningStatus,
+        statusLabel: row.statusIndicator,
+        roomType: row.roomType,
+        guestName: row.guestName,
+        arrivalDate: row.arrivalDate,
+        departureDate: row.departureDate,
+        checkInTime: row.arrivalTime,
+        checkOutTime: row.departureTime,
+        confidence: row.confidence * 100,
+        linkedRooms: [],
+        notes: [],
+        isLastNight: row.hasDepartingGuest,
+        isFirstNight: row.hasArrivingGuest,
+      } as RoomLine));
+      
+      toast({
+        title: "Extraction IA réussie",
+        description: `${rooms.length} chambres (${aBlancCount} à blanc, ${recoucheCount} recouches) - Format ${formatDetection.format}`,
+      });
+      
+      return rooms;
+    }
+    
+    // ===== PHASE 1: Parser intelligent (fallback) =====
     const excludeList = loadExclusionList(hotelId);
     const roomLines = parseRoomLines(fullText, excludeList);
     lastParsedLines = roomLines;
