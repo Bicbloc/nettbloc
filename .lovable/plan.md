@@ -1,89 +1,26 @@
+# Plan : Corriger l'Application des Règles de Combinaison ✅ IMPLÉMENTÉ
 
-# Plan : Corriger l'Application des Règles de Combinaison
+## Statut: TERMINÉ
 
-## Contexte du Problème
-Le système d'apprentissage sauvegarde correctement les règles de combinaison dans `hotel_combination_rules`, mais ces règles ne sont pas appliquées quand un format Mews/Apaleo/Medialog est détecté avec confiance ≥50%. Le `ReportFormatDetector` utilise une logique codée en dur au lieu des règles personnalisées de l'hôtel.
+Les règles de combinaison créées dans le Training Wizard sont maintenant appliquées à **tous** les imports PDF, y compris les formats Mews, Apaleo et Medialog.
 
-## Solution Proposée
+## Modifications apportées
 
-### Étape 1 : Modifier pdfService.ts pour appliquer les règles après ReportFormatDetector
-Après l'extraction par `ReportFormatDetector`, appeler `UnifiedParserService.loadHotelPatterns()` et réappliquer les règles de combinaison sur les résultats.
+### `src/services/pdfService.ts`
+1. ✅ Import de supabase pour accéder à la base de données
+2. ✅ Création de `loadHotelCombinationRules(hotelId)` - charge les règles actives par priorité
+3. ✅ Création de `extractRoomContext(row)` - extrait le contexte (dates, heures, statuts) d'une ligne
+4. ✅ Création de `matchesCombinationRule(rule, context)` - vérifie si une règle correspond
+5. ✅ Création de `applyHotelCombinationRules(rooms, rules, parsedRows)` - applique les règles et modifie les types de nettoyage
+6. ✅ Intégration dans le flux PDF Phase 0 (après ReportFormatDetector)
 
-```text
-Flux actuel :
-PDF → ReportFormatDetector → Rooms (sans règles perso)
-
-Flux corrigé :
-PDF → ReportFormatDetector → Charger règles hotel → Appliquer combinaisons → Rooms finaux
+## Flux corrigé
+```
+PDF → ReportFormatDetector (Mews/Apaleo/Medialog) 
+    → Charger hotel_combination_rules depuis Supabase
+    → Appliquer les règles par priorité décroissante
+    → Rooms finaux avec types de nettoyage personnalisés
 ```
 
-### Étape 2 : Créer une fonction de réanalyse des chambres
-Dans `pdfService.ts`, ajouter une fonction `applyHotelCombinationRules()` qui :
-1. Charge les règles de combinaison de l'hôtel via `supabase`
-2. Pour chaque chambre parsée, vérifie si une règle de combinaison s'applique
-3. Remplace le `cleaningType` par celui de la règle si elle matche
-
-### Étape 3 : Modifier ReportFormatDetector pour exposer le contexte
-Ajouter dans `ParsedRow` les informations de contexte nécessaires :
-- `hasArrivalDate`, `hasDepartureDate`
-- `hasArrivalTime`, `hasDepartureTime` 
-- `hasNightInfo`
-- `rawLine` (déjà présent)
-
-### Étape 4 : Intégrer dans le flux d'import
-
-Modifier `processPdf()` :
-```text
-// Après la détection Mews/Apaleo/Medialog
-if (hotelId && formatDetection.confidence >= 50) {
-  // Charger les règles de combinaison de l'hôtel
-  const combinationRules = await loadHotelCombinationRules(hotelId);
-  
-  // Appliquer les règles aux chambres parsées
-  if (combinationRules.length > 0) {
-    rooms = applyHotelCombinationRules(rooms, combinationRules, parsedRows);
-  }
-}
-```
-
----
-
-## Détails Techniques
-
-### Fichiers à Modifier
-
-1. **src/services/pdfService.ts**
-   - Ajouter import de supabase
-   - Créer fonction `loadHotelCombinationRules(hotelId)`
-   - Créer fonction `applyHotelCombinationRules(rooms, rules, parsedRows)`
-   - Modifier le bloc Phase 0 pour appliquer les règles après extraction
-
-2. **src/services/training/ReportFormatDetector.ts** (optionnel)
-   - S'assurer que `rawLine` et les flags de contexte sont bien exposés dans `ParsedRow`
-
-### Structure des règles de combinaison
-```text
-{
-  status_keywords: ['SAL', 'DIR'],
-  arrival_date: 'present' | 'absent' | 'any',
-  departure_date: 'present' | 'absent' | 'any',
-  arrival_time: 'present' | 'absent' | 'any',
-  departure_time: 'present' | 'absent' | 'any',
-  night_info: 'present' | 'absent' | 'any',
-  result_cleaning_type: 'full' | 'quick' | 'none'
-}
-```
-
-### Logique de matching
-Pour chaque chambre :
-1. Extraire le contexte de la ligne (dates, heures, mots-clés présents)
-2. Parcourir les règles par priorité
-3. Si tous les critères matchent → appliquer le `result_cleaning_type`
-4. Sinon → garder le type détecté par ReportFormatDetector
-
----
-
-## Résultat Attendu
-- Les règles de combinaison créées dans le Training Wizard seront appliquées à **tous** les imports PDF
-- Que le rapport soit Mews, Apaleo, Medialog ou autre format
-- Le client pourra définir : "SAL + 2 dates = À blanc" et cela sera respecté partout
+## Exemple d'utilisation
+Le client peut maintenant définir : **"SAL + 2 dates = À blanc"** et cela sera respecté lors de chaque import PDF.
