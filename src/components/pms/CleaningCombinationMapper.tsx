@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Check, X, Minus, Copy, Sparkles, FileText, ChevronDown, Search, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Check, X, Minus, Pencil, Sparkles, FileText, ChevronDown, Search, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   CleaningType, 
@@ -584,14 +584,16 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
+                            title="Modifier"
                             onClick={() => { setEditingRule(rule); setDialogOpen(true); }}
                           >
-                            <Copy className="h-3 w-3" />
+                            <Pencil className="h-3 w-3" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-destructive"
+                            title="Supprimer"
                             onClick={() => deleteRule(rule.id)}
                           >
                             <Trash2 className="h-3 w-3" />
