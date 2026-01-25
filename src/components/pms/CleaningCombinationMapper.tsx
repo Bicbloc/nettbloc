@@ -12,6 +12,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Plus, Check, X, Minus, Copy, Sparkles, FileText, ChevronDown, Search, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { 
+  CleaningType, 
+  CLEANING_TYPE_LABELS, 
+  getCleaningTypeColors,
+  normalizeCleaningType 
+} from '@/constants/cleaningTypes';
 
 type ConditionValue = 'present' | 'absent' | 'any';
 
@@ -27,7 +33,7 @@ interface CombinationRule {
   arrival_time: ConditionValue;
   departure_time: ConditionValue;
   night_info: ConditionValue;
-  result_cleaning_type: 'a_blanc' | 'recouche' | 'none';
+  result_cleaning_type: CleaningType;
   result_status?: string;
   pms_template?: string;
 }
@@ -50,7 +56,7 @@ const PMS_TEMPLATES: Record<string, CombinationRule[]> = {
       arrival_time: 'absent',
       departure_time: 'absent',
       night_info: 'any',
-      result_cleaning_type: 'recouche',
+      result_cleaning_type: 'quick',
       result_status: 'stayover',
       pms_template: 'mews'
     },
@@ -66,7 +72,7 @@ const PMS_TEMPLATES: Record<string, CombinationRule[]> = {
       arrival_time: 'any',
       departure_time: 'present',
       night_info: 'any',
-      result_cleaning_type: 'a_blanc',
+      result_cleaning_type: 'full',
       result_status: 'checkout',
       pms_template: 'mews'
     },
@@ -82,7 +88,7 @@ const PMS_TEMPLATES: Record<string, CombinationRule[]> = {
       arrival_time: 'any',
       departure_time: 'any',
       night_info: 'any',
-      result_cleaning_type: 'a_blanc',
+      result_cleaning_type: 'full',
       result_status: 'checkout',
       pms_template: 'mews'
     }
@@ -100,7 +106,7 @@ const PMS_TEMPLATES: Record<string, CombinationRule[]> = {
       arrival_time: 'any',
       departure_time: 'absent',
       night_info: 'any',
-      result_cleaning_type: 'recouche',
+      result_cleaning_type: 'quick',
       result_status: 'stayover',
       pms_template: 'apaleo'
     },
@@ -116,7 +122,7 @@ const PMS_TEMPLATES: Record<string, CombinationRule[]> = {
       arrival_time: 'any',
       departure_time: 'any',
       night_info: 'any',
-      result_cleaning_type: 'a_blanc',
+      result_cleaning_type: 'full',
       result_status: 'arrival',
       pms_template: 'apaleo'
     }
@@ -134,7 +140,7 @@ const PMS_TEMPLATES: Record<string, CombinationRule[]> = {
       arrival_time: 'any',
       departure_time: 'absent',
       night_info: 'present',
-      result_cleaning_type: 'recouche',
+      result_cleaning_type: 'quick',
       result_status: 'stayover',
       pms_template: 'medialog'
     },
@@ -150,7 +156,7 @@ const PMS_TEMPLATES: Record<string, CombinationRule[]> = {
       arrival_time: 'any',
       departure_time: 'any',
       night_info: 'any',
-      result_cleaning_type: 'a_blanc',
+      result_cleaning_type: 'full',
       result_status: 'checkout',
       pms_template: 'medialog'
     }
@@ -349,7 +355,7 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
         arrival_time: 'any',
         departure_time: 'any',
         night_info: 'any',
-        result_cleaning_type: 'a_blanc'
+        result_cleaning_type: 'full'
       }
     );
 
@@ -396,15 +402,15 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
               <Label>Résultat nettoyage</Label>
               <Select
                 value={form.result_cleaning_type}
-                onValueChange={(v) => setForm({ ...form, result_cleaning_type: v as any })}
+                onValueChange={(v) => setForm({ ...form, result_cleaning_type: v as CleaningType })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="a_blanc">À Blanc</SelectItem>
-                  <SelectItem value="recouche">Recouche</SelectItem>
-                  <SelectItem value="none">Aucun</SelectItem>
+                  <SelectItem value="full">{CLEANING_TYPE_LABELS.full.fr}</SelectItem>
+                  <SelectItem value="quick">{CLEANING_TYPE_LABELS.quick.fr}</SelectItem>
+                  <SelectItem value="none">{CLEANING_TYPE_LABELS.none.fr}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -556,17 +562,15 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                       <td className="px-3 py-2 text-center"><ConditionIcon value={rule.departure_time} /></td>
                       <td className="px-3 py-2 text-center"><ConditionIcon value={rule.night_info} /></td>
                       <td className="px-3 py-2">
-                        <Badge
-                          className={
-                            rule.result_cleaning_type === 'a_blanc'
-                              ? 'bg-blue-500 text-white'
-                              : rule.result_cleaning_type === 'recouche'
-                              ? 'bg-amber-500 text-white'
-                              : 'bg-gray-500 text-white'
-                          }
-                        >
-                          {rule.result_cleaning_type === 'a_blanc' ? 'À Blanc' : rule.result_cleaning_type === 'recouche' ? 'Recouche' : 'Aucun'}
-                        </Badge>
+                        {(() => {
+                          const normalizedType = normalizeCleaningType(rule.result_cleaning_type);
+                          const colors = getCleaningTypeColors(normalizedType);
+                          return (
+                            <Badge className={`${colors.bg} text-white`}>
+                              {CLEANING_TYPE_LABELS[normalizedType].fr}
+                            </Badge>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-center">
                         <Switch
@@ -703,8 +707,8 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                             const hasOneTime = timeMatches.length === 1;
                             const hasNight = hasNightPattern;
                             
-                            // If has departure time (2 times) → a_blanc, else recouche
-                            const suggestedCleaningType = hasTwoTimes ? 'a_blanc' : 'recouche';
+                            // If has departure time (2 times) → full, else quick
+                            const suggestedCleaningType: CleaningType = hasTwoTimes ? 'full' : 'quick';
                             
                             setEditingRule({
                               id: '',
