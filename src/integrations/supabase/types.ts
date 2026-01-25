@@ -768,6 +768,62 @@ export type Database = {
           },
         ]
       }
+      hotel_report_configs: {
+        Row: {
+          column_mappings: Json
+          config_name: string
+          created_at: string | null
+          created_by: string | null
+          detected_format: string | null
+          exclusion_patterns: string[] | null
+          hotel_id: string
+          id: string
+          last_used_at: string | null
+          manual_corrections: Json | null
+          status_mappings: Json
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          column_mappings?: Json
+          config_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          detected_format?: string | null
+          exclusion_patterns?: string[] | null
+          hotel_id: string
+          id?: string
+          last_used_at?: string | null
+          manual_corrections?: Json | null
+          status_mappings?: Json
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          column_mappings?: Json
+          config_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          detected_format?: string | null
+          exclusion_patterns?: string[] | null
+          hotel_id?: string
+          id?: string
+          last_used_at?: string | null
+          manual_corrections?: Json | null
+          status_mappings?: Json
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_report_configs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_rooms_registry: {
         Row: {
           building: string | null
