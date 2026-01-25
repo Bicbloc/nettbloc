@@ -687,7 +687,6 @@ const IndexDashboard = () => {
               housekeeperNames={housekeeperNames}
               cleaningConfig={cleaningConfig}
               isDistributed={isDistributed}
-              hotelId={currentHotelId || undefined}
               onGenerateReport={handleGenerateReport}
               onGenerateAllReports={handleGenerateAllReports}
             />
