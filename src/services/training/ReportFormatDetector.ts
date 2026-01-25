@@ -490,8 +490,14 @@ function parseApaleoReport(text: string): ParsedReportData {
     staying?: ParsedRow;
   }>();
   
-  // Pattern Apaleo: "01 Chambre twin 17/05/2025 15:00 ..."
+  // Patterns Apaleo améliorés pour gérer les numéros à 2 chiffres
+  // Format: "01 Chambre twin 17/05/2025 15:00 ..."
+  // ou "01   Chambre twin   17/05/2025..."
   const roomPattern = /^(\d{2,4})\s+(Chambre\s+\w+)/i;
+  
+  // Pattern alternatif pour lignes avec plus d'espaces ou format différent
+  const roomPatternAlt = /^\s*(\d{2,4})\s+(?:Chambre\s+)?(\w+(?:\s+\w+)?)\s+(\d{2}\/\d{2}\/\d{4})/i;
+  
   const statusPattern = /\b(Recouche|Parti|En\s+arrivée|Arrivé)\b/i;
   const datePattern = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})/g;
   
@@ -514,8 +520,10 @@ function parseApaleoReport(text: string): ParsedReportData {
     if (/^\d+\s*$/.test(trimmed)) continue; // Numéro de page seul
     if (/^Imprimé le/i.test(trimmed)) continue;
     
-    // Vérifier si c'est le début d'une nouvelle chambre
-    if (roomPattern.test(trimmed)) {
+    // Vérifier si c'est le début d'une nouvelle chambre (pattern principal ou alternatif)
+    const isNewRoom = roomPattern.test(trimmed) || roomPatternAlt.test(trimmed);
+    
+    if (isNewRoom) {
       if (currentEntry) {
         roomEntries.push(currentEntry);
       }
@@ -531,13 +539,33 @@ function parseApaleoReport(text: string): ParsedReportData {
     roomEntries.push(currentEntry);
   }
   
+  console.log(`📋 Apaleo: ${roomEntries.length} entrées de chambre trouvées`);
+  
   // Parser chaque entrée
   for (const entry of roomEntries) {
-    const roomMatch = entry.match(roomPattern);
-    if (!roomMatch) continue;
+    // Essayer le pattern principal, puis alternatif
+    let roomMatch = entry.match(roomPattern);
+    let roomNumber = '';
+    let roomType = '';
     
-    const roomNumber = roomMatch[1];
-    const roomType = roomMatch[2];
+    if (roomMatch) {
+      roomNumber = roomMatch[1];
+      roomType = roomMatch[2];
+    } else {
+      // Essayer le pattern alternatif
+      const altMatch = entry.match(roomPatternAlt);
+      if (altMatch) {
+        roomNumber = altMatch[1];
+        roomType = altMatch[2] || 'Chambre';
+      }
+    }
+    
+    if (!roomNumber) continue;
+    
+    // Normaliser le numéro de chambre (garder les zéros devant)
+    roomNumber = roomNumber.padStart(2, '0');
+    
+    console.log(`🏠 Chambre détectée: ${roomNumber} - ${roomType}`);
     
     // Extraire le statut
     const statusMatch = entry.match(statusPattern);
