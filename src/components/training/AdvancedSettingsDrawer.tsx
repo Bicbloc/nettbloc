@@ -4,9 +4,8 @@ import { ConnectedRoomRulesManager } from "@/components/ConnectedRoomRulesManage
 import { PmsRulesManager } from "@/components/PmsRulesManager";
 import { PmsPatternManager } from "@/components/PmsPatternManager";
 import { ErrorAnalysisDashboard } from "@/components/ErrorAnalysisDashboard";
-import { CleaningCombinationMapper } from "@/components/pms/CleaningCombinationMapper";
 import { ExclusionListManager } from "./ExclusionListManager";
-import { Link2, Settings, Brain, Activity, UserX, Combine } from "lucide-react";
+import { Link2, Settings, Brain, Activity, UserX } from "lucide-react";
 
 interface AdvancedSettingsDrawerProps {
   open: boolean;
@@ -17,7 +16,7 @@ interface AdvancedSettingsDrawerProps {
 export const AdvancedSettingsDrawer = ({ open, onOpenChange, hotelId }: AdvancedSettingsDrawerProps) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader className="pb-4">
           <SheetTitle>Paramètres avancés</SheetTitle>
           <SheetDescription>
@@ -25,12 +24,8 @@ export const AdvancedSettingsDrawer = ({ open, onOpenChange, hotelId }: Advanced
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="combinations" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-6">
-            <TabsTrigger value="combinations" className="flex items-center gap-1.5 text-xs">
-              <Combine className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Combinaisons</span>
-            </TabsTrigger>
+        <Tabs defaultValue="exclusions" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="exclusions" className="flex items-center gap-1.5 text-xs">
               <UserX className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Exclusions</span>
@@ -52,13 +47,6 @@ export const AdvancedSettingsDrawer = ({ open, onOpenChange, hotelId }: Advanced
               <span className="hidden sm:inline">Diagnostic</span>
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="combinations" className="space-y-4">
-            <div className="text-sm text-muted-foreground mb-4">
-              Définissez le type de nettoyage selon la combinaison de critères (dates, horaires, statut PMS)
-            </div>
-            <CleaningCombinationMapper hotelId={hotelId} />
-          </TabsContent>
 
           <TabsContent value="exclusions" className="space-y-4">
             <div className="text-sm text-muted-foreground mb-4">
