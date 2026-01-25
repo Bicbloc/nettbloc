@@ -22,35 +22,35 @@ interface PlanConfig {
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   freemium: {
     name: 'freemium',
-    displayName: 'Freemium',
+    displayName: 'Découverte',
     price: 0,
     maxRooms: 30,
     features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
   },
   basic: {
     name: 'basic',
-    displayName: 'Basic',
+    displayName: 'Essentiel',
     price: 150,
     maxRooms: 70,
     features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
   },
   basic_plus: {
     name: 'basic_plus',
-    displayName: 'Basic+',
+    displayName: 'Business',
     price: 250,
     maxRooms: 170,
-    features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
+    features: { incidents: true, linen_inventory: true, inspection: false, api_access: false, unlimited_rooms: false }
   },
   premium: {
     name: 'premium',
-    displayName: 'Premium',
+    displayName: 'Confort',
     price: 200,
     maxRooms: 150,
     features: { incidents: true, linen_inventory: true, inspection: true, api_access: false, unlimited_rooms: false }
   },
   platinum: {
     name: 'platinum',
-    displayName: 'Platinum',
+    displayName: 'Entreprise',
     price: 400,
     maxRooms: null,
     features: { incidents: true, linen_inventory: true, inspection: true, api_access: true, unlimited_rooms: true }
