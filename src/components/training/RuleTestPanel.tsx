@@ -53,6 +53,8 @@ interface TestResult {
     hasDepartureTime: boolean;
     hasNightInfo: boolean;
     keywords: string[];
+    detectedCleaningType: 'full' | 'quick' | 'none';
+    apaleoStatus: string;
   };
 }
 
@@ -60,6 +62,26 @@ interface RuleTestPanelProps {
   hotelId: string;
   rules: CombinationRule[];
 }
+
+// Détecter le type de nettoyage selon les patterns Apaleo/PMS
+type ApaleoStatus = 'parti' | 'en_arrivee' | 'arrive' | 'recouche' | 'unknown';
+
+const detectApaleoStatus = (line: string): { status: ApaleoStatus; cleaningType: 'full' | 'quick' | 'none' } => {
+  // Pattern Apaleo : "Parti", "En arrivée", "Arrivé", "Recouche"
+  if (/\bparti\b/i.test(line)) {
+    return { status: 'parti', cleaningType: 'full' };
+  }
+  if (/\ben\s*arrivée?\b/i.test(line)) {
+    return { status: 'en_arrivee', cleaningType: 'full' };
+  }
+  if (/\barrivé\b/i.test(line) && !/\ben\s*arrivée?\b/i.test(line)) {
+    return { status: 'arrive', cleaningType: 'quick' };
+  }
+  if (/\brecouche\b/i.test(line)) {
+    return { status: 'recouche', cleaningType: 'quick' };
+  }
+  return { status: 'unknown', cleaningType: 'full' };
+};
 
 // Simuler le contexte d'une ligne de rapport
 const extractContext = (line: string) => {
@@ -78,12 +100,23 @@ const extractContext = (line: string) => {
   // Détecter "Nuit X/Y"
   const hasNightInfo = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line);
   
-  // Extraire les keywords
+  // Extraire les keywords avec patterns plus flexibles
   const keywords: string[] = [];
-  const keywordPatterns = ['SAL', 'DIR', 'INS', 'PRO', 'DEP', 'ARR', 'OCC', 'PARTI', 'RECOUCHE', 'CHECKOUT', 'ARRIVÉE', 'DÉPART'];
-  for (const kw of keywordPatterns) {
+  
+  // Patterns spécifiques Apaleo
+  if (/\bparti\b/i.test(line)) keywords.push('PARTI');
+  if (/\ben\s*arrivée?\b/i.test(line)) keywords.push('EN_ARRIVÉE');
+  if (/\barrivé\b/i.test(line) && !/\ben\s*arrivée?\b/i.test(line)) keywords.push('ARRIVÉ');
+  if (/\brecouche\b/i.test(line)) keywords.push('RECOUCHE');
+  
+  // Autres keywords PMS
+  const simpleKeywords = ['SAL', 'DIR', 'INS', 'PRO', 'DEP', 'OCC', 'CHECKOUT', 'DÉPART'];
+  for (const kw of simpleKeywords) {
     if (upper.includes(kw)) keywords.push(kw);
   }
+  
+  // Détection du type selon logique Apaleo
+  const apaleoResult = detectApaleoStatus(line);
   
   return {
     hasArrivalDate,
@@ -91,7 +124,9 @@ const extractContext = (line: string) => {
     hasArrivalTime,
     hasDepartureTime,
     hasNightInfo,
-    keywords
+    keywords,
+    detectedCleaningType: apaleoResult.cleaningType,
+    apaleoStatus: apaleoResult.status
   };
 };
 
@@ -173,11 +208,9 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
           }
         }
         
-        // Déterminer le type original (logique par défaut)
-        let originalType = 'a_blanc';
-        if (context.keywords.includes('RECOUCHE') || context.keywords.includes('OCC')) {
-          originalType = 'recouche';
-        }
+        // Déterminer le type original selon la logique Apaleo/PMS détectée
+        const originalType = context.detectedCleaningType === 'quick' ? 'recouche' : 
+                             context.detectedCleaningType === 'none' ? 'none' : 'a_blanc';
         
         const finalType = appliedRule ? appliedRule.result_cleaning_type : originalType;
         
@@ -361,6 +394,22 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
                         
                         {/* Contexte détecté */}
                         <div className="flex flex-wrap gap-1 mt-2">
+                          {/* Statut Apaleo détecté */}
+                          {result.context.apaleoStatus !== 'unknown' && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[10px] py-0 ${
+                                result.context.apaleoStatus === 'recouche' || result.context.apaleoStatus === 'arrive'
+                                  ? 'border-blue-500 text-blue-600'
+                                  : 'border-orange-500 text-orange-600'
+                              }`}
+                            >
+                              🏷️ {result.context.apaleoStatus === 'parti' ? 'Parti' :
+                                  result.context.apaleoStatus === 'en_arrivee' ? 'En arrivée' :
+                                  result.context.apaleoStatus === 'arrive' ? 'Arrivé' :
+                                  result.context.apaleoStatus === 'recouche' ? 'Recouche' : ''}
+                            </Badge>
+                          )}
                           {result.context.hasArrivalDate && (
                             <Badge variant="outline" className="text-[10px] py-0">📅 Arrivée</Badge>
                           )}
