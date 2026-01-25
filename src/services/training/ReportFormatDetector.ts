@@ -251,12 +251,19 @@ function parseMewsReport(text: string): ParsedReportData {
   // Pattern pour les heures
   const timePattern = /\b(\d{2}:\d{2})\b/g;
   
-  // Pattern pour les noms de clients (après "Adultes" ou "Enfants")
-  // Capture les noms en majuscules/minuscules sur plusieurs mots
-  const guestPattern = /(?:Adultes?|Enfants?)\s+([A-ZÀ-Ÿa-zà-ÿ][A-Za-zÀ-ÿ',\.\-\s]*?)(?=\s*(?:,\s*Nuit|\d{2}\/\d{2}\/\d{4}|$|\n))/gi;
+  // Pattern pour les noms de clients (après "Adultes" ou "Enfants" avec ×)
+  // Format: "1 × Adults Guoda Cirtautaite" ou "2 × Adultes NOM PRENOM"
+  const guestPatternMews = /\d+\s*×\s*(?:Adults?|Adultes?|Enfants?|Children)\s+([A-ZÀ-Ÿa-zà-ÿ][A-Za-zÀ-ÿ',\.\-\s]+?)(?=\s*(?:,\s*Nuit|Night|\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{2}:\d{2}|$))/gi;
   
-  // Pattern alternatif pour noms en majuscules seuls
-  const capsNamePattern = /\b([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]*)*)\s*$/;
+  // Pattern alternatif sans × : "Adultes NOM"
+  const guestPatternAlt = /(?:Adultes?|Adults?|Enfants?)\s+([A-ZÀ-Ÿa-zà-ÿ][A-Za-zÀ-ÿ',\.\-\s]*?)(?=\s*(?:,\s*Nuit|Night|\d{2}\/\d{2}\/\d{4}|$|\n))/gi;
+  
+  // Pattern pour noms en format "Prénom NOM" ou "NOM Prénom" après dates/heures
+  const nameAfterTimePattern = /\d{2}:\d{2}\s+\d+\s*×\s*(?:Adults?|Adultes?|Enfants?|Children)\s+([A-ZÀ-Ÿa-zà-ÿ][A-Za-zÀ-ÿ\s\-',\.]+?)(?=\s*(?:\d{2}[\/\-]|$|Nuit|Night|,))/gi;
+  
+  // Pattern pour extraire nom entre date et "Nuit X/Y" ou fin de ligne
+  // Format: "04/05/2025 1 × Adults Guoda Cirtautaite , Night 3/3 07/05/2025"
+  const nameInContextPattern = /\d{2}[\/\-]\d{2}[\/\-]\d{4}\s+\d+\s*×\s*(?:Adults?|Adultes?)\s+([A-ZÀ-Ÿa-zà-ÿ][A-Za-zÀ-ÿ\s\-',\.]+?)(?:\s*,?\s*(?:Nuit|Night)\s+\d+\/\d+|\s+\d{2}[\/\-]\d{2}[\/\-]\d{4})/gi;
   
   // Reconstruire le contenu par chambre - grouper les lignes consécutives
   let currentRoomData = '';
@@ -269,6 +276,7 @@ function parseMewsReport(text: string): ParsedReportData {
     // Skip les en-têtes
     if (isHeaderLine(line)) continue;
     if (/^Étage\s+Espaces/i.test(line)) continue;
+    if (/^Floor\s+Spaces/i.test(line)) continue;
     if (/^Hotel\s+/i.test(line)) continue;
     if (/^\d+\s*\/\s*\d+$/.test(line)) continue; // Pagination
     
@@ -313,29 +321,53 @@ function parseMewsReport(text: string): ParsedReportData {
     // Extraire les heures
     const times = [...entry.matchAll(timePattern)].map(m => m[1]);
     
-    // Extraire le nom du client
+    // Extraire le nom du client - essayer plusieurs patterns
     let guestName = '';
-    const guestMatches = [...entry.matchAll(guestPattern)];
-    if (guestMatches.length > 0) {
-      // Prendre le premier nom trouvé et le nettoyer
-      guestName = guestMatches[0][1].trim();
+    
+    // 1. Essayer le pattern principal avec ×
+    const mewsMatches = [...entry.matchAll(guestPatternMews)];
+    if (mewsMatches.length > 0) {
+      // Prendre le dernier match (généralement le client actuel)
+      guestName = mewsMatches[mewsMatches.length - 1][1].trim();
     }
     
-    // Si pas de nom trouvé, chercher un pattern de nom en majuscules après une date
+    // 2. Essayer le pattern contextuel (date + adultes + nom + nuit)
     if (!guestName) {
-      const afterDatePattern = /\d{2}\/\d{2}\/\d{4}\s+(\d+\s*×\s*(?:Adultes?|Enfants?)\s+)?([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]*)*)/gi;
-      const afterDateMatch = afterDatePattern.exec(entry);
-      if (afterDateMatch) {
-        guestName = afterDateMatch[2]?.trim() || '';
+      const contextMatches = [...entry.matchAll(nameInContextPattern)];
+      if (contextMatches.length > 0) {
+        guestName = contextMatches[contextMatches.length - 1][1].trim();
       }
     }
     
-    // Chercher aussi les noms après les heures (format "15:00 2 × Adultes NOM")
+    // 3. Essayer le pattern après heure
     if (!guestName) {
-      const afterTimePattern = /\d{2}:\d{2}\s+\d+\s*×\s*(?:Adultes?|Enfants?)\s+([A-ZÀ-Ÿ][A-Za-zÀ-ÿ\s\-',\.]+?)(?=\s*(?:\d{2}\/|$|Nuit))/gi;
-      const afterTimeMatch = afterTimePattern.exec(entry);
-      if (afterTimeMatch) {
-        guestName = afterTimeMatch[1]?.trim() || '';
+      const afterTimeMatches = [...entry.matchAll(nameAfterTimePattern)];
+      if (afterTimeMatches.length > 0) {
+        guestName = afterTimeMatches[afterTimeMatches.length - 1][1].trim();
+      }
+    }
+    
+    // 4. Essayer le pattern alternatif sans ×
+    if (!guestName) {
+      const altMatches = [...entry.matchAll(guestPatternAlt)];
+      if (altMatches.length > 0) {
+        guestName = altMatches[0][1].trim();
+      }
+    }
+    
+    // Nettoyer le nom (enlever les virgules, espaces multiples, caractères de fin)
+    guestName = guestName
+      .replace(/[,\s]+$/, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s*,\s*$/, '')
+      .trim();
+    
+    // Exclure les noms qui sont clairement des assignés (souvent tout en majuscules ou un seul mot répétitif)
+    if (guestName && guestName.toUpperCase() === guestName && guestName.split(' ').length <= 1) {
+      // Probablement un assigné, pas un client - vérifier si c'est dans la partie assigné
+      const assigneeMatch = entry.match(new RegExp(`${status}\\s+${guestName}`, 'i'));
+      if (assigneeMatch) {
+        guestName = '';
       }
     }
     
