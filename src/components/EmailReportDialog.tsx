@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/accordion";
 import { supabaseClient } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
-import { FileDown, Plus, Trash2 } from "lucide-react";
+import { FileDown, Plus, Trash2, Save, Users, DoorOpen } from "lucide-react";
 
 interface LinenInventoryItem {
   linenTypeId: string;
@@ -36,6 +36,7 @@ interface LinenInventoryItem {
 
 export interface ExtendedReportFields extends ReportFields {
   linenInventory?: LinenInventoryItem[];
+  includeCheckedOutGuests?: boolean;
 }
 
 interface EmailReportDialogProps {
@@ -46,6 +47,7 @@ interface EmailReportDialogProps {
   housekeeperName?: string;
   allHousekeepers?: string[];
   hotelId?: string;
+  checkedOutCount?: number;
 }
 
 const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
@@ -54,7 +56,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   onConfirm,
   housekeeperName = "",
   allHousekeepers = [],
-  hotelId
+  hotelId,
+  checkedOutCount = 0
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customFields, setCustomFields] = useState<ExtendedReportFields>({ 
@@ -63,9 +66,13 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     instructions: '',
     generalInstructions: '',
     housekeeperInstructions: {},
-    linenInventory: []
+    linenInventory: [],
+    includeCheckedOutGuests: false
   });
   const [enableLinenInventory, setEnableLinenInventory] = useState(false);
+  const [showSaveTemplatePrompt, setShowSaveTemplatePrompt] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const { toast } = useToast();
 
   // Fetch linen types for this hotel
@@ -203,12 +210,105 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     }));
   };
 
+  // Check if user has entered custom content that could be saved as template
+  const hasCustomContent = () => {
+    const hasInstructions = (customFields.generalInstructions || '').trim().length > 0;
+    const hasToDo = (customFields.toDoItems || []).some(item => item.trim().length > 0);
+    const hasToKnow = (customFields.toKnowItems || []).some(item => item.trim().length > 0);
+    return hasInstructions || hasToDo || hasToKnow;
+  };
+
+  // Save current content as a template
+  const handleSaveAsTemplate = async () => {
+    if (!hotelId || !newTemplateName.trim()) return;
+    
+    setIsSavingTemplate(true);
+    try {
+      // Save instructions template if present
+      if ((customFields.generalInstructions || '').trim()) {
+        await supabaseClient.from('report_templates').insert({
+          hotel_id: hotelId,
+          name: `${newTemplateName} - Instructions`,
+          template_type: 'instructions',
+          content: [customFields.generalInstructions],
+          is_default: false
+        });
+      }
+      
+      // Save todo template if present
+      const todoItems = (customFields.toDoItems || []).filter(item => item.trim());
+      if (todoItems.length > 0) {
+        await supabaseClient.from('report_templates').insert({
+          hotel_id: hotelId,
+          name: `${newTemplateName} - À faire`,
+          template_type: 'todo',
+          content: todoItems,
+          is_default: false
+        });
+      }
+      
+      // Save toknow template if present
+      const toknowItems = (customFields.toKnowItems || []).filter(item => item.trim());
+      if (toknowItems.length > 0) {
+        await supabaseClient.from('report_templates').insert({
+          hotel_id: hotelId,
+          name: `${newTemplateName} - À savoir`,
+          template_type: 'toknow',
+          content: toknowItems,
+          is_default: false
+        });
+      }
+      
+      toast({
+        title: "Template sauvegardé",
+        description: `"${newTemplateName}" a été créé et sera disponible pour vos prochains rapports.`
+      });
+      
+      setShowSaveTemplatePrompt(false);
+      setNewTemplateName('');
+    } catch (error) {
+      console.error('Error saving template:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de sauvegarder le template."
+      });
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // If user has custom content and hasn't been prompted yet, show save prompt
+    if (hotelId && hasCustomContent() && !showSaveTemplatePrompt) {
+      setShowSaveTemplatePrompt(true);
+      return;
+    }
     
     setIsSubmitting(true);
     try {
       // Pass empty email and hotel name since they're no longer needed
+      await onConfirm('', customFields, '');
+      onClose();
+    } catch (error) {
+      console.error("Erreur lors de la génération du rapport:", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de téléchargement",
+        description: "Une erreur est survenue lors de la génération du PDF. Veuillez réessayer."
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Skip template save and proceed with download
+  const handleSkipSaveAndDownload = async () => {
+    setShowSaveTemplatePrompt(false);
+    setIsSubmitting(true);
+    try {
       await onConfirm('', customFields, '');
       onClose();
     } catch (error) {
@@ -268,9 +368,95 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
           </div>
         </DialogHeader>
 
+        {/* Template Save Prompt */}
+        {showSaveTemplatePrompt && (
+          <div className="border-b bg-amber-50 dark:bg-amber-950/20 px-5 py-4 sm:px-6">
+            <div className="flex items-start gap-3">
+              <Save className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">
+                    Sauvegarder comme template ?
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Réutilisez ces informations pour vos prochains rapports.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    placeholder="Nom du template (ex: Standard semaine)"
+                    value={newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSkipSaveAndDownload}
+                      disabled={isSavingTemplate}
+                    >
+                      Ignorer
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={async () => {
+                        await handleSaveAsTemplate();
+                        handleSkipSaveAndDownload();
+                      }}
+                      disabled={!newTemplateName.trim() || isSavingTemplate}
+                    >
+                      {isSavingTemplate ? 'Sauvegarde...' : 'Sauvegarder et télécharger'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-6 px-5 py-4 sm:px-6 sm:py-5 pr-8">
+              
+              {/* Clients sortis option */}
+              {checkedOutCount > 0 && (
+                <section className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-4">
+                  <div className="flex items-start gap-3">
+                    <DoorOpen className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-amber-900 dark:text-amber-100">
+                            Clients sortis
+                          </p>
+                          <p className="text-sm text-amber-700 dark:text-amber-300">
+                            {checkedOutCount} chambre{checkedOutCount > 1 ? 's' : ''} de clients ayant quitté l'hôtel
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="include-checkout"
+                            checked={customFields.includeCheckedOutGuests || false}
+                            onCheckedChange={(checked) => 
+                              setCustomFields(prev => ({ 
+                                ...prev, 
+                                includeCheckedOutGuests: !!checked 
+                              }))
+                            }
+                          />
+                          <Label htmlFor="include-checkout" className="text-sm cursor-pointer">
+                            Inclure dans le rapport
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
+
               <section className="space-y-2">
                 <Label className="text-sm font-medium">Instructions générales</Label>
                 <Textarea
@@ -281,7 +467,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                   className="min-h-[120px] resize-y text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Ces instructions s’appliquent à tous les rapports.
+                  Ces instructions s'appliquent à tous les rapports.
                 </p>
               </section>
 
