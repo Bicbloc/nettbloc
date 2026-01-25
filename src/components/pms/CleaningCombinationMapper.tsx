@@ -649,12 +649,18 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                         {trainingLines
                           .filter(line => !lineSearch || line.toLowerCase().includes(lineSearch.toLowerCase()))
                           .map((line, i) => {
-                            // Detect if line has a valid room number (3 digits at start, not a year)
-                            // Room numbers: 101, 211, etc. NOT: 2025, dates, etc.
-                            const roomMatch = line.match(/^\s*(\d{2,4})\s+(?:TWN|DBL|SGL|SUI|TRP|FAM|STU)/i) ||
-                                              line.match(/^(\d{2,4})\s+[A-Z]{2,4}\s+(?:SAL|DIR|PRO|INS|OCC|DEP)/i);
+                            // Détecter le numéro de chambre avec plusieurs patterns
+                            // Pattern Mews: "101 TWN SAL..."
+                            // Pattern Apaleo: "01 Chambre twin 17/05/2025..."
+                            // Pattern générique: numéro au début de ligne suivi d'un type de chambre
+                            const roomMatch = 
+                              line.match(/^\s*(\d{2,4})\s+(?:TWN|DBL|SGL|SUI|TRP|FAM|STU|QUAD)/i) ||
+                              line.match(/^(\d{2,4})\s+[A-Z]{2,4}\s+(?:SAL|DIR|PRO|INS|OCC|DEP)/i) ||
+                              line.match(/^\s*(\d{1,4})\s+(?:Chambre|Room|Ch\.?)\s+/i) ||
+                              line.match(/^(?:Ch\.?)\s*(\d{1,4})\s+/i);
+                            
                             const hasRoom = !!roomMatch;
-                            const roomNumber = roomMatch ? roomMatch[1] : null;
+                            const roomNumber = roomMatch ? roomMatch[1].padStart(2, '0') : null;
                             const isSelected = selectedLine === line;
                             
                             return (
@@ -666,7 +672,7 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                                 } ${hasRoom ? 'text-foreground' : 'text-muted-foreground'}`}
                               >
                                 {hasRoom && roomNumber && (
-                                  <Badge variant="outline" className="mr-2 text-[10px] py-0 px-1">{roomNumber}</Badge>
+                                  <Badge variant="outline" className="mr-2 text-[10px] py-0 px-1">Ch. {roomNumber}</Badge>
                                 )}
                                 <span className="text-muted-foreground mr-2">{i + 1}.</span>
                                 {line.length > 90 ? line.substring(0, 90) + '...' : line}
@@ -677,8 +683,10 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
                     </ScrollArea>
                     <div className="text-xs text-muted-foreground">
                       {trainingLines.filter(l => 
-                        /^\s*\d{2,4}\s+(?:TWN|DBL|SGL|SUI|TRP|FAM|STU)/i.test(l) ||
-                        /^\d{2,4}\s+[A-Z]{2,4}\s+(?:SAL|DIR|PRO|INS|OCC|DEP)/i.test(l)
+                        /^\s*\d{2,4}\s+(?:TWN|DBL|SGL|SUI|TRP|FAM|STU|QUAD)/i.test(l) ||
+                        /^\d{2,4}\s+[A-Z]{2,4}\s+(?:SAL|DIR|PRO|INS|OCC|DEP)/i.test(l) ||
+                        /^\s*\d{1,4}\s+(?:Chambre|Room|Ch\.?)\s+/i.test(l) ||
+                        /^(?:Ch\.?)\s*\d{1,4}\s+/i.test(l)
                       ).length} lignes avec chambres détectées sur {trainingLines.length} total
                     </div>
                     {selectedLine && (
