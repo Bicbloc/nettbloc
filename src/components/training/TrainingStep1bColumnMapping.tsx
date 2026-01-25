@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowRight, Zap, CheckCircle2, Info, ArrowLeft, Eye, Settings2, AlertTriangle, RefreshCw, Columns, GripVertical, X, Plus, Edit2, Save, Download, Upload } from 'lucide-react';
+import { ArrowRight, Zap, CheckCircle2, Info, ArrowLeft, Eye, Settings2, AlertTriangle, RefreshCw, Columns, GripVertical, X, Plus, Edit2, Save, Download, Upload, Combine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { TrainingData } from './TrainingWizard';
 import { detectReportFormat, getFormatDescription, CleaningIndicator, ParsedRow, ColumnType } from '@/services/training/ReportFormatDetector';
@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loadHotelReportConfig, saveHotelReportConfig, ColumnMapping, StatusMapping as ServiceStatusMapping } from '@/services/reportConfigService';
+import { CleaningCombinationMapper } from '@/components/pms/CleaningCombinationMapper';
 
 // Types de nettoyage disponibles
 const CLEANING_OPTIONS = [
@@ -433,20 +434,24 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
         </Alert>
       )}
 
-      {/* Tabs: Prévisualisation / Mapping / Configuration */}
+      {/* Tabs: Prévisualisation / Mapping / Colonnes / Combinaisons */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="preview" className="gap-2">
             <Eye className="h-4 w-4" />
-            Prévisualisation
+            <span className="hidden sm:inline">Prévisualisation</span>
           </TabsTrigger>
           <TabsTrigger value="mapping" className="gap-2">
             <Settings2 className="h-4 w-4" />
-            Mapping ({analysis.indicators.length})
+            <span className="hidden sm:inline">Mapping</span> ({analysis.indicators.length})
           </TabsTrigger>
           <TabsTrigger value="columns" className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Colonnes
+            <Columns className="h-4 w-4" />
+            <span className="hidden sm:inline">Colonnes</span>
+          </TabsTrigger>
+          <TabsTrigger value="combinations" className="gap-2">
+            <Combine className="h-4 w-4" />
+            <span className="hidden sm:inline">Combinaisons</span>
           </TabsTrigger>
         </TabsList>
 
@@ -709,6 +714,21 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab Combinaisons - Règles de détermination du type de nettoyage */}
+        <TabsContent value="combinations" className="mt-4">
+          <div className="space-y-4">
+            <Alert className="bg-blue-50 border-blue-200">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Règles de combinaison :</strong> Définissez le type de nettoyage selon la combinaison 
+                de critères présents dans le rapport (dates, horaires, statut PMS, info nuit).
+              </AlertDescription>
+            </Alert>
+            
+            <CleaningCombinationMapper hotelId={hotelId} />
+          </div>
         </TabsContent>
       </Tabs>
 
