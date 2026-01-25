@@ -37,12 +37,27 @@ interface CombinationRule {
   result_cleaning_type: string;
 }
 
+interface ExtractedRoom {
+  roomNumber: string;
+  status?: string;
+  cleaningType?: string;
+  guestName?: string;
+  arrivalDate?: string;
+  departureDate?: string;
+  arrivalTime?: string;
+  departureTime?: string;
+  nightInfo?: string;
+  originalText?: string;
+  roomType?: string;
+}
+
 interface TestResult {
   roomNumber: string;
-  rawLine: string;
-  detectedStatus: string;
+  originalType: string;
   appliedRule: CombinationRule | null;
   finalType: 'full' | 'quick' | 'none';
+  detectedStatus: string;
+  guestName?: string;
 }
 
 interface RuleTestPanelProps {
@@ -50,51 +65,36 @@ interface RuleTestPanelProps {
   rules: CombinationRule[];
 }
 
-// Extraire les mots-clés de statut d'une ligne (même logique que pdfService)
-const extractStatusKeywords = (line: string): string[] => {
+// Extraire le contexte depuis les données parsées
+const extractContextFromRoom = (room: ExtractedRoom) => {
+  // Détecter les mots-clés de statut
   const keywords: string[] = [];
-  const upper = line.toUpperCase();
+  const status = (room.status || '').toUpperCase();
   
-  // Statuts connus des différents PMS
-  const knownStatuses = [
-    // Mews
-    'DIR', 'INS', 'PRO', 'SAL',
-    // Apaleo
-    'PARTI', 'RECOUCHE', 'ARRIVÉE', 'ARRIVEE', 'EN ARRIVÉE', 'EN ARRIVEE',
-    // Generique
-    'DÉPART', 'DEPART', 'CHECKOUT', 'CHECKIN', 'OCC', 'VACANT', 'OCCUPÉ', 'OCCUPE'
-  ];
-  
-  for (const status of knownStatuses) {
-    if (upper.includes(status)) {
-      keywords.push(status);
-    }
-  }
-  
-  return keywords;
-};
-
-// Extraire le contexte d'une ligne (dates, heures, nuits)
-const extractContext = (line: string) => {
-  // Dates format DD/MM/YYYY ou DD-MM-YYYY
-  const dates = line.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
-  // Heures format HH:MM
-  const times = line.match(/\d{1,2}:\d{2}/g) || [];
-  // Info nuit "Nuit X/Y"
-  const hasNightInfo = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line);
+  // Ajouter le statut principal
+  if (status.includes('DIR')) keywords.push('DIR');
+  if (status.includes('INS')) keywords.push('INS');
+  if (status.includes('PRO')) keywords.push('PRO');
+  if (status.includes('SAL')) keywords.push('SAL');
+  if (status.includes('PARTI')) keywords.push('PARTI');
+  if (status.includes('RECOUCHE')) keywords.push('RECOUCHE');
+  if (status.includes('ARRIVÉE') || status.includes('ARRIVEE')) keywords.push('ARRIVÉE');
+  if (status.includes('DÉPART') || status.includes('DEPART')) keywords.push('DÉPART');
+  if (status.includes('VACANT')) keywords.push('VACANT');
+  if (status.includes('PROPRE')) keywords.push('PROPRE');
   
   return {
-    hasArrivalDate: dates.length >= 1,
-    hasDepartureDate: dates.length >= 2,
-    hasArrivalTime: times.length >= 1,
-    hasDepartureTime: times.length >= 2,
-    hasNightInfo,
-    statusKeywords: extractStatusKeywords(line)
+    hasArrivalDate: !!room.arrivalDate,
+    hasDepartureDate: !!room.departureDate,
+    hasArrivalTime: !!room.arrivalTime,
+    hasDepartureTime: !!room.departureTime,
+    hasNightInfo: !!room.nightInfo || (room.originalText?.toLowerCase().includes('night') ?? false),
+    statusKeywords: keywords
   };
 };
 
-// Vérifier si une règle correspond (même logique que pdfService.matchesCombinationRule)
-const matchesRule = (rule: CombinationRule, context: ReturnType<typeof extractContext>): boolean => {
+// Vérifier si une règle correspond
+const matchesRule = (rule: CombinationRule, context: ReturnType<typeof extractContextFromRoom>): boolean => {
   // Vérifier les mots-clés
   if (rule.status_keywords && rule.status_keywords.length > 0) {
     const hasMatch = rule.status_keywords.some(kw => 
@@ -121,34 +121,6 @@ const matchesRule = (rule: CombinationRule, context: ReturnType<typeof extractCo
   return true;
 };
 
-// Déterminer le type par défaut selon les mots-clés (sans règle)
-const getDefaultType = (keywords: string[]): 'full' | 'quick' | 'none' => {
-  const upper = keywords.map(k => k.toUpperCase());
-  
-  // À blanc (départ)
-  if (upper.some(k => ['PARTI', 'DÉPART', 'DEPART', 'CHECKOUT', 'DIR', 'SAL'].includes(k))) {
-    return 'full';
-  }
-  
-  // Recouche (en cours de séjour)
-  if (upper.some(k => ['RECOUCHE', 'OCC', 'OCCUPÉ', 'OCCUPE', 'INS'].includes(k))) {
-    return 'quick';
-  }
-  
-  // Propre (vacant)
-  if (upper.some(k => ['PRO', 'VACANT', 'PROPRE'].includes(k))) {
-    return 'none';
-  }
-  
-  // Cas spécial: "En arrivée" = départ + arrivée le même jour = À blanc
-  if (upper.some(k => k.includes('EN ARRIVÉE') || k.includes('EN ARRIVEE'))) {
-    return 'full';
-  }
-  
-  // Par défaut: À blanc (sécurité)
-  return 'full';
-};
-
 export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
   const [loading, setLoading] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
@@ -159,10 +131,10 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
   const runTest = async () => {
     setLoading(true);
     try {
-      // Charger le dernier rapport d'entraînement
+      // Charger le dernier rapport d'entraînement avec les données extraites
       const { data, error } = await supabase
         .from('report_training_patterns')
-        .select('raw_text, created_at')
+        .select('report_name, extracted_data, created_at')
         .eq('hotel_id', hotelId)
         .order('updated_at', { ascending: false })
         .limit(1)
@@ -170,43 +142,23 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
 
       if (error) throw error;
       
-      if (!data?.raw_text) {
+      if (!data?.extracted_data) {
         toast.error('Aucun rapport trouvé. Importez d\'abord un rapport dans l\'onglet Entraînement.');
         return;
       }
       
-      setReportName(`Rapport du ${new Date(data.created_at).toLocaleDateString('fr-FR')}`);
+      setReportName(data.report_name || `Rapport du ${new Date(data.created_at).toLocaleDateString('fr-FR')}`);
       
-      // Parser les lignes
-      const lines = data.raw_text.split('\n').filter((l: string) => l.trim());
       const activeRules = rules.filter(r => r.is_active).sort((a, b) => b.priority - a.priority);
+      const extractedRooms = (data.extracted_data as unknown) as ExtractedRoom[];
       
-      // Patterns pour détecter les chambres selon différents formats PMS
-      // Format Mews/Opera: "101   TWS   DIR" ou "101  SGL  INS"
-      // Format Apaleo: "01  Chambre twin  Parti"
-      const roomPatterns = [
-        /^(\d{2,4})\s+(?:TWS|SGL|DBS|DBL|JSU|TRP|QUA|STU|APT|SUI)\s+(?:DIR|INS|PRO|SAL)/i,  // Mews format
-        /^(\d{1,4})\s+(?:Chambre|Room|Ch\.?)\s/i,  // Apaleo/Generic format
-        /^(\d{1,4})\s+.*(?:Parti|Recouche|Arrivée|En arrivée|Occupé|Vacant)/i,  // Status-based
-        /^\s*(\d{2,4})\s{2,}/  // Simple: numéro suivi d'espaces multiples
-      ];
-      
+      // Traiter chaque chambre extraite
       const results: TestResult[] = [];
       
-      for (const line of lines) {
-        let roomNumber: string | null = null;
+      for (const room of extractedRooms) {
+        if (!room.roomNumber) continue;
         
-        // Essayer chaque pattern
-        for (const pattern of roomPatterns) {
-          const match = line.match(pattern);
-          if (match) {
-            roomNumber = match[1];
-            break;
-          }
-        }
-        
-        if (!roomNumber) continue;
-        const context = extractContext(line);
+        const context = extractContextFromRoom(room);
         
         // Trouver la règle qui matche (par priorité)
         let appliedRule: CombinationRule | null = null;
@@ -217,17 +169,21 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
           }
         }
         
-        // Déterminer le type final
+        // Type original détecté par le parser
+        const originalType = normalizeCleaningType(room.cleaningType);
+        
+        // Type final (règle appliquée ou original)
         const finalType = appliedRule 
           ? normalizeCleaningType(appliedRule.result_cleaning_type)
-          : getDefaultType(context.statusKeywords);
+          : originalType;
         
         results.push({
-          roomNumber,
-          rawLine: line.substring(0, 80) + (line.length > 80 ? '...' : ''),
-          detectedStatus: context.statusKeywords.join(', ') || '-',
+          roomNumber: room.roomNumber,
+          originalType: room.cleaningType || 'unknown',
           appliedRule,
-          finalType
+          finalType,
+          detectedStatus: room.status || context.statusKeywords.join(', ') || '-',
+          guestName: room.guestName
         });
       }
       
@@ -314,7 +270,7 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
                 {reportName && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <FileText className="h-4 w-4" />
-                    <span>Source: {reportName}</span>
+                    <span className="truncate">{reportName}</span>
                   </div>
                 )}
                 
@@ -367,12 +323,12 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
                             <span className="text-xs text-muted-foreground">Auto</span>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {r.detectedStatus !== '-' && (
-                            <span className="text-primary font-medium">[{r.detectedStatus}]</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-primary font-medium">[{r.detectedStatus}]</span>
+                          {r.guestName && (
+                            <span className="text-xs text-muted-foreground truncate">{r.guestName}</span>
                           )}
-                          {' '}{r.rawLine}
-                        </p>
+                        </div>
                       </div>
                     ))}
                   </div>
