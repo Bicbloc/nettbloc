@@ -761,6 +761,7 @@ const IndexDashboard = () => {
         housekeeperName={reportAction === "single" ? reportHousekeeper : undefined}
         allHousekeepers={housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0)}
         hotelId={selectedHotel?.id || undefined}
+        checkedOutCount={rooms.filter(r => r.status === 'checkout' || r.cleaningType === 'a_blanc').length}
       />
       
       {showDeleteDialog && selectedRoom && (
