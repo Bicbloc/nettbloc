@@ -4,18 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { 
   PlayCircle, 
   Check, 
-  X, 
-  AlertTriangle, 
   RefreshCw, 
-  FileText, 
-  Sparkles,
+  AlertTriangle,
   ArrowRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -23,6 +20,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { CLEANING_TYPE_LABELS, normalizeCleaningType } from '@/constants/cleaningTypes';
 
 interface CombinationRule {
   id: string;
@@ -42,20 +40,9 @@ interface CombinationRule {
 interface TestResult {
   roomNumber: string;
   rawLine: string;
-  originalType: string;
+  detectedStatus: string;
   appliedRule: CombinationRule | null;
-  finalType: string;
-  matched: boolean;
-  context: {
-    hasArrivalDate: boolean;
-    hasDepartureDate: boolean;
-    hasArrivalTime: boolean;
-    hasDepartureTime: boolean;
-    hasNightInfo: boolean;
-    keywords: string[];
-    detectedCleaningType: 'full' | 'quick' | 'none';
-    apaleoStatus: string;
-  };
+  finalType: 'full' | 'quick' | 'none';
 }
 
 interface RuleTestPanelProps {
@@ -63,113 +50,119 @@ interface RuleTestPanelProps {
   rules: CombinationRule[];
 }
 
-// Détecter le type de nettoyage selon les patterns Apaleo/PMS
-type ApaleoStatus = 'parti' | 'en_arrivee' | 'arrive' | 'recouche' | 'unknown';
-
-const detectApaleoStatus = (line: string): { status: ApaleoStatus; cleaningType: 'full' | 'quick' | 'none' } => {
-  // Pattern Apaleo : "Parti", "En arrivée", "Arrivé", "Recouche"
-  if (/\bparti\b/i.test(line)) {
-    return { status: 'parti', cleaningType: 'full' };
-  }
-  if (/\ben\s*arrivée?\b/i.test(line)) {
-    return { status: 'en_arrivee', cleaningType: 'full' };
-  }
-  if (/\barrivé\b/i.test(line) && !/\ben\s*arrivée?\b/i.test(line)) {
-    return { status: 'arrive', cleaningType: 'quick' };
-  }
-  if (/\brecouche\b/i.test(line)) {
-    return { status: 'recouche', cleaningType: 'quick' };
-  }
-  return { status: 'unknown', cleaningType: 'full' };
-};
-
-// Simuler le contexte d'une ligne de rapport
-const extractContext = (line: string) => {
+// Extraire les mots-clés de statut d'une ligne (même logique que pdfService)
+const extractStatusKeywords = (line: string): string[] => {
+  const keywords: string[] = [];
   const upper = line.toUpperCase();
   
-  // Détecter les dates (format DD/MM/YYYY)
-  const dateMatches = line.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
-  const hasArrivalDate = dateMatches.length >= 1;
-  const hasDepartureDate = dateMatches.length >= 2;
+  // Statuts connus des différents PMS
+  const knownStatuses = [
+    // Mews
+    'DIR', 'INS', 'PRO', 'SAL',
+    // Apaleo
+    'PARTI', 'RECOUCHE', 'ARRIVÉE', 'ARRIVEE', 'EN ARRIVÉE', 'EN ARRIVEE',
+    // Generique
+    'DÉPART', 'DEPART', 'CHECKOUT', 'CHECKIN', 'OCC', 'VACANT', 'OCCUPÉ', 'OCCUPE'
+  ];
   
-  // Détecter les heures (format HH:MM)
-  const timeMatches = line.match(/\d{1,2}:\d{2}/g) || [];
-  const hasArrivalTime = timeMatches.length >= 1;
-  const hasDepartureTime = timeMatches.length >= 2;
-  
-  // Détecter "Nuit X/Y"
-  const hasNightInfo = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line);
-  
-  // Extraire les keywords avec patterns plus flexibles
-  const keywords: string[] = [];
-  
-  // Patterns spécifiques Apaleo
-  if (/\bparti\b/i.test(line)) keywords.push('PARTI');
-  if (/\ben\s*arrivée?\b/i.test(line)) keywords.push('EN_ARRIVÉE');
-  if (/\barrivé\b/i.test(line) && !/\ben\s*arrivée?\b/i.test(line)) keywords.push('ARRIVÉ');
-  if (/\brecouche\b/i.test(line)) keywords.push('RECOUCHE');
-  
-  // Autres keywords PMS
-  const simpleKeywords = ['SAL', 'DIR', 'INS', 'PRO', 'DEP', 'OCC', 'CHECKOUT', 'DÉPART'];
-  for (const kw of simpleKeywords) {
-    if (upper.includes(kw)) keywords.push(kw);
+  for (const status of knownStatuses) {
+    if (upper.includes(status)) {
+      keywords.push(status);
+    }
   }
   
-  // Détection du type selon logique Apaleo
-  const apaleoResult = detectApaleoStatus(line);
+  return keywords;
+};
+
+// Extraire le contexte d'une ligne (dates, heures, nuits)
+const extractContext = (line: string) => {
+  // Dates format DD/MM/YYYY ou DD-MM-YYYY
+  const dates = line.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
+  // Heures format HH:MM
+  const times = line.match(/\d{1,2}:\d{2}/g) || [];
+  // Info nuit "Nuit X/Y"
+  const hasNightInfo = /(?:nuit|night)\s*\d+\s*[\/\\]\s*\d+/i.test(line);
   
   return {
-    hasArrivalDate,
-    hasDepartureDate,
-    hasArrivalTime,
-    hasDepartureTime,
+    hasArrivalDate: dates.length >= 1,
+    hasDepartureDate: dates.length >= 2,
+    hasArrivalTime: times.length >= 1,
+    hasDepartureTime: times.length >= 2,
     hasNightInfo,
-    keywords,
-    detectedCleaningType: apaleoResult.cleaningType,
-    apaleoStatus: apaleoResult.status
+    statusKeywords: extractStatusKeywords(line)
   };
 };
 
-// Vérifier si une règle correspond au contexte
-const matchesRule = (rule: CombinationRule, context: TestResult['context']): boolean => {
-  // Vérifier les keywords
-  if (rule.status_keywords.length > 0) {
-    const hasKeyword = rule.status_keywords.some(kw => 
-      context.keywords.includes(kw.toUpperCase())
+// Vérifier si une règle correspond (même logique que pdfService.matchesCombinationRule)
+const matchesRule = (rule: CombinationRule, context: ReturnType<typeof extractContext>): boolean => {
+  // Vérifier les mots-clés
+  if (rule.status_keywords && rule.status_keywords.length > 0) {
+    const hasMatch = rule.status_keywords.some(kw => 
+      context.statusKeywords.some(ctxKw => 
+        ctxKw.toUpperCase().includes(kw.toUpperCase()) ||
+        kw.toUpperCase().includes(ctxKw.toUpperCase())
+      )
     );
-    if (!hasKeyword) return false;
+    if (!hasMatch) return false;
   }
   
-  // Vérifier les conditions de date/heure
-  const checkCondition = (value: 'present' | 'absent' | 'any', actual: boolean) => {
-    if (value === 'any') return true;
-    if (value === 'present') return actual;
-    if (value === 'absent') return !actual;
-    return true;
+  // Vérifier chaque condition
+  const check = (val: 'present' | 'absent' | 'any', actual: boolean) => {
+    if (val === 'any') return true;
+    return val === 'present' ? actual : !actual;
   };
   
-  if (!checkCondition(rule.arrival_date, context.hasArrivalDate)) return false;
-  if (!checkCondition(rule.departure_date, context.hasDepartureDate)) return false;
-  if (!checkCondition(rule.arrival_time, context.hasArrivalTime)) return false;
-  if (!checkCondition(rule.departure_time, context.hasDepartureTime)) return false;
-  if (!checkCondition(rule.night_info, context.hasNightInfo)) return false;
+  if (!check(rule.arrival_date, context.hasArrivalDate)) return false;
+  if (!check(rule.departure_date, context.hasDepartureDate)) return false;
+  if (!check(rule.arrival_time, context.hasArrivalTime)) return false;
+  if (!check(rule.departure_time, context.hasDepartureTime)) return false;
+  if (!check(rule.night_info, context.hasNightInfo)) return false;
   
   return true;
+};
+
+// Déterminer le type par défaut selon les mots-clés (sans règle)
+const getDefaultType = (keywords: string[]): 'full' | 'quick' | 'none' => {
+  const upper = keywords.map(k => k.toUpperCase());
+  
+  // À blanc (départ)
+  if (upper.some(k => ['PARTI', 'DÉPART', 'DEPART', 'CHECKOUT', 'DIR', 'SAL'].includes(k))) {
+    return 'full';
+  }
+  
+  // Recouche (en cours de séjour)
+  if (upper.some(k => ['RECOUCHE', 'OCC', 'OCCUPÉ', 'OCCUPE', 'INS'].includes(k))) {
+    return 'quick';
+  }
+  
+  // Propre (vacant)
+  if (upper.some(k => ['PRO', 'VACANT', 'PROPRE'].includes(k))) {
+    return 'none';
+  }
+  
+  // Cas spécial: "En arrivée" = départ + arrivée le même jour = À blanc
+  if (upper.some(k => k.includes('EN ARRIVÉE') || k.includes('EN ARRIVEE'))) {
+    return 'full';
+  }
+  
+  // Par défaut: À blanc (sécurité)
+  return 'full';
 };
 
 export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
   const [loading, setLoading] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [reportText, setReportText] = useState<string>('');
   const [isOpen, setIsOpen] = useState(false);
+  const [reportName, setReportName] = useState<string>('');
   
-  // Charger le dernier rapport d'entraînement
-  const loadTestData = async () => {
+  // Charger et tester le dernier rapport
+  const runTest = async () => {
     setLoading(true);
     try {
+      // Charger le dernier rapport d'entraînement
       const { data, error } = await supabase
         .from('report_training_patterns')
-        .select('raw_text, extracted_data')
+        .select('raw_text, created_at')
         .eq('hotel_id', hotelId)
         .order('updated_at', { ascending: false })
         .limit(1)
@@ -178,28 +171,28 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
       if (error) throw error;
       
       if (!data?.raw_text) {
-        toast.error('Aucun rapport d\'entraînement trouvé. Importez d\'abord un rapport.');
+        toast.error('Aucun rapport trouvé. Importez d\'abord un rapport dans l\'onglet Entraînement.');
         return;
       }
       
-      setReportText(data.raw_text);
+      setReportName(`Rapport du ${new Date(data.created_at).toLocaleDateString('fr-FR')}`);
       
-      // Parser les lignes du rapport
+      // Parser les lignes
       const lines = data.raw_text.split('\n').filter((l: string) => l.trim());
       const activeRules = rules.filter(r => r.is_active).sort((a, b) => b.priority - a.priority);
       
-      // Détecter les chambres dans les lignes
-      const results: TestResult[] = [];
+      // Détecter les chambres (numéro en début de ligne)
       const roomPattern = /^\s*(\d{1,4})\s+/;
+      const results: TestResult[] = [];
       
       for (const line of lines) {
-        const roomMatch = line.match(roomPattern);
-        if (!roomMatch) continue;
+        const match = line.match(roomPattern);
+        if (!match) continue;
         
-        const roomNumber = roomMatch[1].padStart(2, '0');
+        const roomNumber = match[1].padStart(2, '0');
         const context = extractContext(line);
         
-        // Trouver la première règle qui matche
+        // Trouver la règle qui matche (par priorité)
         let appliedRule: CombinationRule | null = null;
         for (const rule of activeRules) {
           if (matchesRule(rule, context)) {
@@ -208,72 +201,45 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
           }
         }
         
-        // Déterminer le type original selon la logique Apaleo/PMS détectée
-        const originalType = context.detectedCleaningType === 'quick' ? 'recouche' : 
-                             context.detectedCleaningType === 'none' ? 'none' : 'a_blanc';
-        
-        const finalType = appliedRule ? appliedRule.result_cleaning_type : originalType;
+        // Déterminer le type final
+        const finalType = appliedRule 
+          ? normalizeCleaningType(appliedRule.result_cleaning_type)
+          : getDefaultType(context.statusKeywords);
         
         results.push({
           roomNumber,
-          rawLine: line.substring(0, 100) + (line.length > 100 ? '...' : ''),
-          originalType,
+          rawLine: line.substring(0, 80) + (line.length > 80 ? '...' : ''),
+          detectedStatus: context.statusKeywords.join(', ') || '-',
           appliedRule,
-          finalType,
-          matched: appliedRule !== null,
-          context
+          finalType
         });
       }
       
       setTestResults(results);
-      toast.success(`Test effectué sur ${results.length} chambres`);
+      toast.success(`${results.length} chambres analysées`);
       
-    } catch (error) {
-      console.error('Erreur test règles:', error);
+    } catch (err) {
+      console.error('Erreur test:', err);
       toast.error('Erreur lors du test');
     } finally {
       setLoading(false);
     }
   };
   
-  // Statistiques des résultats
-  const stats = useMemo(() => {
-    const total = testResults.length;
-    const matched = testResults.filter(r => r.matched).length;
-    const aBlanc = testResults.filter(r => r.finalType === 'full' || r.finalType === 'a_blanc').length;
-    const recouche = testResults.filter(r => r.finalType === 'quick' || r.finalType === 'recouche').length;
-    const propre = testResults.filter(r => r.finalType === 'none').length;
-    
-    return { total, matched, aBlanc, recouche, propre };
-  }, [testResults]);
+  // Statistiques
+  const stats = useMemo(() => ({
+    total: testResults.length,
+    full: testResults.filter(r => r.finalType === 'full').length,
+    quick: testResults.filter(r => r.finalType === 'quick').length,
+    none: testResults.filter(r => r.finalType === 'none').length,
+    withRule: testResults.filter(r => r.appliedRule).length
+  }), [testResults]);
   
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type: 'full' | 'quick' | 'none') => {
     switch (type) {
-      case 'full':
-      case 'a_blanc':
-        return 'bg-orange-500';
-      case 'quick':
-      case 'recouche':
-        return 'bg-blue-500';
-      case 'none':
-        return 'bg-green-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
-  
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'full':
-      case 'a_blanc':
-        return 'À blanc';
-      case 'quick':
-      case 'recouche':
-        return 'Recouche';
-      case 'none':
-        return 'Propre';
-      default:
-        return type;
+      case 'full': return 'bg-orange-500';
+      case 'quick': return 'bg-blue-500';
+      case 'none': return 'bg-green-500';
     }
   };
   
@@ -285,19 +251,15 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <PlayCircle className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Tester les règles en direct</CardTitle>
+                <CardTitle className="text-base">Tester les règles</CardTitle>
               </div>
               <div className="flex items-center gap-2">
                 {testResults.length > 0 && (
                   <Badge variant="secondary" className="text-xs">
-                    {stats.matched}/{stats.total} règles appliquées
+                    {stats.withRule}/{stats.total} avec règle
                   </Badge>
                 )}
-                {isOpen ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                )}
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </div>
             </div>
           </CardHeader>
@@ -306,131 +268,95 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
         <CollapsibleContent>
           <CardContent className="space-y-4 pt-0">
             <CardDescription>
-              Testez vos règles sur le dernier rapport d'entraînement pour voir comment elles seront appliquées.
+              Teste vos règles sur le dernier rapport importé pour vérifier les résultats.
             </CardDescription>
             
             <Button 
-              onClick={loadTestData} 
-              disabled={loading || rules.length === 0}
+              onClick={runTest} 
+              disabled={loading}
               className="w-full"
               variant="outline"
             >
               {loading ? (
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <Sparkles className="h-4 w-4 mr-2" />
+                <PlayCircle className="h-4 w-4 mr-2" />
               )}
-              {loading ? 'Test en cours...' : 'Lancer le test'}
+              {loading ? 'Analyse...' : 'Lancer le test'}
             </Button>
             
             {rules.length === 0 && (
               <div className="text-center py-4 text-muted-foreground text-sm">
                 <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-amber-500" />
-                <p>Aucune règle définie. Créez des règles pour les tester.</p>
+                <p>Aucune règle définie.</p>
               </div>
             )}
             
             {testResults.length > 0 && (
               <>
-                {/* Statistiques */}
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="text-center p-2 bg-muted rounded-md">
+                {/* Source */}
+                {reportName && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    <span>Source: {reportName}</span>
+                  </div>
+                )}
+                
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="p-2 bg-muted rounded-md">
                     <p className="text-lg font-bold">{stats.total}</p>
-                    <p className="text-xs text-muted-foreground">Chambres</p>
+                    <p className="text-xs text-muted-foreground">Total</p>
                   </div>
-                  <div className="text-center p-2 bg-orange-100 dark:bg-orange-950 rounded-md">
-                    <p className="text-lg font-bold text-orange-600">{stats.aBlanc}</p>
-                    <p className="text-xs text-muted-foreground">À blanc</p>
+                  <div className="p-2 bg-orange-100 dark:bg-orange-950 rounded-md">
+                    <p className="text-lg font-bold text-orange-600">{stats.full}</p>
+                    <p className="text-xs text-muted-foreground">{CLEANING_TYPE_LABELS.full.fr}</p>
                   </div>
-                  <div className="text-center p-2 bg-blue-100 dark:bg-blue-950 rounded-md">
-                    <p className="text-lg font-bold text-blue-600">{stats.recouche}</p>
-                    <p className="text-xs text-muted-foreground">Recouche</p>
+                  <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-md">
+                    <p className="text-lg font-bold text-blue-600">{stats.quick}</p>
+                    <p className="text-xs text-muted-foreground">{CLEANING_TYPE_LABELS.quick.fr}</p>
                   </div>
-                  <div className="text-center p-2 bg-green-100 dark:bg-green-950 rounded-md">
-                    <p className="text-lg font-bold text-green-600">{stats.propre}</p>
+                  <div className="p-2 bg-green-100 dark:bg-green-950 rounded-md">
+                    <p className="text-lg font-bold text-green-600">{stats.none}</p>
                     <p className="text-xs text-muted-foreground">Propre</p>
                   </div>
                 </div>
                 
-                <Separator />
-                
-                {/* Résultats détaillés */}
-                <ScrollArea className="h-64 border rounded-md">
-                  <div className="p-2 space-y-2">
-                    {testResults.map((result, i) => (
+                {/* Résultats */}
+                <ScrollArea className="h-56 border rounded-md">
+                  <div className="p-2 space-y-1">
+                    {testResults.map((r, i) => (
                       <div 
                         key={i} 
-                        className={`p-3 rounded-md border ${
-                          result.matched 
-                            ? 'bg-primary/5 border-primary/20' 
-                            : 'bg-muted/50'
+                        className={`p-2 rounded border ${
+                          r.appliedRule ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="font-mono">
-                              Ch. {result.roomNumber}
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {r.roomNumber}
                             </Badge>
                             <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                            <Badge className={`${getTypeColor(result.finalType)} text-white`}>
-                              {getTypeLabel(result.finalType)}
+                            <Badge className={`${getTypeColor(r.finalType)} text-white text-xs`}>
+                              {CLEANING_TYPE_LABELS[r.finalType].fr}
                             </Badge>
                           </div>
-                          {result.matched ? (
+                          {r.appliedRule ? (
                             <Badge variant="secondary" className="text-xs">
                               <Check className="h-3 w-3 mr-1" />
-                              {result.appliedRule?.rule_name}
+                              {r.appliedRule.rule_name}
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-xs text-muted-foreground">
-                              Défaut
-                            </Badge>
+                            <span className="text-xs text-muted-foreground">Auto</span>
                           )}
                         </div>
-                        
-                        <p className="text-xs font-mono text-muted-foreground truncate">
-                          {result.rawLine}
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {r.detectedStatus !== '-' && (
+                            <span className="text-primary font-medium">[{r.detectedStatus}]</span>
+                          )}
+                          {' '}{r.rawLine}
                         </p>
-                        
-                        {/* Contexte détecté */}
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {/* Statut Apaleo détecté */}
-                          {result.context.apaleoStatus !== 'unknown' && (
-                            <Badge 
-                              variant="outline" 
-                              className={`text-[10px] py-0 ${
-                                result.context.apaleoStatus === 'recouche' || result.context.apaleoStatus === 'arrive'
-                                  ? 'border-blue-500 text-blue-600'
-                                  : 'border-orange-500 text-orange-600'
-                              }`}
-                            >
-                              🏷️ {result.context.apaleoStatus === 'parti' ? 'Parti' :
-                                  result.context.apaleoStatus === 'en_arrivee' ? 'En arrivée' :
-                                  result.context.apaleoStatus === 'arrive' ? 'Arrivé' :
-                                  result.context.apaleoStatus === 'recouche' ? 'Recouche' : ''}
-                            </Badge>
-                          )}
-                          {result.context.hasArrivalDate && (
-                            <Badge variant="outline" className="text-[10px] py-0">📅 Arrivée</Badge>
-                          )}
-                          {result.context.hasDepartureDate && (
-                            <Badge variant="outline" className="text-[10px] py-0">📅 Départ</Badge>
-                          )}
-                          {result.context.hasArrivalTime && (
-                            <Badge variant="outline" className="text-[10px] py-0">⏰ H.Arr</Badge>
-                          )}
-                          {result.context.hasDepartureTime && (
-                            <Badge variant="outline" className="text-[10px] py-0">⏰ H.Dép</Badge>
-                          )}
-                          {result.context.hasNightInfo && (
-                            <Badge variant="outline" className="text-[10px] py-0">🌙 Nuit</Badge>
-                          )}
-                          {result.context.keywords.map(kw => (
-                            <Badge key={kw} variant="secondary" className="text-[10px] py-0">
-                              {kw}
-                            </Badge>
-                          ))}
-                        </div>
                       </div>
                     ))}
                   </div>
