@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowRight, Zap, CheckCircle2, Info, ArrowLeft, Eye, Settings2, AlertTriangle, RefreshCw, Columns, GripVertical, X, Plus, Edit2 } from 'lucide-react';
+import { ArrowRight, Zap, CheckCircle2, Info, ArrowLeft, Eye, Settings2, AlertTriangle, RefreshCw, Columns, GripVertical, X, Plus, Edit2, Save, Download, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { TrainingData } from './TrainingWizard';
 import { detectReportFormat, getFormatDescription, CleaningIndicator, ParsedRow, ColumnType } from '@/services/training/ReportFormatDetector';
@@ -15,6 +15,7 @@ import { normalizeCleaningType, CleaningType } from '@/constants/cleaningTypes';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { loadHotelReportConfig, saveHotelReportConfig, ColumnMapping, StatusMapping as ServiceStatusMapping } from '@/services/reportConfigService';
 
 // Types de nettoyage disponibles
 const CLEANING_OPTIONS = [
@@ -79,6 +80,8 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([]);
   const [editingColumn, setEditingColumn] = useState<string | null>(null);
+  const [savedConfig, setSavedConfig] = useState<boolean>(false);
+  const [loadingConfig, setLoadingConfig] = useState<boolean>(true);
 
   // Détecter le format et parser le rapport
   const analysis = useMemo(() => {
@@ -90,8 +93,20 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
 
   const formatInfo = getFormatDescription(analysis.format);
 
-  // Initialiser les mappings avec les suggestions
-  useEffect(() => {
+  // Fonction d'initialisation des colonnes
+  const initializeColumnsFromAnalysis = () => {
+    const initialColumns: ColumnConfig[] = analysis.structure.suggestedColumns.map((col, idx) => ({
+      id: `col-${idx}`,
+      name: col.name,
+      type: col.type as ColumnType,
+      enabled: col.isRelevantForCleaning,
+      order: idx,
+    }));
+    setColumnConfigs(initialColumns);
+  };
+
+  // Fonction d'initialisation des mappings
+  const initializeFromAnalysis = () => {
     const initialMappings: StatusMapping = {};
     for (const indicator of analysis.indicators) {
       if (indicator.suggestedType !== 'unknown') {
@@ -103,19 +118,105 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
       }
     }
     setStatusMappings(initialMappings);
-  }, [analysis.indicators]);
+    initializeColumnsFromAnalysis();
+  };
 
-  // Initialiser la configuration des colonnes
+  // Charger la config existante de l'hôtel
   useEffect(() => {
-    const initialColumns: ColumnConfig[] = analysis.structure.suggestedColumns.map((col, idx) => ({
-      id: `col-${idx}`,
-      name: col.name,
-      type: col.type as ColumnType,
-      enabled: col.isRelevantForCleaning,
-      order: idx,
-    }));
-    setColumnConfigs(initialColumns);
-  }, [analysis.structure.suggestedColumns]);
+    const loadExistingConfig = async () => {
+      if (!hotelId) {
+        initializeFromAnalysis();
+        setLoadingConfig(false);
+        return;
+      }
+
+      try {
+        const config = await loadHotelReportConfig(hotelId);
+        
+        if (config) {
+          // Appliquer les status mappings sauvegardés
+          if (config.status_mappings && Object.keys(config.status_mappings).length > 0) {
+            setStatusMappings(config.status_mappings as unknown as StatusMapping);
+            toast({
+              title: "📦 Configuration chargée",
+              description: `Configuration précédente appliquée (${Object.keys(config.status_mappings).length} mappings)`,
+            });
+          } else {
+            // Initialiser avec les suggestions
+            const initialMappings: StatusMapping = {};
+            for (const indicator of analysis.indicators) {
+              if (indicator.suggestedType !== 'unknown') {
+                initialMappings[indicator.value] = indicator.suggestedType === 'out_of_service' 
+                  ? 'out_of_service' 
+                  : indicator.suggestedType === 'exclude'
+                  ? 'exclude'
+                  : normalizeCleaningType(indicator.suggestedType);
+              }
+            }
+            setStatusMappings(initialMappings);
+          }
+          
+          // Appliquer les colonnes sauvegardées si le format est le même
+          if (config.column_mappings && config.column_mappings.length > 0 && 
+              config.detected_format === analysis.format) {
+            const savedColumns: ColumnConfig[] = config.column_mappings.map((col, idx) => ({
+              id: `col-${idx}`,
+              name: col.columnName,
+              type: col.type,
+              enabled: col.enabled,
+              order: col.order,
+            }));
+            setColumnConfigs(savedColumns);
+          } else {
+            initializeColumnsFromAnalysis();
+          }
+        } else {
+          initializeFromAnalysis();
+        }
+      } catch (error) {
+        console.error('Erreur chargement config:', error);
+        initializeFromAnalysis();
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+
+    loadExistingConfig();
+  }, [hotelId, analysis.format, analysis.indicators]);
+
+  // Sauvegarder la configuration
+  const handleSaveConfig = async () => {
+    if (!hotelId) return;
+
+    try {
+      const columnMappings: ColumnMapping[] = columnConfigs.map((col, idx) => ({
+        columnIndex: idx,
+        columnName: col.name,
+        type: col.type,
+        enabled: col.enabled,
+        order: col.order,
+      }));
+
+      await saveHotelReportConfig(hotelId, {
+        column_mappings: columnMappings,
+        status_mappings: statusMappings as unknown as ServiceStatusMapping,
+        detected_format: analysis.format,
+      });
+
+      setSavedConfig(true);
+      toast({
+        title: "✅ Configuration sauvegardée",
+        description: "Vos paramètres seront réutilisés pour les prochains imports.",
+      });
+    } catch (error) {
+      console.error('Erreur sauvegarde config:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder la configuration.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Colonnes activées et triées
   const activeColumns = useMemo(() => {
@@ -617,14 +718,27 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
           <ArrowLeft className="h-4 w-4" />
           Retour
         </Button>
-        <Button 
-          onClick={handleContinue} 
-          className="gap-2" 
-          disabled={stats.unmapped > stats.total * 0.5}
-        >
-          Continuer avec {stats.total - stats.excluded} chambres
-          <ArrowRight className="h-4 w-4" />
-        </Button>
+        
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleSaveConfig}
+            className="gap-2"
+            disabled={loadingConfig}
+          >
+            <Save className="h-4 w-4" />
+            {savedConfig ? 'Sauvegardé ✓' : 'Sauvegarder config'}
+          </Button>
+          
+          <Button 
+            onClick={handleContinue} 
+            className="gap-2" 
+            disabled={stats.unmapped > stats.total * 0.5 || loadingConfig}
+          >
+            Continuer avec {stats.total - stats.excluded} chambres
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
