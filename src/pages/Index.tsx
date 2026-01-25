@@ -1,16 +1,10 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, FileText, Calendar, Layers, AlertTriangle, Bed, Building, Key, Brain, Archive, Mail, ClipboardCheck, Package } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { useSearchParams, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHotel } from "@/contexts/HotelContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import UserMenu from "@/components/UserMenu";
 import { useSessionTracking } from "@/hooks/use-session-tracking";
 import { Room, CleaningConfig, getDefaultCleaningConfig } from "@/services/pdfService";
-import { Badge } from "@/components/ui/badge";
 import { generateReport, generateCombinedReport } from "@/services/reportService";
 import { toast } from "@/hooks/use-toast";
 import { ManualAssignmentDialog } from "@/components/ManualAssignmentDialog";
@@ -20,15 +14,12 @@ import EmailReportDialog from "@/components/EmailReportDialog";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
 import { ReportFields as CustomReportFields } from "@/components/ReportCustomFields";
 import { useHousekeeping } from "@/contexts/HousekeepingContext";
-import { NotificationBell } from "@/components/NotificationBell";
-import { DailyReportCloseButton } from "@/components/DailyReportCloseButton";
 import { DailyActionLogPanel } from "@/components/DailyActionLogPanel";
 import { NotificationSound } from "@/components/NotificationSound";
 import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { cleanupInvalidHotelIds, generateHotelId } from "@/lib/utils";
 import { redistributeRooms } from "@/utils/redistributionUtils";
-import { UpgradeButton } from "@/components/UpgradeButton";
 import { storageService } from "@/services/storageService";
 import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -40,8 +31,10 @@ import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
 import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
 import { SupabaseService } from "@/services/supabaseService";
 import { AssignmentService } from "@/services/assignmentService";
-import { GuidedDistributionWizard } from "@/components/GuidedDistributionWizard";
 import { usePdfWorkflow } from "@/hooks/use-pdf-workflow";
+
+// Layout components
+import { MainLayout, TabValue } from "@/components/layout";
 
 // Dashboard tab components
 import { OverviewTab } from "@/components/dashboard/OverviewTab";
@@ -129,7 +122,7 @@ const IndexDashboard = () => {
   
   useSessionTracking();
   
-  const [activeTab, setActiveTab] = useState(() => storageService.getAdminTab());
+  const [activeTab, setActiveTab] = useState<TabValue>(() => storageService.getAdminTab() as TabValue || 'overview');
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   
   const { 
@@ -559,7 +552,7 @@ const IndexDashboard = () => {
   // Note: Auth check is now done at the top of the component
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <>
       {currentHotelId && (
         <FirstTimeSetupWizard
           isOpen={showSetupWizard}
@@ -570,251 +563,185 @@ const IndexDashboard = () => {
         />
       )}
       
-      <div className="container mx-auto py-6 px-4 md:px-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg">
-                <Building className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  Nettobloc
-                </h1>
-                <div className="flex items-center gap-2 mt-1">
-                  {isGuestMode && <Badge variant="outline" className="text-xs">{t.dashboard.guestMode}</Badge>}
-                  {!subscriptionLoading && (
-                    <Badge 
-                      variant="secondary"
-                      className={isPremium ? "bg-gradient-premium text-premium-foreground text-xs border-0" : "bg-gradient-freemium text-freemium-foreground text-xs border-0"}
-                    >
-                      {isPremium ? "Premium" : "Freemium"}
-                    </Badge>
-                  )}
-                  {hotelName && <span className="text-xs text-muted-foreground">{hotelName} • {contextHotelCode}</span>}
-                </div>
-              </div>
-            </div>
-            {isFree && <UpgradeButton variant="outline" size="sm" className="h-8 px-4 text-xs" />}
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <Badge variant={realtimeSync.isConnected ? "default" : "destructive"} className="h-8 gap-2">
-              <div className={`h-2 w-2 rounded-full ${realtimeSync.isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              {realtimeSync.isConnected ? t.dashboard.realtimeActive : t.dashboard.disconnected}
-            </Badge>
-            <GuidedDistributionWizard 
-              onStartWorkflow={() => setActiveTab('overview')} 
-            />
-            <Button asChild><a href="/housekeeper/auth"><UserIcon className="mr-2 h-4 w-4" />{t.housekeeper.staffArea}</a></Button>
-            <DailyReportCloseButton hotelId={currentHotelId || ''} onReportClosed={() => window.location.reload()} />
-            <NotificationBell />
-            <UserMenu />
-          </div>
-        </div>
-
-        <NotificationSound />
+      <NotificationSound />
+      
+      <MainLayout
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isPremium={isPremium}
+        isFree={isFree}
+        isGuestMode={isGuestMode}
+        isConnected={realtimeSync.isConnected}
+        hotelName={hotelName || undefined}
+        hotelCode={contextHotelCode || undefined}
+        currentHotelId={currentHotelId}
+        subscriptionLoading={subscriptionLoading}
+        onStartWorkflow={() => setActiveTab('overview')}
+      >
         <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" orientation="vertical">
-          <div className="flex gap-6">
-            {/* Sidebar */}
-            <div className="hidden md:flex flex-col w-56 shrink-0">
-              <TabsList className="flex flex-col h-auto bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl p-2 sticky top-4 shadow-lg">
-                <TabsTrigger value="overview" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Layers className="h-5 w-5" /><span>{t.dashboard.overview}</span>
-                </TabsTrigger>
-                <TabsTrigger value="rooms" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Bed className="h-5 w-5" /><span>{t.dashboard.rooms}</span>
-                </TabsTrigger>
-                <TabsTrigger value="assignment" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <UserIcon className="h-5 w-5" /><span>{t.dashboard.assignment}</span>
-                </TabsTrigger>
-                <TabsTrigger value="access-codes" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all relative">
-                  <Key className="h-5 w-5" /><span>{t.dashboard.accessCodes}</span>
-                  <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse">!</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="linen" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <span className="text-lg">🧺</span><span>{t.dashboard.linenInventory}</span>
-                </TabsTrigger>
-                <TabsTrigger value="incidents" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <AlertTriangle className="h-5 w-5" /><span>{t.dashboard.incidents}</span>
-                </TabsTrigger>
-                <TabsTrigger value="reports" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <FileText className="h-5 w-5" /><span>{t.dashboard.reports}</span>
-                </TabsTrigger>
-                <TabsTrigger value="training" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Brain className="h-5 w-5" /><span>{t.dashboard.aiTraining}</span>
-                </TabsTrigger>
-                <TabsTrigger value="archives" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Archive className="h-5 w-5" /><span>{t.dashboard.archives}</span>
-                </TabsTrigger>
-                <TabsTrigger value="invitations" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Mail className="h-5 w-5" /><span>{t.dashboard.invitations}</span>
-                </TabsTrigger>
-                <TabsTrigger value="inspections" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <ClipboardCheck className="h-5 w-5" /><span>{t.dashboard.inspections}</span>
-                </TabsTrigger>
-                <TabsTrigger value="lost-found" className="w-full justify-start gap-3 px-4 py-3 text-left data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg transition-all">
-                  <Package className="h-5 w-5" /><span>Objets Trouvés</span>
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            
-            {/* Main Content */}
-            <div className="flex-1 min-w-0">
-              <TabsContent value="overview" className="space-y-6 mt-0">
-                <OverviewTab
-                  rooms={rooms}
-                  housekeeperNames={housekeeperNames}
-                  cleaningConfig={cleaningConfig}
-                  isPremium={isPremium}
-                  currentHotelId={currentHotelId}
-                  roomStats={roomStats}
-                  onPdfProcessed={handlePdfProcessed}
-                  onConfigChange={handleConfigChange}
-                  onHousekeeperNamesChange={handleHousekeeperNamesChange}
-                  onDistribute={handleDistributeWithValidation}
+        <div className="space-y-6 mt-6">
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <OverviewTab
+              rooms={rooms}
+              housekeeperNames={housekeeperNames}
+              cleaningConfig={cleaningConfig}
+              isPremium={isPremium}
+              currentHotelId={currentHotelId}
+              roomStats={roomStats}
+              onPdfProcessed={handlePdfProcessed}
+              onConfigChange={handleConfigChange}
+              onHousekeeperNamesChange={handleHousekeeperNamesChange}
+              onDistribute={handleDistributeWithValidation}
+            />
+          )}
+
+          {/* Rooms Tab */}
+          {activeTab === 'rooms' && (
+            <RoomManagementTab
+              rooms={rooms}
+              housekeeperNames={housekeeperNames}
+              currentHotelId={currentHotelId}
+              onPdfProcessed={handlePdfProcessed}
+              onAddRoom={handleAddRoom}
+              onRoomUpdate={handleRoomUpdate}
+              onRoomUnassign={handleRoomUnassign}
+              onRoomReassign={handleRoomReassign}
+              onOpenManualAssignment={() => openManualAssignment()}
+              onDeleteRoom={handleDeleteRoom}
+              onLinkRooms={(roomNumber) => { 
+                const room = rooms.find(r => r.number === roomNumber);
+                if (room) { setSelectedRoom(room); setShowLinkDialog(true); }
+              }}
+            />
+          )}
+
+          {/* Assignment Tab */}
+          {activeTab === 'assignment' && (
+            <AssignmentTab
+              rooms={rooms}
+              housekeeperNames={housekeeperNames}
+              housekeepers={housekeepers}
+              cleaningConfig={cleaningConfig}
+              currentHotelId={currentHotelId}
+              hotelId={currentHotelId || ''}
+              availableFloors={availableFloors}
+              housekeeperFloorPreferences={housekeeperFloorPreferences}
+              housekeeperMaxRoomsOverrides={housekeeperMaxRoomsOverrides}
+              isDistributed={isDistributed}
+              onPdfProcessed={handlePdfProcessed}
+              onRedistribute={handleRedistribute}
+              onRoomUpdate={handleRoomUpdate}
+              onRoomUnassign={handleRoomUnassign}
+              onRoomReassign={handleRoomReassign}
+              onDirectAssign={handleDirectRoomAssignment}
+              onFloorPreferenceChange={(name, floors) => setHousekeeperFloorPreferences(prev => ({ ...prev, [name]: floors }))}
+              onDeleteHousekeeper={handleDeleteHousekeeper}
+              onMaxRoomsOverrideChange={(name, maxRooms) => setHousekeeperMaxRoomsOverrides(prev => ({ ...prev, [name]: maxRooms || 0 }))}
+              onRenameHousekeeper={handleRenameHousekeeper}
+              onGenerateReport={handleGenerateReport}
+              onGenerateAccessCode={async (name) => housekeepers.find(h => h.name === name)?.access_code || ''}
+              onOpenManualAssignment={openManualAssignment}
+              setActiveTab={(tab: string) => setActiveTab(tab as TabValue)}
+            />
+          )}
+
+          {/* Access Codes Tab */}
+          {activeTab === 'access-codes' && (
+            <PremiumLimitGuard 
+              feature="access_codes" 
+              title="Codes d'accès"
+              description="Gérez les codes d'accès de vos femmes de chambre avec la version Premium."
+            >
+              <AccessCodesTab currentHotelId={currentHotelId} />
+            </PremiumLimitGuard>
+          )}
+
+          {/* Linen Tab */}
+          {activeTab === 'linen' && (
+            <PremiumLimitGuard 
+              feature="linen_inventory" 
+              title="Inventaire du linge"
+              description="Gérez l'inventaire du linge de votre établissement avec la version Premium."
+            >
+              <LinenTab currentHotelId={currentHotelId} />
+            </PremiumLimitGuard>
+          )}
+
+          {/* Incidents Tab */}
+          {activeTab === 'incidents' && (
+            <PremiumLimitGuard 
+              feature="incidents" 
+              title="Gestion des incidents"
+              description="Suivez et gérez les incidents de votre établissement avec la version Premium."
+            >
+              <IncidentsTab currentHotelId={currentHotelId} />
+            </PremiumLimitGuard>
+          )}
+
+          {/* Reports Tab */}
+          {activeTab === 'reports' && (
+            <ReportsTab
+              rooms={rooms}
+              housekeeperNames={housekeeperNames}
+              cleaningConfig={cleaningConfig}
+              isDistributed={isDistributed}
+              hotelId={currentHotelId || undefined}
+              onGenerateReport={handleGenerateReport}
+              onGenerateAllReports={handleGenerateAllReports}
+            />
+          )}
+
+          {/* Training Tab */}
+          {activeTab === 'training' && (
+            <TrainingTab currentHotelId={currentHotelId} />
+          )}
+
+          {/* Archives Tab */}
+          {activeTab === 'archives' && (
+            <ArchivesTab currentHotelId={currentHotelId} />
+          )}
+
+          {/* Invitations Tab */}
+          {activeTab === 'invitations' && (
+            <PremiumLimitGuard 
+              feature="invitations" 
+              title="Invitations du personnel"
+              description="Gérez les invitations de votre personnel avec un abonnement payant."
+            >
+              <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotelName || undefined} />
+            </PremiumLimitGuard>
+          )}
+
+          {/* Inspections Tab */}
+          {activeTab === 'inspections' && (
+            <PremiumLimitGuard 
+              feature="inspection" 
+              title="Inspection des chambres"
+              description="Inspectez et validez le nettoyage des chambres avec la version Premium."
+            >
+              {currentHotelId && (
+                <GovernessInspectionInterface
+                  hotelId={currentHotelId}
+                  governessName="Gouvernante"
                 />
-              </TabsContent>
+              )}
+            </PremiumLimitGuard>
+          )}
 
-              <TabsContent value="rooms" className="space-y-6">
-                <RoomManagementTab
-                  rooms={rooms}
-                  housekeeperNames={housekeeperNames}
-                  currentHotelId={currentHotelId}
-                  onPdfProcessed={handlePdfProcessed}
-                  onAddRoom={handleAddRoom}
-                  onRoomUpdate={handleRoomUpdate}
-                  onRoomUnassign={handleRoomUnassign}
-                  onRoomReassign={handleRoomReassign}
-                  onOpenManualAssignment={() => openManualAssignment()}
-                  onDeleteRoom={handleDeleteRoom}
-                  onLinkRooms={(roomNumber) => { 
-                    const room = rooms.find(r => r.number === roomNumber);
-                    if (room) { setSelectedRoom(room); setShowLinkDialog(true); }
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent value="assignment" className="space-y-6">
-                <AssignmentTab
-                  rooms={rooms}
-                  housekeeperNames={housekeeperNames}
-                  housekeepers={housekeepers}
-                  cleaningConfig={cleaningConfig}
-                  currentHotelId={currentHotelId}
-                  hotelId={currentHotelId || ''}
-                  availableFloors={availableFloors}
-                  housekeeperFloorPreferences={housekeeperFloorPreferences}
-                  housekeeperMaxRoomsOverrides={housekeeperMaxRoomsOverrides}
-                  isDistributed={isDistributed}
-                  onPdfProcessed={handlePdfProcessed}
-                  onRedistribute={handleRedistribute}
-                  onRoomUpdate={handleRoomUpdate}
-                  onRoomUnassign={handleRoomUnassign}
-                  onRoomReassign={handleRoomReassign}
-                  onDirectAssign={handleDirectRoomAssignment}
-                  onFloorPreferenceChange={(name, floors) => setHousekeeperFloorPreferences(prev => ({ ...prev, [name]: floors }))}
-                  onDeleteHousekeeper={handleDeleteHousekeeper}
-                  onMaxRoomsOverrideChange={(name, maxRooms) => setHousekeeperMaxRoomsOverrides(prev => ({ ...prev, [name]: maxRooms || 0 }))}
-                  onRenameHousekeeper={handleRenameHousekeeper}
-                  onGenerateReport={handleGenerateReport}
-                  onGenerateAccessCode={async (name) => housekeepers.find(h => h.name === name)?.access_code || ''}
-                  onOpenManualAssignment={openManualAssignment}
-                  setActiveTab={setActiveTab}
-                />
-              </TabsContent>
-
-              <TabsContent value="access-codes" className="space-y-6">
-                <PremiumLimitGuard 
-                  feature="access_codes" 
-                  title="Codes d'accès"
-                  description="Gérez les codes d'accès de vos femmes de chambre avec la version Premium."
-                >
-                  <AccessCodesTab currentHotelId={currentHotelId} />
-                </PremiumLimitGuard>
-              </TabsContent>
-
-              <TabsContent value="linen" className="space-y-6">
-                <PremiumLimitGuard 
-                  feature="linen_inventory" 
-                  title="Inventaire du linge"
-                  description="Gérez l'inventaire du linge de votre établissement avec la version Premium."
-                >
-                  <LinenTab currentHotelId={currentHotelId} />
-                </PremiumLimitGuard>
-              </TabsContent>
-
-              <TabsContent value="incidents" className="space-y-6">
-                <PremiumLimitGuard 
-                  feature="incidents" 
-                  title="Gestion des incidents"
-                  description="Suivez et gérez les incidents de votre établissement avec la version Premium."
-                >
-                  <IncidentsTab currentHotelId={currentHotelId} />
-                </PremiumLimitGuard>
-              </TabsContent>
-
-              <TabsContent value="reports" className="space-y-6">
-                <ReportsTab
-                  rooms={rooms}
-                  housekeeperNames={housekeeperNames}
-                  cleaningConfig={cleaningConfig}
-                  isDistributed={isDistributed}
-                  hotelId={currentHotelId || undefined}
-                  onGenerateReport={handleGenerateReport}
-                  onGenerateAllReports={handleGenerateAllReports}
-                />
-              </TabsContent>
-
-              <TabsContent value="training" className="space-y-6">
-                <TrainingTab currentHotelId={currentHotelId} />
-              </TabsContent>
-
-              <TabsContent value="archives" className="space-y-6">
-                <ArchivesTab currentHotelId={currentHotelId} />
-              </TabsContent>
-
-              <TabsContent value="invitations" className="space-y-6">
-                <PremiumLimitGuard 
-                  feature="invitations" 
-                  title="Invitations du personnel"
-                  description="Gérez les invitations de votre personnel avec un abonnement payant."
-                >
-                  <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotelName || undefined} />
-                </PremiumLimitGuard>
-              </TabsContent>
-
-              <TabsContent value="inspections" className="space-y-6">
-                <PremiumLimitGuard 
-                  feature="inspection" 
-                  title="Inspection des chambres"
-                  description="Inspectez et validez le nettoyage des chambres avec la version Premium."
-                >
-                  {currentHotelId && (
-                    <GovernessInspectionInterface
-                      hotelId={currentHotelId}
-                      governessName="Gouvernante"
-                    />
-                  )}
-                </PremiumLimitGuard>
-              </TabsContent>
-
-              <TabsContent value="lost-found" className="space-y-6">
-                <PremiumLimitGuard 
-                  feature="lost_found" 
-                  title="Objets Trouvés"
-                  description="Gérez les objets trouvés et leur restitution aux clients avec la version Premium."
-                >
-                  <LostAndFoundTab currentHotelId={currentHotelId} />
-                </PremiumLimitGuard>
-              </TabsContent>
-            </div>
-          </div>
-        </Tabs>
-      </div>
+          {/* Lost & Found Tab */}
+          {activeTab === 'lost-found' && (
+            <PremiumLimitGuard 
+              feature="lost_found" 
+              title="Objets Trouvés"
+              description="Gérez les objets trouvés et leur restitution aux clients avec la version Premium."
+            >
+              <LostAndFoundTab currentHotelId={currentHotelId} />
+            </PremiumLimitGuard>
+          )}
+        </div>
+      </MainLayout>
 
       {/* Dialogs */}
       <ManualAssignmentDialog
@@ -871,7 +798,6 @@ const IndexDashboard = () => {
         housekeeperNames={housekeeperNames}
         onAddHousekeeper={() => {
           setIsRedistributionDialogOpen(false);
-          // Navigate to access codes tab to add a housekeeper
           setActiveTab('access-codes');
         }}
       />
@@ -881,7 +807,7 @@ const IndexDashboard = () => {
         onClose={() => setShowActionLogPanel(false)}
         hotelId={currentHotelId || ''}
       />
-    </div>
+    </>
   );
 };
 
