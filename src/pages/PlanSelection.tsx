@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription, PLAN_CONFIGS, PlanType } from '@/hooks/useSubscription';
 import { Navigate } from 'react-router-dom';
@@ -6,21 +6,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Crown, Star, Diamond, Zap, Check, X, ArrowRight, Gift, Loader2 } from 'lucide-react';
+import { Crown, Star, Diamond, Zap, Check, X, ArrowRight, Gift, Loader2, Building2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingConfig } from '@/hooks/use-pricing-config';
 import { checkoutErrorDescription, detectCheckoutErrorKind, extractErrorMessage } from '@/utils/checkoutErrors';
+import { useHotel } from '@/contexts/HotelContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+// Seuil au-dessus duquel le plan Entreprise est obligatoire
+const ENTERPRISE_THRESHOLD = 170;
 
 const PlanSelection = () => {
   const { isAuthenticated, loading, user } = useAuth();
   const { plan: currentPlan, isPremium, isFree, loading: subscriptionLoading, isInTrial } = useSubscription();
+  const { hotelId } = useHotel();
   const [promoCode, setPromoCode] = useState('');
   const [promoValidating, setPromoValidating] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState<{ type: string; value: number } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [roomCount, setRoomCount] = useState<number>(0);
   const { toast } = useToast();
   const { byPlan: pricingByPlan } = usePricingConfig();
+
+  // Récupérer le nombre de chambres de l'hôtel
+  useEffect(() => {
+    const fetchRoomCount = async () => {
+      if (!hotelId) return;
+      
+      const { count } = await supabase
+        .from('rooms')
+        .select('*', { count: 'exact', head: true })
+        .eq('hotel_id', hotelId);
+      
+      setRoomCount(count || 0);
+    };
+    
+    fetchRoomCount();
+  }, [hotelId]);
+
+  const requiresEnterprise = roomCount > ENTERPRISE_THRESHOLD;
 
   if (!loading && !isAuthenticated) {
     return <Navigate to="/auth" replace />;
@@ -74,6 +99,16 @@ const PlanSelection = () => {
   };
 
   const handleSubscribe = async (planType: PlanType) => {
+    // Vérifier si l'utilisateur doit obligatoirement prendre Entreprise
+    if (requiresEnterprise && planType !== 'platinum') {
+      toast({
+        variant: 'destructive',
+        title: 'Plan insuffisant',
+        description: `Votre établissement de ${roomCount} chambres nécessite le plan Entreprise.`,
+      });
+      return;
+    }
+
     if (planType === 'freemium') {
       window.location.href = '/';
       return;
@@ -124,12 +159,36 @@ const PlanSelection = () => {
     }
   };
 
-  const plans: { type: PlanType; icon: typeof Crown; popular?: boolean; trial?: boolean }[] = [
-    { type: 'freemium', icon: Zap },
-    { type: 'basic', icon: Star, trial: true },
-    { type: 'basic_plus', icon: Star },
-    { type: 'premium', icon: Crown, popular: true, trial: true },
-    { type: 'platinum', icon: Diamond }
+  // Plans ordonnés par prix croissant avec logique claire
+  const plans: { type: PlanType; icon: typeof Crown; popular?: boolean; trial?: boolean; description: string }[] = [
+    { 
+      type: 'freemium', 
+      icon: Zap,
+      description: 'Pour tester la plateforme'
+    },
+    { 
+      type: 'basic', 
+      icon: Building2, 
+      trial: true,
+      description: 'Petits établissements'
+    },
+    { 
+      type: 'premium', 
+      icon: Star, 
+      popular: true, 
+      trial: true,
+      description: 'Établissements moyens'
+    },
+    { 
+      type: 'basic_plus', 
+      icon: Crown,
+      description: 'Grands établissements'
+    },
+    { 
+      type: 'platinum', 
+      icon: Diamond,
+      description: 'Groupes & chaînes hôtelières'
+    }
   ];
 
   const getFeatureList = (planType: PlanType) => {
@@ -139,7 +198,13 @@ const PlanSelection = () => {
     features.push({ name: 'Analyse PDF automatique', included: true });
     features.push({ name: 'Distribution automatique', included: true });
     features.push({ name: 'Téléchargement rapports', included: true });
-    features.push({ name: `Max ${config.maxRooms || '∞'} chambres`, included: true });
+    
+    if (config.maxRooms) {
+      features.push({ name: `Jusqu'à ${config.maxRooms} chambres`, included: true });
+    } else {
+      features.push({ name: 'Chambres illimitées', included: true });
+    }
+    
     features.push({ name: 'Gestion incidents', included: config.features.incidents });
     features.push({ name: 'Inventaire linge', included: config.features.linen_inventory });
     features.push({ name: 'Inspection chambres', included: config.features.inspection });
@@ -156,6 +221,12 @@ const PlanSelection = () => {
     return Math.max(0, price - promoDiscount.value);
   };
 
+  // Vérifie si un plan est accessible (pas bloqué par le seuil)
+  const isPlanAccessible = (planType: PlanType) => {
+    if (!requiresEnterprise) return true;
+    return planType === 'platinum';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-7xl mx-auto py-8">
@@ -166,12 +237,25 @@ const PlanSelection = () => {
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             {isInTrial ? 
               `Vous êtes en période d'essai. Choisissez un plan pour continuer après l'essai.` :
-              'Basic et Premium: 3 mois offerts sans engagement'}
+              'Essentiel et Confort : 3 mois offerts sans engagement'}
           </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Premier prélèvement le 1er {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-          </p>
+          {roomCount > 0 && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Votre établissement : <strong>{roomCount} chambres</strong>
+            </p>
+          )}
         </div>
+
+        {/* Alerte si plan Entreprise obligatoire */}
+        {requiresEnterprise && (
+          <Alert className="max-w-2xl mx-auto mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              <strong>Établissement de plus de {ENTERPRISE_THRESHOLD} chambres</strong> : 
+              Le plan <strong>Entreprise</strong> est requis pour votre établissement de {roomCount} chambres.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Code promo */}
         <div className="max-w-md mx-auto mb-8">
@@ -202,27 +286,35 @@ const PlanSelection = () => {
 
         {/* Plans */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {plans.map(({ type, icon: Icon, popular, trial }) => {
+          {plans.map(({ type, icon: Icon, popular, trial, description }) => {
             const config = PLAN_CONFIGS[type];
             const isCurrentPlan = currentPlan === type;
             const price = config.price;
             const discountedPrice = getDiscountedPrice(price);
             const isPlanActive = pricingByPlan[type]?.is_active ?? true;
+            const isAccessible = isPlanAccessible(type);
+            const isDisabled = !isAccessible || !isPlanActive;
+            
             return (
               <Card 
                 key={type} 
                 className={`relative transition-all duration-300 ${
-                  popular ? 'ring-2 ring-primary shadow-xl scale-105' : ''
-                } ${isCurrentPlan ? 'ring-2 ring-green-500' : ''} ${!isPlanActive ? 'opacity-70' : ''}`}
+                  popular && !isDisabled ? 'ring-2 ring-primary shadow-xl scale-105' : ''
+                } ${isCurrentPlan ? 'ring-2 ring-green-500' : ''} ${isDisabled ? 'opacity-50 grayscale' : ''}`}
               >
-                {popular && (
+                {popular && !isDisabled && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
                     Populaire
                   </Badge>
                 )}
-                {trial && (
+                {trial && !isDisabled && (
                   <Badge className="absolute -top-3 right-2 bg-amber-500">
                     3 mois offerts
+                  </Badge>
+                )}
+                {!isAccessible && requiresEnterprise && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-destructive">
+                    Trop petit
                   </Badge>
                 )}
                 
@@ -231,6 +323,7 @@ const PlanSelection = () => {
                     <Icon className="h-6 w-6" />
                   </div>
                   <CardTitle>{config.displayName}</CardTitle>
+                  <CardDescription className="text-xs">{description}</CardDescription>
                   <div className="mt-2">
                     {price === 0 ? (
                       <span className="text-3xl font-bold">Gratuit</span>
@@ -266,14 +359,16 @@ const PlanSelection = () => {
 
                   <Button 
                     className="w-full"
-                    variant={isCurrentPlan ? 'outline' : popular ? 'default' : 'secondary'}
-                    disabled={isCurrentPlan || checkoutLoading === type || !isPlanActive}
+                    variant={isCurrentPlan ? 'outline' : (popular && !isDisabled) ? 'default' : 'secondary'}
+                    disabled={isCurrentPlan || checkoutLoading === type || isDisabled}
                     onClick={() => handleSubscribe(type)}
                   >
                     {checkoutLoading === type ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : isCurrentPlan ? (
                       'Plan actuel'
+                    ) : !isAccessible ? (
+                      'Capacité insuffisante'
                     ) : !isPlanActive ? (
                       'Indisponible'
                     ) : type === 'freemium' ? (
