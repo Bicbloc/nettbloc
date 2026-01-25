@@ -7,11 +7,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowRight, Zap, CheckCircle2, Info, ArrowLeft, Eye, Settings2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowRight, Zap, CheckCircle2, Info, ArrowLeft, Eye, Settings2, AlertTriangle, RefreshCw, Columns, GripVertical, X, Plus, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { TrainingData } from './TrainingWizard';
-import { detectReportFormat, getFormatDescription, CleaningIndicator, ParsedRow } from '@/services/training/ReportFormatDetector';
+import { detectReportFormat, getFormatDescription, CleaningIndicator, ParsedRow, ColumnType } from '@/services/training/ReportFormatDetector';
 import { normalizeCleaningType, CleaningType } from '@/constants/cleaningTypes';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Types de nettoyage disponibles
 const CLEANING_OPTIONS = [
@@ -21,6 +24,30 @@ const CLEANING_OPTIONS = [
   { value: 'out_of_service', label: 'Hors service', description: 'Chambre bloquée', color: 'bg-purple-500', textColor: 'text-purple-700' },
   { value: 'exclude', label: 'Exclure', description: 'Ignorer cette ligne', color: 'bg-red-500', textColor: 'text-red-700' },
 ];
+
+// Types de colonnes disponibles
+const COLUMN_TYPES: { value: ColumnType; label: string; icon: string }[] = [
+  { value: 'room_number', label: 'N° Chambre', icon: '🚪' },
+  { value: 'room_type', label: 'Type chambre', icon: '🏠' },
+  { value: 'status', label: 'Statut', icon: '📊' },
+  { value: 'guest_name', label: 'Nom client', icon: '👤' },
+  { value: 'arrival_date', label: 'Date arrivée', icon: '📅' },
+  { value: 'departure_date', label: 'Date départ', icon: '📅' },
+  { value: 'arrival_time', label: 'Heure arrivée', icon: '⏰' },
+  { value: 'departure_time', label: 'Heure départ', icon: '⏰' },
+  { value: 'night_info', label: 'Info nuit', icon: '🌙' },
+  { value: 'assignee', label: 'Assigné', icon: '👷' },
+  { value: 'notes', label: 'Notes', icon: '📝' },
+  { value: 'other', label: 'Autre', icon: '❓' },
+];
+
+interface ColumnConfig {
+  id: string;
+  name: string;
+  type: ColumnType;
+  enabled: boolean;
+  order: number;
+}
 
 interface StatusMapping {
   [key: string]: CleaningType | 'out_of_service' | 'exclude' | '';
@@ -37,6 +64,7 @@ export interface MappingConfig {
   formatDetected: string;
   statusMappings: StatusMapping;
   exclusionPatterns: string[];
+  columnConfig?: ColumnConfig[];
 }
 
 export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingProps> = ({
@@ -49,6 +77,8 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
   const [statusMappings, setStatusMappings] = useState<StatusMapping>({});
   const [activeTab, setActiveTab] = useState('preview');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([]);
+  const [editingColumn, setEditingColumn] = useState<string | null>(null);
 
   // Détecter le format et parser le rapport
   const analysis = useMemo(() => {
@@ -74,6 +104,59 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
     }
     setStatusMappings(initialMappings);
   }, [analysis.indicators]);
+
+  // Initialiser la configuration des colonnes
+  useEffect(() => {
+    const initialColumns: ColumnConfig[] = analysis.structure.suggestedColumns.map((col, idx) => ({
+      id: `col-${idx}`,
+      name: col.name,
+      type: col.type as ColumnType,
+      enabled: col.isRelevantForCleaning,
+      order: idx,
+    }));
+    setColumnConfigs(initialColumns);
+  }, [analysis.structure.suggestedColumns]);
+
+  // Colonnes activées et triées
+  const activeColumns = useMemo(() => {
+    return [...columnConfigs]
+      .filter(c => c.enabled)
+      .sort((a, b) => a.order - b.order);
+  }, [columnConfigs]);
+
+  // Handlers pour la gestion des colonnes
+  const toggleColumn = (id: string) => {
+    setColumnConfigs(prev => prev.map(c => 
+      c.id === id ? { ...c, enabled: !c.enabled } : c
+    ));
+  };
+
+  const updateColumnType = (id: string, type: ColumnType) => {
+    setColumnConfigs(prev => prev.map(c => 
+      c.id === id ? { ...c, type } : c
+    ));
+  };
+
+  const updateColumnName = (id: string, name: string) => {
+    setColumnConfigs(prev => prev.map(c => 
+      c.id === id ? { ...c, name } : c
+    ));
+    setEditingColumn(null);
+  };
+
+  const moveColumn = (id: string, direction: 'up' | 'down') => {
+    setColumnConfigs(prev => {
+      const idx = prev.findIndex(c => c.id === id);
+      if (idx === -1) return prev;
+      
+      const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (newIdx < 0 || newIdx >= prev.length) return prev;
+      
+      const newConfigs = [...prev];
+      [newConfigs[idx].order, newConfigs[newIdx].order] = [newConfigs[newIdx].order, newConfigs[idx].order];
+      return newConfigs.sort((a, b) => a.order - b.order);
+    });
+  };
 
   // Recalculer les stats en fonction des mappings manuels
   const stats = useMemo(() => {
@@ -183,6 +266,7 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
       formatDetected: analysis.format,
       statusMappings,
       exclusionPatterns: [],
+      columnConfig: columnConfigs,
     };
 
     onComplete({
@@ -366,36 +450,161 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
           </Card>
         </TabsContent>
 
-        {/* Tab Colonnes détectées */}
+        {/* Tab Colonnes - Configuration interactive */}
         <TabsContent value="columns" className="mt-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Structure des colonnes</CardTitle>
-              <CardDescription>
-                Colonnes détectées automatiquement dans le rapport
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Columns className="h-4 w-4" />
+                    Configuration des colonnes
+                  </CardTitle>
+                  <CardDescription>
+                    Activez, renommez et réordonnez les colonnes selon vos besoins
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {activeColumns.length} / {columnConfigs.length} actives
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {analysis.structure.suggestedColumns.map((col, idx) => (
-                  <Card key={idx} className={`p-3 ${col.isRelevantForCleaning ? 'ring-2 ring-primary/30' : ''}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline" className="text-xs">Col {idx + 1}</Badge>
-                      {col.isRelevantForCleaning && (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <ScrollArea className="h-[400px]">
+                <div className="space-y-2">
+                  {columnConfigs.map((col, idx) => (
+                    <div
+                      key={col.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                        col.enabled 
+                          ? 'bg-card border-primary/30 shadow-sm' 
+                          : 'bg-muted/30 border-muted opacity-60'
+                      }`}
+                    >
+                      {/* Switch activer/désactiver */}
+                      <Switch
+                        checked={col.enabled}
+                        onCheckedChange={() => toggleColumn(col.id)}
+                      />
+                      
+                      {/* Numéro d'ordre */}
+                      <div className="flex flex-col gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => moveColumn(col.id, 'up')}
+                          disabled={idx === 0}
+                        >
+                          <span className="text-xs">▲</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => moveColumn(col.id, 'down')}
+                          disabled={idx === columnConfigs.length - 1}
+                        >
+                          <span className="text-xs">▼</span>
+                        </Button>
+                      </div>
+                      
+                      {/* Nom de la colonne */}
+                      <div className="flex-1 min-w-0">
+                        {editingColumn === col.id ? (
+                          <Input
+                            autoFocus
+                            defaultValue={col.name}
+                            className="h-8 text-sm"
+                            onBlur={(e) => updateColumnName(col.id, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                updateColumnName(col.id, e.currentTarget.value);
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingColumn(null);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm truncate">{col.name}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-50 hover:opacity-100"
+                              onClick={() => setEditingColumn(col.id)}
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Aperçu des valeurs */}
+                        <div className="flex gap-1 mt-1">
+                          {analysis.structure.suggestedColumns[idx]?.sampleValues.slice(0, 2).map((v, i) => (
+                            <Badge key={i} variant="secondary" className="text-[10px] font-mono truncate max-w-[80px]">
+                              {v.substring(0, 15)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Type de colonne */}
+                      <Select
+                        value={col.type}
+                        onValueChange={(value) => updateColumnType(col.id, value as ColumnType)}
+                      >
+                        <SelectTrigger className="w-[150px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50">
+                          {COLUMN_TYPES.map(type => (
+                            <SelectItem key={type.value} value={type.value}>
+                              <span className="flex items-center gap-2">
+                                <span>{type.icon}</span>
+                                <span>{type.label}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      {/* Indicateur important */}
+                      {col.type === 'guest_name' && col.enabled && (
+                        <Badge className="bg-green-100 text-green-800 text-xs">
+                          👤 Client
+                        </Badge>
                       )}
                     </div>
-                    <p className="font-medium text-sm">{col.name}</p>
-                    <p className="text-xs text-muted-foreground">{col.type}</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {col.sampleValues.slice(0, 3).map((v, i) => (
-                        <Badge key={i} variant="secondary" className="text-[10px] font-mono">
-                          {v.substring(0, 12)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </Card>
-                ))}
+                  ))}
+                  
+                  {columnConfigs.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      Aucune colonne détectée dans le rapport.
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
+              
+              {/* Résumé des colonnes actives */}
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground mb-2">Colonnes actives :</p>
+                <div className="flex flex-wrap gap-2">
+                  {activeColumns.map(col => {
+                    const typeInfo = COLUMN_TYPES.find(t => t.value === col.type);
+                    return (
+                      <Badge 
+                        key={col.id} 
+                        variant="outline" 
+                        className="gap-1"
+                      >
+                        <span>{typeInfo?.icon}</span>
+                        <span>{col.name}</span>
+                      </Badge>
+                    );
+                  })}
+                </div>
               </div>
             </CardContent>
           </Card>
