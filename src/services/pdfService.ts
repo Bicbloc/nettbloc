@@ -3,6 +3,33 @@ import * as pdfjs from 'pdfjs-dist';
 import { unifiedParserService, ExtractedRoom, textPreprocessor } from "@/services/pms";
 import { parseRoomLines, RoomLine } from "@/services/pms/RoomLineParser";
 import { detectReportFormat, ParsedRow, type FormatDetection } from "@/services/training/ReportFormatDetector";
+import { supabase } from "@/integrations/supabase/client";
+
+// =========== TYPES POUR LES RÈGLES DE COMBINAISON ===========
+interface HotelCombinationRule {
+  id: string;
+  hotel_id: string;
+  rule_name: string;
+  status_keywords: string[] | null;
+  arrival_date: string; // 'present' | 'absent' | 'any'
+  departure_date: string;
+  arrival_time: string;
+  departure_time: string;
+  night_info: string;
+  result_cleaning_type: string; // 'full' | 'quick' | 'none'
+  priority: number;
+  is_active: boolean;
+}
+
+interface RoomContext {
+  hasArrivalDate: boolean;
+  hasDepartureDate: boolean;
+  hasArrivalTime: boolean;
+  hasDepartureTime: boolean;
+  hasNightInfo: boolean;
+  statusKeywords: string[];
+  rawLine: string;
+}
 
 // Initialiser le worker PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -62,6 +89,168 @@ export const getDefaultCleaningConfig = (isPremium: boolean = false): CleaningCo
 });
 
 export const defaultCleaningConfig: CleaningConfig = getDefaultCleaningConfig(false);
+
+// =========== FONCTIONS POUR LES RÈGLES DE COMBINAISON ===========
+
+/**
+ * Charge les règles de combinaison depuis la base de données
+ */
+async function loadHotelCombinationRules(hotelId: string): Promise<HotelCombinationRule[]> {
+  try {
+    const { data, error } = await supabase
+      .from('hotel_combination_rules')
+      .select('*')
+      .eq('hotel_id', hotelId)
+      .eq('is_active', true)
+      .order('priority', { ascending: false });
+    
+    if (error) {
+      console.warn('Erreur lors du chargement des règles de combinaison:', error);
+      return [];
+    }
+    
+    console.log(`📋 ${data?.length || 0} règles de combinaison chargées pour l'hôtel`);
+    return (data || []) as HotelCombinationRule[];
+  } catch (err) {
+    console.warn('Exception lors du chargement des règles:', err);
+    return [];
+  }
+}
+
+/**
+ * Extrait le contexte d'une ligne parsée pour le matching des règles
+ */
+function extractRoomContext(row: ParsedRow): RoomContext {
+  // Extraire les mots-clés de statut de la ligne brute
+  const statusKeywords: string[] = [];
+  const rawLineUpper = row.rawLine.toUpperCase();
+  
+  // Détecter les statuts courants
+  const knownStatuses = ['DIR', 'INS', 'PRO', 'SAL', 'PARTI', 'RECOUCHE', 'ARRIVÉE', 'ARRIVEE', 'DEPART', 'CHECKOUT', 'CHECKIN'];
+  for (const status of knownStatuses) {
+    if (rawLineUpper.includes(status)) {
+      statusKeywords.push(status);
+    }
+  }
+  
+  // Ajouter le statut détecté si présent
+  if (row.cleaningStatus && !statusKeywords.includes(row.cleaningStatus.toUpperCase())) {
+    statusKeywords.push(row.cleaningStatus.toUpperCase());
+  }
+  
+  return {
+    hasArrivalDate: !!row.arrivalDate && row.arrivalDate.length > 0,
+    hasDepartureDate: !!row.departureDate && row.departureDate.length > 0,
+    hasArrivalTime: !!row.arrivalTime && row.arrivalTime.length > 0,
+    hasDepartureTime: !!row.departureTime && row.departureTime.length > 0,
+    hasNightInfo: !!row.nightInfo && row.nightInfo.length > 0,
+    statusKeywords,
+    rawLine: row.rawLine,
+  };
+}
+
+/**
+ * Vérifie si une règle de combinaison correspond au contexte d'une chambre
+ */
+function matchesCombinationRule(rule: HotelCombinationRule, context: RoomContext): boolean {
+  // Vérifier les mots-clés de statut
+  if (rule.status_keywords && rule.status_keywords.length > 0) {
+    const hasMatchingKeyword = rule.status_keywords.some(keyword => 
+      context.statusKeywords.some(ctxKw => 
+        ctxKw.toUpperCase().includes(keyword.toUpperCase()) ||
+        keyword.toUpperCase().includes(ctxKw.toUpperCase())
+      )
+    );
+    if (!hasMatchingKeyword) return false;
+  }
+  
+  // Vérifier la date d'arrivée
+  if (rule.arrival_date === 'present' && !context.hasArrivalDate) return false;
+  if (rule.arrival_date === 'absent' && context.hasArrivalDate) return false;
+  
+  // Vérifier la date de départ
+  if (rule.departure_date === 'present' && !context.hasDepartureDate) return false;
+  if (rule.departure_date === 'absent' && context.hasDepartureDate) return false;
+  
+  // Vérifier l'heure d'arrivée
+  if (rule.arrival_time === 'present' && !context.hasArrivalTime) return false;
+  if (rule.arrival_time === 'absent' && context.hasArrivalTime) return false;
+  
+  // Vérifier l'heure de départ
+  if (rule.departure_time === 'present' && !context.hasDepartureTime) return false;
+  if (rule.departure_time === 'absent' && context.hasDepartureTime) return false;
+  
+  // Vérifier l'info nuit
+  if (rule.night_info === 'present' && !context.hasNightInfo) return false;
+  if (rule.night_info === 'absent' && context.hasNightInfo) return false;
+  
+  return true;
+}
+
+/**
+ * Applique les règles de combinaison de l'hôtel aux chambres parsées
+ */
+function applyHotelCombinationRules(
+  rooms: Room[], 
+  rules: HotelCombinationRule[], 
+  parsedRows: ParsedRow[]
+): Room[] {
+  if (rules.length === 0) return rooms;
+  
+  // Créer un map des contextes par numéro de chambre
+  const contextMap = new Map<string, RoomContext>();
+  for (const row of parsedRows) {
+    contextMap.set(row.roomNumber, extractRoomContext(row));
+  }
+  
+  let appliedCount = 0;
+  
+  const updatedRooms = rooms.map(room => {
+    const context = contextMap.get(room.number);
+    if (!context) return room;
+    
+    // Trier les règles par priorité décroissante et chercher la première qui matche
+    const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
+    
+    for (const rule of sortedRules) {
+      if (matchesCombinationRule(rule, context)) {
+        // Appliquer le type de nettoyage de la règle
+        const newCleaningType = 
+          rule.result_cleaning_type === 'full' ? 'a_blanc' :
+          rule.result_cleaning_type === 'quick' ? 'recouche' :
+          rule.result_cleaning_type === 'none' ? 'none' :
+          rule.result_cleaning_type === 'a_blanc' ? 'a_blanc' :
+          rule.result_cleaning_type === 'recouche' ? 'recouche' :
+          room.cleaningType;
+        
+        if (newCleaningType !== room.cleaningType) {
+          console.log(`🔄 Règle "${rule.rule_name}" appliquée à ${room.number}: ${room.cleaningType} → ${newCleaningType}`);
+          appliedCount++;
+          
+          const newPriority: Room['priority'] = newCleaningType === 'a_blanc' ? 'high' : newCleaningType === 'recouche' ? 'medium' : 'low';
+          return {
+            ...room,
+            cleaningType: newCleaningType as Room['cleaningType'],
+            priority: newPriority,
+            isUrgent: newCleaningType === 'a_blanc',
+            notUrgent: newCleaningType === 'none',
+            status: newCleaningType === 'none' ? 'clean' : newCleaningType === 'a_blanc' ? 'checkout' : 'stayover',
+            notes: room.notes ? `${room.notes} | Règle: ${rule.rule_name}` : `Règle: ${rule.rule_name}`,
+          } as Room;
+        }
+        break; // Première règle qui matche, on arrête
+      }
+    }
+    
+    return room;
+  });
+  
+  if (appliedCount > 0) {
+    console.log(`✅ ${appliedCount} chambres modifiées par les règles de combinaison`);
+  }
+  
+  return updatedRooms;
+}
 
 /**
  * Charge la liste d'exclusion depuis localStorage
@@ -383,14 +572,23 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       console.log(`🎯 Utilisation du parser ${formatDetection.format} (comme entraînement IA)`);
       
       const parsedRows = formatDetection.parsedData.rows;
-      const rooms = parsedRows.map(convertParsedRowToRoom);
+      let rooms = parsedRows.map(convertParsedRowToRoom);
       
-      // Statistiques
+      // ===== APPLIQUER LES RÈGLES DE COMBINAISON DE L'HÔTEL =====
+      if (hotelId) {
+        const combinationRules = await loadHotelCombinationRules(hotelId);
+        if (combinationRules.length > 0) {
+          console.log(`🔧 Application de ${combinationRules.length} règles de combinaison personnalisées...`);
+          rooms = applyHotelCombinationRules(rooms, combinationRules, parsedRows);
+        }
+      }
+      
+      // Statistiques après application des règles
       const aBlancCount = rooms.filter(r => r.cleaningType === 'a_blanc').length;
       const recoucheCount = rooms.filter(r => r.cleaningType === 'recouche').length;
       const noneCount = rooms.filter(r => r.cleaningType === 'none').length;
       
-      console.log(`📊 Résultat: ${rooms.length} chambres`);
+      console.log(`📊 Résultat final: ${rooms.length} chambres`);
       console.log(`🔵 À blanc: ${aBlancCount} | 🟢 Recouche: ${recoucheCount} | ⚪ Aucun: ${noneCount}`);
       
       // Créer des RoomLines synthétiques pour la prévisualisation
