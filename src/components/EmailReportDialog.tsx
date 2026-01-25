@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ReportFields } from "@/components/ReportCustomFields";
 import ReportCustomFields from "@/components/ReportCustomFields";
-
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,9 +22,24 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabaseClient } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
-import { FileDown, Plus, Trash2, Save, Users, DoorOpen } from "lucide-react";
+import { FileDown, Plus, Trash2, Save, DoorOpen, FileText } from "lucide-react";
+
+interface ReportTemplate {
+  id: string;
+  name: string;
+  template_type: 'instructions' | 'todo' | 'toknow';
+  content: string[];
+  is_default: boolean;
+}
 
 interface LinenInventoryItem {
   linenTypeId: string;
@@ -73,7 +87,26 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   const [showSaveTemplatePrompt, setShowSaveTemplatePrompt] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [hasUsedTemplate, setHasUsedTemplate] = useState(false);
   const { toast } = useToast();
+
+  // Fetch existing templates for this hotel
+  const { data: templates = [], refetch: refetchTemplates } = useQuery({
+    queryKey: ['report-templates', hotelId],
+    queryFn: async () => {
+      if (!hotelId) return [];
+      const { data, error } = await supabaseClient
+        .from('report_templates')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .order('is_default', { ascending: false })
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      return (data || []) as ReportTemplate[];
+    },
+    enabled: !!hotelId && isOpen
+  });
 
   // Fetch linen types for this hotel
   const { data: linenTypes = [] } = useQuery({
@@ -92,7 +125,38 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
     },
     enabled: !!hotelId && isOpen
   });
-  
+
+  // Group templates by type
+  const instructionTemplates = templates.filter(t => t.template_type === 'instructions');
+  const todoTemplates = templates.filter(t => t.template_type === 'todo');
+  const toknowTemplates = templates.filter(t => t.template_type === 'toknow');
+  const hasTemplates = templates.length > 0;
+
+  // Apply a template
+  const applyTemplate = (template: ReportTemplate) => {
+    setHasUsedTemplate(true);
+    if (template.template_type === 'instructions') {
+      setCustomFields(prev => ({
+        ...prev,
+        generalInstructions: template.content.join('\n')
+      }));
+    } else if (template.template_type === 'todo') {
+      setCustomFields(prev => ({
+        ...prev,
+        toDoItems: template.content
+      }));
+    } else if (template.template_type === 'toknow') {
+      setCustomFields(prev => ({
+        ...prev,
+        toKnowItems: template.content
+      }));
+    }
+    toast({
+      title: "Template appliqué",
+      description: `"${template.name}" a été chargé.`
+    });
+  };
+
   // Initialize housekeeperInstructions object when housekeepers list changes
   useEffect(() => {
     if (!customFields.housekeeperInstructions) {
@@ -102,7 +166,6 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
       }));
     }
     
-    // Add any missing housekeepers
     if (allHousekeepers && allHousekeepers.length > 0) {
       const updatedInstructions = {...(customFields.housekeeperInstructions || {})};
       
@@ -122,7 +185,6 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   // Update instructions field for single housekeeper view
   const handleInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (housekeeperName) {
-      // Single housekeeper mode - update specific instructions
       const updatedInstructions = {...(customFields.housekeeperInstructions || {})};
       updatedInstructions[housekeeperName] = e.target.value;
       
@@ -131,7 +193,6 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
         housekeeperInstructions: updatedInstructions
       }));
     } else {
-      // Legacy support for old format
       setCustomFields(prev => ({
         ...prev,
         instructions: e.target.value
@@ -162,7 +223,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   const handleAddLinenItem = (linenTypeId: string, linenTypeName: string) => {
     const currentInventory = customFields.linenInventory || [];
     if (currentInventory.find(item => item.linenTypeId === linenTypeId)) {
-      return; // Already added
+      return;
     }
     
     setCustomFields(prev => ({
@@ -264,6 +325,7 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
         description: `"${newTemplateName}" a été créé et sera disponible pour vos prochains rapports.`
       });
       
+      refetchTemplates();
       setShowSaveTemplatePrompt(false);
       setNewTemplateName('');
     } catch (error) {
@@ -281,15 +343,14 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // If user has custom content and hasn't been prompted yet, show save prompt
-    if (hotelId && hasCustomContent() && !showSaveTemplatePrompt) {
+    // If user has custom content, hasn't used a template, and hasn't been prompted yet, show save prompt
+    if (hotelId && hasCustomContent() && !hasUsedTemplate && !showSaveTemplatePrompt) {
       setShowSaveTemplatePrompt(true);
       return;
     }
     
     setIsSubmitting(true);
     try {
-      // Pass empty email and hotel name since they're no longer needed
       await onConfirm('', customFields, '');
       onClose();
     } catch (error) {
@@ -358,15 +419,88 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                   </Badge>
                 )}
 
-                {hotelId && (
-                  <Badge variant="outline" className="text-xs">
-                    Option linge
+                {hasTemplates && (
+                  <Badge variant="outline" className="text-xs bg-primary/10">
+                    <FileText className="h-3 w-3 mr-1" />
+                    {templates.length} template{templates.length > 1 ? 's' : ''}
                   </Badge>
                 )}
               </div>
             </div>
           </div>
         </DialogHeader>
+
+        {/* Template Selection Section - Show if templates exist */}
+        {hasTemplates && !showSaveTemplatePrompt && (
+          <div className="border-b bg-primary/5 px-5 py-4 sm:px-6">
+            <div className="flex items-start gap-3">
+              <FileText className="h-5 w-5 text-primary mt-0.5" />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <p className="font-medium text-foreground">
+                    Utiliser un template existant
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Chargez rapidement vos instructions et tâches sauvegardées.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {instructionTemplates.length > 0 && (
+                    <Select onValueChange={(value) => {
+                      const template = instructionTemplates.find(t => t.id === value);
+                      if (template) applyTemplate(template);
+                    }}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="📝 Instructions" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {instructionTemplates.map(t => (
+                          <SelectItem key={t.id} value={t.id} className="text-xs">
+                            {t.name} {t.is_default && '⭐'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {todoTemplates.length > 0 && (
+                    <Select onValueChange={(value) => {
+                      const template = todoTemplates.find(t => t.id === value);
+                      if (template) applyTemplate(template);
+                    }}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="✅ À faire" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {todoTemplates.map(t => (
+                          <SelectItem key={t.id} value={t.id} className="text-xs">
+                            {t.name} {t.is_default && '⭐'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {toknowTemplates.length > 0 && (
+                    <Select onValueChange={(value) => {
+                      const template = toknowTemplates.find(t => t.id === value);
+                      if (template) applyTemplate(template);
+                    }}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="💡 À savoir" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {toknowTemplates.map(t => (
+                          <SelectItem key={t.id} value={t.id} className="text-xs">
+                            {t.name} {t.is_default && '⭐'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Template Save Prompt */}
         {showSaveTemplatePrompt && (
@@ -489,6 +623,8 @@ const EmailReportDialog: React.FC<EmailReportDialogProps> = ({
                       }));
                     }}
                     hotelId={hotelId}
+                    initialToDoItems={customFields.toDoItems}
+                    initialToKnowItems={customFields.toKnowItems}
                   />
                 </div>
               </section>

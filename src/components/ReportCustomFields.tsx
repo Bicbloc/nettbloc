@@ -36,19 +36,46 @@ interface Template {
 interface ReportCustomFieldsProps {
   onChange: (fields: ReportFields) => void;
   hotelId?: string;
+  initialToDoItems?: string[];
+  initialToKnowItems?: string[];
 }
 
-const ReportCustomFields: React.FC<ReportCustomFieldsProps> = ({ onChange, hotelId }) => {
+const ReportCustomFields: React.FC<ReportCustomFieldsProps> = ({ 
+  onChange, 
+  hotelId, 
+  initialToDoItems, 
+  initialToKnowItems 
+}) => {
   const [enableToDo, setEnableToDo] = useState<boolean>(false);
   const [enableToKnow, setEnableToKnow] = useState<boolean>(false);
   const [toDoItems, setToDoItems] = useState<string[]>(Array(5).fill(""));
   const [toKnowItems, setToKnowItems] = useState<string[]>(Array(5).fill(""));
+  const [hasAppliedInitial, setHasAppliedInitial] = useState(false);
   
   // Templates state
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [selectedToDoTemplate, setSelectedToDoTemplate] = useState<string>("");
   const [selectedToKnowTemplate, setSelectedToKnowTemplate] = useState<string>("");
+
+  // Apply initial values from parent if provided
+  useEffect(() => {
+    if (!hasAppliedInitial) {
+      if (initialToDoItems && initialToDoItems.some(item => item.trim())) {
+        const items = [...initialToDoItems];
+        while (items.length < 5) items.push("");
+        setToDoItems(items);
+        setEnableToDo(true);
+      }
+      if (initialToKnowItems && initialToKnowItems.some(item => item.trim())) {
+        const items = [...initialToKnowItems];
+        while (items.length < 5) items.push("");
+        setToKnowItems(items);
+        setEnableToKnow(true);
+      }
+      setHasAppliedInitial(true);
+    }
+  }, [initialToDoItems, initialToKnowItems, hasAppliedInitial]);
 
   // Load templates when hotelId is available
   useEffect(() => {
@@ -57,22 +84,26 @@ const ReportCustomFields: React.FC<ReportCustomFieldsProps> = ({ onChange, hotel
     }
   }, [hotelId]);
 
-  // Auto-apply default templates on load
+  // Auto-apply default templates on load (only if no initial values provided)
   useEffect(() => {
-    if (templates.length > 0) {
+    if (templates.length > 0 && hasAppliedInitial) {
+      // Only apply default templates if we don't already have content from initial values
+      const hasInitialTodo = initialToDoItems && initialToDoItems.some(item => item.trim());
+      const hasInitialToKnow = initialToKnowItems && initialToKnowItems.some(item => item.trim());
+      
       const defaultTodo = templates.find(t => t.template_type === 'todo' && t.is_default);
       const defaultToKnow = templates.find(t => t.template_type === 'toknow' && t.is_default);
       
-      if (defaultTodo) {
+      if (defaultTodo && !hasInitialTodo && !enableToDo) {
         applyTemplate(defaultTodo, 'todo');
         setSelectedToDoTemplate(defaultTodo.id);
       }
-      if (defaultToKnow) {
+      if (defaultToKnow && !hasInitialToKnow && !enableToKnow) {
         applyTemplate(defaultToKnow, 'toknow');
         setSelectedToKnowTemplate(defaultToKnow.id);
       }
     }
-  }, [templates]);
+  }, [templates, hasAppliedInitial]);
 
   const loadTemplates = async () => {
     if (!hotelId) return;
