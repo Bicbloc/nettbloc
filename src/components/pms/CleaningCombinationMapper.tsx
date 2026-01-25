@@ -10,8 +10,15 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Check, X, Minus, Pencil, Sparkles, FileText, ChevronDown, Search, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Check, X, Minus, Pencil, Sparkles, FileText, ChevronDown, Search, AlertCircle, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { RuleTestPanel } from '@/components/training/RuleTestPanel';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { 
   CleaningType, 
   CLEANING_TYPE_LABELS, 
@@ -607,6 +614,9 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
             </div>
           </div>
         )}
+
+        {/* Panel de test des règles en direct */}
+        <RuleTestPanel hotelId={hotelId} rules={rules} />
 
         {/* Training Report Lines Panel */}
         <Collapsible open={linesOpen} onOpenChange={setLinesOpen}>

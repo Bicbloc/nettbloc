@@ -9,6 +9,7 @@ import { TrainingStep2Annotate } from "./TrainingStep2Annotate";
 import { TrainingStep3Result } from "./TrainingStep3Result";
 import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 import { TrainingHistory } from "./TrainingHistory";
+import { TrainingStepHelper } from "./TrainingStepHelper";
 import { unifiedParserService, ExtractedRoom } from "@/services/pms";
 
 interface TrainingWizardProps {
@@ -27,10 +28,10 @@ export interface TrainingData {
 
 // Workflow en 4 étapes: Import → Colonnes/Mapping → Vérifier → Sauvegarder
 const DISPLAY_STEPS = [
-  { id: 1, label: "Importer", icon: Upload },
-  { id: 2, label: "Mapping", icon: Columns },
-  { id: 3, label: "Vérifier", icon: Tag },
-  { id: 4, label: "Sauvegarder", icon: CheckCircle },
+  { id: 1, label: "Importer", icon: Upload, description: "Chargez votre rapport PDF" },
+  { id: 2, label: "Mapping", icon: Columns, description: "Configurez les correspondances" },
+  { id: 3, label: "Vérifier", icon: Tag, description: "Validez les détections" },
+  { id: 4, label: "Sauvegarder", icon: CheckCircle, description: "Enregistrez l'apprentissage" },
 ];
 
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
@@ -146,7 +147,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
       {/* Progress Steps */}
       <Card className="p-6">
-        <div className="flex items-center justify-center gap-4 md:gap-8 mb-8">
+        <div className="flex items-center justify-center gap-4 md:gap-8 mb-6">
           {DISPLAY_STEPS.map((step, index) => {
             const Icon = step.icon;
             const isActive = currentStep === step.id;
@@ -155,23 +156,28 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
             return (
               <div key={step.id} className="flex items-center">
-                <button
-                  onClick={() => isClickable && goToStep(step.id)}
-                  disabled={!isClickable}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all ${
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-lg"
-                      : isCompleted
-                      ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{step.label}</span>
-                </button>
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => isClickable && goToStep(step.id)}
+                    disabled={!isClickable}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all ${
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-lg"
+                        : isCompleted
+                        ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium hidden md:inline">{step.label}</span>
+                  </button>
+                  <span className={`text-xs mt-1 hidden md:block ${isActive ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                    {step.description}
+                  </span>
+                </div>
                 {index < DISPLAY_STEPS.length - 1 && (
                   <div
-                    className={`w-12 md:w-20 h-1 mx-2 md:mx-4 rounded-full ${
+                    className={`w-8 md:w-16 h-1 mx-2 md:mx-4 rounded-full ${
                       isCompleted ? "bg-primary" : "bg-muted"
                     }`}
                   />
@@ -179,6 +185,11 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
               </div>
             );
           })}
+        </div>
+
+        {/* Step Helper - Guide contextuel */}
+        <div className="mb-6">
+          <TrainingStepHelper currentStep={currentStep} variant="expanded" />
         </div>
 
         {/* Step Content */}
