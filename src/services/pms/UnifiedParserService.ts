@@ -241,7 +241,7 @@ class UnifiedParserService {
         this.log(`✅ ${reason}`);
         return {
           cleaningType: rule.result_cleaning_type,
-          status: rule.result_status || (rule.result_cleaning_type === 'a_blanc' ? 'checkout' : 'stayover'),
+          status: rule.result_status || (rule.result_cleaning_type === 'full' ? 'checkout' : 'stayover'),
           reason
         };
       }
