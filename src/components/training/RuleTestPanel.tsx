@@ -181,15 +181,31 @@ export const RuleTestPanel = ({ hotelId, rules }: RuleTestPanelProps) => {
       const lines = data.raw_text.split('\n').filter((l: string) => l.trim());
       const activeRules = rules.filter(r => r.is_active).sort((a, b) => b.priority - a.priority);
       
-      // Détecter les chambres (numéro en début de ligne)
-      const roomPattern = /^\s*(\d{1,4})\s+/;
+      // Patterns pour détecter les chambres selon différents formats PMS
+      // Format Mews/Opera: "101   TWS   DIR" ou "101  SGL  INS"
+      // Format Apaleo: "01  Chambre twin  Parti"
+      const roomPatterns = [
+        /^(\d{2,4})\s+(?:TWS|SGL|DBS|DBL|JSU|TRP|QUA|STU|APT|SUI)\s+(?:DIR|INS|PRO|SAL)/i,  // Mews format
+        /^(\d{1,4})\s+(?:Chambre|Room|Ch\.?)\s/i,  // Apaleo/Generic format
+        /^(\d{1,4})\s+.*(?:Parti|Recouche|Arrivée|En arrivée|Occupé|Vacant)/i,  // Status-based
+        /^\s*(\d{2,4})\s{2,}/  // Simple: numéro suivi d'espaces multiples
+      ];
+      
       const results: TestResult[] = [];
       
       for (const line of lines) {
-        const match = line.match(roomPattern);
-        if (!match) continue;
+        let roomNumber: string | null = null;
         
-        const roomNumber = match[1].padStart(2, '0');
+        // Essayer chaque pattern
+        for (const pattern of roomPatterns) {
+          const match = line.match(pattern);
+          if (match) {
+            roomNumber = match[1];
+            break;
+          }
+        }
+        
+        if (!roomNumber) continue;
         const context = extractContext(line);
         
         // Trouver la règle qui matche (par priorité)
