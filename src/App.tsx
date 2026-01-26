@@ -36,6 +36,13 @@ import { AppBoot } from "./components/AppBoot";
 import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
+// Netto Count App
+import NettoCountAuth from "./pages/netto-count/NettoCountAuth";
+import NettoCountSetup from "./pages/netto-count/NettoCountSetup";
+import NettoCountScan from "./pages/netto-count/NettoCountScan";
+import NettoCountResults from "./pages/netto-count/NettoCountResults";
+import NettoCountHistory from "./pages/netto-count/NettoCountHistory";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -80,6 +87,13 @@ const App = () => (
                               <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
                               <Route path="/governess/auth" element={<GovernessAuth />} />
                               <Route path="/governess/dashboard" element={<GovernessDashboard />} />
+                              {/* Netto Count App Routes */}
+                              <Route path="/netto-count" element={<Navigate to="/netto-count/auth" replace />} />
+                              <Route path="/netto-count/auth" element={<NettoCountAuth />} />
+                              <Route path="/netto-count/setup" element={<NettoCountSetup />} />
+                              <Route path="/netto-count/scan" element={<NettoCountScan />} />
+                              <Route path="/netto-count/results/:scanId" element={<NettoCountResults />} />
+                              <Route path="/netto-count/history" element={<NettoCountHistory />} />
                               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                               <Route path="*" element={<NotFound />} />
                             </Routes>
