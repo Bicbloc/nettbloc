@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -23,6 +26,7 @@ interface SessionDetails {
   user_type: string;
   hotel_id?: string;
   hotel_name?: string;
+  hotel_code?: string;
   login_time: string;
   last_activity: string;
   is_active: boolean;
@@ -30,16 +34,29 @@ interface SessionDetails {
   housekeeper_id?: string;
 }
 
+const PAGE_SIZE = 50;
+
 export function SessionsManagementPanel() {
   const [sessions, setSessions] = useState<SessionDetails[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<SessionDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'admin' | 'housekeeper'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedSession, setSelectedSession] = useState<SessionDetails | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadSessions();
@@ -69,61 +86,39 @@ export function SessionsManagementPanel() {
     };
   }, []);
 
+  // Reload on filter changes
   useEffect(() => {
-    applyFilters();
-  }, [sessions, searchTerm, filterType, filterStatus]);
+    loadSessions();
+  }, [filterType, filterStatus, currentPage]);
 
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
+    setLoading(true);
     try {
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('user_sessions')
-        .select('*')
-        .order('last_activity', { ascending: false })
-        .limit(500);
+      // Use enriched view to eliminate N+1 queries
+      let query = supabase
+        .from('sessions_enriched')
+        .select('*', { count: 'exact' })
+        .order('last_activity', { ascending: false });
+
+      // Apply filters
+      if (filterType !== 'all') {
+        query = query.eq('user_type', filterType);
+      }
+      if (filterStatus === 'active') {
+        query = query.eq('is_active', true);
+      } else if (filterStatus === 'inactive') {
+        query = query.eq('is_active', false);
+      }
+
+      // Pagination
+      query = query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
+
+      const { data: sessionsData, count, error: sessionsError } = await query;
 
       if (sessionsError) throw sessionsError;
 
-      // Enrichir avec les noms d'hôtels et emails
-      const enrichedSessions = await Promise.all(
-        (sessionsData || []).map(async (session) => {
-          let hotelName = 'N/A';
-          let userEmail = '';
-
-          // Récupérer le nom de l'hôtel
-          if (session.hotel_id) {
-            const { data: hotelData } = await supabase
-              .from('hotels')
-              .select('name')
-              .eq('id', session.hotel_id)
-              .single();
-            
-            if (hotelData) {
-              hotelName = hotelData.name;
-            }
-          }
-
-          // Récupérer l'email de l'utilisateur si c'est un admin
-          if (session.user_id) {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('email')
-              .eq('id', session.user_id)
-              .single();
-            
-            if (profileData) {
-              userEmail = profileData.email;
-            }
-          }
-
-          return {
-            ...session,
-            hotel_name: hotelName,
-            user_email: userEmail
-          };
-        })
-      );
-
-      setSessions(enrichedSessions);
+      setSessions(sessionsData || []);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Error loading sessions:', error);
       toast({
@@ -134,35 +129,18 @@ export function SessionsManagementPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterType, filterStatus, currentPage, toast]);
 
-  const applyFilters = () => {
-    let filtered = [...sessions];
-
-    // Filter by search term (inclut email)
-    if (searchTerm) {
-      filtered = filtered.filter(session =>
-        session.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.hotel_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        session.id.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Filter by user type
-    if (filterType !== 'all') {
-      filtered = filtered.filter(session => session.user_type === filterType);
-    }
-
-    // Filter by status
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(session => 
-        filterStatus === 'active' ? session.is_active : !session.is_active
-      );
-    }
-
-    setFilteredSessions(filtered);
-  };
+  const filteredSessions = useMemo(() => {
+    if (!debouncedSearchTerm) return sessions;
+    
+    return sessions.filter(session =>
+      session.user_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      session.user_email?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      session.hotel_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      session.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    );
+  }, [sessions, debouncedSearchTerm]);
 
   const terminateSession = async (sessionId: string) => {
     try {
@@ -251,6 +229,25 @@ export function SessionsManagementPanel() {
     }
   };
 
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const activeCount = sessions.filter(s => s.is_active).length;
+
+  const renderSkeletonRows = () => (
+    Array.from({ length: 10 }).map((_, i) => (
+      <TableRow key={i}>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+      </TableRow>
+    ))
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -261,11 +258,11 @@ export function SessionsManagementPanel() {
               Gestion des Sessions
             </CardTitle>
             <CardDescription>
-              {filteredSessions.length} session(s) • {sessions.filter(s => s.is_active).length} active(s)
+              {totalCount} session(s) • {activeCount} active(s)
             </CardDescription>
           </div>
-          <Button onClick={loadSessions} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button onClick={loadSessions} variant="outline" size="sm" disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
         </div>
@@ -277,7 +274,7 @@ export function SessionsManagementPanel() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par nom, hôtel ou ID..."
+                placeholder="Rechercher par nom, email, hôtel..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -323,13 +320,7 @@ export function SessionsManagementPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
-                    Chargement...
-                  </TableCell>
-                </TableRow>
-              ) : filteredSessions.length === 0 ? (
+              {loading ? renderSkeletonRows() : filteredSessions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     Aucune session trouvée
@@ -337,7 +328,7 @@ export function SessionsManagementPanel() {
                 </TableRow>
               ) : (
                 filteredSessions.map((session) => (
-                  <TableRow key={session.id}>
+                  <TableRow key={session.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-muted-foreground" />
@@ -355,7 +346,7 @@ export function SessionsManagementPanel() {
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        {session.hotel_name}
+                        {session.hotel_name || 'N/A'}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -416,6 +407,43 @@ export function SessionsManagementPanel() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                  const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                  if (page > totalPages) return null;
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </CardContent>
 
       {/* Session Details Dialog */}
@@ -483,19 +511,13 @@ export function SessionsManagementPanel() {
                     {getSessionDuration(selectedSession.login_time, selectedSession.last_activity)}
                   </p>
                 </div>
-                {selectedSession.session_token && (
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Token</Label>
-                    <p className="text-sm font-mono mt-1 truncate">{selectedSession.session_token}</p>
-                  </div>
-                )}
               </div>
             </div>
           )}
           <DialogFooter>
             {selectedSession?.is_active && (
-              <Button
-                variant="destructive"
+              <Button 
+                variant="destructive" 
                 onClick={() => {
                   terminateSession(selectedSession.id);
                   setShowDetails(false);
@@ -513,8 +535,4 @@ export function SessionsManagementPanel() {
       </Dialog>
     </Card>
   );
-}
-
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={className}>{children}</div>;
 }
