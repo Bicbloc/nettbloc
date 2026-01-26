@@ -3742,6 +3742,14 @@ export type Database = {
         }[]
       }
       request_password_reset: { Args: { user_email: string }; Returns: boolean }
+      search_hotel_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          hotel_code: string
+          id: string
+          name: string
+        }[]
+      }
       sync_access_codes_with_housekeepers: { Args: never; Returns: number }
       upsert_rooms_from_pdf: {
         Args: { p_hotel_id: string; p_rooms: Json; p_source?: string }

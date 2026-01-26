@@ -132,15 +132,18 @@ export default function HousekeeperHotels() {
     setIsAddingHotel(true);
 
     try {
-      // Trouver l'hôtel par son code
+      // Trouver l'hôtel par son code via RPC sécurisée (bypass RLS)
       const { data: hotelData, error: hotelError } = await supabase
-        .from('hotels')
-        .select('*')
-        .eq('hotel_code', hotelCode.trim().toUpperCase())
-        .single();
+        .rpc('search_hotel_by_code', { p_code: hotelCode.trim() })
+        .maybeSingle();
 
-      if (hotelError || !hotelData) {
-        throw new Error("Code d'hôtel invalide");
+      if (hotelError) {
+        console.error('Erreur recherche hôtel:', hotelError);
+        throw new Error("Erreur lors de la recherche de l'établissement");
+      }
+      
+      if (!hotelData) {
+        throw new Error("Code d'établissement introuvable. Vérifiez le code auprès de votre responsable.");
       }
 
       // Vérifier si une demande existe déjà
