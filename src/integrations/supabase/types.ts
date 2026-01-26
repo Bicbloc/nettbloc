@@ -2203,6 +2203,177 @@ export type Database = {
           },
         ]
       }
+      netto_count_item_types: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      netto_count_profiles: {
+        Row: {
+          confirmation_sent_at: string | null
+          confirmation_token: string | null
+          created_at: string | null
+          email: string
+          email_confirmed: boolean | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          confirmation_sent_at?: string | null
+          confirmation_token?: string | null
+          created_at?: string | null
+          email: string
+          email_confirmed?: boolean | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          confirmation_sent_at?: string | null
+          confirmation_token?: string | null
+          created_at?: string | null
+          email?: string
+          email_confirmed?: boolean | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      netto_count_results: {
+        Row: {
+          confidence: number | null
+          count: number | null
+          created_at: string | null
+          frame_number: number | null
+          id: string
+          item_name: string
+          item_type_id: string | null
+          notes: string | null
+          scan_id: string
+          source_file: string | null
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          count?: number | null
+          created_at?: string | null
+          frame_number?: number | null
+          id?: string
+          item_name: string
+          item_type_id?: string | null
+          notes?: string | null
+          scan_id: string
+          source_file?: string | null
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          count?: number | null
+          created_at?: string | null
+          frame_number?: number | null
+          id?: string
+          item_name?: string
+          item_type_id?: string | null
+          notes?: string | null
+          scan_id?: string
+          source_file?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "netto_count_results_item_type_id_fkey"
+            columns: ["item_type_id"]
+            isOneToOne: false
+            referencedRelation: "netto_count_item_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "netto_count_results_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "netto_count_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      netto_count_scans: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          processing_time_ms: number | null
+          scan_name: string | null
+          scan_type: string | null
+          selected_item_types: string[] | null
+          status: string | null
+          total_items_counted: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          processing_time_ms?: number | null
+          scan_name?: string | null
+          scan_type?: string | null
+          selected_item_types?: string[] | null
+          status?: string | null
+          total_items_counted?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          processing_time_ms?: number | null
+          scan_name?: string | null
+          scan_type?: string | null
+          selected_item_types?: string[] | null
+          status?: string | null
+          total_items_counted?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string

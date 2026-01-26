@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.cancel-subscription]
 verify_jwt = false
+
+[functions.netto-count-analyze]
+verify_jwt = true
