@@ -828,59 +828,85 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-12">
-          <TabsTrigger value="users">
-            <User className="h-4 w-4 mr-2" />
-            Utilisateurs
-          </TabsTrigger>
-          <TabsTrigger value="sessions">
-            <Monitor className="h-4 w-4 mr-2" />
-            Sessions
-          </TabsTrigger>
-          <TabsTrigger value="audit">
-            <Activity className="h-4 w-4 mr-2" />
-            Journal
-          </TabsTrigger>
-          <TabsTrigger value="hotels">
-            <Hotel className="h-4 w-4 mr-2" />
-            Hôtels
-          </TabsTrigger>
-          <TabsTrigger value="access-codes">
-            <Key className="h-4 w-4 mr-2" />
-            Codes
-          </TabsTrigger>
-          <TabsTrigger value="housekeeper-requests" className="relative">
-            <Users className="h-4 w-4 mr-2" />
-            Demandes
-            <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-              !
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="incidents">
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Incidents
-          </TabsTrigger>
-          <TabsTrigger value="training">
-            <Database className="h-4 w-4 mr-2" />
-            IA
-          </TabsTrigger>
-          <TabsTrigger value="tickets">
-            <Bell className="h-4 w-4 mr-2" />
-            Tickets
-          </TabsTrigger>
-          <TabsTrigger value="promos">
-            <Gift className="h-4 w-4 mr-2" />
-            Promos
-          </TabsTrigger>
-          <TabsTrigger value="plans">
-            <CreditCard className="h-4 w-4 mr-2" />
-            Plans
-          </TabsTrigger>
-          <TabsTrigger value="system">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Système
-          </TabsTrigger>
-        </TabsList>
+        {/* Navigation par catégories */}
+        <div className="space-y-3">
+          {/* Catégorie: Utilisateurs & Accès */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Utilisateurs & Accès</p>
+            <TabsList className="h-auto flex-wrap gap-1 bg-muted/50 p-1">
+              <TabsTrigger value="users" className="gap-2">
+                <User className="h-4 w-4" />
+                Utilisateurs
+              </TabsTrigger>
+              <TabsTrigger value="sessions" className="gap-2">
+                <Monitor className="h-4 w-4" />
+                Sessions
+              </TabsTrigger>
+              <TabsTrigger value="access-codes" className="gap-2">
+                <Key className="h-4 w-4" />
+                Codes d'accès
+              </TabsTrigger>
+              <TabsTrigger value="housekeeper-requests" className="gap-2 relative">
+                <Users className="h-4 w-4" />
+                Demandes
+                <Badge variant="destructive" className="ml-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">!</Badge>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          
+          {/* Catégorie: Établissements */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Établissements</p>
+            <TabsList className="h-auto flex-wrap gap-1 bg-muted/50 p-1">
+              <TabsTrigger value="hotels" className="gap-2">
+                <Hotel className="h-4 w-4" />
+                Hôtels
+              </TabsTrigger>
+              <TabsTrigger value="incidents" className="gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Incidents
+              </TabsTrigger>
+              <TabsTrigger value="training" className="gap-2">
+                <Database className="h-4 w-4" />
+                IA Training
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          
+          {/* Catégorie: Abonnements & Facturation */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Abonnements & Facturation</p>
+            <TabsList className="h-auto flex-wrap gap-1 bg-muted/50 p-1">
+              <TabsTrigger value="plans" className="gap-2">
+                <CreditCard className="h-4 w-4" />
+                Plans & Tarifs
+              </TabsTrigger>
+              <TabsTrigger value="promos" className="gap-2">
+                <Gift className="h-4 w-4" />
+                Codes promo
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          
+          {/* Catégorie: Support & Système */}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Support & Système</p>
+            <TabsList className="h-auto flex-wrap gap-1 bg-muted/50 p-1">
+              <TabsTrigger value="tickets" className="gap-2">
+                <Bell className="h-4 w-4" />
+                Tickets
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="gap-2">
+                <Activity className="h-4 w-4" />
+                Journal d'audit
+              </TabsTrigger>
+              <TabsTrigger value="system" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Système
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
 
         <TabsContent value="users" className="space-y-4">
           <UsersManagementPanel />
