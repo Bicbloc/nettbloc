@@ -419,11 +419,9 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     try {
       console.log('Recherche hôtel avec code:', hotelCode);
       
-      // Find hotel by hotel code with explicit RLS bypass for public search
+      // Find hotel by hotel code via RPC sécurisée (bypass RLS)
       const { data: hotel, error: hotelError } = await supabase
-        .from('hotels')
-        .select('id, name, hotel_code')
-        .eq('hotel_code', hotelCode)
+        .rpc('search_hotel_by_code', { p_code: hotelCode })
         .maybeSingle();
 
       console.log('Résultat recherche hôtel:', { hotel, hotelError });
@@ -434,7 +432,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
       }
       
       if (!hotel) {
-        return { success: false, error: "Code d'hôtel invalide ou hôtel introuvable" };
+        return { success: false, error: "Code d'établissement introuvable. Vérifiez le code auprès de votre responsable." };
       }
 
       // Check if user already has an active access to this hotel

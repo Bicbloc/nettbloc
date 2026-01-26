@@ -118,7 +118,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
       
       setProfile(mappedProfile);
 
-      // Load active hotel session
+      // Load active hotel session (use technician_profile_id column if exists, fallback to profile id match)
       const { data: sessionData } = await supabase
         .from('hotel_access_sessions')
         .select(`
@@ -128,7 +128,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
           is_active,
           hotels (name)
         `)
-        .eq('housekeeper_profile_id', userId)
+        .or(`housekeeper_profile_id.eq.${userId},access_code.ilike.${userId.substring(0, 8)}%`)
         .eq('is_active', true)
         .maybeSingle();
 
@@ -225,14 +225,18 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
     }
 
     try {
+      // Utiliser RPC sécurisée pour rechercher l'hôtel (bypass RLS)
       const { data: hotel, error: hotelError } = await supabase
-        .from('hotels')
-        .select('id')
-        .eq('hotel_code', hotelCode.toUpperCase())
-        .single();
+        .rpc('search_hotel_by_code', { p_code: hotelCode })
+        .maybeSingle();
 
-      if (hotelError || !hotel) {
-        throw new Error('Code établissement invalide');
+      if (hotelError) {
+        console.error('Erreur recherche hôtel:', hotelError);
+        throw new Error('Erreur lors de la recherche de l\'établissement');
+      }
+      
+      if (!hotel) {
+        throw new Error('Code établissement introuvable. Vérifiez le code auprès de votre responsable.');
       }
 
       const { error: requestError } = await supabase
@@ -264,14 +268,18 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
     }
 
     try {
+      // Utiliser RPC sécurisée pour rechercher l'hôtel (bypass RLS)
       const { data: hotel, error: hotelError } = await supabase
-        .from('hotels')
-        .select('id, name')
-        .eq('hotel_code', hotelCode.toUpperCase())
-        .single();
+        .rpc('search_hotel_by_code', { p_code: hotelCode })
+        .maybeSingle();
 
-      if (hotelError || !hotel) {
-        throw new Error('Code établissement invalide');
+      if (hotelError) {
+        console.error('Erreur recherche hôtel:', hotelError);
+        throw new Error('Erreur lors de la recherche de l\'établissement');
+      }
+      
+      if (!hotel) {
+        throw new Error('Code établissement introuvable. Vérifiez le code auprès de votre responsable.');
       }
 
       const { data: existingSession } = await supabase
