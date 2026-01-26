@@ -139,6 +139,39 @@ export const HousekeeperAccessRequests = () => {
           rooms_cleaned: 0
         });
 
+      // IMPORTANT: Créer également une entrée dans housekeepers pour l'assignation
+      // Vérifier si elle n'existe pas déjà
+      const { data: existingHousekeeper } = await supabase
+        .from('housekeepers')
+        .select('id')
+        .eq('hotel_id', request.hotel_id)
+        .ilike('name', request.housekeeper_profiles.name)
+        .maybeSingle();
+
+      if (!existingHousekeeper) {
+        // Générer un code d'accès unique
+        const nameInitials = request.housekeeper_profiles.name.toUpperCase().slice(0, 3);
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+        const accessCode = `${request.hotel_code}-${nameInitials}-${randomSuffix}`;
+
+        const { error: housekeeperError } = await supabase
+          .from('housekeepers')
+          .insert({
+            hotel_id: request.hotel_id,
+            name: request.housekeeper_profiles.name,
+            access_code: accessCode,
+            user_id: request.housekeeper_profile_id,
+            is_active: true
+          });
+
+        if (housekeeperError) {
+          console.error('Error creating housekeeper entry:', housekeeperError);
+          // Ne pas bloquer l'approbation si l'insertion échoue
+        } else {
+          console.log('✅ Housekeeper entry created:', request.housekeeper_profiles.name);
+        }
+      }
+
       toast.success('Demande approuvée ! La femme de chambre peut maintenant accéder à l\'hôtel.');
       loadRequests();
     } catch (error) {
