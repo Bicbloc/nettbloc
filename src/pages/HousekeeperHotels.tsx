@@ -55,31 +55,27 @@ export default function HousekeeperHotels() {
 
       setProfile(profileData);
 
-      // Charger les hôtels enregistrés (uniquement ceux approuvés)
+      // Charger les hôtels enregistrés via RPC SECURITY DEFINER (bypass RLS)
       console.log('🔍 Chargement des hôtels approuvés pour:', profileData.id);
       const { data: approvedHotels, error: hotelsError } = await supabase
-        .from('housekeeper_access_requests')
-        .select(`
-          hotel_id,
-          hotels (
-            id,
-            name,
-            hotel_code
-          )
-        `)
-        .eq('housekeeper_profile_id', profileData.id)
-        .eq('status', 'approved')
-        .order('requested_at', { ascending: false });
+        .rpc('get_approved_hotels_for_housekeeper' as any, { 
+          p_housekeeper_profile_id: profileData.id 
+        });
 
       console.log('📋 Hôtels approuvés trouvés:', approvedHotels);
       if (hotelsError) {
         console.error('❌ Erreur chargement hôtels:', hotelsError);
       }
 
-      if (approvedHotels) {
-        const uniqueHotels = Array.from(
-          new Map(approvedHotels.map(item => [item.hotel_id, item.hotels])).values()
-        ).filter(h => h !== null);
+      const hotelsArray = approvedHotels as Array<{ hotel_id: string; hotel_name: string; hotel_code: string }> | null;
+      
+      if (hotelsArray && hotelsArray.length > 0) {
+        // Transformer les données RPC en format attendu
+        const uniqueHotels = hotelsArray.map((h) => ({
+          id: h.hotel_id,
+          name: h.hotel_name,
+          hotel_code: h.hotel_code
+        }));
         setHotels(uniqueHotels);
 
         // Charger le nombre de chambres assignées pour chaque hôtel
