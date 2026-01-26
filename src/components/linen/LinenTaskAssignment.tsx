@@ -49,7 +49,7 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
         .from("housekeeper_hotel_history")
         .select("housekeeper_profile_id, housekeeper_profiles(id, name, email)")
         .eq("hotel_id", hotelId)
-        .eq("ended_at", null);
+        .is("ended_at", null);
       if (error) throw error;
       return data
         .filter((h: any) => h.housekeeper_profiles)
