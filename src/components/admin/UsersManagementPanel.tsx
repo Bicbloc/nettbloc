@@ -457,13 +457,34 @@ export function UsersManagementPanel() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par email, entreprise..."
+                placeholder="Rechercher par email, nom, hôtel..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
           </div>
+          
+          {/* User Type Filter */}
+          <Select value={userTypeFilter} onValueChange={(v) => { setUserTypeFilter(v); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[180px]">
+              <Users className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les types</SelectItem>
+              {Object.entries(USER_TYPE_CONFIGS).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  <div className="flex items-center gap-2">
+                    <config.icon className="h-4 w-4" />
+                    {config.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Plan Filter (only for establishments) */}
           <Select value={planFilter} onValueChange={setPlanFilter}>
             <SelectTrigger className="w-[150px]">
               <Filter className="h-4 w-4 mr-2" />
@@ -476,8 +497,10 @@ export function UsersManagementPanel() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
+          
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Statut" />
             </SelectTrigger>
             <SelectContent>
@@ -486,6 +509,31 @@ export function UsersManagementPanel() {
               <SelectItem value="suspended">Suspendus</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        
+        {/* Stats by type */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {Object.entries(USER_TYPE_CONFIGS).map(([key, config]) => {
+            const count = users.filter(u => u.user_type === key).length;
+            const Icon = config.icon;
+            return (
+              <Card 
+                key={key} 
+                className={`cursor-pointer transition-all ${userTypeFilter === key ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
+                onClick={() => setUserTypeFilter(userTypeFilter === key ? 'all' : key)}
+              >
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${config.color}`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold">{count}</div>
+                    <div className="text-xs text-muted-foreground">{config.label}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Users Table */}
@@ -532,8 +580,8 @@ export function UsersManagementPanel() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.id} className={`hover:bg-muted/50 ${user.is_suspended ? 'opacity-60' : ''}`}>
+                filteredUsers.map((user, index) => (
+                  <TableRow key={`${user.id}-${user.user_type}-${index}`} className={`hover:bg-muted/50 ${user.is_suspended ? 'opacity-60' : ''}`}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -570,74 +618,80 @@ export function UsersManagementPanel() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      {user.role !== 'super_admin' && user.user_type === 'establishment' && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedUser(user);
-                              setShowUserDetails(true);
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Voir détails
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel className="text-xs text-muted-foreground">Changer le plan</DropdownMenuLabel>
-                            {Object.entries(PLAN_CONFIGS).map(([key, config]) => (
-                              <DropdownMenuItem 
-                                key={key} 
-                                onClick={() => changePlan(user.id, key)}
-                                disabled={user.subscription_type === key}
-                              >
-                                {config.icon && <config.icon className="h-4 w-4 mr-2" />}
-                                {!config.icon && <CreditCard className="h-4 w-4 mr-2" />}
-                                {config.label}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedUser(user);
+                            setShowUserDetails(true);
+                          }}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Voir détails
+                          </DropdownMenuItem>
+                          
+                          {user.user_type === 'establishment' && user.role !== 'super_admin' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-xs text-muted-foreground">Changer le plan</DropdownMenuLabel>
+                              {Object.entries(PLAN_CONFIGS).map(([key, config]) => (
+                                <DropdownMenuItem 
+                                  key={key} 
+                                  onClick={() => changePlan(user.id, key)}
+                                  disabled={user.subscription_type === key}
+                                >
+                                  {config.icon && <config.icon className="h-4 w-4 mr-2" />}
+                                  {!config.icon && <CreditCard className="h-4 w-4 mr-2" />}
+                                  {config.label}
+                                </DropdownMenuItem>
+                              ))}
+                              
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-xs text-muted-foreground">Période d'essai</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => extendTrial(user.id, 7)}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                +7 jours
                               </DropdownMenuItem>
-                            ))}
-                            
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel className="text-xs text-muted-foreground">Période d'essai</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => extendTrial(user.id, 7)}>
-                              <Calendar className="h-4 w-4 mr-2" />
-                              +7 jours
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => extendTrial(user.id, 30)}>
-                              <Calendar className="h-4 w-4 mr-2" />
-                              +30 jours
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => extendTrial(user.id, 90)}>
-                              <Calendar className="h-4 w-4 mr-2" />
-                              +90 jours
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => toggleSuspend(user.id, !user.is_suspended)}
-                              className={user.is_suspended ? 'text-green-600' : 'text-orange-600'}
-                            >
-                              {user.is_suspended ? (
-                                <>
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Réactiver
-                                </>
-                              ) : (
-                                <>
-                                  <Ban className="h-4 w-4 mr-2" />
-                                  Suspendre
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                              <DropdownMenuItem onClick={() => extendTrial(user.id, 30)}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                +30 jours
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => extendTrial(user.id, 90)}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                +90 jours
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          
+                          {user.role !== 'super_admin' && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => toggleSuspend(user.id, !user.is_suspended)}
+                                className={user.is_suspended ? 'text-green-600' : 'text-orange-600'}
+                              >
+                                {user.is_suspended ? (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    Réactiver
+                                  </>
+                                ) : (
+                                  <>
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Suspendre
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
