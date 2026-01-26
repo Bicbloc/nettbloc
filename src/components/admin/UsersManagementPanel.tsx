@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -18,26 +20,23 @@ import { fr } from 'date-fns/locale';
 import { 
   User, Shield, Trash2, UserPlus, Ban, CheckCircle, CreditCard, 
   Calendar, Search, RefreshCw, Crown, Star, Zap, Eye, Mail, Building,
-  ArrowUpDown, Filter, Download, MoreHorizontal
+  ArrowUpDown, Filter, Download, MoreHorizontal, Hotel, Wrench, UserCheck,
+  KeyRound, Users
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-interface UserWithRole {
+interface AllUser {
   id: string;
   email: string;
-  company_name?: string;
-  is_suspended?: boolean;
-  suspension_reason?: string;
-  subscription_type?: string;
-  plan?: string;
-  trial_end_date?: string;
-  trial_start_date?: string;
-  max_rooms?: number;
-  role?: 'user' | 'admin' | 'super_admin';
+  name?: string | null;
+  user_type: string;
+  is_suspended?: boolean | null;
+  subscription_type?: string | null;
+  trial_end_date?: string | null;
   created_at: string;
-  hotel_name?: string;
-  hotel_id?: string;
-  features_enabled?: any;
+  linked_hotel_id?: string | null;
+  linked_hotel_name?: string | null;
+  role?: string | null;
 }
 
 interface HotelInfo {
@@ -55,16 +54,27 @@ const PLAN_CONFIGS = {
   platinum: { label: 'Platinum', color: 'bg-purple-100 text-purple-700', icon: Crown },
 };
 
+const USER_TYPE_CONFIGS = {
+  establishment: { label: 'Établissement', icon: Building, color: 'bg-blue-100 text-blue-700' },
+  housekeeper: { label: 'Femme de chambre', icon: User, color: 'bg-green-100 text-green-700' },
+  technician: { label: 'Technicien', icon: Wrench, color: 'bg-orange-100 text-orange-700' },
+  governess: { label: 'Gouvernante', icon: UserCheck, color: 'bg-purple-100 text-purple-700' },
+};
+
+const PAGE_SIZE = 50;
+
 export function UsersManagementPanel() {
-  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [users, setUsers] = useState<AllUser[]>([]);
   const [hotels, setHotels] = useState<HotelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [userTypeFilter, setUserTypeFilter] = useState<string>('all');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'created_at' | 'email' | 'plan'>('created_at');
+  const [sortBy, setSortBy] = useState<'created_at' | 'email' | 'name'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AllUser | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -72,12 +82,23 @@ export function UsersManagementPanel() {
   const [newUserCompany, setNewUserCompany] = useState('');
   const [newUserPlan, setNewUserPlan] = useState('free');
   const [selectedHotelId, setSelectedHotelId] = useState('new');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadUsers();
     loadHotels();
-  }, []);
+  }, [currentPage, userTypeFilter, statusFilter]);
 
   const loadHotels = async () => {
     const { data } = await supabase
@@ -86,36 +107,34 @@ export function UsersManagementPanel() {
     setHotels(data || []);
   };
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      // Charger les profils
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use the enriched all_users_view to get all user types in one query
+      let query = supabase
+        .from('all_users_view')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: sortOrder === 'asc' });
+
+      // Apply filters
+      if (userTypeFilter !== 'all') {
+        query = query.eq('user_type', userTypeFilter);
+      }
+      if (statusFilter === 'active') {
+        query = query.eq('is_suspended', false);
+      } else if (statusFilter === 'suspended') {
+        query = query.eq('is_suspended', true);
+      }
+
+      // Pagination
+      query = query.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
+
+      const { data: usersData, count, error } = await query;
 
       if (error) throw error;
 
-      // Charger les rôles
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-
-      // Charger les assignations hôtels
-      const { data: hotelUsers } = await supabase
-        .from('hotel_users')
-        .select('user_id, hotel_id, hotels!inner(name)');
-
-      // Combiner les données
-      const enrichedUsers = (profiles || []).map(profile => ({
-        ...profile,
-        role: roles?.find(r => r.user_id === profile.id)?.role || 'user',
-        hotel_name: hotelUsers?.find(hu => hu.user_id === profile.id)?.hotels?.name || 'Aucun',
-        hotel_id: hotelUsers?.find(hu => hu.user_id === profile.id)?.hotel_id
-      }));
-
-      setUsers(enrichedUsers);
+      setUsers(usersData || []);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Error loading users:', error);
       toast({
@@ -126,41 +145,38 @@ export function UsersManagementPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, userTypeFilter, statusFilter, sortOrder, toast]);
 
   const filteredUsers = useMemo(() => {
     return users
       .filter(user => {
-        // Search filter
-        if (searchTerm) {
-          const search = searchTerm.toLowerCase();
+        // Search filter (debounced)
+        if (debouncedSearchTerm) {
+          const search = debouncedSearchTerm.toLowerCase();
           if (!user.email.toLowerCase().includes(search) &&
-              !user.company_name?.toLowerCase().includes(search) &&
-              !user.hotel_name?.toLowerCase().includes(search)) {
+              !user.name?.toLowerCase().includes(search) &&
+              !user.linked_hotel_name?.toLowerCase().includes(search)) {
             return false;
           }
         }
-        // Plan filter
-        if (planFilter !== 'all' && user.subscription_type !== planFilter && user.plan !== planFilter) {
+        // Plan filter (only for establishments)
+        if (planFilter !== 'all' && user.user_type === 'establishment' && user.subscription_type !== planFilter) {
           return false;
         }
-        // Status filter
-        if (statusFilter === 'active' && user.is_suspended) return false;
-        if (statusFilter === 'suspended' && !user.is_suspended) return false;
         return true;
       })
       .sort((a, b) => {
         let comparison = 0;
         if (sortBy === 'email') {
           comparison = a.email.localeCompare(b.email);
-        } else if (sortBy === 'plan') {
-          comparison = (a.subscription_type || '').localeCompare(b.subscription_type || '');
+        } else if (sortBy === 'name') {
+          comparison = (a.name || '').localeCompare(b.name || '');
         } else {
           comparison = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         }
         return sortOrder === 'asc' ? comparison : -comparison;
       });
-  }, [users, searchTerm, planFilter, statusFilter, sortBy, sortOrder]);
+  }, [users, debouncedSearchTerm, planFilter, sortBy, sortOrder]);
 
   const changePlan = async (userId: string, newPlan: string) => {
     try {
@@ -272,8 +288,11 @@ export function UsersManagementPanel() {
     }
   };
 
-  const getPlanBadge = (user: UserWithRole) => {
-    const planKey = (user.subscription_type || user.plan || 'free') as keyof typeof PLAN_CONFIGS;
+  const getPlanBadge = (user: AllUser) => {
+    if (user.user_type !== 'establishment') {
+      return <Badge variant="outline">Staff</Badge>;
+    }
+    const planKey = (user.subscription_type || 'free') as keyof typeof PLAN_CONFIGS;
     const config = PLAN_CONFIGS[planKey] || PLAN_CONFIGS.free;
     const Icon = config.icon;
     
@@ -285,8 +304,20 @@ export function UsersManagementPanel() {
     );
   };
 
-  const getTrialStatus = (user: UserWithRole) => {
-    if (!user.trial_end_date) return null;
+  const getUserTypeBadge = (userType: string) => {
+    const config = USER_TYPE_CONFIGS[userType as keyof typeof USER_TYPE_CONFIGS] || USER_TYPE_CONFIGS.establishment;
+    const Icon = config.icon;
+    
+    return (
+      <Badge className={`${config.color} gap-1`}>
+        <Icon className="h-3 w-3" />
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const getTrialStatus = (user: AllUser) => {
+    if (!user.trial_end_date || user.user_type !== 'establishment') return null;
     const endDate = new Date(user.trial_end_date);
     const isActive = endDate > new Date();
     
@@ -299,11 +330,12 @@ export function UsersManagementPanel() {
 
   const exportUsers = () => {
     const csv = [
-      ['Email', 'Entreprise', 'Plan', 'Statut', 'Date inscription'].join(','),
+      ['Email', 'Nom', 'Type', 'Plan', 'Statut', 'Date inscription'].join(','),
       ...filteredUsers.map(u => [
         u.email,
-        u.company_name || '',
-        u.subscription_type || 'free',
+        u.name || '',
+        u.user_type,
+        u.subscription_type || '-',
         u.is_suspended ? 'Suspendu' : 'Actif',
         format(new Date(u.created_at), 'yyyy-MM-dd')
       ].join(','))
@@ -316,6 +348,22 @@ export function UsersManagementPanel() {
     a.download = `users_export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
   };
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  const renderSkeletonRows = () => (
+    Array.from({ length: 10 }).map((_, i) => (
+      <TableRow key={i}>
+        <TableCell><Skeleton className="h-10 w-40" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+        <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+      </TableRow>
+    ))
+  );
 
   return (
     <Card>
@@ -457,19 +505,8 @@ export function UsersManagementPanel() {
                     <ArrowUpDown className="h-3 w-3" />
                   </div>
                 </TableHead>
-                <TableHead>Établissement</TableHead>
-                <TableHead 
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => {
-                    setSortBy('plan');
-                    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                  }}
-                >
-                  <div className="flex items-center gap-1">
-                    Plan
-                    <ArrowUpDown className="h-3 w-3" />
-                  </div>
-                </TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Plan</TableHead>
                 <TableHead>Essai</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead 
@@ -488,11 +525,7 @@ export function UsersManagementPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">Chargement...</TableCell>
-                </TableRow>
-              ) : filteredUsers.length === 0 ? (
+              {loading ? renderSkeletonRows() : filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Aucun utilisateur trouvé
@@ -500,7 +533,7 @@ export function UsersManagementPanel() {
                 </TableRow>
               ) : (
                 filteredUsers.map((user) => (
-                  <TableRow key={user.id} className={user.is_suspended ? 'opacity-60' : ''}>
+                  <TableRow key={user.id} className={`hover:bg-muted/50 ${user.is_suspended ? 'opacity-60' : ''}`}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -508,7 +541,7 @@ export function UsersManagementPanel() {
                         </div>
                         <div>
                           <div className="font-medium text-sm">{user.email}</div>
-                          <div className="text-xs text-muted-foreground">{user.company_name || 'Non définie'}</div>
+                          <div className="text-xs text-muted-foreground">{user.name || 'Non défini'}</div>
                         </div>
                         {user.role === 'super_admin' && (
                           <Badge variant="destructive" className="text-xs">Super Admin</Badge>
@@ -519,10 +552,7 @@ export function UsersManagementPanel() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Building className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm">{user.hotel_name}</span>
-                      </div>
+                      {getUserTypeBadge(user.user_type)}
                     </TableCell>
                     <TableCell>{getPlanBadge(user)}</TableCell>
                     <TableCell>{getTrialStatus(user) || <span className="text-xs text-muted-foreground">-</span>}</TableCell>
@@ -540,7 +570,7 @@ export function UsersManagementPanel() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      {user.role !== 'super_admin' && (
+                      {user.role !== 'super_admin' && user.user_type === 'establishment' && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
@@ -565,7 +595,7 @@ export function UsersManagementPanel() {
                               <DropdownMenuItem 
                                 key={key} 
                                 onClick={() => changePlan(user.id, key)}
-                                disabled={user.subscription_type === key || user.plan === key}
+                                disabled={user.subscription_type === key}
                               >
                                 {config.icon && <config.icon className="h-4 w-4 mr-2" />}
                                 {!config.icon && <CreditCard className="h-4 w-4 mr-2" />}
@@ -631,8 +661,12 @@ export function UsersManagementPanel() {
                   <div className="font-medium">{selectedUser.email}</div>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Entreprise</Label>
-                  <div className="font-medium">{selectedUser.company_name || 'Non définie'}</div>
+                  <Label className="text-muted-foreground">Nom</Label>
+                  <div className="font-medium">{selectedUser.name || 'Non défini'}</div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Type</Label>
+                  <div>{getUserTypeBadge(selectedUser.user_type)}</div>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Plan</Label>
@@ -648,30 +682,13 @@ export function UsersManagementPanel() {
                   <Label className="text-muted-foreground">Inscription</Label>
                   <div>{format(new Date(selectedUser.created_at), 'dd MMMM yyyy', { locale: fr })}</div>
                 </div>
-                <div>
-                  <Label className="text-muted-foreground">Établissement</Label>
-                  <div>{selectedUser.hotel_name}</div>
-                </div>
                 {selectedUser.trial_end_date && (
                   <div>
                     <Label className="text-muted-foreground">Fin essai</Label>
                     <div>{format(new Date(selectedUser.trial_end_date), 'dd MMMM yyyy', { locale: fr })}</div>
                   </div>
                 )}
-                {selectedUser.max_rooms && (
-                  <div>
-                    <Label className="text-muted-foreground">Max chambres</Label>
-                    <div>{selectedUser.max_rooms}</div>
-                  </div>
-                )}
               </div>
-              
-              {selectedUser.suspension_reason && (
-                <div className="p-3 bg-destructive/10 rounded-lg">
-                  <Label className="text-destructive">Raison de suspension</Label>
-                  <div className="text-sm">{selectedUser.suspension_reason}</div>
-                </div>
-              )}
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowUserDetails(false)}>

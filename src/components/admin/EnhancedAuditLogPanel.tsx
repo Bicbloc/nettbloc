@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, subDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -24,9 +26,11 @@ interface AuditLogEntry {
   id: string;
   admin_user_id: string;
   admin_email?: string;
+  admin_company?: string;
   action: string;
   target_user_id?: string;
   target_email?: string;
+  target_company?: string;
   details?: any;
   created_at: string;
 }
@@ -35,6 +39,7 @@ interface ActivityLogEntry {
   id: string;
   hotel_id: string;
   hotel_name?: string;
+  hotel_code?: string;
   activity_type: string;
   entity_type: string;
   entity_id: string;
@@ -42,12 +47,14 @@ interface ActivityLogEntry {
   actor_type: string;
   details?: any;
   timestamp: string;
+  created_at?: string;
 }
 
 interface DailyLogEntry {
   id: string;
   hotel_id: string;
   hotel_name?: string;
+  hotel_code?: string;
   action_type: string;
   description: string;
   room_number?: string;
@@ -72,7 +79,11 @@ const ACTION_CONFIGS: Record<string, { label: string; icon: any; color: string }
   'cleaning-start': { label: 'Début nettoyage', icon: ActivityIcon, color: 'bg-yellow-100 text-yellow-700' },
   'cleaning-end': { label: 'Fin nettoyage', icon: ActivityIcon, color: 'bg-green-100 text-green-700' },
   'incident_created': { label: 'Incident créé', icon: AlertTriangle, color: 'bg-red-100 text-red-700' },
+  'housekeeper_connected': { label: 'Connexion', icon: User, color: 'bg-blue-100 text-blue-700' },
+  'terminate_session': { label: 'Session terminée', icon: LogOut, color: 'bg-orange-100 text-orange-700' },
 };
+
+const PAGE_SIZE = 50;
 
 export function EnhancedAuditLogPanel() {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -80,6 +91,7 @@ export function EnhancedAuditLogPanel() {
   const [dailyLogs, setDailyLogs] = useState<DailyLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [logType, setLogType] = useState<'audit' | 'activity' | 'daily'>('audit');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
@@ -88,7 +100,18 @@ export function EnhancedAuditLogPanel() {
   });
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCounts, setTotalCounts] = useState({ audit: 0, activity: 0, daily: 0 });
   const { toast } = useToast();
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadLogs();
@@ -109,76 +132,53 @@ export function EnhancedAuditLogPanel() {
     };
   }, []);
 
-  const loadLogs = async () => {
+  // Reload when date range changes
+  useEffect(() => {
+    setCurrentPage(1);
+    loadLogs();
+  }, [dateRange]);
+
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      // Load audit logs with enrichment
-      const { data: auditData } = await supabase
-        .from('admin_audit_log')
-        .select('*')
+      // Load audit logs from enriched view (eliminates N+1 queries)
+      const { data: auditData, count: auditCount } = await supabase
+        .from('audit_logs_enriched')
+        .select('*', { count: 'exact' })
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false })
-        .limit(1000);
+        .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
 
-      const enrichedAudit = await Promise.all(
-        (auditData || []).map(async (log) => {
-          const { data: adminProfile } = await supabase
-            .from('profiles')
-            .select('email')
-            .eq('id', log.admin_user_id)
-            .single();
+      setAuditLogs(auditData || []);
 
-          let targetEmail = null;
-          if (log.target_user_id) {
-            const { data: targetProfile } = await supabase
-              .from('profiles')
-              .select('email')
-              .eq('id', log.target_user_id)
-              .single();
-            targetEmail = targetProfile?.email;
-          }
-
-          return { ...log, admin_email: adminProfile?.email, target_email: targetEmail };
-        })
-      );
-      setAuditLogs(enrichedAudit);
-
-      // Load activities
-      const { data: activityData } = await supabase
-        .from('activities')
-        .select('*')
+      // Load activities from enriched view
+      const { data: activityData, count: activityCount } = await supabase
+        .from('activities_enriched')
+        .select('*', { count: 'exact' })
+        .gte('timestamp', dateRange.from.toISOString())
+        .lte('timestamp', dateRange.to.toISOString())
         .order('timestamp', { ascending: false })
-        .limit(1000);
+        .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
 
-      const enrichedActivities = await Promise.all(
-        (activityData || []).map(async (activity) => {
-          const { data: hotelData } = await supabase
-            .from('hotels')
-            .select('name')
-            .eq('id', activity.hotel_id)
-            .single();
-          return { ...activity, hotel_name: hotelData?.name || 'Inconnu' };
-        })
-      );
-      setActivities(enrichedActivities);
+      setActivities(activityData || []);
 
-      // Load daily action logs
-      const { data: dailyData } = await supabase
-        .from('daily_action_logs')
-        .select('*')
+      // Load daily logs from enriched view
+      const { data: dailyData, count: dailyCount } = await supabase
+        .from('daily_logs_enriched')
+        .select('*', { count: 'exact' })
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false })
-        .limit(1000);
+        .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
 
-      const enrichedDaily = await Promise.all(
-        (dailyData || []).map(async (log) => {
-          const { data: hotelData } = await supabase
-            .from('hotels')
-            .select('name')
-            .eq('id', log.hotel_id)
-            .single();
-          return { ...log, hotel_name: hotelData?.name || 'Inconnu' };
-        })
-      );
-      setDailyLogs(enrichedDaily);
+      setDailyLogs(dailyData || []);
+
+      setTotalCounts({
+        audit: auditCount || 0,
+        activity: activityCount || 0,
+        daily: dailyCount || 0
+      });
 
     } catch (error) {
       console.error('Error loading logs:', error);
@@ -186,7 +186,7 @@ export function EnhancedAuditLogPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange, currentPage, toast]);
 
   const filteredLogs = useMemo(() => {
     let logs: any[] = [];
@@ -196,21 +196,15 @@ export function EnhancedAuditLogPanel() {
     else logs = dailyLogs;
 
     return logs.filter(log => {
-      // Date filter
-      const logDate = new Date(log.created_at || log.timestamp);
-      if (!isWithinInterval(logDate, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) })) {
-        return false;
-      }
-
       // Action filter
       if (actionFilter !== 'all') {
         const action = log.action || log.activity_type || log.action_type;
         if (action !== actionFilter) return false;
       }
 
-      // Search filter
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
+      // Search filter (debounced)
+      if (debouncedSearchTerm) {
+        const search = debouncedSearchTerm.toLowerCase();
         const searchFields = [
           log.admin_email, log.target_email, log.action,
           log.actor_name, log.hotel_name, log.activity_type,
@@ -224,7 +218,7 @@ export function EnhancedAuditLogPanel() {
 
       return true;
     });
-  }, [logType, auditLogs, activities, dailyLogs, dateRange, actionFilter, searchTerm]);
+  }, [logType, auditLogs, activities, dailyLogs, actionFilter, debouncedSearchTerm]);
 
   const uniqueActions = useMemo(() => {
     const actions = new Set<string>();
@@ -266,14 +260,30 @@ export function EnhancedAuditLogPanel() {
     a.click();
   };
 
+  const totalPages = Math.ceil(
+    (logType === 'audit' ? totalCounts.audit : logType === 'activity' ? totalCounts.activity : totalCounts.daily) / PAGE_SIZE
+  );
+
   const stats = useMemo(() => ({
-    total: filteredLogs.length,
+    total: logType === 'audit' ? totalCounts.audit : logType === 'activity' ? totalCounts.activity : totalCounts.daily,
     today: filteredLogs.filter(l => {
       const date = new Date(l.created_at || l.timestamp);
       return format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
     }).length,
     actions: uniqueActions.length
-  }), [filteredLogs, uniqueActions]);
+  }), [filteredLogs, uniqueActions, logType, totalCounts]);
+
+  const renderSkeletonRows = () => (
+    Array.from({ length: 10 }).map((_, i) => (
+      <TableRow key={i}>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+        <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+      </TableRow>
+    ))
+  );
 
   return (
     <Card>
@@ -293,8 +303,8 @@ export function EnhancedAuditLogPanel() {
               <Download className="h-4 w-4 mr-2" />
               Exporter
             </Button>
-            <Button onClick={loadLogs} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button onClick={loadLogs} variant="outline" size="sm" disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Actualiser
             </Button>
           </div>
@@ -302,19 +312,19 @@ export function EnhancedAuditLogPanel() {
       </CardHeader>
       <CardContent>
         {/* Log Type Tabs */}
-        <Tabs value={logType} onValueChange={(v: any) => setLogType(v)} className="mb-4">
+        <Tabs value={logType} onValueChange={(v: any) => { setLogType(v); setCurrentPage(1); }} className="mb-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="audit">
               <Shield className="h-4 w-4 mr-2" />
-              Actions Admin ({auditLogs.length})
+              Actions Admin ({totalCounts.audit})
             </TabsTrigger>
             <TabsTrigger value="activity">
               <ActivityIcon className="h-4 w-4 mr-2" />
-              Activités Système ({activities.length})
+              Activités Système ({totalCounts.activity})
             </TabsTrigger>
             <TabsTrigger value="daily">
               <Clock className="h-4 w-4 mr-2" />
-              Logs Journaliers ({dailyLogs.length})
+              Logs Journaliers ({totalCounts.daily})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -426,11 +436,7 @@ export function EnhancedAuditLogPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">Chargement...</TableCell>
-                </TableRow>
-              ) : filteredLogs.length === 0 ? (
+              {loading ? renderSkeletonRows() : filteredLogs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Aucune entrée trouvée
@@ -438,7 +444,7 @@ export function EnhancedAuditLogPanel() {
                 </TableRow>
               ) : (
                 filteredLogs.map((log) => (
-                  <TableRow key={log.id}>
+                  <TableRow key={log.id} className="hover:bg-muted/50">
                     <TableCell className="text-sm whitespace-nowrap">
                       {format(new Date(log.created_at || log.timestamp), 'dd/MM HH:mm:ss', { locale: fr })}
                     </TableCell>
@@ -467,18 +473,27 @@ export function EnhancedAuditLogPanel() {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {log.actor_name || 'Système'}
-                          <Badge variant="secondary" className="ml-2 text-xs">{log.actor_type}</Badge>
+                          <div className="flex items-center gap-1">
+                            <User className="h-3 w-3 text-muted-foreground" />
+                            {log.actor_name || '-'}
+                          </div>
                         </TableCell>
                       </>
                     )}
                     
                     {logType === 'daily' && (
                       <>
-                        <TableCell className="text-sm">{log.hotel_name}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">{log.description}</TableCell>
-                        <TableCell>
-                          {log.room_number && <Badge variant="outline">{log.room_number}</Badge>}
+                        <TableCell className="text-sm">
+                          <div className="flex items-center gap-1">
+                            <Hotel className="h-3 w-3 text-muted-foreground" />
+                            {log.hotel_name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate">
+                          {log.description}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {log.room_number || '-'}
                         </TableCell>
                       </>
                     )}
@@ -501,6 +516,43 @@ export function EnhancedAuditLogPanel() {
             </TableBody>
           </Table>
         </ScrollArea>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                  const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                  if (page > totalPages) return null;
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </CardContent>
 
       {/* Details Dialog */}
@@ -508,14 +560,63 @@ export function EnhancedAuditLogPanel() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Détails de l'entrée</DialogTitle>
-            <DialogDescription>Informations complètes</DialogDescription>
+            <DialogDescription>
+              Informations complètes sur cette action
+            </DialogDescription>
           </DialogHeader>
           {selectedLog && (
-            <ScrollArea className="max-h-[60vh]">
-              <pre className="bg-muted p-4 rounded-lg text-xs overflow-auto">
-                {JSON.stringify(selectedLog, null, 2)}
-              </pre>
-            </ScrollArea>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Date/Heure</p>
+                  <p className="text-sm">
+                    {format(new Date(selectedLog.created_at || selectedLog.timestamp), 'dd/MM/yyyy à HH:mm:ss', { locale: fr })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Action</p>
+                  {getActionBadge(selectedLog.action || selectedLog.activity_type || selectedLog.action_type)}
+                </div>
+                {selectedLog.admin_email && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Administrateur</p>
+                    <p className="text-sm">{selectedLog.admin_email}</p>
+                  </div>
+                )}
+                {selectedLog.target_email && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Utilisateur cible</p>
+                    <p className="text-sm">{selectedLog.target_email}</p>
+                  </div>
+                )}
+                {selectedLog.hotel_name && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Établissement</p>
+                    <p className="text-sm">{selectedLog.hotel_name}</p>
+                  </div>
+                )}
+                {selectedLog.actor_name && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Acteur</p>
+                    <p className="text-sm">{selectedLog.actor_name}</p>
+                  </div>
+                )}
+                {selectedLog.room_number && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Chambre</p>
+                    <p className="text-sm">{selectedLog.room_number}</p>
+                  </div>
+                )}
+              </div>
+              {selectedLog.details && Object.keys(selectedLog.details).length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Détails</p>
+                  <pre className="text-xs bg-muted p-3 rounded-lg overflow-auto max-h-[200px]">
+                    {JSON.stringify(selectedLog.details, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>
