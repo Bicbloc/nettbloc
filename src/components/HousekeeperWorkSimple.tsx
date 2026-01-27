@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package } from 'lucide-react';
 import { IncidentReportDialogSimple } from './incident/IncidentReportDialogSimple';
-import { Package } from 'lucide-react';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { storageService } from '@/services/storageService';
 import { ReportLostItemDialog } from './lost-and-found/ReportLostItemDialog';
+import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from './RoomStatusTabs';
 
 interface Room {
   id: string;
@@ -48,6 +48,8 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
   const [activeTab, setActiveTab] = useState<'rooms' | 'inventory'>('rooms');
+  const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   
   // Pointage
   const [startTime, setStartTime] = useState<string | null>(null);
@@ -638,12 +640,41 @@ export const HousekeeperWorkSimple: React.FC = () => {
   const totalRooms = rooms.length;
   const progressPercent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 0;
 
-  const sortedRooms = [...rooms].sort((a, b) => {
+  // Calculate room counts for tabs
+  const roomCounts = useMemo(() => {
+    return calculateRoomCounts(rooms.map(r => ({
+      status: r.status,
+      cleaning_type: r.cleaning_type
+    })));
+  }, [rooms]);
+  
+  // Apply tab filter to rooms
+  const filteredByTab = useMemo(() => {
+    return filterRoomsByTab(rooms.map(r => ({
+      ...r,
+      cleaning_type: r.cleaning_type
+    })), roomFilterTab);
+  }, [rooms, roomFilterTab]);
+
+  const sortedRooms = [...filteredByTab].sort((a, b) => {
     if (a.status === 'clean' && b.status !== 'clean') return 1;
     if (a.status !== 'clean' && b.status === 'clean') return -1;
     if (a.cleaning_priority !== b.cleaning_priority) return b.cleaning_priority - a.cleaning_priority;
     return a.room_number.localeCompare(b.room_number, undefined, { numeric: true });
   });
+  
+  // Auto-refresh every 5 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (hotelId && !isRefreshing) {
+        console.log('🔄 Auto-refresh (5s interval)');
+        loadWorkData();
+        setLastRefreshTime(new Date());
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [hotelId, isRefreshing]);
 
   if (isLoading) {
     return (
@@ -822,14 +853,23 @@ export const HousekeeperWorkSimple: React.FC = () => {
         {/* Contenu */}
         {activeTab === 'rooms' ? (
           <>
+            {/* Onglets de filtrage par statut */}
+            <RoomStatusTabs
+              activeTab={roomFilterTab}
+              onTabChange={setRoomFilterTab}
+              counts={roomCounts}
+              compact={true}
+            />
+            
             {/* Actions rapides */}
             <div className="flex gap-2 flex-wrap">
               <Button 
                 variant="outline" 
-                className="flex-1"
+                className="flex-1 gap-2"
                 onClick={() => loadWorkData()}
                 disabled={isRefreshing}
               >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 {isRefreshing ? 'Actualisation...' : 'Actualiser'}
               </Button>
               {hotelId && (
@@ -857,9 +897,14 @@ export const HousekeeperWorkSimple: React.FC = () => {
             {sortedRooms.length === 0 ? (
               <Card className="p-8 text-center">
                 <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Aucune chambre assignée</h3>
+                <h3 className="font-semibold text-lg mb-2">
+                  {rooms.length === 0 ? 'Aucune chambre assignée' : 'Aucune chambre dans ce filtre'}
+                </h3>
                 <p className="text-muted-foreground">
-                  Attendez que le responsable vous assigne des chambres
+                  {rooms.length === 0 
+                    ? 'Attendez que le responsable vous assigne des chambres'
+                    : 'Sélectionnez un autre onglet pour voir les chambres'
+                  }
                 </p>
               </Card>
             ) : (

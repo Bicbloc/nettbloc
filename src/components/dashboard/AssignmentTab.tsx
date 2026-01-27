@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Calendar, Key, UserPlus } from "lucide-react";
+import { Plus, Calendar, Key, UserPlus, RefreshCw } from "lucide-react";
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
@@ -16,8 +16,10 @@ import { UnassignedRoomsColumn } from "@/components/UnassignedRoomsColumn";
 import { CleanRoomsSection } from "@/components/CleanRoomsSection";
 import { HousekeeperInviteDialog } from "@/components/HousekeeperInviteDialog";
 import { CreateColumnDialog } from "@/components/CreateColumnDialog";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from "@/components/RoomStatusTabs";
 
 interface Housekeeper {
   id: string;
@@ -83,6 +85,36 @@ export function AssignmentTab({
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCreateColumnDialog, setShowCreateColumnDialog] = useState(false);
   const [activeColumns, setActiveColumns] = useState<string[]>([]);
+  const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
+  const queryClient = useQueryClient();
+  
+  // Auto-refresh every 5 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (hotelId) {
+        queryClient.invalidateQueries({ queryKey: ['rooms', hotelId] });
+        queryClient.invalidateQueries({ queryKey: ['assignments', hotelId] });
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [hotelId, queryClient]);
+  
+  // Calculate room counts for tabs
+  const roomCounts = useMemo(() => {
+    return calculateRoomCounts(rooms.map(r => ({
+      status: r.status,
+      cleaningType: r.cleaningType
+    })));
+  }, [rooms]);
+  
+  // Apply tab filter to rooms
+  const filteredRooms = useMemo(() => {
+    return filterRoomsByTab(rooms.map(r => ({
+      ...r,
+      cleaningType: r.cleaningType
+    })), roomFilterTab) as Room[];
+  }, [rooms, roomFilterTab]);
 
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
@@ -149,6 +181,15 @@ export function AssignmentTab({
           setShowInviteDialog(true);
         }}
       />
+
+      {/* Onglets de filtrage par statut */}
+      {rooms.length > 0 && housekeeperNames.length > 0 && (
+        <RoomStatusTabs
+          activeTab={roomFilterTab}
+          onTabChange={setRoomFilterTab}
+          counts={roomCounts}
+        />
+      )}
 
       {rooms.length === 0 ? (
         <Card>
