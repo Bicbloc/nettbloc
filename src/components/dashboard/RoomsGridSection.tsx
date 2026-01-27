@@ -1,12 +1,13 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, Bed } from 'lucide-react';
+import { Plus, Filter, Bed, RefreshCw } from 'lucide-react';
 import { RoomCard } from '@/components/RoomCard';
 import { RoomFilters } from '@/components/RoomFilters';
 import { Room } from '@/services/pdfService';
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from '@/components/RoomStatusTabs';
 
 interface RoomsGridSectionProps {
   rooms: Room[];
@@ -26,10 +27,23 @@ export function RoomsGridSection({
   hotelId
 }: RoomsGridSectionProps) {
   const [showFilters, setShowFilters] = useState(false);
-  const displayRooms = filteredRooms || rooms;
+  const [activeTab, setActiveTab] = useState<RoomFilterTab>('all');
+  const queryClient = useQueryClient();
+  
+  // Auto-refresh every 5 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (hotelId) {
+        queryClient.invalidateQueries({ queryKey: ['room-incident-counts', hotelId] });
+        queryClient.invalidateQueries({ queryKey: ['rooms', hotelId] });
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [hotelId, queryClient]);
 
   // Récupérer le nombre d'incidents actifs par chambre
-  const { data: incidentCounts } = useQuery({
+  const { data: incidentCounts, refetch: refetchIncidents } = useQuery({
     queryKey: ['room-incident-counts', hotelId],
     queryFn: async () => {
       if (!hotelId) return {};
@@ -53,8 +67,32 @@ export function RoomsGridSection({
       return counts;
     },
     enabled: !!hotelId,
-    staleTime: 30000 // Refresh toutes les 30 secondes
+    staleTime: 5000, // Refresh toutes les 5 secondes
+    refetchInterval: 5000
   });
+  
+  // Calculate room counts for tabs
+  const roomCounts = useMemo(() => {
+    const baseRooms = filteredRooms || rooms;
+    return calculateRoomCounts(baseRooms.map(r => ({
+      status: r.status,
+      cleaningType: r.cleaningType
+    })));
+  }, [rooms, filteredRooms]);
+  
+  // Apply tab filter
+  const displayRooms = useMemo(() => {
+    const baseRooms = filteredRooms || rooms;
+    return filterRoomsByTab(baseRooms.map(r => ({
+      ...r,
+      cleaningType: r.cleaningType
+    })), activeTab);
+  }, [rooms, filteredRooms, activeTab]);
+
+  const handleRefresh = () => {
+    refetchIncidents();
+    queryClient.invalidateQueries({ queryKey: ['rooms', hotelId] });
+  };
 
   return (
     <div className="space-y-4">
@@ -67,6 +105,15 @@ export function RoomsGridSection({
           </h3>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Actualiser
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -87,7 +134,14 @@ export function RoomsGridSection({
         </div>
       </div>
 
-      {/* Filtres */}
+      {/* Onglets de filtrage par statut */}
+      <RoomStatusTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        counts={roomCounts}
+      />
+
+      {/* Filtres avancés */}
       {showFilters && (
         <Card className="p-4 bg-muted/50">
           <RoomFilters
@@ -119,7 +173,7 @@ export function RoomsGridSection({
           <p className="text-sm text-muted-foreground mb-4">
             {rooms.length === 0 
               ? 'Importez des chambres depuis un PDF ou ajoutez-les manuellement'
-              : 'Essayez de modifier les filtres'
+              : 'Essayez de modifier les filtres ou l\'onglet'
             }
           </p>
           {rooms.length === 0 && (

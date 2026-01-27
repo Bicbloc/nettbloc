@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck, Star } from "lucide-react";
+import { Bed, AlertCircle, Clock, Layers, Check, MoreVertical, UserX, ArrowRight, Trash2, Link, Wrench, Loader2, MessageSquare, ShieldCheck, Star, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -291,38 +291,79 @@ export function RoomCard({
             >
               {t.rooms.quickCleanShort}
             </button>
-            <button
-              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onUpdate({
-                  ...room,
-                  status: 'clean'
-                });
-                toast({
-                  description: `Chambre ${room.number} marquée comme propre`
-                });
-              }}
-              title="Marquer comme propre"
-            >
-              <Check className="h-3 w-3" />
-            </button>
-            <button
-              className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-orange-100 text-orange-700 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onUpdate({
-                  ...room,
-                  status: 'ready-to-clean'
-                });
-                toast({
-                  description: `Chambre ${room.number} marquée comme prête à nettoyer (client sorti)`
-                });
-              }}
-              title="Client sorti - Prêt à nettoyer"
-            >
-              🚪
-            </button>
+            {/* Bouton Propre / Annuler Propre */}
+            {room.status === 'clean' ? (
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-red-700 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdate({
+                    ...room,
+                    status: 'needs-cleaning'
+                  });
+                  toast({
+                    description: `❌ Chambre ${room.number} - Annulé "Propre"`
+                  });
+                }}
+                title="Annuler propre"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            ) : (
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-green-100 text-green-700 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdate({
+                    ...room,
+                    status: 'clean'
+                  });
+                  toast({
+                    description: `Chambre ${room.number} marquée comme propre`
+                  });
+                }}
+                title="Marquer comme propre"
+              >
+                <Check className="h-3 w-3" />
+              </button>
+            )}
+            
+            {/* Bouton Client Sorti / Annuler Client Sorti */}
+            {room.status === 'ready-to-clean' || room.status === 'checkout' ? (
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-red-700 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdate({
+                    ...room,
+                    status: 'needs-cleaning'
+                  });
+                  toast({
+                    description: `❌ Chambre ${room.number} - Annulé "Client sorti"`
+                  });
+                }}
+                title="Annuler client sorti"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            ) : (
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-orange-100 text-orange-700 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdate({
+                    ...room,
+                    status: 'ready-to-clean'
+                  });
+                  toast({
+                    description: `Chambre ${room.number} marquée comme prête à nettoyer (client sorti)`
+                  });
+                }}
+                title="Client sorti - Prêt à nettoyer"
+              >
+                🚪
+              </button>
+            )}
             
             {/* Bouton incidents en mode compact */}
             {hotelId && (

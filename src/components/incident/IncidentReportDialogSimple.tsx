@@ -165,11 +165,12 @@ export function IncidentReportDialogSimple({
     },
   });
 
-  // Handle AI recognition result
-  const handleAiResult = (result: any) => {
+  // Handle AI recognition result - with "Autre" fallback and urgent notification
+  const handleAiResult = async (result: any) => {
     setAiSuggestion(result);
     
     let foundItem = false;
+    let usedAutreItem = false;
     
     // Try to find matching item
     if (categoriesWithItems && result.item) {
@@ -195,12 +196,17 @@ export function IncidentReportDialogSimple({
         );
         if (autreItem) {
           form.setValue('item_id', autreItem.id);
+          usedAutreItem = true;
+          // Add AI detected name to description for admin review
+          const currentDesc = form.getValues('description') || '';
+          form.setValue('description', `[IA: ${result.item}] ${currentDesc}`.trim());
           break;
         }
       }
     }
 
     let foundType = false;
+    let usedAutreType = false;
     
     // Try to find matching type
     if (types && result.problem_type) {
@@ -222,12 +228,22 @@ export function IncidentReportDialogSimple({
       );
       if (autreType) {
         form.setValue('type_id', autreType.id);
+        usedAutreType = true;
       }
     }
 
     // Set suggested title
     if (result.suggested_title && !form.getValues('title')) {
       form.setValue('title', result.suggested_title);
+    }
+    
+    // Notify user if "Autre" was used (requires admin attention)
+    if (usedAutreItem || usedAutreType) {
+      toast({
+        title: "⚠️ Élément non reconnu",
+        description: `L'IA a détecté "${result.item}" mais l'élément n'existe pas. L'admin devra le classifier.`,
+        variant: "default",
+      });
     }
   };
 
