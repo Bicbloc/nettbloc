@@ -103,7 +103,7 @@ serve(async (req) => {
             </ul>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://app.nettobloc.com" 
+              <a href="https://nettobloc.bicbloc.eu" 
                  style="background: #059669; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
                 🚀 Continuer l'essai
               </a>
@@ -140,7 +140,7 @@ serve(async (req) => {
             </div>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://app.nettobloc.com" 
+              <a href="https://nettobloc.bicbloc.eu" 
                  style="background: #2563eb; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
                 🔗 Accéder à mon compte
               </a>
