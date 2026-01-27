@@ -306,32 +306,32 @@ export function IncidentReportDialogSimple({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
+        <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto h-10">
           <AlertTriangle className="h-4 w-4" />
           <span className="text-xs sm:text-sm">Incident</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
+      <DialogContent className="w-[95vw] max-w-md sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col p-4 sm:p-6">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
             Signaler un incident
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 pr-2 sm:pr-4">
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit((values) =>
                 createIncidentMutation.mutate(values)
               )}
-              className="space-y-4"
+              className="space-y-3 sm:space-y-4"
             >
-              {/* Photos with AI Recognition */}
-              <div className="space-y-3">
-                <FormLabel className="flex items-center gap-2">
-                  <Camera className="h-4 w-4" />
-                  Photos (optionnel)
+              {/* Photos with AI Recognition - Compact */}
+              <div className="space-y-2">
+                <FormLabel className="flex items-center gap-2 text-sm">
+                  <Camera className="h-3.5 w-3.5" />
+                  Photo (optionnel) - IA pré-remplit le formulaire
                 </FormLabel>
                 <div className="flex flex-wrap gap-2">
                   {selectedImages.map((image, index) => (
@@ -339,28 +339,27 @@ export function IncidentReportDialogSimple({
                       <img
                         src={URL.createObjectURL(image)}
                         alt={`Preview ${index}`}
-                        className="w-24 h-24 object-cover rounded-lg border-2 border-border"
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border-2 border-border"
                       />
                       <Button
                         type="button"
                         variant="destructive"
                         size="icon"
-                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full"
                         onClick={() => removeImage(index)}
                       >
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
                   ))}
-                  <label className="w-24 h-24 flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent hover:border-primary transition-all">
+                  <label className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent hover:border-primary transition-all active:scale-95">
                     <div className="text-center">
-                      <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Ajouter</span>
+                      <Camera className="h-5 w-5 mx-auto text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground">Photo</span>
                     </div>
                     <Input
                       type="file"
                       accept="image/*"
-                      multiple
                       capture="environment"
                       className="hidden"
                       onChange={handleImageSelect}
@@ -368,204 +367,194 @@ export function IncidentReportDialogSimple({
                   </label>
                 </div>
 
-                {/* AI Recognition Button */}
+                {/* AI Recognition Button - Auto-trigger on image */}
                 {selectedImages.length > 0 && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <ImageRecognitionButton
                       imageFile={selectedImages[0]}
                       onResult={handleAiResult}
                     />
                     {aiSuggestion && (
-                      <Badge variant="secondary" className="gap-1">
+                      <Badge variant="secondary" className="gap-1 text-xs">
                         <Sparkles className="h-3 w-3" />
-                        {Math.round(aiSuggestion.confidence * 100)}% confiance
+                        {Math.round(aiSuggestion.confidence * 100)}%
                       </Badge>
                     )}
                   </div>
                 )}
 
-                {/* AI Suggestion Display */}
+                {/* AI Suggestion Display - Compact */}
                 {aiSuggestion && (
-                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                      <Sparkles className="h-4 w-4" />
-                      Suggestion IA
+                  <div className="p-2 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-1">
+                      <Sparkles className="h-3 w-3" />
+                      Suggestion IA appliquée
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-muted-foreground">Catégorie:</span>{" "}
-                        <span className="font-medium">{aiSuggestion.category}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Élément:</span>{" "}
-                        <span className="font-medium">{aiSuggestion.item}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Problème:</span>{" "}
-                        <span className="font-medium">{aiSuggestion.problem_type}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Gravité:</span>{" "}
-                        <Badge variant="outline" className="text-[10px] px-1 py-0 ml-1">
-                          {aiSuggestion.severity}
-                        </Badge>
-                      </div>
+                    <div className="grid grid-cols-2 gap-1 text-[11px]">
+                      <span className="text-muted-foreground truncate">{aiSuggestion.category} → {aiSuggestion.item}</span>
+                      <span className="text-muted-foreground truncate">{aiSuggestion.problem_type}</span>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Title */}
+              {/* Title - Compact */}
               <FormField
                 control={form.control}
                 name="title"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Titre court *</FormLabel>
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-sm">Titre *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: WC bouché chambre 101" {...field} />
+                      <Input placeholder="Ex: WC bouché" {...field} className="h-9" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Item organized by category */}
-              <FormField
-                control={form.control}
-                name="item_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quel élément ? *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner l'élément..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="max-h-[300px]">
-                        {categoriesWithItems?.map((category) => (
-                          <div key={category.id}>
-                            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground bg-muted/50">
-                              {category.icon} {category.name}
-                            </div>
-                            {category.items.map((item: any) => (
-                              <SelectItem key={item.id} value={item.id} className="pl-6">
-                                {item.name}
-                              </SelectItem>
-                            ))}
-                          </div>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Type */}
-              <FormField
-                control={form.control}
-                name="type_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type de problème *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {types?.map((type) => (
-                          <SelectItem key={type.id} value={type.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: type.color || '#gray' }}
-                              />
-                              {type.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Location */}
-              <FormField
-                control={form.control}
-                name="location_reference"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Numéro de chambre *</FormLabel>
-                    {registeredRooms && registeredRooms.length > 0 ? (
+              {/* Two columns on larger screens */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Item organized by category */}
+                <FormField
+                  control={form.control}
+                  name="item_id"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-sm">Élément *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="h-9">
                             <SelectValue placeholder="Sélectionner..." />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="max-h-[200px]">
-                          {registeredRooms.map((room) => (
-                            <SelectItem key={room.id} value={room.room_number}>
-                              {room.room_number}
-                              {room.floor && ` - Étage ${room.floor}`}
+                        <SelectContent className="max-h-[250px]">
+                          {categoriesWithItems?.map((category) => (
+                            <div key={category.id}>
+                              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground bg-muted/50">
+                                {category.icon} {category.name}
+                              </div>
+                              {category.items.map((item: any) => (
+                                <SelectItem key={item.id} value={item.id} className="pl-5 text-sm">
+                                  {item.name}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Type */}
+                <FormField
+                  control={form.control}
+                  name="type_id"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-sm">Type *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Sélectionner..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {types?.map((type) => (
+                            <SelectItem key={type.id} value={type.id} className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: type.color || '#gray' }}
+                                />
+                                {type.name}
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : (
-                      <FormControl>
-                        <Input placeholder="Ex: 101, 205..." {...field} />
-                      </FormControl>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              {/* Assign to role */}
-              <FormField
-                control={form.control}
-                name="assigned_to_role_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assigner à (optionnel)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choisir un service..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {staffRoles?.map((role) => (
-                          <SelectItem key={role.id} value={role.id}>
-                            {role.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Location and Assignment in row on mobile */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Location */}
+                <FormField
+                  control={form.control}
+                  name="location_reference"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-sm">Chambre *</FormLabel>
+                      {registeredRooms && registeredRooms.length > 0 ? (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="N°..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-[200px]">
+                            {registeredRooms.map((room) => (
+                              <SelectItem key={room.id} value={room.room_number} className="text-sm">
+                                {room.room_number}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <FormControl>
+                          <Input placeholder="101..." {...field} className="h-9" />
+                        </FormControl>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Description */}
+                {/* Assign to role */}
+                <FormField
+                  control={form.control}
+                  name="assigned_to_role_id"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-sm">Assigner</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Service..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {staffRoles?.map((role) => (
+                            <SelectItem key={role.id} value={role.id} className="text-sm">
+                              {role.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Description - Collapsible on mobile */}
               <FormField
                 control={form.control}
                 name="description"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Détails (optionnel)</FormLabel>
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-sm">Détails (optionnel)</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="Informations supplémentaires..."
                         {...field}
-                        rows={3}
+                        rows={2}
+                        className="resize-none text-sm"
                       />
                     </FormControl>
                     <FormMessage />
@@ -575,7 +564,7 @@ export function IncidentReportDialogSimple({
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-11 text-base font-semibold"
                 disabled={createIncidentMutation.isPending}
               >
                 {createIncidentMutation.isPending ? (
@@ -584,7 +573,10 @@ export function IncidentReportDialogSimple({
                     Envoi...
                   </>
                 ) : (
-                  "Signaler l'incident"
+                  <>
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Signaler l'incident
+                  </>
                 )}
               </Button>
             </form>
