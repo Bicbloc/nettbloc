@@ -1,4 +1,3 @@
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Check, Clock, Trash2, Bed, LogOut, Layers } from "lucide-react";
 
@@ -28,15 +27,25 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
     { value: 'checkout', label: 'Client sorti', icon: LogOut, count: counts.checkout, color: 'bg-red-500' },
   ];
 
+  const handleTabChange = (value: string) => {
+    console.log('🔄 Tab change:', value);
+    onTabChange(value as RoomFilterTab);
+  };
+
   return (
-    <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as RoomFilterTab)} className="w-full">
-      <TabsList className={`grid w-full ${compact ? 'grid-cols-3 gap-1' : 'grid-cols-6'} h-auto bg-muted/50 p-1`}>
+    <div className="w-full">
+      <div className={`grid w-full ${compact ? 'grid-cols-3 gap-1' : 'grid-cols-6 gap-1'} p-1 bg-muted/50 rounded-lg`}>
         {tabs.map((tab) => (
-          <TabsTrigger
+          <button
             key={tab.value}
-            value={tab.value}
-            className={`flex items-center gap-1 text-xs sm:text-sm py-2 px-2 sm:px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm ${
+            type="button"
+            onClick={() => handleTabChange(tab.value)}
+            className={`flex items-center justify-center gap-1 text-xs sm:text-sm py-2 px-2 sm:px-3 rounded-md transition-all ${
               compact ? 'flex-col' : ''
+            } ${
+              activeTab === tab.value 
+                ? 'bg-background shadow-sm border border-border' 
+                : 'hover:bg-background/50'
             }`}
           >
             <tab.icon className={`h-3 w-3 sm:h-4 sm:w-4 ${activeTab === tab.value ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -49,10 +58,10 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
                 {tab.count}
               </Badge>
             )}
-          </TabsTrigger>
+          </button>
         ))}
-      </TabsList>
-    </Tabs>
+      </div>
+    </div>
   );
 }
 
