@@ -59,7 +59,35 @@ export function RoomCard({
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showIncidentsDialog, setShowIncidentsDialog] = useState(false);
   const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [, setTick] = useState(0); // Force re-render for timer
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to calculate elapsed time
+  const getElapsedTime = (startTime: string | Date): string => {
+    const start = new Date(startTime);
+    const now = new Date();
+    const diffMs = now.getTime() - start.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 60) {
+      return `${diffMins}min`;
+    }
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hours}h${mins > 0 ? `${mins.toString().padStart(2, '0')}` : ''}`;
+  };
+
+  // Update timer every minute for in-progress rooms
+  useEffect(() => {
+    const isInProgressRoom = room.status === 'in_progress' || room.status === 'in-progress';
+    if (!isInProgressRoom || !room.cleaningStartedAt) return;
+    
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, [room.status, room.cleaningStartedAt]);
 
   // Add animation effect when dragging
   useEffect(() => {
@@ -227,6 +255,11 @@ export function RoomCard({
           {isInProgress && (
             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 animate-badge-pulse">
               <Loader2 className="h-2 w-2 animate-spin" /> {t.rooms.inProgress}
+              {room.cleaningStartedAt && (
+                <span className="ml-1 font-medium">
+                  ({getElapsedTime(room.cleaningStartedAt)})
+                </span>
+              )}
             </span>
           )}
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
