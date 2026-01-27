@@ -752,12 +752,12 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </div>
         </Card>
 
-        {/* Tabs */}
+        {/* Tabs - Show inventory if housekeeper has linen task */}
         <div className="flex gap-2">
           <Button 
             variant={activeTab === 'rooms' ? 'default' : 'outline'}
             onClick={() => setActiveTab('rooms')}
-            className="flex-1"
+            className="flex-1 h-12"
           >
             <Home className="h-4 w-4 mr-2" />
             Chambres ({totalRooms})
@@ -766,10 +766,13 @@ export const HousekeeperWorkSimple: React.FC = () => {
             <Button 
               variant={activeTab === 'inventory' ? 'default' : 'outline'}
               onClick={() => setActiveTab('inventory')}
-              className="flex-1"
+              className="flex-1 h-12 relative"
             >
               <Package className="h-4 w-4 mr-2" />
               Inventaire
+              <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1.5 text-[10px] bg-orange-500 text-white">
+                📷
+              </Badge>
             </Button>
           )}
         </div>
@@ -835,20 +838,38 @@ export const HousekeeperWorkSimple: React.FC = () => {
             )}
           </>
         ) : (
-          /* Inventaire linge */
+          /* Inventaire linge avec scan NettoBloc */
           activeLinenTask && hotelId && (
-            <LinenQuickInventory
-              taskId={activeLinenTask}
-              hotelId={hotelId}
-              onClose={() => {
-                setActiveLinenTask(null);
-                setActiveTab('rooms');
-                toast({
-                  title: "✅ Inventaire terminé",
-                  description: "Merci pour votre travail!"
-                });
-              }}
-            />
+            <div className="space-y-4">
+              {/* Header inventaire */}
+              <Card className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-orange-500 text-white">
+                    <Package className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Inventaire Linge</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Scannez chaque type de linge avec l'appareil photo
+                    </p>
+                  </div>
+                </div>
+              </Card>
+              
+              {/* Composant inventaire avec scan */}
+              <LinenQuickInventory
+                taskId={activeLinenTask}
+                hotelId={hotelId}
+                onClose={() => {
+                  setActiveLinenTask(null);
+                  setActiveTab('rooms');
+                  toast({
+                    title: "✅ Inventaire terminé",
+                    description: "Merci pour votre travail!"
+                  });
+                }}
+              />
+            </div>
           )
         )}
 
