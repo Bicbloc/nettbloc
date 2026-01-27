@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Check, Clock, Trash2, Bed, LogOut, Layers } from "lucide-react";
+import { isFullCleaning, isQuickCleaning } from "@/utils/cleaningTypeUtils";
 
 export type RoomFilterTab = 'all' | 'clean' | 'in_progress' | 'dirty' | 'stayover' | 'checkout';
 
@@ -28,7 +29,7 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
   ];
 
   const handleTabChange = (value: string) => {
-    console.log('🔄 Tab change:', value);
+    console.log('🎯 Tab clicked:', value);
     onTabChange(value as RoomFilterTab);
   };
 
@@ -65,64 +66,84 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
   );
 }
 
+/**
+ * Filtre les chambres selon l'onglet actif
+ * Basé sur les vraies données BD:
+ * - cleaning_type: 'full' (À blanc) ou 'quick' (Recouche)
+ * - status: 'checkout', 'clean', 'needs-cleaning', 'ready-to-clean', 'stayover', 'in_progress', etc.
+ */
 export function filterRoomsByTab<T extends { status?: string; cleaning_type?: string; cleaningType?: string }>(
   rooms: T[],
   tab: RoomFilterTab
 ): T[] {
-  console.log('🔍 Filtering rooms:', { tab, totalRooms: rooms.length, rooms: rooms.map(r => ({ status: r.status, type: r.cleaning_type || r.cleaningType })) });
-  
   if (tab === 'all') return rooms;
   
-  const filtered = rooms.filter(room => {
+  console.log('🔍 Filtering rooms by tab:', tab, 'Total rooms:', rooms.length);
+  
+  const result = rooms.filter(room => {
     const status = (room.status || '').toLowerCase();
-    const cleaningType = (room.cleaning_type || room.cleaningType || '').toLowerCase();
+    const cleaningType = room.cleaning_type || room.cleaningType || '';
     
     switch (tab) {
       case 'clean':
+        // Propre = statut 'clean'
         return status === 'clean';
+        
       case 'in_progress':
-        return status === 'in_progress' || status === 'in-progress';
+        // En cours = statut 'in_progress' ou 'in-progress'
+        return status === 'in_progress' || status === 'in-progress' || status === 'in progress';
+        
       case 'dirty':
-        // Chambres à nettoyer qui ne sont pas recouche ni checkout
+        // À nettoyer = statuts dirty/needs-cleaning/ready-to-clean avec cleaning_type = full
+        // (Exclut les stayover/recouche et checkout)
         const isDirtyStatus = ['dirty', 'needs-cleaning', 'ready-to-clean', 'assigned', 'pending'].includes(status);
-        const isNotStayover = !['quick', 'recouche', 'stayover'].includes(cleaningType);
-        const isNotCheckout = !['full', 'a_blanc', 'checkout', 'à blanc'].includes(cleaningType);
-        return isDirtyStatus && isNotStayover && isNotCheckout;
+        return isDirtyStatus && isFullCleaning(cleaningType) && status !== 'checkout' && status !== 'stayover';
+        
       case 'stayover':
-        // Recouche = quick clean
-        return ['quick', 'recouche', 'stayover'].includes(cleaningType);
+        // Recouche = cleaning_type = 'quick' (recouche)
+        return isQuickCleaning(cleaningType);
+        
       case 'checkout':
-        // Client sorti = full clean / à blanc
-        return status === 'checkout' || ['full', 'a_blanc', 'checkout', 'à blanc'].includes(cleaningType);
+        // Client sorti = statut 'checkout' avec cleaning_type = 'full'
+        return status === 'checkout' && isFullCleaning(cleaningType);
+        
       default:
         return true;
     }
   });
   
-  console.log('🔍 Filtered result:', filtered.length);
-  return filtered;
+  console.log('🔍 Filtered result for', tab, ':', result.length, 'rooms');
+  return result;
 }
 
+/**
+ * Calcule le nombre de chambres pour chaque onglet
+ */
 export function calculateRoomCounts<T extends { status?: string; cleaning_type?: string; cleaningType?: string }>(
   rooms: T[]
 ): { all: number; clean: number; in_progress: number; dirty: number; stayover: number; checkout: number } {
-  const getCleaningType = (r: T) => (r.cleaning_type || r.cleaningType || '').toLowerCase();
+  const getCleaningType = (r: T) => r.cleaning_type || r.cleaningType || '';
   const getStatus = (r: T) => (r.status || '').toLowerCase();
   
-  return {
+  const counts = {
     all: rooms.length,
     clean: rooms.filter(r => getStatus(r) === 'clean').length,
-    in_progress: rooms.filter(r => getStatus(r) === 'in_progress' || getStatus(r) === 'in-progress').length,
+    in_progress: rooms.filter(r => {
+      const s = getStatus(r);
+      return s === 'in_progress' || s === 'in-progress' || s === 'in progress';
+    }).length,
     dirty: rooms.filter(r => {
       const status = getStatus(r);
       const type = getCleaningType(r);
-      return ['dirty', 'needs-cleaning', 'ready-to-clean', 'assigned', 'pending'].includes(status) &&
-        !['quick', 'recouche', 'stayover'].includes(type) &&
-        !['full', 'a_blanc', 'checkout', 'à blanc'].includes(type);
+      const isDirtyStatus = ['dirty', 'needs-cleaning', 'ready-to-clean', 'assigned', 'pending'].includes(status);
+      return isDirtyStatus && isFullCleaning(type) && status !== 'checkout' && status !== 'stayover';
     }).length,
-    stayover: rooms.filter(r => ['quick', 'recouche', 'stayover'].includes(getCleaningType(r))).length,
+    stayover: rooms.filter(r => isQuickCleaning(getCleaningType(r))).length,
     checkout: rooms.filter(r => 
-      getStatus(r) === 'checkout' || ['full', 'a_blanc', 'checkout', 'à blanc'].includes(getCleaningType(r))
+      getStatus(r) === 'checkout' && isFullCleaning(getCleaningType(r))
     ).length,
   };
+  
+  console.log('📊 Room counts calculated:', counts);
+  return counts;
 }
