@@ -399,8 +399,9 @@ const IndexDashboard = () => {
     };
 
     loadRoomsFromDatabase();
-    // Augmenter l'intervalle pour éviter les conflits
-    const interval = setInterval(loadRoomsFromDatabase, 180000);
+    // Fallback de synchronisation: rafraîchir toutes les 5s (demande produit)
+    // NOTE: loadRoomsFromDatabase s'auto-bloque pendant import/assignation.
+    const interval = setInterval(loadRoomsFromDatabase, 5000);
     return () => clearInterval(interval);
   }, [currentHotelId, isImporting, isAssigning, setRooms, setIsDistributed]);
 
