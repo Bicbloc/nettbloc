@@ -642,18 +642,22 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
   // Calculate room counts for tabs
   const roomCounts = useMemo(() => {
-    return calculateRoomCounts(rooms.map(r => ({
+    const counts = calculateRoomCounts(rooms.map(r => ({
       status: r.status,
       cleaning_type: r.cleaning_type
     })));
+    console.log('📊 Room counts:', counts, 'from rooms:', rooms.map(r => ({ num: r.room_number, status: r.status, type: r.cleaning_type })));
+    return counts;
   }, [rooms]);
   
   // Apply tab filter to rooms
   const filteredByTab = useMemo(() => {
-    return filterRoomsByTab(rooms.map(r => ({
+    const filtered = filterRoomsByTab(rooms.map(r => ({
       ...r,
       cleaning_type: r.cleaning_type
     })), roomFilterTab);
+    console.log('🎯 Active filter:', roomFilterTab, '→', filtered.length, 'rooms');
+    return filtered;
   }, [rooms, roomFilterTab]);
 
   const sortedRooms = [...filteredByTab].sort((a, b) => {
