@@ -101,22 +101,22 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
     if (!liveMode) {
       const { data: trainingSamples } = await supabase
         .from('linen_training_samples')
-        .select('ai_count, actual_count, notes, created_at')
+        .select('ai_predicted_count, actual_count, notes, created_at')
         .eq('linen_type_id', linenTypeId)
         .order('created_at', { ascending: false })
         .limit(5);
 
       if (trainingSamples && trainingSamples.length > 0) {
-        const corrections = trainingSamples.filter(s => s.ai_count !== s.actual_count);
+        const corrections = trainingSamples.filter(s => s.ai_predicted_count !== s.actual_count);
         if (corrections.length > 0) {
           fullPrompt += '\n\n## APPRENTISSAGE DES ERREURS PASSÉES\n';
           fullPrompt += 'Voici des corrections récentes - adapte ton comptage en conséquence:\n';
           corrections.forEach((sample) => {
-            const diff = (sample.ai_count || 0) - sample.actual_count;
+            const diff = (sample.ai_predicted_count || 0) - sample.actual_count;
             if (diff > 0) {
-              fullPrompt += `- L'IA avait compté ${sample.ai_count}, mais il y avait en réalité ${sample.actual_count} (SURESTIMATION de ${diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
+              fullPrompt += `- L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SURESTIMATION de ${diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
             } else {
-              fullPrompt += `- L'IA avait compté ${sample.ai_count}, mais il y avait en réalité ${sample.actual_count} (SOUS-ESTIMATION de ${-diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
+              fullPrompt += `- L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SOUS-ESTIMATION de ${-diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
             }
           });
           fullPrompt += '\n⚠️ Tendance détectée: ajuste ton comptage en fonction de ces corrections.\n';
