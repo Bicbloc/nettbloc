@@ -15,6 +15,7 @@ import RoomRegistry from "./pages/RoomRegistry";
 import Invoices from "./pages/Invoices";
 import PlanSelection from "./pages/PlanSelection";
 import Success from "./pages/Success";
+import Team from "./pages/Team";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { HotelProvider } from "./contexts/HotelContext";
@@ -75,6 +76,7 @@ const App = () => (
                               <Route path="/admin" element={<Admin />} />
                               <Route path="/room-registry" element={<RoomRegistry />} />
                               <Route path="/invoices" element={<Invoices />} />
+                              <Route path="/team" element={<Team />} />
                               <Route path="/housekeeper/login" element={<Navigate to="/housekeeper/auth" replace />} />
                               <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
                               <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
