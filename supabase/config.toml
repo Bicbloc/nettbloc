@@ -10,8 +10,16 @@ max_rows = 1000
 [auth]
 enabled = true
 port = 54322
-site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://localhost:3000"]
+site_url = "https://nettbloc.lovable.app"
+additional_redirect_urls = [
+  "https://nettbloc.lovable.app",
+  "https://nettbloc.lovable.app/auth",
+  "https://nettbloc.lovable.app/auth/establishment",
+  "https://nettbloc.lovable.app/housekeeper/auth",
+  "https://nettbloc.lovable.app/governess/auth",
+  "https://id-preview--b36a7a8c-909b-4be7-a22c-f96dedec2bb4.lovable.app",
+  "http://localhost:3000"
+]
 jwt_expiry = 3600
 refresh_token_rotation_enabled = true
 security_refresh_token_reuse_interval = 10
