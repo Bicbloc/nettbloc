@@ -23,11 +23,21 @@ interface LinenType {
   color: string | null;
   icon: string;
   display_order: number;
+  average_thickness_cm: number | null;
 }
 
 interface LinenTypeManagerProps {
   hotelId: string;
 }
+
+// Épaisseurs par défaut selon la catégorie
+const DEFAULT_THICKNESS: Record<string, number> = {
+  draps: 1.5,
+  serviettes: 3.0,
+  couvertures: 4.0,
+  taies: 1.0,
+  general: 2.0,
+};
 
 export const LinenTypeManager = ({ hotelId }: LinenTypeManagerProps) => {
   const queryClient = useQueryClient();
@@ -39,6 +49,7 @@ export const LinenTypeManager = ({ hotelId }: LinenTypeManagerProps) => {
     dimensions: "",
     color: "",
     icon: "🧺",
+    average_thickness_cm: 2.0,
   });
 
   const { data: linenTypes = [], isLoading } = useQuery({
@@ -106,7 +117,7 @@ export const LinenTypeManager = ({ hotelId }: LinenTypeManagerProps) => {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", category: "general", dimensions: "", color: "", icon: "🧺" });
+    setFormData({ name: "", category: "general", dimensions: "", color: "", icon: "🧺", average_thickness_cm: 2.0 });
     setIsAdding(false);
     setEditingId(null);
   };
@@ -118,9 +129,19 @@ export const LinenTypeManager = ({ hotelId }: LinenTypeManagerProps) => {
       dimensions: type.dimensions || "",
       color: type.color || "",
       icon: type.icon,
+      average_thickness_cm: type.average_thickness_cm || DEFAULT_THICKNESS[type.category] || 2.0,
     });
     setEditingId(type.id);
     setIsAdding(false);
+  };
+
+  // Auto-update thickness when category changes
+  const handleCategoryChange = (newCategory: string) => {
+    setFormData({ 
+      ...formData, 
+      category: newCategory,
+      average_thickness_cm: DEFAULT_THICKNESS[newCategory] || 2.0
+    });
   };
 
   const handleSubmit = () => {
@@ -171,7 +192,7 @@ export const LinenTypeManager = ({ hotelId }: LinenTypeManagerProps) => {
             </div>
             <div>
               <Label>Catégorie</Label>
-              <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+              <Select value={formData.category} onValueChange={handleCategoryChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -208,6 +229,21 @@ export const LinenTypeManager = ({ hotelId }: LinenTypeManagerProps) => {
                 placeholder="🧺"
                 maxLength={2}
               />
+            </div>
+            <div>
+              <Label>Épaisseur pliée (cm)</Label>
+              <Input
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="10"
+                value={formData.average_thickness_cm}
+                onChange={(e) => setFormData({ ...formData, average_thickness_cm: parseFloat(e.target.value) || 2.0 })}
+                placeholder="2.0"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Pour calcul précis: draps ~1.5cm, serviettes ~3cm
+              </p>
             </div>
           </div>
           <div className="flex gap-2">

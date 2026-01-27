@@ -3,9 +3,10 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus, Hash, Eye, Minus, Plus } from 'lucide-react';
+import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus, Hash, Eye, Minus, Plus, Ruler } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { RulerGuide, RulerCalculationOverlay } from './RulerGuide';
 
 interface LinenCameraScannerProps {
   linenTypeId: string;
@@ -45,6 +46,12 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [manualCount, setManualCount] = useState(0);
   const [liveDetection, setLiveDetection] = useState<DetectionResult | null>(null);
   const [isLiveDetecting, setIsLiveDetecting] = useState(false);
+  
+  // Mode précision avec règle étalon
+  const [useRulerMode, setUseRulerMode] = useState(false);
+  const [rulerDetected, setRulerDetected] = useState(false);
+  const [pileHeightCm, setPileHeightCm] = useState<number | null>(null);
+  const [itemThicknessCm, setItemThicknessCm] = useState(2.0);
   
   // État pour la correction du comptage IA
   const [showCorrectionInput, setShowCorrectionInput] = useState(false);
@@ -333,7 +340,12 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
     try {
       const { data, error } = await supabase.functions.invoke('count-linen', {
-        body: { image: imageData, linenTypeId, hotelId }
+        body: { 
+          image: imageData, 
+          linenTypeId, 
+          hotelId,
+          useRuler: useRulerMode // Pass ruler mode flag
+        }
       });
 
       if (error) {
@@ -351,6 +363,13 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         throw error;
       }
 
+      // Handle ruler-specific response fields
+      if (data.ruler_detected) {
+        setRulerDetected(true);
+        setPileHeightCm(data.pile_height_cm || null);
+        setItemThicknessCm(data.item_thickness_cm || 2.0);
+      }
+
       setResult({
         count: data.count,
         confidence: data.confidence,
@@ -358,11 +377,12 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       });
 
       if (data.confidence >= 0.7) {
-        toast({ title: "✅ Comptage réussi", description: `${data.count} ${linenTypeName} détecté(s)` });
+        const methodNote = data.ruler_detected ? " (📏 règle détectée)" : "";
+        toast({ title: "✅ Comptage réussi", description: `${data.count} ${linenTypeName} détecté(s)${methodNote}` });
       } else if (data.confidence >= 0.5) {
         toast({ title: "⚠️ Confiance moyenne", description: "Vérifiez le résultat", variant: "default" });
       } else {
-        toast({ title: "⚠️ Confiance faible", description: "Recommandé de reprendre", variant: "destructive" });
+        toast({ title: "⚠️ Confiance faible", description: "Recommandé de reprendre ou utiliser la règle", variant: "destructive" });
       }
     } catch (error: any) {
       console.error('Erreur comptage:', error);
@@ -620,6 +640,16 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               </p>
             </div>
             <div className="flex gap-2">
+              {/* Ruler precision mode toggle */}
+              <Button
+                variant={useRulerMode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setUseRulerMode(!useRulerMode)}
+                className={useRulerMode ? "bg-blue-600 text-white" : "text-white hover:bg-white/20"}
+              >
+                <Ruler className="h-4 w-4 mr-1" />
+                {useRulerMode ? "Précision ON" : "Précision"}
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -673,7 +703,26 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                       ref={overlayCanvasRef}
                       className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                     />
+                    {/* Ruler guide overlay when precision mode is active */}
+                    {useRulerMode && (
+                      <RulerGuide 
+                        isVisible={true} 
+                        detectedRuler={rulerDetected}
+                        pileHeightCm={pileHeightCm || undefined}
+                      />
+                    )}
                   </>
+                )}
+                
+                {/* Show ruler calculation result on captured image */}
+                {capturedImage && result && rulerDetected && pileHeightCm && (
+                  <RulerCalculationOverlay
+                    isVisible={true}
+                    pileHeightCm={pileHeightCm}
+                    itemThicknessCm={itemThicknessCm}
+                    calculatedCount={result.count}
+                    confidence={result.confidence}
+                  />
                 )}
                 
                 {/* Fallback: caméra indisponible */}

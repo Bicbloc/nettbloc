@@ -2174,8 +2174,11 @@ export type Database = {
           hotel_id: string
           id: string
           image_url: string
+          lighting_conditions: string | null
           linen_type_id: string
           notes: string | null
+          ruler_detected: boolean | null
+          scan_method: string | null
         }
         Insert: {
           actual_count: number
@@ -2185,8 +2188,11 @@ export type Database = {
           hotel_id: string
           id?: string
           image_url: string
+          lighting_conditions?: string | null
           linen_type_id: string
           notes?: string | null
+          ruler_detected?: boolean | null
+          scan_method?: string | null
         }
         Update: {
           actual_count?: number
@@ -2196,8 +2202,11 @@ export type Database = {
           hotel_id?: string
           id?: string
           image_url?: string
+          lighting_conditions?: string | null
           linen_type_id?: string
           notes?: string | null
+          ruler_detected?: boolean | null
+          scan_method?: string | null
         }
         Relationships: [
           {
@@ -2225,6 +2234,7 @@ export type Database = {
       }
       linen_types: {
         Row: {
+          average_thickness_cm: number | null
           category: string | null
           color: string | null
           created_at: string | null
@@ -2239,6 +2249,7 @@ export type Database = {
           weight_per_unit: number | null
         }
         Insert: {
+          average_thickness_cm?: number | null
           category?: string | null
           color?: string | null
           created_at?: string | null
@@ -2253,6 +2264,7 @@ export type Database = {
           weight_per_unit?: number | null
         }
         Update: {
+          average_thickness_cm?: number | null
           category?: string | null
           color?: string | null
           created_at?: string | null

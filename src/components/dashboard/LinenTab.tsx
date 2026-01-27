@@ -9,12 +9,14 @@ import { LinenTypeManager } from "@/components/linen/LinenTypeManager";
 import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
 import { LinenTaskAssignment } from "@/components/linen/LinenTaskAssignment";
 import { AdminLinenInventory } from "@/components/linen/AdminLinenInventory";
+import { PrintableRuler } from "@/components/linen/PrintableRuler";
 
 interface LinenTabProps {
   currentHotelId: string | null;
+  hotelName?: string;
 }
 
-export function LinenTab({ currentHotelId }: LinenTabProps) {
+export function LinenTab({ currentHotelId, hotelName }: LinenTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6">
@@ -25,11 +27,12 @@ export function LinenTab({ currentHotelId }: LinenTabProps) {
       </div>
 
       <Tabs defaultValue="types" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="types">Types de linge</TabsTrigger>
           <TabsTrigger value="inventory">Saisie & Validation</TabsTrigger>
           <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
           <TabsTrigger value="training">Entraînement IA</TabsTrigger>
+          <TabsTrigger value="ruler">📏 Règle Étalon</TabsTrigger>
         </TabsList>
 
         <TabsContent value="types" className="space-y-4">
@@ -65,6 +68,16 @@ export function LinenTab({ currentHotelId }: LinenTabProps) {
         <TabsContent value="training" className="space-y-4">
           {currentHotelId ? (
             <LinenTrainingManager hotelId={currentHotelId} />
+          ) : (
+            <Alert>
+              <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
+            </Alert>
+          )}
+        </TabsContent>
+
+        <TabsContent value="ruler" className="space-y-4">
+          {currentHotelId ? (
+            <PrintableRuler hotelId={currentHotelId} hotelName={hotelName} />
           ) : (
             <Alert>
               <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
