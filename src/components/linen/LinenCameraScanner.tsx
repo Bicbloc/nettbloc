@@ -68,11 +68,14 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       setIsInitializing(true);
       // Set a timeout to show fallback if camera doesn't start
       initTimeoutRef.current = setTimeout(() => {
-        if (!isStreaming) {
+        const readyState = videoRef.current?.readyState ?? 0;
+        const hasStream = !!streamRef.current;
+        if (!hasStream || readyState < 2) {
+          console.log('⏱️ Camera init timeout: fallback UI', { hasStream, readyState });
           setIsInitializing(false);
           setCameraFailed(true);
         }
-      }, 5000); // 5 second timeout
+      }, 8000); // 8 second timeout
       
       startCamera();
     }
@@ -239,6 +242,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   const startCamera = async () => {
     try {
+      console.log('🎥 startCamera: init');
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         console.log('Camera API not available');
         setIsInitializing(false);
@@ -270,35 +274,78 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         }
       }
       
-      if (videoRef.current && stream) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        
-        try {
-          await Promise.race([
-            new Promise<void>((resolve) => {
-              if (videoRef.current) {
-                videoRef.current.onloadedmetadata = () => {
-                  videoRef.current?.play().catch(console.error);
-                  resolve();
-                };
-              }
-            }),
-            new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000))
-          ]);
-          
-          // Clear the timeout since camera started successfully
-          if (initTimeoutRef.current) {
-            clearTimeout(initTimeoutRef.current);
+      const video = videoRef.current;
+      if (!video || !stream) {
+        console.log('❌ startCamera: videoRef missing or stream null');
+        setIsInitializing(false);
+        setCameraFailed(true);
+        return;
+      }
+
+      // Attach stream
+      streamRef.current = stream;
+      setCameraFailed(false);
+
+      // Wait for metadata + ensure play succeeds
+      const waitForReady = () =>
+        new Promise<void>((resolve, reject) => {
+          let resolved = false;
+
+          const cleanup = () => {
+            video.removeEventListener('loadedmetadata', onReady);
+            video.removeEventListener('canplay', onReady);
+            video.removeEventListener('error', onError);
+          };
+
+          const onError = () => {
+            if (resolved) return;
+            resolved = true;
+            cleanup();
+            reject(new Error('Video element error'));
+          };
+
+          const onReady = async () => {
+            if (resolved) return;
+            resolved = true;
+            cleanup();
+            try {
+              await video.play();
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          };
+
+          video.addEventListener('loadedmetadata', onReady, { once: true });
+          video.addEventListener('canplay', onReady, { once: true });
+          video.addEventListener('error', onError, { once: true });
+
+          // In case metadata is already available
+          if (video.readyState >= 1) {
+            onReady();
           }
-          setIsInitializing(false);
-          setIsStreaming(true);
-        } catch (playError) {
-          console.error('Video play failed:', playError);
-          setIsInitializing(false);
-          setCameraFailed(true);
+        });
+
+      // Important: set srcObject after listeners are attached
+      video.srcObject = stream;
+
+      try {
+        await Promise.race([
+          waitForReady(),
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for video')), 8000))
+        ]);
+
+        // Clear the timeout since camera started successfully
+        if (initTimeoutRef.current) {
+          clearTimeout(initTimeoutRef.current);
         }
-      } else {
+
+        setIsInitializing(false);
+        setIsStreaming(true);
+        console.log('✅ startCamera: streaming started');
+      } catch (playError) {
+        console.error('❌ startCamera: video play failed:', playError);
+        stopCamera();
         setIsInitializing(false);
         setCameraFailed(true);
       }
@@ -430,6 +477,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     setCapturedImage(null);
     setResult(null);
     setCameraFailed(false);
+    setIsInitializing(true);
     setLiveDetection(null);
     lastDetectionRef.current = null;
     startCamera();
@@ -720,22 +768,23 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             <>
               {/* Video with overlay */}
               <div className="flex-1 relative flex items-center justify-center bg-black">
-                {isStreaming && !capturedImage && (
+                {!capturedImage && (
                   <>
                     <video
                       ref={videoRef}
                       autoPlay
                       playsInline
-                      className="w-full h-full object-contain"
+                      muted
+                      className={`w-full h-full object-contain transition-opacity duration-300 ${isStreaming ? 'opacity-100' : 'opacity-0'}`}
                     />
                     <canvas
                       ref={overlayCanvasRef}
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                      className={`absolute inset-0 w-full h-full object-contain pointer-events-none transition-opacity duration-300 ${isStreaming ? 'opacity-100' : 'opacity-0'}`}
                     />
                     {/* Ruler guide overlay when precision mode is active */}
-                    {useRulerMode && (
-                      <RulerGuide 
-                        isVisible={true} 
+                    {isStreaming && useRulerMode && (
+                      <RulerGuide
+                        isVisible={true}
                         detectedRuler={rulerDetected}
                         pileHeightCm={pileHeightCm || undefined}
                       />
@@ -783,14 +832,28 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/80 mb-4" />
                     <p className="text-lg mb-2">Initialisation de la caméra…</p>
                     <p className="text-sm opacity-70 mb-6">Cela peut prendre quelques secondes...</p>
-                    <Button 
-                      size="lg" 
-                      variant="secondary"
-                      onClick={triggerFileInput}
-                    >
-                      <Camera className="h-5 w-5 mr-2" />
-                      Prendre une photo directement
-                    </Button>
+                      <div className="flex flex-col gap-3 w-full max-w-sm">
+                        <Button
+                          size="lg"
+                          variant="secondary"
+                          onClick={() => {
+                            setCameraFailed(false);
+                            setIsInitializing(true);
+                            startCamera();
+                          }}
+                        >
+                          <RotateCcw className="h-5 w-5 mr-2" />
+                          Relancer la caméra
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="secondary"
+                          onClick={triggerFileInput}
+                        >
+                          <Camera className="h-5 w-5 mr-2" />
+                          Prendre une photo directement
+                        </Button>
+                      </div>
                   </div>
                 )}
           

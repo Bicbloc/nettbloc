@@ -162,11 +162,14 @@ export function useDashboardRooms({
         });
       }
 
-      if (dbRooms && dbRooms.length > 0) {
-        const mergedRooms: Room[] = dbRooms.map(r => {
-          const assignment = dbAssignments?.find(a => a.room_id === r.id);
+       if (dbRooms && dbRooms.length > 0) {
+         const mergedRooms: Room[] = dbRooms.map(r => {
+           const assignment = dbAssignments?.find(a => a.room_id === r.id);
           const sessionAssigned = sessionAssignments[r.room_number];
           const assignedTo = assignment?.housekeeper_name || sessionAssigned || undefined;
+           const assignmentInProgress = assignment?.status === 'in_progress';
+           const cleaningStartedAt = assignment?.started_at || assignment?.assigned_at || undefined;
+           const cleaningFinishedAt = assignment?.completed_at || undefined;
           
           // PRIORITÉ AU cleaningType STOCKÉ EN BASE (appris par l'IA)
           const rawCleaningType = r.cleaning_type;
@@ -184,8 +187,10 @@ export function useDashboardRooms({
             cleaningType = r.status === 'clean' ? 'none' : 'a_blanc';
           }
           
-          // Si cleaningType = 'none', le statut devrait être 'clean'
-          const status = cleaningType === 'none' ? 'clean' : r.status;
+           // Si cleaningType = 'none', le statut devrait être 'clean'
+           // Sinon, si une assignation est en cours, forcer l'affichage "en cours" côté admin.
+           let status = cleaningType === 'none' ? 'clean' : r.status;
+           if (assignmentInProgress) status = 'in_progress';
           const notUrgent = cleaningType === 'none';
 
           return {
@@ -193,6 +198,8 @@ export function useDashboardRooms({
             status: status,
             cleaningType,
             assignedTo,
+             cleaningStartedAt,
+             cleaningFinishedAt,
             floor: r.floor || undefined,
             notes: r.notes || undefined,
             isUrgent: r.cleaning_priority === 10,
