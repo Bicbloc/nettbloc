@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Lock, Loader2, UserPlus, Sparkles, Shield, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Loader2, UserPlus, Sparkles, Shield, ArrowRight, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
 import { retryQuery } from '@/services/queryUtils';
@@ -15,10 +15,110 @@ import { validateUserAccessToInterface, getRedirectMessage } from '@/services/us
 export default function HousekeeperAuth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [isRequestingReset, setIsRequestingReset] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { translations: t, language } = useTranslation();
+
+  // Detect recovery mode from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const hash = window.location.hash;
+
+    if (code) {
+      // PKCE flow - exchange code for session
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (!error && data.session) {
+          setIsRecoveryMode(true);
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      });
+    } else if (hash.includes('type=recovery')) {
+      setIsRecoveryMode(true);
+    }
+  }, []);
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      toast({
+        variant: "destructive",
+        title: language === 'en' ? "Email required" : "Email requis",
+        description: language === 'en' ? "Please enter your email" : "Veuillez entrer votre email"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/housekeeper/auth`
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: language === 'en' ? "Email sent!" : "Email envoyé !",
+        description: language === 'en' 
+          ? "Check your inbox for the reset link" 
+          : "Vérifiez votre boîte de réception pour le lien de réinitialisation"
+      });
+      setIsRequestingReset(false);
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      toast({
+        variant: "destructive",
+        title: language === 'en' ? "Error" : "Erreur",
+        description: error.message
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast({
+        variant: "destructive",
+        title: language === 'en' ? "Password too short" : "Mot de passe trop court",
+        description: language === 'en' 
+          ? "Password must be at least 6 characters" 
+          : "Le mot de passe doit contenir au moins 6 caractères"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) throw error;
+
+      toast({
+        title: language === 'en' ? "Password updated!" : "Mot de passe mis à jour !",
+        description: language === 'en' 
+          ? "You can now log in with your new password" 
+          : "Vous pouvez maintenant vous connecter avec votre nouveau mot de passe"
+      });
+      setIsRecoveryMode(false);
+      setNewPassword('');
+    } catch (error: any) {
+      console.error('Update password error:', error);
+      toast({
+        variant: "destructive",
+        title: language === 'en' ? "Error" : "Erreur",
+        description: error.message
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +198,149 @@ export default function HousekeeperAuth() {
     }
   };
 
+  // Recovery mode - show new password form
+  if (isRecoveryMode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-pink-500/20 rounded-full blur-3xl" />
+        </div>
+
+        <div className="w-full max-w-md relative z-10 animate-fade-in">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-4 shadow-2xl border border-white/30">
+              <KeyRound className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              {language === 'en' ? 'New Password' : 'Nouveau mot de passe'}
+            </h1>
+            <p className="text-white/80">
+              {language === 'en' ? 'Enter your new password' : 'Entrez votre nouveau mot de passe'}
+            </p>
+          </div>
+
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword" className="flex items-center gap-2 text-sm font-medium">
+                    <Lock className="h-4 w-4 text-muted-foreground" />
+                    {language === 'en' ? 'New password' : 'Nouveau mot de passe'}
+                  </Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleUpdatePassword}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      {language === 'en' ? 'Updating...' : 'Mise à jour...'}
+                    </>
+                  ) : (
+                    language === 'en' ? 'Update password' : 'Mettre à jour le mot de passe'
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Request reset mode
+  if (isRequestingReset) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-pink-500/20 rounded-full blur-3xl" />
+        </div>
+
+        <div className="absolute top-4 left-4 z-10">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsRequestingReset(false)} 
+            className="text-white hover:bg-white/20"
+          >
+            <ArrowRight className="h-5 w-5 rotate-180" />
+          </Button>
+        </div>
+
+        <div className="w-full max-w-md relative z-10 animate-fade-in">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-4 shadow-2xl border border-white/30">
+              <Mail className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              {language === 'en' ? 'Reset Password' : 'Mot de passe oublié'}
+            </h1>
+            <p className="text-white/80">
+              {language === 'en' ? 'Enter your email to receive a reset link' : 'Entrez votre email pour recevoir un lien'}
+            </p>
+          </div>
+
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="resetEmail" className="flex items-center gap-2 text-sm font-medium">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    {language === 'en' ? 'Email address' : 'Adresse email'}
+                  </Label>
+                  <Input
+                    id="resetEmail"
+                    type="email"
+                    placeholder={t.auth.emailPlaceholder}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+
+                <Button
+                  onClick={handlePasswordReset}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      {language === 'en' ? 'Sending...' : 'Envoi...'}
+                    </>
+                  ) : (
+                    language === 'en' ? 'Send reset link' : 'Envoyer le lien'
+                  )}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsRequestingReset(false)}
+                  className="w-full"
+                >
+                  {language === 'en' ? 'Back to login' : 'Retour à la connexion'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Decorative elements */}
@@ -168,6 +411,18 @@ export default function HousekeeperAuth() {
                   className="h-12 text-base bg-muted/50 border-muted-foreground/20 focus:border-primary focus:ring-primary"
                   autoComplete="current-password"
                 />
+              </div>
+
+              <div className="text-right">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => setIsRequestingReset(true)}
+                  className="text-primary hover:text-primary/80 p-0 h-auto font-normal"
+                >
+                  {language === 'en' ? 'Forgot password?' : 'Mot de passe oublié ?'}
+                </Button>
               </div>
 
               <Button
