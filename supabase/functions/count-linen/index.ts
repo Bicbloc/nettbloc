@@ -54,43 +54,73 @@ serve(async (req) => {
     // Simplified prompt for live mode (fewer tokens = faster + cheaper)
     const livePrompt = `Compte le linge "${linenType.name}" dans l'image. Réponds JSON: {"count": N, "confidence": 0-1}`;
     
-    // Full prompt for normal mode
-    let fullPrompt = `Tu es un expert en comptage de linge d'hôtel. Compte le nombre EXACT de "${linenType.name}" (${linenType.category || 'linge'}) dans cette image.
+    // Full prompt for normal mode - AMÉLIORÉ pour les piles
+    let fullPrompt = `Tu es un expert en comptage de linge d'hôtel avec une spécialisation dans le comptage de piles.
 
-Informations:
-- Nom: ${linenType.name}
-- Catégorie: ${linenType.category || 'Non spécifiée'}
-${linenType.dimensions ? `- Dimensions: ${linenType.dimensions}` : ''}
-${linenType.color ? `- Couleur: ${linenType.color}` : ''}
+OBJET À COMPTER: "${linenType.name}" (${linenType.category || 'linge'})
+${linenType.dimensions ? `Dimensions: ${linenType.dimensions}` : ''}
+${linenType.color ? `Couleur: ${linenType.color}` : ''}
 
-MÉTHODE:
-1. Examine toute l'image systématiquement
-2. Identifie les bords et coins de chaque pièce
-3. Pour les piles: compte les couches visibles
-4. Ne compte pas les ombres ou plis
+## MÉTHODE POUR LES PILES DE LINGE
+
+### Étape 1: Analyse de la structure
+- Identifie si le linge est posé à plat, plié, ou en pile
+- Pour les piles: observe l'épaisseur totale et l'épaisseur d'UNE pièce
+
+### Étape 2: Comptage des couches
+- Compte les PLIS visibles sur le côté de la pile
+- Chaque pli = 1 pièce
+- Si tu vois N plis distincts, il y a N pièces
+
+### Étape 3: Vérification
+- Épaisseur typique d'un drap plié: 1-2 cm
+- Épaisseur typique d'une serviette pliée: 2-4 cm
+- Divise l'épaisseur totale par l'épaisseur d'une pièce
+
+### ERREURS À ÉVITER
+❌ Ne pas compter les ombres comme des pièces
+❌ Ne pas confondre un pli de tissu avec une pièce séparée
+❌ Ne pas surestimer: en cas de doute, compte MOINS
+❌ Les bords repliés d'une même pièce ne sont PAS des pièces supplémentaires
+
+### RÈGLE D'OR POUR LES PILES
+Si tu vois une pile compacte et homogène:
+1. Compte les STRATES distinctes (lignes horizontales sur le côté)
+2. Chaque strate = 1 pièce
+3. En cas d'incertitude, SOUS-ESTIME plutôt que surestimer
 
 CONFIANCE:
-- 0.9-1.0: Pièces clairement visibles
-- 0.7-0.89: Quelques zones d'ombre
-- 0.5-0.69: Superpositions difficiles
-- <0.5: Image floue ou pile compacte
+- 0.9-1.0: Pièces séparées, clairement visibles une par une
+- 0.7-0.89: Pile avec strates bien définies
+- 0.5-0.69: Pile compacte, estimation nécessaire
+- <0.5: Impossible de distinguer les couches
 
-Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "observations"}`;
+Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode utilisée et observations"}`;
 
-    // Get training samples for normal mode only (saves API calls in live mode)
+    // Get training samples + corrections for improved accuracy
     if (!liveMode) {
       const { data: trainingSamples } = await supabase
         .from('linen_training_samples')
-        .select('actual_count, notes')
+        .select('ai_count, actual_count, notes, created_at')
         .eq('linen_type_id', linenTypeId)
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(5);
 
       if (trainingSamples && trainingSamples.length > 0) {
-        fullPrompt += '\n\nExemples précédents:\n';
-        trainingSamples.forEach((sample, idx) => {
-          fullPrompt += `- ${sample.actual_count} pièces${sample.notes ? ` (${sample.notes})` : ''}\n`;
-        });
+        const corrections = trainingSamples.filter(s => s.ai_count !== s.actual_count);
+        if (corrections.length > 0) {
+          fullPrompt += '\n\n## APPRENTISSAGE DES ERREURS PASSÉES\n';
+          fullPrompt += 'Voici des corrections récentes - adapte ton comptage en conséquence:\n';
+          corrections.forEach((sample) => {
+            const diff = (sample.ai_count || 0) - sample.actual_count;
+            if (diff > 0) {
+              fullPrompt += `- L'IA avait compté ${sample.ai_count}, mais il y avait en réalité ${sample.actual_count} (SURESTIMATION de ${diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
+            } else {
+              fullPrompt += `- L'IA avait compté ${sample.ai_count}, mais il y avait en réalité ${sample.actual_count} (SOUS-ESTIMATION de ${-diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
+            }
+          });
+          fullPrompt += '\n⚠️ Tendance détectée: ajuste ton comptage en fonction de ces corrections.\n';
+        }
       }
     }
 
