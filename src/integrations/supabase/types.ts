@@ -65,6 +65,8 @@ export type Database = {
           hotel_id: string
           id: string
           metadata: Json | null
+          sub_account_id: string | null
+          sub_account_name: string | null
           timestamp: string
         }
         Insert: {
@@ -78,6 +80,8 @@ export type Database = {
           hotel_id: string
           id?: string
           metadata?: Json | null
+          sub_account_id?: string | null
+          sub_account_name?: string | null
           timestamp?: string
         }
         Update: {
@@ -91,6 +95,8 @@ export type Database = {
           hotel_id?: string
           id?: string
           metadata?: Json | null
+          sub_account_id?: string | null
+          sub_account_name?: string | null
           timestamp?: string
         }
         Relationships: [
@@ -106,6 +112,13 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_sub_account_id_fkey"
+            columns: ["sub_account_id"]
+            isOneToOne: false
+            referencedRelation: "sub_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -324,6 +337,8 @@ export type Database = {
           id: string
           log_date: string
           room_number: string | null
+          sub_account_id: string | null
+          sub_account_name: string | null
         }
         Insert: {
           action_type: string
@@ -336,6 +351,8 @@ export type Database = {
           id?: string
           log_date?: string
           room_number?: string | null
+          sub_account_id?: string | null
+          sub_account_name?: string | null
         }
         Update: {
           action_type?: string
@@ -348,6 +365,8 @@ export type Database = {
           id?: string
           log_date?: string
           room_number?: string | null
+          sub_account_id?: string | null
+          sub_account_name?: string | null
         }
         Relationships: [
           {
@@ -362,6 +381,13 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_action_logs_sub_account_id_fkey"
+            columns: ["sub_account_id"]
+            isOneToOne: false
+            referencedRelation: "sub_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -1102,6 +1128,7 @@ export type Database = {
           email: string
           hotel_code: string | null
           id: string
+          import_mode: string | null
           name: string
           settings: Json | null
           status: string | null
@@ -1114,6 +1141,7 @@ export type Database = {
           email: string
           hotel_code?: string | null
           id?: string
+          import_mode?: string | null
           name: string
           settings?: Json | null
           status?: string | null
@@ -1126,6 +1154,7 @@ export type Database = {
           email?: string
           hotel_code?: string | null
           id?: string
+          import_mode?: string | null
           name?: string
           settings?: Json | null
           status?: string | null
@@ -2828,6 +2857,36 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_role_templates: {
+        Row: {
+          created_at: string | null
+          default_permissions: Json | null
+          description: string | null
+          display_name: string
+          id: string
+          is_system: boolean | null
+          role_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          default_permissions?: Json | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_system?: boolean | null
+          role_name: string
+        }
+        Update: {
+          created_at?: string | null
+          default_permissions?: Json | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_system?: boolean | null
+          role_name?: string
+        }
+        Relationships: []
+      }
       pms_rules: {
         Row: {
           combination_rules: Json | null
@@ -3622,6 +3681,80 @@ export type Database = {
           },
         ]
       }
+      sub_account_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_allowed: boolean | null
+          permission_key: string
+          sub_account_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_allowed?: boolean | null
+          permission_key: string
+          sub_account_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_allowed?: boolean | null
+          permission_key?: string
+          sub_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_account_permissions_sub_account_id_fkey"
+            columns: ["sub_account_id"]
+            isOneToOne: false
+            referencedRelation: "sub_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_accounts: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          email: string
+          first_name: string
+          id: string
+          is_active: boolean | null
+          last_login_at: string | null
+          last_name: string
+          parent_user_id: string
+          role_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          email: string
+          first_name: string
+          id?: string
+          is_active?: boolean | null
+          last_login_at?: string | null
+          last_name: string
+          parent_user_id: string
+          role_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          email?: string
+          first_name?: string
+          id?: string
+          is_active?: boolean | null
+          last_login_at?: string | null
+          last_name?: string
+          parent_user_id?: string
+          role_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           created_at: string | null
@@ -4291,6 +4424,10 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      sub_account_has_permission: {
+        Args: { p_permission_key: string; p_sub_account_id: string }
+        Returns: boolean
       }
       sync_access_codes_with_housekeepers: { Args: never; Returns: number }
       upsert_rooms_from_pdf: {
