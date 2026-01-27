@@ -1,91 +1,120 @@
 
 
-# Plan de Migration vers le Domaine nettobloc.bicbloc.eu
+# Plan : Ajout de la Réinitialisation de Mot de Passe pour Tous les Utilisateurs
 
 ## Résumé
 
-Migration de tous les fichiers de configuration pour utiliser le nouveau domaine personnalisé `nettobloc.bicbloc.eu` au lieu de `nettbloc.lovable.app`.
+Ajouter la fonctionnalité "Mot de passe oublié" aux trois pages d'authentification : Femme de chambre, Gouvernante et Technicien.
 
-## Fichiers à Modifier
+## Pages à Modifier
 
-### 1. supabase/config.toml
-**Objectif** : Mettre à jour les URLs de redirection pour l'authentification
+### 1. src/pages/HousekeeperAuth.tsx
+**Objectif** : Ajouter le lien et la logique de réinitialisation de mot de passe
 
 **Modifications** :
-```toml
-[auth]
-site_url = "https://nettobloc.bicbloc.eu"
-additional_redirect_urls = [
-  "https://nettobloc.bicbloc.eu",
-  "https://nettobloc.bicbloc.eu/auth",
-  "https://nettobloc.bicbloc.eu/auth/establishment",
-  "https://nettobloc.bicbloc.eu/housekeeper/auth",
-  "https://nettobloc.bicbloc.eu/governess/auth",
-  "https://id-preview--b36a7a8c-909b-4be7-a22c-f96dedec2bb4.lovable.app",
-  "http://localhost:3000"
-]
-```
+- Ajouter un état `isRecoveryMode` et `isPasswordReset` pour détecter le mode récupération
+- Ajouter un état `newPassword` pour le nouveau mot de passe
+- Ajouter une fonction `handlePasswordReset` qui appelle `supabase.auth.resetPasswordForEmail()`
+- Ajouter une fonction `handleUpdatePassword` pour mettre à jour le mot de passe
+- Détecter les tokens de récupération dans l'URL (`?code=` ou `#access_token`)
+- Ajouter un lien "Mot de passe oublié ?" sous le formulaire de connexion
+- Afficher le formulaire de nouveau mot de passe si en mode récupération
 
-### 2. supabase/functions/send-staff-invitation/index.ts
-**Objectif** : Corriger l'URL par défaut pour les liens d'invitation
+### 2. src/pages/GovernessAuth.tsx
+**Objectif** : Ajouter le lien et la logique de réinitialisation de mot de passe
 
-**Ligne 31** - Changer :
+**Modifications** :
+- Ajouter un état `isRecoveryMode` pour détecter le mode récupération
+- Ajouter un état `newPassword` pour le nouveau mot de passe  
+- Ajouter une fonction `handlePasswordReset` qui appelle `supabase.auth.resetPasswordForEmail()`
+- Ajouter une fonction `handleUpdatePassword` pour mettre à jour le mot de passe
+- Détecter les tokens de récupération dans l'URL
+- Ajouter un lien "Mot de passe oublié ?" sous le formulaire de connexion
+- Afficher le formulaire de nouveau mot de passe si en mode récupération
+
+### 3. src/pages/TechnicianLogin.tsx
+**Objectif** : Ajouter le lien et la logique de réinitialisation de mot de passe
+
+**Modifications** :
+- Ajouter un état `isRecoveryMode` pour détecter le mode récupération
+- Ajouter un état `newPassword` pour le nouveau mot de passe
+- Ajouter une fonction `handlePasswordReset` qui appelle `supabase.auth.resetPasswordForEmail()`
+- Ajouter une fonction `handleUpdatePassword` pour mettre à jour le mot de passe
+- Détecter les tokens de récupération dans l'URL
+- Ajouter un lien "Mot de passe oublié ?" sous le formulaire de connexion
+- Afficher le formulaire de nouveau mot de passe si en mode récupération
+
+## Logique Commune à Implémenter
+
 ```typescript
-const baseUrl = Deno.env.get("APP_URL") || "https://rarhqnvvbjzfdevnghnz.lovableproject.com";
+// Détection du mode récupération au chargement
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const hash = window.location.hash;
+  
+  if (code) {
+    // PKCE flow - échanger le code contre une session
+    supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+      if (!error && data.session) {
+        setIsRecoveryMode(true);
+      }
+    });
+  } else if (hash.includes('type=recovery')) {
+    setIsRecoveryMode(true);
+  }
+}, []);
+
+// Réinitialisation du mot de passe
+const handlePasswordReset = async () => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/PAGE_PATH`
+  });
+  
+  if (!error) {
+    toast({ title: "Email envoyé", description: "Vérifiez votre boîte de réception" });
+  }
+};
+
+// Mise à jour du mot de passe
+const handleUpdatePassword = async () => {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  
+  if (!error) {
+    toast({ title: "Mot de passe mis à jour" });
+    setIsRecoveryMode(false);
+    navigate('/PAGE_PATH');
+  }
+};
 ```
-**En** :
-```typescript
-const baseUrl = Deno.env.get("APP_URL") || "https://nettobloc.bicbloc.eu";
-```
 
-### 3. supabase/functions/send-activation-email/index.ts
-**Objectif** : Corriger les liens dans les emails d'activation
+## URLs de Redirection
 
-**Ligne 106** - Changer :
-```html
-<a href="https://app.nettobloc.com"
-```
-**En** :
-```html
-<a href="https://nettobloc.bicbloc.eu"
-```
+| Page | redirectTo |
+|------|------------|
+| HousekeeperAuth | `${window.location.origin}/housekeeper/auth` |
+| GovernessAuth | `${window.location.origin}/governess/auth` |
+| TechnicianLogin | `${window.location.origin}/technician/login` |
 
-**Ligne 143** - Même modification
+## Interface Utilisateur
 
-### 4. capacitor.config.ts
-**Objectif** : Corriger l'URL du serveur pour l'application mobile
+Chaque page affichera :
+1. **Mode normal** : Formulaire de connexion avec lien "Mot de passe oublié ?"
+2. **Mode demande reset** : Champ email + bouton "Envoyer le lien"
+3. **Mode récupération** : Champ "Nouveau mot de passe" + bouton "Mettre à jour"
 
-**Ligne 8** - Changer :
-```typescript
-url: 'https://b36a7a8c-909b-4be7-a22c-f96dedec2bb4.lovableproject.com?forceHideBadge=true',
-```
-**En** :
-```typescript
-url: 'https://nettobloc.bicbloc.eu?forceHideBadge=true',
-```
+## Configuration Supabase Requise
 
-## Action Manuelle Requise (Dashboard Supabase)
+Les URLs suivantes doivent être dans les **Redirect URLs** du dashboard Supabase :
+- `https://nettobloc.bicbloc.eu/housekeeper/auth`
+- `https://nettobloc.bicbloc.eu/governess/auth`
+- `https://nettobloc.bicbloc.eu/technician/login`
 
-Après l'implémentation, vous devez également mettre à jour le Dashboard Supabase :
+Ces URLs sont déjà couvertes par le pattern `https://nettobloc.bicbloc.eu/**` si vous l'avez configuré.
 
-1. Aller sur https://supabase.com/dashboard/project/rarhqnvvbjzfdevnghnz/auth/url-configuration
-2. **Site URL** : `https://nettobloc.bicbloc.eu`
-3. **Redirect URLs** - Ajouter :
-   - `https://nettobloc.bicbloc.eu/**`
+## Note sur l'Erreur Rate Limit
 
-## Fichiers Non Modifiés
+L'erreur "email rate limit exceeded" signifie que Supabase a temporairement bloqué les emails pour cette adresse. Attendez environ **60 minutes** avant de réessayer.
 
-Les fichiers suivants contiennent `@bicbloc.eu` mais ce sont des adresses email, pas des URLs d'application :
-- Migrations SQL avec `support@bicbloc.eu`, `operations@bicbloc.eu`, `freeflex@bicbloc.eu`
-- `src/pages/Invoices.tsx` avec `support@bicbloc.eu`
-
-Ces fichiers n'ont **pas** besoin d'être modifiés.
-
-## Résultat Attendu
-
-Après cette migration :
-- Les emails de réinitialisation de mot de passe redirigeront vers `nettobloc.bicbloc.eu`
-- Les invitations du personnel utiliseront le bon domaine
-- Les emails d'activation pointeront vers le bon site
-- L'application mobile se connectera au bon domaine
+L'erreur de build "429 Cloudflare" est également temporaire - réessayez la publication dans quelques secondes.
 
