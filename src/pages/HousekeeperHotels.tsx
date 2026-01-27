@@ -67,19 +67,21 @@ export default function HousekeeperHotels() {
         console.error('❌ Erreur chargement hôtels:', hotelsError);
       }
 
-      const hotelsArray = approvedHotels as Array<{ hotel_id: string; hotel_name: string; hotel_code: string }> | null;
+      const hotelsArray = approvedHotels as Array<{ hotel_id: string; hotel_name: string; hotel_code: string; approved_at: string }> | null;
       
       if (hotelsArray && hotelsArray.length > 0) {
         // Transformer les données RPC en format attendu
         const uniqueHotels = hotelsArray.map((h) => ({
           id: h.hotel_id,
           name: h.hotel_name,
-          hotel_code: h.hotel_code
+          hotel_code: h.hotel_code,
+          approved_at: h.approved_at
         }));
-        setHotels(uniqueHotels);
 
         // Charger le nombre de chambres assignées pour chaque hôtel
         const assignmentCounts: Record<string, number> = {};
+        const lastActivityMap: Record<string, string> = {};
+        
         // Load assignments in parallel with timeout
         const assignmentPromises = uniqueHotels.map(async (hotel) => {
           try {
@@ -90,13 +92,20 @@ export default function HousekeeperHotels() {
             // Chercher par housekeeper_id OU housekeeper_name pour couvrir tous les cas
             const queryPromise = supabase
               .from('assignments')
-              .select('*', { count: 'exact', head: true })
+              .select('created_at', { count: 'exact' })
               .eq('hotel_id', hotel.id)
               .or(`housekeeper_id.eq.${profileData.id},housekeeper_name.eq.${profileData.name}`)
-              .in('status', ['assigned', 'in_progress']);
+              .in('status', ['assigned', 'in_progress'])
+              .order('created_at', { ascending: false })
+              .limit(1);
 
-            const { count } = await Promise.race([queryPromise, timeoutPromise]);
+            const { count, data } = await Promise.race([queryPromise, timeoutPromise]);
             assignmentCounts[hotel.id] = count || 0;
+            
+            // Track last activity (most recent assignment)
+            if (data && data.length > 0) {
+              lastActivityMap[hotel.id] = data[0].created_at;
+            }
           } catch (error) {
             console.error(`Error loading assignments for hotel ${hotel.id}:`, error);
             assignmentCounts[hotel.id] = 0;
@@ -105,6 +114,30 @@ export default function HousekeeperHotels() {
 
         await Promise.all(assignmentPromises);
         setHotelAssignments(assignmentCounts);
+        
+        // Sort hotels: today's active hotel first (has recent assignments), then by name
+        const today = new Date().toISOString().split('T')[0];
+        const sortedHotels = [...uniqueHotels].sort((a, b) => {
+          const aHasAssignments = assignmentCounts[a.id] > 0;
+          const bHasAssignments = assignmentCounts[b.id] > 0;
+          const aLastActivity = lastActivityMap[a.id];
+          const bLastActivity = lastActivityMap[b.id];
+          const aIsToday = aLastActivity && aLastActivity.startsWith(today);
+          const bIsToday = bLastActivity && bLastActivity.startsWith(today);
+          
+          // Today's hotel with assignments comes first
+          if (aIsToday && aHasAssignments && !(bIsToday && bHasAssignments)) return -1;
+          if (bIsToday && bHasAssignments && !(aIsToday && aHasAssignments)) return 1;
+          
+          // Then hotels with assignments
+          if (aHasAssignments && !bHasAssignments) return -1;
+          if (bHasAssignments && !aHasAssignments) return 1;
+          
+          // Then by name
+          return a.name.localeCompare(b.name);
+        });
+        
+        setHotels(sortedHotels);
         console.log('✅ Comptage assignations final:', assignmentCounts);
       }
 
@@ -341,28 +374,35 @@ export default function HousekeeperHotels() {
               </div>
             ) : (
               <div className="grid gap-2 sm:gap-3">
-                {hotels.map((hotel: any) => {
+                {hotels.map((hotel: any, index: number) => {
                   const assignedRooms = hotelAssignments[hotel.id] || 0;
                   const hasAssignments = assignedRooms > 0;
+                  const isTodayHotel = index === 0 && hasAssignments; // First hotel with assignments is "today's"
                   
                   return (
                     <button
                       key={hotel.id}
                       onClick={() => handleSelectHotel(hotel)}
                       className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border-2 rounded-lg hover:bg-accent transition-all text-left gap-3 ${
-                        hasAssignments 
+                        isTodayHotel
+                          ? 'border-orange-500 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950 shadow-lg shadow-orange-200/50' 
+                          : hasAssignments 
                           ? 'border-green-500 bg-green-50 dark:bg-green-950' 
                           : 'border-border'
                       }`}
                     >
                       <div className="flex items-center gap-3 w-full sm:w-auto">
                         <div className={`p-2 rounded flex-shrink-0 ${
-                          hasAssignments 
+                          isTodayHotel
+                            ? 'bg-orange-100 dark:bg-orange-900'
+                            : hasAssignments 
                             ? 'bg-green-100 dark:bg-green-900' 
                             : 'bg-purple-100 dark:bg-purple-900'
                         }`}>
                           <Building2 className={`h-5 w-5 ${
-                            hasAssignments 
+                            isTodayHotel
+                              ? 'text-orange-600 dark:text-orange-400'
+                              : hasAssignments 
                               ? 'text-green-600 dark:text-green-400' 
                               : 'text-purple-600 dark:text-purple-400'
                           }`} />
@@ -370,6 +410,11 @@ export default function HousekeeperHotels() {
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="font-medium truncate">{hotel.name}</p>
+                            {isTodayHotel && (
+                              <Badge className="bg-orange-500 text-white text-xs animate-pulse">
+                                📅 Aujourd'hui
+                              </Badge>
+                            )}
                             {hasAssignments && (
                               <Badge variant="default" className="bg-green-600 text-xs">
                                 {assignedRooms} {assignedRooms === 1 ? 'chambre' : 'chambres'}
@@ -382,7 +427,9 @@ export default function HousekeeperHotels() {
                         </div>
                       </div>
                       <CheckCircle2 className={`h-5 w-5 flex-shrink-0 ${
-                        hasAssignments 
+                        isTodayHotel
+                          ? 'text-orange-600 dark:text-orange-400'
+                          : hasAssignments 
                           ? 'text-green-600 dark:text-green-400' 
                           : 'text-purple-600 dark:text-purple-400'
                       }`} />

@@ -2,12 +2,13 @@ import { useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package } from 'lucide-react';
+import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package, LogOut } from 'lucide-react';
 import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
 import { ReportLostItemDialog, GuestInfo } from '@/components/lost-and-found/ReportLostItemDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ActionLogService } from '@/services/actionLogService';
+import { isFullCleaning } from '@/constants/cleaningTypes';
 
 interface Room {
   id: string;
@@ -16,6 +17,7 @@ interface Room {
   notes?: string;
   cleaning_priority?: number;
   cleaning_type?: string;
+  is_checkout?: boolean; // Client sorti
   // Guest info from PMS data
   guest_arrival?: GuestInfo;
   guest_departure?: GuestInfo;
@@ -276,22 +278,30 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                   </Badge>
                 )}
                 
+                {/* Client sorti badge */}
+                {(room.is_checkout || isFullCleaning(room.cleaning_type) || room.status === 'checkout') && (
+                  <Badge className="bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs gap-1">
+                    <LogOut className="h-3 w-3" />
+                    Client sorti
+                  </Badge>
+                )}
+
                 {/* Cleaning type badge */}
                 {room.cleaning_type && (
                   <Badge 
-                    className={`text-sm font-medium ${room.cleaning_type === 'full' 
+                    className={`text-sm font-medium ${isFullCleaning(room.cleaning_type) 
                       ? 'bg-gradient-to-r from-purple-500 to-violet-500 text-white' 
                       : 'bg-gradient-to-r from-sky-400 to-blue-500 text-white'
                     }`}
                   >
                     <Sparkles className="h-3.5 w-3.5 mr-1" />
-                    {room.cleaning_type === 'full' ? 'À blanc' : 'Recouche'}
+                    {isFullCleaning(room.cleaning_type) ? 'À blanc' : 'Recouche'}
                   </Badge>
                 )}
 
                 {/* Status badge */}
                 <Badge 
-                  variant="outline" 
+                  variant="outline"
                   className={`text-sm font-medium ${
                     room.status === 'clean'
                       ? 'bg-green-100 text-green-700 border-green-400'
