@@ -30,7 +30,7 @@ class RealtimeManager {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private isConnecting = false;
   private lastConnectionAttempt = 0;
-  private minTimeBetweenAttempts = 1000;
+  private minTimeBetweenAttempts = 500; // Réduit pour des mises à jour plus rapides
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private statusCallbacks: Set<StatusCallback> = new Set();
   private isOnline = true;
@@ -416,8 +416,8 @@ class RealtimeManager {
       return;
     }
 
-    // Backoff: 2s, 4s, 8s, 16s, max 30s
-    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 2000, 30000);
+    // Backoff réduit: 1s, 2s, 4s, 8s, max 15s pour reconnexion plus rapide
+    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 15000);
     this.reconnectAttempts++;
 
     console.log(
@@ -532,7 +532,7 @@ class RealtimeManager {
           this.scheduleReconnect();
         }
       }
-    }, 45000);
+    }, 30000); // Heartbeat toutes les 30s pour détection plus rapide
   }
 
   private stopHeartbeat() {
