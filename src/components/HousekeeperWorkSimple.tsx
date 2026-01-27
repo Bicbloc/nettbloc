@@ -475,6 +475,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
         return acc;
       }, []) || [];
 
+      // IMPORTANT: Extraire TOUTES les chambres assignées (recouche ET à blanc)
       const extractedRooms: Room[] = uniqueAssignments
         .filter((a: any) => a.rooms)
         .map((a: any) => ({
@@ -486,7 +487,12 @@ export const HousekeeperWorkSimple: React.FC = () => {
           cleaning_type: a.rooms.cleaning_type
         }));
 
-      console.log('✅ Chambres extraites:', extractedRooms.length);
+      // Log détaillé pour debug
+      const aBlancCount = extractedRooms.filter(r => r.cleaning_type === 'full' || r.cleaning_type === 'checkout' || r.cleaning_type === 'À blanc').length;
+      const recoucheCount = extractedRooms.filter(r => r.cleaning_type === 'quick' || r.cleaning_type === 'stayover' || r.cleaning_type === 'Recouche').length;
+      const otherCount = extractedRooms.length - aBlancCount - recoucheCount;
+      console.log('✅ Chambres extraites:', extractedRooms.length, `(${aBlancCount} à blanc, ${recoucheCount} recouche, ${otherCount} autres)`);
+      console.log('📦 Types de chambres:', extractedRooms.map(r => ({ num: r.room_number, type: r.cleaning_type, status: r.status })));
       
       setAssignments(uniqueAssignments);
       setRooms(extractedRooms);
@@ -559,24 +565,45 @@ export const HousekeeperWorkSimple: React.FC = () => {
           .from('assignments')
           .update({ 
             status: newAssignmentStatus,
-            completed_at: newStatus === 'clean' ? new Date().toISOString() : null
+            completed_at: newStatus === 'clean' ? new Date().toISOString() : null,
+            started_at: newStatus === 'in_progress' ? new Date().toISOString() : assignment.started_at
           })
           .eq('id', assignment.id);
       }
 
-      // Logger l'action
+      // Logger l'action dans daily_action_logs + notifier l'admin en temps réel
       if (hotelId) {
+        const actionType = newStatus === 'clean' ? 'cleaning-end' : 'cleaning-start';
+        const description = `${housekeeperName} - Chambre ${room.room_number} - ${newStatus === 'clean' ? 'Nettoyage terminé' : 'Nettoyage démarré'}`;
+        
+        // 1. Journal d'action
         await supabase.from('daily_action_logs').insert({
           hotel_id: hotelId,
-          action_type: newStatus === 'clean' ? 'cleaning-end' : 'cleaning-start',
-          description: `Chambre ${room.room_number} - ${newStatus === 'clean' ? 'Nettoyage terminé' : 'Nettoyage en cours'}`,
+          action_type: actionType,
+          description,
           room_number: room.room_number,
           actor_name: housekeeperName,
           actor_type: 'housekeeper',
-          details: { notes, previousStatus: room.status }
+          details: { 
+            notes, 
+            previousStatus: room.status, 
+            cleaningType: room.cleaning_type,
+            timestamp: new Date().toISOString()
+          }
+        });
+
+        // 2. Notification temps réel pour l'admin via RPC
+        await supabase.rpc('log_housekeeper_action', {
+          p_hotel_id: hotelId,
+          p_type: actionType,
+          p_title: newStatus === 'clean' ? '✅ Nettoyage terminé' : '🔄 Nettoyage en cours',
+          p_description: description,
+          p_housekeeper_name: housekeeperName,
+          p_room_number: room.room_number
         });
       }
 
+      // Mise à jour optimiste locale
       setRooms(prev => prev.map(r => 
         r.id === roomId ? { ...r, status: newStatus, notes: notes || r.notes } : r
       ));
