@@ -23,6 +23,7 @@ export function useRealtimeRooms({
     console.log(`📡 Temps réel [${table}] ${payload.eventType}:`, {
       roomNumber: payload.new?.room_number,
       status: payload.new?.status,
+      cleaning_type: payload.new?.cleaning_type,
       notes: payload.new?.notes,
       assignedTo: payload.new?.housekeeper_name,
       id: payload.new?.id
@@ -32,35 +33,68 @@ export function useRealtimeRooms({
     
     if (table === 'rooms' && (eventType === 'UPDATE' || eventType === 'INSERT')) {
       setRooms(prev => {
-        const existingIndex = prev.findIndex(r => r.number === newRecord.room_number);
+        // Try to find by room_number
+        const existingIndex = prev.findIndex(r => 
+          r.number === newRecord.room_number
+        );
+        
         if (existingIndex !== -1) {
-          console.log(`✅ Chambre ${newRecord.room_number} trouvée, mise à jour: ${oldRecord?.status} → ${newRecord.status}`);
-          return prev.map((r, i) => {
+          console.log(`✅ Chambre ${newRecord.room_number} trouvée, mise à jour: ${oldRecord?.status} → ${newRecord.status}, cleaning_type: ${newRecord.cleaning_type}`);
+          
+          const updatedRooms = prev.map((r, i) => {
             if (i !== existingIndex) return r;
+            
             // Normalize cleaning_type from database to UI format
             let normalizedCleaningType: typeof r.cleaningType = r.cleaningType;
-            if (newRecord.cleaning_type === 'full' || newRecord.cleaning_type === 'a_blanc') {
+            const dbCleaningType = (newRecord.cleaning_type || '').toLowerCase();
+            
+            if (dbCleaningType === 'full' || dbCleaningType === 'a_blanc' || dbCleaningType === 'checkout') {
               normalizedCleaningType = 'a_blanc';
-            } else if (newRecord.cleaning_type === 'quick' || newRecord.cleaning_type === 'recouche') {
+            } else if (dbCleaningType === 'quick' || dbCleaningType === 'recouche' || dbCleaningType === 'stayover') {
               normalizedCleaningType = 'recouche';
+            } else if (dbCleaningType === 'none') {
+              normalizedCleaningType = 'none';
             }
+            
+            // Also preserve cleaning_type for RoomStatusTabs filtering
             return { 
               ...r, 
               status: newRecord.status,
               cleaningType: normalizedCleaningType,
+              cleaning_type: newRecord.cleaning_type, // Keep raw value for filtering
               notes: newRecord.notes || r.notes
             };
           });
+          
+          console.log(`📊 Rooms après mise à jour RT:`, updatedRooms.map(r => ({
+            number: r.number, 
+            status: r.status, 
+            cleaningType: r.cleaningType,
+            cleaning_type: (r as any).cleaning_type
+          })));
+          
+          return updatedRooms;
         }
+        
         console.log(`⚠️ Chambre ${newRecord.room_number} non trouvée dans la liste locale`);
         return prev;
       });
 
-      // Notification only if status changes to clean
-      if (newRecord.status === 'clean') {
+      // Notification for status changes
+      if (newRecord.status === 'clean' && oldRecord?.status !== 'clean') {
         toast({
           title: "✅ Chambre nettoyée",
           description: `Chambre ${newRecord.room_number} marquée propre${newRecord.notes ? ` - ${newRecord.notes}` : ''}`,
+          duration: 4000
+        });
+      }
+      
+      // Notification for checkout status
+      if ((newRecord.status === 'checkout' || newRecord.status === 'ready-to-clean') && 
+          oldRecord?.status !== 'checkout' && oldRecord?.status !== 'ready-to-clean') {
+        toast({
+          title: "🚪 Client sorti",
+          description: `Chambre ${newRecord.room_number} - Client sorti`,
           duration: 4000
         });
       }
@@ -73,8 +107,8 @@ export function useRealtimeRooms({
         status: newRecord.status
       });
       
-      // Refresh data if an assignment is completed
-      if (newRecord.status === 'completed' && hotelId) {
+      // Refresh data if an assignment is completed or modified
+      if ((newRecord.status === 'completed' || eventType === 'UPDATE') && hotelId) {
         setTimeout(() => {
           refreshHousekeepers?.();
         }, 500);

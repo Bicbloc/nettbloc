@@ -244,8 +244,9 @@ export const HousekeeperWorkSimple: React.FC = () => {
       if (eventType === 'UPDATE') {
         const isMyRoom = rooms.some(r => r.id === newRecord.id);
         
-        // Notification si chambre devient disponible
-        if (newRecord.status === 'ready-to-clean' && oldRecord?.status !== 'ready-to-clean') {
+        // Notification si chambre devient disponible (checkout)
+        if ((newRecord.status === 'ready-to-clean' || newRecord.status === 'checkout') && 
+            oldRecord?.status !== 'ready-to-clean' && oldRecord?.status !== 'checkout') {
           addToActivityLog(`🚪 Chambre ${newRecord.room_number} disponible - Client sorti`, 'info');
           setAvailableRooms(prev => {
             if (!prev.find(r => r.id === newRecord.id)) {
@@ -255,12 +256,23 @@ export const HousekeeperWorkSimple: React.FC = () => {
           });
         }
         
-        // Mise à jour locale si c'est ma chambre
+        // Mise à jour locale si c'est ma chambre - SYNCHRONISATION COMPLÈTE
         if (isMyRoom) {
-          setRooms(prev => prev.map(r => r.id === newRecord.id ? { ...r, ...newRecord } : r));
+          console.log(`📡 [Housekeeper] Mise à jour chambre ${newRecord.room_number}: ${oldRecord?.status} → ${newRecord.status}, type: ${newRecord.cleaning_type}`);
+          setRooms(prev => prev.map(r => {
+            if (r.id !== newRecord.id) return r;
+            // Fusionner en gardant la structure locale
+            return { 
+              ...r, 
+              status: newRecord.status,
+              cleaning_type: newRecord.cleaning_type,
+              notes: newRecord.notes || r.notes,
+              cleaning_priority: newRecord.cleaning_priority || r.cleaning_priority
+            };
+          }));
           // Si statut changé par le responsable
           if (newRecord.status !== oldRecord?.status) {
-            addToActivityLog(`🔄 Chambre ${newRecord.room_number} mise à jour par le responsable`, 'info');
+            addToActivityLog(`🔄 Chambre ${newRecord.room_number} mise à jour: ${newRecord.status}`, 'info');
           }
         }
       } else if (eventType === 'DELETE') {
