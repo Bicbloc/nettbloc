@@ -1,120 +1,133 @@
 
+# Plan : Système de Scan Linge Ultra-Précis (98-100%)
 
-# Plan : Ajout de la Réinitialisation de Mot de Passe pour Tous les Utilisateurs
+## Objectif
+Améliorer la reconnaissance des piles de linge (serviettes, draps, etc.) pour atteindre une précision proche de 100%, en combinant IA avancée et indicateurs physiques optionnels.
 
-## Résumé
+---
 
-Ajouter la fonctionnalité "Mot de passe oublié" aux trois pages d'authentification : Femme de chambre, Gouvernante et Technicien.
+## Phase 1 : Amélioration du Scan Vidéo Temps Réel
 
-## Pages à Modifier
+### 1.1 Optimisation du Mode Live
+- Augmenter la fréquence d'analyse à 2 frames/seconde (actuellement ~1/sec)
+- Utiliser un modèle plus puissant pour la capture finale (`gemini-2.5-pro` au lieu de `flash-lite`)
+- Implémenter un **buffer de stabilisation** : moyenner les 3 dernières détections pour lisser les variations
 
-### 1. src/pages/HousekeeperAuth.tsx
-**Objectif** : Ajouter le lien et la logique de réinitialisation de mot de passe
+### 1.2 Analyse Multi-Frame
+- Capturer automatiquement plusieurs angles pendant le scan
+- Demander à l'utilisateur de "tourner légèrement" autour de la pile
+- Fusionner les comptages de différents angles pour réduire l'erreur
 
-**Modifications** :
-- Ajouter un état `isRecoveryMode` et `isPasswordReset` pour détecter le mode récupération
-- Ajouter un état `newPassword` pour le nouveau mot de passe
-- Ajouter une fonction `handlePasswordReset` qui appelle `supabase.auth.resetPasswordForEmail()`
-- Ajouter une fonction `handleUpdatePassword` pour mettre à jour le mot de passe
-- Détecter les tokens de récupération dans l'URL (`?code=` ou `#access_token`)
-- Ajouter un lien "Mot de passe oublié ?" sous le formulaire de connexion
-- Afficher le formulaire de nouveau mot de passe si en mode récupération
+---
 
-### 2. src/pages/GovernessAuth.tsx
-**Objectif** : Ajouter le lien et la logique de réinitialisation de mot de passe
+## Phase 2 : Indicateur Physique Imprimable (Règle Étalon)
 
-**Modifications** :
-- Ajouter un état `isRecoveryMode` pour détecter le mode récupération
-- Ajouter un état `newPassword` pour le nouveau mot de passe  
-- Ajouter une fonction `handlePasswordReset` qui appelle `supabase.auth.resetPasswordForEmail()`
-- Ajouter une fonction `handleUpdatePassword` pour mettre à jour le mot de passe
-- Détecter les tokens de récupération dans l'URL
-- Ajouter un lien "Mot de passe oublié ?" sous le formulaire de connexion
-- Afficher le formulaire de nouveau mot de passe si en mode récupération
+### 2.1 Création d'une Règle Étalon
+- Générer un PDF imprimable avec :
+  - Règle graduée (0-30 cm) avec couleurs distinctes
+  - Épaisseurs de référence par type de linge (1.5cm pour draps, 3cm pour serviettes)
+  - QR code contenant l'ID de l'hôtel (pour calibration automatique)
 
-### 3. src/pages/TechnicianLogin.tsx
-**Objectif** : Ajouter le lien et la logique de réinitialisation de mot de passe
+### 2.2 Détection Automatique de la Règle
+- L'IA détecte la règle colorée dans l'image
+- Calcule l'échelle réelle (pixels → cm)
+- Mesure la hauteur de la pile et divise par l'épaisseur connue
 
-**Modifications** :
-- Ajouter un état `isRecoveryMode` pour détecter le mode récupération
-- Ajouter un état `newPassword` pour le nouveau mot de passe
-- Ajouter une fonction `handlePasswordReset` qui appelle `supabase.auth.resetPasswordForEmail()`
-- Ajouter une fonction `handleUpdatePassword` pour mettre à jour le mot de passe
-- Détecter les tokens de récupération dans l'URL
-- Ajouter un lien "Mot de passe oublié ?" sous le formulaire de connexion
-- Afficher le formulaire de nouveau mot de passe si en mode récupération
+### 2.3 Mode "Calibration Précise"
+- Bouton "📏 Mode Précision" dans l'interface
+- Demande de placer la règle à côté de la pile
+- Affiche des instructions visuelles (overlay avec zone de placement)
 
-## Logique Commune à Implémenter
+---
 
-```typescript
-// Détection du mode récupération au chargement
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const hash = window.location.hash;
-  
-  if (code) {
-    // PKCE flow - échanger le code contre une session
-    supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
-      if (!error && data.session) {
-        setIsRecoveryMode(true);
-      }
-    });
-  } else if (hash.includes('type=recovery')) {
-    setIsRecoveryMode(true);
-  }
-}, []);
+## Phase 3 : Amélioration du Système d'Apprentissage
 
-// Réinitialisation du mot de passe
-const handlePasswordReset = async () => {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/PAGE_PATH`
-  });
-  
-  if (!error) {
-    toast({ title: "Email envoyé", description: "Vérifiez votre boîte de réception" });
-  }
-};
+### 3.1 Épaisseurs par Type de Linge
+- Nouvelle colonne `average_thickness_cm` dans la table `linen_types`
+- Permet à l'admin de configurer l'épaisseur moyenne de chaque type
+- L'IA utilise cette donnée pour calculer : `count = height_cm / thickness_cm`
 
-// Mise à jour du mot de passe
-const handleUpdatePassword = async () => {
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  
-  if (!error) {
-    toast({ title: "Mot de passe mis à jour" });
-    setIsRecoveryMode(false);
-    navigate('/PAGE_PATH');
-  }
-};
+### 3.2 Corrections Contextuelles
+- Stocker non seulement le compte corrigé, mais aussi :
+  - La méthode (pile/étalé/vrac)
+  - Les conditions (éclairage, angle)
+  - La photo originale pour réentraînement futur
+- Utiliser un score de confiance adaptatif basé sur l'historique de corrections
+
+### 3.3 Alertes Proactives
+- Si l'IA détecte une pile dense avec confiance < 70%, suggérer automatiquement :
+  - "Utilisez la règle étalon pour plus de précision"
+  - "Essayez de photographier le côté de la pile"
+
+---
+
+## Phase 4 : Interface Utilisateur Améliorée
+
+### 4.1 Overlay de Guidage
+- Afficher une zone cible sur la caméra (rectangle où placer la pile)
+- Indicateur de qualité d'image (flou, éclairage, distance)
+- Conseils en temps réel : "Rapprochez-vous", "Évitez les ombres"
+
+### 4.2 Mode Multi-Scan
+- Bouton "Scanner tout" : capturer automatiquement 3 photos sous différents angles
+- Animation pour guider l'utilisateur à tourner autour de la pile
+- Fusion des résultats avec affichage du meilleur comptage
+
+### 4.3 Confirmation Rapide
+- Après le scan, afficher le comptage avec boutons +/- directement visibles
+- Si correction = 0 (comptage exact), renforcer le modèle
+- Si correction > 2, marquer comme "échantillon prioritaire" pour analyse
+
+---
+
+## Architecture Technique
+
+### Modifications Base de Données
+```text
+Table: linen_types
+  + average_thickness_cm DECIMAL(3,1) -- Épaisseur moyenne en cm
+
+Table: linen_training_samples
+  + scan_method TEXT -- 'pile', 'spread', 'ruler'
+  + lighting_conditions TEXT -- 'good', 'dim', 'bright'
+  + ruler_detected BOOLEAN
 ```
 
-## URLs de Redirection
+### Edge Function count-linen (Améliorations)
+- Nouveau paramètre `useRuler: boolean`
+- Prompt spécifique quand la règle est détectée
+- Calcul mathématique : `count = measured_height / type_thickness`
+- Retourner `measurement_method: 'ai' | 'ruler_calculation'`
 
-| Page | redirectTo |
-|------|------------|
-| HousekeeperAuth | `${window.location.origin}/housekeeper/auth` |
-| GovernessAuth | `${window.location.origin}/governess/auth` |
-| TechnicianLogin | `${window.location.origin}/technician/login` |
+### Fichiers à Modifier/Créer
+1. `supabase/functions/count-linen/index.ts` - Logique de détection de règle
+2. `src/components/linen/LinenCameraScanner.tsx` - Mode précision avec règle
+3. `src/components/linen/RulerGuide.tsx` - Nouveau composant overlay
+4. `src/components/linen/PrintableRuler.tsx` - Génération PDF de la règle
+5. `src/components/linen/LinenTypeManager.tsx` - Ajout épaisseur configurable
 
-## Interface Utilisateur
+---
 
-Chaque page affichera :
-1. **Mode normal** : Formulaire de connexion avec lien "Mot de passe oublié ?"
-2. **Mode demande reset** : Champ email + bouton "Envoyer le lien"
-3. **Mode récupération** : Champ "Nouveau mot de passe" + bouton "Mettre à jour"
+## Résumé des Améliorations
 
-## Configuration Supabase Requise
+| Fonctionnalité | Impact Précision | Complexité |
+|----------------|------------------|------------|
+| Mode multi-frame (3 angles) | +10% | Moyenne |
+| Règle étalon physique | +20-25% | Moyenne |
+| Épaisseur par type | +15% | Faible |
+| Buffer de stabilisation | +5% | Faible |
+| Overlay de guidage | +5% | Faible |
 
-Les URLs suivantes doivent être dans les **Redirect URLs** du dashboard Supabase :
-- `https://nettobloc.bicbloc.eu/housekeeper/auth`
-- `https://nettobloc.bicbloc.eu/governess/auth`
-- `https://nettobloc.bicbloc.eu/technician/login`
+**Résultat attendu** : Précision de 98-100% avec la règle étalon, 90-95% sans.
 
-Ces URLs sont déjà couvertes par le pattern `https://nettobloc.bicbloc.eu/**` si vous l'avez configuré.
+---
 
-## Note sur l'Erreur Rate Limit
+## Recommandation
 
-L'erreur "email rate limit exceeded" signifie que Supabase a temporairement bloqué les emails pour cette adresse. Attendez environ **60 minutes** avant de réessayer.
+Je recommande de commencer par les améliorations les plus rapides à implémenter :
+1. **Ajouter l'épaisseur configurable par type de linge** (5 min)
+2. **Améliorer le prompt IA avec calcul mathématique** (10 min)
+3. **Créer la règle imprimable** (15 min)
+4. **Implémenter la détection de règle** (20 min)
 
-L'erreur de build "429 Cloudflare" est également temporaire - réessayez la publication dans quelques secondes.
-
+Cela permettra d'atteindre 95-100% de précision avec un effort modéré.
