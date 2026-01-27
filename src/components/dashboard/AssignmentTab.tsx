@@ -20,6 +20,7 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from "@/components/RoomStatusTabs";
+import { SimplifiedRoomList } from "./SimplifiedRoomList";
 
 interface Housekeeper {
   id: string;
@@ -115,6 +116,25 @@ export function AssignmentTab({
       cleaningType: r.cleaningType
     })), roomFilterTab) as Room[];
   }, [rooms, roomFilterTab]);
+
+  const isSimplifiedView = roomFilterTab !== 'all';
+
+  const getTabTitle = (tab: RoomFilterTab) => {
+    switch (tab) {
+      case 'clean':
+        return 'Chambres propres';
+      case 'in_progress':
+        return 'Chambres en cours';
+      case 'dirty':
+        return 'Chambres à nettoyer';
+      case 'stayover':
+        return 'Chambres recouche';
+      case 'checkout':
+        return 'Chambres client sorti';
+      default:
+        return 'Toutes les chambres';
+    }
+  };
 
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
@@ -224,6 +244,13 @@ export function AssignmentTab({
           </CardContent>
         </Card>
       ) : (
+        isSimplifiedView ? (
+          <SimplifiedRoomList
+            rooms={filteredRooms}
+            title={getTabTitle(roomFilterTab)}
+            emptyMessage="Aucune chambre dans cette catégorie"
+          />
+        ) : (
         <div className="space-y-6">
           {/* Chambres non assignées */}
           <UnassignedRoomsColumn
@@ -338,6 +365,7 @@ export function AssignmentTab({
             }}
           />
         </div>
+        )
       )}
     </div>
   );
