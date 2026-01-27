@@ -169,6 +169,8 @@ export function IncidentReportDialogSimple({
   const handleAiResult = (result: any) => {
     setAiSuggestion(result);
     
+    let foundItem = false;
+    
     // Try to find matching item
     if (categoriesWithItems && result.item) {
       for (const category of categoriesWithItems) {
@@ -178,11 +180,28 @@ export function IncidentReportDialogSimple({
         );
         if (matchingItem) {
           form.setValue('item_id', matchingItem.id);
+          foundItem = true;
+          break;
+        }
+      }
+    }
+    
+    // If no matching item found, try to find "Autre" item
+    if (!foundItem && categoriesWithItems) {
+      for (const category of categoriesWithItems) {
+        const autreItem = category.items.find((item: any) => 
+          item.name.toLowerCase() === 'autre' || 
+          item.name.toLowerCase() === 'autres'
+        );
+        if (autreItem) {
+          form.setValue('item_id', autreItem.id);
           break;
         }
       }
     }
 
+    let foundType = false;
+    
     // Try to find matching type
     if (types && result.problem_type) {
       const matchingType = types.find((type: any) =>
@@ -191,6 +210,18 @@ export function IncidentReportDialogSimple({
       );
       if (matchingType) {
         form.setValue('type_id', matchingType.id);
+        foundType = true;
+      }
+    }
+    
+    // If no matching type found, try to find "Autre" type
+    if (!foundType && types) {
+      const autreType = types.find((type: any) => 
+        type.name.toLowerCase() === 'autre' || 
+        type.name.toLowerCase() === 'autres'
+      );
+      if (autreType) {
+        form.setValue('type_id', autreType.id);
       }
     }
 
