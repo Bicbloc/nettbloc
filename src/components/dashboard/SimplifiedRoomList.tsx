@@ -17,10 +17,15 @@ interface SimplifiedRoomListProps {
 
 export function SimplifiedRoomList({ rooms, title, emptyMessage = "Aucune chambre" }: SimplifiedRoomListProps) {
   const getStatusBadge = (status: string) => {
-    const s = status.toLowerCase();
+    const s = status.toLowerCase().replace(/-/g, '_');
     if (s === 'clean') return <Badge className="bg-green-500/20 text-green-700 border-green-500/30">Propre</Badge>;
-    if (s === 'in_progress' || s === 'in-progress') return <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30">En cours</Badge>;
-    if (s === 'checkout') return <Badge className="bg-red-500/20 text-red-700 border-red-500/30">Client sorti</Badge>;
+    if (s === 'in_progress' || s === 'inprogress') return <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30">En cours</Badge>;
+
+    // IMPORTANT: dans l'app, "Client sorti" est souvent `checkout` OU `ready-to-clean`
+    if (s === 'checkout' || s === 'ready_to_clean') {
+      return <Badge className="bg-red-500/20 text-red-700 border-red-500/30">Client sorti</Badge>;
+    }
+
     if (s === 'stayover') return <Badge className="bg-purple-500/20 text-purple-700 border-purple-500/30">Recouche</Badge>;
     return <Badge className="bg-yellow-500/20 text-yellow-700 border-yellow-500/30">À nettoyer</Badge>;
   };
