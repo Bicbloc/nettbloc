@@ -4196,6 +4196,15 @@ export type Database = {
         }
         Returns: string
       }
+      get_approved_hotels_for_housekeeper: {
+        Args: { p_housekeeper_profile_id: string }
+        Returns: {
+          approved_at: string
+          hotel_code: string
+          hotel_id: string
+          hotel_name: string
+        }[]
+      }
       get_hotel_info_for_access_code: {
         Args: { p_hotel_code: string }
         Returns: {
