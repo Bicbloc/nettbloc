@@ -4205,6 +4205,17 @@ export type Database = {
           hotel_name: string
         }[]
       }
+      get_hotel_for_housekeeper: {
+        Args: { p_hotel_id: string; p_housekeeper_profile_id: string }
+        Returns: {
+          address: string
+          email: string
+          hotel_code: string
+          id: string
+          name: string
+          settings: Json
+        }[]
+      }
       get_hotel_info_for_access_code: {
         Args: { p_hotel_code: string }
         Returns: {

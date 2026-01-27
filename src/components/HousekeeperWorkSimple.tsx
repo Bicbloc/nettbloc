@@ -328,16 +328,32 @@ export const HousekeeperWorkSimple: React.FC = () => {
         return;
       }
       
+      // Utiliser la fonction RPC sécurisée pour récupérer les infos de l'hôtel
+      // Cette fonction vérifie que la femme de chambre a bien une demande approuvée
       const { data: hotelData, error: hotelError } = await supabase
-        .from('hotels')
-        .select('*')
-        .eq('id', hotelId)
-        .single();
+        .rpc('get_hotel_for_housekeeper', {
+          p_housekeeper_profile_id: housekeeperProfile.id,
+          p_hotel_id: hotelId
+        });
 
-      if (hotelError || !hotelData) {
+      if (hotelError) {
+        console.error('❌ Erreur RPC get_hotel_for_housekeeper:', hotelError);
         toast({
           title: "Erreur",
-          description: "Hôtel non trouvé",
+          description: "Impossible de charger l'hôtel",
+          variant: "destructive"
+        });
+        navigate('/housekeeper/hotels');
+        return;
+      }
+
+      // hotelData est un tableau, prendre le premier élément
+      const hotel = Array.isArray(hotelData) ? hotelData[0] : hotelData;
+      
+      if (!hotel) {
+        toast({
+          title: "Erreur",
+          description: "Hôtel non trouvé ou accès non autorisé",
           variant: "destructive"
         });
         navigate('/housekeeper/hotels');
@@ -346,7 +362,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
 
       authResult = {
         success: true,
-        hotel: hotelData,
+        hotel: hotel,
         user: {
           id: housekeeperProfile.id,
           name: housekeeperProfile.name,
