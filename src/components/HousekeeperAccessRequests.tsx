@@ -139,17 +139,45 @@ export const HousekeeperAccessRequests = () => {
           rooms_cleaned: 0
         });
 
-      // IMPORTANT: Créer également une entrée dans housekeepers pour l'assignation
-      // Vérifier si elle n'existe pas déjà
-      const { data: existingHousekeeper } = await supabase
+      // IMPORTANT: Créer ou mettre à jour une entrée dans housekeepers pour l'assignation
+      // Vérifier si elle n'existe pas déjà par user_id OU par nom
+      const { data: existingByUserId } = await supabase
         .from('housekeepers')
-        .select('id')
+        .select('id, name')
         .eq('hotel_id', request.hotel_id)
-        .ilike('name', request.housekeeper_profiles.name)
+        .eq('user_id', request.housekeeper_profile_id)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (!existingHousekeeper) {
-        // Générer un code d'accès unique
+      const { data: existingByName } = await supabase
+        .from('housekeepers')
+        .select('id, user_id')
+        .eq('hotel_id', request.hotel_id)
+        .ilike('name', request.housekeeper_profiles.name)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingByUserId) {
+        // Mettre à jour le nom si différent
+        if (existingByUserId.name !== request.housekeeper_profiles.name) {
+          await supabase
+            .from('housekeepers')
+            .update({ name: request.housekeeper_profiles.name, updated_at: new Date().toISOString() })
+            .eq('id', existingByUserId.id);
+        }
+        console.log('✅ Housekeeper already exists for this profile:', request.housekeeper_profiles.name);
+      } else if (existingByName && !existingByName.user_id) {
+        // Une entrée existe avec ce nom mais sans user_id lié - la mettre à jour
+        await supabase
+          .from('housekeepers')
+          .update({ 
+            user_id: request.housekeeper_profile_id, 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', existingByName.id);
+        console.log('✅ Housekeeper entry linked to profile:', request.housekeeper_profiles.name);
+      } else if (!existingByName) {
+        // Aucune entrée existante - créer une nouvelle
         const nameInitials = request.housekeeper_profiles.name.toUpperCase().slice(0, 3);
         const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
         const accessCode = `${request.hotel_code}-${nameInitials}-${randomSuffix}`;
@@ -166,10 +194,11 @@ export const HousekeeperAccessRequests = () => {
 
         if (housekeeperError) {
           console.error('Error creating housekeeper entry:', housekeeperError);
-          // Ne pas bloquer l'approbation si l'insertion échoue
         } else {
           console.log('✅ Housekeeper entry created:', request.housekeeper_profiles.name);
         }
+      } else {
+        console.log('ℹ️ Housekeeper with same name exists with different profile');
       }
 
       toast.success('Demande approuvée ! La femme de chambre peut maintenant accéder à l\'hôtel.');
