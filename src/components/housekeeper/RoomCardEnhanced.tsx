@@ -40,8 +40,9 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
   const touchStartX = useRef(0);
   const touchCurrentX = useRef(0);
 
-  const isActionable = ['dirty', 'needs-cleaning', 'ready-to-clean', 'assigned'].includes(room.status);
-  const isStartable = isActionable;
+  // Les chambres sont actionnables si elles ne sont pas déjà propres ou en cours
+  const isActionable = ['dirty', 'needs-cleaning', 'ready-to-clean', 'assigned', 'pending'].includes(room.status);
+  const isStartable = isActionable && room.status !== 'in_progress';
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (room.status === 'in_progress' || isActionable) {

@@ -50,12 +50,18 @@ interface IncidentReportDialogSimpleProps {
   hotelId: string;
   userType: "admin" | "housekeeper";
   defaultLocation?: string;
+  defaultItemId?: string;
+  defaultTypeId?: string;
+  defaultTitle?: string;
 }
 
 export function IncidentReportDialogSimple({
   hotelId,
   userType,
   defaultLocation,
+  defaultItemId,
+  defaultTypeId,
+  defaultTitle,
 }: IncidentReportDialogSimpleProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -76,6 +82,9 @@ export function IncidentReportDialogSimple({
     resolver: zodResolver(incidentSchema),
     defaultValues: {
       location_reference: defaultLocation || '',
+      item_id: defaultItemId || '',
+      type_id: defaultTypeId || '',
+      title: defaultTitle || '',
     },
   });
 

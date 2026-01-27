@@ -752,7 +752,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </div>
         </Card>
 
-        {/* Tabs - Show inventory if housekeeper has linen task */}
+        {/* Tabs - Show inventory always (housekeeper can start inventory anytime) */}
         <div className="flex gap-2">
           <Button 
             variant={activeTab === 'rooms' ? 'default' : 'outline'}
@@ -762,19 +762,23 @@ export const HousekeeperWorkSimple: React.FC = () => {
             <Home className="h-4 w-4 mr-2" />
             Chambres ({totalRooms})
           </Button>
-          {activeLinenTask && (
-            <Button 
-              variant={activeTab === 'inventory' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('inventory')}
-              className="flex-1 h-12 relative"
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Inventaire
-              <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1.5 text-[10px] bg-orange-500 text-white">
-                📷
-              </Badge>
-            </Button>
-          )}
+          <Button 
+            variant={activeTab === 'inventory' ? 'default' : 'outline'}
+            onClick={() => {
+              setActiveTab('inventory');
+              // Si pas de tâche active, créer une tâche temporaire
+              if (!activeLinenTask) {
+                setActiveLinenTask(`temp_${Date.now()}`);
+              }
+            }}
+            className="flex-1 h-12 relative"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Inventaire
+            <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1.5 text-[10px] bg-orange-500 text-white">
+              📷
+            </Badge>
+          </Button>
         </div>
 
         {/* Contenu */}
@@ -839,7 +843,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
           </>
         ) : (
           /* Inventaire linge avec scan NettoBloc */
-          activeLinenTask && hotelId && (
+          hotelId && (
             <div className="space-y-4">
               {/* Header inventaire */}
               <Card className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
@@ -858,7 +862,7 @@ export const HousekeeperWorkSimple: React.FC = () => {
               
               {/* Composant inventaire avec scan */}
               <LinenQuickInventory
-                taskId={activeLinenTask}
+                taskId={activeLinenTask || `manual_${Date.now()}`}
                 hotelId={hotelId}
                 onClose={() => {
                   setActiveLinenTask(null);
