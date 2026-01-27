@@ -28,7 +28,7 @@ const getRoleLabel = (role: string): string => {
 };
 
 const getSignupUrl = (role: string, code: string): string => {
-  const baseUrl = Deno.env.get("APP_URL") || "https://rarhqnvvbjzfdevnghnz.lovableproject.com";
+  const baseUrl = Deno.env.get("APP_URL") || "https://nettobloc.bicbloc.eu";
   switch (role) {
     case 'housekeeper': return `${baseUrl}/housekeeper/signup?invitation=${code}`;
     case 'technician': return `${baseUrl}/technician/signup?invitation=${code}`;
