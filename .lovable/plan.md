@@ -1,133 +1,168 @@
 
-# Plan : Système de Scan Linge Ultra-Précis (98-100%)
+# Plan : Système d'invitation par email pour les sous-comptes
 
-## Objectif
-Améliorer la reconnaissance des piles de linge (serviettes, draps, etc.) pour atteindre une précision proche de 100%, en combinant IA avancée et indicateurs physiques optionnels.
+## Résumé
 
----
+Ce plan implémente un système d'invitation par email pour les sous-comptes. Lorsqu'un administrateur crée un sous-compte, l'invité reçoit un email avec un lien pour créer son compte personnel, automatiquement rattaché à l'hôtel de l'administrateur.
 
-## Phase 1 : Amélioration du Scan Vidéo Temps Réel
+## Architecture proposée
 
-### 1.1 Optimisation du Mode Live
-- Augmenter la fréquence d'analyse à 2 frames/seconde (actuellement ~1/sec)
-- Utiliser un modèle plus puissant pour la capture finale (`gemini-2.5-pro` au lieu de `flash-lite`)
-- Implémenter un **buffer de stabilisation** : moyenner les 3 dernières détections pour lisser les variations
-
-### 1.2 Analyse Multi-Frame
-- Capturer automatiquement plusieurs angles pendant le scan
-- Demander à l'utilisateur de "tourner légèrement" autour de la pile
-- Fusionner les comptages de différents angles pour réduire l'erreur
-
----
-
-## Phase 2 : Indicateur Physique Imprimable (Règle Étalon)
-
-### 2.1 Création d'une Règle Étalon
-- Générer un PDF imprimable avec :
-  - Règle graduée (0-30 cm) avec couleurs distinctes
-  - Épaisseurs de référence par type de linge (1.5cm pour draps, 3cm pour serviettes)
-  - QR code contenant l'ID de l'hôtel (pour calibration automatique)
-
-### 2.2 Détection Automatique de la Règle
-- L'IA détecte la règle colorée dans l'image
-- Calcule l'échelle réelle (pixels → cm)
-- Mesure la hauteur de la pile et divise par l'épaisseur connue
-
-### 2.3 Mode "Calibration Précise"
-- Bouton "📏 Mode Précision" dans l'interface
-- Demande de placer la règle à côté de la pile
-- Affiche des instructions visuelles (overlay avec zone de placement)
-
----
-
-## Phase 3 : Amélioration du Système d'Apprentissage
-
-### 3.1 Épaisseurs par Type de Linge
-- Nouvelle colonne `average_thickness_cm` dans la table `linen_types`
-- Permet à l'admin de configurer l'épaisseur moyenne de chaque type
-- L'IA utilise cette donnée pour calculer : `count = height_cm / thickness_cm`
-
-### 3.2 Corrections Contextuelles
-- Stocker non seulement le compte corrigé, mais aussi :
-  - La méthode (pile/étalé/vrac)
-  - Les conditions (éclairage, angle)
-  - La photo originale pour réentraînement futur
-- Utiliser un score de confiance adaptatif basé sur l'historique de corrections
-
-### 3.3 Alertes Proactives
-- Si l'IA détecte une pile dense avec confiance < 70%, suggérer automatiquement :
-  - "Utilisez la règle étalon pour plus de précision"
-  - "Essayez de photographier le côté de la pile"
-
----
-
-## Phase 4 : Interface Utilisateur Améliorée
-
-### 4.1 Overlay de Guidage
-- Afficher une zone cible sur la caméra (rectangle où placer la pile)
-- Indicateur de qualité d'image (flou, éclairage, distance)
-- Conseils en temps réel : "Rapprochez-vous", "Évitez les ombres"
-
-### 4.2 Mode Multi-Scan
-- Bouton "Scanner tout" : capturer automatiquement 3 photos sous différents angles
-- Animation pour guider l'utilisateur à tourner autour de la pile
-- Fusion des résultats avec affichage du meilleur comptage
-
-### 4.3 Confirmation Rapide
-- Après le scan, afficher le comptage avec boutons +/- directement visibles
-- Si correction = 0 (comptage exact), renforcer le modèle
-- Si correction > 2, marquer comme "échantillon prioritaire" pour analyse
-
----
-
-## Architecture Technique
-
-### Modifications Base de Données
 ```text
-Table: linen_types
-  + average_thickness_cm DECIMAL(3,1) -- Épaisseur moyenne en cm
-
-Table: linen_training_samples
-  + scan_method TEXT -- 'pile', 'spread', 'ruler'
-  + lighting_conditions TEXT -- 'good', 'dim', 'bright'
-  + ruler_detected BOOLEAN
+┌─────────────────────────────────────────────────────────────────┐
+│                     FLUX D'INVITATION                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Admin crée sous-compte    2. Email envoyé                   │
+│  ┌─────────────────┐         ┌─────────────────┐                │
+│  │ SubAccountsManager │────▶│ Edge Function   │                │
+│  │ (Formulaire)    │         │ send-subaccount │                │
+│  └─────────────────┘         │ -invitation     │                │
+│                              └────────┬────────┘                │
+│                                       │                         │
+│                                       ▼                         │
+│                              ┌─────────────────┐                │
+│                              │  Email Resend   │                │
+│                              │  avec lien      │                │
+│                              └────────┬────────┘                │
+│                                       │                         │
+│  3. Invité clique             4. Création compte                │
+│  ┌─────────────────┐         ┌─────────────────┐                │
+│  │ /team/join?code=│────▶│ SubAccountSignup │                   │
+│  │ INV-XXXX        │         │ Page            │                │
+│  └─────────────────┘         └────────┬────────┘                │
+│                                       │                         │
+│                                       ▼                         │
+│                              ┌─────────────────┐                │
+│                              │ Supabase Auth   │                │
+│                              │ + Link to hotel │                │
+│                              └─────────────────┘                │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Edge Function count-linen (Améliorations)
-- Nouveau paramètre `useRuler: boolean`
-- Prompt spécifique quand la règle est détectée
-- Calcul mathématique : `count = measured_height / type_thickness`
-- Retourner `measurement_method: 'ai' | 'ruler_calculation'`
+## Modifications à effectuer
 
-### Fichiers à Modifier/Créer
-1. `supabase/functions/count-linen/index.ts` - Logique de détection de règle
-2. `src/components/linen/LinenCameraScanner.tsx` - Mode précision avec règle
-3. `src/components/linen/RulerGuide.tsx` - Nouveau composant overlay
-4. `src/components/linen/PrintableRuler.tsx` - Génération PDF de la règle
-5. `src/components/linen/LinenTypeManager.tsx` - Ajout épaisseur configurable
+### 1. Base de données
 
----
+**Nouvelle table : `sub_account_invitations`**
 
-## Résumé des Améliorations
+| Colonne | Type | Description |
+|---------|------|-------------|
+| id | uuid | Clé primaire |
+| sub_account_id | uuid | FK vers sub_accounts |
+| invitation_code | text | Code unique (ex: INV-XK4F-A2B3) |
+| status | text | pending, sent, accepted, expired |
+| sent_at | timestamp | Date d'envoi email |
+| accepted_at | timestamp | Date d'acceptation |
+| expires_at | timestamp | Expiration (7 jours) |
 
-| Fonctionnalité | Impact Précision | Complexité |
-|----------------|------------------|------------|
-| Mode multi-frame (3 angles) | +10% | Moyenne |
-| Règle étalon physique | +20-25% | Moyenne |
-| Épaisseur par type | +15% | Faible |
-| Buffer de stabilisation | +5% | Faible |
-| Overlay de guidage | +5% | Faible |
+**Ajouts à `sub_accounts`**
 
-**Résultat attendu** : Précision de 98-100% avec la règle étalon, 90-95% sans.
+| Colonne | Type | Description |
+|---------|------|-------------|
+| user_id | uuid | FK vers auth.users (rempli après signup) |
+| invitation_status | text | invited, active |
+| hotel_id | uuid | FK vers hotels (hôtel de rattachement) |
 
----
+### 2. Edge Function : `send-subaccount-invitation`
 
-## Recommandation
+**Rôle** : Envoie l'email d'invitation avec Resend
 
-Je recommande de commencer par les améliorations les plus rapides à implémenter :
-1. **Ajouter l'épaisseur configurable par type de linge** (5 min)
-2. **Améliorer le prompt IA avec calcul mathématique** (10 min)
-3. **Créer la règle imprimable** (15 min)
-4. **Implémenter la détection de règle** (20 min)
+**Logique** :
+1. Reçoit : sub_account_id, email, first_name, last_name, hotel_name
+2. Génère un code d'invitation unique
+3. Enregistre dans `sub_account_invitations`
+4. Envoie l'email avec le lien `/team/join?code=XXX`
+5. Met à jour le statut
 
-Cela permettra d'atteindre 95-100% de précision avec un effort modéré.
+**Template email** :
+- Titre : "Vous êtes invité à rejoindre {hotel_name}"
+- Corps : Bouton "Créer mon compte" + code d'invitation
+- Expiration : 7 jours
+
+### 3. Nouvelle page : `/team/join` (SubAccountSignup)
+
+**Fonctionnalités** :
+1. Récupère le code d'invitation depuis l'URL
+2. Vérifie la validité (non expiré, non utilisé)
+3. Affiche les infos préremplies (email, prénom, nom)
+4. Permet à l'invité de définir son mot de passe
+5. Crée le compte Supabase Auth
+6. Lie le `sub_account` au nouveau `user_id`
+7. Redirige vers le dashboard
+
+### 4. Modifications SubAccountsManager
+
+**Changements UI** :
+- Affichage du statut d'invitation (badge : Invité / Actif)
+- Bouton "Renvoyer l'invitation" pour les invités non confirmés
+- Désactivation de l'édition tant que le compte n'est pas activé
+
+**Nouveau flux de création** :
+```text
+1. Admin remplit formulaire (prénom, nom, email, rôle)
+2. Clic "Créer" → Insert dans sub_accounts
+3. Appel Edge Function → Email envoyé
+4. Toast : "Invitation envoyée à {email}"
+```
+
+### 5. Gestion des permissions
+
+**Contexte d'authentification étendu** :
+- Détecter si l'utilisateur est un sous-compte
+- Charger ses permissions depuis `sub_accounts` + `sub_account_permissions`
+- Restreindre l'accès aux pages/fonctionnalités
+
+**Hook : `useSubAccountPermissions`**
+```typescript
+const { hasPermission, isSubAccount, parentHotelId } = useSubAccountPermissions();
+
+// Usage
+if (hasPermission('linen.add_types')) {
+  // Afficher le bouton
+}
+```
+
+## Fichiers à créer/modifier
+
+| Fichier | Action | Description |
+|---------|--------|-------------|
+| `supabase/migrations/XXX.sql` | Créer | Schema sub_account_invitations + colonnes |
+| `supabase/functions/send-subaccount-invitation/index.ts` | Créer | Edge function envoi email |
+| `src/pages/SubAccountJoin.tsx` | Créer | Page signup pour invités |
+| `src/components/SubAccountsManager.tsx` | Modifier | Ajouter appel invitation + statuts |
+| `src/hooks/use-sub-account-permissions.ts` | Créer | Hook gestion permissions |
+| `src/contexts/AuthContext.tsx` | Modifier | Détecter sous-comptes |
+| `src/App.tsx` | Modifier | Route /team/join |
+
+## Sécurité
+
+1. **RLS sur `sub_account_invitations`** : Seul l'admin parent peut voir/créer
+2. **Validation du code** : Vérification serveur de l'expiration et unicité
+3. **Lien user_id** : Le sub_account ne peut être lié qu'une seule fois
+4. **Permissions** : Stockées en base, jamais côté client
+
+## Détails techniques
+
+### Code d'invitation
+Format : `SUB-{timestamp_base36}-{random_4chars}`
+Exemple : `SUB-2K4F1A-X7B3`
+
+### Email (via Resend)
+```html
+Bonjour {first_name},
+
+Vous avez été invité(e) à rejoindre l'équipe de {hotel_name}.
+
+Rôle : {role_display_name}
+
+[Créer mon compte] ← Bouton vers /team/join?code=XXX
+
+Ce lien expire dans 7 jours.
+```
+
+### Workflow de connexion sous-compte
+
+1. Sous-compte se connecte avec email/password
+2. AuthContext détecte qu'il est un sous-compte (via `sub_accounts.user_id`)
+3. Charge l'hôtel rattaché (`sub_accounts.hotel_id`)
+4. Applique les restrictions de permissions
