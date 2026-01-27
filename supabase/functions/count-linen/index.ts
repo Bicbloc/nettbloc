@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image, linenTypeId, hotelId, liveMode = false, useRuler = false } = await req.json();
+    const { image, linenTypeId, hotelId, liveMode = false, useRuler = false, detectMode = false } = await req.json();
     
     if (!image || !linenTypeId || !hotelId) {
       return new Response(
@@ -46,19 +46,66 @@ serve(async (req) => {
       );
     }
 
+    // Get all linen types for detection mode (to identify which type it is)
+    let allLinenTypes: any[] = [];
+    if (detectMode) {
+      const { data: types } = await supabase
+        .from('linen_types')
+        .select('id, name, category, dimensions, average_thickness_cm')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true);
+      allLinenTypes = types || [];
+    }
+
     // Get average thickness (default 2cm if not configured)
     const avgThickness = linenType.average_thickness_cm || 2.0;
 
     // Model selection:
+    // - Detect mode: fast model for dimension/type detection
     // - Live mode: ultra-fast for real-time preview
     // - Ruler mode: use powerful model for precise measurement
     // - Normal mode: balanced flash model
     let model = 'google/gemini-2.5-flash';
-    if (liveMode) {
+    if (detectMode || liveMode) {
       model = 'google/gemini-2.5-flash-lite';
     } else if (useRuler) {
       model = 'google/gemini-2.5-pro'; // Most powerful for ruler detection
     }
+    
+    // Detection mode prompt - for identifying linen type by dimensions
+    const detectPrompt = `Tu es un expert en identification de linge d'hôtel.
+
+TYPES DE LINGE DISPONIBLES:
+${allLinenTypes.map(t => `- ${t.name}${t.dimensions ? ` (${t.dimensions})` : ''}${t.category ? ` [${t.category}]` : ''}`).join('\n')}
+
+## TÂCHE
+1. Identifie le type de linge visible dans l'image
+2. Estime les DIMENSIONS APPROXIMATIVES (largeur x hauteur en cm)
+3. Compte le nombre de pièces
+4. Compare les dimensions détectées avec les types connus
+
+## INDICES POUR IDENTIFIER
+- DRAPS: rectangulaires, grands (>150cm), souvent blancs, pliés en rectangle allongé
+- SERVIETTES: rectangulaires moyens (50-100cm), épais, souvent blancs
+- TAIES D'OREILLER: petits rectangles (~50x70cm), fins
+- NAPPES: très grands rectangles, souvent colorés ou blancs
+- TORCHONS: petits carrés (~50x50cm), fins
+- COUVERTURES: très grands, épais
+
+## RÉPONSE JSON OBLIGATOIRE
+{
+  "detected_type": "nom du type identifié",
+  "expected_type": "${linenType.name}",
+  "type_match": true/false,
+  "count": N,
+  "confidence": 0-1,
+  "dimensions": {
+    "width_cm": X,
+    "height_cm": Y
+  },
+  "pile_detected": true/false,
+  "notes": "explication"
+}`;
     
     // Simplified prompt for live mode
     const livePrompt = `Compte le linge "${linenType.name}" dans l'image. Réponds JSON: {"count": N, "confidence": 0-1}`;
@@ -171,9 +218,9 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
     }
 
     // Select the appropriate prompt
-    let systemPrompt = liveMode ? livePrompt : (useRuler ? rulerPrompt : fullPrompt);
+    let systemPrompt = detectMode ? detectPrompt : (liveMode ? livePrompt : (useRuler ? rulerPrompt : fullPrompt));
 
-    console.log(`[count-linen] Mode: ${liveMode ? 'LIVE' : useRuler ? 'RULER' : 'NORMAL'}, Model: ${model}, Thickness: ${avgThickness}cm`);
+    console.log(`[count-linen] Mode: ${detectMode ? 'DETECT' : liveMode ? 'LIVE' : useRuler ? 'RULER' : 'NORMAL'}, Model: ${model}, Thickness: ${avgThickness}cm`);
 
     // Call Lovable AI with vision
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -255,20 +302,31 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
 
     console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}, ruler=${result.ruler_detected || false}`);
 
+    // Build response with detection-specific fields
+    const response: any = {
+      count: result.count || 0,
+      confidence: result.confidence || 0,
+      notes: result.notes || '',
+      linenType: linenType.name,
+      model: model,
+      mode: detectMode ? 'detect' : (liveMode ? 'live' : (useRuler ? 'ruler' : 'normal')),
+      // Ruler-specific fields
+      ruler_detected: result.ruler_detected || false,
+      pile_height_cm: result.pile_height_cm || null,
+      measurement_method: result.measurement_method || 'visual_count',
+      item_thickness_cm: avgThickness
+    };
+
+    // Add detection-specific fields
+    if (detectMode) {
+      response.detected_type = result.detected_type || null;
+      response.type_match = result.type_match !== undefined ? result.type_match : true;
+      response.dimensions = result.dimensions || { width_cm: null, height_cm: null };
+      response.pile_detected = result.pile_detected || false;
+    }
+
     return new Response(
-      JSON.stringify({
-        count: result.count || 0,
-        confidence: result.confidence || 0,
-        notes: result.notes || '',
-        linenType: linenType.name,
-        model: model,
-        mode: liveMode ? 'live' : (useRuler ? 'ruler' : 'normal'),
-        // Ruler-specific fields
-        ruler_detected: result.ruler_detected || false,
-        pile_height_cm: result.pile_height_cm || null,
-        measurement_method: result.measurement_method || 'visual_count',
-        item_thickness_cm: avgThickness
-      }),
+      JSON.stringify(response),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
