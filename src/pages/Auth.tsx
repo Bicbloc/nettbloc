@@ -29,32 +29,70 @@ const Auth = () => {
   const navigate = useNavigate();
   const { translations: t, language } = useTranslation();
 
-  // Handle password reset link
+  // Handle password reset link (support both old hash tokens and new PKCE ?code=... links)
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const searchParams = new URLSearchParams(window.location.search);
+
+    const type = hashParams.get('type') ?? searchParams.get('type');
     const accessToken = hashParams.get('access_token');
     const refreshToken = hashParams.get('refresh_token');
-    const type = hashParams.get('type');
+    const code = searchParams.get('code');
 
-    if (accessToken && refreshToken && type === 'recovery') {
-      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-        .then(({ error }) => {
-          if (error) {
-            toast({ 
-              variant: "destructive", 
-              title: language === 'en' ? "Link expired" : "Lien expiré", 
-              description: language === 'en' ? "Please request a new link." : "Veuillez demander un nouveau lien." 
-            });
-          } else {
-            setMode('new-password');
-            window.history.replaceState({}, '', '/auth');
-          }
+    const handleRecovery = async () => {
+      if (type !== 'recovery') return;
+
+      // Legacy format: #access_token=...&refresh_token=...&type=recovery
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
         });
-    }
+
+        if (error) {
+          toast({
+            variant: 'destructive',
+            title: language === 'en' ? 'Link expired' : 'Lien expiré',
+            description:
+              language === 'en'
+                ? 'Please request a new link.'
+                : 'Veuillez demander un nouveau lien.',
+          });
+          return;
+        }
+
+        setMode('new-password');
+        window.history.replaceState({}, document.title, '/auth');
+        return;
+      }
+
+      // New format (PKCE): ?code=...&type=recovery
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          toast({
+            variant: 'destructive',
+            title: language === 'en' ? 'Link expired' : 'Lien expiré',
+            description:
+              language === 'en'
+                ? 'Please request a new link.'
+                : 'Veuillez demander un nouveau lien.',
+          });
+          return;
+        }
+
+        setMode('new-password');
+        window.history.replaceState({}, document.title, '/auth');
+      }
+    };
+
+    void handleRecovery();
   }, [toast, language]);
 
   // Si authentifié, rediriger immédiatement
-  if (isAuthenticated) {
+  // IMPORTANT: en mode recovery, l'utilisateur est authentifié, mais doit voir l'écran "Nouveau mot de passe"
+  if (isAuthenticated && mode !== 'new-password') {
     return <Navigate to="/" replace />;
   }
 
@@ -85,8 +123,25 @@ const Auth = () => {
         case 'hotel-signup': {
           if (!formData.companyName.trim()) throw new Error(language === 'en' ? "Establishment name required" : "Nom de l'établissement requis");
           if (formData.password !== formData.confirmPassword) throw new Error(t.auth.passwordMismatch);
-          const { error } = await signUp(formData.email, formData.password, formData.companyName);
+          const { error, needsEmailVerification } = await signUp(
+            formData.email,
+            formData.password,
+            formData.companyName
+          );
           if (error) throw error;
+
+          if (needsEmailVerification) {
+            toast({
+              title: language === 'en' ? 'Verification email sent' : 'Email de vérification envoyé',
+              description:
+                language === 'en'
+                  ? 'Check your inbox, confirm your email, then sign in.'
+                  : 'Vérifiez votre boîte mail, confirmez votre email, puis connectez-vous.',
+            });
+            setMode('hotel-signin');
+            break;
+          }
+
           toast({ title: t.auth.signupSuccess });
           navigate('/plan-selection');
           break;

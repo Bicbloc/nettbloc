@@ -8,7 +8,11 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isInitialized: boolean;
-  signUp: (email: string, password: string, companyName?: string) => Promise<{ error: AuthError | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    companyName?: string
+  ) => Promise<{ error: AuthError | null; needsEmailVerification: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null; success: boolean }>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
@@ -170,7 +174,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [refreshSession, startTokenRefresh, stopTokenRefresh]);
 
   const signUp = useCallback(async (email: string, password: string, companyName?: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -178,7 +182,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         data: { company_name: companyName }
       }
     });
-    return { error };
+
+    // Si Supabase exige la confirmation email, il n'y aura pas de session immédiate.
+    const needsEmailVerification = !error && !data?.session;
+
+    return { error, needsEmailVerification };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
