@@ -219,12 +219,12 @@ export function useDashboardRooms({
     }
   }, [hotelId, isImporting]);
 
-  // Auto-load rooms on mount and hotel change
+  // Auto-load rooms on mount and hotel change - rafraîchissement toutes les 5 secondes
   useEffect(() => {
     loadRoomsFromDatabase();
     
-    // Reload every 2 minutes
-    const interval = setInterval(loadRoomsFromDatabase, 120000);
+    // Reload every 5 seconds for near-real-time updates
+    const interval = setInterval(loadRoomsFromDatabase, 5000);
     return () => clearInterval(interval);
   }, [loadRoomsFromDatabase]);
 
