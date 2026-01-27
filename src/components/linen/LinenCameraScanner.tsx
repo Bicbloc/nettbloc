@@ -45,6 +45,10 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [manualCount, setManualCount] = useState(0);
   const [liveDetection, setLiveDetection] = useState<DetectionResult | null>(null);
   const [isLiveDetecting, setIsLiveDetecting] = useState(false);
+  
+  // État pour la correction du comptage IA
+  const [showCorrectionInput, setShowCorrectionInput] = useState(false);
+  const [correctedCount, setCorrectedCount] = useState(0);
 
   const fileInputId = `linen-photo-input-${linenTypeId}`;
   
@@ -396,6 +400,37 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     reader.readAsDataURL(file);
   };
 
+  // Fonction pour sauvegarder la correction d'apprentissage
+  const saveTrainingSample = async (aiCount: number, actualCount: number, photoUrl: string) => {
+    if (aiCount === actualCount) return; // Pas de correction nécessaire
+    
+    try {
+      const { error } = await supabase
+        .from('linen_training_samples')
+        .insert({
+          hotel_id: hotelId,
+          linen_type_id: linenTypeId,
+          ai_predicted_count: aiCount,
+          actual_count: actualCount,
+          image_url: photoUrl || 'no-image',
+          notes: `Correction: IA a compté ${aiCount}, réel: ${actualCount}`,
+          created_by: 'housekeeper'
+        });
+      
+      if (error) {
+        console.error('Erreur sauvegarde apprentissage:', error);
+      } else {
+        console.log('✅ Correction sauvegardée pour apprentissage');
+        toast({
+          title: "🧠 Apprentissage enregistré",
+          description: "Le système apprendra de cette correction",
+        });
+      }
+    } catch (err) {
+      console.error('Erreur sauvegarde sample:', err);
+    }
+  };
+
   const handleConfirm = async () => {
     // For manual mode
     if (mode === 'manual') {
@@ -414,6 +449,10 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
     // For camera/photo mode
     if (!result || !capturedImage) return;
+    
+    // Déterminer le compte final (corrigé ou original)
+    const finalCount = showCorrectionInput ? correctedCount : result.count;
+    const wasCorrection = showCorrectionInput && correctedCount !== result.count;
 
     try {
       const response = await fetch(capturedImage);
@@ -424,18 +463,43 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         .from('linen-images')
         .upload(fileName, blob, { contentType: 'image/jpeg', upsert: false });
 
-      if (uploadError) {
-        toast({ title: "⚠️ Photo non sauvegardée", description: "Comptage enregistré sans photo", variant: "default" });
-        onCountComplete({ count: result.count, confidence: result.confidence, photoUrl: '', notes: result.notes });
-        return;
+      let publicUrl = '';
+      if (!uploadError) {
+        const { data } = supabase.storage.from('linen-images').getPublicUrl(fileName);
+        publicUrl = data.publicUrl;
       }
 
-      const { data: { publicUrl } } = supabase.storage.from('linen-images').getPublicUrl(fileName);
-      onCountComplete({ count: result.count, confidence: result.confidence, photoUrl: publicUrl, notes: result.notes });
-      toast({ title: "Photo enregistrée", description: `Comptage: ${result.count} ${linenTypeName}` });
+      // Si c'était une correction, sauvegarder pour apprentissage
+      if (wasCorrection) {
+        await saveTrainingSample(result.count, correctedCount, publicUrl);
+      }
+
+      if (uploadError) {
+        toast({ title: "⚠️ Photo non sauvegardée", description: "Comptage enregistré sans photo", variant: "default" });
+      }
+      
+      onCountComplete({ 
+        count: finalCount, 
+        confidence: wasCorrection ? 1.0 : result.confidence, 
+        photoUrl: publicUrl, 
+        notes: wasCorrection ? `Corrigé manuellement (IA: ${result.count})` : result.notes 
+      });
+      
+      toast({ 
+        title: wasCorrection ? "✏️ Correction enregistrée" : "Photo enregistrée", 
+        description: `Comptage: ${finalCount} ${linenTypeName}` 
+      });
     } catch (error) {
       console.error('Erreur upload photo:', error);
-      onCountComplete({ count: result.count, confidence: result.confidence, photoUrl: '', notes: result.notes });
+      onCountComplete({ count: finalCount, confidence: result.confidence, photoUrl: '', notes: result.notes });
+    }
+  };
+
+  // Fonction pour activer le mode correction
+  const handleEnableCorrection = () => {
+    if (result) {
+      setCorrectedCount(result.count);
+      setShowCorrectionInput(true);
     }
   };
 
@@ -687,14 +751,44 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           </div>
         )}
 
-        {/* Result Display */}
+        {/* Result Display with Correction Option */}
         {result && capturedImage && !isCounting && (
           <div className="absolute top-20 left-4 right-4 z-10">
             <Card className="p-4 bg-white/95 backdrop-blur">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <p className="text-2xl font-bold text-primary">{result.count} pièces</p>
-                  <p className="text-sm text-muted-foreground">{linenTypeName}</p>
+                  {showCorrectionInput ? (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 w-10 rounded-full"
+                        onClick={() => setCorrectedCount(Math.max(0, correctedCount - 1))}
+                      >
+                        <Minus className="h-5 w-5" />
+                      </Button>
+                      <Input
+                        type="number"
+                        value={correctedCount}
+                        onChange={(e) => setCorrectedCount(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-20 h-10 text-xl font-bold text-center"
+                        min={0}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 w-10 rounded-full"
+                        onClick={() => setCorrectedCount(correctedCount + 1)}
+                      >
+                        <Plus className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold text-primary">{result.count} pièces</p>
+                      <p className="text-sm text-muted-foreground">{linenTypeName}</p>
+                    </>
+                  )}
                 </div>
                 <div className="text-right">
                   <Badge className={getConfidenceColor(result.confidence)}>
@@ -705,8 +799,28 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                   </p>
                 </div>
               </div>
-              {result.notes && (
-                <p className="text-sm text-muted-foreground border-t pt-2">💡 {result.notes}</p>
+              
+              {/* Bouton de correction */}
+              {!showCorrectionInput && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-orange-600 border-orange-300 hover:bg-orange-50"
+                  onClick={handleEnableCorrection}
+                >
+                  ✏️ Corriger le comptage
+                </Button>
+              )}
+              
+              {showCorrectionInput && correctedCount !== result.count && (
+                <div className="text-sm text-orange-600 mt-2 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  L'IA apprendra de cette correction !
+                </div>
+              )}
+              
+              {result.notes && !showCorrectionInput && (
+                <p className="text-sm text-muted-foreground border-t pt-2 mt-2">💡 {result.notes}</p>
               )}
             </Card>
           </div>
