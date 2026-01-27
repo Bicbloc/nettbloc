@@ -3681,6 +3681,50 @@ export type Database = {
           },
         ]
       }
+      sub_account_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          invitation_code: string
+          sent_at: string | null
+          status: string
+          sub_account_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          invitation_code: string
+          sent_at?: string | null
+          status?: string
+          sub_account_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          invitation_code?: string
+          sent_at?: string | null
+          status?: string
+          sub_account_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_account_invitations_sub_account_id_fkey"
+            columns: ["sub_account_id"]
+            isOneToOne: false
+            referencedRelation: "sub_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sub_account_permissions: {
         Row: {
           created_at: string | null
@@ -3719,41 +3763,65 @@ export type Database = {
           created_by: string | null
           email: string
           first_name: string
+          hotel_id: string | null
           id: string
+          invitation_status: string | null
           is_active: boolean | null
           last_login_at: string | null
           last_name: string
           parent_user_id: string
           role_name: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           created_by?: string | null
           email: string
           first_name: string
+          hotel_id?: string | null
           id?: string
+          invitation_status?: string | null
           is_active?: boolean | null
           last_login_at?: string | null
           last_name: string
           parent_user_id: string
           role_name?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           created_by?: string | null
           email?: string
           first_name?: string
+          hotel_id?: string | null
           id?: string
+          invitation_status?: string | null
           is_active?: boolean | null
           last_login_at?: string | null
           last_name?: string
           parent_user_id?: string
           role_name?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sub_accounts_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_accounts_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -4230,6 +4298,10 @@ export type Database = {
       }
     }
     Functions: {
+      activate_sub_account: {
+        Args: { p_code: string; p_user_id: string }
+        Returns: boolean
+      }
       add_housekeeper_xp: {
         Args: {
           p_hotel_id: string
@@ -4370,6 +4442,18 @@ export type Database = {
         }[]
       }
       get_housekeeper_profile_id: { Args: never; Returns: string }
+      get_sub_account_info: {
+        Args: { p_user_id: string }
+        Returns: {
+          first_name: string
+          hotel_id: string
+          is_sub_account: boolean
+          last_name: string
+          parent_user_id: string
+          role_name: string
+          sub_account_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -4457,6 +4541,20 @@ export type Database = {
           discount_value: number
           error_message: string
           is_valid: boolean
+        }[]
+      }
+      validate_sub_account_invitation: {
+        Args: { p_code: string }
+        Returns: {
+          email: string
+          error_message: string
+          first_name: string
+          hotel_id: string
+          hotel_name: string
+          is_valid: boolean
+          last_name: string
+          role_name: string
+          sub_account_id: string
         }[]
       }
     }

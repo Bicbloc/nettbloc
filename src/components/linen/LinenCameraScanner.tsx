@@ -42,10 +42,12 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [result, setResult] = useState<{ count: number; confidence: number; notes?: string } | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraFailed, setCameraFailed] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [mode, setMode] = useState<'camera' | 'manual'>('camera');
   const [manualCount, setManualCount] = useState(0);
   const [liveDetection, setLiveDetection] = useState<DetectionResult | null>(null);
   const [isLiveDetecting, setIsLiveDetecting] = useState(false);
+  const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Mode précision avec règle étalon
   const [useRulerMode, setUseRulerMode] = useState(false);
@@ -63,12 +65,24 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   useEffect(() => {
     if (mode === 'camera') {
+      setIsInitializing(true);
+      // Set a timeout to show fallback if camera doesn't start
+      initTimeoutRef.current = setTimeout(() => {
+        if (!isStreaming) {
+          setIsInitializing(false);
+          setCameraFailed(true);
+        }
+      }, 5000); // 5 second timeout
+      
       startCamera();
     }
     return () => {
       stopCamera();
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
       }
     };
   }, [mode]);
@@ -226,12 +240,9 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.log('Camera API not available');
+        setIsInitializing(false);
         setCameraFailed(true);
-        toast({
-          title: "Caméra non disponible",
-          description: "Utilisez le mode manuel ou sélectionnez une photo.",
-          variant: "destructive"
-        });
         return;
       }
 
@@ -246,37 +257,55 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           }
         });
       } catch (envError) {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
+        console.log('Trying fallback camera config:', envError);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+        } catch (fallbackError) {
+          console.log('All camera attempts failed:', fallbackError);
+          setIsInitializing(false);
+          setCameraFailed(true);
+          return;
+        }
       }
       
       if (videoRef.current && stream) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         
-        await Promise.race([
-          new Promise<void>((resolve) => {
-            if (videoRef.current) {
-              videoRef.current.onloadedmetadata = () => {
-                videoRef.current?.play().catch(console.error);
-                resolve();
-              };
-            }
-          }),
-          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
-        ]);
-        
-        setIsStreaming(true);
+        try {
+          await Promise.race([
+            new Promise<void>((resolve) => {
+              if (videoRef.current) {
+                videoRef.current.onloadedmetadata = () => {
+                  videoRef.current?.play().catch(console.error);
+                  resolve();
+                };
+              }
+            }),
+            new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000))
+          ]);
+          
+          // Clear the timeout since camera started successfully
+          if (initTimeoutRef.current) {
+            clearTimeout(initTimeoutRef.current);
+          }
+          setIsInitializing(false);
+          setIsStreaming(true);
+        } catch (playError) {
+          console.error('Video play failed:', playError);
+          setIsInitializing(false);
+          setCameraFailed(true);
+        }
+      } else {
+        setIsInitializing(false);
+        setCameraFailed(true);
       }
     } catch (error: any) {
       console.error('Erreur accès caméra:', error);
+      setIsInitializing(false);
       setCameraFailed(true);
-      toast({
-        title: "Caméra non disponible",
-        description: "Utilisez le mode manuel ou sélectionnez une photo.",
-        variant: "default"
-      });
     }
   };
 
@@ -749,18 +778,18 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                 )}
 
                 {/* Fallback: en cours d'initialisation (évite un écran noir) */}
-                {!cameraFailed && !capturedImage && !isStreaming && (
+                {isInitializing && !cameraFailed && !capturedImage && !isStreaming && (
                   <div className="flex flex-col items-center justify-center text-white p-8 text-center">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/80 mb-4" />
                     <p className="text-lg mb-2">Initialisation de la caméra…</p>
-                    <p className="text-sm opacity-70 mb-6">Si rien ne s'affiche, utilisez la prise de photo.</p>
+                    <p className="text-sm opacity-70 mb-6">Cela peut prendre quelques secondes...</p>
                     <Button 
                       size="lg" 
                       variant="secondary"
                       onClick={triggerFileInput}
                     >
                       <Camera className="h-5 w-5 mr-2" />
-                      Prendre une photo
+                      Prendre une photo directement
                     </Button>
                   </div>
                 )}
