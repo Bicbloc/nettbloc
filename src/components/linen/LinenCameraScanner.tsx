@@ -45,6 +45,8 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [manualCount, setManualCount] = useState(0);
   const [liveDetection, setLiveDetection] = useState<DetectionResult | null>(null);
   const [isLiveDetecting, setIsLiveDetecting] = useState(false);
+
+  const fileInputId = `linen-photo-input-${linenTypeId}`;
   
   const { toast } = useToast();
 
@@ -577,10 +579,11 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
         <input
           ref={fileInputRef}
+          id={fileInputId}
           type="file"
           accept="image/*"
           capture="environment"
-          className="hidden"
+          className="sr-only"
           onChange={handleFileSelect}
         />
 
@@ -601,14 +604,38 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             </>
           )}
           
+          {/* Fallback: caméra indisponible */}
           {cameraFailed && !capturedImage && !isStreaming && (
             <div className="flex flex-col items-center justify-center text-white p-8 text-center">
               <Camera className="h-16 w-16 mb-4 opacity-50" />
               <p className="text-lg mb-2">Caméra non disponible</p>
               <p className="text-sm opacity-70 mb-6">Utilisez le mode manuel ou sélectionnez une photo</p>
-              <Button onClick={() => setMode('manual')} variant="secondary" size="lg">
-                <Hash className="h-5 w-5 mr-2" />
-                Passer en mode manuel
+              <div className="flex flex-col gap-3 w-full max-w-sm">
+                <Button asChild size="lg" variant="secondary">
+                  <label htmlFor={fileInputId} className="cursor-pointer">
+                    <Camera className="h-5 w-5 mr-2" />
+                    Ouvrir l'appareil photo
+                  </label>
+                </Button>
+                <Button onClick={() => setMode('manual')} variant="secondary" size="lg">
+                  <Hash className="h-5 w-5 mr-2" />
+                  Passer en mode manuel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Fallback: en cours d'initialisation (évite un écran noir) */}
+          {!cameraFailed && !capturedImage && !isStreaming && (
+            <div className="flex flex-col items-center justify-center text-white p-8 text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/80 mb-4" />
+              <p className="text-lg mb-2">Initialisation de la caméra…</p>
+              <p className="text-sm opacity-70 mb-6">Si rien ne s'affiche, utilisez la prise de photo.</p>
+              <Button asChild size="lg" variant="secondary">
+                <label htmlFor={fileInputId} className="cursor-pointer">
+                  <Camera className="h-5 w-5 mr-2" />
+                  Prendre une photo
+                </label>
               </Button>
             </div>
           )}
@@ -685,13 +712,15 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               )}
               
               <Button
-                onClick={() => fileInputRef.current?.click()}
+                asChild
                 size="lg"
                 variant={cameraFailed ? "default" : "outline"}
                 className={`w-full h-14 ${cameraFailed ? 'rounded-full' : ''}`}
               >
-                <ImagePlus className="h-5 w-5 mr-2" />
-                {cameraFailed ? 'Sélectionner une photo' : 'Choisir depuis la galerie'}
+                <label htmlFor={fileInputId} className="cursor-pointer">
+                  <ImagePlus className="h-5 w-5 mr-2" />
+                  {cameraFailed ? "Ouvrir l'appareil photo" : "Prendre une photo (ou galerie)"}
+                </label>
               </Button>
             </div>
           )}

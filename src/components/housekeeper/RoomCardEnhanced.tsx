@@ -40,8 +40,17 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
   const touchStartX = useRef(0);
   const touchCurrentX = useRef(0);
 
-  // Les chambres sont actionnables si elles ne sont pas déjà propres ou en cours
-  const isActionable = ['dirty', 'needs-cleaning', 'ready-to-clean', 'assigned', 'pending'].includes(room.status);
+  // Statuts réellement utilisés côté PMS/DB : checkout, stayover, etc.
+  // On considère actionnable tout ce qui n'est pas déjà terminé.
+  const isActionable = [
+    'dirty',
+    'needs-cleaning',
+    'ready-to-clean',
+    'assigned',
+    'pending',
+    'checkout',
+    'stayover',
+  ].includes(room.status);
   const isStartable = isActionable && room.status !== 'in_progress';
 
   const handleTouchStart = (e: React.TouchEvent) => {

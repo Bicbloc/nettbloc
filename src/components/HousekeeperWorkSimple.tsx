@@ -646,6 +646,17 @@ export const HousekeeperWorkSimple: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Retour liste établissements */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/housekeeper/hotels')}
+                title="Changer d'établissement"
+                aria-label="Changer d'établissement"
+              >
+                <Building2 className="h-5 w-5" />
+              </Button>
+
               {/* Indicateur connexion */}
               <Badge variant={isConnected ? "default" : "destructive"} className="gap-1">
                 {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
