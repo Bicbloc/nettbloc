@@ -3,10 +3,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus, Hash, Eye, Minus, Plus, Ruler } from 'lucide-react';
+import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus, Hash, Eye, Minus, Plus, Ruler, Scan } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { RulerGuide, RulerCalculationOverlay } from './RulerGuide';
+import { LinenDetectionOverlay } from './LinenDetectionOverlay';
 
 interface LinenCameraScannerProps {
   linenTypeId: string;
@@ -20,6 +21,18 @@ interface DetectionResult {
   count: number;
   confidence: number;
   boxes?: Array<{ x: number; y: number; width: number; height: number }>;
+}
+
+interface DetectionState {
+  status: 'scanning' | 'stabilizing' | 'ready' | 'confirmed';
+  linenType: string | null;
+  estimatedCount: number;
+  dimensions: {
+    widthCm: number | null;
+    heightCm: number | null;
+  };
+  confidence: number;
+  stabilityProgress: number;
 }
 
 export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
@@ -54,6 +67,13 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [rulerDetected, setRulerDetected] = useState(false);
   const [pileHeightCm, setPileHeightCm] = useState<number | null>(null);
   const [itemThicknessCm, setItemThicknessCm] = useState(2.0);
+  
+  // Mode détection intelligente (type scanner ID)
+  const [useSmartDetection, setUseSmartDetection] = useState(true);
+  const [detectionState, setDetectionState] = useState<DetectionState | null>(null);
+  const [stableFrameCount, setStableFrameCount] = useState(0);
+  const lastDetectionValuesRef = useRef<{ count: number; confidence: number } | null>(null);
+  const stabilityTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // État pour la correction du comptage IA
   const [showCorrectionInput, setShowCorrectionInput] = useState(false);
@@ -90,7 +110,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     };
   }, [mode]);
 
-  // Live detection loop
+  // Live detection loop with smart detection mode
   const runLiveDetection = useCallback(async () => {
     if (!videoRef.current || !overlayCanvasRef.current || !isStreaming || capturedImage) {
       return;
@@ -112,7 +132,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     // Clear previous overlay
     ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-    // Run detection every ~1 second to avoid overloading
+    // Run detection every ~1.5 seconds to avoid overloading
     if (!isLiveDetecting) {
       setIsLiveDetecting(true);
       
@@ -124,15 +144,16 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         const tempCtx = tempCanvas.getContext('2d');
         if (tempCtx) {
           tempCtx.drawImage(video, 0, 0);
-          const frameData = tempCanvas.toDataURL('image/jpeg', 0.5); // Lower quality for speed
+          const frameData = tempCanvas.toDataURL('image/jpeg', 0.5);
           
-          // Call detection API
+          // Call detection API with detectMode for smart detection
           const { data, error } = await supabase.functions.invoke('count-linen', {
             body: {
               image: frameData,
               linenTypeId,
               hotelId,
-              liveMode: true // Indicate this is for live preview
+              liveMode: !useSmartDetection, // Use liveMode only if smart detection is off
+              detectMode: useSmartDetection // Enable dimension/type detection
             }
           });
 
@@ -144,6 +165,69 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             };
             lastDetectionRef.current = detection;
             setLiveDetection(detection);
+
+            // Handle smart detection mode - stability check
+            if (useSmartDetection && data.count > 0) {
+              const prev = lastDetectionValuesRef.current;
+              const isStable = prev && 
+                prev.count === data.count && 
+                Math.abs(prev.confidence - data.confidence) < 0.15;
+
+              if (isStable) {
+                // Increment stability counter
+                const newStableCount = stableFrameCount + 1;
+                setStableFrameCount(newStableCount);
+                
+                // Update detection state based on stability
+                if (newStableCount >= 3) {
+                  // Ready for validation after 3 stable frames (~4.5 seconds)
+                  setDetectionState({
+                    status: 'ready',
+                    linenType: data.detected_type || null,
+                    estimatedCount: data.count,
+                    dimensions: {
+                      widthCm: data.dimensions?.width_cm || null,
+                      heightCm: data.dimensions?.height_cm || null,
+                    },
+                    confidence: data.confidence,
+                    stabilityProgress: 100,
+                  });
+                } else {
+                  // Still stabilizing
+                  setDetectionState({
+                    status: 'stabilizing',
+                    linenType: data.detected_type || null,
+                    estimatedCount: data.count,
+                    dimensions: {
+                      widthCm: data.dimensions?.width_cm || null,
+                      heightCm: data.dimensions?.height_cm || null,
+                    },
+                    confidence: data.confidence,
+                    stabilityProgress: Math.min(100, (newStableCount / 3) * 100),
+                  });
+                }
+              } else {
+                // Reset stability - values changed
+                setStableFrameCount(0);
+                setDetectionState({
+                  status: 'scanning',
+                  linenType: data.detected_type || null,
+                  estimatedCount: data.count,
+                  dimensions: {
+                    widthCm: data.dimensions?.width_cm || null,
+                    heightCm: data.dimensions?.height_cm || null,
+                  },
+                  confidence: data.confidence,
+                  stabilityProgress: 0,
+                });
+              }
+
+              // Store current values for next comparison
+              lastDetectionValuesRef.current = {
+                count: data.count,
+                confidence: data.confidence,
+              };
+            }
           }
         }
       } catch (err) {
@@ -153,8 +237,8 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       }
     }
 
-    // Draw overlay with last detection result
-    if (lastDetectionRef.current) {
+    // Draw overlay with last detection result (only if not using smart detection overlay)
+    if (lastDetectionRef.current && !useSmartDetection) {
       drawOverlay(ctx, lastDetectionRef.current, overlayCanvas.width, overlayCanvas.height);
     }
 
@@ -473,6 +557,17 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     }
   };
 
+  // Handle smart detection validation - capture when user confirms
+  const handleSmartValidate = () => {
+    if (!detectionState || detectionState.status !== 'ready') return;
+    
+    // Mark as confirmed
+    setDetectionState(prev => prev ? { ...prev, status: 'confirmed' } : null);
+    
+    // Capture the photo
+    capturePhoto();
+  };
+
   const handleRetake = () => {
     setCapturedImage(null);
     setResult(null);
@@ -480,6 +575,10 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     setIsInitializing(true);
     setLiveDetection(null);
     lastDetectionRef.current = null;
+    // Reset smart detection state
+    setDetectionState(null);
+    setStableFrameCount(0);
+    lastDetectionValuesRef.current = null;
     startCamera();
   };
 
@@ -717,6 +816,23 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               </p>
             </div>
             <div className="flex gap-2">
+              {/* Smart detection toggle */}
+              <Button
+                variant={useSmartDetection ? "default" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setUseSmartDetection(!useSmartDetection);
+                  if (!useSmartDetection) {
+                    // Reset when enabling
+                    setDetectionState(null);
+                    setStableFrameCount(0);
+                  }
+                }}
+                className={useSmartDetection ? "bg-purple-600 text-white" : "text-white hover:bg-white/20"}
+              >
+                <Scan className="h-4 w-4 mr-1" />
+                {useSmartDetection ? "Smart ON" : "Smart"}
+              </Button>
               {/* Ruler precision mode toggle */}
               <Button
                 variant={useRulerMode ? "default" : "ghost"}
@@ -725,7 +841,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                 className={useRulerMode ? "bg-blue-600 text-white" : "text-white hover:bg-white/20"}
               >
                 <Ruler className="h-4 w-4 mr-1" />
-                {useRulerMode ? "Précision ON" : "Précision"}
+                {useRulerMode ? "Règle ON" : "Règle"}
               </Button>
               <Button
                 variant="ghost"
@@ -787,6 +903,16 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                         isVisible={true}
                         detectedRuler={rulerDetected}
                         pileHeightCm={pileHeightCm || undefined}
+                      />
+                    )}
+                    
+                    {/* Smart detection overlay - ID scanner style */}
+                    {isStreaming && useSmartDetection && !capturedImage && (
+                      <LinenDetectionOverlay
+                        detection={detectionState}
+                        isActive={true}
+                        onValidate={handleSmartValidate}
+                        linenTypeName={linenTypeName}
                       />
                     )}
                   </>
@@ -967,25 +1093,33 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           </div>
         )}
 
-        {/* Controls */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
+        {/* Controls - hide when smart detection is active and ready */}
+        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6 ${
+          useSmartDetection && detectionState?.status === 'ready' && !capturedImage ? 'opacity-0 pointer-events-none' : ''
+        }`}>
           {!capturedImage && (
             <div className="flex flex-col gap-3">
-              {isStreaming && (
+              {isStreaming && !useSmartDetection && (
                 <Button onClick={capturePhoto} size="lg" className="w-full h-16 text-lg rounded-full">
                   <Camera className="h-6 w-6 mr-2" />
                   {liveDetection ? `Capturer (${liveDetection.count} détecté)` : 'Capturer la photo'}
                 </Button>
               )}
               
+              {isStreaming && useSmartDetection && detectionState?.status !== 'ready' && (
+                <div className="text-center text-white/80 text-sm">
+                  <p>Placez le linge dans le cadre et attendez la stabilisation</p>
+                </div>
+              )}
+              
               <Button
                 size="lg"
                 variant={cameraFailed ? "default" : "outline"}
-                className={`w-full h-14 ${cameraFailed ? 'rounded-full' : ''}`}
+                className={`w-full h-14 ${cameraFailed ? 'rounded-full' : ''} ${useSmartDetection && isStreaming ? 'opacity-50' : ''}`}
                 onClick={triggerFileInput}
               >
                 <ImagePlus className="h-5 w-5 mr-2" />
-                {cameraFailed ? "Ouvrir l'appareil photo" : "Prendre une photo (ou galerie)"}
+                {cameraFailed ? "Ouvrir l'appareil photo" : "Photo depuis galerie"}
               </Button>
             </div>
           )}
