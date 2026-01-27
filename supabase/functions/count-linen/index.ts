@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image, linenTypeId, hotelId, liveMode = false } = await req.json();
+    const { image, linenTypeId, hotelId, liveMode = false, useRuler = false } = await req.json();
     
     if (!image || !linenTypeId || !hotelId) {
       return new Response(
@@ -31,7 +31,7 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get linen type details
+    // Get linen type details including thickness for ruler-based calculation
     const { data: linenType, error: linenError } = await supabase
       .from('linen_types')
       .select('*')
@@ -46,20 +46,61 @@ serve(async (req) => {
       );
     }
 
-    // Use different models based on mode
-    // Live mode: ultra-fast lightweight model for real-time detection
-    // Normal mode: balanced flash model for accuracy with good speed
-    const model = liveMode ? 'google/gemini-2.5-flash-lite' : 'google/gemini-2.5-flash';
+    // Get average thickness (default 2cm if not configured)
+    const avgThickness = linenType.average_thickness_cm || 2.0;
+
+    // Model selection:
+    // - Live mode: ultra-fast for real-time preview
+    // - Ruler mode: use powerful model for precise measurement
+    // - Normal mode: balanced flash model
+    let model = 'google/gemini-2.5-flash';
+    if (liveMode) {
+      model = 'google/gemini-2.5-flash-lite';
+    } else if (useRuler) {
+      model = 'google/gemini-2.5-pro'; // Most powerful for ruler detection
+    }
     
-    // Simplified prompt for live mode (fewer tokens = faster + cheaper)
+    // Simplified prompt for live mode
     const livePrompt = `Compte le linge "${linenType.name}" dans l'image. Réponds JSON: {"count": N, "confidence": 0-1}`;
     
-    // Full prompt for normal mode - AMÉLIORÉ pour les piles
+    // RULER MODE: Specialized prompt for ruler-based measurement
+    const rulerPrompt = `Tu es un expert en mesure et comptage de linge avec règle étalon.
+
+OBJET: "${linenType.name}" (${linenType.category || 'linge'})
+ÉPAISSEUR CONNUE: ${avgThickness} cm par pièce pliée
+
+## ÉTAPE 1: DÉTECTER LA RÈGLE ÉTALON
+Cherche une règle colorée graduée (0-30cm) avec des bandes alternées:
+- Rouge (0-5cm), Orange (5-10cm), Jaune (10-15cm), Vert (15-20cm), Bleu (20-25cm), Violet (25-30cm)
+
+Si règle détectée:
+1. Calibre l'échelle (pixels par cm)
+2. Mesure la HAUTEUR TOTALE de la pile en cm
+3. CALCUL: nombre = hauteur_cm ÷ ${avgThickness}
+4. Arrondir au nombre entier le plus proche
+
+## ÉTAPE 2: VÉRIFICATION VISUELLE
+- Compte les strates/plis horizontaux visibles sur le côté
+- Compare avec le calcul mathématique
+- En cas de différence, privilégie le calcul si la règle est claire
+
+## RÉPONSE JSON OBLIGATOIRE
+{
+  "count": N,
+  "confidence": 0-1,
+  "ruler_detected": true/false,
+  "pile_height_cm": X.X,
+  "measurement_method": "ruler_calculation" | "visual_count",
+  "notes": "Description de la méthode"
+}`;
+
+    // Full prompt for normal mode (improved for stacks)
     let fullPrompt = `Tu es un expert en comptage de linge d'hôtel avec une spécialisation dans le comptage de piles.
 
 OBJET À COMPTER: "${linenType.name}" (${linenType.category || 'linge'})
 ${linenType.dimensions ? `Dimensions: ${linenType.dimensions}` : ''}
 ${linenType.color ? `Couleur: ${linenType.color}` : ''}
+ÉPAISSEUR MOYENNE PLIÉE: ${avgThickness} cm
 
 ## MÉTHODE POUR LES PILES DE LINGE
 
@@ -68,25 +109,26 @@ ${linenType.color ? `Couleur: ${linenType.color}` : ''}
 - Pour les piles: observe l'épaisseur totale et l'épaisseur d'UNE pièce
 
 ### Étape 2: Comptage des couches
-- Compte les PLIS visibles sur le côté de la pile
-- Chaque pli = 1 pièce
-- Si tu vois N plis distincts, il y a N pièces
+- Compte les PLIS/STRATES visibles sur le côté de la pile
+- Chaque strate horizontale distincte = 1 pièce
+- Si tu vois N strates distinctes, il y a N pièces
 
-### Étape 3: Vérification
-- Épaisseur typique d'un drap plié: 1-2 cm
-- Épaisseur typique d'une serviette pliée: 2-4 cm
-- Divise l'épaisseur totale par l'épaisseur d'une pièce
+### Étape 3: Vérification mathématique
+- Estime l'épaisseur totale de la pile
+- Divise par ${avgThickness} cm (épaisseur connue de ce type)
+- Compare avec le comptage visuel
 
 ### ERREURS À ÉVITER
 ❌ Ne pas compter les ombres comme des pièces
 ❌ Ne pas confondre un pli de tissu avec une pièce séparée
 ❌ Ne pas surestimer: en cas de doute, compte MOINS
 ❌ Les bords repliés d'une même pièce ne sont PAS des pièces supplémentaires
+❌ Une pile haute mais fine = MOINS de pièces qu'on pense
 
 ### RÈGLE D'OR POUR LES PILES
 Si tu vois une pile compacte et homogène:
 1. Compte les STRATES distinctes (lignes horizontales sur le côté)
-2. Chaque strate = 1 pièce
+2. Si pile dense sans strates visibles: estimation = hauteur estimée ÷ ${avgThickness}
 3. En cas d'incertitude, SOUS-ESTIME plutôt que surestimer
 
 CONFIANCE:
@@ -95,13 +137,13 @@ CONFIANCE:
 - 0.5-0.69: Pile compacte, estimation nécessaire
 - <0.5: Impossible de distinguer les couches
 
-Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode utilisée et observations"}`;
+Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode utilisée"}`;
 
-    // Get training samples + corrections for improved accuracy
+    // Get training samples + corrections for improved accuracy (not in live mode)
     if (!liveMode) {
       const { data: trainingSamples } = await supabase
         .from('linen_training_samples')
-        .select('ai_predicted_count, actual_count, notes, created_at')
+        .select('ai_predicted_count, actual_count, notes, scan_method, created_at')
         .eq('linen_type_id', linenTypeId)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -109,24 +151,29 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
       if (trainingSamples && trainingSamples.length > 0) {
         const corrections = trainingSamples.filter(s => s.ai_predicted_count !== s.actual_count);
         if (corrections.length > 0) {
-          fullPrompt += '\n\n## APPRENTISSAGE DES ERREURS PASSÉES\n';
-          fullPrompt += 'Voici des corrections récentes - adapte ton comptage en conséquence:\n';
-          corrections.forEach((sample) => {
-            const diff = (sample.ai_predicted_count || 0) - sample.actual_count;
-            if (diff > 0) {
-              fullPrompt += `- L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SURESTIMATION de ${diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
-            } else {
-              fullPrompt += `- L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SOUS-ESTIMATION de ${-diff})${sample.notes ? ` - ${sample.notes}` : ''}\n`;
-            }
-          });
-          fullPrompt += '\n⚠️ Tendance détectée: ajuste ton comptage en fonction de ces corrections.\n';
+          const appendix = '\n\n## ⚠️ APPRENTISSAGE DES ERREURS PASSÉES\n' +
+            'Voici des corrections récentes - adapte ton comptage en conséquence:\n' +
+            corrections.map((sample) => {
+              const diff = (sample.ai_predicted_count || 0) - sample.actual_count;
+              const method = sample.scan_method || 'pile';
+              if (diff > 0) {
+                return `- Méthode ${method}: L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SURESTIMATION de ${diff})${sample.notes ? ` - ${sample.notes}` : ''}`;
+              } else {
+                return `- Méthode ${method}: L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SOUS-ESTIMATION de ${-diff})${sample.notes ? ` - ${sample.notes}` : ''}`;
+              }
+            }).join('\n') +
+            '\n\n⚠️ Tendance détectée: ajuste ton comptage en fonction de ces corrections.\n';
+          
+          fullPrompt += appendix;
+          // Also add to ruler prompt if using ruler
         }
       }
     }
 
-    const systemPrompt = liveMode ? livePrompt : fullPrompt;
+    // Select the appropriate prompt
+    let systemPrompt = liveMode ? livePrompt : (useRuler ? rulerPrompt : fullPrompt);
 
-    console.log(`[count-linen] Mode: ${liveMode ? 'LIVE' : 'NORMAL'}, Model: ${model}`);
+    console.log(`[count-linen] Mode: ${liveMode ? 'LIVE' : useRuler ? 'RULER' : 'NORMAL'}, Model: ${model}, Thickness: ${avgThickness}cm`);
 
     // Call Lovable AI with vision
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -147,7 +194,7 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
           }
         ],
         temperature: 0.1,
-        max_tokens: liveMode ? 100 : 300
+        max_tokens: liveMode ? 100 : 500
       })
     });
 
@@ -206,7 +253,7 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
       );
     }
 
-    console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}`);
+    console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}, ruler=${result.ruler_detected || false}`);
 
     return new Response(
       JSON.stringify({
@@ -215,7 +262,12 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
         notes: result.notes || '',
         linenType: linenType.name,
         model: model,
-        mode: liveMode ? 'live' : 'normal'
+        mode: liveMode ? 'live' : (useRuler ? 'ruler' : 'normal'),
+        // Ruler-specific fields
+        ruler_detected: result.ruler_detected || false,
+        pile_height_cm: result.pile_height_cm || null,
+        measurement_method: result.measurement_method || 'visual_count',
+        item_thickness_cm: avgThickness
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
