@@ -20,9 +20,11 @@ import { Room } from "@/services/pdfService";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
 import { ManualRoomEntryDialog } from "@/components/ManualRoomEntryDialog";
+import { ImportModeSwitch } from "@/components/ImportModeSwitch";
 import { RoomFilters } from "@/components/RoomFilters";
 import { RoomCard } from "@/components/RoomCard";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface RoomManagementTabProps {
   rooms: Room[];
@@ -52,7 +54,23 @@ export function RoomManagementTab({
   onLinkRooms,
 }: RoomManagementTabProps) {
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
+  const [importMode, setImportMode] = useState<'auto' | 'manual'>('auto');
 
+  // Load hotel's import mode preference
+  useEffect(() => {
+    const loadImportMode = async () => {
+      if (!currentHotelId) return;
+      const { data } = await supabase
+        .from('hotels')
+        .select('import_mode')
+        .eq('id', currentHotelId)
+        .maybeSingle();
+      if (data?.import_mode) {
+        setImportMode(data.import_mode as 'auto' | 'manual');
+      }
+    };
+    loadImportMode();
+  }, [currentHotelId]);
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'needs-cleaning':
@@ -96,6 +114,13 @@ export function RoomManagementTab({
 
   return (
     <div className="space-y-6">
+      {/* Import Mode Switch */}
+      <ImportModeSwitch 
+        hotelId={currentHotelId}
+        currentMode={importMode}
+        onModeChange={setImportMode}
+      />
+
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Gestion des chambres</h2>
         <div className="flex gap-2">
@@ -103,10 +128,18 @@ export function RoomManagementTab({
             onAddRoom={onAddRoom} 
             existingRooms={rooms} 
           />
-          <PdfWorkflowDialog 
-            hotelId={currentHotelId}
-            onWorkflowComplete={onPdfProcessed}
-          />
+          {importMode === 'auto' ? (
+            <PdfWorkflowDialog 
+              hotelId={currentHotelId}
+              onWorkflowComplete={onPdfProcessed}
+            />
+          ) : (
+            <ManualRoomEntryDialog 
+              hotelId={currentHotelId}
+              onRoomsAdded={handleManualRoomsAdded}
+              existingRoomNumbers={existingRoomNumbers}
+            />
+          )}
           <Button
             onClick={onOpenManualAssignment}
             variant="outline"
@@ -121,73 +154,48 @@ export function RoomManagementTab({
       {rooms.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Aucune chambre importée</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-md">
-              Choisissez comment ajouter vos chambres : automatiquement via un rapport PDF ou manuellement.
-            </p>
-            
-            {/* Two-option choice */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
-              {/* Option 1: PDF Auto Recognition */}
-              <Card className="relative overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <Sparkles className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="text-base">Reconnaissance automatique</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="pb-4">
-                  <CardDescription className="mb-3">
-                    Importez un rapport PDF de votre PMS et laissez l'IA extraire automatiquement les chambres et statuts.
-                  </CardDescription>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    <Badge variant="secondary" className="text-xs">Mews</Badge>
-                    <Badge variant="secondary" className="text-xs">Apaleo</Badge>
-                    <Badge variant="secondary" className="text-xs">Opera</Badge>
-                    <Badge variant="secondary" className="text-xs">+</Badge>
-                  </div>
-                  <PdfWorkflowDialog 
-                    hotelId={currentHotelId}
-                    onWorkflowComplete={onPdfProcessed}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Option 2: Manual Entry */}
-              <Card className="relative overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-secondary text-secondary-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <ClipboardList className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="text-base">Saisie manuelle</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="pb-4">
-                  <CardDescription className="mb-3">
-                    Entrez vos chambres manuellement avec leur numéro, type de nettoyage (À blanc, Recouche) et statut.
-                  </CardDescription>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    <Badge variant="outline" className="text-xs">🚪 À blanc</Badge>
-                    <Badge variant="outline" className="text-xs">🛏️ Recouche</Badge>
-                    <Badge variant="outline" className="text-xs">✅ Propre</Badge>
-                  </div>
-                  <ManualRoomEntryDialog 
-                    hotelId={currentHotelId}
-                    onRoomsAdded={handleManualRoomsAdded}
-                    existingRoomNumbers={existingRoomNumbers}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+            {importMode === 'auto' ? (
+              <>
+                <Sparkles className="h-12 w-12 text-primary mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Importez vos chambres</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-md">
+                  Téléchargez un rapport PDF de votre PMS. L'IA extraira automatiquement les chambres et statuts.
+                </p>
+                <div className="flex flex-wrap gap-1 mb-4 justify-center">
+                  <Badge variant="secondary" className="text-xs">Mews</Badge>
+                  <Badge variant="secondary" className="text-xs">Apaleo</Badge>
+                  <Badge variant="secondary" className="text-xs">Opera</Badge>
+                  <Badge variant="secondary" className="text-xs">+10 PMS</Badge>
+                </div>
+                <PdfWorkflowDialog 
+                  hotelId={currentHotelId}
+                  onWorkflowComplete={onPdfProcessed}
+                />
+              </>
+            ) : (
+              <>
+                <ClipboardList className="h-12 w-12 text-secondary-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Saisissez vos chambres</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-md">
+                  Ajoutez vos chambres manuellement avec leur numéro, type de nettoyage et statut.
+                </p>
+                <div className="flex flex-wrap gap-1 mb-4 justify-center">
+                  <Badge variant="outline" className="text-xs">🚪 À blanc</Badge>
+                  <Badge variant="outline" className="text-xs">🛏️ Recouche</Badge>
+                  <Badge variant="outline" className="text-xs">✅ Propre</Badge>
+                </div>
+                <ManualRoomEntryDialog 
+                  hotelId={currentHotelId}
+                  onRoomsAdded={handleManualRoomsAdded}
+                  existingRoomNumbers={existingRoomNumbers}
+                />
+              </>
+            )}
 
             {/* Quick add single room */}
-            <div className="mt-6 pt-4 border-t w-full max-w-2xl">
+            <div className="mt-6 pt-4 border-t w-full max-w-md">
               <p className="text-sm text-muted-foreground text-center mb-3">
-                Ou ajoutez une seule chambre rapidement :
+                Ou ajoutez une seule chambre :
               </p>
               <div className="flex justify-center">
                 <AddRoomDialog 
@@ -200,26 +208,6 @@ export function RoomManagementTab({
         </Card>
       ) : (
         <>
-          {/* Action buttons when rooms exist */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Ajouter des chambres</CardTitle>
-                <div className="flex gap-2">
-                  <PdfWorkflowDialog 
-                    hotelId={currentHotelId}
-                    onWorkflowComplete={onPdfProcessed}
-                  />
-                  <ManualRoomEntryDialog 
-                    hotelId={currentHotelId}
-                    onRoomsAdded={handleManualRoomsAdded}
-                    existingRoomNumbers={existingRoomNumbers}
-                  />
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Filtres et options</CardTitle>
