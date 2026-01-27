@@ -90,8 +90,9 @@ export function filterRoomsByTab<T extends { status?: string; cleaning_type?: st
     const isNoneType = rawCleaningType === 'none' || rawCleaningType === '';
 
     // IMPORTANT:
-    // - "Client sorti" dans l'app correspond souvent à `checkout` MAIS aussi à `ready-to-clean`.
-    // - On évite de compter `ready_to_clean` dans "À nettoyer" pour ne pas vider l'onglet "Client sorti".
+    // - "Client sorti" dans l'app correspond à un STATUT: `checkout` OU `ready-to-clean`.
+    // - Le bouton "🚪 client sorti" met le statut à `ready-to-clean` quel que soit le type de nettoyage.
+    // - Donc l'onglet "Client sorti" doit se baser sur le statut (sinon le compteur paraît bloqué).
     const isCheckoutLikeStatus = status === 'checkout' || status === 'ready_to_clean';
     const isDirtyStatus = ['dirty', 'needs_cleaning', 'assigned', 'pending'].includes(status);
     const isInProgressStatus = status === 'in_progress' || status === 'inprogress';
@@ -113,8 +114,8 @@ export function filterRoomsByTab<T extends { status?: string; cleaning_type?: st
         return isQuickType;
 
       case 'checkout':
-        // Client sorti = checkout OU ready-to-clean (mais uniquement pour les À blanc)
-        return isFullType && isCheckoutLikeStatus;
+        // Client sorti = checkout OU ready-to-clean (peu importe le type)
+        return isCheckoutLikeStatus;
 
       default:
         return true;
@@ -159,9 +160,8 @@ export function calculateRoomCounts<T extends { status?: string; cleaning_type?:
     stayover: rooms.filter(r => isQuickType(getCleaningType(r))).length,
     checkout: rooms.filter(r => {
       const s = getStatus(r);
-      const t = getCleaningType(r);
       const isCheckoutLikeStatus = s === 'checkout' || s === 'ready_to_clean';
-      return isFullType(t) && isCheckoutLikeStatus;
+      return isCheckoutLikeStatus;
     }).length,
   };
   
