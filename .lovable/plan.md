@@ -1,168 +1,151 @@
 
-# Plan : Système d'invitation par email pour les sous-comptes
 
-## Résumé
+# Plan d'Optimisation : Scanner Linge Ultra-Performant
 
-Ce plan implémente un système d'invitation par email pour les sous-comptes. Lorsqu'un administrateur crée un sous-compte, l'invité reçoit un email avec un lien pour créer son compte personnel, automatiquement rattaché à l'hôtel de l'administrateur.
+## Analyse du Système Actuel
 
-## Architecture proposée
+Le système actuel effectue les opérations suivantes en boucle :
+1. Capture frame vidéo → compression JPEG (50%)
+2. Appel API Edge Function (~1.5s par détection)
+3. Traitement IA Gemini (variable selon le modèle)
+4. Analyse de stabilité (3 frames = ~4.5 secondes)
+
+**Problèmes identifiés :**
+- Latence API trop élevée entre chaque détection (~1.5s)
+- Compression image à 50% réduit les détails
+- Modèle `gemini-2.5-flash-lite` en mode détection peut manquer de précision
+- 3 frames stables = 4.5s d'attente minimum
+- Pas de pré-traitement d'image côté client
+
+## Optimisations Proposées
+
+### 1. Architecture Bi-Phase (Détection Rapide + Validation Précise)
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                     FLUX D'INVITATION                           │
+│                    NOUVELLE ARCHITECTURE                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  1. Admin crée sous-compte    2. Email envoyé                   │
-│  ┌─────────────────┐         ┌─────────────────┐                │
-│  │ SubAccountsManager │────▶│ Edge Function   │                │
-│  │ (Formulaire)    │         │ send-subaccount │                │
-│  └─────────────────┘         │ -invitation     │                │
-│                              └────────┬────────┘                │
-│                                       │                         │
-│                                       ▼                         │
-│                              ┌─────────────────┐                │
-│                              │  Email Resend   │                │
-│                              │  avec lien      │                │
-│                              └────────┬────────┘                │
-│                                       │                         │
-│  3. Invité clique             4. Création compte                │
-│  ┌─────────────────┐         ┌─────────────────┐                │
-│  │ /team/join?code=│────▶│ SubAccountSignup │                   │
-│  │ INV-XXXX        │         │ Page            │                │
-│  └─────────────────┘         └────────┬────────┘                │
-│                                       │                         │
-│                                       ▼                         │
-│                              ┌─────────────────┐                │
-│                              │ Supabase Auth   │                │
-│                              │ + Link to hotel │                │
-│                              └─────────────────┘                │
+│  PHASE 1: DÉTECTION RAPIDE (Local + IA Lite)                    │
+│  ┌─────────────────┐      ┌─────────────────┐                   │
+│  │ Pré-traitement  │─────▶│ Gemini Flash    │                   │
+│  │ Client (WebGL)  │      │ Lite (300ms)    │                   │
+│  └─────────────────┘      └─────────────────┘                   │
+│         │                         │                             │
+│         ▼                         ▼                             │
+│  • Détection bords          • Présence pile?                    │
+│  • Estimation taille        • Estimation count                  │
+│  • Qualité image            • Type probable                     │
+│                                                                 │
+│  PHASE 2: VALIDATION PRÉCISE (IA Pro)                           │
+│  ┌─────────────────┐      ┌─────────────────┐                   │
+│  │ Capture HD      │─────▶│ Gemini Pro      │                   │
+│  │ (85% quality)   │      │ (précis)        │                   │
+│  └─────────────────┘      └─────────────────┘                   │
+│                                   │                             │
+│                                   ▼                             │
+│                           Résultat final                        │
+│                           Confiance 95%+                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Modifications à effectuer
+### 2. Optimisations Techniques Détaillées
 
-### 1. Base de données
+| Optimisation | Avant | Après | Impact |
+|--------------|-------|-------|--------|
+| Intervalle détection | 1.5s | 0.8s | -47% latence |
+| Frames stables requis | 3 | 2 | -33% temps stabilisation |
+| Compression capture | 50% | 70% live / 90% final | +qualité |
+| Modèle détection | flash-lite | flash-lite optimisé | idem |
+| Modèle validation | flash | flash (pro si règle) | +précision |
+| Pré-traitement client | Non | Oui (Canvas API) | +qualité image |
 
-**Nouvelle table : `sub_account_invitations`**
+### 3. Améliorations Edge Function
 
-| Colonne | Type | Description |
-|---------|------|-------------|
-| id | uuid | Clé primaire |
-| sub_account_id | uuid | FK vers sub_accounts |
-| invitation_code | text | Code unique (ex: INV-XK4F-A2B3) |
-| status | text | pending, sent, accepted, expired |
-| sent_at | timestamp | Date d'envoi email |
-| accepted_at | timestamp | Date d'acceptation |
-| expires_at | timestamp | Expiration (7 jours) |
+**Nouvelle logique de sélection de modèle :**
+- `quickDetect` mode : `gemini-2.5-flash-lite` avec prompt minimaliste
+- Validation standard : `gemini-2.5-flash` avec prompt complet
+- Mode règle : `gemini-2.5-pro` pour calcul précis
 
-**Ajouts à `sub_accounts`**
+**Réduction des tokens :**
+- Live detection prompt : 50 tokens max
+- Validation prompt : 300 tokens max (vs 500 actuellement)
 
-| Colonne | Type | Description |
-|---------|------|-------------|
-| user_id | uuid | FK vers auth.users (rempli après signup) |
-| invitation_status | text | invited, active |
-| hotel_id | uuid | FK vers hotels (hôtel de rattachement) |
+### 4. Pré-traitement Image Côté Client
 
-### 2. Edge Function : `send-subaccount-invitation`
+Avant envoi à l'API :
+1. **Contraste automatique** : Améliore la distinction des couches
+2. **Détection de bords** : Estime le contour de la pile
+3. **Correction luminosité** : Compense les conditions d'éclairage
+4. **Recadrage intelligent** : Focus sur la zone d'intérêt
 
-**Rôle** : Envoie l'email d'invitation avec Resend
+### 5. Mode "Snap Instant"
 
-**Logique** :
-1. Reçoit : sub_account_id, email, first_name, last_name, hotel_name
-2. Génère un code d'invitation unique
-3. Enregistre dans `sub_account_invitations`
-4. Envoie l'email avec le lien `/team/join?code=XXX`
-5. Met à jour le statut
+Pour les utilisateurs pressés :
+- 1 seule détection rapide (pas de stabilisation)
+- Validation manuelle du résultat
+- Option "+1/-1" pour correction rapide
 
-**Template email** :
-- Titre : "Vous êtes invité à rejoindre {hotel_name}"
-- Corps : Bouton "Créer mon compte" + code d'invitation
-- Expiration : 7 jours
+## Fichiers à Modifier
 
-### 3. Nouvelle page : `/team/join` (SubAccountSignup)
+| Fichier | Modifications |
+|---------|---------------|
+| `supabase/functions/count-linen/index.ts` | Nouveau mode `quickDetect`, prompts optimisés, timeouts réduits |
+| `src/components/linen/LinenCameraScanner.tsx` | Intervalle 800ms, 2 frames stables, pré-traitement canvas |
+| `src/components/linen/LinenDetectionOverlay.tsx` | Affichage temps restant, indicateur qualité image |
+| `src/utils/imageProcessing.ts` (nouveau) | Fonctions pré-traitement (contraste, luminosité, crop) |
 
-**Fonctionnalités** :
-1. Récupère le code d'invitation depuis l'URL
-2. Vérifie la validité (non expiré, non utilisé)
-3. Affiche les infos préremplies (email, prénom, nom)
-4. Permet à l'invité de définir son mot de passe
-5. Crée le compte Supabase Auth
-6. Lie le `sub_account` au nouveau `user_id`
-7. Redirige vers le dashboard
+## Paramètres de Stabilisation Optimisés
 
-### 4. Modifications SubAccountsManager
-
-**Changements UI** :
-- Affichage du statut d'invitation (badge : Invité / Actif)
-- Bouton "Renvoyer l'invitation" pour les invités non confirmés
-- Désactivation de l'édition tant que le compte n'est pas activé
-
-**Nouveau flux de création** :
 ```text
-1. Admin remplit formulaire (prénom, nom, email, rôle)
-2. Clic "Créer" → Insert dans sub_accounts
-3. Appel Edge Function → Email envoyé
-4. Toast : "Invitation envoyée à {email}"
+AVANT:
+- Intervalle détection: 1500ms
+- Frames stables: 3
+- Temps total minimum: 4.5 secondes
+
+APRÈS:
+- Intervalle détection: 800ms
+- Frames stables: 2
+- Tolérance confiance: 0.12 (vs 0.15)
+- Temps total minimum: 1.6 secondes
 ```
 
-### 5. Gestion des permissions
+## Prompts IA Optimisés
 
-**Contexte d'authentification étendu** :
-- Détecter si l'utilisateur est un sous-compte
-- Charger ses permissions depuis `sub_accounts` + `sub_account_permissions`
-- Restreindre l'accès aux pages/fonctionnalités
-
-**Hook : `useSubAccountPermissions`**
-```typescript
-const { hasPermission, isSubAccount, parentHotelId } = useSubAccountPermissions();
-
-// Usage
-if (hasPermission('linen.add_types')) {
-  // Afficher le bouton
-}
+**Prompt Détection Rapide (quickDetect) - 30 tokens :**
+```
+Pile de linge visible? JSON: {"pile":bool,"count":N,"confidence":0-1}
 ```
 
-## Fichiers à créer/modifier
+**Prompt Validation - 150 tokens :**
+Focus sur le comptage précis des strates avec les règles d'or existantes mais format condensé.
 
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `supabase/migrations/XXX.sql` | Créer | Schema sub_account_invitations + colonnes |
-| `supabase/functions/send-subaccount-invitation/index.ts` | Créer | Edge function envoi email |
-| `src/pages/SubAccountJoin.tsx` | Créer | Page signup pour invités |
-| `src/components/SubAccountsManager.tsx` | Modifier | Ajouter appel invitation + statuts |
-| `src/hooks/use-sub-account-permissions.ts` | Créer | Hook gestion permissions |
-| `src/contexts/AuthContext.tsx` | Modifier | Détecter sous-comptes |
-| `src/App.tsx` | Modifier | Route /team/join |
+## Indicateurs de Qualité Image (Nouveau)
 
-## Sécurité
+Le système évaluera en temps réel :
+- **Netteté** : Détection flou de bougé
+- **Luminosité** : Trop sombre / surexposé
+- **Cadrage** : Pile centrée dans le cadre
 
-1. **RLS sur `sub_account_invitations`** : Seul l'admin parent peut voir/créer
-2. **Validation du code** : Vérification serveur de l'expiration et unicité
-3. **Lien user_id** : Le sub_account ne peut être lié qu'une seule fois
-4. **Permissions** : Stockées en base, jamais côté client
+Affichage de conseils contextuels :
+- "🔆 Ajoutez de la lumière"
+- "📷 Rapprochez-vous"
+- "✋ Stabilisez le téléphone"
 
-## Détails techniques
+## Résumé des Gains Attendus
 
-### Code d'invitation
-Format : `SUB-{timestamp_base36}-{random_4chars}`
-Exemple : `SUB-2K4F1A-X7B3`
+| Métrique | Actuel | Objectif |
+|----------|--------|----------|
+| Temps stabilisation | 4.5s | 1.6s |
+| Temps total (scan → résultat) | 6-8s | 2-3s |
+| Précision comptage | ~85% | 95%+ |
+| Consommation API | 100% | 70% |
 
-### Email (via Resend)
-```html
-Bonjour {first_name},
+## Implémentation par Priorité
 
-Vous avez été invité(e) à rejoindre l'équipe de {hotel_name}.
+1. **Haute** : Réduire intervalle détection + frames stables
+2. **Haute** : Optimiser prompts Edge Function
+3. **Moyenne** : Pré-traitement image client
+4. **Moyenne** : Indicateurs qualité image
+5. **Basse** : Mode "Snap Instant"
 
-Rôle : {role_display_name}
-
-[Créer mon compte] ← Bouton vers /team/join?code=XXX
-
-Ce lien expire dans 7 jours.
-```
-
-### Workflow de connexion sous-compte
-
-1. Sous-compte se connecte avec email/password
-2. AuthContext détecte qu'il est un sous-compte (via `sub_accounts.user_id`)
-3. Charge l'hôtel rattaché (`sub_accounts.hotel_id`)
-4. Applique les restrictions de permissions
