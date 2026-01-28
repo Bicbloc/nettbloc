@@ -88,12 +88,12 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   const fileInputId = `linen-photo-input-${linenTypeId}`;
   
-  // OPTIMIZED DETECTION PARAMETERS
-  const DETECTION_INTERVAL_MS = 800; // Down from 1500ms
-  const STABLE_FRAMES_REQUIRED = 2; // Down from 3
-  const CONFIDENCE_TOLERANCE = 0.12; // Tighter than 0.15
-  const LIVE_QUALITY = 0.7; // Up from 0.5
-  const FINAL_QUALITY = 0.9; // High quality for validation
+  // ULTRA-FAST DETECTION PARAMETERS
+  const DETECTION_INTERVAL_MS = 500; // Ultra-fast: 500ms
+  const STABLE_FRAMES_REQUIRED = 2; // Only 2 stable frames needed (~1s)
+  const CONFIDENCE_TOLERANCE = 0.15;
+  const LIVE_QUALITY = 0.65; // Slightly lower for speed
+  const FINAL_QUALITY = 0.9; // High quality for final capture
   const { toast } = useToast();
 
   useEffect(() => {

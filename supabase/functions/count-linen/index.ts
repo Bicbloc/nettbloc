@@ -82,23 +82,19 @@ serve(async (req) => {
       model = 'google/gemini-2.5-pro'; // Most powerful for ruler detection
     }
     
-    // ========== PROMPT SELECTION ==========
+    // ========== ULTRA-OPTIMIZED PROMPTS ==========
 
-    // QUICK DETECT - Ultra-minimal prompt for live preview (~30 tokens)
-    const quickDetectPrompt = `Pile de ${linenType.name} visible? Compte rapide. JSON: {"pile":true/false,"count":N,"confidence":0-1}`;
+    // QUICK DETECT - Minimal prompt for instant response (~20 tokens)
+    const quickDetectPrompt = `Pile ${linenType.name}? JSON:{"pile":true/false,"count":N,"confidence":0.0-1.0,"width_cm":X}`;
     
-    // Detection mode prompt - for identifying linen type by dimensions
-    const detectPrompt = `Expert identification linge hôtel.
-
-TYPES: ${allLinenTypes.map(t => `${t.name}${t.dimensions ? ` (${t.dimensions})` : ''}`).join(', ')}
-
-Identifie type, estime dimensions (cm), compte pièces.
-DRAPS: >150cm | SERVIETTES: 50-100cm | TAIES: ~50x70cm
-
-JSON: {"detected_type":"...","count":N,"confidence":0-1,"dimensions":{"width_cm":X,"height_cm":Y},"pile_detected":true/false}`;
+    // Detection mode - identify type by width
+    const widthRanges = `DRAPS>150cm|SERVIETTES50-100cm|TAIES~50cm`;
+    const detectPrompt = `Linge: ${allLinenTypes.map(t => t.name).join('|')}
+Mesure largeur, compte pièces. ${widthRanges}
+JSON:{"detected_type":"...","count":N,"confidence":0-1,"dimensions":{"width_cm":X}}`;
     
-    // Simplified prompt for live mode
-    const livePrompt = `Compte "${linenType.name}" dans l'image. JSON: {"count":N,"confidence":0-1}`;
+    // Live mode - quick count
+    const livePrompt = `Compte "${linenType.name}". JSON:{"count":N,"confidence":0-1}`;
     
     // RULER MODE: Specialized prompt for ruler-based measurement
     const rulerPrompt = `Expert mesure linge avec règle étalon.
@@ -172,9 +168,9 @@ JSON: {"count":N,"confidence":0-1,"notes":"méthode"}`;
     const modeLabel = quickDetect ? 'QUICK' : detectMode ? 'DETECT' : liveMode ? 'LIVE' : useRuler ? 'RULER' : 'VALIDATE';
     console.log(`[count-linen] Mode: ${modeLabel}, Model: ${model}, Thickness: ${avgThickness}cm`);
 
-    // Call Lovable AI with vision - OPTIMIZED timeouts
+    // Call Lovable AI - ULTRA-FAST timeouts for quick detect
     const controller = new AbortController();
-    const timeout = quickDetect ? 5000 : (liveMode || detectMode) ? 8000 : 30000;
+    const timeout = quickDetect ? 3000 : (liveMode || detectMode) ? 6000 : 25000;
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
@@ -195,8 +191,8 @@ JSON: {"count":N,"confidence":0-1,"notes":"méthode"}`;
               ]
             }
           ],
-          temperature: 0.1,
-          max_tokens: quickDetect ? 50 : (liveMode || detectMode) ? 100 : 300
+          temperature: 0.05, // Lower for more consistent responses
+          max_tokens: quickDetect ? 40 : (liveMode || detectMode) ? 80 : 250
         }),
         signal: controller.signal
       });
