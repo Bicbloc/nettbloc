@@ -3,12 +3,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus, Hash, Eye, Minus, Plus, Ruler, Scan } from 'lucide-react';
+import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus, Hash, Eye, Minus, Plus, Ruler, Scan, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { RulerGuide, RulerCalculationOverlay } from './RulerGuide';
 import { LinenDetectionOverlay } from './LinenDetectionOverlay';
-
+import { analyzeImageQuality, captureAndProcessFrame, ImageQuality } from '@/utils/imageProcessing';
 interface LinenCameraScannerProps {
   linenTypeId: string;
   linenTypeName: string;
@@ -74,6 +74,13 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [stableFrameCount, setStableFrameCount] = useState(0);
   const lastDetectionValuesRef = useRef<{ count: number; confidence: number } | null>(null);
   const stabilityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Image quality tracking
+  const [imageQuality, setImageQuality] = useState<ImageQuality | null>(null);
+  
+  // Instant mode (skip stabilization)
+  const [instantMode, setInstantMode] = useState(false);
   
   // État pour la correction du comptage IA
   const [showCorrectionInput, setShowCorrectionInput] = useState(false);
@@ -81,6 +88,12 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   const fileInputId = `linen-photo-input-${linenTypeId}`;
   
+  // OPTIMIZED DETECTION PARAMETERS
+  const DETECTION_INTERVAL_MS = 800; // Down from 1500ms
+  const STABLE_FRAMES_REQUIRED = 2; // Down from 3
+  const CONFIDENCE_TOLERANCE = 0.12; // Tighter than 0.15
+  const LIVE_QUALITY = 0.7; // Up from 0.5
+  const FINAL_QUALITY = 0.9; // High quality for validation
   const { toast } = useToast();
 
   useEffect(() => {
@@ -107,12 +120,148 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
       }
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
     };
   }, [mode]);
 
-  // Live detection loop with smart detection mode
+  // OPTIMIZED Live detection loop with smart detection mode
+  const runSingleDetection = useCallback(async () => {
+    if (!videoRef.current || !isStreaming || capturedImage || isLiveDetecting) {
+      return;
+    }
+
+    const video = videoRef.current;
+    if (video.videoWidth === 0) return;
+
+    setIsLiveDetecting(true);
+    
+    try {
+      // Capture and preprocess frame
+      const { imageData: frameData, quality } = await captureAndProcessFrame(video, {
+        quality: LIVE_QUALITY,
+        maxWidth: 1280,
+        enhance: false // Skip enhancement for speed
+      });
+      
+      // Update image quality display
+      setImageQuality(quality);
+      
+      // Use quickDetect for faster initial detection
+      const useQuickMode = !detectionState || detectionState.status === 'scanning';
+      
+      // Call detection API with optimized parameters
+      const { data, error } = await supabase.functions.invoke('count-linen', {
+        body: {
+          image: frameData,
+          linenTypeId,
+          hotelId,
+          liveMode: !useSmartDetection,
+          detectMode: useSmartDetection,
+          quickDetect: useQuickMode // NEW: Ultra-fast mode for scanning phase
+        }
+      });
+
+      if (!error && data) {
+        const detection: DetectionResult = {
+          count: data.count || 0,
+          confidence: data.confidence || 0,
+          boxes: data.boxes || []
+        };
+        lastDetectionRef.current = detection;
+        setLiveDetection(detection);
+
+        // Handle smart detection mode - stability check with OPTIMIZED parameters
+        if (useSmartDetection && data.count > 0) {
+          const prev = lastDetectionValuesRef.current;
+          const isStable = prev && 
+            prev.count === data.count && 
+            Math.abs(prev.confidence - data.confidence) < CONFIDENCE_TOLERANCE;
+
+          if (isStable) {
+            // Increment stability counter
+            const newStableCount = stableFrameCount + 1;
+            setStableFrameCount(newStableCount);
+            
+            // Update detection state based on stability - OPTIMIZED: 2 frames instead of 3
+            if (newStableCount >= STABLE_FRAMES_REQUIRED) {
+              // Ready for validation after 2 stable frames (~1.6 seconds)
+              setDetectionState({
+                status: 'ready',
+                linenType: data.detected_type || null,
+                estimatedCount: data.count,
+                dimensions: {
+                  widthCm: data.dimensions?.width_cm || null,
+                  heightCm: data.dimensions?.height_cm || null,
+                },
+                confidence: data.confidence,
+                stabilityProgress: 100,
+              });
+            } else {
+              // Still stabilizing
+              setDetectionState({
+                status: 'stabilizing',
+                linenType: data.detected_type || null,
+                estimatedCount: data.count,
+                dimensions: {
+                  widthCm: data.dimensions?.width_cm || null,
+                  heightCm: data.dimensions?.height_cm || null,
+                },
+                confidence: data.confidence,
+                stabilityProgress: Math.min(100, (newStableCount / STABLE_FRAMES_REQUIRED) * 100),
+              });
+            }
+          } else {
+            // Reset stability - values changed
+            setStableFrameCount(0);
+            setDetectionState({
+              status: 'scanning',
+              linenType: data.detected_type || null,
+              estimatedCount: data.count,
+              dimensions: {
+                widthCm: data.dimensions?.width_cm || null,
+                heightCm: data.dimensions?.height_cm || null,
+              },
+              confidence: data.confidence,
+              stabilityProgress: 0,
+            });
+          }
+
+          // Store current values for next comparison
+          lastDetectionValuesRef.current = {
+            count: data.count,
+            confidence: data.confidence,
+          };
+        }
+      }
+    } catch (err) {
+      console.log('Live detection error (ignored):', err);
+    } finally {
+      setIsLiveDetecting(false);
+    }
+  }, [isStreaming, capturedImage, isLiveDetecting, linenTypeId, hotelId, useSmartDetection, detectionState, stableFrameCount]);
+
+  // OPTIMIZED: Use interval-based detection instead of requestAnimationFrame
+  useEffect(() => {
+    if (isStreaming && !capturedImage && mode === 'camera' && useSmartDetection) {
+      // Run first detection immediately
+      runSingleDetection();
+      
+      // Then run on interval - OPTIMIZED: 800ms instead of 1500ms
+      detectionIntervalRef.current = setInterval(runSingleDetection, DETECTION_INTERVAL_MS);
+      
+      return () => {
+        if (detectionIntervalRef.current) {
+          clearInterval(detectionIntervalRef.current);
+        }
+      };
+    }
+  }, [isStreaming, capturedImage, mode, useSmartDetection, runSingleDetection]);
+
+  // Legacy overlay drawing for non-smart mode
   const runLiveDetection = useCallback(async () => {
-    if (!videoRef.current || !overlayCanvasRef.current || !isStreaming || capturedImage) {
+    if (!videoRef.current || !overlayCanvasRef.current || !isStreaming || capturedImage || useSmartDetection) {
       return;
     }
 
@@ -125,126 +274,17 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       return;
     }
 
-    // Sync overlay canvas size with video
     overlayCanvas.width = video.videoWidth;
     overlayCanvas.height = video.videoHeight;
-
-    // Clear previous overlay
     ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-    // Run detection every ~1.5 seconds to avoid overloading
-    if (!isLiveDetecting) {
-      setIsLiveDetecting(true);
-      
-      try {
-        // Capture current frame
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = video.videoWidth;
-        tempCanvas.height = video.videoHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        if (tempCtx) {
-          tempCtx.drawImage(video, 0, 0);
-          const frameData = tempCanvas.toDataURL('image/jpeg', 0.5);
-          
-          // Call detection API with detectMode for smart detection
-          const { data, error } = await supabase.functions.invoke('count-linen', {
-            body: {
-              image: frameData,
-              linenTypeId,
-              hotelId,
-              liveMode: !useSmartDetection, // Use liveMode only if smart detection is off
-              detectMode: useSmartDetection // Enable dimension/type detection
-            }
-          });
-
-          if (!error && data) {
-            const detection: DetectionResult = {
-              count: data.count || 0,
-              confidence: data.confidence || 0,
-              boxes: data.boxes || []
-            };
-            lastDetectionRef.current = detection;
-            setLiveDetection(detection);
-
-            // Handle smart detection mode - stability check
-            if (useSmartDetection && data.count > 0) {
-              const prev = lastDetectionValuesRef.current;
-              const isStable = prev && 
-                prev.count === data.count && 
-                Math.abs(prev.confidence - data.confidence) < 0.15;
-
-              if (isStable) {
-                // Increment stability counter
-                const newStableCount = stableFrameCount + 1;
-                setStableFrameCount(newStableCount);
-                
-                // Update detection state based on stability
-                if (newStableCount >= 3) {
-                  // Ready for validation after 3 stable frames (~4.5 seconds)
-                  setDetectionState({
-                    status: 'ready',
-                    linenType: data.detected_type || null,
-                    estimatedCount: data.count,
-                    dimensions: {
-                      widthCm: data.dimensions?.width_cm || null,
-                      heightCm: data.dimensions?.height_cm || null,
-                    },
-                    confidence: data.confidence,
-                    stabilityProgress: 100,
-                  });
-                } else {
-                  // Still stabilizing
-                  setDetectionState({
-                    status: 'stabilizing',
-                    linenType: data.detected_type || null,
-                    estimatedCount: data.count,
-                    dimensions: {
-                      widthCm: data.dimensions?.width_cm || null,
-                      heightCm: data.dimensions?.height_cm || null,
-                    },
-                    confidence: data.confidence,
-                    stabilityProgress: Math.min(100, (newStableCount / 3) * 100),
-                  });
-                }
-              } else {
-                // Reset stability - values changed
-                setStableFrameCount(0);
-                setDetectionState({
-                  status: 'scanning',
-                  linenType: data.detected_type || null,
-                  estimatedCount: data.count,
-                  dimensions: {
-                    widthCm: data.dimensions?.width_cm || null,
-                    heightCm: data.dimensions?.height_cm || null,
-                  },
-                  confidence: data.confidence,
-                  stabilityProgress: 0,
-                });
-              }
-
-              // Store current values for next comparison
-              lastDetectionValuesRef.current = {
-                count: data.count,
-                confidence: data.confidence,
-              };
-            }
-          }
-        }
-      } catch (err) {
-        console.log('Live detection error (ignored):', err);
-      } finally {
-        setIsLiveDetecting(false);
-      }
-    }
-
-    // Draw overlay with last detection result (only if not using smart detection overlay)
-    if (lastDetectionRef.current && !useSmartDetection) {
+    // Draw overlay with last detection result
+    if (lastDetectionRef.current) {
       drawOverlay(ctx, lastDetectionRef.current, overlayCanvas.width, overlayCanvas.height);
     }
 
-    // Continue loop
     animationFrameRef.current = requestAnimationFrame(runLiveDetection);
-  }, [isStreaming, capturedImage, isLiveDetecting, linenTypeId, hotelId]);
+  }, [isStreaming, capturedImage, useSmartDetection]);
 
   // Start live detection when streaming
   useEffect(() => {
@@ -564,8 +604,71 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     // Mark as confirmed
     setDetectionState(prev => prev ? { ...prev, status: 'confirmed' } : null);
     
-    // Capture the photo
-    capturePhoto();
+    // Capture the photo with high quality
+    capturePhotoWithQuality(FINAL_QUALITY);
+  };
+
+  // Handle instant capture (skip stabilization)
+  const handleInstantCapture = () => {
+    if (!detectionState || detectionState.estimatedCount === 0) {
+      toast({ title: "⚠️ Aucune pile détectée", description: "Attendez une détection", variant: "default" });
+      return;
+    }
+    
+    setDetectionState(prev => prev ? { ...prev, status: 'confirmed' } : null);
+    capturePhotoWithQuality(FINAL_QUALITY);
+  };
+
+  // Capture with configurable quality
+  const capturePhotoWithQuality = (quality: number) => {
+    if (!videoRef.current || !canvasRef.current) {
+      toast({ title: "Erreur", description: "Caméra non initialisée", variant: "destructive" });
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast({ title: "Erreur", description: "La vidéo n'est pas encore prête.", variant: "destructive" });
+      return;
+    }
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0);
+    const imageDataUrl = canvas.toDataURL('image/jpeg', quality);
+    setCapturedImage(imageDataUrl);
+    stopCamera();
+    
+    // Use smart detection result if available
+    if (detectionState && detectionState.estimatedCount > 0 && detectionState.confidence >= 0.5) {
+      setResult({
+        count: detectionState.estimatedCount,
+        confidence: detectionState.confidence,
+        notes: `Smart detection (${Math.round(detectionState.confidence * 100)}%)`
+      });
+      toast({
+        title: "✅ Photo capturée",
+        description: `${detectionState.estimatedCount} ${linenTypeName} détecté(s)`,
+      });
+    } else if (liveDetection && liveDetection.confidence >= 0.5) {
+      setResult({
+        count: liveDetection.count,
+        confidence: liveDetection.confidence,
+        notes: `Détection en temps réel`
+      });
+      toast({
+        title: "✅ Photo capturée",
+        description: `${liveDetection.count} ${linenTypeName} détecté(s)`,
+      });
+    } else {
+      handleCount(imageDataUrl);
+    }
   };
 
   const handleRetake = () => {
@@ -579,6 +682,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     setDetectionState(null);
     setStableFrameCount(0);
     lastDetectionValuesRef.current = null;
+    setImageQuality(null);
     startCamera();
   };
 
@@ -913,6 +1017,9 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                         isActive={true}
                         onValidate={handleSmartValidate}
                         linenTypeName={linenTypeName}
+                        imageQuality={imageQuality}
+                        instantMode={instantMode}
+                        onInstantCapture={handleInstantCapture}
                       />
                     )}
                   </>
