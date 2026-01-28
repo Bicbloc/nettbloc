@@ -12,7 +12,15 @@ serve(async (req) => {
   }
 
   try {
-    const { image, linenTypeId, hotelId, liveMode = false, useRuler = false, detectMode = false } = await req.json();
+    const { 
+      image, 
+      linenTypeId, 
+      hotelId, 
+      liveMode = false, 
+      useRuler = false, 
+      detectMode = false,
+      quickDetect = false // NEW: Ultra-fast detection for live preview
+    } = await req.json();
     
     if (!image || !linenTypeId || !hotelId) {
       return new Response(
@@ -48,7 +56,7 @@ serve(async (req) => {
 
     // Get all linen types for detection mode (to identify which type it is)
     let allLinenTypes: any[] = [];
-    if (detectMode) {
+    if (detectMode && !quickDetect) {
       const { data: types } = await supabase
         .from('linen_types')
         .select('id, name, category, dimensions, average_thickness_cm')
@@ -60,134 +68,70 @@ serve(async (req) => {
     // Get average thickness (default 2cm if not configured)
     const avgThickness = linenType.average_thickness_cm || 2.0;
 
-    // Model selection:
-    // - Detect mode: fast model for dimension/type detection
-    // - Live mode: ultra-fast for real-time preview
-    // - Ruler mode: use powerful model for precise measurement
-    // - Normal mode: balanced flash model
+    // Model selection - OPTIMIZED for speed
+    // - quickDetect: ultra-fast for live stabilization (~300ms)
+    // - detectMode/liveMode: fast model for real-time preview
+    // - useRuler: powerful model for precise measurement
+    // - validation (normal): balanced flash model
     let model = 'google/gemini-2.5-flash';
-    if (detectMode || liveMode) {
+    if (quickDetect) {
+      model = 'google/gemini-2.5-flash-lite'; // Fastest for live tracking
+    } else if (detectMode || liveMode) {
       model = 'google/gemini-2.5-flash-lite';
     } else if (useRuler) {
       model = 'google/gemini-2.5-pro'; // Most powerful for ruler detection
     }
     
+    // ========== PROMPT SELECTION ==========
+
+    // QUICK DETECT - Ultra-minimal prompt for live preview (~30 tokens)
+    const quickDetectPrompt = `Pile de ${linenType.name} visible? Compte rapide. JSON: {"pile":true/false,"count":N,"confidence":0-1}`;
+    
     // Detection mode prompt - for identifying linen type by dimensions
-    const detectPrompt = `Tu es un expert en identification de linge d'hôtel.
+    const detectPrompt = `Expert identification linge hôtel.
 
-TYPES DE LINGE DISPONIBLES:
-${allLinenTypes.map(t => `- ${t.name}${t.dimensions ? ` (${t.dimensions})` : ''}${t.category ? ` [${t.category}]` : ''}`).join('\n')}
+TYPES: ${allLinenTypes.map(t => `${t.name}${t.dimensions ? ` (${t.dimensions})` : ''}`).join(', ')}
 
-## TÂCHE
-1. Identifie le type de linge visible dans l'image
-2. Estime les DIMENSIONS APPROXIMATIVES (largeur x hauteur en cm)
-3. Compte le nombre de pièces
-4. Compare les dimensions détectées avec les types connus
+Identifie type, estime dimensions (cm), compte pièces.
+DRAPS: >150cm | SERVIETTES: 50-100cm | TAIES: ~50x70cm
 
-## INDICES POUR IDENTIFIER
-- DRAPS: rectangulaires, grands (>150cm), souvent blancs, pliés en rectangle allongé
-- SERVIETTES: rectangulaires moyens (50-100cm), épais, souvent blancs
-- TAIES D'OREILLER: petits rectangles (~50x70cm), fins
-- NAPPES: très grands rectangles, souvent colorés ou blancs
-- TORCHONS: petits carrés (~50x50cm), fins
-- COUVERTURES: très grands, épais
-
-## RÉPONSE JSON OBLIGATOIRE
-{
-  "detected_type": "nom du type identifié",
-  "expected_type": "${linenType.name}",
-  "type_match": true/false,
-  "count": N,
-  "confidence": 0-1,
-  "dimensions": {
-    "width_cm": X,
-    "height_cm": Y
-  },
-  "pile_detected": true/false,
-  "notes": "explication"
-}`;
+JSON: {"detected_type":"...","count":N,"confidence":0-1,"dimensions":{"width_cm":X,"height_cm":Y},"pile_detected":true/false}`;
     
     // Simplified prompt for live mode
-    const livePrompt = `Compte le linge "${linenType.name}" dans l'image. Réponds JSON: {"count": N, "confidence": 0-1}`;
+    const livePrompt = `Compte "${linenType.name}" dans l'image. JSON: {"count":N,"confidence":0-1}`;
     
     // RULER MODE: Specialized prompt for ruler-based measurement
-    const rulerPrompt = `Tu es un expert en mesure et comptage de linge avec règle étalon.
+    const rulerPrompt = `Expert mesure linge avec règle étalon.
+OBJET: "${linenType.name}" | ÉPAISSEUR: ${avgThickness}cm/pièce
 
-OBJET: "${linenType.name}" (${linenType.category || 'linge'})
-ÉPAISSEUR CONNUE: ${avgThickness} cm par pièce pliée
+Cherche règle colorée 0-30cm. Si détectée:
+1. Calibre échelle (px/cm)
+2. Mesure hauteur pile
+3. Calcul: hauteur_cm ÷ ${avgThickness} = nombre
 
-## ÉTAPE 1: DÉTECTER LA RÈGLE ÉTALON
-Cherche une règle colorée graduée (0-30cm) avec des bandes alternées:
-- Rouge (0-5cm), Orange (5-10cm), Jaune (10-15cm), Vert (15-20cm), Bleu (20-25cm), Violet (25-30cm)
+JSON: {"count":N,"confidence":0-1,"ruler_detected":true/false,"pile_height_cm":X.X,"measurement_method":"ruler_calculation"|"visual_count"}`;
 
-Si règle détectée:
-1. Calibre l'échelle (pixels par cm)
-2. Mesure la HAUTEUR TOTALE de la pile en cm
-3. CALCUL: nombre = hauteur_cm ÷ ${avgThickness}
-4. Arrondir au nombre entier le plus proche
+    // Full prompt for VALIDATION mode (final precise count)
+    let fullPrompt = `Expert comptage linge d'hôtel - VALIDATION FINALE.
 
-## ÉTAPE 2: VÉRIFICATION VISUELLE
-- Compte les strates/plis horizontaux visibles sur le côté
-- Compare avec le calcul mathématique
-- En cas de différence, privilégie le calcul si la règle est claire
+OBJET: "${linenType.name}" | ÉPAISSEUR: ${avgThickness}cm
 
-## RÉPONSE JSON OBLIGATOIRE
-{
-  "count": N,
-  "confidence": 0-1,
-  "ruler_detected": true/false,
-  "pile_height_cm": X.X,
-  "measurement_method": "ruler_calculation" | "visual_count",
-  "notes": "Description de la méthode"
-}`;
+MÉTHODE COMPTAGE PILE:
+1. Compte les STRATES horizontales visibles sur le côté
+2. Chaque ligne distincte = 1 pièce
+3. Vérification: hauteur estimée ÷ ${avgThickness}
 
-    // Full prompt for normal mode (improved for stacks)
-    let fullPrompt = `Tu es un expert en comptage de linge d'hôtel avec une spécialisation dans le comptage de piles.
+RÈGLES:
+- SOUS-ESTIME si incertitude
+- Ombres ≠ pièces
+- Plis internes ≠ pièces séparées
 
-OBJET À COMPTER: "${linenType.name}" (${linenType.category || 'linge'})
-${linenType.dimensions ? `Dimensions: ${linenType.dimensions}` : ''}
-${linenType.color ? `Couleur: ${linenType.color}` : ''}
-ÉPAISSEUR MOYENNE PLIÉE: ${avgThickness} cm
+CONFIANCE: 0.9+ (séparées) | 0.7-0.89 (strates nettes) | 0.5-0.69 (estimation)
 
-## MÉTHODE POUR LES PILES DE LINGE
+JSON: {"count":N,"confidence":0-1,"notes":"méthode"}`;
 
-### Étape 1: Analyse de la structure
-- Identifie si le linge est posé à plat, plié, ou en pile
-- Pour les piles: observe l'épaisseur totale et l'épaisseur d'UNE pièce
-
-### Étape 2: Comptage des couches
-- Compte les PLIS/STRATES visibles sur le côté de la pile
-- Chaque strate horizontale distincte = 1 pièce
-- Si tu vois N strates distinctes, il y a N pièces
-
-### Étape 3: Vérification mathématique
-- Estime l'épaisseur totale de la pile
-- Divise par ${avgThickness} cm (épaisseur connue de ce type)
-- Compare avec le comptage visuel
-
-### ERREURS À ÉVITER
-❌ Ne pas compter les ombres comme des pièces
-❌ Ne pas confondre un pli de tissu avec une pièce séparée
-❌ Ne pas surestimer: en cas de doute, compte MOINS
-❌ Les bords repliés d'une même pièce ne sont PAS des pièces supplémentaires
-❌ Une pile haute mais fine = MOINS de pièces qu'on pense
-
-### RÈGLE D'OR POUR LES PILES
-Si tu vois une pile compacte et homogène:
-1. Compte les STRATES distinctes (lignes horizontales sur le côté)
-2. Si pile dense sans strates visibles: estimation = hauteur estimée ÷ ${avgThickness}
-3. En cas d'incertitude, SOUS-ESTIME plutôt que surestimer
-
-CONFIANCE:
-- 0.9-1.0: Pièces séparées, clairement visibles une par une
-- 0.7-0.89: Pile avec strates bien définies
-- 0.5-0.69: Pile compacte, estimation nécessaire
-- <0.5: Impossible de distinguer les couches
-
-Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode utilisée"}`;
-
-    // Get training samples + corrections for improved accuracy (not in live mode)
-    if (!liveMode) {
+    // Get training samples + corrections for improved accuracy (not in quick/live mode)
+    if (!liveMode && !quickDetect) {
       const { data: trainingSamples } = await supabase
         .from('linen_training_samples')
         .select('ai_predicted_count, actual_count, notes, scan_method, created_at')
@@ -198,137 +142,167 @@ Réponds UNIQUEMENT en JSON: {"count": N, "confidence": 0-1, "notes": "méthode 
       if (trainingSamples && trainingSamples.length > 0) {
         const corrections = trainingSamples.filter(s => s.ai_predicted_count !== s.actual_count);
         if (corrections.length > 0) {
-          const appendix = '\n\n## ⚠️ APPRENTISSAGE DES ERREURS PASSÉES\n' +
-            'Voici des corrections récentes - adapte ton comptage en conséquence:\n' +
+          const appendix = '\n\n⚠️ CORRECTIONS PASSÉES:\n' +
             corrections.map((sample) => {
               const diff = (sample.ai_predicted_count || 0) - sample.actual_count;
-              const method = sample.scan_method || 'pile';
-              if (diff > 0) {
-                return `- Méthode ${method}: L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SURESTIMATION de ${diff})${sample.notes ? ` - ${sample.notes}` : ''}`;
-              } else {
-                return `- Méthode ${method}: L'IA avait compté ${sample.ai_predicted_count}, mais il y avait en réalité ${sample.actual_count} (SOUS-ESTIMATION de ${-diff})${sample.notes ? ` - ${sample.notes}` : ''}`;
-              }
-            }).join('\n') +
-            '\n\n⚠️ Tendance détectée: ajuste ton comptage en fonction de ces corrections.\n';
+              return diff > 0 
+                ? `IA:${sample.ai_predicted_count}→Réel:${sample.actual_count} (−${diff})` 
+                : `IA:${sample.ai_predicted_count}→Réel:${sample.actual_count} (+${-diff})`;
+            }).join(' | ');
           
           fullPrompt += appendix;
-          // Also add to ruler prompt if using ruler
         }
       }
     }
 
     // Select the appropriate prompt
-    let systemPrompt = detectMode ? detectPrompt : (liveMode ? livePrompt : (useRuler ? rulerPrompt : fullPrompt));
-
-    console.log(`[count-linen] Mode: ${detectMode ? 'DETECT' : liveMode ? 'LIVE' : useRuler ? 'RULER' : 'NORMAL'}, Model: ${model}, Thickness: ${avgThickness}cm`);
-
-    // Call Lovable AI with vision
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: systemPrompt },
-              { type: 'image_url', image_url: { url: image } }
-            ]
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: liveMode ? 100 : 500
-      })
-    });
-
-    // Handle specific error codes
-    if (aiResponse.status === 402) {
-      console.error('[count-linen] 402 - Insufficient AI credits');
-      return new Response(
-        JSON.stringify({ 
-          error: 'AI_CREDITS_INSUFFICIENT',
-          message: 'Crédits IA insuffisants. Utilisez le mode manuel.',
-          fallback: 'manual'
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    let systemPrompt: string;
+    if (quickDetect) {
+      systemPrompt = quickDetectPrompt;
+    } else if (detectMode) {
+      systemPrompt = detectPrompt;
+    } else if (liveMode) {
+      systemPrompt = livePrompt;
+    } else if (useRuler) {
+      systemPrompt = rulerPrompt;
+    } else {
+      systemPrompt = fullPrompt;
     }
 
-    if (aiResponse.status === 429) {
-      console.error('[count-linen] 429 - Rate limited');
-      return new Response(
-        JSON.stringify({ 
-          error: 'RATE_LIMITED',
-          message: 'Trop de requêtes. Réessayez dans quelques secondes.',
-          fallback: 'retry'
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const modeLabel = quickDetect ? 'QUICK' : detectMode ? 'DETECT' : liveMode ? 'LIVE' : useRuler ? 'RULER' : 'VALIDATE';
+    console.log(`[count-linen] Mode: ${modeLabel}, Model: ${model}, Thickness: ${avgThickness}cm`);
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('[count-linen] AI Gateway error:', aiResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: 'AI service error', details: errorText }),
-        { status: aiResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Call Lovable AI with vision - OPTIMIZED timeouts
+    const controller = new AbortController();
+    const timeout = quickDetect ? 5000 : (liveMode || detectMode) ? 8000 : 30000;
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices?.[0]?.message?.content || '';
-    
-    // Parse AI response
-    let result;
     try {
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : aiContent;
-      result = JSON.parse(jsonStr);
-    } catch (parseError) {
-      console.error('[count-linen] Failed to parse AI response:', aiContent);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to parse AI response',
-          rawResponse: aiContent,
-          fallback: 'manual'
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: systemPrompt },
+                { type: 'image_url', image_url: { url: image } }
+              ]
+            }
+          ],
+          temperature: 0.1,
+          max_tokens: quickDetect ? 50 : (liveMode || detectMode) ? 100 : 300
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle specific error codes
+      if (aiResponse.status === 402) {
+        console.error('[count-linen] 402 - Insufficient AI credits');
+        return new Response(
+          JSON.stringify({ 
+            error: 'AI_CREDITS_INSUFFICIENT',
+            message: 'Crédits IA insuffisants. Utilisez le mode manuel.',
+            fallback: 'manual'
+          }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (aiResponse.status === 429) {
+        console.error('[count-linen] 429 - Rate limited');
+        return new Response(
+          JSON.stringify({ 
+            error: 'RATE_LIMITED',
+            message: 'Trop de requêtes. Réessayez dans quelques secondes.',
+            fallback: 'retry'
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error('[count-linen] AI Gateway error:', aiResponse.status, errorText);
+        return new Response(
+          JSON.stringify({ error: 'AI service error', details: errorText }),
+          { status: aiResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const aiData = await aiResponse.json();
+      const aiContent = aiData.choices?.[0]?.message?.content || '';
+      
+      // Parse AI response
+      let result;
+      try {
+        const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : aiContent;
+        result = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error('[count-linen] Failed to parse AI response:', aiContent);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to parse AI response',
+            rawResponse: aiContent,
+            fallback: 'manual'
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}, mode=${modeLabel}`);
+
+      // Build response with detection-specific fields
+      const response: any = {
+        count: result.count || 0,
+        confidence: result.confidence || 0,
+        notes: result.notes || '',
+        linenType: linenType.name,
+        model: model,
+        mode: modeLabel.toLowerCase(),
+        // Ruler-specific fields
+        ruler_detected: result.ruler_detected || false,
+        pile_height_cm: result.pile_height_cm || null,
+        measurement_method: result.measurement_method || 'visual_count',
+        item_thickness_cm: avgThickness
+      };
+
+      // Add detection-specific fields
+      if (detectMode || quickDetect) {
+        response.detected_type = result.detected_type || null;
+        response.type_match = result.type_match !== undefined ? result.type_match : true;
+        response.dimensions = result.dimensions || { width_cm: null, height_cm: null };
+        response.pile_detected = result.pile_detected ?? result.pile ?? false;
+      }
+
+      return new Response(
+        JSON.stringify(response),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error('[count-linen] Request timeout');
+        return new Response(
+          JSON.stringify({ 
+            error: 'TIMEOUT',
+            message: 'Délai dépassé. Réessayez.',
+            fallback: 'retry'
+          }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw fetchError;
     }
-
-    console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}, ruler=${result.ruler_detected || false}`);
-
-    // Build response with detection-specific fields
-    const response: any = {
-      count: result.count || 0,
-      confidence: result.confidence || 0,
-      notes: result.notes || '',
-      linenType: linenType.name,
-      model: model,
-      mode: detectMode ? 'detect' : (liveMode ? 'live' : (useRuler ? 'ruler' : 'normal')),
-      // Ruler-specific fields
-      ruler_detected: result.ruler_detected || false,
-      pile_height_cm: result.pile_height_cm || null,
-      measurement_method: result.measurement_method || 'visual_count',
-      item_thickness_cm: avgThickness
-    };
-
-    // Add detection-specific fields
-    if (detectMode) {
-      response.detected_type = result.detected_type || null;
-      response.type_match = result.type_match !== undefined ? result.type_match : true;
-      response.dimensions = result.dimensions || { width_cm: null, height_cm: null };
-      response.pile_detected = result.pile_detected || false;
-    }
-
-    return new Response(
-      JSON.stringify(response),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
 
   } catch (error) {
     console.error('[count-linen] Error:', error);

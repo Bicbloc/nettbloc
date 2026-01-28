@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { CheckCircle, AlertCircle, Ruler, Eye, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Ruler, Eye, Loader2, Zap, Camera } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ImageQuality } from '@/utils/imageProcessing';
 
 interface DetectionState {
   status: 'scanning' | 'stabilizing' | 'ready' | 'confirmed';
@@ -20,6 +21,9 @@ interface LinenDetectionOverlayProps {
   isActive: boolean;
   onValidate: () => void;
   linenTypeName: string;
+  imageQuality?: ImageQuality | null;
+  instantMode?: boolean;
+  onInstantCapture?: () => void;
 }
 
 export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
@@ -27,14 +31,28 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
   isActive,
   onValidate,
   linenTypeName,
+  imageQuality,
+  instantMode = false,
+  onInstantCapture,
 }) => {
   const [pulseAnimation, setPulseAnimation] = useState(true);
+  const [scanLinePosition, setScanLinePosition] = useState(0);
 
   useEffect(() => {
     if (detection?.status === 'ready') {
       setPulseAnimation(false);
     } else {
       setPulseAnimation(true);
+    }
+  }, [detection?.status]);
+
+  // Animate scan line
+  useEffect(() => {
+    if (detection?.status === 'scanning') {
+      const interval = setInterval(() => {
+        setScanLinePosition(prev => (prev + 2) % 100);
+      }, 30);
+      return () => clearInterval(interval);
     }
   }, [detection?.status]);
 
@@ -54,8 +72,8 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
   const getStatusText = () => {
     if (!detection) return 'Positionnez le linge dans le cadre';
     switch (detection.status) {
-      case 'scanning': return 'Détection en cours...';
-      case 'stabilizing': return 'Stabilisation... Ne bougez plus';
+      case 'scanning': return 'Détection rapide...';
+      case 'stabilizing': return `Stabilisation... ${Math.round(detection.stabilityProgress)}%`;
       case 'ready': return '✓ Pile détectée - Appuyez pour valider';
       case 'confirmed': return 'Capture en cours...';
       default: return 'Positionnez le linge';
@@ -73,15 +91,34 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
     }
   };
 
+  // Estimated time remaining for stabilization
+  const getTimeRemaining = () => {
+    if (!detection || detection.status !== 'stabilizing') return null;
+    const remaining = Math.ceil((100 - detection.stabilityProgress) / 50); // ~2 seconds total
+    return remaining > 0 ? `~${remaining}s` : null;
+  };
+
   return (
     <div className="absolute inset-0 pointer-events-none z-20">
+      {/* Quality indicators - top bar */}
+      {imageQuality && imageQuality.suggestions.length > 0 && (
+        <div className="absolute top-4 left-4 right-4 z-30">
+          <div className="bg-orange-500/90 backdrop-blur rounded-lg px-3 py-2 flex items-center gap-2 pointer-events-auto">
+            <AlertCircle className="h-4 w-4 text-white flex-shrink-0" />
+            <span className="text-white text-sm font-medium">
+              {imageQuality.suggestions[0]}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Detection frame - like ID scanner */}
       <div className="absolute inset-4 sm:inset-8 flex items-center justify-center">
         <div
           className={cn(
-            "relative w-full max-w-md aspect-[4/3] rounded-2xl border-4 transition-all duration-500",
+            "relative w-full max-w-md aspect-[4/3] rounded-2xl border-4 transition-all duration-300",
             getStatusColor(),
-            pulseAnimation && "animate-pulse"
+            pulseAnimation && detection?.status === 'scanning' && "animate-pulse"
           )}
         >
           {/* Corner markers */}
@@ -92,15 +129,28 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
 
           {/* Scanning line animation */}
           {detection?.status === 'scanning' && (
-            <div className="absolute inset-x-2 top-0 h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-scan-line" />
+            <div 
+              className="absolute inset-x-2 h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent rounded"
+              style={{ top: `${scanLinePosition}%` }}
+            />
           )}
 
-          {/* Center guide */}
+          {/* Center guide when no detection */}
           {!detection && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center text-white/80">
                 <div className="text-4xl mb-2">📦</div>
                 <p className="text-sm">Placez la pile de linge ici</p>
+              </div>
+            </div>
+          )}
+
+          {/* Live count preview during scanning */}
+          {detection && detection.status === 'scanning' && detection.estimatedCount > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/60 backdrop-blur rounded-xl px-6 py-4 text-center">
+                <div className="text-4xl font-bold text-white">{detection.estimatedCount}</div>
+                <div className="text-sm text-white/70">{linenTypeName}</div>
               </div>
             </div>
           )}
@@ -137,16 +187,21 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
       <div className="absolute bottom-24 left-4 right-4">
         <div className="bg-black/80 backdrop-blur rounded-xl p-4 pointer-events-auto">
           {/* Status message */}
-          <div className="flex items-center justify-center gap-2 text-white mb-3">
-            {getStatusIcon()}
-            <span className="text-sm font-medium">{getStatusText()}</span>
+          <div className="flex items-center justify-between text-white mb-3">
+            <div className="flex items-center gap-2">
+              {getStatusIcon()}
+              <span className="text-sm font-medium">{getStatusText()}</span>
+            </div>
+            {getTimeRemaining() && (
+              <span className="text-xs text-white/60">{getTimeRemaining()}</span>
+            )}
           </div>
 
           {/* Stability progress bar */}
           {detection?.status === 'stabilizing' && (
             <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden mb-3">
               <div
-                className="h-full bg-gradient-to-r from-yellow-400 to-green-400 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-yellow-400 to-green-400 transition-all duration-200"
                 style={{ width: `${detection.stabilityProgress}%` }}
               />
             </div>
@@ -198,20 +253,49 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
               </button>
             </div>
           )}
+
+          {/* Instant mode button */}
+          {instantMode && detection?.status === 'scanning' && onInstantCapture && (
+            <button
+              onClick={onInstantCapture}
+              className="w-full py-3 mt-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              <Zap className="h-5 w-5" />
+              Snap Instant
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Add scan-line animation */}
-      <style>{`
-        @keyframes scan-line {
-          0% { transform: translateY(0); opacity: 0; }
-          50% { opacity: 1; }
-          100% { transform: translateY(calc(100% * 3)); opacity: 0; }
-        }
-        .animate-scan-line {
-          animation: scan-line 2s ease-in-out infinite;
-        }
-      `}</style>
+      {/* Image quality indicators - corner badges */}
+      {imageQuality && (
+        <div className="absolute top-16 right-4 flex flex-col gap-1">
+          {/* Sharpness */}
+          <Badge 
+            variant="secondary" 
+            className={cn(
+              "text-xs",
+              imageQuality.isBlurry ? "bg-red-500/80 text-white" : "bg-green-500/80 text-white"
+            )}
+          >
+            {imageQuality.isBlurry ? "🔍 Flou" : "✓ Net"}
+          </Badge>
+          
+          {/* Brightness */}
+          <Badge 
+            variant="secondary" 
+            className={cn(
+              "text-xs",
+              imageQuality.isTooDark || imageQuality.isTooLight 
+                ? "bg-orange-500/80 text-white" 
+                : "bg-green-500/80 text-white"
+            )}
+          >
+            {imageQuality.isTooDark ? "🌙 Sombre" : 
+             imageQuality.isTooLight ? "☀️ Clair" : "✓ Lumière"}
+          </Badge>
+        </div>
+      )}
     </div>
   );
 };
