@@ -83,49 +83,31 @@ serve(async (req) => {
     }
     
     // ========== ULTRA-OPTIMIZED PROMPTS ==========
+    // CRITICAL: All prompts MUST demand JSON-only output, no text
 
-    // QUICK DETECT - Minimal prompt with pile position detection
-    const quickDetectPrompt = `Pile ${linenType.name}? Position de la pile dans l'image (gauche/centre/droite)?
-JSON:{"pile":true/false,"count":N,"confidence":0.0-1.0,"width_cm":X,"position":"left"|"center"|"right","bounds":{"x":0-1,"y":0-1,"w":0-1,"h":0-1}}`;
+    // QUICK DETECT - Minimal prompt, STRICT JSON
+    const quickDetectPrompt = `ONLY JSON OUTPUT. Detect ${linenType.name} pile in image.
+Output: {"pile":true,"count":5,"confidence":0.8,"width_cm":60,"position":"center","bounds":{"x":0.3,"y":0.2,"w":0.4,"h":0.6}}
+If no pile: {"pile":false,"count":0,"confidence":0,"width_cm":0,"position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
     
     // Detection mode - identify type by width
-    const widthRanges = `DRAPS>150cm|SERVIETTES50-100cm|TAIES~50cm`;
-    const detectPrompt = `Linge: ${allLinenTypes.map(t => t.name).join('|')}
-Mesure largeur, compte pièces, localise pile. ${widthRanges}
-JSON:{"detected_type":"...","count":N,"confidence":0-1,"dimensions":{"width_cm":X},"position":"left"|"center"|"right","bounds":{"x":0-1,"y":0-1,"w":0-1,"h":0-1}}`;
+    const detectPrompt = `ONLY JSON. Detect linen pile, measure width, count items.
+Width guide: sheets>150cm, towels=50-100cm, pillowcases≈50cm
+Output: {"pile":true,"count":8,"confidence":0.85,"width_cm":75,"position":"center","bounds":{"x":0.2,"y":0.1,"w":0.6,"h":0.8}}`;
     
     // Live mode - quick count
-    const livePrompt = `Compte "${linenType.name}". JSON:{"count":N,"confidence":0-1}`;
+    const livePrompt = `ONLY JSON. Count ${linenType.name} items.
+Output: {"count":5,"confidence":0.8}`;
     
-    // RULER MODE: Specialized prompt for ruler-based measurement
-    const rulerPrompt = `Expert mesure linge avec règle étalon.
-OBJET: "${linenType.name}" | ÉPAISSEUR: ${avgThickness}cm/pièce
+    // RULER MODE
+    const rulerPrompt = `ONLY JSON. Count ${linenType.name} using ruler if visible.
+Each item is ${avgThickness}cm thick.
+Output: {"count":10,"confidence":0.9,"ruler_detected":true,"pile_height_cm":20.0,"measurement_method":"ruler_calculation"}`;
 
-Cherche règle colorée 0-30cm. Si détectée:
-1. Calibre échelle (px/cm)
-2. Mesure hauteur pile
-3. Calcul: hauteur_cm ÷ ${avgThickness} = nombre
-
-JSON: {"count":N,"confidence":0-1,"ruler_detected":true/false,"pile_height_cm":X.X,"measurement_method":"ruler_calculation"|"visual_count"}`;
-
-    // Full prompt for VALIDATION mode (final precise count)
-    let fullPrompt = `Expert comptage linge d'hôtel - VALIDATION FINALE.
-
-OBJET: "${linenType.name}" | ÉPAISSEUR: ${avgThickness}cm
-
-MÉTHODE COMPTAGE PILE:
-1. Compte les STRATES horizontales visibles sur le côté
-2. Chaque ligne distincte = 1 pièce
-3. Vérification: hauteur estimée ÷ ${avgThickness}
-
-RÈGLES:
-- SOUS-ESTIME si incertitude
-- Ombres ≠ pièces
-- Plis internes ≠ pièces séparées
-
-CONFIANCE: 0.9+ (séparées) | 0.7-0.89 (strates nettes) | 0.5-0.69 (estimation)
-
-JSON: {"count":N,"confidence":0-1,"notes":"méthode"}`;
+    // VALIDATION mode
+    let fullPrompt = `ONLY JSON. Expert count of ${linenType.name} pile.
+Method: count horizontal layers, each layer = 1 item (${avgThickness}cm thick).
+Output: {"count":12,"confidence":0.85,"notes":"counted 12 visible layers"}`;
 
     // Get training samples + corrections for improved accuracy (not in quick/live mode)
     if (!liveMode && !quickDetect) {
@@ -192,8 +174,8 @@ JSON: {"count":N,"confidence":0-1,"notes":"méthode"}`;
               ]
             }
           ],
-          temperature: 0.05, // Lower for more consistent responses
-          max_tokens: quickDetect ? 40 : (liveMode || detectMode) ? 80 : 250
+          temperature: 0.1,
+          max_tokens: quickDetect ? 120 : (liveMode || detectMode) ? 150 : 300
         }),
         signal: controller.signal
       });
@@ -237,22 +219,35 @@ JSON: {"count":N,"confidence":0-1,"notes":"méthode"}`;
       const aiData = await aiResponse.json();
       const aiContent = aiData.choices?.[0]?.message?.content || '';
       
-      // Parse AI response
+      // Parse AI response - handle markdown blocks, incomplete JSON, text responses
       let result;
       try {
-        const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : aiContent;
+        let jsonStr = aiContent.trim();
+        
+        // Remove markdown code blocks
+        jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+        
+        // Extract JSON object
+        const jsonMatch = jsonStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[0];
+        }
+        
+        // Try to parse
         result = JSON.parse(jsonStr);
       } catch (parseError) {
-        console.error('[count-linen] Failed to parse AI response:', aiContent);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Failed to parse AI response',
-            rawResponse: aiContent,
-            fallback: 'manual'
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.error('[count-linen] Parse failed, raw:', aiContent.substring(0, 100));
+        
+        // Fallback: return default detection result
+        result = {
+          pile: false,
+          count: 0,
+          confidence: 0,
+          width_cm: 0,
+          position: 'center',
+          bounds: { x: 0, y: 0, w: 0, h: 0 },
+          notes: 'Detection failed - try repositioning'
+        };
       }
 
       console.log(`[count-linen] Result: count=${result.count}, confidence=${result.confidence}, mode=${modeLabel}`);
