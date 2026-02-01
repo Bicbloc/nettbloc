@@ -84,14 +84,15 @@ serve(async (req) => {
     
     // ========== ULTRA-OPTIMIZED PROMPTS ==========
 
-    // QUICK DETECT - Minimal prompt for instant response (~20 tokens)
-    const quickDetectPrompt = `Pile ${linenType.name}? JSON:{"pile":true/false,"count":N,"confidence":0.0-1.0,"width_cm":X}`;
+    // QUICK DETECT - Minimal prompt with pile position detection
+    const quickDetectPrompt = `Pile ${linenType.name}? Position de la pile dans l'image (gauche/centre/droite)?
+JSON:{"pile":true/false,"count":N,"confidence":0.0-1.0,"width_cm":X,"position":"left"|"center"|"right","bounds":{"x":0-1,"y":0-1,"w":0-1,"h":0-1}}`;
     
     // Detection mode - identify type by width
     const widthRanges = `DRAPS>150cm|SERVIETTES50-100cm|TAIES~50cm`;
     const detectPrompt = `Linge: ${allLinenTypes.map(t => t.name).join('|')}
-Mesure largeur, compte pièces. ${widthRanges}
-JSON:{"detected_type":"...","count":N,"confidence":0-1,"dimensions":{"width_cm":X}}`;
+Mesure largeur, compte pièces, localise pile. ${widthRanges}
+JSON:{"detected_type":"...","count":N,"confidence":0-1,"dimensions":{"width_cm":X},"position":"left"|"center"|"right","bounds":{"x":0-1,"y":0-1,"w":0-1,"h":0-1}}`;
     
     // Live mode - quick count
     const livePrompt = `Compte "${linenType.name}". JSON:{"count":N,"confidence":0-1}`;
@@ -275,8 +276,12 @@ JSON: {"count":N,"confidence":0-1,"notes":"méthode"}`;
       if (detectMode || quickDetect) {
         response.detected_type = result.detected_type || null;
         response.type_match = result.type_match !== undefined ? result.type_match : true;
-        response.dimensions = result.dimensions || { width_cm: null, height_cm: null };
+        response.dimensions = result.dimensions || { width_cm: result.width_cm || null, height_cm: null };
         response.pile_detected = result.pile_detected ?? result.pile ?? false;
+        
+        // Pile position and bounds for UI display
+        response.pile_position = result.position || 'center';
+        response.pile_bounds = result.bounds || null;
       }
 
       return new Response(

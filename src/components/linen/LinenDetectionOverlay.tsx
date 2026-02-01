@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { CheckCircle, AlertCircle, Ruler, Eye, Loader2, Zap, Target } from 'lucide-react';
+import { CheckCircle, AlertCircle, Ruler, Loader2, Zap, Target, MoveLeft, MoveRight, Smartphone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ImageQuality } from '@/utils/imageProcessing';
 
@@ -14,6 +14,14 @@ interface DetectionState {
   };
   confidence: number;
   stabilityProgress: number;
+  // New: pile position info
+  pilePosition?: 'centered' | 'left' | 'right' | null;
+  pileBounds?: {
+    x: number; // 0-1 relative to frame
+    y: number;
+    width: number;
+    height: number;
+  } | null;
 }
 
 interface LinenDetectionOverlayProps {
@@ -67,8 +75,13 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
 
   if (!isActive) return null;
 
+  // Pile position guidance
+  const pilePosition = detection?.pilePosition || null;
+  const needsRepositioning = pilePosition === 'left' || pilePosition === 'right';
+  const pileBounds = detection?.pileBounds || null;
+
   // Alignment status: check if pile is detected and positioned correctly
-  const isAligned = detection && detection.estimatedCount > 0 && detection.confidence >= 0.5;
+  const isAligned = detection && detection.estimatedCount > 0 && detection.confidence >= 0.5 && !needsRepositioning;
   const alignmentColor = isAligned ? '#22c55e' : '#ef4444'; // green : red
 
   const getStatusColor = () => {
@@ -245,8 +258,77 @@ export const LinenDetectionOverlay: React.FC<LinenDetectionOverlayProps> = ({
           <div className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 rounded-tl-lg border-current" />
           <div className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 rounded-tr-lg border-current" />
 
+          {/* ========== PILE CONTOUR VISUALIZATION ========== */}
+          {pileBounds && detection && detection.estimatedCount > 0 && (
+            <div 
+              className="absolute transition-all duration-200 pointer-events-none"
+              style={{
+                left: `${pileBounds.x * 100}%`,
+                top: `${pileBounds.y * 100}%`,
+                width: `${pileBounds.width * 100}%`,
+                height: `${pileBounds.height * 100}%`,
+              }}
+            >
+              {/* Animated contour border */}
+              <div 
+                className={cn(
+                  "absolute inset-0 border-2 rounded-lg",
+                  isAligned ? "border-green-400" : "border-yellow-400",
+                  "animate-pulse"
+                )}
+                style={{
+                  boxShadow: isAligned 
+                    ? '0 0 20px rgba(34, 197, 94, 0.5), inset 0 0 10px rgba(34, 197, 94, 0.2)' 
+                    : '0 0 20px rgba(250, 204, 21, 0.5), inset 0 0 10px rgba(250, 204, 21, 0.2)'
+                }}
+              />
+              
+              {/* Corner highlight markers */}
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-green-400 rounded-tl" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-green-400 rounded-tr" />
+              <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-green-400 rounded-bl" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-green-400 rounded-br" />
+              
+              {/* Pile label */}
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-green-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap">
+                📦 Pile détectée
+              </div>
+            </div>
+          )}
+
+          {/* ========== REPOSITIONING GUIDE ========== */}
+          {needsRepositioning && detection && detection.estimatedCount > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center z-50">
+              <div className="bg-orange-500/95 backdrop-blur-sm rounded-xl px-4 py-3 flex flex-col items-center gap-2 shadow-xl animate-bounce">
+                <div className="flex items-center gap-3 text-white">
+                  {pilePosition === 'left' ? (
+                    <>
+                      <MoveRight className="h-8 w-8" />
+                      <div className="text-center">
+                        <p className="font-bold text-sm">Déplacez vers la droite</p>
+                        <p className="text-xs opacity-80">Pile trop à gauche</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <MoveLeft className="h-8 w-8" />
+                      <div className="text-center">
+                        <p className="font-bold text-sm">Déplacez vers la gauche</p>
+                        <p className="text-xs opacity-80">Pile trop à droite</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-white/80 text-[10px]">
+                  <Smartphone className="h-3 w-3" />
+                  <span>Centrez la pile dans le cadre</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Fast scanning line */}
-          {detection?.status === 'scanning' && (
+          {detection?.status === 'scanning' && !needsRepositioning && (
             <div 
               className="absolute inset-x-10 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent rounded"
               style={{ top: `${100 - scanLinePosition}%` }}

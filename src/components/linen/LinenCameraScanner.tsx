@@ -33,6 +33,14 @@ interface DetectionState {
   };
   confidence: number;
   stabilityProgress: number;
+  // Pile position and bounds for visual feedback
+  pilePosition?: 'centered' | 'left' | 'right' | null;
+  pileBounds?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
 }
 
 export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
@@ -179,6 +187,24 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             prev.count === data.count && 
             Math.abs(prev.confidence - data.confidence) < CONFIDENCE_TOLERANCE;
 
+          // Parse pile position from API response
+          const pilePosition = data.pile_position === 'left' ? 'left' : 
+                               data.pile_position === 'right' ? 'right' : 'centered';
+          
+          // Parse pile bounds from API response  
+          const pileBounds = data.pile_bounds ? {
+            x: data.pile_bounds.x || 0.1,
+            y: data.pile_bounds.y || 0.2,
+            width: data.pile_bounds.w || data.pile_bounds.width || 0.8,
+            height: data.pile_bounds.h || data.pile_bounds.height || 0.6,
+          } : {
+            // Default centered bounds if not returned
+            x: 0.15,
+            y: 0.2,
+            width: 0.7,
+            height: 0.6,
+          };
+
           if (isStable) {
             // Increment stability counter
             const newStableCount = stableFrameCount + 1;
@@ -197,6 +223,8 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                 },
                 confidence: data.confidence,
                 stabilityProgress: 100,
+                pilePosition,
+                pileBounds,
               });
             } else {
               // Still stabilizing
@@ -210,6 +238,8 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                 },
                 confidence: data.confidence,
                 stabilityProgress: Math.min(100, (newStableCount / STABLE_FRAMES_REQUIRED) * 100),
+                pilePosition,
+                pileBounds,
               });
             }
           } else {
@@ -225,6 +255,8 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               },
               confidence: data.confidence,
               stabilityProgress: 0,
+              pilePosition,
+              pileBounds,
             });
           }
 
