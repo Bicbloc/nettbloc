@@ -47,7 +47,7 @@ export function LinenTab({ currentHotelId, hotelName }: LinenTabProps) {
 
         <TabsContent value="inventory" className="space-y-4">
           {currentHotelId ? (
-            <AdminLinenInventory hotelId={currentHotelId} />
+            <AdminLinenInventory hotelId={currentHotelId} hotelName={hotelName} />
           ) : (
             <Alert>
               <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
