@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, Loader2, UserPlus, Sparkles, Shield, ArrowRight, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import BackButton from '@/components/BackButton';
 import { retryQuery } from '@/services/queryUtils';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
+import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 
 export default function HousekeeperAuth() {
   const [email, setEmail] = useState('');
@@ -57,8 +59,8 @@ export default function HousekeeperAuth() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/housekeeper/auth`
+      const { error } = await supabaseRecovery.auth.resetPasswordForEmail(email, {
+        redirectTo: PASSWORD_RESET_URL,
       });
 
       if (error) throw error;

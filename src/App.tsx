@@ -36,6 +36,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { AppBoot } from "./components/AppBoot";
 import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import ResetPassword from "./pages/ResetPassword";
 
 // Netto Count App
 import NettoCountAuth from "./pages/netto-count/NettoCountAuth";
@@ -66,6 +67,7 @@ const App = () => (
                             <Routes>
                               <Route path="/" element={<Index />} />
                               <Route path="/auth" element={<Auth />} />
+                              <Route path="/reset-password" element={<ResetPassword />} />
                               <Route path="/auth/establishment" element={<EstablishmentAuth />} />
                               <Route path="/guest" element={<GuestMode />} />
                               <Route path="/plan-selection" element={<PlanSelection />} />

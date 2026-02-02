@@ -8,8 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
@@ -167,8 +169,8 @@ const Auth = () => {
           break;
         }
         case 'reset-password': {
-          const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-            redirectTo: `${window.location.origin}/auth`
+          const { error } = await supabaseRecovery.auth.resetPasswordForEmail(formData.email, {
+            redirectTo: PASSWORD_RESET_URL,
           });
           if (error) throw error;
           toast({ 

@@ -8,7 +8,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Wrench, Loader2, Lock, Mail, KeyRound, ArrowRight } from 'lucide-react';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import BackButton from '@/components/BackButton';
+import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 
 export default function TechnicianLogin() {
   const [email, setEmail] = useState('');
@@ -54,8 +56,8 @@ export default function TechnicianLogin() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/technician/login`
+      const { error } = await supabaseRecovery.auth.resetPasswordForEmail(email, {
+        redirectTo: PASSWORD_RESET_URL,
       });
 
       if (error) throw error;
