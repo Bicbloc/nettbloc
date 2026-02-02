@@ -8,6 +8,7 @@ interface OnboardingState {
   trialWarningLevel: number;
   isTrialExpired: boolean;
   onboardingCompletedAt: string | null;
+  isSuperAdmin: boolean;
 }
 
 export function useOnboarding() {
@@ -17,7 +18,8 @@ export function useOnboarding() {
     isLoading: true,
     trialWarningLevel: 0,
     isTrialExpired: false,
-    onboardingCompletedAt: null
+    onboardingCompletedAt: null,
+    isSuperAdmin: false
   });
 
   useEffect(() => {
@@ -28,12 +30,22 @@ export function useOnboarding() {
           isLoading: false,
           trialWarningLevel: 0,
           isTrialExpired: false,
-          onboardingCompletedAt: null
+          onboardingCompletedAt: null,
+          isSuperAdmin: false
         });
         return;
       }
 
       try {
+        // Vérifier si super admin d'abord
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'super_admin')
+          .maybeSingle();
+
+        const isSuperAdmin = !!roleData;
         // Récupérer le profil
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -67,18 +79,19 @@ export function useOnboarding() {
           }
         }
 
-        // Si abonné, pas d'expiration
-        if (profile?.subscription_status === 'active' || profile?.subscription_type === 'premium') {
+        // Si abonné ou super admin, pas d'expiration
+        if (profile?.subscription_status === 'active' || profile?.subscription_type === 'premium' || isSuperAdmin) {
           isTrialExpired = false;
           trialWarningLevel = 0;
         }
 
         setState({
-          needsOnboarding,
+          needsOnboarding: isSuperAdmin ? false : needsOnboarding, // Super admin skip onboarding
           isLoading: false,
           trialWarningLevel,
           isTrialExpired,
-          onboardingCompletedAt: profile?.onboarding_completed_at
+          onboardingCompletedAt: profile?.onboarding_completed_at,
+          isSuperAdmin
         });
       } catch (error) {
         console.error('Erreur vérification onboarding:', error);
