@@ -748,6 +748,7 @@ const IndexDashboard = () => {
               housekeeperNames={housekeeperNames}
               cleaningConfig={cleaningConfig}
               isDistributed={isDistributed}
+              hotelId={currentHotelId}
               onGenerateReport={handleGenerateReport}
               onGenerateAllReports={handleGenerateAllReports}
             />
