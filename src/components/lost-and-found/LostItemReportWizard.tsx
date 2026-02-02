@@ -11,15 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -36,7 +28,9 @@ import {
   User,
   Calendar,
   MapPin,
-  Send
+  Send,
+  Tag,
+  FileText
 } from "lucide-react";
 
 export interface GuestInfo {
@@ -80,7 +74,31 @@ const OBJECT_CATEGORIES = [
   { value: "other", label: "Autre", icon: "📦" },
 ];
 
-type WizardStep = 'photo' | 'analysis' | 'form' | 'confirm';
+// Step-by-step wizard
+type WizardStep = 
+  | 'photo' 
+  | 'analysis' 
+  | 'location_type'
+  | 'room_number'
+  | 'location_details'
+  | 'description' 
+  | 'category' 
+  | 'guest_name'
+  | 'guest_dates'
+  | 'confirm';
+
+const STEPS: WizardStep[] = [
+  'photo', 
+  'analysis', 
+  'location_type', 
+  'room_number',
+  'location_details',
+  'description', 
+  'category',
+  'guest_name',
+  'guest_dates',
+  'confirm'
+];
 
 export function LostItemReportWizard({
   hotelId,
@@ -129,14 +147,13 @@ export function LostItemReportWizard({
 
   // Determine best guest info to use
   const bestGuest = useMemo(() => {
-    // Priority: departure (most likely left something) > staying > arrival
     if (guestDeparture) return guestDeparture;
     if (guestStaying) return guestStaying;
     if (guestArrival) return guestArrival;
     return null;
   }, [guestArrival, guestDeparture, guestStaying]);
 
-  // Auto-fill guest info when opening or when room is selected
+  // Auto-fill guest info when room is selected
   useEffect(() => {
     if (open && locationType === "room" && bestGuest) {
       setGuestFirstName(bestGuest.firstName || "");
@@ -210,13 +227,11 @@ export function LostItemReportWizard({
     setCurrentStep('analysis');
     
     try {
-      // Upload image first
       const uploadedUrl = await uploadImage(selectedImage);
       if (uploadedUrl) {
         setImageUrl(uploadedUrl);
       }
 
-      // Convert to base64 for AI
       const base64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -241,7 +256,7 @@ export function LostItemReportWizard({
       });
     } finally {
       setIsAnalyzing(false);
-      setCurrentStep('form');
+      setCurrentStep('location_type');
     }
   };
 
@@ -268,7 +283,7 @@ export function LostItemReportWizard({
         setImageUrl(uploadedUrl);
       }
     }
-    setCurrentStep('form');
+    setCurrentStep('location_type');
   };
 
   // Create lost item mutation
@@ -311,23 +326,90 @@ export function LostItemReportWizard({
     },
   });
 
-  const getStepProgress = () => {
-    switch (currentStep) {
-      case 'photo': return 25;
-      case 'analysis': return 50;
-      case 'form': return 75;
-      case 'confirm': return 100;
-      default: return 0;
+  // Get applicable steps based on location type
+  const getApplicableSteps = (): WizardStep[] => {
+    const steps: WizardStep[] = ['photo', 'analysis', 'location_type'];
+    
+    if (locationType === 'room') {
+      steps.push('room_number');
+    }
+    
+    steps.push('location_details', 'description', 'category');
+    
+    if (locationType === 'room') {
+      steps.push('guest_name', 'guest_dates');
+    }
+    
+    steps.push('confirm');
+    return steps;
+  };
+
+  const applicableSteps = getApplicableSteps();
+  const getStepIndex = () => applicableSteps.indexOf(currentStep);
+  const getStepProgress = () => ((getStepIndex() + 1) / applicableSteps.length) * 100;
+
+  const goNext = () => {
+    const steps = getApplicableSteps();
+    const idx = steps.indexOf(currentStep);
+    if (idx < steps.length - 1) {
+      // Skip analysis if no image
+      if (steps[idx + 1] === 'analysis' && !selectedImage) {
+        setCurrentStep('location_type');
+      } else {
+        setCurrentStep(steps[idx + 1]);
+      }
     }
   };
 
-  const getStepTitle = () => {
+  const goBack = () => {
+    const steps = getApplicableSteps();
+    const idx = steps.indexOf(currentStep);
+    if (idx > 0) {
+      if (steps[idx - 1] === 'analysis') {
+        setCurrentStep('photo');
+      } else {
+        setCurrentStep(steps[idx - 1]);
+      }
+    }
+  };
+
+  const getStepConfig = () => {
     switch (currentStep) {
-      case 'photo': return 'Étape 1 : Prendre une photo';
-      case 'analysis': return 'Étape 2 : Analyse IA en cours...';
-      case 'form': return 'Étape 3 : Vérifier et compléter';
-      case 'confirm': return 'Étape 4 : Confirmation';
-      default: return '';
+      case 'photo':
+        return { icon: Camera, title: "Photo de l'objet", subtitle: "Prenez une photo pour l'analyse IA" };
+      case 'analysis':
+        return { icon: Sparkles, title: "Analyse IA", subtitle: "Identification automatique..." };
+      case 'location_type':
+        return { icon: MapPin, title: "Lieu de découverte", subtitle: "Où avez-vous trouvé l'objet ?" };
+      case 'room_number':
+        return { icon: MapPin, title: "Numéro de chambre", subtitle: "Quelle chambre ?" };
+      case 'location_details':
+        return { icon: MapPin, title: "Précisions", subtitle: "Où exactement ? (optionnel)" };
+      case 'description':
+        return { icon: FileText, title: "Description", subtitle: "Décrivez l'objet trouvé" };
+      case 'category':
+        return { icon: Tag, title: "Catégorie", subtitle: "Type d'objet" };
+      case 'guest_name':
+        return { icon: User, title: "Nom du client", subtitle: "Propriétaire potentiel (optionnel)" };
+      case 'guest_dates':
+        return { icon: Calendar, title: "Dates de séjour", subtitle: "Arrivée et départ (optionnel)" };
+      case 'confirm':
+        return { icon: Check, title: "Confirmation", subtitle: "Vérifiez et envoyez" };
+      default:
+        return { icon: Package, title: "", subtitle: "" };
+    }
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 'location_type': return !!locationType;
+      case 'room_number': return !!roomNumber;
+      case 'location_details': return true; // Optional
+      case 'description': return objectDescription.length >= 3;
+      case 'category': return !!objectCategory;
+      case 'guest_name': return true; // Optional
+      case 'guest_dates': return true; // Optional
+      default: return true;
     }
   };
 
@@ -339,7 +421,8 @@ export function LostItemReportWizard({
     return LOCATION_TYPES.find(l => l.value === value)?.label || value;
   };
 
-  const canProceedToConfirm = objectDescription && locationType;
+  const stepConfig = getStepConfig();
+  const StepIcon = stepConfig.icon;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -351,420 +434,394 @@ export function LostItemReportWizard({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-hidden flex flex-col p-0">
-        {/* Header avec progression */}
+      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0">
+        {/* Header compact */}
         <div className="p-4 border-b bg-muted/30">
           <DialogHeader className="pb-2">
             <DialogTitle className="flex items-center gap-2 text-base">
-              <Package className="h-4 w-4 text-amber-600" />
-              {getStepTitle()}
+              <StepIcon className="h-5 w-5 text-amber-600" />
+              {stepConfig.title}
             </DialogTitle>
+            <p className="text-sm text-muted-foreground">{stepConfig.subtitle}</p>
           </DialogHeader>
-          <Progress value={getStepProgress()} className="h-2" />
-          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-            <span className={currentStep === 'photo' ? 'text-primary font-medium' : ''}>📷 Photo</span>
-            <span className={currentStep === 'analysis' ? 'text-primary font-medium' : ''}>🤖 IA</span>
-            <span className={currentStep === 'form' ? 'text-primary font-medium' : ''}>📝 Détails</span>
-            <span className={currentStep === 'confirm' ? 'text-primary font-medium' : ''}>✅ Envoi</span>
-          </div>
+          <Progress value={getStepProgress()} className="h-1.5 mt-3" />
+          <p className="text-xs text-muted-foreground mt-1 text-right">
+            Étape {getStepIndex() + 1} / {applicableSteps.length}
+          </p>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
-          {/* ÉTAPE 1: Photo */}
-          {currentStep === 'photo' && (
-            <div className="space-y-4">
-              <Card className="p-6 border-dashed border-2 text-center">
-                {imagePreview ? (
-                  <div className="relative inline-block">
-                    <img 
-                      src={imagePreview} 
-                      alt="Preview" 
-                      className="max-h-48 rounded-lg mx-auto"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                      onClick={() => {
-                        setSelectedImage(null);
-                        setImagePreview(null);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
-                      <Camera className="h-8 w-8 text-amber-600" />
+        <ScrollArea className="flex-1">
+          <div className="p-4">
+            {/* AI Banner if available */}
+            {aiSuggestion && currentStep !== 'photo' && currentStep !== 'analysis' && currentStep !== 'confirm' && (
+              <Card className="p-2 mb-4 bg-amber-50 border-amber-200">
+                <div className="flex items-center gap-2 text-xs">
+                  <Sparkles className="h-3 w-3 text-amber-600" />
+                  <span className="text-amber-700 font-medium">IA</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(aiSuggestion.confidence * 100)}%
+                  </Badge>
+                </div>
+              </Card>
+            )}
+
+            {/* Image preview compact */}
+            {imagePreview && currentStep !== 'photo' && currentStep !== 'analysis' && (
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg mb-4">
+                <img src={imagePreview} alt="Photo" className="h-10 w-10 object-cover rounded" />
+                <span className="text-xs text-muted-foreground">Photo jointe</span>
+              </div>
+            )}
+
+            {/* STEP: Photo */}
+            {currentStep === 'photo' && (
+              <div className="space-y-4">
+                <Card className="p-8 border-dashed border-2 text-center">
+                  {imagePreview ? (
+                    <div className="relative inline-block">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="max-h-48 rounded-lg mx-auto"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setImagePreview(null);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                    <div>
-                      <p className="font-medium">Photographiez l'objet trouvé</p>
-                      <p className="text-sm text-muted-foreground">
+                  ) : (
+                    <label className="cursor-pointer block">
+                      <Camera className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
+                      <p className="font-medium">Photographiez l'objet</p>
+                      <p className="text-sm text-muted-foreground mt-1">
                         L'IA identifiera automatiquement l'objet
                       </p>
-                    </div>
-                  </div>
-                )}
-              </Card>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleImageSelect}
+                      />
+                    </label>
+                  )}
+                </Card>
 
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageSelect}
-                className="hidden"
-                id="lost-item-photo"
-              />
-              <label htmlFor="lost-item-photo">
-                <Button variant="outline" className="w-full gap-2" asChild>
-                  <span>
-                    <Camera className="h-4 w-4" />
-                    {imagePreview ? "Reprendre la photo" : "Prendre une photo"}
-                  </span>
-                </Button>
-              </label>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  className="flex-1"
-                  onClick={skipAnalysis}
-                  disabled={uploading}
-                >
-                  Passer →
-                </Button>
-                <Button
-                  className="flex-1 gap-2"
-                  onClick={analyzeImage}
-                  disabled={!selectedImage || uploading}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  {uploading ? "Envoi..." : "Analyser avec l'IA"}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* ÉTAPE 2: Analyse IA */}
-          {currentStep === 'analysis' && (
-            <div className="py-12 text-center space-y-6">
-              <div className="relative w-24 h-24 mx-auto">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 animate-spin opacity-20" />
-                <div className="absolute inset-2 rounded-full bg-background flex items-center justify-center">
-                  <Sparkles className="h-10 w-10 text-amber-600 animate-pulse" />
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost" 
+                    className="flex-1"
+                    onClick={skipAnalysis}
+                    disabled={uploading}
+                  >
+                    Passer
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  {selectedImage && (
+                    <Button 
+                      className="flex-1"
+                      onClick={analyzeImage}
+                      disabled={uploading}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {uploading ? "Envoi..." : "Analyser"}
+                    </Button>
+                  )}
                 </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold">Analyse en cours...</h3>
-                <p className="text-muted-foreground">
-                  L'IA identifie l'objet pour faciliter la restitution
+            )}
+
+            {/* STEP: Analysis */}
+            {currentStep === 'analysis' && (
+              <div className="text-center py-12 space-y-4">
+                <div className="relative inline-block">
+                  {imagePreview && (
+                    <img 
+                      src={imagePreview} 
+                      alt="Analyse" 
+                      className="max-h-32 rounded-lg mx-auto opacity-50"
+                    />
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="h-12 w-12 animate-spin text-amber-600" />
+                  </div>
+                </div>
+                <p className="font-medium">Analyse en cours...</p>
+              </div>
+            )}
+
+            {/* STEP: Location Type */}
+            {currentStep === 'location_type' && (
+              <div className="grid grid-cols-2 gap-2">
+                {LOCATION_TYPES.map((loc) => (
+                  <Button
+                    key={loc.value}
+                    variant={locationType === loc.value ? "default" : "outline"}
+                    className="h-16 flex-col gap-1"
+                    onClick={() => setLocationType(loc.value)}
+                  >
+                    <span className="text-xl">{loc.icon}</span>
+                    <span className="text-sm">{loc.label}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {/* STEP: Room Number */}
+            {currentStep === 'room_number' && (
+              <div className="space-y-4">
+                <Input 
+                  placeholder="Numéro de chambre..." 
+                  value={roomNumber}
+                  onChange={(e) => setRoomNumber(e.target.value)}
+                  className="h-14 text-xl text-center font-bold"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* STEP: Location Details */}
+            {currentStep === 'location_details' && (
+              <div className="space-y-4">
+                <Input 
+                  placeholder="Ex: Sous le lit, dans la salle de bain..." 
+                  value={locationDetails}
+                  onChange={(e) => setLocationDetails(e.target.value)}
+                  className="h-12"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Précisez l'emplacement exact (optionnel)
                 </p>
               </div>
-              {imagePreview && (
-                <img 
-                  src={imagePreview} 
-                  alt="Analysing" 
-                  className="max-h-32 rounded-lg mx-auto opacity-50"
-                />
-              )}
-            </div>
-          )}
+            )}
 
-          {/* ÉTAPE 3: Formulaire */}
-          {currentStep === 'form' && (
-            <div className="space-y-4">
-              {/* AI Results Banner */}
-              {aiSuggestion && (
-                <Card className="p-3 bg-amber-50 border-amber-200">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="h-5 w-5 text-amber-600 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-amber-900">Analyse IA</span>
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            aiSuggestion.confidence > 0.8 
-                              ? "bg-green-100 text-green-800 border-green-300"
-                              : aiSuggestion.confidence > 0.5
-                              ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-                              : "bg-orange-100 text-orange-800 border-orange-300"
-                          }
-                        >
-                          {Math.round(aiSuggestion.confidence * 100)}% confiance
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-amber-800 mt-1">
-                        {aiSuggestion.object_name}
-                        {aiSuggestion.brand && ` - ${aiSuggestion.brand}`}
-                        {aiSuggestion.color && ` (${aiSuggestion.color})`}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Image preview */}
-              {imagePreview && (
-                <div className="flex justify-center">
-                  <img 
-                    src={imagePreview} 
-                    alt="Objet trouvé" 
-                    className="max-h-24 rounded-lg shadow-sm"
-                  />
-                </div>
-              )}
-
-              {/* Object Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description">Description de l'objet *</Label>
+            {/* STEP: Description */}
+            {currentStep === 'description' && (
+              <div className="space-y-4">
                 <Textarea
-                  id="description"
                   placeholder="Ex: Téléphone Samsung noir, montre dorée..."
                   value={objectDescription}
                   onChange={(e) => setObjectDescription(e.target.value)}
-                  className="min-h-[80px]"
-                  required
+                  rows={4}
+                  className="resize-none text-base"
+                  autoFocus
                 />
+                {aiSuggestion?.object_name && objectDescription !== aiSuggestion.object_name && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2 text-left"
+                    onClick={() => {
+                      let desc = aiSuggestion.object_name;
+                      if (aiSuggestion.brand) desc += ` - ${aiSuggestion.brand}`;
+                      if (aiSuggestion.color) desc += ` (${aiSuggestion.color})`;
+                      setObjectDescription(desc);
+                    }}
+                  >
+                    <Sparkles className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">Suggestion: {aiSuggestion.object_name}</span>
+                  </Button>
+                )}
               </div>
+            )}
 
-              {/* Category */}
-              <div className="space-y-2">
-                <Label>Catégorie</Label>
-                <Select value={objectCategory} onValueChange={setObjectCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une catégorie" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {OBJECT_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.icon} {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* STEP: Category */}
+            {currentStep === 'category' && (
+              <div className="grid grid-cols-2 gap-2">
+                {OBJECT_CATEGORIES.map((cat) => (
+                  <Button
+                    key={cat.value}
+                    variant={objectCategory === cat.value ? "default" : "outline"}
+                    className="h-14 flex-col gap-1"
+                    onClick={() => setObjectCategory(cat.value)}
+                  >
+                    <span className="text-lg">{cat.icon}</span>
+                    <span className="text-xs">{cat.label}</span>
+                  </Button>
+                ))}
               </div>
+            )}
 
-              {/* Location Type */}
-              <div className="space-y-2">
-                <Label>Lieu de découverte *</Label>
-                <Select value={locationType} onValueChange={setLocationType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Où avez-vous trouvé l'objet ?" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LOCATION_TYPES.map((loc) => (
-                      <SelectItem key={loc.value} value={loc.value}>
-                        {loc.icon} {loc.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Room Number (if room) */}
-              {locationType === "room" && (
-                <div className="space-y-2">
-                  <Label htmlFor="roomNumber">Numéro de chambre</Label>
-                  <Input
-                    id="roomNumber"
-                    placeholder="Ex: 101"
-                    value={roomNumber}
-                    onChange={(e) => setRoomNumber(e.target.value)}
-                  />
+            {/* STEP: Guest Name */}
+            {currentStep === 'guest_name' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Prénom</label>
+                    <Input 
+                      placeholder="Prénom..."
+                      value={guestFirstName}
+                      onChange={(e) => setGuestFirstName(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Nom</label>
+                    <Input 
+                      placeholder="Nom..."
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
                 </div>
-              )}
-
-              {/* Location Details */}
-              <div className="space-y-2">
-                <Label htmlFor="locationDetails">Précisions sur le lieu</Label>
-                <Input
-                  id="locationDetails"
-                  placeholder="Ex: Sous le lit, dans la salle de bain..."
-                  value={locationDetails}
-                  onChange={(e) => setLocationDetails(e.target.value)}
-                />
+                {bestGuest && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    💡 Informations pré-remplies depuis les données de la chambre
+                  </p>
+                )}
               </div>
+            )}
 
-              {/* Guest Info (if room) */}
-              {locationType === "room" && (
-                <Card className="p-4 bg-muted/50">
-                  <div className="flex items-center gap-2 mb-3">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">
-                      Informations client
-                      {bestGuest && <Badge variant="outline" className="ml-2 text-xs">Pré-rempli</Badge>}
-                    </span>
+            {/* STEP: Guest Dates */}
+            {currentStep === 'guest_dates' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Arrivée</label>
+                    <Input 
+                      type="date"
+                      value={guestCheckIn}
+                      onChange={(e) => setGuestCheckIn(e.target.value)}
+                      className="h-12"
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="guestFirstName" className="text-xs">Prénom</Label>
-                      <Input
-                        id="guestFirstName"
-                        value={guestFirstName}
-                        onChange={(e) => setGuestFirstName(e.target.value)}
-                        className="h-9"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="guestName" className="text-xs">Nom</Label>
-                      <Input
-                        id="guestName"
-                        value={guestName}
-                        onChange={(e) => setGuestName(e.target.value)}
-                        className="h-9"
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Départ</label>
+                    <Input 
+                      type="date"
+                      value={guestCheckOut}
+                      onChange={(e) => setGuestCheckOut(e.target.value)}
+                      className="h-12"
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="checkIn" className="text-xs">Arrivée</Label>
-                      <Input
-                        id="checkIn"
-                        type="date"
-                        value={guestCheckIn}
-                        onChange={(e) => setGuestCheckIn(e.target.value)}
-                        className="h-9"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="checkOut" className="text-xs">Départ</Label>
-                      <Input
-                        id="checkOut"
-                        type="date"
-                        value={guestCheckOut}
-                        onChange={(e) => setGuestCheckOut(e.target.value)}
-                        className="h-9"
-                      />
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {/* Navigation */}
-              <div className="flex gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentStep('photo')}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Retour
-                </Button>
-                <Button
-                  className="flex-1 gap-2"
-                  onClick={() => setCurrentStep('confirm')}
-                  disabled={!canProceedToConfirm}
-                >
-                  Continuer
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* ÉTAPE 4: Confirmation */}
-          {currentStep === 'confirm' && (
-            <div className="space-y-4">
-              <Card className="p-4 bg-amber-50 border-amber-200">
-                <h4 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
-                  <Check className="h-4 w-4" />
-                  Récapitulatif
-                </h4>
-                
-                <div className="space-y-3 text-sm">
-                  {imagePreview && (
-                    <div className="flex justify-center pb-2">
-                      <img 
-                        src={imagePreview} 
-                        alt="Objet trouvé" 
-                        className="max-h-24 rounded-lg"
-                      />
-                    </div>
-                  )}
+            {/* STEP: Confirm */}
+            {currentStep === 'confirm' && (
+              <div className="space-y-4">
+                <Card className="p-4 bg-amber-50 border-amber-200">
+                  <h4 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                    <Check className="h-4 w-4" />
+                    Récapitulatif
+                  </h4>
+                  
+                  <div className="space-y-3 text-sm">
+                    {imagePreview && (
+                      <div className="flex justify-center pb-2">
+                        <img 
+                          src={imagePreview} 
+                          alt="Objet trouvé" 
+                          className="max-h-24 rounded-lg"
+                        />
+                      </div>
+                    )}
 
-                  <div className="flex items-start gap-2">
-                    <Package className="h-4 w-4 text-amber-700 mt-0.5" />
-                    <div>
-                      <span className="font-medium">Objet : </span>
-                      <span>{objectDescription}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">Catégorie : </span>
-                    <Badge variant="secondary">
-                      {OBJECT_CATEGORIES.find(c => c.value === objectCategory)?.icon} {getCategoryLabel(objectCategory)}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-amber-700 mt-0.5" />
-                    <div>
-                      <span className="font-medium">Lieu : </span>
-                      <span>
-                        {getLocationLabel(locationType)}
-                        {roomNumber && ` - Chambre ${roomNumber}`}
-                        {locationDetails && ` (${locationDetails})`}
-                      </span>
-                    </div>
-                  </div>
-
-                  {(guestFirstName || guestName) && (
-                    <div className="flex items-start gap-2">
-                      <User className="h-4 w-4 text-amber-700 mt-0.5" />
-                      <div>
-                        <span className="font-medium">Client : </span>
-                        <span>{guestFirstName} {guestName}</span>
-                        {(guestCheckIn || guestCheckOut) && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                            <Calendar className="h-3 w-3" />
-                            {guestCheckIn && `Du ${new Date(guestCheckIn).toLocaleDateString('fr-FR')}`}
-                            {guestCheckOut && ` au ${new Date(guestCheckOut).toLocaleDateString('fr-FR')}`}
-                          </div>
-                        )}
+                    <div className="flex items-start gap-2 py-1 border-b border-amber-200">
+                      <Package className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="font-medium">Objet: </span>
+                        <span>{objectDescription}</span>
                       </div>
                     </div>
-                  )}
-                </div>
-              </Card>
 
-              {aiSuggestion && aiSuggestion.confidence < 0.6 && (
-                <Card className="p-3 bg-orange-50 border-orange-200">
-                  <div className="flex items-center gap-2 text-orange-800 text-sm">
-                    <Sparkles className="h-4 w-4" />
-                    <span>L'IA n'a pas pu identifier l'objet avec certitude - l'admin vérifiera</span>
+                    <div className="flex items-center gap-2 py-1 border-b border-amber-200">
+                      <Tag className="h-4 w-4 text-amber-700 flex-shrink-0" />
+                      <span className="font-medium">Catégorie: </span>
+                      <Badge variant="secondary">
+                        {OBJECT_CATEGORIES.find(c => c.value === objectCategory)?.icon} {getCategoryLabel(objectCategory)}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-start gap-2 py-1 border-b border-amber-200">
+                      <MapPin className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">Lieu: </span>
+                        <span>
+                          {getLocationLabel(locationType)}
+                          {roomNumber && ` - Chambre ${roomNumber}`}
+                          {locationDetails && ` (${locationDetails})`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {(guestFirstName || guestName) && (
+                      <div className="flex items-start gap-2 py-1">
+                        <User className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <span className="font-medium">Client: </span>
+                          <span>{guestFirstName} {guestName}</span>
+                          {(guestCheckIn || guestCheckOut) && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                              <Calendar className="h-3 w-3" />
+                              {guestCheckIn && `Du ${new Date(guestCheckIn).toLocaleDateString('fr-FR')}`}
+                              {guestCheckOut && ` au ${new Date(guestCheckOut).toLocaleDateString('fr-FR')}`}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Card>
-              )}
 
-              {/* Navigation */}
-              <div className="flex gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentStep('form')}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Modifier
-                </Button>
-                <Button
-                  className="flex-1 gap-2"
-                  onClick={() => createItemMutation.mutate()}
-                  disabled={createItemMutation.isPending}
-                >
-                  {createItemMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  Enregistrer l'objet
-                </Button>
+                {aiSuggestion && aiSuggestion.confidence < 0.6 && (
+                  <Card className="p-3 bg-orange-50 border-orange-200">
+                    <div className="flex items-center gap-2 text-orange-800 text-sm">
+                      <Sparkles className="h-4 w-4" />
+                      <span>L'IA n'a pas pu identifier l'objet avec certitude - l'admin vérifiera</span>
+                    </div>
+                  </Card>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </ScrollArea>
+
+        {/* Footer navigation */}
+        {currentStep !== 'photo' && currentStep !== 'analysis' && (
+          <div className="p-4 border-t bg-background flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={goBack}
+              className="flex-1"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour
+            </Button>
+            {currentStep === 'confirm' ? (
+              <Button 
+                onClick={() => createItemMutation.mutate()}
+                disabled={createItemMutation.isPending}
+                className="flex-1 bg-amber-600 hover:bg-amber-700"
+              >
+                {createItemMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Enregistrer
+              </Button>
+            ) : (
+              <Button 
+                onClick={goNext}
+                disabled={!canProceed()}
+                className="flex-1"
+              >
+                Suivant
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
