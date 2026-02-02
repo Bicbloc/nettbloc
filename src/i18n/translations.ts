@@ -166,6 +166,19 @@ type TranslationSchema = {
     disconnected: string;
     linenInventory: string;
     aiTraining: string;
+    lostAndFound: string;
+    menu: string;
+    operations: string;
+    inventory: string;
+    tools: string;
+    principal: string;
+    home: string;
+    team: string;
+    more: string;
+    codes: string;
+    linenShort: string;
+    found: string;
+    ia: string;
   };
   stats: {
     totalRooms: string;
@@ -404,6 +417,19 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       disconnected: "Déconnecté",
       linenInventory: "Inventaire Linge",
       aiTraining: "Entraînement IA",
+      lostAndFound: "Objets Trouvés",
+      menu: "Menu",
+      operations: "Opérations",
+      inventory: "Inventaires",
+      tools: "Outils",
+      principal: "Principal",
+      home: "Accueil",
+      team: "Équipe",
+      more: "Plus",
+      codes: "Codes",
+      linenShort: "Linge",
+      found: "Trouvés",
+      ia: "IA",
     },
     
     // Stats
@@ -653,6 +679,19 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       disconnected: "Disconnected",
       linenInventory: "Linen Inventory",
       aiTraining: "AI Training",
+      lostAndFound: "Lost & Found",
+      menu: "Menu",
+      operations: "Operations",
+      inventory: "Inventory",
+      tools: "Tools",
+      principal: "Main",
+      home: "Home",
+      team: "Team",
+      more: "More",
+      codes: "Codes",
+      linenShort: "Linen",
+      found: "Found",
+      ia: "AI",
     },
     
     // Stats

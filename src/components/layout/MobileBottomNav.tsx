@@ -34,49 +34,49 @@ interface MobileBottomNavProps {
 
 interface NavItem {
   value: TabValue;
-  label: string;
-  shortLabel: string;
+  labelKey: keyof ReturnType<typeof useLanguage>['t']['dashboard'];
+  shortLabelKey: keyof ReturnType<typeof useLanguage>['t']['dashboard'];
   icon: React.ReactNode;
   premium?: boolean;
 }
 
-// Onglets principaux visibles en permanence
-const primaryItems: NavItem[] = [
-  { value: 'overview', label: 'Vue d\'ensemble', shortLabel: 'Accueil', icon: <Layers className="h-5 w-5" /> },
-  { value: 'rooms', label: 'Chambres', shortLabel: 'Chambres', icon: <Bed className="h-5 w-5" /> },
-  { value: 'assignment', label: 'Affectation', shortLabel: 'Équipe', icon: <UserIcon className="h-5 w-5" /> },
-];
-
-// Menu "Plus" organisé par catégorie
-const moreItems: { category: string; items: NavItem[] }[] = [
-  {
-    category: 'Opérations',
-    items: [
-      { value: 'access-codes', label: 'Codes d\'accès', shortLabel: 'Codes', icon: <Key className="h-5 w-5" />, premium: true },
-      { value: 'incidents', label: 'Incidents', shortLabel: 'Incidents', icon: <AlertTriangle className="h-5 w-5" />, premium: true },
-      { value: 'inspections', label: 'Inspections', shortLabel: 'Inspect.', icon: <ClipboardCheck className="h-5 w-5" />, premium: true },
-    ]
-  },
-  {
-    category: 'Inventaires',
-    items: [
-      { value: 'linen', label: 'Inventaire Linge', shortLabel: 'Linge', icon: <span className="text-lg">🧺</span>, premium: true },
-      { value: 'lost-found', label: 'Objets Trouvés', shortLabel: 'Trouvés', icon: <Package className="h-5 w-5" />, premium: true },
-    ]
-  },
-  {
-    category: 'Outils',
-    items: [
-      { value: 'reports', label: 'Rapports', shortLabel: 'Rapports', icon: <FileText className="h-5 w-5" /> },
-      { value: 'archives', label: 'Archives', shortLabel: 'Archives', icon: <Archive className="h-5 w-5" /> },
-      { value: 'training', label: 'Entraînement IA', shortLabel: 'IA', icon: <Brain className="h-5 w-5" /> },
-    ]
-  }
-];
-
 export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBottomNavProps) {
   const { t } = useLanguage();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+
+  // Onglets principaux visibles en permanence
+  const primaryItems: NavItem[] = [
+    { value: 'overview', labelKey: 'overview', shortLabelKey: 'home', icon: <Layers className="h-5 w-5" /> },
+    { value: 'rooms', labelKey: 'rooms', shortLabelKey: 'rooms', icon: <Bed className="h-5 w-5" /> },
+    { value: 'assignment', labelKey: 'assignment', shortLabelKey: 'team', icon: <UserIcon className="h-5 w-5" /> },
+  ];
+
+  // Menu "Plus" organisé par catégorie
+  const moreItems: { categoryKey: keyof ReturnType<typeof useLanguage>['t']['dashboard']; items: NavItem[] }[] = [
+    {
+      categoryKey: 'operations',
+      items: [
+        { value: 'access-codes', labelKey: 'accessCodes', shortLabelKey: 'codes', icon: <Key className="h-5 w-5" />, premium: true },
+        { value: 'incidents', labelKey: 'incidents', shortLabelKey: 'incidents', icon: <AlertTriangle className="h-5 w-5" />, premium: true },
+        { value: 'inspections', labelKey: 'inspections', shortLabelKey: 'inspections', icon: <ClipboardCheck className="h-5 w-5" />, premium: true },
+      ]
+    },
+    {
+      categoryKey: 'inventory',
+      items: [
+        { value: 'linen', labelKey: 'linenInventory', shortLabelKey: 'linenShort', icon: <span className="text-lg">🧺</span>, premium: true },
+        { value: 'lost-found', labelKey: 'lostAndFound', shortLabelKey: 'found', icon: <Package className="h-5 w-5" />, premium: true },
+      ]
+    },
+    {
+      categoryKey: 'tools',
+      items: [
+        { value: 'reports', labelKey: 'reports', shortLabelKey: 'reports', icon: <FileText className="h-5 w-5" /> },
+        { value: 'archives', labelKey: 'archives', shortLabelKey: 'archives', icon: <Archive className="h-5 w-5" /> },
+        { value: 'training', labelKey: 'aiTraining', shortLabelKey: 'ia', icon: <Brain className="h-5 w-5" /> },
+      ]
+    }
+  ];
 
   const handleTabChange = (tab: TabValue) => {
     onTabChange(tab);
@@ -85,6 +85,10 @@ export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBot
 
   const allSecondaryItems = moreItems.flatMap(cat => cat.items);
   const isSecondaryActive = allSecondaryItems.some(item => item.value === activeTab);
+
+  const getLabel = (key: keyof ReturnType<typeof useLanguage>['t']['dashboard']) => {
+    return t.dashboard[key] as string;
+  };
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border safe-area-inset-bottom">
@@ -101,7 +105,7 @@ export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBot
             )}
           >
             {item.icon}
-            <span className="text-[10px] font-medium">{item.shortLabel}</span>
+            <span className="text-[10px] font-medium">{getLabel(item.shortLabelKey)}</span>
           </button>
         ))}
         
@@ -117,19 +121,19 @@ export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBot
               )}
             >
               <MoreHorizontal className="h-5 w-5" />
-              <span className="text-[10px] font-medium">Plus</span>
+              <span className="text-[10px] font-medium">{t.dashboard.more}</span>
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="h-[65vh] rounded-t-2xl">
             <SheetHeader className="pb-4">
-              <SheetTitle>Menu</SheetTitle>
+              <SheetTitle>{t.dashboard.menu}</SheetTitle>
             </SheetHeader>
             <ScrollArea className="h-full pb-8">
               <div className="space-y-6 px-2">
                 {moreItems.map((category) => (
-                  <div key={category.category}>
+                  <div key={category.categoryKey}>
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                      {category.category}
+                      {getLabel(category.categoryKey)}
                     </p>
                     <div className="grid grid-cols-3 gap-3">
                       {category.items.map((item) => (
@@ -145,7 +149,7 @@ export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBot
                           )}
                         >
                           {item.icon}
-                          <span className="text-xs font-medium text-center">{item.shortLabel}</span>
+                          <span className="text-xs font-medium text-center">{getLabel(item.shortLabelKey)}</span>
                           {item.premium && !isPremium && (
                             <Badge variant="outline" className="text-[8px] px-1 py-0">PRO</Badge>
                           )}

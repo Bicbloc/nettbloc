@@ -81,16 +81,20 @@ export function useUserTypeGuard(expectedType: Exclude<UserType, null>): UserTyp
 
         console.log('🔐 Checking user type for:', email);
 
-        // Check all profile types in parallel
-        const [hotelResult, housekeeperResult, governessResult] = await Promise.all([
+        // Check all profile types in parallel (including technicians)
+        const [hotelResult, housekeeperResult, governessResult, technicianResult] = await Promise.all([
           supabase.from('hotels').select('id').eq('email', email).maybeSingle(),
           supabase.from('housekeeper_profiles').select('id').eq('email', email).maybeSingle(),
-          supabase.from('governess_profiles').select('id').eq('email', email).maybeSingle()
+          supabase.from('governess_profiles').select('id').eq('email', email).maybeSingle(),
+          supabase.from('technician_profiles').select('id').eq('email', email).maybeSingle()
         ]);
 
         let detectedType: UserType = null;
 
-        if (housekeeperResult.data) {
+        // Check technician first to prevent them from accessing other interfaces
+        if (technicianResult.data) {
+          detectedType = 'technician';
+        } else if (housekeeperResult.data) {
           detectedType = 'housekeeper';
         } else if (governessResult.data) {
           detectedType = 'governess';
