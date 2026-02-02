@@ -28,7 +28,7 @@ export default function GovernessAuth() {
     // Vérifier si déjà connecté
     const profile = localStorage.getItem('governess_profile');
     if (profile && !isRecoveryMode) {
-      navigate('/governess/dashboard');
+      navigate('/governess/hotels');
     }
   }, [navigate, isRecoveryMode]);
 
@@ -174,7 +174,7 @@ export default function GovernessAuth() {
             title: "Connexion réussie",
             description: `Bienvenue ${profileData.name}`
           });
-          navigate('/governess/dashboard');
+          navigate('/governess/hotels');
         } else {
           throw new Error("Profil gouvernante non trouvé. Créez d'abord un compte.");
         }

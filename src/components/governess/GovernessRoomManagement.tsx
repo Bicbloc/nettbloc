@@ -14,6 +14,7 @@ import {
   MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX, Package
 } from 'lucide-react';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
+import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 
 interface GovernessRoomManagementProps {
   hotelId: string;
@@ -261,6 +262,34 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
     }
   };
 
+  const handleSetClean = async (room: Room) => {
+    try {
+      await supabase
+        .from('rooms')
+        .update({ status: 'clean' })
+        .eq('id', room.id);
+
+      // Logger l'action
+      await supabase.from('daily_action_logs').insert({
+        hotel_id: hotelId,
+        action_type: 'set-clean',
+        description: `Chambre ${room.room_number} marquée comme propre`,
+        room_number: room.room_number,
+        actor_name: governessName,
+        actor_type: 'governess'
+      });
+
+      toast({ 
+        title: '✅ Chambre propre',
+        description: `Chambre ${room.room_number} marquée comme propre` 
+      });
+      loadData();
+    } catch (error) {
+      console.error('Erreur mise à jour statut:', error);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de mettre à jour le statut' });
+    }
+  };
+
   const openAssignDialog = (room: Room) => {
     setSelectedRoom(room);
     const existingAssignment = assignments.get(room.id);
@@ -465,7 +494,7 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
                   )}
 
                   {/* Actions */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -475,6 +504,19 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
                       <User className="h-4 w-4 mr-1" />
                       {assignment ? 'Réassigner' : 'Assigner'}
                     </Button>
+                    
+                    {/* Mettre en propre - visible si pas propre */}
+                    {room.status !== 'clean' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => handleSetClean(room)}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    )}
+                    
                     <Button
                       variant="outline"
                       size="sm"
@@ -482,6 +524,21 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
                     >
                       <MessageSquare className="h-4 w-4" />
                     </Button>
+                    
+                    {/* Incident */}
+                    <IncidentReportWizard
+                      hotelId={hotelId}
+                      userType="governess"
+                      userName={governessName}
+                      defaultLocation={room.room_number}
+                      trigger={
+                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                          <AlertCircle className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
+                    
+                    {/* Objet trouvé */}
                     <ReportLostItemDialog
                       hotelId={hotelId}
                       reporterName={governessName}
