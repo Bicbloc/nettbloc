@@ -9,13 +9,35 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Crown, LogOut, Building2, CheckCircle, AlertTriangle, Eye, Loader2, RefreshCw, Clock, XCircle, Home, Users, FileText } from 'lucide-react';
+import { 
+  Crown, 
+  LogOut, 
+  Building2, 
+  CheckCircle, 
+  AlertTriangle, 
+  Eye, 
+  Loader2, 
+  RefreshCw, 
+  Clock, 
+  XCircle, 
+  Home, 
+  Users, 
+  FileText,
+  Package,
+  Shirt,
+  ClipboardCheck
+} from 'lucide-react';
 import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
 import { GovernessRoomManagement } from '@/components/governess/GovernessRoomManagement';
 import { GovernessStaffPanel } from '@/components/governess/GovernessStaffPanel';
 import { GovernessActionLog } from '@/components/governess/GovernessActionLog';
-import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
+import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { IncidentList } from '@/components/incident/IncidentList';
+import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
+import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
+import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
+import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
+
 interface GovernessProfile {
   id: string;
   name: string;
@@ -49,14 +71,16 @@ export default function GovernessDashboard() {
     totalRooms: 0,
     cleanRooms: 0,
     inspectedRooms: 0,
-    pendingIncidents: 0
+    pendingIncidents: 0,
+    lostItems: 0
   });
   
-  // Dialog state for hotel code input
+  // Dialog states
   const [isHotelDialogOpen, setIsHotelDialogOpen] = useState(false);
   const [hotelCodeInput, setHotelCodeInput] = useState('');
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [hotelCodeError, setHotelCodeError] = useState<string | null>(null);
+  const [showLinenScanner, setShowLinenScanner] = useState(false);
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -161,13 +185,20 @@ export default function GovernessDashboard() {
         .from('incidents')
         .select('*', { count: 'exact', head: true })
         .eq('hotel_id', selectedHotel.id)
-        .in('status', ['open', 'in_progress']);
+        .in('status', ['open', 'in_progress', 'new']);
+
+      const { count: lostItems } = await supabase
+        .from('lost_and_found')
+        .select('*', { count: 'exact', head: true })
+        .eq('hotel_id', selectedHotel.id)
+        .in('status', ['pending', 'reported']);
 
       setStats({
         totalRooms: totalRooms || 0,
         cleanRooms: cleanRooms || 0,
         inspectedRooms: inspectedRooms || 0,
-        pendingIncidents: pendingIncidents || 0
+        pendingIncidents: pendingIncidents || 0,
+        lostItems: lostItems || 0
       });
     } catch (error) {
       console.error('Erreur chargement stats:', error);
@@ -216,7 +247,7 @@ export default function GovernessDashboard() {
       }
 
       if (data.error === 'hotel_not_found') {
-        setHotelCodeError(`Code "${hotelCodeInput.toUpperCase().trim()}" introuvable. Vérifiez auprès de l'établissement.`);
+        setHotelCodeError(`Code "${hotelCodeInput.toUpperCase().trim()}" introuvable.`);
         return;
       }
 
@@ -237,7 +268,7 @@ export default function GovernessDashboard() {
       if (data.status === 'request_pending') {
         toast({
           title: "Demande déjà en cours",
-          description: `Votre demande pour "${data.hotel.name}" est en attente de validation.`
+          description: `Votre demande pour "${data.hotel.name}" est en attente.`
         });
         setIsHotelDialogOpen(false);
         loadPendingRequests(profile.id);
@@ -247,7 +278,7 @@ export default function GovernessDashboard() {
       if (data.status === 'request_submitted') {
         toast({
           title: "Demande envoyée !",
-          description: `Votre demande d'accès à "${data.hotel.name}" a été soumise. L'établissement doit la valider.`
+          description: `Demande d'accès à "${data.hotel.name}" soumise.`
         });
         setIsHotelDialogOpen(false);
         loadPendingRequests(profile.id);
@@ -381,7 +412,7 @@ export default function GovernessDashboard() {
               <Clock className="h-12 w-12 mx-auto text-amber-500 mb-4" />
               <h2 className="text-lg font-semibold mb-2">Demandes en cours</h2>
               <p className="text-muted-foreground mb-4">
-                Vos demandes sont en attente de validation par les établissements.
+                Vos demandes sont en attente de validation.
               </p>
               <Button variant="outline" onClick={openHotelAccessDialog}>
                 <Building2 className="h-4 w-4 mr-2" />
@@ -391,57 +422,70 @@ export default function GovernessDashboard() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <Card className="p-3">
+                <div className="flex items-center gap-2">
                   <div className="bg-blue-100 p-2 rounded-full">
-                    <Building2 className="h-5 w-5 text-blue-600" />
+                    <Building2 className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats.totalRooms}</p>
+                    <p className="text-xl font-bold">{stats.totalRooms}</p>
                     <p className="text-xs text-muted-foreground">Chambres</p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
+              <Card className="p-3">
+                <div className="flex items-center gap-2">
                   <div className="bg-green-100 p-2 rounded-full">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats.cleanRooms}</p>
+                    <p className="text-xl font-bold">{stats.cleanRooms}</p>
                     <p className="text-xs text-muted-foreground">Propres</p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
+              <Card className="p-3">
+                <div className="flex items-center gap-2">
                   <div className="bg-amber-100 p-2 rounded-full">
-                    <Eye className="h-5 w-5 text-amber-600" />
+                    <Eye className="h-4 w-4 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats.inspectedRooms}</p>
+                    <p className="text-xl font-bold">{stats.inspectedRooms}</p>
                     <p className="text-xs text-muted-foreground">Inspectées</p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
+              <Card className="p-3">
+                <div className="flex items-center gap-2">
                   <div className="bg-red-100 p-2 rounded-full">
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{stats.pendingIncidents}</p>
+                    <p className="text-xl font-bold">{stats.pendingIncidents}</p>
                     <p className="text-xs text-muted-foreground">Incidents</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-3">
+                <div className="flex items-center gap-2">
+                  <div className="bg-purple-100 p-2 rounded-full">
+                    <Package className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold">{stats.lostItems}</p>
+                    <p className="text-xs text-muted-foreground">Objets</p>
                   </div>
                 </div>
               </Card>
             </div>
 
-            {/* Sélection hôtel si plusieurs */}
+            {/* Sélection hôtel */}
             {hotels.length > 1 && (
               <Card>
                 <CardHeader className="pb-3">
@@ -467,29 +511,42 @@ export default function GovernessDashboard() {
             {/* Tabs principal */}
             {selectedHotel && (
               <Tabs defaultValue="rooms" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="rooms" className="gap-2">
+                <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 h-auto">
+                  <TabsTrigger value="rooms" className="flex-col gap-1 py-2 text-xs">
                     <Home className="h-4 w-4" />
                     <span className="hidden sm:inline">Chambres</span>
                   </TabsTrigger>
-                  <TabsTrigger value="staff" className="gap-2">
-                    <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">Personnel</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="inspection" className="gap-2">
+                  <TabsTrigger value="inspection" className="flex-col gap-1 py-2 text-xs">
                     <Eye className="h-4 w-4" />
                     <span className="hidden sm:inline">Inspections</span>
                   </TabsTrigger>
-                  <TabsTrigger value="incidents" className="gap-2">
+                  <TabsTrigger value="incidents" className="flex-col gap-1 py-2 text-xs">
                     <AlertTriangle className="h-4 w-4" />
                     <span className="hidden sm:inline">Incidents</span>
                   </TabsTrigger>
-                  <TabsTrigger value="logs" className="gap-2">
+                  <TabsTrigger value="lost" className="flex-col gap-1 py-2 text-xs">
+                    <Package className="h-4 w-4" />
+                    <span className="hidden sm:inline">Objets</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="linen" className="flex-col gap-1 py-2 text-xs">
+                    <Shirt className="h-4 w-4" />
+                    <span className="hidden sm:inline">Linge</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="staff" className="flex-col gap-1 py-2 text-xs">
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Personnel</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="validate" className="flex-col gap-1 py-2 text-xs">
+                    <ClipboardCheck className="h-4 w-4" />
+                    <span className="hidden sm:inline">Validation</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="logs" className="flex-col gap-1 py-2 text-xs">
                     <FileText className="h-4 w-4" />
                     <span className="hidden sm:inline">Journal</span>
                   </TabsTrigger>
                 </TabsList>
 
+                {/* Chambres */}
                 <TabsContent value="rooms">
                   <Card>
                     <CardHeader>
@@ -507,29 +564,14 @@ export default function GovernessDashboard() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="staff">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Personnel</CardTitle>
-                      <CardDescription>
-                        Suivez l'activité de toutes les femmes de chambre
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <GovernessStaffPanel hotelId={selectedHotel.id} />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
+                {/* Inspections */}
                 <TabsContent value="inspection">
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle>Inspections des chambres</CardTitle>
-                          <CardDescription>
-                            Validez les chambres nettoyées
-                          </CardDescription>
+                          <CardDescription>Validez les chambres nettoyées</CardDescription>
                         </div>
                         <Button variant="outline" size="sm" onClick={loadStats}>
                           <RefreshCw className="h-4 w-4 mr-2" />
@@ -547,19 +589,21 @@ export default function GovernessDashboard() {
                   </Card>
                 </TabsContent>
 
+                {/* Incidents */}
                 <TabsContent value="incidents">
                   <Card>
                     <CardHeader>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
                           <CardTitle>Gestion des incidents</CardTitle>
-                          <CardDescription>
-                            Signalez et suivez les incidents
-                          </CardDescription>
+                          <CardDescription>Signalez et suivez les incidents</CardDescription>
                         </div>
-                        <IncidentReportDialogSimple 
+                        <IncidentReportWizard 
                           hotelId={selectedHotel.id}
-                          userType="admin"
+                          userType="governess"
+                          userName={profile.name}
+                          userId={profile.id}
+                          onSuccess={loadStats}
                         />
                       </div>
                     </CardHeader>
@@ -569,13 +613,93 @@ export default function GovernessDashboard() {
                   </Card>
                 </TabsContent>
 
+                {/* Objets trouvés */}
+                <TabsContent value="lost">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <CardTitle>Objets trouvés</CardTitle>
+                          <CardDescription>Déclarez et gérez les objets perdus</CardDescription>
+                        </div>
+                        <ReportLostItemDialog
+                          hotelId={selectedHotel.id}
+                          reporterName={profile.name}
+                          reporterType="governess"
+                        />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <LostAndFoundList hotelId={selectedHotel.id} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Inventaire Linge */}
+                <TabsContent value="linen">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <CardTitle>Inventaire du linge</CardTitle>
+                          <CardDescription>Scanner et compter le linge</CardDescription>
+                        </div>
+                        <Button onClick={() => setShowLinenScanner(true)}>
+                          <Shirt className="h-4 w-4 mr-2" />
+                          Scanner le linge
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground text-sm mb-4">
+                        Utilisez le scanner IA pour compter automatiquement les piles de linge.
+                      </p>
+                      {showLinenScanner && (
+                        <LinenQuickInventory
+                          taskId={`temp-governess-${Date.now()}`}
+                          hotelId={selectedHotel.id}
+                          onClose={() => setShowLinenScanner(false)}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Personnel */}
+                <TabsContent value="staff">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Personnel</CardTitle>
+                      <CardDescription>Suivez l'activité des femmes de chambre</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <GovernessStaffPanel hotelId={selectedHotel.id} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Validation inventaire */}
+                <TabsContent value="validate">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Validation des inventaires</CardTitle>
+                      <CardDescription>Vérifiez et validez les comptages de linge</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <AdminLinenInventory 
+                        hotelId={selectedHotel.id} 
+                        hotelName={selectedHotel.name}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* Journal */}
                 <TabsContent value="logs">
                   <Card>
                     <CardHeader>
                       <CardTitle>Journal d'actions</CardTitle>
-                      <CardDescription>
-                        Historique des actions des femmes de chambre
-                      </CardDescription>
+                      <CardDescription>Historique des actions du personnel</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <GovernessActionLog hotelId={selectedHotel.id} />
@@ -596,7 +720,7 @@ export default function GovernessDashboard() {
         )}
       </main>
 
-      {/* Dialog intégré pour le code hôtel */}
+      {/* Dialog code hôtel */}
       <Dialog open={isHotelDialogOpen} onOpenChange={setIsHotelDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
