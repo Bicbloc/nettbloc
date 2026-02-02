@@ -1,151 +1,188 @@
 
 
-# Plan d'Optimisation : Scanner Linge Ultra-Performant
+# Plan : Amélioration Interface Admin Inventaire Linge
 
-## Analyse du Système Actuel
+## Objectif
 
-Le système actuel effectue les opérations suivantes en boucle :
-1. Capture frame vidéo → compression JPEG (50%)
-2. Appel API Edge Function (~1.5s par détection)
-3. Traitement IA Gemini (variable selon le modèle)
-4. Analyse de stabilité (3 frames = ~4.5 secondes)
+Refondre l'interface "Saisie & Validation" pour :
+1. **Afficher les images** prises lors du scan pour chaque type de linge
+2. **Organiser par date** avec une vue calendrier/liste de dates
+3. **Vue détaillée par date** : cliquer sur une date affiche tous les inventaires du jour
+4. **Télécharger un rapport PDF** de la journée complète
 
-**Problèmes identifiés :**
-- Latence API trop élevée entre chaque détection (~1.5s)
-- Compression image à 50% réduit les détails
-- Modèle `gemini-2.5-flash-lite` en mode détection peut manquer de précision
-- 3 frames stables = 4.5s d'attente minimum
-- Pas de pré-traitement d'image côté client
+## Analyse Technique
 
-## Optimisations Proposées
+### Données Existantes
+- Table `linen_inventory_entries` contient déjà `photo_url` 
+- Bucket `linen-images` est configuré et public
+- Les images sont déjà uploadées lors du scan mais non affichées
 
-### 1. Architecture Bi-Phase (Détection Rapide + Validation Précise)
+### Architecture Actuelle
+L'interface liste simplement toutes les tâches sans regroupement par date.
+
+## Nouvelle Architecture UI
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    NOUVELLE ARCHITECTURE                         │
+│  NIVEAU 1: LISTE DES DATES                                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  PHASE 1: DÉTECTION RAPIDE (Local + IA Lite)                    │
-│  ┌─────────────────┐      ┌─────────────────┐                   │
-│  │ Pré-traitement  │─────▶│ Gemini Flash    │                   │
-│  │ Client (WebGL)  │      │ Lite (300ms)    │                   │
-│  └─────────────────┘      └─────────────────┘                   │
-│         │                         │                             │
-│         ▼                         ▼                             │
-│  • Détection bords          • Présence pile?                    │
-│  • Estimation taille        • Estimation count                  │
-│  • Qualité image            • Type probable                     │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 📅 Lundi 3 Février 2026                                 │    │
+│  │ • 3 tâches | 156 pièces comptées | ✅ Validé            │    │
+│  │                                   [Voir] [📥 Rapport]   │    │
+│  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
-│  PHASE 2: VALIDATION PRÉCISE (IA Pro)                           │
-│  ┌─────────────────┐      ┌─────────────────┐                   │
-│  │ Capture HD      │─────▶│ Gemini Pro      │                   │
-│  │ (85% quality)   │      │ (précis)        │                   │
-│  └─────────────────┘      └─────────────────┘                   │
-│                                   │                             │
-│                                   ▼                             │
-│                           Résultat final                        │
-│                           Confiance 95%+                        │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 📅 Dimanche 2 Février 2026                              │    │
+│  │ • 2 tâches | 98 pièces comptées | ⏳ En attente         │    │
+│  │                                   [Voir] [📥 Rapport]   │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  NIVEAU 2: DÉTAIL D'UNE JOURNÉE (Clic sur "Voir")               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  📅 Lundi 3 Février 2026                   [📥 Télécharger PDF] │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 🧻 Serviettes de bain                                   │    │
+│  │ ┌──────────┐                                            │    │
+│  │ │  [IMAGE] │  Propre: 45 | Sale: 12 | Abîmé: 2          │    │
+│  │ │          │  Confiance IA: 94%                         │    │
+│  │ └──────────┘  Par: Marie • 10:32                        │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 🛏️ Draps                                                │    │
+│  │ ┌──────────┐                                            │    │
+│  │ │  [IMAGE] │  Propre: 23 | Sale: 5 | Abîmé: 1           │    │
+│  │ │          │  Confiance IA: 87%                         │    │
+│  │ └──────────┘  Par: Sophie • 11:15                       │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Optimisations Techniques Détaillées
+## Modifications à Effectuer
 
-| Optimisation | Avant | Après | Impact |
-|--------------|-------|-------|--------|
-| Intervalle détection | 1.5s | 0.8s | -47% latence |
-| Frames stables requis | 3 | 2 | -33% temps stabilisation |
-| Compression capture | 50% | 70% live / 90% final | +qualité |
-| Modèle détection | flash-lite | flash-lite optimisé | idem |
-| Modèle validation | flash | flash (pro si règle) | +précision |
-| Pré-traitement client | Non | Oui (Canvas API) | +qualité image |
+### 1. Refonte `AdminLinenInventory.tsx`
 
-### 3. Améliorations Edge Function
+| Section | Modification |
+|---------|-------------|
+| Structure principale | Ajouter un état `selectedDate` pour la navigation par date |
+| Liste des tâches | Regrouper par `task_date` au lieu de lister individuellement |
+| Vue date | Nouvelle vue en tableau avec images et détails |
+| Dialogue détail | Afficher les photos pour chaque type de linge |
 
-**Nouvelle logique de sélection de modèle :**
-- `quickDetect` mode : `gemini-2.5-flash-lite` avec prompt minimaliste
-- Validation standard : `gemini-2.5-flash` avec prompt complet
-- Mode règle : `gemini-2.5-pro` pour calcul précis
+**Composants UI à ajouter :**
+- `DateGroupCard` : Carte résumant une journée d'inventaire
+- `DailyInventoryTable` : Tableau détaillé avec images par type de linge
+- `LinenEntryWithImage` : Ligne du tableau avec miniature cliquable
 
-**Réduction des tokens :**
-- Live detection prompt : 50 tokens max
-- Validation prompt : 300 tokens max (vs 500 actuellement)
+### 2. Nouveau Composant : `LinenDailyReportDownload.tsx`
 
-### 4. Pré-traitement Image Côté Client
+Génération d'un rapport PDF pour une journée :
+- En-tête avec date et nom de l'hôtel
+- Tableau récapitulatif par type de linge
+- Images miniatures intégrées
+- Totaux et statistiques
 
-Avant envoi à l'API :
-1. **Contraste automatique** : Améliore la distinction des couches
-2. **Détection de bords** : Estime le contour de la pile
-3. **Correction luminosité** : Compense les conditions d'éclairage
-4. **Recadrage intelligent** : Focus sur la zone d'intérêt
+### 3. Amélioration Affichage Images
 
-### 5. Mode "Snap Instant"
+Dans le dialogue de détail :
+- Afficher la miniature de l'image (si `photo_url` existe)
+- Clic sur l'image = modal plein écran
+- Badge de confiance IA coloré
+- Horodatage de la capture
 
-Pour les utilisateurs pressés :
-- 1 seule détection rapide (pas de stabilisation)
-- Validation manuelle du résultat
-- Option "+1/-1" pour correction rapide
+## Structure des Données
 
-## Fichiers à Modifier
+Regroupement des tâches par date :
 
-| Fichier | Modifications |
-|---------|---------------|
-| `supabase/functions/count-linen/index.ts` | Nouveau mode `quickDetect`, prompts optimisés, timeouts réduits |
-| `src/components/linen/LinenCameraScanner.tsx` | Intervalle 800ms, 2 frames stables, pré-traitement canvas |
-| `src/components/linen/LinenDetectionOverlay.tsx` | Affichage temps restant, indicateur qualité image |
-| `src/utils/imageProcessing.ts` (nouveau) | Fonctions pré-traitement (contraste, luminosité, crop) |
-
-## Paramètres de Stabilisation Optimisés
-
-```text
-AVANT:
-- Intervalle détection: 1500ms
-- Frames stables: 3
-- Temps total minimum: 4.5 secondes
-
-APRÈS:
-- Intervalle détection: 800ms
-- Frames stables: 2
-- Tolérance confiance: 0.12 (vs 0.15)
-- Temps total minimum: 1.6 secondes
+```typescript
+interface DailyInventorySummary {
+  date: string;                    // YYYY-MM-DD
+  tasks: Task[];                   // Toutes les tâches du jour
+  totalPieces: number;             // Total de pièces comptées
+  entriesWithPhotos: number;       // Nombre d'entrées avec photos
+  overallStatus: 'pending' | 'in_progress' | 'completed' | 'validated';
+}
 ```
 
-## Prompts IA Optimisés
+## Fichiers à Modifier/Créer
 
-**Prompt Détection Rapide (quickDetect) - 30 tokens :**
+| Fichier | Action | Description |
+|---------|--------|-------------|
+| `src/components/linen/AdminLinenInventory.tsx` | Modifier | Refonte complète avec vue par dates |
+| `src/components/linen/LinenDailyReport.tsx` | Créer | Composant rapport journalier avec images |
+| `src/components/linen/LinenImageViewer.tsx` | Créer | Modal pour visualiser les images en plein écran |
+
+## Détails d'Implémentation
+
+### Regroupement par Date
+
+```typescript
+// Regrouper les tâches par date
+const tasksByDate = useMemo(() => {
+  const grouped: Record<string, Task[]> = {};
+  tasks.forEach(task => {
+    const date = task.task_date;
+    if (!grouped[date]) grouped[date] = [];
+    grouped[date].push(task);
+  });
+  // Trier par date décroissante
+  return Object.entries(grouped)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, tasks]) => ({
+      date,
+      tasks,
+      totalPieces: tasks.reduce((sum, t) => sum + getTotalForTask(t), 0),
+      entriesWithPhotos: tasks.flatMap(t => t.linen_inventory_entries || [])
+        .filter(e => e.photo_url).length
+    }));
+}, [tasks]);
 ```
-Pile de linge visible? JSON: {"pile":bool,"count":N,"confidence":0-1}
+
+### Affichage Image avec Fallback
+
+```tsx
+{entry.photo_url ? (
+  <img 
+    src={entry.photo_url} 
+    alt={linenType.name}
+    className="w-16 h-16 object-cover rounded cursor-pointer"
+    onClick={() => openImageViewer(entry.photo_url)}
+  />
+) : (
+  <div className="w-16 h-16 bg-muted rounded flex items-center justify-center">
+    <Camera className="h-6 w-6 text-muted-foreground" />
+  </div>
+)}
 ```
 
-**Prompt Validation - 150 tokens :**
-Focus sur le comptage précis des strates avec les règles d'or existantes mais format condensé.
+### Génération Rapport PDF
 
-## Indicateurs de Qualité Image (Nouveau)
+Utilisation de `html2pdf.js` (déjà installé) pour générer un rapport :
+- Date et nom de l'hôtel en en-tête
+- Tableau avec colonnes : Type, Image, Propre, Sale, Abîmé, Total, Opérateur, Heure
+- Signature/footer avec horodatage de génération
 
-Le système évaluera en temps réel :
-- **Netteté** : Détection flou de bougé
-- **Luminosité** : Trop sombre / surexposé
-- **Cadrage** : Pile centrée dans le cadre
+## Résumé des Gains UX
 
-Affichage de conseils contextuels :
-- "🔆 Ajoutez de la lumière"
-- "📷 Rapprochez-vous"
-- "✋ Stabilisez le téléphone"
+| Avant | Après |
+|-------|-------|
+| Liste plate de toutes les tâches | Vue organisée par dates |
+| Pas de visualisation d'images | Images miniatures + vue plein écran |
+| Pas de rapport téléchargeable | Bouton "Télécharger PDF" par jour |
+| Navigation confuse | Clic sur date → détail du jour |
 
-## Résumé des Gains Attendus
+## Étapes d'Implémentation
 
-| Métrique | Actuel | Objectif |
-|----------|--------|----------|
-| Temps stabilisation | 4.5s | 1.6s |
-| Temps total (scan → résultat) | 6-8s | 2-3s |
-| Précision comptage | ~85% | 95%+ |
-| Consommation API | 100% | 70% |
-
-## Implémentation par Priorité
-
-1. **Haute** : Réduire intervalle détection + frames stables
-2. **Haute** : Optimiser prompts Edge Function
-3. **Moyenne** : Pré-traitement image client
-4. **Moyenne** : Indicateurs qualité image
-5. **Basse** : Mode "Snap Instant"
+1. **Refonte AdminLinenInventory.tsx** : Ajouter regroupement par date et navigation
+2. **Créer LinenImageViewer.tsx** : Modal pour visualiser images plein écran
+3. **Créer LinenDailyReport.tsx** : Génération et téléchargement du rapport PDF
+4. **Mise à jour des requêtes** : S'assurer que `photo_url` est bien récupéré dans les requêtes
 
