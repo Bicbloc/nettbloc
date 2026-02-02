@@ -13,14 +13,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -42,9 +34,12 @@ import {
   ArrowRight, 
   ArrowLeft,
   Check,
-  Image as ImageIcon,
   FileText,
-  Send
+  Send,
+  MapPin,
+  Wrench,
+  Tag,
+  Users
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
@@ -69,7 +64,19 @@ interface IncidentReportWizardProps {
   onSuccess?: () => void;
 }
 
-type WizardStep = 'photo' | 'analysis' | 'form' | 'confirm';
+// Step-by-step wizard: Photo → AI → Location → Item → Type → Title → Assignment → Description → Confirm
+type WizardStep = 
+  | 'photo' 
+  | 'analysis' 
+  | 'location' 
+  | 'item' 
+  | 'type' 
+  | 'title' 
+  | 'assignment' 
+  | 'description' 
+  | 'confirm';
+
+const STEPS: WizardStep[] = ['photo', 'analysis', 'location', 'item', 'type', 'title', 'assignment', 'description', 'confirm'];
 
 export function IncidentReportWizard({
   hotelId,
@@ -235,7 +242,7 @@ export function IncidentReportWizard({
       });
     } finally {
       setIsAnalyzing(false);
-      setCurrentStep('form');
+      setCurrentStep('location');
     }
   };
 
@@ -309,7 +316,7 @@ export function IncidentReportWizard({
 
   // Skip AI analysis
   const skipAnalysis = () => {
-    setCurrentStep('form');
+    setCurrentStep('location');
   };
 
   // Create incident mutation
@@ -418,23 +425,56 @@ export function IncidentReportWizard({
     },
   });
 
-  const getStepProgress = () => {
-    switch (currentStep) {
-      case 'photo': return 25;
-      case 'analysis': return 50;
-      case 'form': return 75;
-      case 'confirm': return 100;
-      default: return 0;
+  // Navigation
+  const getStepIndex = () => STEPS.indexOf(currentStep);
+  const getStepProgress = () => ((getStepIndex() + 1) / STEPS.length) * 100;
+
+  const goNext = () => {
+    const idx = getStepIndex();
+    if (idx < STEPS.length - 1) {
+      // Skip analysis step if no image
+      if (STEPS[idx + 1] === 'analysis' && !selectedImage) {
+        setCurrentStep('location');
+      } else {
+        setCurrentStep(STEPS[idx + 1]);
+      }
     }
   };
 
-  const getStepTitle = () => {
+  const goBack = () => {
+    const idx = getStepIndex();
+    if (idx > 0) {
+      // Skip analysis step when going back
+      if (STEPS[idx - 1] === 'analysis') {
+        setCurrentStep('photo');
+      } else {
+        setCurrentStep(STEPS[idx - 1]);
+      }
+    }
+  };
+
+  const getStepConfig = () => {
     switch (currentStep) {
-      case 'photo': return 'Étape 1 : Prendre une photo';
-      case 'analysis': return 'Étape 2 : Analyse IA en cours...';
-      case 'form': return 'Étape 3 : Vérifier et compléter';
-      case 'confirm': return 'Étape 4 : Confirmation';
-      default: return '';
+      case 'photo':
+        return { icon: Camera, title: "Photo de l'incident", subtitle: "Prenez une photo pour l'analyse IA" };
+      case 'analysis':
+        return { icon: Sparkles, title: "Analyse IA", subtitle: "Identification automatique..." };
+      case 'location':
+        return { icon: MapPin, title: "Où est le problème ?", subtitle: "Sélectionnez la chambre ou le lieu" };
+      case 'item':
+        return { icon: Tag, title: "Quel élément ?", subtitle: "Identifiez l'élément concerné" };
+      case 'type':
+        return { icon: Wrench, title: "Type de problème", subtitle: "Quel type d'intervention ?" };
+      case 'title':
+        return { icon: FileText, title: "Titre du signalement", subtitle: "Décrivez brièvement le problème" };
+      case 'assignment':
+        return { icon: Users, title: "Assigner à", subtitle: "Quel service doit intervenir ? (optionnel)" };
+      case 'description':
+        return { icon: FileText, title: "Détails supplémentaires", subtitle: "Informations complémentaires (optionnel)" };
+      case 'confirm':
+        return { icon: Check, title: "Confirmation", subtitle: "Vérifiez et envoyez" };
+      default:
+        return { icon: AlertTriangle, title: "", subtitle: "" };
     }
   };
 
@@ -451,6 +491,21 @@ export function IncidentReportWizard({
     return types?.find((t: any) => t.id === typeId)?.name || '';
   };
 
+  const canProceed = () => {
+    switch (currentStep) {
+      case 'location': return !!form.watch('location_reference');
+      case 'item': return !!form.watch('item_id');
+      case 'type': return !!form.watch('type_id');
+      case 'title': return form.watch('title')?.length >= 3;
+      case 'assignment': return true; // Optional
+      case 'description': return true; // Optional
+      default: return true;
+    }
+  };
+
+  const stepConfig = getStepConfig();
+  const StepIcon = stepConfig.icon;
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -461,426 +516,348 @@ export function IncidentReportWizard({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-hidden flex flex-col p-0">
-        {/* Header avec progression */}
+      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0">
+        {/* Header compact */}
         <div className="p-4 border-b bg-muted/30">
           <DialogHeader className="pb-2">
             <DialogTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              {getStepTitle()}
+              <StepIcon className="h-5 w-5 text-primary" />
+              {stepConfig.title}
             </DialogTitle>
+            <p className="text-sm text-muted-foreground">{stepConfig.subtitle}</p>
           </DialogHeader>
-          <Progress value={getStepProgress()} className="h-2" />
-          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-            <span className={currentStep === 'photo' ? 'text-primary font-medium' : ''}>📷 Photo</span>
-            <span className={currentStep === 'analysis' ? 'text-primary font-medium' : ''}>🤖 IA</span>
-            <span className={currentStep === 'form' ? 'text-primary font-medium' : ''}>📝 Détails</span>
-            <span className={currentStep === 'confirm' ? 'text-primary font-medium' : ''}>✅ Envoi</span>
-          </div>
+          <Progress value={getStepProgress()} className="h-1.5 mt-3" />
+          <p className="text-xs text-muted-foreground mt-1 text-right">
+            Étape {getStepIndex() + 1} / {STEPS.length}
+          </p>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
-          {/* ÉTAPE 1: Photo */}
-          {currentStep === 'photo' && (
-            <div className="space-y-4">
-              <Card className="p-6 border-dashed border-2 text-center">
-                {imagePreview ? (
-                  <div className="relative inline-block">
+        <ScrollArea className="flex-1">
+          <div className="p-4">
+            {/* AI Banner if available */}
+            {aiSuggestion && currentStep !== 'photo' && currentStep !== 'analysis' && currentStep !== 'confirm' && (
+              <Card className="p-2 mb-4 bg-primary/5 border-primary/20">
+                <div className="flex items-center gap-2 text-xs">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  <span className="text-primary font-medium">IA</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(aiSuggestion.confidence * 100)}%
+                  </Badge>
+                </div>
+              </Card>
+            )}
+
+            {/* Image preview compact */}
+            {imagePreview && currentStep !== 'photo' && currentStep !== 'analysis' && (
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg mb-4">
+                <img src={imagePreview} alt="Photo" className="h-10 w-10 object-cover rounded" />
+                <span className="text-xs text-muted-foreground">Photo jointe</span>
+              </div>
+            )}
+
+            {/* STEP: Photo */}
+            {currentStep === 'photo' && (
+              <div className="space-y-4">
+                <Card className="p-8 border-dashed border-2 text-center">
+                  {imagePreview ? (
+                    <div className="relative inline-block">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="max-h-48 rounded-lg mx-auto"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setImagePreview(null);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer block">
+                      <Camera className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
+                      <p className="font-medium">Prenez une photo</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        L'IA identifiera automatiquement le problème
+                      </p>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleImageSelect}
+                      />
+                    </label>
+                  )}
+                </Card>
+
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost" 
+                    className="flex-1"
+                    onClick={skipAnalysis}
+                  >
+                    Passer
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  {selectedImage && (
+                    <Button 
+                      className="flex-1"
+                      onClick={analyzeImage}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Analyser
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STEP: Analysis */}
+            {currentStep === 'analysis' && (
+              <div className="text-center py-12 space-y-4">
+                <div className="relative inline-block">
+                  {imagePreview && (
                     <img 
                       src={imagePreview} 
-                      alt="Preview" 
-                      className="max-h-48 rounded-lg mx-auto"
+                      alt="Analyse" 
+                      className="max-h-32 rounded-lg mx-auto opacity-50"
                     />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                      onClick={() => {
-                        setSelectedImage(null);
-                        setImagePreview(null);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                  </div>
+                </div>
+                <p className="font-medium">Analyse en cours...</p>
+              </div>
+            )}
+
+            {/* STEP: Location */}
+            {currentStep === 'location' && (
+              <div className="space-y-4">
+                {registeredRooms && registeredRooms.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {registeredRooms.map((room) => (
+                      <Button
+                        key={room.id}
+                        variant={form.watch('location_reference') === room.room_number ? "default" : "outline"}
+                        className="h-14 text-lg font-bold"
+                        onClick={() => form.setValue('location_reference', room.room_number)}
+                      >
+                        {room.room_number}
+                      </Button>
+                    ))}
                   </div>
                 ) : (
-                  <label className="cursor-pointer block">
-                    <div className="py-8">
-                      <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                      <p className="font-medium">Prendre une photo de l'incident</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        L'IA analysera automatiquement l'image
-                      </p>
-                    </div>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={handleImageSelect}
-                    />
-                  </label>
+                  <Input 
+                    placeholder="Numéro de chambre ou lieu..." 
+                    value={form.watch('location_reference')}
+                    onChange={(e) => form.setValue('location_reference', e.target.value)}
+                    className="h-14 text-lg text-center"
+                  />
                 )}
-              </Card>
+              </div>
+            )}
 
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={skipAnalysis}
-                >
-                  Passer cette étape
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-                {selectedImage && (
-                  <Button 
-                    className="flex-1"
-                    onClick={analyzeImage}
+            {/* STEP: Item */}
+            {currentStep === 'item' && (
+              <div className="space-y-3">
+                {categoriesWithItems?.map((category) => (
+                  <div key={category.id}>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      {category.icon} {category.name}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {category.items.map((item: any) => (
+                        <Button
+                          key={item.id}
+                          variant={form.watch('item_id') === item.id ? "default" : "outline"}
+                          className="h-12 justify-start text-left"
+                          onClick={() => form.setValue('item_id', item.id)}
+                        >
+                          {item.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* STEP: Type */}
+            {currentStep === 'type' && (
+              <div className="grid grid-cols-1 gap-2">
+                {types?.map((type) => (
+                  <Button
+                    key={type.id}
+                    variant={form.watch('type_id') === type.id ? "default" : "outline"}
+                    className="h-14 justify-start text-left gap-3"
+                    onClick={() => form.setValue('type_id', type.id)}
                   >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Analyser avec l'IA
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: type.color || '#gray' }}
+                    />
+                    <span className="font-medium">{type.name}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {/* STEP: Title */}
+            {currentStep === 'title' && (
+              <div className="space-y-4">
+                <Input 
+                  placeholder="Ex: WC bouché, Ampoule grillée..." 
+                  value={form.watch('title')}
+                  onChange={(e) => form.setValue('title', e.target.value)}
+                  className="h-14 text-lg"
+                  autoFocus
+                />
+                {aiSuggestion?.suggested_title && form.watch('title') !== aiSuggestion.suggested_title && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2"
+                    onClick={() => form.setValue('title', aiSuggestion.suggested_title)}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Utiliser la suggestion IA: "{aiSuggestion.suggested_title}"
                   </Button>
                 )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* ÉTAPE 2: Analyse IA */}
-          {currentStep === 'analysis' && (
-            <div className="text-center py-12 space-y-4">
-              <div className="relative inline-block">
-                {imagePreview && (
-                  <img 
-                    src={imagePreview} 
-                    alt="Analyse" 
-                    className="max-h-32 rounded-lg mx-auto opacity-50"
-                  />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                </div>
+            {/* STEP: Assignment */}
+            {currentStep === 'assignment' && (
+              <div className="space-y-2">
+                <Button
+                  variant={!form.watch('assigned_to_role_id') ? "default" : "outline"}
+                  className="w-full h-12 justify-start"
+                  onClick={() => form.setValue('assigned_to_role_id', '')}
+                >
+                  Aucune assignation
+                </Button>
+                {staffRoles?.map((role) => (
+                  <Button
+                    key={role.id}
+                    variant={form.watch('assigned_to_role_id') === role.id ? "default" : "outline"}
+                    className="w-full h-12 justify-start"
+                    onClick={() => form.setValue('assigned_to_role_id', role.id)}
+                  >
+                    {role.name}
+                  </Button>
+                ))}
               </div>
-              <div>
-                <p className="font-medium">Analyse en cours...</p>
-                <p className="text-sm text-muted-foreground">
-                  L'IA identifie l'élément et le type de problème
-                </p>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* ÉTAPE 3: Formulaire pré-rempli */}
-          {currentStep === 'form' && (
-            <div className="space-y-4">
-              {/* Rapport IA */}
-              {aiSuggestion && (
-                <Card className="p-3 bg-primary/5 border-primary/20">
-                  <div className="flex items-center gap-2 text-sm font-medium text-primary mb-2">
-                    <Sparkles className="h-4 w-4" />
-                    Rapport IA
-                    <Badge variant="secondary" className="ml-auto">
-                      {Math.round(aiSuggestion.confidence * 100)}% confiance
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Catégorie:</span>
-                      <span className="ml-1 font-medium">{aiSuggestion.category}</span>
+            {/* STEP: Description */}
+            {currentStep === 'description' && (
+              <div className="space-y-4">
+                <Textarea
+                  placeholder="Informations supplémentaires (optionnel)..."
+                  value={form.watch('description')}
+                  onChange={(e) => form.setValue('description', e.target.value)}
+                  rows={4}
+                  className="resize-none text-base"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* STEP: Confirm */}
+            {currentStep === 'confirm' && (
+              <div className="space-y-4">
+                <Card className="p-4 space-y-3">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Récapitulatif
+                  </h4>
+                  
+                  {imagePreview && (
+                    <img src={imagePreview} alt="Photo" className="w-full h-32 object-cover rounded-lg" />
+                  )}
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-1 border-b">
+                      <span className="text-muted-foreground">Chambre:</span>
+                      <span className="font-medium">{form.getValues('location_reference')}</span>
                     </div>
-                    <div>
+                    <div className="flex justify-between py-1 border-b">
                       <span className="text-muted-foreground">Élément:</span>
-                      <span className="ml-1 font-medium">{aiSuggestion.item}</span>
+                      <span className="font-medium">{getItemName(form.getValues('item_id'))}</span>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Problème:</span>
-                      <span className="ml-1 font-medium">{aiSuggestion.problem_type}</span>
+                    <div className="flex justify-between py-1 border-b">
+                      <span className="text-muted-foreground">Type:</span>
+                      <span className="font-medium">{getTypeName(form.getValues('type_id'))}</span>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Sévérité:</span>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          aiSuggestion.severity === 'high' ? 'border-red-300 text-red-700' :
-                          aiSuggestion.severity === 'medium' ? 'border-orange-300 text-orange-700' :
-                          'border-green-300 text-green-700'
-                        }
-                      >
-                        {aiSuggestion.severity}
-                      </Badge>
+                    <div className="flex justify-between py-1 border-b">
+                      <span className="text-muted-foreground">Titre:</span>
+                      <span className="font-medium">{form.getValues('title')}</span>
                     </div>
+                    {form.getValues('assigned_to_role_id') && (
+                      <div className="flex justify-between py-1 border-b">
+                        <span className="text-muted-foreground">Assigné à:</span>
+                        <span className="font-medium">
+                          {staffRoles?.find(r => r.id === form.getValues('assigned_to_role_id'))?.name}
+                        </span>
+                      </div>
+                    )}
+                    {form.getValues('description') && (
+                      <div className="pt-1">
+                        <span className="text-muted-foreground">Détails:</span>
+                        <p className="mt-1 text-xs bg-muted p-2 rounded">
+                          {form.getValues('description')}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </Card>
-              )}
-
-              {/* Image miniature */}
-              {imagePreview && (
-                <div className="flex items-center gap-3 p-2 bg-muted rounded-lg">
-                  <img src={imagePreview} alt="Photo" className="h-12 w-12 object-cover rounded" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Photo jointe</p>
-                    <p className="text-xs text-muted-foreground">Sera envoyée avec l'incident</p>
-                  </div>
-                </div>
-              )}
-
-              <Form {...form}>
-                <form className="space-y-3">
-                  {/* Titre */}
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Titre *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ex: WC bouché" {...field} className="h-10" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Élément */}
-                    <FormField
-                      control={form.control}
-                      name="item_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">Élément *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Sélectionner..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="max-h-[200px]">
-                              {categoriesWithItems?.map((category) => (
-                                <div key={category.id}>
-                                  <div className="px-2 py-1 text-xs font-semibold text-muted-foreground bg-muted/50">
-                                    {category.icon} {category.name}
-                                  </div>
-                                  {category.items.map((item: any) => (
-                                    <SelectItem key={item.id} value={item.id} className="pl-5">
-                                      {item.name}
-                                    </SelectItem>
-                                  ))}
-                                </div>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Type */}
-                    <FormField
-                      control={form.control}
-                      name="type_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">Type *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Sélectionner..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {types?.map((type) => (
-                                <SelectItem key={type.id} value={type.id}>
-                                  <div className="flex items-center gap-2">
-                                    <div
-                                      className="w-2.5 h-2.5 rounded-full"
-                                      style={{ backgroundColor: type.color || '#gray' }}
-                                    />
-                                    {type.name}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Chambre */}
-                    <FormField
-                      control={form.control}
-                      name="location_reference"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">Chambre *</FormLabel>
-                          {registeredRooms && registeredRooms.length > 0 ? (
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger className="h-10">
-                                  <SelectValue placeholder="N°..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent className="max-h-[200px]">
-                                {registeredRooms.map((room) => (
-                                  <SelectItem key={room.id} value={room.room_number}>
-                                    {room.room_number}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <FormControl>
-                              <Input placeholder="101..." {...field} className="h-10" />
-                            </FormControl>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Assigner */}
-                    <FormField
-                      control={form.control}
-                      name="assigned_to_role_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm">Assigner</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Service..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {staffRoles?.map((role) => (
-                                <SelectItem key={role.id} value={role.id}>
-                                  {role.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Détails (optionnel)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Informations supplémentaires..."
-                            {...field}
-                            rows={2}
-                            className="resize-none"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </form>
-              </Form>
-
-              <div className="flex gap-2 pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setCurrentStep('photo')}
-                  className="flex-1"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Retour
-                </Button>
-                <Button 
-                  onClick={() => setCurrentStep('confirm')}
-                  className="flex-1"
-                  disabled={!form.formState.isValid}
-                >
-                  Vérifier
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
               </div>
-            </div>
-          )}
-
-          {/* ÉTAPE 4: Confirmation */}
-          {currentStep === 'confirm' && (
-            <div className="space-y-4">
-              <Card className="p-4 space-y-3">
-                <h4 className="font-medium flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Récapitulatif de l'incident
-                </h4>
-                
-                {imagePreview && (
-                  <img src={imagePreview} alt="Photo" className="w-full h-32 object-cover rounded-lg" />
-                )}
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Titre:</span>
-                    <span className="font-medium">{form.getValues('title')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Élément:</span>
-                    <span className="font-medium">{getItemName(form.getValues('item_id'))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Type:</span>
-                    <span className="font-medium">{getTypeName(form.getValues('type_id'))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Chambre:</span>
-                    <span className="font-medium">{form.getValues('location_reference')}</span>
-                  </div>
-                  {form.getValues('description') && (
-                    <div>
-                      <span className="text-muted-foreground">Détails:</span>
-                      <p className="mt-1 text-xs bg-muted p-2 rounded">
-                        {form.getValues('description')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setCurrentStep('form')}
-                  className="flex-1"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Modifier
-                </Button>
-                <Button 
-                  onClick={() => createIncidentMutation.mutate(form.getValues())}
-                  disabled={createIncidentMutation.isPending}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                >
-                  {createIncidentMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Envoi...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Envoyer
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </ScrollArea>
+
+        {/* Footer navigation */}
+        {currentStep !== 'photo' && currentStep !== 'analysis' && (
+          <div className="p-4 border-t bg-background flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={goBack}
+              className="flex-1"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour
+            </Button>
+            {currentStep === 'confirm' ? (
+              <Button 
+                onClick={() => createIncidentMutation.mutate(form.getValues())}
+                disabled={createIncidentMutation.isPending}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {createIncidentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Envoyer
+              </Button>
+            ) : (
+              <Button 
+                onClick={goNext}
+                disabled={!canProceed()}
+                className="flex-1"
+              >
+                Suivant
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
