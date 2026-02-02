@@ -1,6 +1,6 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Package, AlertTriangle } from "lucide-react";
-import { ReportLostItemDialog } from "@/components/lost-and-found/ReportLostItemDialog";
+import { LostItemReportWizard } from "@/components/lost-and-found/LostItemReportWizard";
 import { LostAndFoundList } from "@/components/lost-and-found/LostAndFoundList";
 
 interface LostAndFoundTabProps {
@@ -31,7 +31,7 @@ export function LostAndFoundTab({ currentHotelId }: LostAndFoundTabProps) {
             Gérez les objets trouvés et leur restitution aux clients
           </p>
         </div>
-        <ReportLostItemDialog
+        <LostItemReportWizard
           hotelId={currentHotelId}
           reporterName="Admin"
           reporterType="admin"

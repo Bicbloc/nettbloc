@@ -3,8 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package, LogOut } from 'lucide-react';
-import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
-import { ReportLostItemDialog, GuestInfo } from '@/components/lost-and-found/ReportLostItemDialog';
+import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
+import { LostItemReportWizard, GuestInfo } from '@/components/lost-and-found/LostItemReportWizard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ActionLogService } from '@/services/actionLogService';
@@ -328,12 +328,18 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
             {/* Action buttons */}
             {room.status !== 'clean' && (
               <div className="flex flex-col gap-2">
-                <IncidentReportDialogSimple 
+                <IncidentReportWizard 
                   hotelId={hotelId} 
                   userType="housekeeper"
+                  userName={housekeeperName}
                   defaultLocation={room.room_number}
+                  trigger={
+                    <Button variant="outline" size="icon" className="h-10 w-10" title="Signaler un incident">
+                      <AlertCircle className="h-5 w-5" />
+                    </Button>
+                  }
                 />
-                <ReportLostItemDialog
+                <LostItemReportWizard
                   hotelId={hotelId}
                   reporterName={housekeeperName}
                   reporterType="housekeeper"

@@ -33,7 +33,7 @@ import { GovernessStaffPanel } from '@/components/governess/GovernessStaffPanel'
 import { GovernessActionLog } from '@/components/governess/GovernessActionLog';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { IncidentList } from '@/components/incident/IncidentList';
-import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
+import { LostItemReportWizard } from '@/components/lost-and-found/LostItemReportWizard';
 import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
 import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
 import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
@@ -622,10 +622,11 @@ export default function GovernessDashboard() {
                           <CardTitle>Objets trouvés</CardTitle>
                           <CardDescription>Déclarez et gérez les objets perdus</CardDescription>
                         </div>
-                        <ReportLostItemDialog
+                        <LostItemReportWizard
                           hotelId={selectedHotel.id}
                           reporterName={profile.name}
                           reporterType="governess"
+                          onSuccess={loadStats}
                         />
                       </div>
                     </CardHeader>
