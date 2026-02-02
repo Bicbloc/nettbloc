@@ -5,9 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Clock, Crown, Gift, CreditCard } from 'lucide-react';
+import { Clock, Crown, Gift, CreditCard, Calculator } from 'lucide-react';
+import { PlanSimulator } from '@/components/subscription/PlanSimulator';
 
 interface SubscriptionManagementDialogProps {
   isOpen: boolean;
@@ -33,6 +35,7 @@ export function SubscriptionManagementDialog({
   const [extensionDays, setExtensionDays] = useState('');
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('manage');
 
   const handleExtendTrial = async () => {
     if (!extensionDays || parseInt(extensionDays) <= 0) {
@@ -139,6 +142,7 @@ export function SubscriptionManagementDialog({
     setNewStatus('');
     setExtensionDays('');
     setReason('');
+    setActiveTab('manage');
   };
 
   const handleClose = () => {
@@ -172,7 +176,7 @@ export function SubscriptionManagementDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             🔧 Gestion d'abonnement
@@ -192,135 +196,152 @@ export function SubscriptionManagementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="action">Action à effectuer</Label>
-            <Select value={action} onValueChange={setAction}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choisissez une action..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="extend">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Étendre la période d'essai
-                  </div>
-                </SelectItem>
-                <SelectItem value="change">
-                  <div className="flex items-center gap-2">
-                    <Crown className="h-4 w-4" />
-                    Changer le statut d'abonnement
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="manage" className="gap-2">
+              <CreditCard className="h-4 w-4" />
+              Gérer
+            </TabsTrigger>
+            <TabsTrigger value="simulator" className="gap-2">
+              <Calculator className="h-4 w-4" />
+              Simulateur
+            </TabsTrigger>
+          </TabsList>
 
-          {action === 'extend' && (
-            <div className="space-y-3">
+          <TabsContent value="manage" className="space-y-4 mt-4">
+            <div>
+              <Label htmlFor="action">Action à effectuer</Label>
+              <Select value={action} onValueChange={setAction}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisissez une action..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="extend">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Étendre la période d'essai
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="change">
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-4 w-4" />
+                      Changer le statut d'abonnement
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {action === 'extend' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="days">Nombre de jours à ajouter</Label>
+                  <Input
+                    id="days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={extensionDays}
+                    onChange={(e) => setExtensionDays(e.target.value)}
+                    placeholder="Ex: 30"
+                  />
+                </div>
+              </div>
+            )}
+
+            {action === 'change' && (
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="status">Nouveau statut</Label>
+                  <Select value={newStatus} onValueChange={setNewStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un statut..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="free">
+                        <div className="flex items-center gap-2">
+                          <Gift className="h-4 w-4" />
+                          Gratuit
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="trial">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Période d'essai
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="basic">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          Basic
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="basic_plus">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-blue-500" />
+                          Basic+
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="premium">
+                        <div className="flex items-center gap-2">
+                          <Crown className="h-4 w-4 text-amber-500" />
+                          Premium
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="platinum">
+                        <div className="flex items-center gap-2">
+                          <Crown className="h-4 w-4 text-purple-500" />
+                          Platinum
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {action && (
               <div>
-                <Label htmlFor="days">Nombre de jours à ajouter</Label>
-                <Input
-                  id="days"
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={extensionDays}
-                  onChange={(e) => setExtensionDays(e.target.value)}
-                  placeholder="Ex: 30"
+                <Label htmlFor="reason">Raison (optionnel)</Label>
+                <Textarea
+                  id="reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Expliquez la raison de cette modification..."
+                  rows={3}
                 />
               </div>
-            </div>
-          )}
+            )}
 
-          {action === 'change' && (
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="status">Nouveau statut</Label>
-                <Select value={newStatus} onValueChange={setNewStatus}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un statut..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="free">
-                      <div className="flex items-center gap-2">
-                        <Gift className="h-4 w-4" />
-                        Gratuit
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="trial">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Période d'essai
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="basic">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        Basic
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="basic_plus">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-blue-500" />
-                        Basic+
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="premium">
-                      <div className="flex items-center gap-2">
-                        <Crown className="h-4 w-4 text-amber-500" />
-                        Premium
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="platinum">
-                      <div className="flex items-center gap-2">
-                        <Crown className="h-4 w-4 text-purple-500" />
-                        Platinum
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose}>
+                Annuler
+              </Button>
+              {action === 'extend' && (
+                <Button 
+                  onClick={handleExtendTrial} 
+                  disabled={isSubmitting || !extensionDays}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSubmitting ? 'Extension...' : 'Étendre la période'}
+                </Button>
+              )}
+              {action === 'change' && (
+                <Button 
+                  onClick={handleChangeStatus} 
+                  disabled={isSubmitting || !newStatus}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isSubmitting ? 'Modification...' : 'Changer le statut'}
+                </Button>
+              )}
+            </DialogFooter>
+          </TabsContent>
 
-          {action && (
-            <div>
-              <Label htmlFor="reason">Raison (optionnel)</Label>
-              <Textarea
-                id="reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Expliquez la raison de cette modification..."
-                rows={3}
-              />
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Annuler
-          </Button>
-          {action === 'extend' && (
-            <Button 
-              onClick={handleExtendTrial} 
-              disabled={isSubmitting || !extensionDays}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {isSubmitting ? 'Extension...' : 'Étendre la période'}
-            </Button>
-          )}
-          {action === 'change' && (
-            <Button 
-              onClick={handleChangeStatus} 
-              disabled={isSubmitting || !newStatus}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isSubmitting ? 'Modification...' : 'Changer le statut'}
-            </Button>
-          )}
-        </DialogFooter>
+          <TabsContent value="simulator" className="mt-4">
+            <PlanSimulator compact />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
