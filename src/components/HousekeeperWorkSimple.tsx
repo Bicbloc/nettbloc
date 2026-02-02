@@ -13,6 +13,7 @@ import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { storageService } from '@/services/storageService';
 import { ReportLostItemDialog } from './lost-and-found/ReportLostItemDialog';
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from './RoomStatusTabs';
+import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 
 interface Room {
   id: string;
@@ -30,7 +31,7 @@ interface ActivityLogEntry {
   type: 'info' | 'success' | 'warning' | 'error';
 }
 
-export const HousekeeperWorkSimple: React.FC = () => {
+const HousekeeperWorkContent: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -996,5 +997,14 @@ export const HousekeeperWorkSimple: React.FC = () => {
         )}
       </div>
     </div>
+  );
+};
+
+// Wrapper avec le guard de type d'utilisateur
+export const HousekeeperWorkSimple: React.FC = () => {
+  return (
+    <UserTypeGuard expectedType="housekeeper">
+      <HousekeeperWorkContent />
+    </UserTypeGuard>
   );
 };

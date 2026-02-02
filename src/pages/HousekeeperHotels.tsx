@@ -11,8 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { storageService } from '@/services/storageService';
 import { realtimeManager } from '@/services/RealtimeManager';
+import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 
-export default function HousekeeperHotels() {
+function HousekeeperHotelsContent() {
   const [profile, setProfile] = useState<any>(null);
   const [hotels, setHotels] = useState<any[]>([]);
   const [hotelCode, setHotelCode] = useState('');
@@ -483,5 +484,14 @@ export default function HousekeeperHotels() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Wrapper avec le guard de type d'utilisateur
+export default function HousekeeperHotels() {
+  return (
+    <UserTypeGuard expectedType="housekeeper">
+      <HousekeeperHotelsContent />
+    </UserTypeGuard>
   );
 }

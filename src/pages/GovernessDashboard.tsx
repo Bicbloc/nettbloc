@@ -37,6 +37,7 @@ import { LostItemReportWizard } from '@/components/lost-and-found/LostItemReport
 import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
 import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
 import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
+import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 
 interface GovernessProfile {
   id: string;
@@ -61,7 +62,7 @@ interface PendingRequest {
   } | null;
 }
 
-export default function GovernessDashboard() {
+function GovernessDashboardContent() {
   const [profile, setProfile] = useState<GovernessProfile | null>(null);
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
@@ -792,5 +793,14 @@ export default function GovernessDashboard() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Wrapper avec le guard de type d'utilisateur
+export default function GovernessDashboard() {
+  return (
+    <UserTypeGuard expectedType="governess">
+      <GovernessDashboardContent />
+    </UserTypeGuard>
   );
 }

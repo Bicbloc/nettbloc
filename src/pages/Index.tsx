@@ -34,6 +34,7 @@ import { AssignmentService } from "@/services/assignmentService";
 import { usePdfWorkflow } from "@/hooks/use-pdf-workflow";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { OnboardingWizard, TrialExpiryBanner, TrialExpiredBlocker } from "@/components/onboarding";
+import { useUserTypeGuard } from "@/hooks/use-user-type-guard";
 
 // Layout components
 import { MainLayout, TabValue } from "@/components/layout";
@@ -57,10 +58,13 @@ import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, loading: authLoading, isInitialized } = useAuth();
+  const { isAuthenticated, loading: authLoading, isInitialized, user } = useAuth();
   const { isHotelReady } = useHotel();
   const { t } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
+
+  // Vérifier le type d'utilisateur pour les utilisateurs authentifiés (pas en mode invité)
+  const { isLoading: typeCheckLoading, isVerified } = useUserTypeGuard('establishment');
 
   // Attendre initialisation auth
   if (!isInitialized || authLoading) {
@@ -77,6 +81,31 @@ const Index = () => {
   // Redirection si pas authentifié
   if (!isAuthenticated && !isGuestMode) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Vérifier le type d'utilisateur (seulement pour les authentifiés, pas en guest mode)
+  if (isAuthenticated && !isGuestMode && user) {
+    if (typeCheckLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
+          <div className="text-center space-y-4">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-muted-foreground text-sm">Vérification des accès...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!isVerified) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-destructive/5 via-background to-destructive/10">
+          <div className="text-center space-y-4">
+            <div className="w-8 h-8 border-4 border-destructive border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-muted-foreground text-sm">Redirection vers votre espace...</p>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Attendre que l'hôtel soit prêt (pour les utilisateurs authentifiés)

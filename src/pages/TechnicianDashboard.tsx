@@ -9,8 +9,9 @@ import { IncidentList } from '@/components/incident/IncidentList';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { TechnicianAccessRequest } from '@/components/TechnicianAccessRequest';
+import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 
-export default function TechnicianDashboard() {
+function TechnicianDashboardContent() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { profile, currentHotelSession, loading, signOut } = useTechnicianAuth();
@@ -142,5 +143,14 @@ export default function TechnicianDashboard() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+// Wrapper avec le guard de type d'utilisateur
+export default function TechnicianDashboard() {
+  return (
+    <UserTypeGuard expectedType="technician">
+      <TechnicianDashboardContent />
+    </UserTypeGuard>
   );
 }
