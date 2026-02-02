@@ -54,14 +54,15 @@ export default function ResetPassword() {
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
 
-      // 1) Legacy / implicit format: #access_token=...&refresh_token=...&type=recovery
-      if ((type === "recovery" || hashParams.has("access_token")) && accessToken && refreshToken) {
+      // 1) Implicit format: #access_token=...&refresh_token=...&type=recovery
+      if (accessToken && refreshToken) {
         const { error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
         });
 
         if (error) {
+          console.error("Reset password: setSession error", error);
           setStep("invalid");
           return;
         }
@@ -72,28 +73,64 @@ export default function ResetPassword() {
         return;
       }
 
-      // 2) PKCE format: ?code=...
+      // 2) PKCE format: ?code=... (may fail if code_verifier missing)
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-        if (error) {
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error("Reset password: exchangeCodeForSession error", error);
+            // Don't immediately fail - check if session was set anyway
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData.session) {
+              window.history.replaceState({}, document.title, "/reset-password");
+              setStep("ready");
+              return;
+            }
+            setStep("invalid");
+            return;
+          }
+          window.history.replaceState({}, document.title, "/reset-password");
+          setStep("ready");
+          return;
+        } catch (e) {
+          console.error("Reset password: code exchange exception", e);
+          // Check session as fallback
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session) {
+            window.history.replaceState({}, document.title, "/reset-password");
+            setStep("ready");
+            return;
+          }
           setStep("invalid");
           return;
         }
-
-        window.history.replaceState({}, document.title, "/reset-password");
-        setStep("ready");
-        return;
       }
 
-      // 3) If user already has a session (opened the page directly)
+      // 3) Check for existing session (user may already be logged in from the link)
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         setStep("ready");
         return;
       }
 
-      setStep("invalid");
+      // 4) Listen for auth state change (Supabase may auto-detect the token)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+          window.history.replaceState({}, document.title, "/reset-password");
+          setStep("ready");
+        }
+      });
+
+      // Wait a moment for potential auto-detection
+      setTimeout(async () => {
+        const { data: checkData } = await supabase.auth.getSession();
+        if (checkData.session) {
+          setStep("ready");
+        } else if (step === "checking") {
+          setStep("invalid");
+        }
+        subscription.unsubscribe();
+      }, 2000);
     };
 
     void run();
