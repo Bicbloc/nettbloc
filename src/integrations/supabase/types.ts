@@ -2110,6 +2110,7 @@ export type Database = {
           created_by: string | null
           delivery_date: string
           delivery_reference: string | null
+          document_url: string | null
           hotel_id: string
           id: string
           notes: string | null
@@ -2124,6 +2125,7 @@ export type Database = {
           created_by?: string | null
           delivery_date?: string
           delivery_reference?: string | null
+          document_url?: string | null
           hotel_id: string
           id?: string
           notes?: string | null
@@ -2138,6 +2140,7 @@ export type Database = {
           created_by?: string | null
           delivery_date?: string
           delivery_reference?: string | null
+          document_url?: string | null
           hotel_id?: string
           id?: string
           notes?: string | null
