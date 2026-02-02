@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Wrench, LogOut, Building2, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IncidentList } from '@/components/incident/IncidentList';
-import { IncidentReportDialogSimple } from '@/components/incident/IncidentReportDialogSimple';
+import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { TechnicianAccessRequest } from '@/components/TechnicianAccessRequest';
 
@@ -130,9 +130,11 @@ export default function TechnicianDashboard() {
                 <CardTitle>Signaler un nouvel incident</CardTitle>
               </CardHeader>
               <CardContent className="flex justify-center">
-                <IncidentReportDialogSimple 
+                <IncidentReportWizard 
                   hotelId={currentHotelSession.hotel_id} 
-                  userType="admin"
+                  userType="technician"
+                  userName={profile.name}
+                  userId={profile.id}
                 />
               </CardContent>
             </Card>
