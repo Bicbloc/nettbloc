@@ -72,6 +72,15 @@ export function SubscriptionCard() {
       
       if (error) throw error;
       
+      // Handle case where no subscription exists
+      if (data?.has_subscription === false) {
+        toast({
+          title: "Pas d'abonnement actif",
+          description: "Vous n'avez pas encore d'abonnement. Passez au plan Premium pour bénéficier de toutes les fonctionnalités."
+        });
+        return;
+      }
+      
       if (data?.subscription) {
         setSubscriptionDetails(data);
         setShowDetails(true);
