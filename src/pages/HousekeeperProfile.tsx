@@ -36,6 +36,7 @@ import { GamificationService } from '@/services/gamificationService';
 import { BadgeDisplay } from '@/components/gamification/BadgeDisplay';
 import { LevelProgressBar } from '@/components/gamification/LevelProgressBar';
 import { storageService } from '@/services/storageService';
+import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 
 interface Assignment {
   id: string;
@@ -61,7 +62,7 @@ interface Stats {
   performanceByDay: { date: string; count: number }[];
 }
 
-export default function HousekeeperProfile() {
+function HousekeeperProfileContent() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -633,5 +634,14 @@ export default function HousekeeperProfile() {
         </Card>
       )}
     </div>
+  );
+}
+
+// Wrapper avec le guard de type d'utilisateur
+export default function HousekeeperProfile() {
+  return (
+    <UserTypeGuard expectedType="housekeeper">
+      <HousekeeperProfileContent />
+    </UserTypeGuard>
   );
 }

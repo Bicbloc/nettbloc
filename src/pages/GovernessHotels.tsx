@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, LogOut, User, Loader2, CheckCircle2, Crown, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 
 interface GovernessProfile {
   id: string;
@@ -32,7 +33,7 @@ interface PendingRequest {
   hotels: { name: string } | null;
 }
 
-export default function GovernessHotels() {
+function GovernessHotelsContent() {
   const [profile, setProfile] = useState<GovernessProfile | null>(null);
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
@@ -397,5 +398,14 @@ export default function GovernessHotels() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Wrapper avec le guard de type d'utilisateur
+export default function GovernessHotels() {
+  return (
+    <UserTypeGuard expectedType="governess">
+      <GovernessHotelsContent />
+    </UserTypeGuard>
   );
 }
