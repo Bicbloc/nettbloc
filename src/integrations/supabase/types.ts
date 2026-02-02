@@ -4351,22 +4351,7 @@ export type Database = {
           user_name: string | null
           user_type: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_sessions_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_sessions_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_stats_view"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {
