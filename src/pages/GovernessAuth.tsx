@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, Loader2, ArrowRight, Crown, UserPlus, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import BackButton from '@/components/BackButton';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
+import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 
 export default function GovernessAuth() {
   const [email, setEmail] = useState('');
@@ -63,8 +65,8 @@ export default function GovernessAuth() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/governess/auth`
+      const { error } = await supabaseRecovery.auth.resetPasswordForEmail(email, {
+        redirectTo: PASSWORD_RESET_URL,
       });
 
       if (error) throw error;

@@ -11,7 +11,9 @@ import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { Loader2, Building, Users, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
+import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 
 const EstablishmentAuth = () => {
   const { signIn, signUp, isAuthenticated, loading, isInitialized } = useAuth();
@@ -214,8 +216,8 @@ const EstablishmentAuth = () => {
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth/establishment`
+      const { error } = await supabaseRecovery.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: PASSWORD_RESET_URL,
       });
 
       if (error) throw error;
