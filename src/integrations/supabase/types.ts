@@ -2104,6 +2104,117 @@ export type Database = {
         }
         Relationships: []
       }
+      linen_deliveries: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          delivery_date: string
+          delivery_reference: string | null
+          hotel_id: string
+          id: string
+          notes: string | null
+          status: string
+          supplier_name: string | null
+          updated_at: string | null
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_date?: string
+          delivery_reference?: string | null
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          status?: string
+          supplier_name?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          delivery_date?: string
+          delivery_reference?: string | null
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          supplier_name?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linen_deliveries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "linen_deliveries_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      linen_delivery_items: {
+        Row: {
+          counted_at: string | null
+          created_at: string | null
+          delivery_id: string
+          difference: number | null
+          id: string
+          linen_type_id: string
+          notes: string | null
+          quantity_counted: number | null
+          quantity_delivered: number
+        }
+        Insert: {
+          counted_at?: string | null
+          created_at?: string | null
+          delivery_id: string
+          difference?: number | null
+          id?: string
+          linen_type_id: string
+          notes?: string | null
+          quantity_counted?: number | null
+          quantity_delivered?: number
+        }
+        Update: {
+          counted_at?: string | null
+          created_at?: string | null
+          delivery_id?: string
+          difference?: number | null
+          id?: string
+          linen_type_id?: string
+          notes?: string | null
+          quantity_counted?: number | null
+          quantity_delivered?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linen_delivery_items_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "linen_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "linen_delivery_items_linen_type_id_fkey"
+            columns: ["linen_type_id"]
+            isOneToOne: false
+            referencedRelation: "linen_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       linen_inventory_entries: {
         Row: {
           ai_confidence: number | null

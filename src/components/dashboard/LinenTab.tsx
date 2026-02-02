@@ -10,6 +10,7 @@ import { LinenTrainingManager } from "@/components/linen/LinenTrainingManager";
 import { LinenTaskAssignment } from "@/components/linen/LinenTaskAssignment";
 import { AdminLinenInventory } from "@/components/linen/AdminLinenInventory";
 import { PrintableRuler } from "@/components/linen/PrintableRuler";
+import { LinenDeliveryManager } from "@/components/linen/LinenDeliveryManager";
 
 interface LinenTabProps {
   currentHotelId: string | null;
@@ -22,13 +23,14 @@ export function LinenTab({ currentHotelId, hotelName }: LinenTabProps) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold">🧺 Inventaire du linge</h2>
-          <p className="text-muted-foreground">Gérer les types de linge, entraîner l'IA et assigner les tâches</p>
+          <p className="text-muted-foreground">Gérer les types de linge, livraisons et inventaires</p>
         </div>
       </div>
 
       <Tabs defaultValue="types" className="space-y-4">
         <TabsList className="flex-wrap">
           <TabsTrigger value="types">Types de linge</TabsTrigger>
+          <TabsTrigger value="deliveries">🚚 Livraisons</TabsTrigger>
           <TabsTrigger value="inventory">Saisie & Validation</TabsTrigger>
           <TabsTrigger value="tasks">Attribution des tâches</TabsTrigger>
           <TabsTrigger value="training">Entraînement IA</TabsTrigger>
@@ -38,6 +40,16 @@ export function LinenTab({ currentHotelId, hotelName }: LinenTabProps) {
         <TabsContent value="types" className="space-y-4">
           {currentHotelId ? (
             <LinenTypeManager hotelId={currentHotelId} />
+          ) : (
+            <Alert>
+              <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
+            </Alert>
+          )}
+        </TabsContent>
+
+        <TabsContent value="deliveries" className="space-y-4">
+          {currentHotelId ? (
+            <LinenDeliveryManager hotelId={currentHotelId} />
           ) : (
             <Alert>
               <AlertDescription>Aucun hôtel sélectionné</AlertDescription>
