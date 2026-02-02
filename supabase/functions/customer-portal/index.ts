@@ -55,8 +55,17 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
+    // If no subscription found, return graceful response instead of error
     if (!subscription?.gocardless_subscription_id) {
-      throw new Error("No active subscription found");
+      logStep("No subscription found for user");
+      return new Response(JSON.stringify({ 
+        has_subscription: false,
+        message: "Aucun abonnement actif",
+        portal_type: "none"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
     logStep("Found subscription", { subscriptionId: subscription.gocardless_subscription_id });
