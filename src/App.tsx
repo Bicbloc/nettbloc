@@ -30,6 +30,7 @@ import TechnicianSignup from "./pages/TechnicianSignup";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
 import GovernessAuth from "./pages/GovernessAuth";
 import GovernessDashboard from "./pages/GovernessDashboard";
+import GovernessHotels from "./pages/GovernessHotels";
 import { TechnicianAuthProvider } from "./contexts/TechnicianAuthContext";
 import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
 import { NotificationProvider } from "./contexts/NotificationContext";
@@ -90,6 +91,7 @@ const App = () => (
                               <Route path="/technician/login" element={<TechnicianLogin />} />
                               <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
                               <Route path="/governess/auth" element={<GovernessAuth />} />
+                              <Route path="/governess/hotels" element={<GovernessHotels />} />
                               <Route path="/governess/dashboard" element={<GovernessDashboard />} />
                               {/* Netto Count App Routes */}
                               <Route path="/netto-count" element={<Navigate to="/netto-count/auth" replace />} />

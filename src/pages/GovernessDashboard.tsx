@@ -94,6 +94,14 @@ export default function GovernessDashboard() {
     
     const parsedProfile = JSON.parse(storedProfile);
     setProfile(parsedProfile);
+    
+    // Vérifier si un hôtel est déjà sélectionné
+    const storedHotel = localStorage.getItem('governess_selected_hotel');
+    if (storedHotel) {
+      const hotel = JSON.parse(storedHotel);
+      setSelectedHotel(hotel);
+    }
+    
     loadHotels(parsedProfile.id);
     loadPendingRequests(parsedProfile.id);
   }, [navigate]);
