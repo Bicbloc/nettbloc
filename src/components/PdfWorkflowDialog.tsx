@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf, getLastParsedLines } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles, Map, Zap, Settings2 } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles, Map, Zap, Settings2, UserCheck } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,21 @@ import {
   filterOutInactiveRooms,
   normalizeRoomNumber
 } from "@/utils/roomFormatUtils";
+import { GovernessAssignmentStep } from "@/components/workflow/GovernessAssignmentStep";
+
+interface GovernessAssignment {
+  governessName: string;
+  governessProfileId?: string;
+  assignmentType: 'floor' | 'housekeeper';
+  assignedFloors: number[];
+  assignedHousekeepers: string[];
+}
+
+interface DailyInstructions {
+  instructions: string;
+  toKnow: string;
+  todoList: string;
+}
 
 interface PdfWorkflowDialogProps {
   onWorkflowComplete: (data: any, housekeepers?: string[], distributionMethod?: 'random' | 'floor' | 'cleaning-type') => void;
@@ -41,7 +56,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'choice' | 'upload' | 'preview' | 'mapping' | 'import-mode' | 'housekeepers' | 'distribution' | 'linen-inventory'>('choice');
+  const [step, setStep] = useState<'choice' | 'upload' | 'preview' | 'mapping' | 'import-mode' | 'housekeepers' | 'governess' | 'distribution' | 'linen-inventory'>('choice');
   const [pmsMapping, setPmsMapping] = useState<Record<string, string>>({});
   const [pdfData, setPdfData] = useState<any>(null);
   const [parsedLines, setParsedLines] = useState<RoomLine[]>([]);
@@ -49,6 +64,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [newHousekeeperName, setNewHousekeeperName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [existingHousekeepers, setExistingHousekeepers] = useState<HousekeeperWithCode[]>([]);
+  const [governessAssignments, setGovernessAssignments] = useState<GovernessAssignment[]>([]);
+  const [dailyInstructions, setDailyInstructions] = useState<DailyInstructions>({ instructions: '', toKnow: '', todoList: '' });
   const [selectedExisting, setSelectedExisting] = useState<string[]>([]);
   const [isLoadingHousekeepers, setIsLoadingHousekeepers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1596,7 +1613,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           Retour
         </Button>
         <Button
-          onClick={() => setStep('distribution')}
+          onClick={() => setStep('governess')}
           disabled={selectedExisting.length === 0 && housekeepers.length === 0}
         >
           Continuer
@@ -1605,6 +1622,59 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       </DialogFooter>
     </>
   );
+  };
+
+  const handleGovernessComplete = async (assignments: GovernessAssignment[], instructions: DailyInstructions) => {
+    setGovernessAssignments(assignments);
+    setDailyInstructions(instructions);
+
+    // Save to database
+    if (hotelId) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Save daily instructions
+      if (instructions.instructions || instructions.toKnow || instructions.todoList) {
+        await supabase.from('daily_instructions').upsert({
+          hotel_id: hotelId,
+          instruction_date: today,
+          instructions: instructions.instructions || null,
+          to_know: instructions.toKnow || null,
+          todo_list: instructions.todoList || null,
+          created_by: user?.id
+        }, { onConflict: 'hotel_id,instruction_date' });
+      }
+
+      // Save governess assignments
+      for (const assignment of assignments) {
+        await supabase.from('daily_governess_assignments').upsert({
+          hotel_id: hotelId,
+          assignment_date: today,
+          governess_name: assignment.governessName,
+          governess_profile_id: assignment.governessProfileId || null,
+          assignment_type: assignment.assignmentType,
+          assigned_floors: assignment.assignedFloors,
+          assigned_housekeepers: assignment.assignedHousekeepers,
+          created_by: user?.id
+        }, { onConflict: 'hotel_id,assignment_date,governess_name' });
+      }
+    }
+
+    setStep('distribution');
+  };
+
+  const renderGovernessStep = () => {
+    const allHousekeepers = [...selectedExisting, ...housekeepers];
+    
+    return (
+      <GovernessAssignmentStep
+        hotelId={hotelId || ''}
+        housekeeperNames={allHousekeepers}
+        pdfData={pdfData || []}
+        onComplete={handleGovernessComplete}
+        onBack={() => setStep('housekeepers')}
+      />
+    );
   };
 
   const renderDistributionStep = () => (
@@ -1852,6 +1922,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         {step === 'mapping' && renderMappingStep()}
         {step === 'import-mode' && renderImportModeStep()}
         {step === 'housekeepers' && renderHousekeepersStep()}
+        {step === 'governess' && renderGovernessStep()}
         {step === 'distribution' && renderDistributionStep()}
         {step === 'linen-inventory' && renderLinenInventoryStep()}
       </DialogContent>

@@ -14,6 +14,7 @@ import { storageService } from '@/services/storageService';
 import { ReportLostItemDialog } from './lost-and-found/ReportLostItemDialog';
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from './RoomStatusTabs';
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
+import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
 
 interface Room {
   id: string;
@@ -790,6 +791,9 @@ const HousekeeperWorkContent: React.FC = () => {
       )}
 
       <div className="container mx-auto px-4 py-4 space-y-4">
+        {/* Consignes du jour */}
+        {hotelId && <DailyInstructionsBanner hotelId={hotelId} />}
+
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <Card className="p-3 text-center">
