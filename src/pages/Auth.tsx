@@ -292,7 +292,15 @@ const Auth = () => {
           </div>
 
           <p className="text-center text-xs text-muted-foreground pt-4">
-            {language === 'en' ? 'By continuing, you accept our terms' : 'En continuant, vous acceptez nos conditions'}
+            {language === 'en' ? 'By continuing, you accept our ' : 'En continuant, vous acceptez nos '}
+            <a 
+              href="/legal/cgv" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline font-medium"
+            >
+              {language === 'en' ? 'terms and conditions' : 'conditions générales de vente'}
+            </a>
           </p>
         </div>
       </div>
