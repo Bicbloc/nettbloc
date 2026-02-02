@@ -73,3 +73,6 @@ verify_jwt = false
 
 [functions.netto-count-analyze]
 verify_jwt = true
+
+[functions.analyze-delivery]
+verify_jwt = true

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,11 @@ import {
   Package,
   ClipboardCheck,
   Trash2,
-  Edit,
+  Upload,
+  FileText,
+  Loader2,
+  Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -29,7 +33,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -40,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface LinenDeliveryManagerProps {
   hotelId: string;
@@ -59,13 +63,38 @@ interface DeliveryItem {
   quantity_counted: number | null;
   difference?: number;
   notes: string;
+  confidence?: number;
+}
+
+interface AIAnalysisResult {
+  success?: boolean;
+  supplier_name?: string;
+  delivery_reference?: string;
+  delivery_date?: string;
+  items?: Array<{
+    linen_type_id: string;
+    name: string;
+    quantity: number;
+    confidence: number;
+  }>;
+  unrecognized_items?: Array<{
+    name: string;
+    quantity: number;
+  }>;
+  notes?: string;
+  error?: string;
 }
 
 export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [viewMode, setViewMode] = useState<"list" | "detail" | "reconcile">("list");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AIAnalysisResult | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -117,6 +146,117 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
     },
   });
 
+  // Analyze document with AI
+  const analyzeDocument = async (file: File) => {
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("analyze-delivery", {
+        body: {
+          imageBase64: base64,
+          linenTypes: linenTypes,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        toast.error(data.error);
+        setAnalysisResult(data);
+      } else {
+        setAnalysisResult(data);
+        
+        // Auto-fill form data
+        if (data.supplier_name) {
+          setFormData(prev => ({ ...prev, supplier_name: data.supplier_name }));
+        }
+        if (data.delivery_reference) {
+          setFormData(prev => ({ ...prev, delivery_reference: data.delivery_reference }));
+        }
+        if (data.delivery_date) {
+          setFormData(prev => ({ ...prev, delivery_date: data.delivery_date }));
+        }
+        if (data.notes) {
+          setFormData(prev => ({ ...prev, notes: data.notes }));
+        }
+
+        // Update items with AI detected quantities
+        if (data.items && data.items.length > 0) {
+          setItems(prev => {
+            const updated = [...prev];
+            data.items.forEach((aiItem: any) => {
+              const idx = updated.findIndex(i => i.linen_type_id === aiItem.linen_type_id);
+              if (idx >= 0) {
+                updated[idx] = {
+                  ...updated[idx],
+                  quantity_delivered: aiItem.quantity,
+                  confidence: aiItem.confidence,
+                };
+              }
+            });
+            return updated;
+          });
+          toast.success(`${data.items.length} article(s) reconnu(s) par l'IA`);
+        }
+
+        if (data.unrecognized_items && data.unrecognized_items.length > 0) {
+          toast.warning(`${data.unrecognized_items.length} article(s) non reconnu(s) - vérifiez manuellement`);
+        }
+      }
+    } catch (err) {
+      console.error("Analysis error:", err);
+      toast.error("Erreur lors de l'analyse du document");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFile(file);
+    
+    // Create preview URL
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+
+    // Start AI analysis
+    await analyzeDocument(file);
+  };
+
+  // Upload document to storage
+  const uploadDocument = async (deliveryId: string): Promise<string | null> => {
+    if (!uploadedFile) return null;
+
+    const fileExt = uploadedFile.name.split(".").pop();
+    const fileName = `${hotelId}/${deliveryId}/${Date.now()}.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+      .from("linen-deliveries")
+      .upload(fileName, uploadedFile);
+
+    if (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("linen-deliveries")
+      .getPublicUrl(fileName);
+
+    return urlData.publicUrl;
+  };
+
   // Create delivery mutation
   const createDeliveryMutation = useMutation({
     mutationFn: async () => {
@@ -139,6 +279,17 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
         .single();
 
       if (deliveryError) throw deliveryError;
+
+      // Upload document if exists
+      if (uploadedFile) {
+        const docUrl = await uploadDocument(delivery.id);
+        if (docUrl) {
+          await supabase
+            .from("linen_deliveries")
+            .update({ document_url: docUrl })
+            .eq("id", delivery.id);
+        }
+      }
 
       // Create items
       const itemsToInsert = items
@@ -175,7 +326,6 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
     mutationFn: async () => {
       if (!selectedDelivery) throw new Error("Aucune livraison sélectionnée");
 
-      // Update each item with counted quantity
       for (const item of items) {
         if (item.id && item.quantity_counted !== null) {
           await supabase
@@ -189,7 +339,6 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
         }
       }
 
-      // Update delivery status
       await supabase
         .from("linen_deliveries")
         .update({ status: "reconciled" })
@@ -232,6 +381,12 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
       notes: "",
     });
     setItems([]);
+    setUploadedFile(null);
+    setPreviewUrl(null);
+    setAnalysisResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const initializeItems = () => {
@@ -325,7 +480,7 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
               Livraisons de linge
             </h3>
             <p className="text-sm text-muted-foreground">
-              Enregistrer les livraisons et effectuer le rapprochement
+              Téléchargez un bon de livraison pour analyse automatique
             </p>
           </div>
           <Button onClick={openCreateDialog}>
@@ -354,6 +509,12 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
                         {format(new Date(delivery.delivery_date), "EEEE d MMMM yyyy", { locale: fr })}
                       </span>
                       {getStatusBadge(delivery.status)}
+                      {delivery.document_url && (
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          Document
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground ml-8">
                       {delivery.supplier_name && (
@@ -420,14 +581,103 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
 
         {/* Create Dialog */}
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Truck className="h-5 w-5" />
                 Nouvelle livraison de linge
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Upload section */}
+              <Card className="p-4 border-dashed border-2">
+                <div className="text-center space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-lg font-medium">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    Analyse automatique par IA
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Téléchargez une photo du bon de livraison pour extraction automatique des quantités
+                  </p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isAnalyzing}
+                    className="w-full"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analyse en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadedFile ? "Changer de document" : "Télécharger un bon de livraison"}
+                      </>
+                    )}
+                  </Button>
+
+                  {previewUrl && (
+                    <div className="mt-4">
+                      <img
+                        src={previewUrl}
+                        alt="Aperçu"
+                        className="max-h-48 mx-auto rounded border"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {uploadedFile?.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              {/* AI Analysis Result */}
+              {analysisResult && (
+                <div className="space-y-2">
+                  {analysisResult.success ? (
+                    <Alert>
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertDescription>
+                        Document analysé ! Les quantités ont été pré-remplies. Vérifiez et ajustez si nécessaire.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        {analysisResult.error || "Impossible d'analyser le document"}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {analysisResult.unrecognized_items && analysisResult.unrecognized_items.length > 0 && (
+                    <Alert>
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription>
+                        <div>Articles non reconnus à saisir manuellement :</div>
+                        <ul className="list-disc list-inside mt-1 text-sm">
+                          {analysisResult.unrecognized_items.map((item, idx) => (
+                            <li key={idx}>{item.name}: {item.quantity} pièces</li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              {/* Form fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Date de livraison *</Label>
@@ -471,9 +721,10 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
                 </div>
               </div>
 
+              {/* Items list */}
               <div>
                 <Label className="text-base font-semibold">Quantités livrées par type</Label>
-                <div className="mt-2 space-y-2">
+                <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
                   {items.map((item) => {
                     const type = linenTypes.find((t) => t.id === item.linen_type_id);
                     if (!type) return null;
@@ -484,6 +735,11 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
                       >
                         <span className="text-xl">{type.icon}</span>
                         <span className="flex-1 font-medium">{type.name}</span>
+                        {item.confidence !== undefined && (
+                          <Badge variant="outline" className="text-xs">
+                            IA: {Math.round(item.confidence * 100)}%
+                          </Badge>
+                        )}
                         <Input
                           type="number"
                           min="0"
@@ -548,6 +804,26 @@ export const LinenDeliveryManager = ({ hotelId }: LinenDeliveryManagerProps) => 
             </div>
           </div>
         </div>
+
+        {/* Document preview */}
+        {selectedDelivery.document_url && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <span className="font-medium">Bon de livraison</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(selectedDelivery.document_url, "_blank")}
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                Voir le document
+              </Button>
+            </div>
+          </Card>
+        )}
 
         <Card className="overflow-hidden">
           <Table>
