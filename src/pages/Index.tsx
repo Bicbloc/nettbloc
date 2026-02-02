@@ -49,7 +49,7 @@ import { IncidentsTab } from "@/components/dashboard/IncidentsTab";
 import { ReportsTab } from "@/components/dashboard/ReportsTab";
 import { TrainingTab } from "@/components/dashboard/TrainingTab";
 import { ArchivesTab } from "@/components/dashboard/ArchivesTab";
-import { StaffInvitationsTab } from "@/components/dashboard/StaffInvitationsTab";
+
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
 import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
@@ -764,16 +764,6 @@ const IndexDashboard = () => {
             <ArchivesTab currentHotelId={currentHotelId} />
           )}
 
-          {/* Invitations Tab */}
-          {activeTab === 'invitations' && (
-            <PremiumLimitGuard 
-              feature="invitations" 
-              title="Invitations du personnel"
-              description="Gérez les invitations de votre personnel avec un abonnement payant."
-            >
-              <StaffInvitationsTab currentHotelId={currentHotelId} hotelName={hotelName || undefined} />
-            </PremiumLimitGuard>
-          )}
 
           {/* Inspections Tab */}
           {activeTab === 'inspections' && (

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown } from 'lucide-react';
+import { Loader2, Building, Users, ArrowLeft, Mail, Lock, User, ArrowRight, Crown, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
@@ -283,6 +283,27 @@ const Auth = () => {
                     <p className="font-medium">{language === 'en' ? 'Governess' : 'Gouvernante'}</p>
                     <p className="text-xs text-muted-foreground">
                       {language === 'en' ? 'Inspection & incidents' : 'Inspection & incidents'}
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/technician/login')}
+              className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    <Wrench className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{language === 'en' ? 'Technician' : 'Technicien'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'en' ? 'Maintenance & incidents' : 'Maintenance & incidents'}
                     </p>
                   </div>
                 </div>
