@@ -1,95 +1,222 @@
 
-# Plan: Supprimer le système d'invitations et ajouter un bouton Technicien sur la page Auth
+# Plan d'action : Correction des incohérences et améliorations
 
-## Résumé
+## Résumé des problèmes identifiés
 
-Ce plan supprime le système d'invitations inutilisé (StaffInvitationsTab + Edge Function) et ajoute un bouton d'accès Technicien sur la page d'authentification principale.
+### 1. Problèmes critiques de sécurité/fonctionnement
 
-## Changements à effectuer
+| Problème | Fichier | Impact |
+|----------|---------|--------|
+| `useUserTypeGuard` ne vérifie pas `technician_profiles` | `src/hooks/use-user-type-guard.tsx` | Un technicien peut accéder aux interfaces Établissement/Équipe |
+| Résidu `'invitations'` dans les features payantes | `src/components/PremiumLimitGuard.tsx` | Code mort, confusion |
+| `BackButton` dans `EstablishmentAuth` pointe vers `/` | `src/pages/EstablishmentAuth.tsx` | Devrait pointer vers `/auth` |
 
-### 1. Supprimer les fichiers du système d'invitations
+### 2. Incohérences visuelles (pages d'authentification)
 
-**Fichiers à supprimer:**
-- `src/components/dashboard/StaffInvitationsTab.tsx` - Composant d'interface des invitations
-- `supabase/functions/send-staff-invitation/` - Edge Function d'envoi d'emails
+| Page | Style | Couleurs |
+|------|-------|----------|
+| HousekeeperAuth | Gradient moderne | Violet/Purple |
+| GovernessAuth | Gradient moderne | Amber/Orange |
+| TechnicianLogin | Gradient simple | Slate/Blue |
+| EstablishmentAuth | Plat, sans gradient | Gris/Vert |
 
-### 2. Modifier la page Auth.tsx
+**Problème** : `EstablishmentAuth` et `TechnicianLogin/Signup` ont un design daté comparé aux autres.
 
-Ajouter un nouveau bouton dans l'écran de sélection (mode `'select'`) pour les techniciens:
+### 3. Textes hardcodés (pas i18n)
+
+| Fichier | Textes en dur |
+|---------|---------------|
+| `AppSidebar.tsx` | "Opérations", "Inventaires", "Outils", "Objets Trouvés", "Menu" |
+| `MobileBottomNav.tsx` | "Accueil", "Chambres", "Équipe", "Plus", "Principal", "Opérations", etc. |
+
+---
+
+## Actions à effectuer
+
+### Phase 1 : Corrections critiques
+
+#### 1.1 Ajouter la vérification `technician_profiles` dans `useUserTypeGuard`
+
+**Fichier**: `src/hooks/use-user-type-guard.tsx`
 
 ```text
-┌────────────────────────────────┐
-│  🏢 Établissement              │  → /auth/establishment
-│     Gérant, responsable        │
-├────────────────────────────────┤
-│  👥 Équipe                     │  → /housekeeper/auth
-│     Femme/valet de chambre     │
-├────────────────────────────────┤
-│  👑 Gouvernante                │  → /governess/auth
-│     Inspection & incidents     │
-├────────────────────────────────┤
-│  🔧 Technicien       (NOUVEAU) │  → /technician/login
-│     Maintenance & incidents    │
-└────────────────────────────────┘
+Ligne 85-89 : Ajouter la requête technician_profiles au Promise.all
+
+Avant:
+  const [hotelResult, housekeeperResult, governessResult] = await Promise.all([
+    supabase.from('hotels').select('id').eq('email', email).maybeSingle(),
+    supabase.from('housekeeper_profiles').select('id').eq('email', email).maybeSingle(),
+    supabase.from('governess_profiles').select('id').eq('email', email).maybeSingle()
+  ]);
+
+Après:
+  const [hotelResult, housekeeperResult, governessResult, technicianResult] = await Promise.all([
+    supabase.from('hotels').select('id').eq('email', email).maybeSingle(),
+    supabase.from('housekeeper_profiles').select('id').eq('email', email).maybeSingle(),
+    supabase.from('governess_profiles').select('id').eq('email', email).maybeSingle(),
+    supabase.from('technician_profiles').select('id').eq('email', email).maybeSingle()
+  ]);
 ```
 
-### 3. Nettoyer Index.tsx
+```text
+Ligne 91-99 : Ajouter la détection du technicien
 
-- Supprimer l'import de `StaffInvitationsTab`
-- Supprimer le bloc de rendu conditionnel pour `activeTab === 'invitations'`
+Avant:
+  if (housekeeperResult.data) {
+    detectedType = 'housekeeper';
+  } else if (governessResult.data) {
+    detectedType = 'governess';
+  } else if (hotelResult.data) {
+    detectedType = 'establishment';
+  }
 
-### 4. Base de données
+Après:
+  if (technicianResult.data) {
+    detectedType = 'technician';
+  } else if (housekeeperResult.data) {
+    detectedType = 'housekeeper';
+  } else if (governessResult.data) {
+    detectedType = 'governess';
+  } else if (hotelResult.data) {
+    detectedType = 'establishment';
+  }
+```
 
-La table `staff_invitations` restera en place pour l'instant (elle ne contient probablement pas de données critiques). Une migration pourra être effectuée ultérieurement pour la supprimer si souhaité.
+#### 1.2 Supprimer le résidu `'invitations'`
+
+**Fichier**: `src/components/PremiumLimitGuard.tsx`
+
+```text
+Ligne 31:
+Avant: const paidPlanFeatures = ['access_codes', 'invitations'];
+Après: const paidPlanFeatures = ['access_codes'];
+```
+
+#### 1.3 Corriger le BackButton dans EstablishmentAuth
+
+**Fichier**: `src/pages/EstablishmentAuth.tsx`
+
+```text
+Ligne 298:
+Avant: <BackButton to="/" />
+Après: <BackButton to="/auth" />
+```
 
 ---
 
-## Détails techniques
+### Phase 2 : Harmonisation des pages d'authentification
 
-### Fichier: `src/pages/Auth.tsx`
+#### 2.1 Moderniser `TechnicianLogin.tsx`
 
-Ajouter dans la section des boutons (après le bouton Gouvernante, ligne ~290):
+Appliquer le même style gradient que `HousekeeperAuth` avec une couleur bleue :
+- Background: `bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-700`
+- Ajouter les éléments décoratifs (cercles blur)
+- Moderniser le header avec icône dans un cercle glassmorphism
 
-```tsx
-<button
-  type="button"
-  onClick={() => navigate('/technician/login')}
-  className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
->
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-3">
-      <div className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-        <Wrench className="h-5 w-5" />
-      </div>
-      <div>
-        <p className="font-medium">{language === 'en' ? 'Technician' : 'Technicien'}</p>
-        <p className="text-xs text-muted-foreground">
-          {language === 'en' ? 'Maintenance & incidents' : 'Maintenance & incidents'}
-        </p>
-      </div>
-    </div>
-    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-  </div>
-</button>
-```
+#### 2.2 Moderniser `TechnicianSignup.tsx`
 
-### Fichier: `src/pages/Index.tsx`
+Même traitement que `TechnicianLogin`
 
-- Supprimer la ligne 52: `import { StaffInvitationsTab } from "@/components/dashboard/StaffInvitationsTab";`
-- Supprimer les lignes 767-776 (bloc invitations)
+#### 2.3 Moderniser `EstablishmentAuth.tsx`
 
-### Edge Function à supprimer
-
-Le dossier `supabase/functions/send-staff-invitation/` sera supprimé et la fonction déployée sera aussi supprimée de Supabase.
+- Background: `bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700`
+- Ajouter les éléments décoratifs
+- Supprimer la Card "Vous êtes femme de chambre ?" (redondante avec `/auth`)
+- Corriger le BackButton vers `/auth`
 
 ---
 
-## Récapitulatif des actions
+### Phase 3 : Internationalisation du menu
 
-| Action | Fichier/Dossier |
-|--------|-----------------|
-| Supprimer | `src/components/dashboard/StaffInvitationsTab.tsx` |
-| Supprimer | `supabase/functions/send-staff-invitation/` |
-| Modifier | `src/pages/Auth.tsx` (ajouter bouton Technicien) |
-| Modifier | `src/pages/Index.tsx` (supprimer import et bloc invitations) |
+#### 3.1 Ajouter les traductions manquantes
 
+**Fichier**: `src/i18n/translations.ts`
+
+```typescript
+dashboard: {
+  // Existants...
+  lostAndFound: string;
+  menu: string;
+  operations: string;
+  inventory: string;
+  tools: string;
+  principal: string;
+}
+```
+
+Valeurs FR:
+```typescript
+lostAndFound: 'Objets Trouvés',
+menu: 'Menu',
+operations: 'Opérations',
+inventory: 'Inventaires',
+tools: 'Outils',
+principal: 'Principal',
+```
+
+Valeurs EN:
+```typescript
+lostAndFound: 'Lost & Found',
+menu: 'Menu',
+operations: 'Operations',
+inventory: 'Inventory',
+tools: 'Tools',
+principal: 'Main',
+```
+
+#### 3.2 Utiliser les traductions dans AppSidebar
+
+**Fichier**: `src/components/layout/AppSidebar.tsx`
+
+```text
+Ligne 65: 
+Avant: { value: 'lost-found', label: 'Objets Trouvés', ... }
+Après: { value: 'lost-found', label: t.dashboard.lostAndFound, ... }
+
+Ligne 138:
+Avant: <span className="text-sm font-semibold">Menu</span>
+Après: <span className="text-sm font-semibold">{t.dashboard.menu}</span>
+
+Ligne 161: 
+Avant: {renderSection(operationsItems, 'Opérations')}
+Après: {renderSection(operationsItems, t.dashboard.operations)}
+
+Ligne 165:
+Avant: {renderSection(inventoryItems, 'Inventaires')}
+Après: {renderSection(inventoryItems, t.dashboard.inventory)}
+
+Ligne 169:
+Avant: {renderSection(toolsItems, 'Outils')}
+Après: {renderSection(toolsItems, t.dashboard.tools)}
+```
+
+#### 3.3 Utiliser les traductions dans MobileBottomNav
+
+**Fichier**: `src/components/layout/MobileBottomNav.tsx`
+
+Même principe : remplacer tous les textes en dur par `t.dashboard.*`
+
+---
+
+## Récapitulatif des fichiers à modifier
+
+| Fichier | Changements |
+|---------|-------------|
+| `src/hooks/use-user-type-guard.tsx` | Ajouter vérification technician_profiles |
+| `src/components/PremiumLimitGuard.tsx` | Supprimer 'invitations' |
+| `src/pages/EstablishmentAuth.tsx` | Corriger BackButton, moderniser design |
+| `src/pages/TechnicianLogin.tsx` | Moderniser design gradient |
+| `src/pages/TechnicianSignup.tsx` | Moderniser design gradient |
+| `src/i18n/translations.ts` | Ajouter traductions menu |
+| `src/components/layout/AppSidebar.tsx` | Utiliser traductions |
+| `src/components/layout/MobileBottomNav.tsx` | Utiliser traductions |
+
+---
+
+## Ordre d'exécution recommandé
+
+1. **Corrections critiques** (Phase 1) - Sécurité et fonctionnement
+2. **Internationalisation** (Phase 3) - Prérequis pour la cohérence
+3. **Harmonisation visuelle** (Phase 2) - Expérience utilisateur
+
+Total estimé : ~8 fichiers modifiés
