@@ -2102,6 +2102,57 @@ export type Database = {
           },
         ]
       }
+      instruction_templates: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          is_default: boolean | null
+          name: string
+          template_type: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          hotel_id: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          template_type: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          hotel_id?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          template_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instruction_templates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instruction_templates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount_ht: number
@@ -2713,6 +2764,93 @@ export type Database = {
             columns: ["lost_item_id"]
             isOneToOne: false
             referencedRelation: "lost_and_found"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manual_tasks: {
+        Row: {
+          assigned_to_id: string | null
+          assigned_to_name: string | null
+          assigned_to_type: string
+          completed_at: string | null
+          completed_by_name: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          hotel_id: string
+          id: string
+          location_reference: string | null
+          location_type: string
+          notes: string | null
+          priority: string | null
+          started_at: string | null
+          status: string
+          task_date: string
+          title: string
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          assigned_to_id?: string | null
+          assigned_to_name?: string | null
+          assigned_to_type?: string
+          completed_at?: string | null
+          completed_by_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hotel_id: string
+          id?: string
+          location_reference?: string | null
+          location_type?: string
+          notes?: string | null
+          priority?: string | null
+          started_at?: string | null
+          status?: string
+          task_date?: string
+          title: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          assigned_to_id?: string | null
+          assigned_to_name?: string | null
+          assigned_to_type?: string
+          completed_at?: string | null
+          completed_by_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          location_reference?: string | null
+          location_type?: string
+          notes?: string | null
+          priority?: string | null
+          started_at?: string | null
+          status?: string
+          task_date?: string
+          title?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_tasks_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_tasks_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
             referencedColumns: ["id"]
           },
         ]
@@ -3975,6 +4113,81 @@ export type Database = {
           },
           {
             foreignKeyName: "staff_roles_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_timesheets: {
+        Row: {
+          break_minutes: number | null
+          created_at: string
+          end_time: string | null
+          hotel_id: string
+          id: string
+          incidents_reported: number | null
+          notes: string | null
+          rooms_cleaned: number | null
+          rooms_depart: number | null
+          rooms_inspected: number | null
+          rooms_recouche: number | null
+          staff_id: string | null
+          staff_name: string
+          staff_type: string
+          start_time: string | null
+          updated_at: string
+          work_date: string
+        }
+        Insert: {
+          break_minutes?: number | null
+          created_at?: string
+          end_time?: string | null
+          hotel_id: string
+          id?: string
+          incidents_reported?: number | null
+          notes?: string | null
+          rooms_cleaned?: number | null
+          rooms_depart?: number | null
+          rooms_inspected?: number | null
+          rooms_recouche?: number | null
+          staff_id?: string | null
+          staff_name: string
+          staff_type: string
+          start_time?: string | null
+          updated_at?: string
+          work_date?: string
+        }
+        Update: {
+          break_minutes?: number | null
+          created_at?: string
+          end_time?: string | null
+          hotel_id?: string
+          id?: string
+          incidents_reported?: number | null
+          notes?: string | null
+          rooms_cleaned?: number | null
+          rooms_depart?: number | null
+          rooms_inspected?: number | null
+          rooms_recouche?: number | null
+          staff_id?: string | null
+          staff_name?: string
+          staff_type?: string
+          start_time?: string | null
+          updated_at?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_timesheets_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_timesheets_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels_stats_view"
