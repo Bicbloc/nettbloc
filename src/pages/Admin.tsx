@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
-  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell
+  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell, FileText
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
@@ -41,6 +41,7 @@ import { RolePermissionsManager } from '@/components/incident/RolePermissionsMan
 import { SupportTicketsPanel } from '@/components/admin/SupportTicketsPanel';
 import { PromoCodesPanel } from '@/components/admin/PromoCodesPanel';
 import { PricingPlansPanel } from '@/components/admin/PricingPlansPanel';
+import { LegalPagesPanel } from '@/components/admin/LegalPagesPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -900,6 +901,10 @@ const Admin = () => {
                 <Activity className="h-4 w-4" />
                 Journal d'audit
               </TabsTrigger>
+              <TabsTrigger value="legal" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Pages légales
+              </TabsTrigger>
               <TabsTrigger value="system" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Système
@@ -1242,6 +1247,10 @@ const Admin = () => {
 
         <TabsContent value="promos" className="space-y-4">
           <PromoCodesPanel />
+        </TabsContent>
+
+        <TabsContent value="legal" className="space-y-4">
+          <LegalPagesPanel />
         </TabsContent>
       </Tabs>
       
