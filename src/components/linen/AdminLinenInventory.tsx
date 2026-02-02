@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,11 @@ import {
   Calendar,
   User,
   AlertCircle,
-  Check
+  Check,
+  ArrowLeft,
+  Download,
+  Camera,
+  Image as ImageIcon
 } from "lucide-react";
 import {
   Dialog,
@@ -26,23 +30,28 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { LinenImageViewer } from "./LinenImageViewer";
+import { LinenDailyReport } from "./LinenDailyReport";
 
 interface AdminLinenInventoryProps {
   hotelId: string;
+  hotelName?: string;
 }
 
-export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
+interface DailyInventorySummary {
+  date: string;
+  tasks: any[];
+  totalPieces: number;
+  entriesWithPhotos: number;
+  overallStatus: string;
+}
+
+export const AdminLinenInventory = ({ hotelId, hotelName }: AdminLinenInventoryProps) => {
   const queryClient = useQueryClient();
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'view' | 'edit' | 'validate'>('view');
   const [entries, setEntries] = useState<Record<string, any>>({});
@@ -50,6 +59,7 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newTaskDate, setNewTaskDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [newTaskNotes, setNewTaskNotes] = useState("");
+  const [viewingImage, setViewingImage] = useState<{ url: string; name: string } | null>(null);
 
   // Récupérer les types de linge
   const { data: linenTypes = [] } = useQuery({
@@ -66,7 +76,7 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
     },
   });
 
-  // Récupérer toutes les tâches d'inventaire
+  // Récupérer toutes les tâches d'inventaire avec les photos
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["admin-linen-tasks", hotelId],
     queryFn: async () => {
@@ -74,12 +84,22 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
         .from("linen_inventory_tasks")
         .select(`
           *,
-          linen_inventory_entries(*)
+          linen_inventory_entries(
+            id,
+            linen_type_id,
+            quantity_clean,
+            quantity_dirty,
+            quantity_damaged,
+            ai_confidence,
+            photo_url,
+            counted_at,
+            count_method
+          )
         `)
         .eq("hotel_id", hotelId)
         .order("task_date", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(200);
       if (error) throw error;
       return data;
     },
@@ -100,13 +120,48 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
     },
   });
 
-  // Mutation pour créer une tâche admin (saisie directe)
+  // Regrouper les tâches par date
+  const tasksByDate: DailyInventorySummary[] = useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+    tasks.forEach((task: any) => {
+      const date = task.task_date;
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(task);
+    });
+
+    return Object.entries(grouped)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, dateTasks]) => {
+        const allEntries = dateTasks.flatMap((t: any) => t.linen_inventory_entries || []);
+        const totalPieces = allEntries.reduce(
+          (sum: number, e: any) =>
+            sum + (e.quantity_clean || 0) + (e.quantity_dirty || 0) + (e.quantity_damaged || 0),
+          0
+        );
+        const entriesWithPhotos = allEntries.filter((e: any) => e.photo_url).length;
+
+        // Déterminer le statut global
+        const statuses = dateTasks.map((t: any) => t.status);
+        let overallStatus = 'pending';
+        if (statuses.every((s: string) => s === 'validated')) overallStatus = 'validated';
+        else if (statuses.some((s: string) => s === 'completed')) overallStatus = 'completed';
+        else if (statuses.some((s: string) => s === 'in_progress')) overallStatus = 'in_progress';
+
+        return { date, tasks: dateTasks, totalPieces, entriesWithPhotos, overallStatus };
+      });
+  }, [tasks]);
+
+  // Tâches pour la date sélectionnée
+  const selectedDateData = useMemo(() => {
+    return tasksByDate.find((d) => d.date === selectedDate);
+  }, [tasksByDate, selectedDate]);
+
+  // Mutations
   const createAdminTaskMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non authentifié");
 
-      // Créer une tâche assignée à l'admin lui-même
       const { data: task, error } = await supabase
         .from("linen_inventory_tasks")
         .insert({
@@ -128,7 +183,6 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
       toast.success("Tâche créée - Vous pouvez maintenant saisir les quantités");
       setShowCreateDialog(false);
       setNewTaskNotes("");
-      // Ouvrir directement en mode édition
       setSelectedTask(task);
       setViewMode('edit');
       setEntries({});
@@ -138,18 +192,15 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
     },
   });
 
-  // Mutation pour sauvegarder les entrées
   const saveEntriesMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTask) throw new Error("Aucune tâche sélectionnée");
 
-      // Supprimer les anciennes entrées
       await supabase
         .from("linen_inventory_entries")
         .delete()
         .eq("task_id", selectedTask.id);
 
-      // Insérer les nouvelles entrées
       const entriesToSave = Object.entries(entries)
         .filter(([_, values]: [string, any]) => 
           values.clean > 0 || values.dirty > 0 || values.damaged > 0
@@ -171,7 +222,6 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
         if (error) throw error;
       }
 
-      // Mettre à jour le statut de la tâche
       await supabase
         .from("linen_inventory_tasks")
         .update({
@@ -192,7 +242,6 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
     },
   });
 
-  // Mutation pour valider une tâche
   const validateTaskMutation = useMutation({
     mutationFn: async (approved: boolean) => {
       if (!selectedTask) throw new Error("Aucune tâche sélectionnée");
@@ -223,13 +272,15 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
     setSelectedTask(task);
     setViewMode(mode);
     
-    // Charger les entrées existantes
     const entriesMap: Record<string, any> = {};
     task.linen_inventory_entries?.forEach((entry: any) => {
       entriesMap[entry.linen_type_id] = {
         clean: entry.quantity_clean || 0,
         dirty: entry.quantity_dirty || 0,
         damaged: entry.quantity_damaged || 0,
+        photo_url: entry.photo_url,
+        ai_confidence: entry.ai_confidence,
+        counted_at: entry.counted_at,
       };
     });
     setEntries(entriesMap);
@@ -274,133 +325,268 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
     }, 0) || 0;
   };
 
+  // Vue liste des dates
+  if (!selectedDate) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Inventaire Linge par Date
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Cliquez sur une date pour voir le détail et télécharger le rapport
+            </p>
+          </div>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Saisie directe
+          </Button>
+        </div>
+
+        {/* Liste des dates */}
+        <div className="space-y-3">
+          {isLoading ? (
+            <Card className="p-8 text-center text-muted-foreground">
+              Chargement...
+            </Card>
+          ) : tasksByDate.length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground">
+              Aucun inventaire trouvé
+            </Card>
+          ) : (
+            tasksByDate.map((dayData) => (
+              <Card key={dayData.date} className="p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-5 w-5 text-primary" />
+                      <span className="font-semibold text-lg capitalize">
+                        {format(new Date(dayData.date), "EEEE d MMMM yyyy", { locale: fr })}
+                      </span>
+                      {getStatusBadge(dayData.overallStatus)}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground ml-8">
+                      <span className="flex items-center gap-1">
+                        <ClipboardList className="h-3 w-3" />
+                        {dayData.tasks.length} tâche{dayData.tasks.length > 1 ? 's' : ''}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        📦 {dayData.totalPieces} pièces
+                      </span>
+                      {dayData.entriesWithPhotos > 0 && (
+                        <span className="flex items-center gap-1 text-blue-600">
+                          <ImageIcon className="h-3 w-3" />
+                          {dayData.entriesWithPhotos} photo{dayData.entriesWithPhotos > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedDate(dayData.date)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Voir
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Dialog création */}
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nouvelle saisie d'inventaire</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Date de l'inventaire</Label>
+                <Input
+                  type="date"
+                  value={newTaskDate}
+                  onChange={(e) => setNewTaskDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Notes (optionnel)</Label>
+                <Textarea
+                  value={newTaskNotes}
+                  onChange={(e) => setNewTaskNotes(e.target.value)}
+                  placeholder="Notes sur cet inventaire..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Annuler
+              </Button>
+              <Button onClick={() => createAdminTaskMutation.mutate()}>
+                Créer et saisir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Vue détaillée d'une date
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header avec retour */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
-            Gestion Inventaire Linge (Admin)
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Saisissez, visualisez et validez les comptages de linge
-          </p>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedDate(null)}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Retour
+          </Button>
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2 capitalize">
+              📅 {format(new Date(selectedDate), "EEEE d MMMM yyyy", { locale: fr })}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {selectedDateData?.tasks.length || 0} tâche(s) • {selectedDateData?.totalPieces || 0} pièces
+            </p>
+          </div>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Edit className="h-4 w-4 mr-2" />
-          Saisie directe
-        </Button>
       </div>
 
-      {/* Liste des tâches */}
-      <div className="space-y-3">
-        {isLoading ? (
-          <Card className="p-8 text-center text-muted-foreground">
-            Chargement...
-          </Card>
-        ) : tasks.length === 0 ? (
-          <Card className="p-8 text-center text-muted-foreground">
-            Aucun inventaire trouvé
-          </Card>
-        ) : (
-          tasks.map((task: any) => (
-            <Card key={task.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">
-                      {format(new Date(task.task_date), "d MMMM yyyy", { locale: fr })}
-                    </span>
-                    {getStatusBadge(task.status)}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    <span>{getHousekeeperName(task.assigned_to)}</span>
-                    <span>•</span>
-                    <span>{getTotalForTask(task)} pièces comptées</span>
-                  </div>
-                  {task.notes && (
-                    <p className="text-sm text-muted-foreground mt-1 italic">
-                      {task.notes}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
+      {/* Rapport PDF téléchargeable */}
+      {selectedDateData && (
+        <LinenDailyReport
+          date={selectedDate}
+          tasks={selectedDateData.tasks}
+          linenTypes={linenTypes}
+          hotelName={hotelName}
+          getHousekeeperName={getHousekeeperName}
+        />
+      )}
+
+      {/* Liste des entrées avec images */}
+      <div className="space-y-4">
+        <h4 className="font-medium">Détail des comptages</h4>
+        {selectedDateData?.tasks.map((task: any) => (
+          <Card key={task.id} className="overflow-hidden">
+            <div className="p-3 bg-muted/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{getHousekeeperName(task.assigned_to)}</span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-sm text-muted-foreground">
+                  {format(new Date(task.created_at), "HH:mm", { locale: fr })}
+                </span>
+                {getStatusBadge(task.status)}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => openTask(task, 'view')}>
+                  <Eye className="h-4 w-4 mr-1" />
+                  Détail
+                </Button>
+                {task.status === 'completed' && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => openTask(task, 'view')}
+                    onClick={() => openTask(task, 'validate')}
+                    className="border-green-300 text-green-700 hover:bg-green-50"
                   >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Voir
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Valider
                   </Button>
-                  {task.status === 'completed' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openTask(task, 'validate')}
-                      className="border-green-300 text-green-700 hover:bg-green-50"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Valider
-                    </Button>
-                  )}
-                  {(task.status === 'pending' || task.status === 'in_progress' || task.status === 'rejected') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openTask(task, 'edit')}
-                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Compléter
-                    </Button>
-                  )}
-                </div>
+                )}
               </div>
-            </Card>
-          ))
-        )}
+            </div>
+
+            {/* Tableau des entrées avec images */}
+            <div className="divide-y">
+              {task.linen_inventory_entries?.map((entry: any) => {
+                const linenType = linenTypes.find((t: any) => t.id === entry.linen_type_id);
+                if (!linenType) return null;
+                const total = (entry.quantity_clean || 0) + (entry.quantity_dirty || 0) + (entry.quantity_damaged || 0);
+                if (total === 0) return null;
+
+                return (
+                  <div key={entry.id} className="p-4 flex items-center gap-4">
+                    {/* Image miniature */}
+                    {entry.photo_url ? (
+                      <img
+                        src={entry.photo_url}
+                        alt={linenType.name}
+                        className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity border"
+                        onClick={() => setViewingImage({ url: entry.photo_url, name: linenType.name })}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
+                        <Camera className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+
+                    {/* Infos type de linge */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{linenType.icon || "📦"}</span>
+                        <span className="font-medium">{linenType.name}</span>
+                        {linenType.dimensions && (
+                          <span className="text-xs text-muted-foreground">({linenType.dimensions})</span>
+                        )}
+                      </div>
+                      {entry.ai_confidence && (
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${
+                            entry.ai_confidence >= 0.8
+                              ? "border-green-300 text-green-700"
+                              : entry.ai_confidence >= 0.5
+                              ? "border-yellow-300 text-yellow-700"
+                              : "border-red-300 text-red-700"
+                          }`}
+                        >
+                          IA: {Math.round(entry.ai_confidence * 100)}%
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Comptages */}
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="text-center">
+                        <div className="font-bold text-green-700">{entry.quantity_clean || 0}</div>
+                        <div className="text-xs text-muted-foreground">Propre</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-bold text-orange-700">{entry.quantity_dirty || 0}</div>
+                        <div className="text-xs text-muted-foreground">Sale</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-bold text-red-700">{entry.quantity_damaged || 0}</div>
+                        <div className="text-xs text-muted-foreground">Abîmé</div>
+                      </div>
+                      <Badge variant="secondary" className="text-lg px-3 ml-2">
+                        {total}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        ))}
       </div>
 
-      {/* Dialog création saisie directe */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nouvelle saisie d'inventaire</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Date de l'inventaire</Label>
-              <Input
-                type="date"
-                value={newTaskDate}
-                onChange={(e) => setNewTaskDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Notes (optionnel)</Label>
-              <Textarea
-                value={newTaskNotes}
-                onChange={(e) => setNewTaskNotes(e.target.value)}
-                placeholder="Notes sur cet inventaire..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Annuler
-            </Button>
-            <Button onClick={() => createAdminTaskMutation.mutate()}>
-              Créer et saisir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Visionneuse d'image plein écran */}
+      <LinenImageViewer
+        imageUrl={viewingImage?.url || null}
+        linenTypeName={viewingImage?.name}
+        onClose={() => setViewingImage(null)}
+      />
 
-      {/* Dialog vue/édition/validation */}
+      {/* Dialog détail/édition/validation */}
       <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -416,7 +602,6 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
 
           {selectedTask && (
             <div className="space-y-4">
-              {/* Info tâche */}
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div>
                   <div className="font-medium">
@@ -429,7 +614,6 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
                 {getStatusBadge(selectedTask.status)}
               </div>
 
-              {/* Liste des types de linge */}
               <div className="space-y-3">
                 {linenTypes.map((type: any) => {
                   const entry = entries[type.id] || { clean: 0, dirty: 0, damaged: 0 };
@@ -439,11 +623,26 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
                   return (
                     <Card key={type.id} className="p-4">
                       <div className="flex items-center gap-3 mb-3">
-                        <span className="text-2xl">{type.icon || '📦'}</span>
+                        {/* Image miniature dans le dialog */}
+                        {entry.photo_url ? (
+                          <img
+                            src={entry.photo_url}
+                            alt={type.name}
+                            className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
+                            onClick={() => setViewingImage({ url: entry.photo_url, name: type.name })}
+                          />
+                        ) : (
+                          <span className="text-2xl">{type.icon || '📦'}</span>
+                        )}
                         <div className="flex-1">
                           <div className="font-medium">{type.name}</div>
                           {type.dimensions && (
                             <div className="text-sm text-muted-foreground">{type.dimensions}</div>
+                          )}
+                          {entry.ai_confidence && (
+                            <Badge variant="outline" className="text-xs mt-1">
+                              Confiance IA: {Math.round(entry.ai_confidence * 100)}%
+                            </Badge>
                           )}
                         </div>
                         {total > 0 && (
@@ -511,7 +710,6 @@ export const AdminLinenInventory = ({ hotelId }: AdminLinenInventoryProps) => {
                 })}
               </div>
 
-              {/* Zone de validation */}
               {viewMode === 'validate' && (
                 <div className="p-4 bg-blue-50 rounded-lg space-y-3">
                   <Label>Notes de validation (optionnel)</Label>
