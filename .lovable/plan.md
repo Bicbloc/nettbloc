@@ -1,79 +1,95 @@
 
-# Plan : Améliorer le flux de réinitialisation de mot de passe femme de chambre
+# Plan: Supprimer le système d'invitations et ajouter un bouton Technicien sur la page Auth
 
 ## Résumé
-Améliorer l'interface de réinitialisation de mot de passe pour les femmes de chambre en ajoutant un champ de confirmation et en s'assurant que les emails utilisent le bon domaine (sans Lovable visible).
 
----
+Ce plan supprime le système d'invitations inutilisé (StaffInvitationsTab + Edge Function) et ajoute un bouton d'accès Technicien sur la page d'authentification principale.
 
-## Problèmes identifiés
+## Changements à effectuer
 
-1. **Interface incomplète** : La page `/housekeeper/auth` n'a qu'un seul champ "nouveau mot de passe" sans confirmation
-2. **Configuration Supabase** : Le Site URL doit être `https://nettobloc.bicbloc.eu` pour que les liens de réinitialisation pointent vers le bon domaine
+### 1. Supprimer les fichiers du système d'invitations
 
----
+**Fichiers à supprimer:**
+- `src/components/dashboard/StaffInvitationsTab.tsx` - Composant d'interface des invitations
+- `supabase/functions/send-staff-invitation/` - Edge Function d'envoi d'emails
 
-## Modifications à effectuer
+### 2. Modifier la page Auth.tsx
 
-### 1. Ajouter le champ de confirmation du mot de passe
+Ajouter un nouveau bouton dans l'écran de sélection (mode `'select'`) pour les techniciens:
 
-**Fichier** : `src/pages/HousekeeperAuth.tsx`
+```text
+┌────────────────────────────────┐
+│  🏢 Établissement              │  → /auth/establishment
+│     Gérant, responsable        │
+├────────────────────────────────┤
+│  👥 Équipe                     │  → /housekeeper/auth
+│     Femme/valet de chambre     │
+├────────────────────────────────┤
+│  👑 Gouvernante                │  → /governess/auth
+│     Inspection & incidents     │
+├────────────────────────────────┤
+│  🔧 Technicien       (NOUVEAU) │  → /technician/login
+│     Maintenance & incidents    │
+└────────────────────────────────┘
+```
 
-- Ajouter un état `confirmPassword` pour stocker la confirmation
-- Ajouter un champ de saisie "Confirmer le nouveau mot de passe" 
-- Valider que les deux mots de passe correspondent avant soumission
-- Afficher une erreur si les mots de passe ne correspondent pas
+### 3. Nettoyer Index.tsx
 
-### 2. Améliorer le handler de mise à jour
+- Supprimer l'import de `StaffInvitationsTab`
+- Supprimer le bloc de rendu conditionnel pour `activeTab === 'invitations'`
 
-**Fichier** : `src/pages/HousekeeperAuth.tsx`
+### 4. Base de données
 
-- Modifier `handleUpdatePassword` pour vérifier que `newPassword === confirmPassword`
-- Afficher un message d'erreur explicite si les mots de passe diffèrent
+La table `staff_invitations` restera en place pour l'instant (elle ne contient probablement pas de données critiques). Une migration pourra être effectuée ultérieurement pour la supprimer si souhaité.
 
 ---
 
 ## Détails techniques
 
-### État à ajouter
-```text
-const [confirmPassword, setConfirmPassword] = useState('');
+### Fichier: `src/pages/Auth.tsx`
+
+Ajouter dans la section des boutons (après le bouton Gouvernante, ligne ~290):
+
+```tsx
+<button
+  type="button"
+  onClick={() => navigate('/technician/login')}
+  className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
+>
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <div className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+        <Wrench className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="font-medium">{language === 'en' ? 'Technician' : 'Technicien'}</p>
+        <p className="text-xs text-muted-foreground">
+          {language === 'en' ? 'Maintenance & incidents' : 'Maintenance & incidents'}
+        </p>
+      </div>
+    </div>
+    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+  </div>
+</button>
 ```
 
-### Interface recovery mode mise à jour
-La section "Recovery Mode" (lignes 201-261) sera modifiée pour inclure :
-- Champ "Nouveau mot de passe" (existant)
-- Champ "Confirmer le nouveau mot de passe" (nouveau)
-- Bouton "Valider" (existant, renommé)
+### Fichier: `src/pages/Index.tsx`
 
-### Validation ajoutée
-```text
-if (newPassword !== confirmPassword) {
-  toast({ variant: "destructive", ... });
-  return;
-}
-```
+- Supprimer la ligne 52: `import { StaffInvitationsTab } from "@/components/dashboard/StaffInvitationsTab";`
+- Supprimer les lignes 767-776 (bloc invitations)
+
+### Edge Function à supprimer
+
+Le dossier `supabase/functions/send-staff-invitation/` sera supprimé et la fonction déployée sera aussi supprimée de Supabase.
 
 ---
 
-## Configuration Supabase requise (action manuelle)
+## Récapitulatif des actions
 
-Pour que les emails de réinitialisation pointent vers `nettobloc.bicbloc.eu` au lieu de Lovable :
+| Action | Fichier/Dossier |
+|--------|-----------------|
+| Supprimer | `src/components/dashboard/StaffInvitationsTab.tsx` |
+| Supprimer | `supabase/functions/send-staff-invitation/` |
+| Modifier | `src/pages/Auth.tsx` (ajouter bouton Technicien) |
+| Modifier | `src/pages/Index.tsx` (supprimer import et bloc invitations) |
 
-1. **Dashboard Supabase** → Authentication → URL Configuration
-2. **Site URL** : `https://nettobloc.bicbloc.eu`
-3. **Redirect URLs** : ajouter `https://nettobloc.bicbloc.eu/**`
-
-Cette configuration détermine la base URL utilisée dans les emails de Supabase Auth.
-
----
-
-## Résultat attendu
-
-1. L'utilisateur clique sur "Mot de passe oublié"
-2. Il reçoit un email de `support@bicbloc.eu` avec un lien vers `nettobloc.bicbloc.eu`
-3. Le lien l'amène à une page avec :
-   - Champ "Nouveau mot de passe"
-   - Champ "Confirmer le nouveau mot de passe"  
-   - Bouton "Valider"
-4. Après validation, le mot de passe est changé et l'utilisateur peut se connecter
