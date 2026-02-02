@@ -57,7 +57,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   }
 };
 
-interface SubscriptionState {
+export interface SubscriptionState {
   plan: PlanType;
   subscribed: boolean;
   loading: boolean;
@@ -66,9 +66,11 @@ interface SubscriptionState {
   trialEndDate?: string;
   trialDaysRemaining?: number;
   isInTrial: boolean;
+  isTrialExpired: boolean;
   maxRooms: number;
   featuresEnabled: Record<string, boolean>;
   planConfig: PlanConfig;
+  subscriptionStatus: 'none' | 'trial' | 'active' | 'expired' | 'cancelled';
 }
 
 const DEFAULT_FEATURES = {
@@ -91,9 +93,11 @@ export function useSubscription() {
     subscribed: false,
     loading: true,
     isInTrial: false,
+    isTrialExpired: false,
     maxRooms: 30,
     featuresEnabled: DEFAULT_FEATURES,
-    planConfig: PLAN_CONFIGS.freemium
+    planConfig: PLAN_CONFIGS.freemium,
+    subscriptionStatus: 'none'
   });
 
   const checkSubscription = async () => {
@@ -103,9 +107,11 @@ export function useSubscription() {
         subscribed: false, 
         loading: false,
         isInTrial: false,
+        isTrialExpired: false,
         maxRooms: 30,
         featuresEnabled: DEFAULT_FEATURES,
-        planConfig: PLAN_CONFIGS.freemium
+        planConfig: PLAN_CONFIGS.freemium,
+        subscriptionStatus: 'none'
       });
       return;
     }
@@ -113,20 +119,29 @@ export function useSubscription() {
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('plan, subscription_type, trial_start_date, trial_duration_months, trial_end_date, max_rooms, features_enabled, created_at')
+        .select('plan, subscription_type, subscription_status, trial_start_date, trial_duration_months, trial_end_date, max_rooms, features_enabled, created_at, onboarding_completed_at')
         .eq('id', user.id)
         .single();
 
       // Check trial status
       let isInTrial = false;
+      let isTrialExpired = false;
       let trialEndDate: Date | undefined;
       let trialDaysRemaining = 0;
+      let subscriptionStatus: SubscriptionState['subscriptionStatus'] = 'none';
 
-      if (profile?.trial_end_date) {
+      // If user has active subscription
+      if (profile?.subscription_status === 'active' || profile?.subscription_type === 'premium') {
+        subscriptionStatus = 'active';
+      } else if (profile?.trial_end_date) {
         trialEndDate = new Date(profile.trial_end_date);
         if (new Date() < trialEndDate) {
           isInTrial = true;
+          subscriptionStatus = 'trial';
           trialDaysRemaining = differenceInDays(trialEndDate, new Date());
+        } else {
+          isTrialExpired = true;
+          subscriptionStatus = 'expired';
         }
       } else if (profile?.trial_start_date) {
         const trialStart = new Date(profile.trial_start_date);
@@ -135,7 +150,11 @@ export function useSubscription() {
         
         if (new Date() < trialEndDate) {
           isInTrial = true;
+          subscriptionStatus = 'trial';
           trialDaysRemaining = differenceInDays(trialEndDate, new Date());
+        } else {
+          isTrialExpired = true;
+          subscriptionStatus = 'expired';
         }
       }
 
@@ -173,12 +192,14 @@ export function useSubscription() {
         subscribed: isSubscribed,
         loading: false,
         isInTrial,
+        isTrialExpired,
         trialStartDate: profile?.trial_start_date,
         trialEndDate: trialEndDate?.toISOString(),
         trialDaysRemaining,
         maxRooms: planConfig.maxRooms || 999999,
         featuresEnabled,
-        planConfig
+        planConfig,
+        subscriptionStatus
       });
     } catch (error) {
       console.error('Error checking subscription:', error);
@@ -187,9 +208,11 @@ export function useSubscription() {
         subscribed: false,
         loading: false,
         isInTrial: false,
+        isTrialExpired: false,
         maxRooms: 30,
         featuresEnabled: DEFAULT_FEATURES,
-        planConfig: PLAN_CONFIGS.freemium
+        planConfig: PLAN_CONFIGS.freemium,
+        subscriptionStatus: 'none'
       });
     }
   };
@@ -248,9 +271,11 @@ export function useSubscription() {
     isPremium: ['premium', 'platinum'].includes(subscription.plan) && subscription.subscribed,
     isFree: subscription.plan === 'freemium' && !subscription.isInTrial,
     isInTrial: subscription.isInTrial,
+    isTrialExpired: subscription.isTrialExpired,
     isPlatinum: subscription.plan === 'platinum',
     isBasic: subscription.plan === 'basic',
     isBasicPlus: subscription.plan === 'basic_plus',
     isPaidPlan,
+    subscriptionStatus: subscription.subscriptionStatus,
   };
 }

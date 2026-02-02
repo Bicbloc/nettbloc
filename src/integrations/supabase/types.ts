@@ -2998,17 +2998,30 @@ export type Database = {
       profiles: {
         Row: {
           billing_address: string | null
+          billing_city: string | null
+          billing_company_name: string | null
+          billing_contact_email: string | null
+          billing_contact_name: string | null
+          billing_country: string | null
           billing_email: string | null
+          billing_phone: string | null
+          billing_postal_code: string | null
           billing_siret: string | null
+          billing_tva_number: string | null
           company_name: string | null
           created_at: string
           current_hotel_id: string | null
           email: string
           features_enabled: Json | null
+          gocardless_customer_id: string | null
+          gocardless_mandate_id: string | null
           id: string
           is_suspended: boolean
           max_rooms: number | null
+          onboarding_completed_at: string | null
           plan: string | null
+          subscription_started_at: string | null
+          subscription_status: string | null
           subscription_type: string | null
           suspension_reason: string | null
           trial_duration_months: number | null
@@ -3017,22 +3030,37 @@ export type Database = {
           trial_extension_granted_at: string | null
           trial_extension_granted_by: string | null
           trial_extension_reason: string | null
+          trial_reminder_sent_at: string | null
           trial_start_date: string | null
+          trial_warning_level: number | null
           updated_at: string
         }
         Insert: {
           billing_address?: string | null
+          billing_city?: string | null
+          billing_company_name?: string | null
+          billing_contact_email?: string | null
+          billing_contact_name?: string | null
+          billing_country?: string | null
           billing_email?: string | null
+          billing_phone?: string | null
+          billing_postal_code?: string | null
           billing_siret?: string | null
+          billing_tva_number?: string | null
           company_name?: string | null
           created_at?: string
           current_hotel_id?: string | null
           email: string
           features_enabled?: Json | null
+          gocardless_customer_id?: string | null
+          gocardless_mandate_id?: string | null
           id: string
           is_suspended?: boolean
           max_rooms?: number | null
+          onboarding_completed_at?: string | null
           plan?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string | null
           subscription_type?: string | null
           suspension_reason?: string | null
           trial_duration_months?: number | null
@@ -3041,22 +3069,37 @@ export type Database = {
           trial_extension_granted_at?: string | null
           trial_extension_granted_by?: string | null
           trial_extension_reason?: string | null
+          trial_reminder_sent_at?: string | null
           trial_start_date?: string | null
+          trial_warning_level?: number | null
           updated_at?: string
         }
         Update: {
           billing_address?: string | null
+          billing_city?: string | null
+          billing_company_name?: string | null
+          billing_contact_email?: string | null
+          billing_contact_name?: string | null
+          billing_country?: string | null
           billing_email?: string | null
+          billing_phone?: string | null
+          billing_postal_code?: string | null
           billing_siret?: string | null
+          billing_tva_number?: string | null
           company_name?: string | null
           created_at?: string
           current_hotel_id?: string | null
           email?: string
           features_enabled?: Json | null
+          gocardless_customer_id?: string | null
+          gocardless_mandate_id?: string | null
           id?: string
           is_suspended?: boolean
           max_rooms?: number | null
+          onboarding_completed_at?: string | null
           plan?: string | null
+          subscription_started_at?: string | null
+          subscription_status?: string | null
           subscription_type?: string | null
           suspension_reason?: string | null
           trial_duration_months?: number | null
@@ -3065,7 +3108,9 @@ export type Database = {
           trial_extension_granted_at?: string | null
           trial_extension_granted_by?: string | null
           trial_extension_reason?: string | null
+          trial_reminder_sent_at?: string | null
           trial_start_date?: string | null
+          trial_warning_level?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -4454,6 +4499,7 @@ export type Database = {
           sub_account_id: string
         }[]
       }
+      get_trial_warning_level: { Args: { p_user_id: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -4509,6 +4555,7 @@ export type Database = {
           name: string
         }[]
       }
+      start_trial_period: { Args: { p_user_id: string }; Returns: string }
       sub_account_has_permission: {
         Args: { p_permission_key: string; p_sub_account_id: string }
         Returns: boolean

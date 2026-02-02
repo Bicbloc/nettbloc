@@ -2,13 +2,14 @@ import { ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Lock, Crown, Sparkles, Zap } from 'lucide-react';
-import { useSubscription } from '@/hooks/useSubscription';
+import { Lock, Crown, Sparkles, Zap, AlertTriangle } from 'lucide-react';
+import { useSubscription, PLAN_CONFIGS } from '@/hooks/useSubscription';
 import { UpgradeButton } from '@/components/UpgradeButton';
+import { useNavigate } from 'react-router-dom';
 
 interface FeatureGuardProps {
   children: ReactNode;
-  feature: 'incidents' | 'linen' | 'access_codes' | 'ai_learning' | 'api_access' | 'unlimited_rooms';
+  feature: 'incidents' | 'linen' | 'access_codes' | 'ai_learning' | 'api_access' | 'unlimited_rooms' | 'inspection';
   fallback?: ReactNode;
   showUpgradeCard?: boolean;
   roomCount?: number;
@@ -45,6 +46,11 @@ const featureLabels: Record<string, { title: string; description: string; icon: 
     title: "Chambres illimitées",
     description: "Gérez autant de chambres que nécessaire",
     icon: <Crown className="h-5 w-5" />
+  },
+  inspection: {
+    title: "Inspections gouvernante",
+    description: "Module d'inspection des chambres avec notation",
+    icon: <Sparkles className="h-5 w-5" />
   }
 };
 
@@ -56,11 +62,20 @@ export function FeatureGuard({
   roomCount,
   maxFreeRooms = 15
 }: FeatureGuardProps) {
-  const { isPremium, isInTrial, loading, trialDaysRemaining } = useSubscription();
+  const { isPremium, isInTrial, isTrialExpired, loading, trialDaysRemaining, plan, maxRooms, subscribed } = useSubscription();
+  const navigate = useNavigate();
 
   // Loading state
   if (loading) {
     return <div className="animate-pulse bg-muted rounded-lg h-32" />;
+  }
+
+  // Trial expired - redirect to plan selection
+  if (isTrialExpired && !subscribed) {
+    if (fallback) return <>{fallback}</>;
+    return (
+      <TrialExpiredCard onChoosePlan={() => navigate('/plans')} />
+    );
   }
 
   // Premium or in trial: show content
@@ -70,7 +85,7 @@ export function FeatureGuard({
 
   // Room limit check for free users
   if (feature === 'unlimited_rooms' && roomCount !== undefined) {
-    if (roomCount <= maxFreeRooms) {
+    if (roomCount <= maxRooms) {
       return <>{children}</>;
     }
   }
@@ -106,34 +121,36 @@ export function FeatureGuard({
       <CardContent className="text-center space-y-4">
         <div className="p-3 bg-muted/50 rounded-lg">
           <p className="text-sm text-muted-foreground">
-            Passez au Premium pour débloquer cette fonctionnalité et profiter de tous les avantages :
+            Votre plan actuel: <Badge variant="outline">{PLAN_CONFIGS[plan].displayName}</Badge>
           </p>
-          <ul className="text-sm text-left mt-3 space-y-2">
-            <li className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Chambres illimitées
-            </li>
-            <li className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Codes d'accès pour l'équipe
-            </li>
-            <li className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Gestion des incidents
-            </li>
-            <li className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Inventaire linge IA
-            </li>
-          </ul>
         </div>
         
         <div className="space-y-2">
           <UpgradeButton className="w-full" />
-          <p className="text-xs text-muted-foreground">
-            Essai gratuit de 3 mois pour les nouveaux utilisateurs
-          </p>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Trial expired card
+function TrialExpiredCard({ onChoosePlan }: { onChoosePlan: () => void }) {
+  return (
+    <Card className="border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-transparent dark:from-amber-950/20">
+      <CardHeader className="text-center pb-2">
+        <div className="mx-auto p-3 rounded-full bg-amber-100 dark:bg-amber-900/30 w-fit mb-2">
+          <AlertTriangle className="h-6 w-6 text-amber-600" />
+        </div>
+        <CardTitle className="text-lg">Période d'essai terminée</CardTitle>
+        <CardDescription>
+          Choisissez un plan pour continuer à accéder à cette fonctionnalité
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="text-center">
+        <Button onClick={onChoosePlan} className="bg-amber-600 hover:bg-amber-700">
+          <Crown className="h-4 w-4 mr-2" />
+          Choisir un plan
+        </Button>
       </CardContent>
     </Card>
   );

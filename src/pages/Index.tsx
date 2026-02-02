@@ -32,6 +32,8 @@ import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
 import { SupabaseService } from "@/services/supabaseService";
 import { AssignmentService } from "@/services/assignmentService";
 import { usePdfWorkflow } from "@/hooks/use-pdf-workflow";
+import { useOnboarding } from "@/hooks/use-onboarding";
+import { OnboardingWizard, TrialExpiryBanner, TrialExpiredBlocker } from "@/components/onboarding";
 
 // Layout components
 import { MainLayout, TabValue } from "@/components/layout";
@@ -552,11 +554,33 @@ const IndexDashboard = () => {
 
   // Note: Auth check is now done at the top of the component
 
+  // Onboarding check
+  const { needsOnboarding, isTrialExpired, trialWarningLevel, isLoading: onboardingLoading } = useOnboarding();
+  const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
+
+  // Show onboarding wizard for new users
+  useEffect(() => {
+    if (!onboardingLoading && needsOnboarding && isAuthenticated) {
+      setShowOnboardingWizard(true);
+    }
+  }, [needsOnboarding, onboardingLoading, isAuthenticated]);
+
+  // Block access if trial expired
+  if (isTrialExpired && !subscriptionLoading) {
+    return <TrialExpiredBlocker />;
+  }
+
   return (
     <>
+      {/* Onboarding Wizard for new users */}
+      <OnboardingWizard
+        isOpen={showOnboardingWizard}
+        onComplete={() => setShowOnboardingWizard(false)}
+      />
+
       {currentHotelId && (
         <FirstTimeSetupWizard
-          isOpen={showSetupWizard}
+          isOpen={showSetupWizard && !showOnboardingWizard}
           onComplete={handleSetupComplete}
           hotelCode={contextHotelCode || ''}
           hotelId={currentHotelId}
@@ -579,6 +603,13 @@ const IndexDashboard = () => {
         subscriptionLoading={subscriptionLoading}
         onStartWorkflow={() => setActiveTab('overview')}
       >
+        {/* Trial expiry banner */}
+        {trialWarningLevel > 0 && (
+          <div className="mb-4">
+            <TrialExpiryBanner />
+          </div>
+        )}
+        
         <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
         
         <div className="space-y-6 mt-6">
