@@ -92,7 +92,7 @@ serve(async (req: Request): Promise<Response> => {
     // NOTE: Until you verify your domain at resend.com/domains, 
     // you can only send to your own email address (testing mode)
     const { error: emailError } = await resend.emails.send({
-      from: "NettooBloc <onboarding@resend.dev>",  // Change to your-domain after verification
+      from: "Nettobloc <noreply@bicbloc.eu>",
       to: [email],
       subject: `Invitation à rejoindre ${hotelName} - NettooBloc`,
       html: `
