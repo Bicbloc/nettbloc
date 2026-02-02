@@ -392,6 +392,121 @@ export type Database = {
           },
         ]
       }
+      daily_governess_assignments: {
+        Row: {
+          assigned_floors: number[] | null
+          assigned_housekeepers: string[] | null
+          assignment_date: string
+          assignment_type: string
+          created_at: string
+          created_by: string | null
+          governess_name: string
+          governess_profile_id: string | null
+          hotel_id: string
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          assigned_floors?: number[] | null
+          assigned_housekeepers?: string[] | null
+          assignment_date?: string
+          assignment_type?: string
+          created_at?: string
+          created_by?: string | null
+          governess_name: string
+          governess_profile_id?: string | null
+          hotel_id: string
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          assigned_floors?: number[] | null
+          assigned_housekeepers?: string[] | null
+          assignment_date?: string
+          assignment_type?: string
+          created_at?: string
+          created_by?: string | null
+          governess_name?: string
+          governess_profile_id?: string | null
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_governess_assignments_governess_profile_id_fkey"
+            columns: ["governess_profile_id"]
+            isOneToOne: false
+            referencedRelation: "governess_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_governess_assignments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_governess_assignments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_instructions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          instruction_date: string
+          instructions: string | null
+          to_know: string | null
+          todo_list: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          hotel_id: string
+          id?: string
+          instruction_date?: string
+          instructions?: string | null
+          to_know?: string | null
+          todo_list?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          hotel_id?: string
+          id?: string
+          instruction_date?: string
+          instructions?: string | null
+          to_know?: string | null
+          todo_list?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_instructions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_instructions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_reports: {
         Row: {
           created_at: string | null
