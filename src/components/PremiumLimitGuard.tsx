@@ -28,7 +28,7 @@ export const PremiumLimitGuard: React.FC<PremiumLimitGuardProps> = ({
   const { isPremium, isFree, loading, isPaidPlan } = useSubscription() as ReturnType<typeof useSubscription> & { isPaidPlan: boolean };
 
   // Features that require at least a paid plan (basic, basic+, premium, platinum)
-  const paidPlanFeatures = ['access_codes', 'invitations'];
+  const paidPlanFeatures = ['access_codes'];
 
   // Features that require premium only (premium, platinum)
   const premiumFeatures = [

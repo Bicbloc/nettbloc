@@ -62,7 +62,7 @@ export function AppSidebar({
   // Inventaires
   const inventoryItems: NavItem[] = [
     { value: 'linen', label: t.dashboard.linenInventory, icon: <span className="text-lg">🧺</span>, premium: true },
-    { value: 'lost-found', label: 'Objets Trouvés', icon: <Package className="h-5 w-5" />, premium: true },
+    { value: 'lost-found', label: t.dashboard.lostAndFound, icon: <Package className="h-5 w-5" />, premium: true },
   ];
 
   // Outils avancés
@@ -135,7 +135,7 @@ export function AppSidebar({
         {/* Header */}
         <div className="p-3 border-b border-border/50 flex items-center justify-between">
           {!isCollapsed && (
-            <span className="text-sm font-semibold">Menu</span>
+            <span className="text-sm font-semibold">{t.dashboard.menu}</span>
           )}
           <Button
             variant="ghost"
@@ -158,17 +158,17 @@ export function AppSidebar({
             {!isCollapsed && <Separator className="mx-2" />}
             
             {/* Opérations */}
-            {renderSection(operationsItems, 'Opérations')}
+            {renderSection(operationsItems, t.dashboard.operations)}
             
             {!isCollapsed && <Separator className="mx-2" />}
             
             {/* Inventaires */}
-            {renderSection(inventoryItems, 'Inventaires')}
+            {renderSection(inventoryItems, t.dashboard.inventory)}
             
             {!isCollapsed && <Separator className="mx-2" />}
             
             {/* Outils */}
-            {renderSection(toolsItems, 'Outils')}
+            {renderSection(toolsItems, t.dashboard.tools)}
           </div>
         </ScrollArea>
       </div>

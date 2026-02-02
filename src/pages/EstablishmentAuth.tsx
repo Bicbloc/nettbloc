@@ -7,9 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import BackButton from '@/components/BackButton';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Building, Users, KeyRound } from 'lucide-react';
+import { Loader2, Building, KeyRound, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
@@ -285,31 +284,49 @@ const EstablishmentAuth = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Vérification de l'authentification...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <p className="text-white/80">Vérification de l'authentification...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4 relative">
-      <div className="absolute top-4 left-4">
-        <BackButton to="/" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 p-4 relative overflow-hidden">
+      {/* Decorative elements */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-400/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-cyan-400/20 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl" />
+      
+      <div className="absolute top-4 left-4 z-20">
+        <Link to="/auth">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
       </div>
-      <div className="w-full max-w-md space-y-6">
+      
+      <div className="w-full max-w-md space-y-6 relative z-10">
         <div className="text-center space-y-2">
-          <Building className="h-12 w-12 mx-auto text-primary" />
-          <h1 className="text-3xl font-bold">Espace Établissement</h1>
-          <p className="text-muted-foreground">Gérez votre hôtel et vos équipes</p>
+          <div className="flex justify-center mb-4">
+            <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
+              <Building className="h-12 w-12 text-white" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white">Espace Établissement</h1>
+          <p className="text-white/80">Gérez votre hôtel et vos équipes</p>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="bg-white/95 backdrop-blur-sm shadow-2xl border-0">
+          <CardHeader className="pb-2">
             <CardTitle>
               {isPasswordReset ? (
                 <div className="flex items-center gap-2">
-                  <KeyRound className="h-5 w-5" />
+                  <KeyRound className="h-5 w-5 text-emerald-600" />
                   Nouveau mot de passe
                 </div>
               ) : (
@@ -336,6 +353,7 @@ const EstablishmentAuth = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, newPassword: e.target.value }))}
                     required
                     minLength={6}
+                    className="h-12 bg-slate-50 border-slate-200"
                   />
                 </div>
                 <div className="space-y-2">
@@ -348,9 +366,14 @@ const EstablishmentAuth = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
                     required
                     minLength={6}
+                    className="h-12 bg-slate-50 border-slate-200"
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg" 
+                  disabled={isLoading}
+                >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Mettre à jour
                 </Button>
@@ -373,6 +396,7 @@ const EstablishmentAuth = () => {
                         value={formData.email}
                         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                         required
+                        className="h-12 bg-slate-50 border-slate-200"
                       />
                     </div>
                     <div className="space-y-2">
@@ -383,9 +407,14 @@ const EstablishmentAuth = () => {
                         value={formData.password}
                         onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                         required
+                        className="h-12 bg-slate-50 border-slate-200"
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button 
+                      type="submit" 
+                      className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg" 
+                      disabled={isLoading}
+                    >
                       {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Se connecter
                     </Button>
@@ -394,7 +423,7 @@ const EstablishmentAuth = () => {
                         variant="link" 
                         type="button"
                         onClick={handlePasswordReset}
-                        className="text-sm text-muted-foreground"
+                        className="text-sm text-emerald-600 hover:text-emerald-800"
                       >
                         Mot de passe oublié ?
                       </Button>
@@ -413,6 +442,7 @@ const EstablishmentAuth = () => {
                         value={formData.companyName}
                         onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                         required
+                        className="h-12 bg-slate-50 border-slate-200"
                       />
                     </div>
                     <div className="space-y-2">
@@ -424,6 +454,7 @@ const EstablishmentAuth = () => {
                         value={formData.email}
                         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                         required
+                        className="h-12 bg-slate-50 border-slate-200"
                       />
                     </div>
                     <div className="space-y-2">
@@ -436,6 +467,7 @@ const EstablishmentAuth = () => {
                         onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                         required
                         minLength={6}
+                        className="h-12 bg-slate-50 border-slate-200"
                       />
                     </div>
                     <div className="space-y-2">
@@ -446,9 +478,14 @@ const EstablishmentAuth = () => {
                         value={formData.confirmPassword}
                         onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                         required
+                        className="h-12 bg-slate-50 border-slate-200"
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button 
+                      type="submit" 
+                      className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg" 
+                      disabled={isLoading}
+                    >
                       {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Créer mon compte
                     </Button>
@@ -456,24 +493,6 @@ const EstablishmentAuth = () => {
                 </TabsContent>
               </Tabs>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Lien vers connexion femme de chambre */}
-        <Card className="bg-emerald-50 border-emerald-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3 mb-3">
-              <Users className="h-6 w-6 text-emerald-600" />
-              <div>
-                <h3 className="font-semibold text-emerald-800">Vous êtes femme de chambre ?</h3>
-                <p className="text-sm text-emerald-700">Accédez à l'interface mobile dédiée</p>
-              </div>
-            </div>
-            <Link to="/housekeeper/login">
-              <Button variant="outline" className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-100">
-                Connexion Femme de chambre
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>

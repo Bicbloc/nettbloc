@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Loader2 } from 'lucide-react';
+import { Wrench, Loader2, ArrowLeft } from 'lucide-react';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 
 export default function TechnicianSignup() {
@@ -75,15 +75,32 @@ export default function TechnicianSignup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-700 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Decorative elements */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl" />
+      
+      <div className="absolute top-4 left-4 z-20">
+        <Link to="/auth">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+      </div>
+      
+      <Card className="w-full max-w-md relative z-10 bg-white/95 backdrop-blur-sm shadow-2xl border-0">
+        <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">
-            <div className="bg-blue-100 p-4 rounded-full">
-              <Wrench className="h-10 w-10 text-blue-600" />
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-4 rounded-2xl shadow-lg">
+              <Wrench className="h-10 w-10 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Inscription Technicien</CardTitle>
+          <CardTitle className="text-2xl font-bold">Inscription Technicien</CardTitle>
           <CardDescription>
             Créez votre compte pour accéder aux incidents
           </CardDescription>
@@ -97,7 +114,7 @@ export default function TechnicianSignup() {
                 placeholder="Jean Dupont"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="h-11"
+                className="h-12 bg-slate-50 border-slate-200"
                 required
               />
             </div>
@@ -110,7 +127,7 @@ export default function TechnicianSignup() {
                 placeholder="technicien@hotel.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-11"
+                className="h-12 bg-slate-50 border-slate-200"
                 required
               />
             </div>
@@ -123,7 +140,7 @@ export default function TechnicianSignup() {
                 placeholder="+33 6 12 34 56 78"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="h-11"
+                className="h-12 bg-slate-50 border-slate-200"
               />
             </div>
 
@@ -132,10 +149,10 @@ export default function TechnicianSignup() {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Minimum 6 caractères"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-11"
+                className="h-12 bg-slate-50 border-slate-200"
                 required
               />
             </div>
@@ -148,7 +165,7 @@ export default function TechnicianSignup() {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="h-11"
+                className="h-12 bg-slate-50 border-slate-200"
                 required
               />
             </div>
@@ -156,7 +173,7 @@ export default function TechnicianSignup() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11"
+              className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
             >
               {isLoading ? (
                 <>
@@ -173,7 +190,7 @@ export default function TechnicianSignup() {
 
             <div className="text-center text-sm text-muted-foreground">
               Déjà un compte ?{' '}
-              <Link to="/technician/login" className="text-primary hover:underline">
+              <Link to="/technician/login" className="text-blue-600 hover:underline font-medium">
                 Se connecter
               </Link>
             </div>
