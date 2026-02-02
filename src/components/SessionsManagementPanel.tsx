@@ -41,7 +41,7 @@ export function SessionsManagementPanel() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'admin' | 'housekeeper'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'admin' | 'housekeeper' | 'governess' | 'technician'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedSession, setSelectedSession] = useState<SessionDetails | null>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -289,6 +289,8 @@ export function SessionsManagementPanel() {
               <SelectItem value="all">Tous les types</SelectItem>
               <SelectItem value="admin">Administrateurs</SelectItem>
               <SelectItem value="housekeeper">Femmes de chambre</SelectItem>
+              <SelectItem value="governess">Gouvernantes</SelectItem>
+              <SelectItem value="technician">Techniciens</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
@@ -339,8 +341,19 @@ export function SessionsManagementPanel() {
                       {session.user_email || '-'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={session.user_type === 'admin' ? 'default' : 'secondary'}>
-                        {session.user_type === 'admin' ? 'Admin' : 'Femme de chambre'}
+                      <Badge variant={
+                        session.user_type === 'admin' ? 'default' : 
+                        session.user_type === 'governess' ? 'outline' :
+                        session.user_type === 'technician' ? 'destructive' :
+                        'secondary'
+                      } className={
+                        session.user_type === 'governess' ? 'border-purple-500 text-purple-600' :
+                        session.user_type === 'technician' ? 'bg-orange-500' : ''
+                      }>
+                        {session.user_type === 'admin' ? 'Admin' : 
+                         session.user_type === 'governess' ? 'Gouvernante' :
+                         session.user_type === 'technician' ? 'Technicien' :
+                         'Femme de chambre'}
                       </Badge>
                     </TableCell>
                     <TableCell>
