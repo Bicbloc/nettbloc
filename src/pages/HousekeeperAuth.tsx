@@ -16,6 +16,7 @@ export default function HousekeeperAuth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isRequestingReset, setIsRequestingReset] = useState(false);
@@ -93,6 +94,17 @@ export default function HousekeeperAuth() {
       return;
     }
 
+    if (newPassword !== confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: language === 'en' ? "Passwords don't match" : "Les mots de passe ne correspondent pas",
+        description: language === 'en' 
+          ? "Please make sure both passwords are identical" 
+          : "Veuillez vous assurer que les deux mots de passe sont identiques"
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -108,6 +120,7 @@ export default function HousekeeperAuth() {
       });
       setIsRecoveryMode(false);
       setNewPassword('');
+      setConfirmPassword('');
     } catch (error: any) {
       console.error('Update password error:', error);
       toast({
@@ -238,6 +251,21 @@ export default function HousekeeperAuth() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="flex items-center gap-2 text-sm font-medium">
+                    <Lock className="h-4 w-4 text-muted-foreground" />
+                    {language === 'en' ? 'Confirm new password' : 'Confirmer le nouveau mot de passe'}
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+
                 <Button
                   onClick={handleUpdatePassword}
                   className="w-full h-12 text-base font-semibold bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
@@ -249,7 +277,7 @@ export default function HousekeeperAuth() {
                       {language === 'en' ? 'Updating...' : 'Mise à jour...'}
                     </>
                   ) : (
-                    language === 'en' ? 'Update password' : 'Mettre à jour le mot de passe'
+                    language === 'en' ? 'Confirm' : 'Valider'
                   )}
                 </Button>
               </div>
