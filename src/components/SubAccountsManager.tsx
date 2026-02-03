@@ -201,7 +201,7 @@ export function SubAccountsManager() {
           last_name: formData.last_name,
           role_name: formData.role_name,
           created_by: user.id,
-          invitation_status: 'pending',
+          invitation_status: 'invited',
         })
         .select()
         .single();
@@ -394,8 +394,8 @@ export function SubAccountsManager() {
               Nouveau sous-compte
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
                 {editingAccount ? 'Modifier le sous-compte' : 'Créer un sous-compte'}
@@ -405,7 +405,7 @@ export function SubAccountsManager() {
               </DialogDescription>
             </DialogHeader>
 
-            <ScrollArea className="flex-1 pr-4">
+            <ScrollArea className="flex-1 min-h-0 pr-4">
               <div className="space-y-6 py-4">
                 {/* Informations personnelles */}
                 <div className="space-y-4">
