@@ -5043,6 +5043,18 @@ export type Database = {
         Args: { p_current_session_id?: string; p_user_id: string }
         Returns: undefined
       }
+      complete_onboarding: {
+        Args: {
+          p_company_name?: string
+          p_contact_email?: string
+          p_contact_name?: string
+          p_phone?: string
+          p_siret?: string
+          p_tva_number?: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       create_hotel_incident_defaults: {
         Args: { p_hotel_id: string }
         Returns: undefined

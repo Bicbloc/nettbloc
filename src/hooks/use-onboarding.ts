@@ -65,12 +65,16 @@ export function useOnboarding() {
           .from('profiles')
           .select('onboarding_completed_at, trial_end_date, subscription_status, subscription_type')
           .eq('id', profileUserId)
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
+        // Si le profil n'existe pas encore, l'onboarding est nécessaire
+        if (error && error.code !== 'PGRST116') {
+          console.error('Erreur récupération profil:', error);
+        }
 
         // Les sous-comptes n'ont pas besoin d'onboarding - ils héritent de la config du parent
-        const needsOnboarding = isSubAccount ? false : !profile?.onboarding_completed_at;
+        // Si pas de profil, l'utilisateur doit faire l'onboarding
+        const needsOnboarding = isSubAccount ? false : (!profile || !profile?.onboarding_completed_at);
 
         // Calculer le niveau d'avertissement trial
         let trialWarningLevel = 0;
