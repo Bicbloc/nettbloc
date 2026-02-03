@@ -93,6 +93,14 @@ export default function ActivateAccount() {
     setIsActivating(true);
 
     try {
+      if (!code) {
+        throw new Error("Code d'activation manquant");
+      }
+
+      if (!subAccount?.id) {
+        throw new Error("Invitation invalide (sous-compte introuvable)");
+      }
+
       // Clear any existing cache to prevent stale hotel data
       localStorage.removeItem('nettbloc_hotel');
       localStorage.removeItem('nettbloc-hotel');
@@ -132,51 +140,31 @@ export default function ActivateAccount() {
 
       console.log("✅ Auth user created:", authData.user.id);
 
-      // Update sub_account with user_id and mark as active
-      const { error: updateError } = await supabase
-        .from("sub_accounts")
-        .update({
-          user_id: authData.user.id,
-          invitation_status: "active",
-          is_active: true,
-        })
-        .eq("id", subAccount.id);
+      // Link the new auth user to the invited sub-account + parent hotel on the server side.
+      // This is critical because signUp may not create an immediate session (email confirmation settings).
+      const { data: activationData, error: activationError } = await supabase.functions.invoke(
+        'activate-subaccount',
+        {
+          body: {
+            invitationCode: code,
+            userId: authData.user.id,
+          },
+        }
+      );
 
-      if (updateError) {
-        console.error("❌ Error updating sub_account:", updateError);
-      } else {
-        console.log("✅ sub_account updated with user_id");
+      if (activationError) {
+        console.error('❌ activate-subaccount error:', activationError);
+        throw new Error(activationError.message || "Erreur lors de l'activation du sous-compte");
       }
 
-      // Create a profile for the sub-account linked to parent's hotel
-      // This prevents HotelContext from creating a new hotel
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: authData.user.id,
-          email: email,
-          current_hotel_id: subAccount.hotel_id, // CRITICAL: Link to parent hotel
-          onboarding_completed_at: new Date().toISOString(), // Skip onboarding
-          company_name: subAccount.hotels?.name || null,
-          subscription_type: 'trial', // Inherit trial status (parent manages subscription)
-        });
+      console.log('✅ Sub-account linked to hotel:', activationData?.hotel);
 
-      if (profileError) {
-        console.error("❌ Error creating profile:", profileError);
-      } else {
-        console.log("✅ Profile created with current_hotel_id:", subAccount.hotel_id);
-      }
-
-      // Mark invitation as accepted
-      if (invitation?.id) {
-        await supabase
-          .from("sub_account_invitations")
-          .update({
-            status: "accepted",
-            accepted_at: new Date().toISOString(),
-          })
-          .eq("id", invitation.id);
-        console.log("✅ Invitation marked as accepted");
+      // Try to sign in immediately (optional). If email confirmation is required, this will fail gracefully.
+      if (!authData.session) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          console.warn('ℹ️ Immediate sign-in skipped:', signInError.message);
+        }
       }
 
       toast.success("Compte activé avec succès !");

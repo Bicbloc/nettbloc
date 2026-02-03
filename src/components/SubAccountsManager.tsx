@@ -114,7 +114,9 @@ export function SubAccountsManager() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSending, setIsSending] = useState(false);
 
-  const activationBaseUrl = "https://nettobloc.bicbloc.eu";
+  const activationBaseUrl = typeof window !== 'undefined'
+    ? window.location.origin
+    : 'https://nettbloc.lovable.app';
   const getActivationUrl = (code: string) => `${activationBaseUrl}/activate-account?code=${encodeURIComponent(code)}`;
   
   const [formData, setFormData] = useState({
