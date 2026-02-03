@@ -27,18 +27,16 @@ interface LinenCameraScannerProps {
   onClose: () => void;
 }
 
-// Parse width from dimensions string (e.g., "140x200" -> 140)
 const parseWidthFromDimensions = (dimensions: string | null): number | null => {
   if (!dimensions) return null;
   const match = dimensions.match(/^(\d+)/);
   return match ? parseInt(match[1], 10) : null;
 };
 
-// Guide frame constants (percentage of video area)
-const GUIDE_LEFT = 10; // 10%
-const GUIDE_TOP = 15; // 15%
-const GUIDE_WIDTH = 80; // 80%
-const GUIDE_HEIGHT = 70; // 70%
+const GUIDE_LEFT = 10;
+const GUIDE_TOP = 10;
+const GUIDE_WIDTH = 80;
+const GUIDE_HEIGHT = 55;
 
 export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   linenTypeId,
@@ -56,6 +54,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLiveScanning, setIsLiveScanning] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [liveResult, setLiveResult] = useState<{
     count: number;
     confidence: number;
@@ -73,7 +72,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [scanMode, setScanMode] = useState<'live' | 'photo' | 'manual'>('live');
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   
-  // Linen type detection
   const [linenTypes, setLinenTypes] = useState<LinenType[]>([]);
   const [matchingLinenTypes, setMatchingLinenTypes] = useState<LinenType[]>([]);
   const [showLinenTypeSelector, setShowLinenTypeSelector] = useState(false);
@@ -82,7 +80,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   
   const { toast } = useToast();
 
-  // Load linen types for width detection
   useEffect(() => {
     const loadLinenTypes = async () => {
       const { data, error } = await supabase
@@ -98,7 +95,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     loadLinenTypes();
   }, [hotelId]);
 
-  // Detect matching linen types based on width
   useEffect(() => {
     if (!liveResult?.widthCm || linenTypes.length === 0) {
       setMatchingLinenTypes([]);
@@ -106,7 +102,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     }
 
     const detectedWidth = liveResult.widthCm;
-    const tolerance = 15; // 15cm tolerance
+    const tolerance = 15;
 
     const matches = linenTypes.filter(lt => {
       const width = parseWidthFromDimensions(lt.dimensions);
@@ -116,21 +112,14 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
     setMatchingLinenTypes(matches);
 
-    // If multiple matches found, prompt user to select
     if (matches.length > 1) {
       setShowLinenTypeSelector(true);
     } else if (matches.length === 1 && matches[0].id !== selectedLinenTypeId) {
-      // Auto-select if only one match
       setSelectedLinenTypeId(matches[0].id);
       setSelectedLinenTypeName(matches[0].name);
-      toast({
-        title: "Type de linge détecté",
-        description: `${matches[0].name} détecté (largeur ≈ ${Math.round(detectedWidth)}cm)`,
-      });
     }
-  }, [liveResult?.widthCm, linenTypes, selectedLinenTypeId, toast]);
+  }, [liveResult?.widthCm, linenTypes, selectedLinenTypeId]);
 
-  // Start camera on mount
   useEffect(() => {
     if (scanMode === 'live' || scanMode === 'photo') {
       startCamera();
@@ -168,7 +157,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         const confidence = Number(data?.confidence ?? 0);
         const widthCm = data?.dimensions?.width_cm ?? null;
 
-        // Parse pile bounds - these are relative to full image (0-1)
         const rawBounds = data?.pile_bounds;
         let pileBounds = null;
         if (rawBounds && (rawBounds.w > 0 || rawBounds.h > 0)) {
@@ -202,7 +190,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         if (!hasShownLiveError) {
           toast({
             title: "Erreur du scanner",
-            description: "Impossible d'analyser. Réessayez ou utilisez le mode photo.",
+            description: "Impossible d'analyser. Réessayez.",
             variant: 'destructive',
           });
           setHasShownLiveError(true);
@@ -214,7 +202,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     };
 
     tick();
-    const id = window.setInterval(tick, 1500); // Slightly slower for better accuracy
+    const id = window.setInterval(tick, 1500);
     return () => window.clearInterval(id);
   }, [isStreaming, isLiveScanning, cameraFailed, selectedLinenTypeId, hotelId, hasManualOverride, scanMode, hasShownLiveError, toast]);
 
@@ -253,7 +241,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     setIsStreaming(false);
   };
 
-  const captureFrameDataUrl = () => {
+  const captureFrameDataUrl = (quality = 0.75) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return null;
@@ -269,11 +257,55 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, w, h);
 
-    return canvas.toDataURL('image/jpeg', 0.75);
+    return canvas.toDataURL('image/jpeg', quality);
+  };
+
+  // Upload photo to Supabase storage
+  const uploadPhotoToStorage = async (dataUrl: string): Promise<string | null> => {
+    try {
+      const base64Data = dataUrl.split(',')[1];
+      if (!base64Data) return null;
+
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+      const fileName = `linen-scan-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const filePath = `${hotelId}/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('linen-scans')
+        .upload(filePath, blob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        // Try creating bucket if not exists
+        if (error.message?.includes('not found')) {
+          console.log('Bucket may not exist, photo will not be saved');
+        }
+        return null;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('linen-scans')
+        .getPublicUrl(filePath);
+
+      return urlData?.publicUrl || null;
+    } catch (err) {
+      console.error('Upload failed:', err);
+      return null;
+    }
   };
 
   const handleCapturePhoto = async () => {
-    const imageData = captureFrameDataUrl();
+    const imageData = captureFrameDataUrl(0.85);
     if (!imageData) return;
     
     setCapturedPhoto(imageData);
@@ -297,13 +329,13 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       
       toast({
         title: "Photo analysée",
-        description: `${count} pièce(s) détectée(s) avec ${Math.round(confidence * 100)}% de confiance`,
+        description: `${count} pièce(s) détectée(s)`,
       });
     } catch (err) {
       console.error('Photo analysis error:', err);
       toast({
         title: "Erreur d'analyse",
-        description: 'Réessayez ou comptez manuellement',
+        description: 'Comptez manuellement',
         variant: 'destructive',
       });
       setLiveResult({ count: 0, confidence: 0, pileDetected: false, pileBounds: null });
@@ -348,7 +380,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           console.error('Analysis error:', err);
           toast({
             title: "Erreur d'analyse",
-            description: 'Réessayez ou comptez manuellement',
+            description: 'Comptez manuellement',
             variant: 'destructive',
           });
           setLiveResult({ count: 0, confidence: 0, pileDetected: false, pileBounds: null });
@@ -361,54 +393,72 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleConfirm = () => {
-    const confidence = liveResult?.confidence ?? 0;
-    const notes = liveResult?.pileDetected === false ? 'Aucune pile détectée (vérifiez le cadrage)' : undefined;
-    onCountComplete({ 
-      count: editCount, 
-      confidence, 
-      photoUrl: capturedPhoto || '', 
-      notes,
-      detectedLinenTypeId: selectedLinenTypeId !== linenTypeId ? selectedLinenTypeId : undefined
-    });
+  const handleConfirm = async () => {
+    setIsUploading(true);
+    
+    try {
+      // Capture current frame if in live mode (no captured photo yet)
+      let photoToUpload = capturedPhoto;
+      if (!photoToUpload && scanMode === 'live' && isStreaming) {
+        photoToUpload = captureFrameDataUrl(0.85);
+      }
+
+      // Upload photo to storage for admin visibility
+      let uploadedUrl = '';
+      if (photoToUpload) {
+        const url = await uploadPhotoToStorage(photoToUpload);
+        uploadedUrl = url || '';
+      }
+
+      const confidence = liveResult?.confidence ?? 0;
+      const notes = liveResult?.pileDetected === false ? 'Aucune pile détectée' : undefined;
+      
+      onCountComplete({ 
+        count: editCount, 
+        confidence, 
+        photoUrl: uploadedUrl,
+        notes,
+        detectedLinenTypeId: selectedLinenTypeId !== linenTypeId ? selectedLinenTypeId : undefined
+      });
+    } catch (err) {
+      console.error('Confirm error:', err);
+      // Still complete even if upload fails
+      onCountComplete({ 
+        count: editCount, 
+        confidence: liveResult?.confidence ?? 0, 
+        photoUrl: '',
+        notes: 'Photo non sauvegardée'
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleLinenTypeSelect = (lt: LinenType) => {
     setSelectedLinenTypeId(lt.id);
     setSelectedLinenTypeName(lt.name);
     setShowLinenTypeSelector(false);
-    toast({
-      title: "Type de linge sélectionné",
-      description: lt.name,
-    });
   };
 
   const getConfidenceVariant = (c: number) => (c >= 0.7 ? 'default' : c >= 0.5 ? 'secondary' : 'outline');
 
-  // Convert AI bounds (relative to full image) to position inside the white guide frame
   const boundsStyle = useMemo(() => {
     const b = liveResult?.pileBounds;
     if (!b || !liveResult?.pileDetected) return null;
     if (b.w <= 0 && b.h <= 0) return null;
     
-    // The guide frame position (in % of container)
     const guideL = GUIDE_LEFT / 100;
     const guideT = GUIDE_TOP / 100;
     const guideW = GUIDE_WIDTH / 100;
     const guideH = GUIDE_HEIGHT / 100;
     
-    // AI returns bounds relative to full image (0-1)
-    // We need to constrain them inside the guide frame
     const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
     
-    // Convert bounds to be relative to guide frame
-    // If AI bounds are within the guide area, show them inside the guide
     const relX = clamp(b.x, guideL, guideL + guideW);
     const relY = clamp(b.y, guideT, guideT + guideH);
     const maxW = Math.min(b.w, guideL + guideW - relX);
     const maxH = Math.min(b.h, guideT + guideH - relY);
     
-    // Only show if bounds have meaningful size
     if (maxW < 0.05 || maxH < 0.05) return null;
     
     return {
@@ -419,77 +469,45 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     } as React.CSSProperties;
   }, [liveResult?.pileBounds, liveResult?.pileDetected]);
 
-  const statusLabel = useMemo(() => {
-    if (scanMode === 'manual') return 'Comptage manuel';
-    if (capturedPhoto) return 'Photo capturée';
-    if (cameraFailed) return 'Caméra indisponible';
-    if (!isStreaming) return 'Initialisation…';
-    if (!isLiveScanning) return 'Pause';
-    if (isAnalyzing) return 'Analyse…';
-    if (liveResult?.pileDetected === false) return 'Aucune pile détectée';
-    if (liveResult?.count && liveResult.count > 0) return `${liveResult.count} détecté(s)`;
-    return 'Scan en temps réel';
-  }, [scanMode, capturedPhoto, cameraFailed, isStreaming, isLiveScanning, isAnalyzing, liveResult?.pileDetected, liveResult?.count]);
+  const displayCount = hasManualOverride ? editCount : (liveResult?.count ?? editCount);
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between bg-gradient-to-b from-background/95 to-transparent">
-        <div className="text-foreground">
-          <h2 className="text-lg font-bold">{selectedLinenTypeName}</h2>
-          <p className="text-sm opacity-70">{statusLabel}</p>
+      <div className="absolute top-0 left-0 right-0 z-20 p-3 flex items-center justify-between">
+        <div className="bg-black/70 backdrop-blur-sm rounded-xl px-4 py-2">
+          <h2 className="text-white font-bold text-lg">{selectedLinenTypeName}</h2>
+          <p className="text-white/70 text-xs">
+            {scanMode === 'manual' ? 'Mode manuel' : scanMode === 'photo' ? 'Mode photo' : 'Temps réel'}
+          </p>
         </div>
-        <Button variant="destructive" size="icon" onClick={onClose} className="h-12 w-12 rounded-full">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onClose} 
+          className="h-12 w-12 rounded-full bg-black/50 text-white hover:bg-red-600"
+        >
           <X className="h-6 w-6" />
         </Button>
       </div>
 
-      {/* Mode selector */}
-      <div className="absolute top-20 left-4 right-4 z-20 flex gap-2">
-        <Button
-          variant={scanMode === 'live' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => {
-            setScanMode('live');
-            setCapturedPhoto(null);
-            setIsLiveScanning(true);
-          }}
-          className="flex-1"
-        >
-          <Play className="h-4 w-4 mr-1" />
-          Temps réel
-        </Button>
-        <Button
-          variant={scanMode === 'photo' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => {
-            setScanMode('photo');
-            setCapturedPhoto(null);
-            setIsLiveScanning(false);
-          }}
-          className="flex-1"
-        >
-          <Camera className="h-4 w-4 mr-1" />
-          Photo
-        </Button>
-        <Button
-          variant={scanMode === 'manual' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => {
-            setScanMode('manual');
-            stopCamera();
-            setCapturedPhoto(null);
-            setIsLiveScanning(false);
-          }}
-          className="flex-1"
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Manuel
-        </Button>
+      {/* PROMINENT REAL-TIME COUNT DISPLAY */}
+      <div className="absolute top-20 left-0 right-0 z-20 flex justify-center pointer-events-none">
+        <div className="bg-primary text-primary-foreground rounded-2xl px-8 py-4 shadow-2xl">
+          <div className="text-center">
+            <div className="text-6xl font-black tabular-nums">{displayCount}</div>
+            <div className="text-lg font-medium opacity-90">pièces détectées</div>
+            {liveResult?.confidence && liveResult.confidence > 0 && (
+              <Badge variant="secondary" className="mt-2">
+                {Math.round(liveResult.confidence * 100)}% confiance
+              </Badge>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Camera view / Manual mode */}
-      <div className="flex-1 relative mt-28">
+      {/* Camera view */}
+      <div className="flex-1 relative">
         {scanMode !== 'manual' ? (
           <>
             {capturedPhoto ? (
@@ -498,10 +516,10 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             )}
 
-            {/* FIXED white guide frame - pile must be inside this */}
+            {/* Fixed white guide frame */}
             {isStreaming && !capturedPhoto && (
               <div 
-                className="absolute pointer-events-none border-4 border-white/90 rounded-2xl shadow-lg"
+                className="absolute pointer-events-none border-4 border-white rounded-2xl"
                 style={{
                   left: `${GUIDE_LEFT}%`,
                   top: `${GUIDE_TOP}%`,
@@ -509,86 +527,49 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                   height: `${GUIDE_HEIGHT}%`,
                 }}
               >
-                {/* Corner markers for better visibility */}
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl" />
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl" />
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl" />
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl" />
-                
-                {/* Center text */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-black/40 backdrop-blur-sm px-4 py-2 rounded-lg">
-                    <span className="text-white text-sm font-medium">
-                      📍 Placez la pile ici
-                    </span>
-                  </div>
-                </div>
+                <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white rounded-tl-xl" />
+                <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white rounded-tr-xl" />
+                <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white rounded-bl-xl" />
+                <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white rounded-br-xl" />
               </div>
             )}
 
-            {/* MOVING purple/violet detection bounds - stays INSIDE white frame */}
+            {/* Purple detection bounds inside white frame */}
             {boundsStyle && !capturedPhoto && (
               <div
-                className="absolute border-4 border-primary rounded-xl pointer-events-none shadow-lg"
-                style={{
-                  ...boundsStyle,
-                  boxShadow: '0 0 20px rgba(147, 51, 234, 0.5)',
-                }}
-              >
-                {/* Pulse animation indicator */}
-                <div className="absolute inset-0 border-2 border-primary/50 rounded-xl animate-ping" />
+                className="absolute border-4 border-purple-500 rounded-xl pointer-events-none"
+                style={boundsStyle}
+              />
+            )}
+
+            {/* Width badge */}
+            {liveResult?.widthCm && liveResult.widthCm > 0 && !capturedPhoto && (
+              <div className="absolute bottom-48 left-4 z-20">
+                <Badge variant="secondary" className="text-sm px-3 py-1">
+                  Largeur ≈ {Math.round(liveResult.widthCm)} cm
+                </Badge>
               </div>
             )}
 
-            {/* Live result HUD */}
-            {(scanMode === 'live' || capturedPhoto) && liveResult && (
-              <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
-                <div className="rounded-2xl bg-background/95 backdrop-blur-md px-4 py-3 border border-border shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">{selectedLinenTypeName}</div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold tabular-nums">{liveResult.count}</span>
-                        <span className="text-sm text-muted-foreground">pièces</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <Badge variant={getConfidenceVariant(liveResult.confidence)} className="text-xs">
-                        {Math.round(liveResult.confidence * 100)}%
-                      </Badge>
-                      {typeof liveResult.widthCm === 'number' && liveResult.widthCm > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          ≈ {Math.round(liveResult.widthCm)} cm
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  {lastUpdateAt && scanMode === 'live' && !capturedPhoto && (
-                    <div className="mt-2 text-[11px] text-muted-foreground text-center">
-                      Dernière analyse: il y a {Math.max(0, Math.round((Date.now() - lastUpdateAt) / 1000))}s
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
             {/* Loading overlay */}
-            {isAnalyzing && !liveResult && (
-              <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-                <div className="text-center text-foreground">
-                  <Loader2 className="h-12 w-12 animate-spin mx-auto mb-3" />
-                  <p className="text-lg font-medium">Comptage IA...</p>
+            {(isAnalyzing || isUploading) && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-30">
+                <div className="text-center text-white">
+                  <Loader2 className="h-16 w-16 animate-spin mx-auto mb-3" />
+                  <p className="text-xl font-medium">
+                    {isUploading ? 'Enregistrement...' : 'Analyse IA...'}
+                  </p>
                 </div>
               </div>
             )}
 
             {/* Camera fallback */}
             {cameraFailed && !capturedPhoto && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background">
-                <div className="text-center text-foreground p-6">
+              <div className="absolute inset-0 flex items-center justify-center bg-black">
+                <div className="text-center text-white p-6">
                   <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
                   <p className="mb-4">Caméra indisponible</p>
-                  <Button onClick={() => fileInputRef.current?.click()}>
+                  <Button onClick={() => fileInputRef.current?.click()} variant="secondary">
                     📷 Choisir une photo
                   </Button>
                 </div>
@@ -596,12 +577,11 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             )}
           </>
         ) : (
-          // Manual mode
-          <div className="flex items-center justify-center h-full bg-muted/30">
-            <div className="text-center p-8">
-              <div className="text-6xl mb-4">📋</div>
-              <h3 className="text-xl font-bold mb-2">Comptage manuel</h3>
-              <p className="text-muted-foreground">
+          <div className="flex items-center justify-center h-full bg-muted/10">
+            <div className="text-center p-8 text-white">
+              <div className="text-7xl mb-4">✋</div>
+              <h3 className="text-2xl font-bold mb-2">Comptage manuel</h3>
+              <p className="text-white/70">
                 Utilisez les boutons +/- ci-dessous
               </p>
             </div>
@@ -620,136 +600,167 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         className="hidden"
       />
 
-      {/* Bottom controls */}
-      <div className="bg-background border-t border-border p-4 pb-8">
-        <div className="space-y-4">
-          {/* Photo mode capture button */}
-          {scanMode === 'photo' && !capturedPhoto && isStreaming && (
-            <Button 
-              onClick={handleCapturePhoto} 
-              className="w-full h-14 text-lg"
-              disabled={isAnalyzing}
-            >
-              <Camera className="h-6 w-6 mr-2" />
-              Prendre la photo
-            </Button>
-          )}
-
-          {/* Retake button */}
-          {capturedPhoto && (
-            <Button 
-              onClick={handleRetakePhoto} 
-              variant="outline"
-              className="w-full"
-            >
-              <Camera className="h-4 w-4 mr-2" />
-              Reprendre la photo
-            </Button>
-          )}
-
-          {/* Manual count controls */}
-          <div className="flex items-center justify-center gap-6">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-16 w-16 rounded-full text-2xl"
-              onClick={() => {
-                setHasManualOverride(true);
-                setEditCount(Math.max(0, editCount - 1));
-              }}
-            >
-              <Minus className="h-8 w-8" />
-            </Button>
-
-            <div className="text-center">
-              <Input
-                type="number"
-                value={editCount}
-                onChange={(e) => {
-                  setHasManualOverride(true);
-                  setEditCount(Math.max(0, parseInt(e.target.value) || 0));
-                }}
-                className="text-5xl font-bold text-center h-20 w-32 tabular-nums"
-                min={0}
-              />
-              {hasManualOverride && (
-                <Badge variant="outline" className="mt-2 text-xs">
-                  Modifié manuellement
-                </Badge>
-              )}
-            </div>
-
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-16 w-16 rounded-full text-2xl"
-              onClick={() => {
-                setHasManualOverride(true);
-                setEditCount(editCount + 1);
-              }}
-            >
-              <Plus className="h-8 w-8" />
-            </Button>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex gap-3">
-            {scanMode === 'live' && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (!isStreaming) {
-                    startCamera();
-                    return;
-                  }
-                  setIsLiveScanning((v) => !v);
-                }}
-                className="h-14"
-                disabled={cameraFailed}
-              >
-                {isLiveScanning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-              </Button>
-            )}
-
-            <Button 
-              variant="outline"
-              onClick={onClose} 
-              className="flex-1 h-14"
-            >
-              <X className="h-5 w-5 mr-2" />
-              Quitter
-            </Button>
-
-            <Button onClick={handleConfirm} className="flex-1 h-14 text-lg">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              Valider {editCount}
-            </Button>
-          </div>
-
-          {/* Import fallback */}
-          {scanMode !== 'manual' && !cameraFailed && !capturedPhoto && (
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              variant="ghost"
-              className="w-full"
-            >
-              <ImageIcon className="h-4 w-4 mr-2" />
-              Importer une photo
-            </Button>
-          )}
+      {/* Bottom controls - MODE BUTTONS HERE */}
+      <div className="bg-background border-t border-border p-4 pb-6 space-y-4">
+        {/* Mode selector - NOW AT BOTTOM */}
+        <div className="flex gap-2">
+          <Button
+            variant={scanMode === 'live' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setScanMode('live');
+              setCapturedPhoto(null);
+              setIsLiveScanning(true);
+              setHasManualOverride(false);
+            }}
+            className="flex-1"
+          >
+            <Play className="h-4 w-4 mr-1" />
+            Temps réel
+          </Button>
+          <Button
+            variant={scanMode === 'photo' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setScanMode('photo');
+              setCapturedPhoto(null);
+              setIsLiveScanning(false);
+            }}
+            className="flex-1"
+          >
+            <Camera className="h-4 w-4 mr-1" />
+            Photo
+          </Button>
+          <Button
+            variant={scanMode === 'manual' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setScanMode('manual');
+              stopCamera();
+              setCapturedPhoto(null);
+              setIsLiveScanning(false);
+              setHasManualOverride(true);
+            }}
+            className="flex-1"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Manuel
+          </Button>
         </div>
+
+        {/* Photo mode: capture button */}
+        {scanMode === 'photo' && !capturedPhoto && isStreaming && (
+          <Button 
+            onClick={handleCapturePhoto} 
+            className="w-full h-14 text-lg"
+            disabled={isAnalyzing}
+          >
+            <Camera className="h-6 w-6 mr-2" />
+            Prendre la photo
+          </Button>
+        )}
+
+        {/* Retake button */}
+        {capturedPhoto && (
+          <Button 
+            onClick={handleRetakePhoto} 
+            variant="outline"
+            className="w-full"
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Reprendre
+          </Button>
+        )}
+
+        {/* Manual count adjustment */}
+        <div className="flex items-center justify-center gap-6">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-14 w-14 rounded-full text-2xl"
+            onClick={() => {
+              setHasManualOverride(true);
+              setEditCount(Math.max(0, editCount - 1));
+            }}
+          >
+            <Minus className="h-7 w-7" />
+          </Button>
+
+          <div className="text-center">
+            <Input
+              type="number"
+              value={editCount}
+              onChange={(e) => {
+                setHasManualOverride(true);
+                setEditCount(Math.max(0, parseInt(e.target.value) || 0));
+              }}
+              className="text-4xl font-bold text-center h-16 w-28 tabular-nums"
+              min={0}
+            />
+            {hasManualOverride && (
+              <Badge variant="outline" className="mt-1 text-xs">Modifié</Badge>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-14 w-14 rounded-full text-2xl"
+            onClick={() => {
+              setHasManualOverride(true);
+              setEditCount(editCount + 1);
+            }}
+          >
+            <Plus className="h-7 w-7" />
+          </Button>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3">
+          {scanMode === 'live' && isStreaming && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsLiveScanning(!isLiveScanning)}
+              className="h-14 w-14"
+            >
+              {isLiveScanning ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+            </Button>
+          )}
+
+          <Button onClick={handleConfirm} className="flex-1 h-14 text-lg" disabled={isUploading}>
+            {isUploading ? (
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            )}
+            Valider {editCount} pièces
+          </Button>
+        </div>
+
+        {/* Import fallback */}
+        {scanMode !== 'manual' && !cameraFailed && !capturedPhoto && (
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            variant="ghost"
+            className="w-full"
+          >
+            <ImageIcon className="h-4 w-4 mr-2" />
+            Importer une photo
+          </Button>
+        )}
       </div>
 
-      {/* Linen type selector dialog */}
+      {/* Linen type selector */}
       <Dialog open={showLinenTypeSelector} onOpenChange={setShowLinenTypeSelector}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-500" />
-              Plusieurs types de linge détectés
+              Plusieurs types détectés
             </DialogTitle>
             <DialogDescription>
-              Largeur détectée: ≈ {Math.round(liveResult?.widthCm || 0)} cm
+              Largeur ≈ {Math.round(liveResult?.widthCm || 0)} cm
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
@@ -763,9 +774,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                 <div className="text-left">
                   <div className="font-medium">{lt.name}</div>
                   {lt.dimensions && (
-                    <div className="text-sm text-muted-foreground">
-                      {lt.dimensions} cm
-                    </div>
+                    <div className="text-sm text-muted-foreground">{lt.dimensions} cm</div>
                   )}
                 </div>
               </Button>
