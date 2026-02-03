@@ -252,12 +252,14 @@ export class RoomArchiveService {
 
   /**
    * Supprime toutes les chambres existantes et les remplace par les nouvelles
+   * Ne met PAS à jour le registre automatiquement - retourne les nouvelles chambres à confirmer
    */
   static async replaceAllRooms(
     hotelId: string, 
     newRooms: any[], 
-    sourceName: string
-  ): Promise<{ deleted: number; inserted: number }> {
+    sourceName: string,
+    skipRegistryUpdate: boolean = false
+  ): Promise<{ deleted: number; inserted: number; newRoomsForRegistry: any[] }> {
     console.log(`🔄 Remplacement de toutes les chambres pour ${hotelId}`);
     
     try {
@@ -267,13 +269,21 @@ export class RoomArchiveService {
         .select('*', { count: 'exact', head: true })
         .eq('hotel_id', hotelId);
       
-      // 2. Supprimer toutes les assignations
+      // 2. Récupérer le registre existant pour détecter les nouvelles chambres
+      const { data: existingRegistry } = await supabase
+        .from('hotel_rooms_registry')
+        .select('room_number')
+        .eq('hotel_id', hotelId);
+      
+      const existingRoomNumbers = new Set(existingRegistry?.map(r => r.room_number) || []);
+      
+      // 3. Supprimer toutes les assignations
       await supabase
         .from('assignments')
         .delete()
         .eq('hotel_id', hotelId);
       
-      // 3. Supprimer toutes les chambres existantes (mais PAS le registre)
+      // 4. Supprimer toutes les chambres existantes (mais PAS le registre)
       const { error: deleteRoomsError } = await supabase
         .from('rooms')
         .delete()
@@ -337,40 +347,92 @@ export class RoomArchiveService {
       
       if (insertRoomsError) throw insertRoomsError;
       
-      // 6. Mettre à jour le registre (upsert - ajouter les nouvelles, préserver les existantes)
-      const registryData = newRooms.map((room: any) => {
-        const roomNumber = room.roomNumber || room.room_number || room.number;
-        return {
-          hotel_id: hotelId,
-          room_number: roomNumber,
-          floor: room.floor ?? null,
-          room_type: room.type || room.room_type || null,
-          building: room.building || null,
-          zone: room.zone || null,
-          source: 'pdf_import',
-          imported_from: sourceName,
-          last_seen_at: new Date().toISOString(),
-          metadata: { status: room.status, raw_data: room }
-        };
-      }).filter(r => !!r.room_number);
+      // 6. Identifier les NOUVELLES chambres (pas dans le registre existant)
+      const newRoomsForRegistry = newRooms
+        .map((room: any) => {
+          const roomNumber = room.roomNumber || room.room_number || room.number;
+          if (!roomNumber || existingRoomNumbers.has(roomNumber)) {
+            return null;
+          }
+          return {
+            room_number: roomNumber,
+            floor: room.floor ?? null,
+            room_type: room.type || room.room_type || null,
+            building: room.building || null,
+            zone: room.zone || null,
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
       
-      // Upsert pour préserver le registre existant
-      await supabase
-        .from('hotel_rooms_registry')
-        .upsert(registryData, { 
-          onConflict: 'hotel_id,room_number',
-          ignoreDuplicates: false 
-        });
+      // Dédupliquer les nouvelles chambres
+      const uniqueNewRooms = Array.from(
+        new Map(newRoomsForRegistry.map(r => [r.room_number, r])).values()
+      );
       
-      console.log(`✅ ${roomsForInsert.length} nouvelles chambres insérées, registre mis à jour`);
+      console.log(`📋 ${uniqueNewRooms.length} nouvelles chambres détectées (pas dans le registre)`);
+      
+      console.log(`✅ ${roomsForInsert.length} chambres insérées pour aujourd'hui`);
       
       return {
         deleted: existingCount || 0,
-        inserted: roomsForInsert.length
+        inserted: roomsForInsert.length,
+        newRoomsForRegistry: uniqueNewRooms
       };
     } catch (error) {
       console.error('❌ Erreur remplacement chambres:', error);
       throw error;
     }
+  }
+
+  /**
+   * Ajouter des chambres au registre permanent
+   */
+  static async addRoomsToRegistry(
+    hotelId: string,
+    rooms: { room_number: string; floor?: number | null; room_type?: string | null; building?: string | null; zone?: string | null }[],
+    sourceName: string = 'pdf_import'
+  ): Promise<number> {
+    if (rooms.length === 0) return 0;
+
+    try {
+      const registryData = rooms.map(room => ({
+        hotel_id: hotelId,
+        room_number: room.room_number,
+        floor: room.floor ?? null,
+        room_type: room.room_type ?? null,
+        building: room.building ?? null,
+        zone: room.zone ?? null,
+        source: 'pdf_import',
+        imported_from: sourceName,
+        last_seen_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase
+        .from('hotel_rooms_registry')
+        .upsert(registryData, {
+          onConflict: 'hotel_id,room_number',
+          ignoreDuplicates: false
+        });
+
+      if (error) throw error;
+
+      console.log(`✅ ${rooms.length} chambres ajoutées au registre permanent`);
+      return rooms.length;
+    } catch (error) {
+      console.error('❌ Erreur ajout au registre:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir le nombre de chambres dans le registre
+   */
+  static async getRegistryCount(hotelId: string): Promise<number> {
+    const { count } = await supabase
+      .from('hotel_rooms_registry')
+      .select('*', { count: 'exact', head: true })
+      .eq('hotel_id', hotelId);
+    
+    return count || 0;
   }
 }
