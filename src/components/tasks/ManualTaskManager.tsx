@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Plus, 
   Trash2, 
@@ -20,7 +21,10 @@ import {
   AlertCircle,
   Loader2,
   CheckCheck,
-  XCircle
+  XCircle,
+  FileText,
+  Repeat,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -47,6 +51,18 @@ interface Task {
   completed_by_name: string | null;
   validated_at: string | null;
   notes: string | null;
+}
+
+interface TaskTemplate {
+  id: string;
+  title: string;
+  description: string | null;
+  location_type: string;
+  location_reference: string | null;
+  assigned_to_type: string;
+  assigned_user_name: string | null;
+  priority: string;
+  is_one_time: boolean;
 }
 
 const LOCATION_TYPES = [
@@ -79,6 +95,7 @@ export function ManualTaskManager({
   technicianNames = [],
 }: ManualTaskManagerProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showTemplatePopover, setShowTemplatePopover] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -108,6 +125,41 @@ export function ManualTaskManager({
       return data as Task[];
     },
   });
+
+  // Fetch task templates (recurring and one-time)
+  const { data: taskTemplates } = useQuery({
+    queryKey: ["task-templates", hotelId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_templates")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .eq("is_active", true)
+        .order("is_one_time")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as TaskTemplate[];
+    },
+  });
+
+  const recurringTemplates = taskTemplates?.filter(t => !t.is_one_time) || [];
+  const oneTimeTemplates = taskTemplates?.filter(t => t.is_one_time) || [];
+
+  const applyTemplate = (template: TaskTemplate) => {
+    setNewTask({
+      title: template.title,
+      description: template.description || '',
+      location_type: template.location_type,
+      location_reference: template.location_reference || '',
+      assigned_to_type: template.assigned_to_type,
+      assigned_to_name: template.assigned_user_name || '',
+      priority: template.priority,
+    });
+    setShowTemplatePopover(false);
+    setShowCreateDialog(true);
+    toast({ title: "Template appliqué", description: `"${template.title}" chargé` });
+  };
 
   // Create task mutation
   const createTask = useMutation({
@@ -215,12 +267,94 @@ export function ManualTaskManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-medium">Tâches manuelles du jour</h3>
-        <Button size="sm" onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Nouvelle tâche
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Template selector popover */}
+          <Popover open={showTemplatePopover} onOpenChange={setShowTemplatePopover}>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                disabled={!taskTemplates || taskTemplates.length === 0}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Templates
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="p-3 border-b">
+                <h4 className="font-medium text-sm">Charger depuis un template</h4>
+                <p className="text-xs text-muted-foreground">Sélectionnez un template pour pré-remplir</p>
+              </div>
+              <ScrollArea className="max-h-[300px]">
+                {/* Recurring templates */}
+                {recurringTemplates.length > 0 && (
+                  <div className="p-2">
+                    <h5 className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-2 px-2">
+                      <Repeat className="h-3 w-3" />
+                      Récurrentes
+                    </h5>
+                    {recurringTemplates.map(template => (
+                      <Button
+                        key={template.id}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-left h-auto py-2"
+                        onClick={() => applyTemplate(template)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{template.title}</div>
+                          {template.description && (
+                            <div className="text-xs text-muted-foreground truncate">{template.description}</div>
+                          )}
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* One-time templates */}
+                {oneTimeTemplates.length > 0 && (
+                  <div className="p-2 border-t">
+                    <h5 className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-2 px-2">
+                      <CalendarIcon className="h-3 w-3" />
+                      Ponctuelles
+                    </h5>
+                    {oneTimeTemplates.map(template => (
+                      <Button
+                        key={template.id}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-left h-auto py-2"
+                        onClick={() => applyTemplate(template)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{template.title}</div>
+                          {template.description && (
+                            <div className="text-xs text-muted-foreground truncate">{template.description}</div>
+                          )}
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                )}
+
+                {(!taskTemplates || taskTemplates.length === 0) && (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    Aucun template disponible
+                  </div>
+                )}
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+
+          <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Nouvelle tâche
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

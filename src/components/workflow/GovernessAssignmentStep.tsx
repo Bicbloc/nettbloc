@@ -171,10 +171,8 @@ export function GovernessAssignmentStep({
     });
   };
 
-  const canProceed = selectedGovernesses.length === 0 || 
-    selectedGovernesses.every(g => 
-      g.assignedFloors.length > 0 || g.assignedHousekeepers.length > 0
-    );
+  // Allow proceeding if no governesses selected, or if governesses are selected (assignment is optional)
+  const canProceed = true;
 
   // Fetch governess names for tasks
   const governessNamesList = governesses?.map(g => g.name) || [];
