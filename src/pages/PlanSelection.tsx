@@ -13,11 +13,12 @@ import { usePricingConfig } from '@/hooks/use-pricing-config';
 import { checkoutErrorDescription, detectCheckoutErrorKind, extractErrorMessage } from '@/utils/checkoutErrors';
 import { useHotel } from '@/contexts/HotelContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SubAccountGuard } from '@/components/SubAccountGuard';
 
 // Seuil au-dessus duquel le plan Entreprise est obligatoire
 const ENTERPRISE_THRESHOLD = 170;
 
-const PlanSelection = () => {
+const PlanSelectionContent = () => {
   const { isAuthenticated, loading, user } = useAuth();
   const { plan: currentPlan, isPremium, isFree, loading: subscriptionLoading, isInTrial } = useSubscription();
   const { hotelId } = useHotel();
@@ -395,5 +396,11 @@ const PlanSelection = () => {
     </div>
   );
 };
+
+const PlanSelection = () => (
+  <SubAccountGuard featureName="la gestion des plans d'abonnement">
+    <PlanSelectionContent />
+  </SubAccountGuard>
+);
 
 export default PlanSelection;

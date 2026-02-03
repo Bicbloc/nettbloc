@@ -11,6 +11,7 @@ import { fr } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import BackButton from '@/components/BackButton';
 import { BillingInfoForm } from '@/components/billing/BillingInfoForm';
+import { SubAccountGuard } from '@/components/SubAccountGuard';
 
 interface Invoice {
   id: string;
@@ -25,7 +26,7 @@ interface Invoice {
   pdf_url: string | null;
 }
 
-const Invoices = () => {
+const InvoicesContent = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -186,5 +187,11 @@ const Invoices = () => {
     </div>
   );
 };
+
+const Invoices = () => (
+  <SubAccountGuard featureName="la facturation et les factures">
+    <InvoicesContent />
+  </SubAccountGuard>
+);
 
 export default Invoices;
