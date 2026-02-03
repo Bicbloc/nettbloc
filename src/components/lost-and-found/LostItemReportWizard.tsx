@@ -30,7 +30,8 @@ import {
   MapPin,
   Send,
   Tag,
-  FileText
+  FileText,
+  Search
 } from "lucide-react";
 
 export interface GuestInfo {
@@ -130,6 +131,9 @@ export function LostItemReportWizard({
   const [guestCheckIn, setGuestCheckIn] = useState("");
   const [guestCheckOut, setGuestCheckOut] = useState("");
 
+  // Search query for categories
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+
   // AI Results
   const [aiSuggestion, setAiSuggestion] = useState<{
     object_name: string;
@@ -181,8 +185,17 @@ export function LostItemReportWizard({
       setGuestFirstName("");
       setGuestCheckIn("");
       setGuestCheckOut("");
+      setCategorySearchQuery("");
     }
   }, [open, defaultRoomNumber]);
+
+  // Filter categories by search query
+  const filteredCategories = useMemo(() => {
+    if (!categorySearchQuery.trim()) return OBJECT_CATEGORIES;
+    return OBJECT_CATEGORIES.filter(cat => 
+      cat.label.toLowerCase().includes(categorySearchQuery.toLowerCase())
+    );
+  }, [categorySearchQuery]);
 
   // Handle image selection
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -634,18 +647,39 @@ export function LostItemReportWizard({
 
             {/* STEP: Category */}
             {currentStep === 'category' && (
-              <div className="grid grid-cols-2 gap-2">
-                {OBJECT_CATEGORIES.map((cat) => (
-                  <Button
-                    key={cat.value}
-                    variant={objectCategory === cat.value ? "default" : "outline"}
-                    className="h-14 flex-col gap-1"
-                    onClick={() => setObjectCategory(cat.value)}
-                  >
-                    <span className="text-lg">{cat.icon}</span>
-                    <span className="text-xs">{cat.label}</span>
-                  </Button>
-                ))}
+              <div className="space-y-3">
+                {/* Search bar */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher une catégorie..."
+                    value={categorySearchQuery}
+                    onChange={(e) => setCategorySearchQuery(e.target.value)}
+                    className="pl-10 h-11"
+                  />
+                </div>
+
+                {/* Categories with scroll */}
+                <ScrollArea className="h-[280px] pr-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {filteredCategories.map((cat) => (
+                      <Button
+                        key={cat.value}
+                        variant={objectCategory === cat.value ? "default" : "outline"}
+                        className="h-14 flex-col gap-1"
+                        onClick={() => setObjectCategory(cat.value)}
+                      >
+                        <span className="text-lg">{cat.icon}</span>
+                        <span className="text-xs">{cat.label}</span>
+                      </Button>
+                    ))}
+                    {filteredCategories.length === 0 && (
+                      <div className="col-span-2 text-center py-8 text-muted-foreground">
+                        Aucune catégorie trouvée
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
             )}
 
