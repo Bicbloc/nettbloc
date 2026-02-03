@@ -32,7 +32,7 @@ export const BackButton: React.FC<BackButtonProps> = ({
       className={`flex items-center gap-2 ${className}`}
     >
       <ArrowLeft className="h-4 w-4" />
-      {label}
+      <span>{label}</span>
     </Button>
   );
 };
