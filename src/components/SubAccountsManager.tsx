@@ -394,8 +394,8 @@ export function SubAccountsManager() {
               Nouveau sous-compte
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-            <DialogHeader className="flex-shrink-0">
+          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <DialogHeader className="flex-shrink-0 pb-4">
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
                 {editingAccount ? 'Modifier le sous-compte' : 'Créer un sous-compte'}
@@ -405,8 +405,8 @@ export function SubAccountsManager() {
               </DialogDescription>
             </DialogHeader>
 
-            <ScrollArea className="flex-1 min-h-0 pr-4">
-              <div className="space-y-6 py-4">
+            <ScrollArea className="flex-1 h-[60vh] pr-4">
+              <div className="space-y-6 py-2 pr-2">
                 {/* Informations personnelles */}
                 <div className="space-y-4">
                   <h3 className="font-medium flex items-center gap-2">
