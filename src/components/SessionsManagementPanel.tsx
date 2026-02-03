@@ -91,7 +91,7 @@ export function SessionsManagementPanel() {
     loadSessions();
   }, [filterType, filterStatus, currentPage]);
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(async (retryCount = 0) => {
     setLoading(true);
     try {
       // Use enriched view to eliminate N+1 queries
@@ -119,12 +119,19 @@ export function SessionsManagementPanel() {
 
       setSessions(sessionsData || []);
       setTotalCount(count || 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading sessions:', error);
+      
+      // Retry on network errors (up to 2 retries)
+      if (retryCount < 2 && (error.message?.includes('fetch') || error.message?.includes('network'))) {
+        setTimeout(() => loadSessions(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
+      
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de charger les sessions."
+        description: "Impossible de charger les sessions. Vérifiez votre connexion."
       });
     } finally {
       setLoading(false);
@@ -261,7 +268,7 @@ export function SessionsManagementPanel() {
               {totalCount} session(s) • {activeCount} active(s)
             </CardDescription>
           </div>
-          <Button onClick={loadSessions} variant="outline" size="sm" disabled={loading}>
+          <Button onClick={() => loadSessions()} variant="outline" size="sm" disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
