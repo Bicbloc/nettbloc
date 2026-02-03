@@ -10,10 +10,8 @@ import {
   ChevronLeft, 
   Check, 
   Building2,
-  Phone,
   Sparkles,
-  Gift,
-  Calendar
+  Gift
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,58 +22,39 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-interface BillingInfo {
+interface OnboardingInfo {
   companyName: string;
-  address: string;
-  postalCode: string;
-  city: string;
-  country: string;
-  siret: string;
-  tvaNumber: string;
-  phone: string;
   contactName: string;
-  contactEmail: string;
+  phone: string;
 }
 
-// SIRET et infos de facturation sont optionnels pendant l'essai
-// Ils seront demandés à la fin de la période d'essai avant le paiement
 const STEPS = [
   { id: 'welcome', title: 'Bienvenue', icon: Sparkles },
-  { id: 'company', title: 'Entreprise', icon: Building2 },
-  { id: 'contact', title: 'Contact', icon: Phone },
-  { id: 'trial', title: 'Essai gratuit', icon: Gift },
+  { id: 'info', title: 'Vos informations', icon: Building2 },
+  { id: 'confirm', title: 'Confirmation', icon: Gift },
 ];
 
 export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [billingInfo, setBillingInfo] = useState<BillingInfo>({
+  const [info, setInfo] = useState<OnboardingInfo>({
     companyName: '',
-    address: '',
-    postalCode: '',
-    city: '',
-    country: 'France',
-    siret: '',
-    tvaNumber: '',
-    phone: '',
     contactName: '',
-    contactEmail: user?.email || '',
+    phone: '',
   });
 
-  const updateField = (field: keyof BillingInfo, value: string) => {
-    setBillingInfo(prev => ({ ...prev, [field]: value }));
+  const updateField = (field: keyof OnboardingInfo, value: string) => {
+    setInfo(prev => ({ ...prev, [field]: value }));
   };
 
   const canProceed = () => {
     switch (currentStep) {
       case 0:
         return true;
-      case 1: // Company - only company name is required, SIRET is optional during trial
-        return billingInfo.companyName.length > 2;
-      case 2: // Contact - name and phone required
-        return billingInfo.contactName.length > 2 && billingInfo.phone.length >= 10;
-      case 3:
+      case 1:
+        return info.companyName.length > 2 && info.contactName.length > 2 && info.phone.length >= 10;
+      case 2:
         return true;
       default:
         return true;
@@ -87,21 +66,16 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
     
     setIsSubmitting(true);
     try {
-      // Utiliser la fonction SECURITY DEFINER qui gère tout (création profil + trial)
-      const { data, error } = await supabase.rpc('complete_onboarding', {
+      const { data, error } = await supabase.rpc('complete_onboarding_simple', {
         p_user_id: user.id,
-        p_company_name: billingInfo.companyName || null,
-        p_contact_name: billingInfo.contactName || null,
-        p_contact_email: billingInfo.contactEmail || null,
-        p_phone: billingInfo.phone || null,
-        p_siret: billingInfo.siret || null,
-        p_tva_number: billingInfo.tvaNumber || null
+        p_company_name: info.companyName,
+        p_contact_name: info.contactName,
+        p_phone: info.phone
       });
 
-      if (error) throw error;
-      
-      if (data === false) {
-        throw new Error('La configuration a échoué');
+      if (error) {
+        console.error('RPC error:', error);
+        throw error;
       }
 
       toast({
@@ -134,7 +108,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <div>
                 <h3 className="text-2xl font-bold">Bienvenue sur NettoBloc !</h3>
                 <p className="text-muted-foreground mt-2">
-                  Configurez votre compte en quelques étapes pour profiter de votre période d'essai de 3 mois.
+                  Configurez votre compte en 30 secondes pour profiter de votre période d'essai gratuite.
                 </p>
               </div>
             </div>
@@ -146,78 +120,35 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                   <div>
                     <p className="font-semibold text-green-800 dark:text-green-200">3 mois d'essai gratuit</p>
                     <p className="text-sm text-green-600 dark:text-green-400">
-                      Accès complet à toutes les fonctionnalités premium
+                      Accès complet à toutes les fonctionnalités
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            <div className="text-center text-sm text-muted-foreground">
-              <Calendar className="inline-block h-4 w-4 mr-1" />
-              Environ 1 minute
-            </div>
           </div>
         );
 
-      case 1: // Entreprise - SIRET optionnel
+      case 1:
         return (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="companyName">Nom de l'entreprise *</Label>
+              <Label htmlFor="companyName">Nom de l'établissement *</Label>
               <Input
                 id="companyName"
-                value={billingInfo.companyName}
+                value={info.companyName}
                 onChange={(e) => updateField('companyName', e.target.value)}
-                placeholder="Hôtel Le Magnifique SAS"
+                placeholder="Hôtel Le Magnifique"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="siret">SIRET (optionnel pendant l'essai)</Label>
-              <Input
-                id="siret"
-                value={billingInfo.siret}
-                onChange={(e) => updateField('siret', e.target.value.replace(/\D/g, '').slice(0, 14))}
-                placeholder="12345678901234"
-                maxLength={14}
-              />
-              <p className="text-xs text-muted-foreground">Sera demandé à la fin de l'essai pour la facturation</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="tvaNumber">Numéro TVA intracommunautaire (optionnel)</Label>
-              <Input
-                id="tvaNumber"
-                value={billingInfo.tvaNumber}
-                onChange={(e) => updateField('tvaNumber', e.target.value.toUpperCase())}
-                placeholder="FR12345678901"
-              />
-            </div>
-          </div>
-        );
-
-      case 2: // Contact
-        return (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="contactName">Nom du contact *</Label>
+              <Label htmlFor="contactName">Votre nom *</Label>
               <Input
                 id="contactName"
-                value={billingInfo.contactName}
+                value={info.contactName}
                 onChange={(e) => updateField('contactName', e.target.value)}
                 placeholder="Marie Dupont"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="contactEmail">Email de facturation</Label>
-              <Input
-                id="contactEmail"
-                type="email"
-                value={billingInfo.contactEmail}
-                onChange={(e) => updateField('contactEmail', e.target.value)}
-                placeholder="comptabilite@hotel.fr"
               />
             </div>
 
@@ -226,15 +157,19 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <Input
                 id="phone"
                 type="tel"
-                value={billingInfo.phone}
+                value={info.phone}
                 onChange={(e) => updateField('phone', e.target.value)}
                 placeholder="+33 1 23 45 67 89"
               />
             </div>
+
+            <p className="text-xs text-muted-foreground mt-4">
+              Les informations de facturation (SIRET, IBAN) seront demandées uniquement à la fin de votre période d'essai.
+            </p>
           </div>
         );
 
-      case 3: // Récapitulatif et essai
+      case 2:
         return (
           <div className="space-y-6 py-4">
             <div className="text-center space-y-4">
@@ -244,7 +179,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <div>
                 <h3 className="text-xl font-bold">Tout est prêt !</h3>
                 <p className="text-muted-foreground mt-2">
-                  Votre période d'essai de 3 mois va commencer dès maintenant.
+                  Votre période d'essai de 3 mois va commencer.
                 </p>
               </div>
             </div>
@@ -254,12 +189,12 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                 <h4 className="font-semibold">Récapitulatif</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Entreprise</span>
-                    <span className="font-medium">{billingInfo.companyName}</span>
+                    <span className="text-muted-foreground">Établissement</span>
+                    <span className="font-medium">{info.companyName}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Contact</span>
-                    <span className="font-medium">{billingInfo.contactName}</span>
+                    <span className="font-medium">{info.contactName}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Essai gratuit</span>
@@ -270,7 +205,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             </Card>
 
             <p className="text-xs text-center text-muted-foreground">
-              À la fin de l'essai, vous serez invité à compléter les informations de facturation (SIRET, IBAN) et choisir un plan.
+              À la fin de l'essai, vous pourrez choisir un plan et fournir vos informations de facturation.
             </p>
           </div>
         );
@@ -284,7 +219,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-[500px]" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-[450px]" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
             {STEPS.map((step, idx) => (
