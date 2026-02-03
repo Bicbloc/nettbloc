@@ -68,46 +68,53 @@ serve(async (req) => {
     // Get average thickness (default 2cm if not configured)
     const avgThickness = linenType.average_thickness_cm || 2.0;
 
-    // Model selection - OPTIMIZED for speed
-    // - quickDetect: ultra-fast for live stabilization (~300ms)
-    // - detectMode/liveMode: fast model for real-time preview
-    // - useRuler: powerful model for precise measurement
-    // - validation (normal): balanced flash model
+    // Model selection - Use better model for counting accuracy
     let model = 'google/gemini-2.5-flash';
     if (quickDetect) {
-      model = 'google/gemini-2.5-flash-lite'; // Fastest for live tracking
+      model = 'google/gemini-2.5-flash'; // Better model for accuracy
     } else if (detectMode || liveMode) {
-      model = 'google/gemini-2.5-flash-lite';
+      model = 'google/gemini-2.5-flash';
     } else if (useRuler) {
-      model = 'google/gemini-2.5-pro'; // Most powerful for ruler detection
+      model = 'google/gemini-2.5-pro';
     }
     
-    // ========== ULTRA-OPTIMIZED PROMPTS ==========
-    // CRITICAL: All prompts MUST demand JSON-only output, no text
+    // ========== IMPROVED PROMPTS FOR COUNTING ==========
+    
+    // QUICK DETECT - Clear counting instructions
+    const quickDetectPrompt = `You are an expert at counting folded linen items in a stack/pile.
 
-    // QUICK DETECT - Minimal prompt, STRICT JSON
-    const quickDetectPrompt = `ONLY JSON OUTPUT. Detect ${linenType.name} pile in image.
-Output: {"pile":true,"count":5,"confidence":0.8,"width_cm":60,"position":"center","bounds":{"x":0.3,"y":0.2,"w":0.4,"h":0.6}}
-If no pile: {"pile":false,"count":0,"confidence":0,"width_cm":0,"position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
+TASK: Count the number of ${linenType.name} items in this image.
+
+COUNTING METHOD:
+1. Look for a stack/pile of folded fabric
+2. Count the horizontal layers/folds visible from the side
+3. Each distinct horizontal layer = 1 item
+4. If items are ${avgThickness}cm thick each, estimate based on pile height
+
+RESPOND WITH ONLY THIS JSON (no other text):
+{"pile":true,"count":NUMBER,"confidence":0.0-1.0,"width_cm":WIDTH_IN_CM,"position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}
+
+If NO pile visible:
+{"pile":false,"count":0,"confidence":0,"width_cm":0,"position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
     
-    // Detection mode - identify type by width
-    const detectPrompt = `ONLY JSON. Detect linen pile, measure width, count items.
-Width guide: sheets>150cm, towels=50-100cm, pillowcases≈50cm
-Output: {"pile":true,"count":8,"confidence":0.85,"width_cm":75,"position":"center","bounds":{"x":0.2,"y":0.1,"w":0.6,"h":0.8}}`;
+    // Detection mode
+    const detectPrompt = `Count folded linen items. Each layer = 1 item.
+Estimate width in cm. Common: sheets 200-240cm, towels 50-100cm, pillowcases 50cm.
+JSON only: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}`;
     
-    // Live mode - quick count
-    const livePrompt = `ONLY JSON. Count ${linenType.name} items.
-Output: {"count":5,"confidence":0.8}`;
+    // Live mode
+    const livePrompt = `Count ${linenType.name} items in the pile. Each horizontal fold/layer = 1 item.
+JSON only: {"count":N,"confidence":0.X}`;
     
     // RULER MODE
-    const rulerPrompt = `ONLY JSON. Count ${linenType.name} using ruler if visible.
-Each item is ${avgThickness}cm thick.
-Output: {"count":10,"confidence":0.9,"ruler_detected":true,"pile_height_cm":20.0,"measurement_method":"ruler_calculation"}`;
+    const rulerPrompt = `Count ${linenType.name} using ruler measurement. Each item ≈ ${avgThickness}cm thick.
+Calculate: pile_height_cm / ${avgThickness} = count
+JSON only: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,"measurement_method":"ruler_calculation"}`;
 
     // VALIDATION mode
-    let fullPrompt = `ONLY JSON. Expert count of ${linenType.name} pile.
-Method: count horizontal layers, each layer = 1 item (${avgThickness}cm thick).
-Output: {"count":12,"confidence":0.85,"notes":"counted 12 visible layers"}`;
+    let fullPrompt = `Expert linen counting for ${linenType.name}.
+Count horizontal layers/folds. Each layer = 1 item (${avgThickness}cm thick).
+Be precise. JSON only: {"count":N,"confidence":0.X,"notes":"description"}`;
 
     // Get training samples + corrections for improved accuracy (not in quick/live mode)
     if (!liveMode && !quickDetect) {
@@ -151,9 +158,9 @@ Output: {"count":12,"confidence":0.85,"notes":"counted 12 visible layers"}`;
     const modeLabel = quickDetect ? 'QUICK' : detectMode ? 'DETECT' : liveMode ? 'LIVE' : useRuler ? 'RULER' : 'VALIDATE';
     console.log(`[count-linen] Mode: ${modeLabel}, Model: ${model}, Thickness: ${avgThickness}cm`);
 
-    // Call Lovable AI - ULTRA-FAST timeouts for quick detect
+    // Call Lovable AI - Reasonable timeouts
     const controller = new AbortController();
-    const timeout = quickDetect ? 3000 : (liveMode || detectMode) ? 6000 : 25000;
+    const timeout = quickDetect ? 8000 : (liveMode || detectMode) ? 10000 : 30000;
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
