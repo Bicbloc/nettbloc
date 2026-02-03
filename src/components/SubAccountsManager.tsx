@@ -114,9 +114,8 @@ export function SubAccountsManager() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSending, setIsSending] = useState(false);
 
-  const activationBaseUrl = typeof window !== 'undefined'
-    ? window.location.origin
-    : 'https://nettbloc.lovable.app';
+  // Always use production domain for activation URLs
+  const activationBaseUrl = 'https://nettobloc.bicbloc.eu';
   const getActivationUrl = (code: string) => `${activationBaseUrl}/activate-account?code=${encodeURIComponent(code)}`;
   
   const [formData, setFormData] = useState({
@@ -178,17 +177,21 @@ export function SubAccountsManager() {
     
     setIsSending(true);
     try {
-      const { data: hotelData } = await supabase
+      const { data: hotelData, error: hotelError } = await supabase
         .from('hotels')
         .select('id, name')
         .eq('user_id', user.id)
         .single();
 
+      if (hotelError || !hotelData?.id) {
+        throw new Error("Aucun établissement trouvé. Veuillez d'abord créer votre établissement.");
+      }
+
       const { data: newAccount, error } = await supabase
         .from('sub_accounts')
         .insert({
           parent_user_id: user.id,
-          hotel_id: hotelData?.id,
+          hotel_id: hotelData.id, // Always required
           email: formData.email,
           first_name: formData.first_name,
           last_name: formData.last_name,
