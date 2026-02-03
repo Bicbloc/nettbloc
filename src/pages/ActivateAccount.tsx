@@ -38,7 +38,7 @@ export default function ActivateAccount() {
       // Find invitation with this code in sub_account_invitations table
       const { data: invitationData, error: invitationError } = await supabase
         .from("sub_account_invitations")
-        .select("*, sub_accounts(*, hotels(name))")
+        .select("*, sub_accounts(*, hotels(id, name, hotel_code))")
         .eq("invitation_code", invitationCode)
         .single();
 
@@ -62,6 +62,9 @@ export default function ActivateAccount() {
         setIsLoading(false);
         return;
       }
+
+      console.log("✅ Invitation validated, sub_account:", invitationData.sub_accounts);
+      console.log("✅ Parent hotel:", invitationData.sub_accounts?.hotels);
 
       setInvitation(invitationData);
       setSubAccount(invitationData.sub_accounts);
@@ -93,6 +96,11 @@ export default function ActivateAccount() {
       // Clear any existing cache to prevent stale hotel data
       localStorage.removeItem('nettbloc_hotel');
       localStorage.removeItem('nettbloc-hotel');
+      localStorage.removeItem('nettobloc_hotel_session');
+      localStorage.removeItem('selectedHotelId');
+      
+      console.log("🔐 Creating sub-account user for hotel_id:", subAccount.hotel_id);
+      console.log("🔐 Parent hotel info:", subAccount.hotels);
       
       // Create Supabase auth user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -103,6 +111,7 @@ export default function ActivateAccount() {
             first_name: subAccount.first_name,
             last_name: subAccount.last_name,
             is_sub_account: true, // Mark as sub-account to prevent hotel creation
+            company_name: subAccount.hotels?.name || null, // Pass parent hotel name
           },
         },
       });
@@ -121,6 +130,8 @@ export default function ActivateAccount() {
         throw new Error("Échec de la création du compte");
       }
 
+      console.log("✅ Auth user created:", authData.user.id);
+
       // Update sub_account with user_id and mark as active
       const { error: updateError } = await supabase
         .from("sub_accounts")
@@ -132,7 +143,9 @@ export default function ActivateAccount() {
         .eq("id", subAccount.id);
 
       if (updateError) {
-        console.error("Error updating sub_account:", updateError);
+        console.error("❌ Error updating sub_account:", updateError);
+      } else {
+        console.log("✅ sub_account updated with user_id");
       }
 
       // Create a profile for the sub-account linked to parent's hotel
@@ -142,13 +155,16 @@ export default function ActivateAccount() {
         .upsert({
           id: authData.user.id,
           email: email,
-          current_hotel_id: subAccount.hotel_id,
+          current_hotel_id: subAccount.hotel_id, // CRITICAL: Link to parent hotel
           onboarding_completed_at: new Date().toISOString(), // Skip onboarding
           company_name: subAccount.hotels?.name || null,
+          subscription_type: 'trial', // Inherit trial status (parent manages subscription)
         });
 
       if (profileError) {
-        console.error("Error creating profile:", profileError);
+        console.error("❌ Error creating profile:", profileError);
+      } else {
+        console.log("✅ Profile created with current_hotel_id:", subAccount.hotel_id);
       }
 
       // Mark invitation as accepted
@@ -160,6 +176,7 @@ export default function ActivateAccount() {
             accepted_at: new Date().toISOString(),
           })
           .eq("id", invitation.id);
+        console.log("✅ Invitation marked as accepted");
       }
 
       toast.success("Compte activé avec succès !");
@@ -169,7 +186,7 @@ export default function ActivateAccount() {
         navigate("/auth/establishment");
       }, 2000);
     } catch (err: any) {
-      console.error("Activation error:", err);
+      console.error("❌ Activation error:", err);
       toast.error(err.message || "Erreur lors de l'activation");
     } finally {
       setIsActivating(false);

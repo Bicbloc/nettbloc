@@ -52,17 +52,21 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
 
     try {
       // Phase 0: Vérifier si l'utilisateur est un sous-compte
-      const { data: subAccountData } = await supabase
+      const { data: subAccountData, error: subError } = await supabase
         .from('sub_accounts')
         .select('id, hotel_id, parent_user_id, hotels(id, name, hotel_code)')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .maybeSingle();
 
+      if (subError) {
+        console.warn('⚠️ HotelContext: Erreur check sous-compte:', subError.message);
+      }
+
       if (subAccountData?.hotels) {
         // C'est un sous-compte - utiliser l'hôtel du parent
         const hotelData = subAccountData.hotels as unknown as HotelData;
-        console.log('✅ HotelContext: Sous-compte détecté, hôtel du parent chargé');
+        console.log('✅ HotelContext: Sous-compte détecté, hôtel du parent chargé:', hotelData.name, hotelData.hotel_code);
         setHotel(hotelData);
         storageService.saveHotel({
           id: hotelData.id,
@@ -81,6 +85,34 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         setIsLoading(false);
         setHasAttemptedLoad(true);
         return;
+      }
+      
+      // Si sub_accounts ne retourne rien, vérifier aussi via le profil (fallback)
+      if (user.user_metadata?.is_sub_account === true) {
+        console.log('🏨 HotelContext: Utilisateur marqué comme sous-compte, check via profil...');
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('current_hotel_id, hotels!profiles_current_hotel_id_fkey(id, name, hotel_code)')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileData?.hotels) {
+          const hotelData = profileData.hotels as unknown as HotelData;
+          console.log('✅ HotelContext: Hôtel trouvé via profil du sous-compte:', hotelData.name);
+          setHotel(hotelData);
+          storageService.saveHotel({
+            id: hotelData.id,
+            name: hotelData.name,
+            code: hotelData.hotel_code
+          });
+          
+          await HotelSessionService.createSession(hotelData.id);
+          window.dispatchEvent(new CustomEvent('hotel:ready', { detail: { hotelId: hotelData.id } }));
+          
+          setIsLoading(false);
+          setHasAttemptedLoad(true);
+          return;
+        }
       }
 
       // Phase 1: Vérifier le cache localStorage (pour les admins)
