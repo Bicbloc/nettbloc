@@ -35,27 +35,37 @@ export default function ActivateAccount() {
 
   const validateCode = async (invitationCode: string) => {
     try {
-      // Find sub_account with this invitation code
-      const { data: subAccountData, error: subAccountError } = await supabase
-        .from("sub_accounts")
-        .select("*, hotels(name)")
+      // Find invitation with this code in sub_account_invitations table
+      const { data: invitationData, error: invitationError } = await supabase
+        .from("sub_account_invitations")
+        .select("*, sub_accounts(*, hotels(name))")
         .eq("invitation_code", invitationCode)
         .single();
 
-      if (subAccountError || !subAccountData) {
+      if (invitationError || !invitationData) {
+        console.error("Invitation lookup error:", invitationError);
         setError("Code d'invitation invalide ou expiré");
         setIsLoading(false);
         return;
       }
 
-      if (subAccountData.invitation_status === "active") {
+      // Check if already accepted
+      if (invitationData.status === "accepted" || invitationData.accepted_at) {
         setError("Ce compte a déjà été activé");
         setIsLoading(false);
         return;
       }
 
-      setSubAccount(subAccountData);
-      setEmail(subAccountData.email || "");
+      // Check expiration
+      if (invitationData.expires_at && new Date(invitationData.expires_at) < new Date()) {
+        setError("Ce code d'invitation a expiré");
+        setIsLoading(false);
+        return;
+      }
+
+      setInvitation(invitationData);
+      setSubAccount(invitationData.sub_accounts);
+      setEmail(invitationData.sub_accounts?.email || "");
       setIsLoading(false);
     } catch (err) {
       console.error("Error validating code:", err);
@@ -118,6 +128,17 @@ export default function ActivateAccount() {
 
       if (updateError) {
         console.error("Error updating sub_account:", updateError);
+      }
+
+      // Mark invitation as accepted
+      if (invitation?.id) {
+        await supabase
+          .from("sub_account_invitations")
+          .update({
+            status: "accepted",
+            accepted_at: new Date().toISOString(),
+          })
+          .eq("id", invitation.id);
       }
 
       toast.success("Compte activé avec succès !");
