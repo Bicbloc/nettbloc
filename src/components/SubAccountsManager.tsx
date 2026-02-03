@@ -185,7 +185,7 @@ export function SubAccountsManager() {
           last_name: formData.last_name,
           role_name: formData.role_name,
           created_by: user.id,
-          invitation_status: 'pending',
+          invitation_status: 'invited',
         })
         .select()
         .single();
@@ -327,10 +327,10 @@ export function SubAccountsManager() {
 
   const getInvitationStatusBadge = (status?: string) => {
     switch (status) {
-      case 'pending':
+      case 'invited':
         return <Badge variant="outline" className="border-orange-400 text-orange-600">En attente</Badge>;
-      case 'accepted':
-        return <Badge className="bg-green-100 text-green-800">Acceptée</Badge>;
+      case 'active':
+        return <Badge className="bg-green-100 text-green-800">Actif</Badge>;
       default:
         return <Badge variant="secondary">Invité</Badge>;
     }
