@@ -46,17 +46,31 @@ export function useOnboarding() {
           .maybeSingle();
 
         const isSuperAdmin = !!roleData;
-        // Récupérer le profil
+
+        // Vérifier si l'utilisateur est un sous-compte
+        const { data: subAccountData } = await supabase
+          .from('sub_accounts')
+          .select('id, parent_user_id, is_active')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        const isSubAccount = !!subAccountData;
+
+        // Si sous-compte, récupérer le profil du parent pour l'abonnement
+        const profileUserId = subAccountData?.parent_user_id || user.id;
+
+        // Récupérer le profil (du parent si sous-compte)
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('onboarding_completed_at, trial_end_date, subscription_status, subscription_type')
-          .eq('id', user.id)
+          .eq('id', profileUserId)
           .single();
 
         if (error) throw error;
 
-        // Vérifier si l'onboarding est nécessaire
-        const needsOnboarding = !profile?.onboarding_completed_at;
+        // Les sous-comptes n'ont pas besoin d'onboarding - ils héritent de la config du parent
+        const needsOnboarding = isSubAccount ? false : !profile?.onboarding_completed_at;
 
         // Calculer le niveau d'avertissement trial
         let trialWarningLevel = 0;
@@ -79,14 +93,14 @@ export function useOnboarding() {
           }
         }
 
-        // Si abonné ou super admin, pas d'expiration
-        if (profile?.subscription_status === 'active' || profile?.subscription_type === 'premium' || isSuperAdmin) {
+        // Si abonné, super admin ou sous-compte, pas d'expiration/warning
+        if (profile?.subscription_status === 'active' || profile?.subscription_type === 'premium' || isSuperAdmin || isSubAccount) {
           isTrialExpired = false;
           trialWarningLevel = 0;
         }
 
         setState({
-          needsOnboarding: isSuperAdmin ? false : needsOnboarding, // Super admin skip onboarding
+          needsOnboarding: (isSuperAdmin || isSubAccount) ? false : needsOnboarding,
           isLoading: false,
           trialWarningLevel,
           isTrialExpired,
