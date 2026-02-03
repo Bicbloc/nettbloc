@@ -4279,6 +4279,7 @@ export type Database = {
           first_name: string
           hotel_id: string | null
           id: string
+          invitation_code: string | null
           invitation_status: string | null
           is_active: boolean | null
           last_login_at: string | null
@@ -4295,6 +4296,7 @@ export type Database = {
           first_name: string
           hotel_id?: string | null
           id?: string
+          invitation_code?: string | null
           invitation_status?: string | null
           is_active?: boolean | null
           last_login_at?: string | null
@@ -4311,6 +4313,7 @@ export type Database = {
           first_name?: string
           hotel_id?: string | null
           id?: string
+          invitation_code?: string | null
           invitation_status?: string | null
           is_active?: boolean | null
           last_login_at?: string | null

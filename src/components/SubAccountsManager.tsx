@@ -183,16 +183,25 @@ export function SubAccountsManager() {
     }
 
     try {
+      // Get the hotel info for the email
+      const { data: hotelData } = await supabase
+        .from('hotels')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .single();
+
       // Create sub-account record
       const { data: newAccount, error } = await supabase
         .from('sub_accounts')
         .insert({
           parent_user_id: user.id,
+          hotel_id: hotelData?.id,
           email: formData.email,
           first_name: formData.first_name,
           last_name: formData.last_name,
           role_name: formData.role_name,
           created_by: user.id,
+          invitation_status: 'pending',
         })
         .select()
         .single();
@@ -214,10 +223,43 @@ export function SubAccountsManager() {
           .insert(permissionOverrides);
       }
 
-      toast({
-        title: "✅ Sous-compte créé",
-        description: `${formData.first_name} ${formData.last_name} a été ajouté.`,
-      });
+      // Send invitation email via edge function
+      try {
+        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
+          'send-subaccount-invitation',
+          {
+            body: {
+              subAccountId: newAccount.id,
+              email: formData.email,
+              firstName: formData.first_name,
+              lastName: formData.last_name,
+              roleName: formData.role_name,
+              hotelName: hotelData?.name || 'NettBloc',
+            },
+          }
+        );
+
+        if (inviteError) {
+          console.error('Error sending invitation:', inviteError);
+          toast({
+            variant: "default",
+            title: "⚠️ Sous-compte créé",
+            description: `${formData.first_name} ${formData.last_name} a été ajouté, mais l'email d'invitation n'a pas pu être envoyé.`,
+          });
+        } else {
+          toast({
+            title: "✅ Sous-compte créé",
+            description: `Une invitation a été envoyée à ${formData.email}.`,
+          });
+        }
+      } catch (emailError) {
+        console.error('Error invoking edge function:', emailError);
+        toast({
+          variant: "default",
+          title: "⚠️ Sous-compte créé",
+          description: `${formData.first_name} ${formData.last_name} a été ajouté. L'email sera envoyé ultérieurement.`,
+        });
+      }
 
       setIsDialogOpen(false);
       resetForm();
