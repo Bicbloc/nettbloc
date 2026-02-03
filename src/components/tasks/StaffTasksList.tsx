@@ -3,18 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
-  CheckCircle, Clock, MapPin, AlertTriangle, 
-  ChevronDown, ChevronUp, Loader2, ClipboardList,
-  Repeat, Calendar as CalendarIcon
+  CheckCircle, ChevronDown, ChevronUp, Loader2, ClipboardList,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 
 interface StaffTasksListProps {
   hotelId: string;
@@ -82,14 +78,13 @@ export function StaffTasksList({
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["staff-tasks", hotelId, staffType, staffId, today],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("task_templates")
         .select("*")
         .eq("hotel_id", hotelId)
         .eq("is_active", true)
         .eq("assigned_to_type", staffType);
 
-      const { data, error } = await query;
       if (error) throw error;
 
       // Filter tasks based on:
@@ -117,19 +112,19 @@ export function StaffTasksList({
   // Fetch today's completions
   const { data: completions } = useQuery({
     queryKey: ["task-completions", hotelId, today],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<TaskCompletion[]> => {
+      // Use a raw query since types might not be updated yet
+      const { data, error } = await (supabase as any)
         .from("task_completions")
         .select("*")
         .eq("hotel_id", hotelId)
         .eq("completion_date", today);
 
       if (error) {
-        // Table might not exist yet, return empty array
         console.log("Task completions query error:", error);
         return [];
       }
-      return data as TaskCompletion[];
+      return (data || []) as unknown as TaskCompletion[];
     },
     enabled: !!hotelId,
   });
@@ -138,19 +133,20 @@ export function StaffTasksList({
   const completeMutation = useMutation({
     mutationFn: async ({ taskId, completed }: { taskId: string; completed: boolean }) => {
       if (completed) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("task_completions")
           .insert({
             hotel_id: hotelId,
             task_template_id: taskId,
             completed_by_id: staffId || 'unknown',
             completed_by_name: staffName || 'Staff',
+            completed_by_type: staffType,
             completion_date: today,
           });
         if (error) throw error;
       } else {
         // Remove completion
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("task_completions")
           .delete()
           .eq("task_template_id", taskId)

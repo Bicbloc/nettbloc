@@ -38,6 +38,7 @@ import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
 import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
 import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
+import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 
 interface GovernessProfile {
   id: string;
@@ -493,6 +494,16 @@ function GovernessDashboardContent() {
                 </div>
               </Card>
             </div>
+
+            {/* Tâches du jour */}
+            {selectedHotel && (
+              <StaffTasksList
+                hotelId={selectedHotel.id}
+                staffType="governess"
+                staffId={profile.id}
+                staffName={profile.name}
+              />
+            )}
 
             {/* Sélection hôtel */}
             {hotels.length > 1 && (

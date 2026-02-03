@@ -4448,6 +4448,67 @@ export type Database = {
           },
         ]
       }
+      task_completions: {
+        Row: {
+          completed_at: string
+          completed_by_id: string
+          completed_by_name: string
+          completed_by_type: string | null
+          completion_date: string
+          created_at: string
+          hotel_id: string
+          id: string
+          notes: string | null
+          task_template_id: string
+        }
+        Insert: {
+          completed_at?: string
+          completed_by_id: string
+          completed_by_name: string
+          completed_by_type?: string | null
+          completion_date?: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          task_template_id: string
+        }
+        Update: {
+          completed_at?: string
+          completed_by_id?: string
+          completed_by_name?: string
+          completed_by_type?: string | null
+          completion_date?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          task_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_completions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_completions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_completions_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_templates: {
         Row: {
           assigned_to_all: boolean | null

@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { RoomRegistryAutocomplete } from "./RoomRegistryAutocomplete";
 import { 
   Plus, Trash2, Edit, Calendar as CalendarIcon, 
   Repeat, Clock, MapPin, User, Loader2, CheckCircle, Save, Users
@@ -552,11 +552,13 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Référence</Label>
-                <Input
-                  placeholder="Ex: Étage 2..."
+                <Label>Espace / Référence</Label>
+                <RoomRegistryAutocomplete
+                  hotelId={hotelId}
                   value={formData.location_reference}
-                  onChange={(e) => setFormData({ ...formData, location_reference: e.target.value })}
+                  onChange={(v) => setFormData({ ...formData, location_reference: v })}
+                  locationType={formData.location_type}
+                  placeholder="Rechercher dans le registre..."
                 />
               </div>
             </div>
