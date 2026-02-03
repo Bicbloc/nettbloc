@@ -74,10 +74,25 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-      <Card className="w-full max-w-2xl max-h-[80vh] bg-card border shadow-lg animate-scale-in">
-        <CardHeader className="space-y-1 border-b">
-          <div className="flex items-center justify-between">
+    <div 
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <Card className="w-full max-w-2xl max-h-[80vh] bg-background border shadow-xl animate-scale-in relative">
+        {/* Bouton fermer visible en haut à droite */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 h-8 w-8 rounded-full bg-muted hover:bg-destructive hover:text-white transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </Button>
+        
+        <CardHeader className="space-y-1 border-b pr-12">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
               Journal des Actions
@@ -96,7 +111,7 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
                   className="text-sm hover-scale"
                 >
                   <Check className="h-4 w-4 mr-1" />
-                  Tout marquer
+                  <span className="hidden sm:inline">Tout marquer</span>
                 </Button>
               )}
               <Button
@@ -106,15 +121,7 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
                 className="text-sm hover-scale"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                Effacer
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onClose}
-                className="hover-scale"
-              >
-                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Effacer</span>
               </Button>
             </div>
           </div>
