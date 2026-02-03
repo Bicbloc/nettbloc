@@ -51,7 +51,39 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
     console.log('🏨 HotelContext: Chargement hôtel pour user:', user.id.slice(0, 8) + '...');
 
     try {
-      // Phase 1: Vérifier le cache localStorage
+      // Phase 0: Vérifier si l'utilisateur est un sous-compte
+      const { data: subAccountData } = await supabase
+        .from('sub_accounts')
+        .select('id, hotel_id, parent_user_id, hotels(id, name, hotel_code)')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (subAccountData?.hotels) {
+        // C'est un sous-compte - utiliser l'hôtel du parent
+        const hotelData = subAccountData.hotels as unknown as HotelData;
+        console.log('✅ HotelContext: Sous-compte détecté, hôtel du parent chargé');
+        setHotel(hotelData);
+        storageService.saveHotel({
+          id: hotelData.id,
+          name: hotelData.name,
+          code: hotelData.hotel_code
+        });
+        
+        // Créer/restaurer la session hôtel
+        await HotelSessionService.createSession(hotelData.id);
+        console.log('✅ HotelContext: Hôtel prêt (sous-compte):', hotelData.id.slice(0, 8) + '...');
+        
+        window.dispatchEvent(new CustomEvent('hotel:ready', { 
+          detail: { hotelId: hotelData.id } 
+        }));
+        
+        setIsLoading(false);
+        setHasAttemptedLoad(true);
+        return;
+      }
+
+      // Phase 1: Vérifier le cache localStorage (pour les admins)
       const cachedHotel = storageService.getHotel();
       if (cachedHotel?.id && cachedHotel.id.length > 30) {
         // Vérifier que l'hôtel appartient à l'utilisateur
@@ -80,7 +112,7 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         storageService.clearHotel();
       }
 
-      // Phase 2: Requête base de données
+      // Phase 2: Requête base de données (pour les admins)
       const { data: profileData } = await supabase
         .from('profiles')
         .select(`
