@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package, LogOut } from 'lucide-react';
+import { CheckCircle, X, Sparkles, Send, AlertCircle, Play, ChevronRight, Package, LogOut, Bed } from 'lucide-react';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { LostItemReportWizard, GuestInfo } from '@/components/lost-and-found/LostItemReportWizard';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +18,7 @@ interface Room {
   cleaning_priority?: number;
   cleaning_type?: string;
   is_checkout?: boolean; // Client sorti
+  is_twin?: boolean; // Chambre twin
   // Guest info from PMS data
   guest_arrival?: GuestInfo;
   guest_departure?: GuestInfo;
@@ -283,6 +284,14 @@ export const RoomCardEnhanced = ({ room, hotelId, housekeeperName = 'Femme de ch
                   <Badge className="bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs gap-1">
                     <LogOut className="h-3 w-3" />
                     Client sorti
+                  </Badge>
+                )}
+
+                {/* Twin badge */}
+                {room.is_twin && (
+                  <Badge className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs gap-1">
+                    <Bed className="h-3 w-3" />
+                    Twin
                   </Badge>
                 )}
 

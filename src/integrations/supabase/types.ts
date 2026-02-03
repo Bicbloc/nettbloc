@@ -3889,6 +3889,7 @@ export type Database = {
           id: string
           inspected_at: string | null
           inspected_by: string | null
+          is_twin: boolean | null
           last_cleaned_at: string | null
           notes: string | null
           room_number: string
@@ -3906,6 +3907,7 @@ export type Database = {
           id?: string
           inspected_at?: string | null
           inspected_by?: string | null
+          is_twin?: boolean | null
           last_cleaned_at?: string | null
           notes?: string | null
           room_number: string
@@ -3923,6 +3925,7 @@ export type Database = {
           id?: string
           inspected_at?: string | null
           inspected_by?: string | null
+          is_twin?: boolean | null
           last_cleaned_at?: string | null
           notes?: string | null
           room_number?: string
