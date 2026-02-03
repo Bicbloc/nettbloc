@@ -40,8 +40,8 @@ export function TrialExpiredBlocker({ onSelectPlan }: TrialExpiredBlockerProps) 
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
-      <Card className="max-w-3xl w-full">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4 overflow-auto">
+      <Card className="max-w-3xl w-full my-8">
         <CardHeader className="text-center">
           <div className="mx-auto w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4">
             <AlertTriangle className="h-8 w-8 text-amber-600" />
@@ -49,20 +49,21 @@ export function TrialExpiredBlocker({ onSelectPlan }: TrialExpiredBlockerProps) 
           <Badge variant="secondary" className="mx-auto mb-2">
             Essai terminé
           </Badge>
-          <CardTitle className="text-2xl">Choisissez le plan adapté à vos besoins</CardTitle>
+          <CardTitle className="text-2xl">Votre période d'essai est terminée</CardTitle>
           <CardDescription className="text-base">
-            Répondez à quelques questions pour trouver le plan idéal pour votre établissement.
+            Utilisez notre simulateur pour trouver le plan adapté à votre établissement.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-8">
+          {/* Plan Simulator - always shown */}
           <PlanSimulator />
 
           {/* CTA */}
           <div className="flex flex-col gap-3 pt-4">
             <Button size="lg" onClick={handleChoosePlan} className="w-full">
               <CreditCard className="h-5 w-5 mr-2" />
-              Souscrire maintenant
+              Voir tous les plans et souscrire
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
             <p className="text-xs text-center text-muted-foreground">
