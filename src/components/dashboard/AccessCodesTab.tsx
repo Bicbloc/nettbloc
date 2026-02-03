@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Check, X, Clock, Loader2, RefreshCw, UserPlus, Crown, Wrench } from "lucide-react";
+import { Bell, Check, X, Clock, Loader2, RefreshCw, UserPlus, Crown, Wrench, Trash2, Ban } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHotel } from "@/contexts/HotelContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -292,6 +292,122 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
     }
   };
 
+  // Suspend/Delete handlers
+  const handleSuspendHousekeeper = async (request: HousekeeperRequest) => {
+    setProcessingId(request.id);
+    try {
+      await supabase
+        .from('housekeeper_access_requests')
+        .update({ status: 'suspended', reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq('id', request.id);
+      
+      // Also deactivate the housekeeper record
+      await supabase
+        .from('housekeepers')
+        .update({ is_active: false })
+        .eq('user_id', request.housekeeper_profile_id)
+        .eq('hotel_id', request.hotel_id);
+      
+      toast.success('Accès suspendu');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la suspension');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleDeleteHousekeeper = async (requestId: string) => {
+    if (!confirm('Supprimer définitivement cette demande ?')) return;
+    setProcessingId(requestId);
+    try {
+      await supabase
+        .from('housekeeper_access_requests')
+        .delete()
+        .eq('id', requestId);
+      toast.success('Demande supprimée');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleSuspendGoverness = async (request: GovernessRequest) => {
+    setProcessingId(request.id);
+    try {
+      await supabase
+        .from('governess_access_requests')
+        .update({ status: 'suspended', reviewed_at: new Date().toISOString() })
+        .eq('id', request.id);
+      
+      await supabase
+        .from('governess_hotel_sessions')
+        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .eq('governess_profile_id', request.governess_profile_id)
+        .eq('hotel_id', request.hotel_id);
+      
+      toast.success('Accès suspendu');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la suspension');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleDeleteGoverness = async (requestId: string) => {
+    if (!confirm('Supprimer définitivement cette demande ?')) return;
+    setProcessingId(requestId);
+    try {
+      await supabase
+        .from('governess_access_requests')
+        .delete()
+        .eq('id', requestId);
+      toast.success('Demande supprimée');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleSuspendTechnician = async (request: TechnicianRequest) => {
+    setProcessingId(request.id);
+    try {
+      await supabase
+        .from('technician_access_requests')
+        .update({ status: 'suspended', reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq('id', request.id);
+      
+      toast.success('Accès suspendu');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la suspension');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleDeleteTechnician = async (requestId: string) => {
+    if (!confirm('Supprimer définitivement cette demande ?')) return;
+    setProcessingId(requestId);
+    try {
+      await supabase
+        .from('technician_access_requests')
+        .delete()
+        .eq('id', requestId);
+      toast.success('Demande supprimée');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -300,6 +416,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         return <Badge className="bg-green-100 text-green-700 gap-1"><Check className="h-3 w-3" /> Approuvé</Badge>;
       case 'rejected':
         return <Badge variant="destructive" className="gap-1"><X className="h-3 w-3" /> Refusé</Badge>;
+      case 'suspended':
+        return <Badge className="bg-orange-100 text-orange-700 gap-1"><Ban className="h-3 w-3" /> Suspendu</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -322,7 +440,9 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
     requests: any[],
     type: 'housekeeper' | 'governess' | 'technician',
     onApprove: (req: any) => void,
-    onReject: (id: string) => void
+    onReject: (id: string) => void,
+    onSuspend: (req: any) => void,
+    onDelete: (id: string) => void
   ) => {
     const profileKey = type === 'housekeeper' ? 'housekeeper_profiles' : type === 'governess' ? 'governess_profiles' : 'technician_profiles';
 
@@ -339,63 +459,76 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         <TableHeader>
           <TableRow>
             <TableHead>Nom</TableHead>
-            <TableHead>Email</TableHead>
             <TableHead>Statut</TableHead>
-            <TableHead>Date</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {requests.map((request) => (
             <TableRow key={request.id}>
-              <TableCell className="font-medium">
-                {request[profileKey]?.name || 'N/A'}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {request[profileKey]?.email || 'N/A'}
+              <TableCell>
+                <div>
+                  <div className="font-medium">{request[profileKey]?.name || 'N/A'}</div>
+                  <div className="text-xs text-muted-foreground">{request[profileKey]?.email || ''}</div>
+                </div>
               </TableCell>
               <TableCell>
                 {getStatusBadge(request.status)}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {new Date(request.requested_at).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'short'
-                })}
-              </TableCell>
               <TableCell className="text-right">
-                {request.status === 'pending' && (
-                  <div className="flex gap-1 justify-end">
+                <div className="flex gap-1 justify-end">
+                  {request.status === 'pending' && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => onReject(request.id)}
+                        disabled={processingId === request.id}
+                        title="Refuser"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 bg-green-600 hover:bg-green-700"
+                        onClick={() => onApprove(request)}
+                        disabled={processingId === request.id}
+                        title="Approuver"
+                      >
+                        {processingId === request.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </>
+                  )}
+                  {request.status === 'approved' && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => onReject(request.id)}
+                      className="h-7 w-7 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      onClick={() => onSuspend(request)}
                       disabled={processingId === request.id}
+                      title="Suspendre"
                     >
-                      {processingId === request.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <X className="h-4 w-4" />
-                      )}
+                      <Ban className="h-4 w-4" />
                     </Button>
+                  )}
+                  {(request.status === 'rejected' || request.status === 'suspended') && (
                     <Button
                       size="sm"
-                      className="h-8 bg-green-600 hover:bg-green-700"
-                      onClick={() => onApprove(request)}
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => onDelete(request.id)}
                       disabled={processingId === request.id}
+                      title="Supprimer"
                     >
-                      {processingId === request.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4 mr-1" />
-                          Valider
-                        </>
-                      )}
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </TableCell>
             </TableRow>
           ))}
@@ -453,7 +586,9 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
               housekeeperRequests,
               'housekeeper',
               handleApproveHousekeeper,
-              handleRejectHousekeeper
+              handleRejectHousekeeper,
+              handleSuspendHousekeeper,
+              handleDeleteHousekeeper
             )}
           </CardContent>
         </Card>
@@ -478,7 +613,9 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
               governessRequests,
               'governess',
               handleApproveGoverness,
-              handleRejectGoverness
+              handleRejectGoverness,
+              handleSuspendGoverness,
+              handleDeleteGoverness
             )}
           </CardContent>
         </Card>
@@ -503,7 +640,9 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
               technicianRequests,
               'technician',
               handleApproveTechnician,
-              handleRejectTechnician
+              handleRejectTechnician,
+              handleSuspendTechnician,
+              handleDeleteTechnician
             )}
           </CardContent>
         </Card>
