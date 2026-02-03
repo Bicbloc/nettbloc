@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -30,24 +31,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { 
   UserPlus, 
   Users, 
   Shield, 
   Trash2, 
-  Edit, 
   Save, 
-  X,
-  CheckCircle,
-  XCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  ArrowLeft,
+  ArrowRight,
+  Mail,
+  CheckCircle,
+  Send,
+  Loader2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,6 +59,7 @@ interface SubAccount {
   is_active: boolean;
   created_at: string;
   last_login_at: string | null;
+  invitation_status?: string;
 }
 
 interface RoleTemplate {
@@ -79,28 +77,28 @@ interface Permission {
 }
 
 const ALL_PERMISSIONS: Permission[] = [
-  // Chambres
   { key: 'rooms.view', label: 'Voir les chambres', category: 'Chambres' },
   { key: 'rooms.import', label: 'Importer des chambres', category: 'Chambres' },
   { key: 'rooms.edit', label: 'Modifier les chambres', category: 'Chambres' },
   { key: 'rooms.delete', label: 'Supprimer des chambres', category: 'Chambres' },
-  // Linge
   { key: 'linen.view', label: 'Voir l\'inventaire linge', category: 'Linge' },
   { key: 'linen.add_types', label: 'Ajouter des types de linge', category: 'Linge' },
   { key: 'linen.scan', label: 'Scanner le linge', category: 'Linge' },
-  // IA & Configuration
   { key: 'ai.training', label: 'Entraînement IA', category: 'Configuration IA' },
   { key: 'ai.rules', label: 'Règles de nettoyage', category: 'Configuration IA' },
-  // Rapports
   { key: 'reports.view', label: 'Voir les rapports', category: 'Rapports' },
   { key: 'reports.export', label: 'Exporter les rapports', category: 'Rapports' },
-  // Personnel
   { key: 'staff.view', label: 'Voir le personnel', category: 'Personnel' },
   { key: 'staff.manage', label: 'Gérer le personnel', category: 'Personnel' },
-  // Incidents
   { key: 'incidents.view', label: 'Voir les incidents', category: 'Incidents' },
   { key: 'incidents.manage', label: 'Gérer les incidents', category: 'Incidents' },
   { key: 'incidents.add_items', label: 'Ajouter des items', category: 'Incidents' },
+];
+
+const STEPS = [
+  { id: 1, title: 'Informations', icon: Users },
+  { id: 2, title: 'Rôle & Permissions', icon: Shield },
+  { id: 3, title: 'Confirmation', icon: Mail },
 ];
 
 export function SubAccountsManager() {
@@ -109,13 +107,11 @@ export function SubAccountsManager() {
   const [roleTemplates, setRoleTemplates] = useState<RoleTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<SubAccount | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSending, setIsSending] = useState(false);
   
-  // Form state
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     first_name: '',
     last_name: '',
     role_name: 'staff',
@@ -131,7 +127,6 @@ export function SubAccountsManager() {
     
     setIsLoading(true);
     try {
-      // Load sub-accounts
       const { data: accounts, error: accountsError } = await supabase
         .from('sub_accounts')
         .select('*')
@@ -141,7 +136,6 @@ export function SubAccountsManager() {
       if (accountsError) throw accountsError;
       setSubAccounts(accounts || []);
 
-      // Load role templates
       const { data: roles, error: rolesError } = await supabase
         .from('permission_role_templates')
         .select('*')
@@ -170,27 +164,17 @@ export function SubAccountsManager() {
     }
   };
 
-  const handleCreateAccount = async () => {
+  const handleSendInvitation = async () => {
     if (!user) return;
     
-    if (!formData.email || !formData.first_name || !formData.last_name) {
-      toast({
-        variant: "destructive",
-        title: "Champs requis",
-        description: "Veuillez remplir tous les champs obligatoires.",
-      });
-      return;
-    }
-
+    setIsSending(true);
     try {
-      // Get the hotel info for the email
       const { data: hotelData } = await supabase
         .from('hotels')
         .select('id, name')
         .eq('user_id', user.id)
         .single();
 
-      // Create sub-account record
       const { data: newAccount, error } = await supabase
         .from('sub_accounts')
         .insert({
@@ -201,14 +185,13 @@ export function SubAccountsManager() {
           last_name: formData.last_name,
           role_name: formData.role_name,
           created_by: user.id,
-          invitation_status: 'invited',
+          invitation_status: 'pending',
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Save custom permissions if any
       const permissionOverrides = Object.entries(customPermissions)
         .filter(([_, value]) => value !== undefined)
         .map(([key, is_allowed]) => ({
@@ -218,46 +201,33 @@ export function SubAccountsManager() {
         }));
 
       if (permissionOverrides.length > 0) {
-        await supabase
-          .from('sub_account_permissions')
-          .insert(permissionOverrides);
+        await supabase.from('sub_account_permissions').insert(permissionOverrides);
       }
 
-      // Send invitation email via edge function
-      try {
-        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
-          'send-subaccount-invitation',
-          {
-            body: {
-              subAccountId: newAccount.id,
-              email: formData.email,
-              firstName: formData.first_name,
-              lastName: formData.last_name,
-              roleName: formData.role_name,
-              hotelName: hotelData?.name || 'NettBloc',
-            },
-          }
-        );
-
-        if (inviteError) {
-          console.error('Error sending invitation:', inviteError);
-          toast({
-            variant: "default",
-            title: "⚠️ Sous-compte créé",
-            description: `${formData.first_name} ${formData.last_name} a été ajouté, mais l'email d'invitation n'a pas pu être envoyé.`,
-          });
-        } else {
-          toast({
-            title: "✅ Sous-compte créé",
-            description: `Une invitation a été envoyée à ${formData.email}.`,
-          });
+      const { error: inviteError } = await supabase.functions.invoke(
+        'send-subaccount-invitation',
+        {
+          body: {
+            subAccountId: newAccount.id,
+            email: formData.email,
+            firstName: formData.first_name,
+            lastName: formData.last_name,
+            roleName: roleTemplates.find(r => r.role_name === formData.role_name)?.display_name || formData.role_name,
+            hotelName: hotelData?.name || 'NettBloc',
+          },
         }
-      } catch (emailError) {
-        console.error('Error invoking edge function:', emailError);
+      );
+
+      if (inviteError) {
         toast({
           variant: "default",
           title: "⚠️ Sous-compte créé",
-          description: `${formData.first_name} ${formData.last_name} a été ajouté. L'email sera envoyé ultérieurement.`,
+          description: `L'email d'invitation n'a pas pu être envoyé. Réessayez plus tard.`,
+        });
+      } else {
+        toast({
+          title: "✅ Invitation envoyée",
+          description: `Un email a été envoyé à ${formData.email} pour activer son compte.`,
         });
       }
 
@@ -272,6 +242,8 @@ export function SubAccountsManager() {
         title: "Erreur",
         description: error.message || "Impossible de créer le sous-compte.",
       });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -291,11 +263,7 @@ export function SubAccountsManager() {
 
       loadData();
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Erreur", description: error.message });
     }
   };
 
@@ -305,11 +273,7 @@ export function SubAccountsManager() {
     }
 
     try {
-      const { error } = await supabase
-        .from('sub_accounts')
-        .delete()
-        .eq('id', account.id);
-
+      const { error } = await supabase.from('sub_accounts').delete().eq('id', account.id);
       if (error) throw error;
 
       toast({
@@ -319,35 +283,22 @@ export function SubAccountsManager() {
 
       loadData();
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Erreur", description: error.message });
     }
   };
 
   const resetForm = () => {
-    setFormData({
-      email: '',
-      password: '',
-      first_name: '',
-      last_name: '',
-      role_name: 'staff',
-    });
+    setFormData({ email: '', first_name: '', last_name: '', role_name: 'staff' });
     setCustomPermissions({});
-    setEditingAccount(null);
+    setCurrentStep(1);
   };
 
   const getRoleDefaultPermissions = (roleName: string): string[] => {
-    const role = roleTemplates.find(r => r.role_name === roleName);
-    return role?.default_permissions || [];
+    return roleTemplates.find(r => r.role_name === roleName)?.default_permissions || [];
   };
 
   const isPermissionEnabled = (permKey: string): boolean => {
-    if (customPermissions[permKey] !== undefined) {
-      return customPermissions[permKey];
-    }
+    if (customPermissions[permKey] !== undefined) return customPermissions[permKey];
     return getRoleDefaultPermissions(formData.role_name).includes(permKey);
   };
 
@@ -356,14 +307,11 @@ export function SubAccountsManager() {
     const current = customPermissions[permKey];
     
     if (current === undefined) {
-      // First toggle: set to opposite of role default
       setCustomPermissions({ ...customPermissions, [permKey]: !roleDefault });
     } else if (current === !roleDefault) {
-      // Second toggle: clear override (back to role default)
       const { [permKey]: _, ...rest } = customPermissions;
       setCustomPermissions(rest);
     } else {
-      // Toggle the value
       setCustomPermissions({ ...customPermissions, [permKey]: !current });
     }
   };
@@ -373,6 +321,20 @@ export function SubAccountsManager() {
     acc[perm.category].push(perm);
     return acc;
   }, {} as Record<string, Permission[]>);
+
+  const canProceedStep1 = formData.first_name && formData.last_name && formData.email && formData.email.includes('@');
+  const canProceedStep2 = formData.role_name;
+
+  const getInvitationStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="border-orange-400 text-orange-600">En attente</Badge>;
+      case 'accepted':
+        return <Badge className="bg-green-100 text-green-800">Acceptée</Badge>;
+      default:
+        return <Badge variant="secondary">Invité</Badge>;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -387,32 +349,68 @@ export function SubAccountsManager() {
           </p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={resetForm}>
+            <Button className="gap-2">
               <UserPlus className="h-4 w-4" />
-              Nouveau sous-compte
+              Inviter un membre
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-            <DialogHeader className="flex-shrink-0 pb-4">
+            <DialogHeader className="flex-shrink-0 pb-2">
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
-                {editingAccount ? 'Modifier le sous-compte' : 'Créer un sous-compte'}
+                Inviter un membre de l'équipe
               </DialogTitle>
               <DialogDescription>
-                Ajoutez un membre de votre équipe avec des permissions personnalisées.
+                Une invitation par email sera envoyée pour activer le compte.
               </DialogDescription>
             </DialogHeader>
 
-            <ScrollArea className="flex-1 h-[60vh] pr-4">
-              <div className="space-y-6 py-2 pr-2">
-                {/* Informations personnelles */}
-                <div className="space-y-4">
-                  <h3 className="font-medium flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Informations personnelles
-                  </h3>
+            {/* Stepper */}
+            <div className="flex-shrink-0 py-4">
+              <div className="flex items-center justify-between mb-2">
+                {STEPS.map((step, idx) => (
+                  <React.Fragment key={step.id}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                        currentStep >= step.id 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {currentStep > step.id ? <CheckCircle className="h-4 w-4" /> : step.id}
+                      </div>
+                      <span className={`text-sm font-medium hidden sm:block ${
+                        currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
+                      }`}>
+                        {step.title}
+                      </span>
+                    </div>
+                    {idx < STEPS.length - 1 && (
+                      <div className={`flex-1 h-0.5 mx-2 ${
+                        currentStep > step.id ? 'bg-primary' : 'bg-muted'
+                      }`} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+              <Progress value={(currentStep / STEPS.length) * 100} className="h-1" />
+            </div>
+
+            <ScrollArea className="flex-1 pr-4">
+              {/* Step 1: Personal Info */}
+              {currentStep === 1 && (
+                <div className="space-y-4 py-2">
+                  <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                    <h3 className="font-medium flex items-center gap-2 mb-1">
+                      <Users className="h-4 w-4" />
+                      Informations personnelles
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Renseignez les coordonnées du nouveau membre.
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="first_name">Prénom *</Label>
@@ -434,7 +432,7 @@ export function SubAccountsManager() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
+                    <Label htmlFor="email">Adresse email *</Label>
                     <Input
                       id="email"
                       type="email"
@@ -442,24 +440,33 @@ export function SubAccountsManager() {
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="jean.dupont@hotel.com"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      L'invitation sera envoyée à cette adresse.
+                    </p>
                   </div>
                 </div>
+              )}
 
-                <Separator />
+              {/* Step 2: Role & Permissions */}
+              {currentStep === 2 && (
+                <div className="space-y-4 py-2">
+                  <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                    <h3 className="font-medium flex items-center gap-2 mb-1">
+                      <Shield className="h-4 w-4" />
+                      Rôle et permissions
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choisissez un rôle de base puis personnalisez les accès si nécessaire.
+                    </p>
+                  </div>
 
-                {/* Rôle */}
-                <div className="space-y-4">
-                  <h3 className="font-medium flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Rôle et permissions
-                  </h3>
                   <div className="space-y-2">
                     <Label>Rôle de base</Label>
                     <Select
                       value={formData.role_name}
                       onValueChange={(value) => {
                         setFormData({ ...formData, role_name: value });
-                        setCustomPermissions({}); // Reset custom permissions
+                        setCustomPermissions({});
                       }}
                     >
                       <SelectTrigger>
@@ -478,60 +485,128 @@ export function SubAccountsManager() {
                     </Select>
                   </div>
 
-                  {/* Permissions granulaires */}
-                  <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="permissions">
-                      <AccordionTrigger className="text-sm">
-                        Personnaliser les permissions
-                        {Object.keys(customPermissions).length > 0 && (
-                          <Badge variant="secondary" className="ml-2">
-                            {Object.keys(customPermissions).length} modifiée(s)
-                          </Badge>
-                        )}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-4 pt-2">
-                          {Object.entries(permissionsByCategory).map(([category, perms]) => (
-                            <div key={category} className="space-y-2">
-                              <h4 className="text-sm font-medium text-muted-foreground">{category}</h4>
-                              <div className="grid grid-cols-2 gap-2">
-                                {perms.map((perm) => {
-                                  const enabled = isPermissionEnabled(perm.key);
-                                  const isOverridden = customPermissions[perm.key] !== undefined;
-                                  return (
-                                    <div
-                                      key={perm.key}
-                                      className={`flex items-center justify-between p-2 rounded-md border ${
-                                        isOverridden ? 'border-primary bg-primary/5' : 'border-border'
-                                      }`}
-                                    >
-                                      <span className="text-sm">{perm.label}</span>
-                                      <Switch
-                                        checked={enabled}
-                                        onCheckedChange={() => togglePermission(perm.key)}
-                                      />
-                                    </div>
-                                  );
-                                })}
+                  <Separator className="my-4" />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm">Permissions</h4>
+                      {Object.keys(customPermissions).length > 0 && (
+                        <Badge variant="secondary">
+                          {Object.keys(customPermissions).length} modifiée(s)
+                        </Badge>
+                      )}
+                    </div>
+
+                    {Object.entries(permissionsByCategory).map(([category, perms]) => (
+                      <div key={category} className="space-y-2">
+                        <h5 className="text-sm font-medium text-muted-foreground">{category}</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {perms.map((perm) => {
+                            const enabled = isPermissionEnabled(perm.key);
+                            const isOverridden = customPermissions[perm.key] !== undefined;
+                            return (
+                              <div
+                                key={perm.key}
+                                className={`flex items-center justify-between p-2 rounded-md border ${
+                                  isOverridden ? 'border-primary bg-primary/5' : 'border-border'
+                                }`}
+                              >
+                                <span className="text-sm">{perm.label}</span>
+                                <Switch
+                                  checked={enabled}
+                                  onCheckedChange={() => togglePermission(perm.key)}
+                                />
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Step 3: Confirmation */}
+              {currentStep === 3 && (
+                <div className="space-y-4 py-2">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+                    <h3 className="font-medium flex items-center gap-2 mb-1 text-green-800 dark:text-green-300">
+                      <Mail className="h-4 w-4" />
+                      Prêt à envoyer l'invitation
+                    </h3>
+                    <p className="text-sm text-green-700 dark:text-green-400">
+                      Un email sera envoyé avec un code d'activation unique.
+                    </p>
+                  </div>
+
+                  <div className="bg-muted rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Destinataire</span>
+                      <span className="font-medium">{formData.first_name} {formData.last_name}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Email</span>
+                      <span className="font-medium">{formData.email}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Rôle</span>
+                      <Badge variant="secondary">
+                        {roleTemplates.find(r => r.role_name === formData.role_name)?.display_name || formData.role_name}
+                      </Badge>
+                    </div>
+                    {Object.keys(customPermissions).length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Permissions personnalisées</span>
+                          <Badge variant="outline">{Object.keys(customPermissions).length}</Badge>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Le membre recevra un email avec un lien pour créer son mot de passe et activer son compte.
+                    </p>
+                  </div>
+                </div>
+              )}
             </ScrollArea>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Annuler
-              </Button>
-              <Button onClick={handleCreateAccount} className="gap-2">
-                <Save className="h-4 w-4" />
-                {editingAccount ? 'Enregistrer' : 'Créer le sous-compte'}
-              </Button>
+            <DialogFooter className="flex-shrink-0 pt-4 gap-2 sm:gap-0">
+              {currentStep > 1 && (
+                <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)} disabled={isSending}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Précédent
+                </Button>
+              )}
+              
+              {currentStep < 3 ? (
+                <Button 
+                  onClick={() => setCurrentStep(currentStep + 1)} 
+                  disabled={currentStep === 1 ? !canProceedStep1 : !canProceedStep2}
+                >
+                  Suivant
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : (
+                <Button onClick={handleSendInvitation} disabled={isSending} className="gap-2">
+                  {isSending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Envoi en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Envoyer l'invitation
+                    </>
+                  )}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -543,13 +618,13 @@ export function SubAccountsManager() {
       ) : subAccounts.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed rounded-lg">
           <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Aucun sous-compte</h3>
+          <h3 className="text-lg font-semibold mb-2">Aucun membre invité</h3>
           <p className="text-muted-foreground mb-4">
-            Créez des sous-comptes pour permettre à votre équipe d'accéder à l'application.
+            Invitez des membres de votre équipe pour leur donner accès à l'application.
           </p>
           <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
             <UserPlus className="h-4 w-4" />
-            Créer un sous-compte
+            Inviter un membre
           </Button>
         </div>
       ) : (
@@ -577,7 +652,9 @@ export function SubAccountsManager() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {account.is_active ? (
+                  {account.invitation_status === 'pending' || account.invitation_status === 'invited' ? (
+                    getInvitationStatusBadge(account.invitation_status)
+                  ) : account.is_active ? (
                     <Badge className="bg-green-100 text-green-800">Actif</Badge>
                   ) : (
                     <Badge variant="secondary">Inactif</Badge>
