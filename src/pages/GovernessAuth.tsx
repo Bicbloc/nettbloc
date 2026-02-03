@@ -416,7 +416,11 @@ export default function GovernessAuth() {
       </div>
 
       <div className="absolute top-4 left-4 z-10">
-        <BackButton to="/auth" className="text-white hover:bg-white/20" />
+        <BackButton 
+          to="/auth" 
+          variant="secondary"
+          className="bg-white/90 hover:bg-white text-gray-800 shadow-md backdrop-blur-sm" 
+        />
       </div>
 
       <div className="w-full max-w-md relative z-10 animate-fade-in">

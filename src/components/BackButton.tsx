@@ -7,12 +7,14 @@ interface BackButtonProps {
   to?: string;
   label?: string;
   className?: string;
+  variant?: 'default' | 'outline' | 'ghost' | 'secondary';
 }
 
 export const BackButton: React.FC<BackButtonProps> = ({ 
   to = '/', 
   label = 'Retour',
-  className = '' 
+  className = '',
+  variant = 'secondary'
 }) => {
   const navigate = useNavigate();
 
@@ -26,7 +28,7 @@ export const BackButton: React.FC<BackButtonProps> = ({
 
   return (
     <Button
-      variant="outline"
+      variant={variant}
       size="sm"
       onClick={handleBack}
       className={`flex items-center gap-2 ${className}`}
