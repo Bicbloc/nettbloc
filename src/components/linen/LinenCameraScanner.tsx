@@ -527,6 +527,66 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               </div>
             )}
 
+            {/* Mode selector bar - BELOW WHITE FRAME */}
+            {isStreaming && !capturedPhoto && (
+              <div 
+                className="absolute z-20 left-1/2 -translate-x-1/2 flex gap-1 bg-black/80 backdrop-blur-sm p-1 rounded-xl"
+                style={{ top: `${GUIDE_TOP + GUIDE_HEIGHT + 2}%` }}
+              >
+                <Button
+                  variant={scanMode === 'live' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => {
+                    setScanMode('live');
+                    setCapturedPhoto(null);
+                    setIsLiveScanning(true);
+                    setHasManualOverride(false);
+                  }}
+                  className="text-white h-9 px-3"
+                >
+                  <Play className="h-4 w-4 mr-1" />
+                  Temps réel
+                </Button>
+                <Button
+                  variant={scanMode === 'photo' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => {
+                    setScanMode('photo');
+                    setCapturedPhoto(null);
+                    setIsLiveScanning(false);
+                  }}
+                  className="text-white h-9 px-3"
+                >
+                  <Camera className="h-4 w-4 mr-1" />
+                  Photo
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setScanMode('manual');
+                    stopCamera();
+                    setCapturedPhoto(null);
+                    setIsLiveScanning(false);
+                    setHasManualOverride(true);
+                  }}
+                  className="text-white h-9 px-3"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Manuel
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClose}
+                  className="text-white h-9 px-3"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Quitter
+                </Button>
+              </div>
+            )}
+
             {/* Purple detection bounds inside white frame */}
             {boundsStyle && !capturedPhoto && (
               <div
@@ -541,6 +601,24 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                 <Badge variant="secondary" className="text-sm px-3 py-1">
                   Largeur ≈ {Math.round(liveResult.widthCm)} cm
                 </Badge>
+              </div>
+            )}
+
+            {/* VALIDATE BUTTON - Shown when result is available */}
+            {liveResult && liveResult.count > 0 && !isAnalyzing && !capturedPhoto && (
+              <div className="absolute bottom-6 left-4 right-4 z-20">
+                <Button 
+                  onClick={handleConfirm} 
+                  className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 shadow-2xl"
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-6 w-6 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-6 w-6 mr-2" />
+                  )}
+                  Valider {displayCount} et enregistrer
+                </Button>
               </div>
             )}
 
@@ -593,53 +671,55 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         className="hidden"
       />
 
-      {/* Bottom controls - REORGANIZED */}
+      {/* Bottom controls - SIMPLIFIED */}
       <div className="bg-background border-t border-border p-4 pb-6 space-y-3">
-        {/* Mode selector bar - PROMINENT AT BOTTOM */}
-        <div className="flex gap-2 bg-muted p-1 rounded-lg">
-          <Button
-            variant={scanMode === 'live' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setScanMode('live');
-              setCapturedPhoto(null);
-              setIsLiveScanning(true);
-              setHasManualOverride(false);
-            }}
-            className="flex-1"
-          >
-            <Play className="h-4 w-4 mr-1" />
-            Temps réel
-          </Button>
-          <Button
-            variant={scanMode === 'photo' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setScanMode('photo');
-              setCapturedPhoto(null);
-              setIsLiveScanning(false);
-            }}
-            className="flex-1"
-          >
-            <Camera className="h-4 w-4 mr-1" />
-            Photo
-          </Button>
-          <Button
-            variant={scanMode === 'manual' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setScanMode('manual');
-              stopCamera();
-              setCapturedPhoto(null);
-              setIsLiveScanning(false);
-              setHasManualOverride(true);
-            }}
-            className="flex-1"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Manuel
-          </Button>
-        </div>
+        {/* Mode selector for manual mode or when camera not streaming */}
+        {(scanMode === 'manual' || !isStreaming || capturedPhoto) && (
+          <div className="flex gap-2 bg-muted p-1 rounded-lg">
+            <Button
+              variant={scanMode === 'live' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                setScanMode('live');
+                setCapturedPhoto(null);
+                setIsLiveScanning(true);
+                setHasManualOverride(false);
+              }}
+              className="flex-1"
+            >
+              <Play className="h-4 w-4 mr-1" />
+              Temps réel
+            </Button>
+            <Button
+              variant={scanMode === 'photo' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                setScanMode('photo');
+                setCapturedPhoto(null);
+                setIsLiveScanning(false);
+              }}
+              className="flex-1"
+            >
+              <Camera className="h-4 w-4 mr-1" />
+              Photo
+            </Button>
+            <Button
+              variant={scanMode === 'manual' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                setScanMode('manual');
+                stopCamera();
+                setCapturedPhoto(null);
+                setIsLiveScanning(false);
+                setHasManualOverride(true);
+              }}
+              className="flex-1"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Manuel
+            </Button>
+          </div>
+        )}
 
         {/* Photo mode: capture button */}
         {scanMode === 'photo' && !capturedPhoto && isStreaming && (
@@ -708,40 +788,31 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
           </Button>
         </div>
 
-        {/* Action buttons - QUIT and VALIDATE */}
-        <div className="flex gap-3">
-          {/* Quit button */}
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="h-12 px-4"
+        {/* Action buttons - Validate prominently shown when result available, or in captured/manual mode */}
+        {(capturedPhoto || scanMode === 'manual' || (liveResult && liveResult.count >= 0)) && (
+          <Button 
+            onClick={handleConfirm} 
+            className="w-full h-14 text-lg bg-green-600 hover:bg-green-700"
+            disabled={isUploading}
           >
-            <X className="h-5 w-5 mr-1" />
-            Quitter
-          </Button>
-
-          {/* Pause/Resume for live mode */}
-          {scanMode === 'live' && isStreaming && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsLiveScanning(!isLiveScanning)}
-              className="h-12 w-12"
-            >
-              {isLiveScanning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-            </Button>
-          )}
-
-          {/* Validate button */}
-          <Button onClick={handleConfirm} className="flex-1 h-12 text-lg" disabled={isUploading}>
             {isUploading ? (
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              <Loader2 className="h-6 w-6 mr-2 animate-spin" />
             ) : (
-              <CheckCircle className="h-5 w-5 mr-2" />
+              <CheckCircle className="h-6 w-6 mr-2" />
             )}
-            Valider {editCount}
+            Valider {editCount} et enregistrer la photo
           </Button>
-        </div>
+        )}
+
+        {/* Quit button - always visible */}
+        <Button
+          variant="outline"
+          onClick={onClose}
+          className="w-full h-10"
+        >
+          <X className="h-5 w-5 mr-2" />
+          Quitter sans enregistrer
+        </Button>
 
         {/* Import fallback - smaller */}
         {scanMode !== 'manual' && !cameraFailed && !capturedPhoto && (
