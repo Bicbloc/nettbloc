@@ -39,6 +39,7 @@ import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import ResetPassword from "./pages/ResetPassword";
 import LegalPage from "./pages/LegalPage";
+import ActivateAccount from "./pages/ActivateAccount";
 
 // Netto Count App
 import NettoCountAuth from "./pages/netto-count/NettoCountAuth";
@@ -103,6 +104,8 @@ const App = () => (
                               <Route path="/netto-count/history" element={<NettoCountHistory />} />
                               {/* Legal pages */}
                               <Route path="/legal/:slug" element={<LegalPage />} />
+                              {/* Account activation */}
+                              <Route path="/activate-account" element={<ActivateAccount />} />
                               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                               <Route path="*" element={<NotFound />} />
                             </Routes>
