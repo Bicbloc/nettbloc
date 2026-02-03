@@ -7,8 +7,9 @@ import { useState, useEffect } from "react";
 import { 
   Layers, Bed, UserIcon, Key, AlertTriangle, FileText, 
   Brain, Archive, ClipboardCheck, Package, 
-  ChevronRight, Settings, Repeat
+  ChevronRight, Settings, Repeat, ShoppingCart
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ export function AppSidebar({
   onCollapsedChange 
 }: AppSidebarProps) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   // Menu principal - accès rapide
   const mainItems: NavItem[] = [
@@ -72,6 +74,11 @@ export function AppSidebar({
     { value: 'archives', label: t.dashboard.archives, icon: <Archive className="h-5 w-5" /> },
     { value: 'training', label: t.dashboard.aiTraining, icon: <Brain className="h-5 w-5" /> },
   ];
+
+  // Handle order navigation
+  const handleOrderClick = () => {
+    navigate('/order');
+  };
 
   const renderItem = (item: NavItem) => {
     const isActive = activeTab === item.value;
@@ -170,6 +177,28 @@ export function AppSidebar({
             
             {/* Outils */}
             {renderSection(toolsItems, t.dashboard.tools)}
+
+            {!isCollapsed && <Separator className="mx-2" />}
+            
+            {/* Commander */}
+            <div className="space-y-0.5">
+              {!isCollapsed && (
+                <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Commander
+                </p>
+              )}
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start gap-3 px-3 py-2.5 h-auto text-left",
+                  "hover:bg-primary/10 border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent"
+                )}
+                onClick={handleOrderClick}
+              >
+                <ShoppingCart className="h-5 w-5 text-primary" />
+                {!isCollapsed && <span className="flex-1 truncate">Commander personnel</span>}
+              </Button>
+            </div>
           </div>
         </ScrollArea>
       </div>
