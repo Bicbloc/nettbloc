@@ -1,46 +1,17 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Camera, X, RotateCcw, CheckCircle, AlertCircle, ImagePlus, Hash, Eye, Minus, Plus, Ruler, Scan, Zap } from 'lucide-react';
+import { Camera, X, RotateCcw, CheckCircle, Minus, Plus, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { RulerGuide, RulerCalculationOverlay } from './RulerGuide';
-import { LinenDetectionOverlay } from './LinenDetectionOverlay';
-import { analyzeImageQuality, captureAndProcessFrame, ImageQuality } from '@/utils/imageProcessing';
+
 interface LinenCameraScannerProps {
   linenTypeId: string;
   linenTypeName: string;
   hotelId: string;
   onCountComplete: (result: { count: number; confidence: number; photoUrl: string; notes?: string }) => void;
   onClose: () => void;
-}
-
-interface DetectionResult {
-  count: number;
-  confidence: number;
-  boxes?: Array<{ x: number; y: number; width: number; height: number }>;
-}
-
-interface DetectionState {
-  status: 'scanning' | 'stabilizing' | 'ready' | 'confirmed';
-  linenType: string | null;
-  estimatedCount: number;
-  dimensions: {
-    widthCm: number | null;
-    heightCm: number | null;
-  };
-  confidence: number;
-  stabilityProgress: number;
-  // Pile position and bounds for visual feedback
-  pilePosition?: 'centered' | 'left' | 'right' | null;
-  pileBounds?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null;
 }
 
 export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
@@ -52,1244 +23,300 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastDetectionRef = useRef<DetectionResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isCounting, setIsCounting] = useState(false);
-  const [result, setResult] = useState<{ count: number; confidence: number; notes?: string } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<{ count: number; confidence: number } | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraFailed, setCameraFailed] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [mode, setMode] = useState<'camera' | 'manual'>('camera');
-  const [manualCount, setManualCount] = useState(0);
-  const [liveDetection, setLiveDetection] = useState<DetectionResult | null>(null);
-  const [isLiveDetecting, setIsLiveDetecting] = useState(false);
-  const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [editCount, setEditCount] = useState(0);
   
-  // Mode précision avec règle étalon
-  const [useRulerMode, setUseRulerMode] = useState(false);
-  const [rulerDetected, setRulerDetected] = useState(false);
-  const [pileHeightCm, setPileHeightCm] = useState<number | null>(null);
-  const [itemThicknessCm, setItemThicknessCm] = useState(2.0);
-  
-  // Mode détection intelligente (type scanner ID)
-  const [useSmartDetection, setUseSmartDetection] = useState(true);
-  const [detectionState, setDetectionState] = useState<DetectionState | null>(null);
-  const [stableFrameCount, setStableFrameCount] = useState(0);
-  const lastDetectionValuesRef = useRef<{ count: number; confidence: number } | null>(null);
-  const stabilityTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Image quality tracking
-  const [imageQuality, setImageQuality] = useState<ImageQuality | null>(null);
-  
-  // Instant mode (skip stabilization)
-  const [instantMode, setInstantMode] = useState(false);
-  
-  // État pour la correction du comptage IA
-  const [showCorrectionInput, setShowCorrectionInput] = useState(false);
-  const [correctedCount, setCorrectedCount] = useState(0);
-
-  const fileInputId = `linen-photo-input-${linenTypeId}`;
-  
-  // ULTRA-FAST DETECTION PARAMETERS
-  const DETECTION_INTERVAL_MS = 500; // Ultra-fast: 500ms
-  const STABLE_FRAMES_REQUIRED = 2; // Only 2 stable frames needed (~1s)
-  const CONFIDENCE_TOLERANCE = 0.15;
-  const LIVE_QUALITY = 0.65; // Slightly lower for speed
-  const FINAL_QUALITY = 0.9; // High quality for final capture
   const { toast } = useToast();
 
+  // Start camera on mount
   useEffect(() => {
-    if (mode === 'camera') {
-      setIsInitializing(true);
-      // Set a timeout to show fallback if camera doesn't start
-      initTimeoutRef.current = setTimeout(() => {
-        const readyState = videoRef.current?.readyState ?? 0;
-        const hasStream = !!streamRef.current;
-        if (!hasStream || readyState < 2) {
-          console.log('⏱️ Camera init timeout: fallback UI', { hasStream, readyState });
-          setIsInitializing(false);
-          setCameraFailed(true);
-        }
-      }, 8000); // 8 second timeout
-      
-      startCamera();
-    }
-    return () => {
-      stopCamera();
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      if (initTimeoutRef.current) {
-        clearTimeout(initTimeoutRef.current);
-      }
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
-      }
-    };
-  }, [mode]);
-
-  // OPTIMIZED Live detection loop with smart detection mode
-  const runSingleDetection = useCallback(async () => {
-    if (!videoRef.current || !isStreaming || capturedImage || isLiveDetecting) {
-      return;
-    }
-
-    const video = videoRef.current;
-    if (video.videoWidth === 0) return;
-
-    setIsLiveDetecting(true);
-    
-    try {
-      // Capture and preprocess frame
-      const { imageData: frameData, quality } = await captureAndProcessFrame(video, {
-        quality: LIVE_QUALITY,
-        maxWidth: 1280,
-        enhance: false // Skip enhancement for speed
-      });
-      
-      // Update image quality display
-      setImageQuality(quality);
-      
-      // Use quickDetect for faster initial detection
-      const useQuickMode = !detectionState || detectionState.status === 'scanning';
-      
-      // Call detection API with optimized parameters
-      const { data, error } = await supabase.functions.invoke('count-linen', {
-        body: {
-          image: frameData,
-          linenTypeId,
-          hotelId,
-          liveMode: !useSmartDetection,
-          detectMode: useSmartDetection,
-          quickDetect: useQuickMode // NEW: Ultra-fast mode for scanning phase
-        }
-      });
-
-      if (!error && data) {
-        const detection: DetectionResult = {
-          count: data.count || 0,
-          confidence: data.confidence || 0,
-          boxes: data.boxes || []
-        };
-        lastDetectionRef.current = detection;
-        setLiveDetection(detection);
-
-        // Handle smart detection mode - stability check with OPTIMIZED parameters
-        if (useSmartDetection && data.count > 0) {
-          const prev = lastDetectionValuesRef.current;
-          const isStable = prev && 
-            prev.count === data.count && 
-            Math.abs(prev.confidence - data.confidence) < CONFIDENCE_TOLERANCE;
-
-          // Parse pile position from API response
-          const pilePosition = data.pile_position === 'left' ? 'left' : 
-                               data.pile_position === 'right' ? 'right' : 'centered';
-          
-          // Parse pile bounds from API response  
-          const pileBounds = data.pile_bounds ? {
-            x: data.pile_bounds.x || 0.1,
-            y: data.pile_bounds.y || 0.2,
-            width: data.pile_bounds.w || data.pile_bounds.width || 0.8,
-            height: data.pile_bounds.h || data.pile_bounds.height || 0.6,
-          } : {
-            // Default centered bounds if not returned
-            x: 0.15,
-            y: 0.2,
-            width: 0.7,
-            height: 0.6,
-          };
-
-          if (isStable) {
-            // Increment stability counter
-            const newStableCount = stableFrameCount + 1;
-            setStableFrameCount(newStableCount);
-            
-            // Update detection state based on stability - OPTIMIZED: 2 frames instead of 3
-            if (newStableCount >= STABLE_FRAMES_REQUIRED) {
-              // Ready for validation after 2 stable frames (~1.6 seconds)
-              setDetectionState({
-                status: 'ready',
-                linenType: data.detected_type || null,
-                estimatedCount: data.count,
-                dimensions: {
-                  widthCm: data.dimensions?.width_cm || null,
-                  heightCm: data.dimensions?.height_cm || null,
-                },
-                confidence: data.confidence,
-                stabilityProgress: 100,
-                pilePosition,
-                pileBounds,
-              });
-            } else {
-              // Still stabilizing
-              setDetectionState({
-                status: 'stabilizing',
-                linenType: data.detected_type || null,
-                estimatedCount: data.count,
-                dimensions: {
-                  widthCm: data.dimensions?.width_cm || null,
-                  heightCm: data.dimensions?.height_cm || null,
-                },
-                confidence: data.confidence,
-                stabilityProgress: Math.min(100, (newStableCount / STABLE_FRAMES_REQUIRED) * 100),
-                pilePosition,
-                pileBounds,
-              });
-            }
-          } else {
-            // Reset stability - values changed
-            setStableFrameCount(0);
-            setDetectionState({
-              status: 'scanning',
-              linenType: data.detected_type || null,
-              estimatedCount: data.count,
-              dimensions: {
-                widthCm: data.dimensions?.width_cm || null,
-                heightCm: data.dimensions?.height_cm || null,
-              },
-              confidence: data.confidence,
-              stabilityProgress: 0,
-              pilePosition,
-              pileBounds,
-            });
-          }
-
-          // Store current values for next comparison
-          lastDetectionValuesRef.current = {
-            count: data.count,
-            confidence: data.confidence,
-          };
-        }
-      }
-    } catch (err) {
-      console.log('Live detection error (ignored):', err);
-    } finally {
-      setIsLiveDetecting(false);
-    }
-  }, [isStreaming, capturedImage, isLiveDetecting, linenTypeId, hotelId, useSmartDetection, detectionState, stableFrameCount]);
-
-  // OPTIMIZED: Use interval-based detection instead of requestAnimationFrame
-  useEffect(() => {
-    if (isStreaming && !capturedImage && mode === 'camera' && useSmartDetection) {
-      // Run first detection immediately
-      runSingleDetection();
-      
-      // Then run on interval - OPTIMIZED: 800ms instead of 1500ms
-      detectionIntervalRef.current = setInterval(runSingleDetection, DETECTION_INTERVAL_MS);
-      
-      return () => {
-        if (detectionIntervalRef.current) {
-          clearInterval(detectionIntervalRef.current);
-        }
-      };
-    }
-  }, [isStreaming, capturedImage, mode, useSmartDetection, runSingleDetection]);
-
-  // Legacy overlay drawing for non-smart mode
-  const runLiveDetection = useCallback(async () => {
-    if (!videoRef.current || !overlayCanvasRef.current || !isStreaming || capturedImage || useSmartDetection) {
-      return;
-    }
-
-    const video = videoRef.current;
-    const overlayCanvas = overlayCanvasRef.current;
-    const ctx = overlayCanvas.getContext('2d');
-    
-    if (!ctx || video.videoWidth === 0) {
-      animationFrameRef.current = requestAnimationFrame(runLiveDetection);
-      return;
-    }
-
-    overlayCanvas.width = video.videoWidth;
-    overlayCanvas.height = video.videoHeight;
-    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-    // Draw overlay with last detection result
-    if (lastDetectionRef.current) {
-      drawOverlay(ctx, lastDetectionRef.current, overlayCanvas.width, overlayCanvas.height);
-    }
-
-    animationFrameRef.current = requestAnimationFrame(runLiveDetection);
-  }, [isStreaming, capturedImage, useSmartDetection]);
-
-  // Start live detection when streaming
-  useEffect(() => {
-    if (isStreaming && !capturedImage && mode === 'camera') {
-      animationFrameRef.current = requestAnimationFrame(runLiveDetection);
-    }
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [isStreaming, capturedImage, mode, runLiveDetection]);
-
-  const drawOverlay = (ctx: CanvasRenderingContext2D, detection: DetectionResult, width: number, height: number) => {
-    // Draw semi-transparent background with grid lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-    
-    // Grid lines
-    const gridSize = 5;
-    for (let i = 1; i < gridSize; i++) {
-      // Vertical
-      ctx.beginPath();
-      ctx.moveTo((width / gridSize) * i, 0);
-      ctx.lineTo((width / gridSize) * i, height);
-      ctx.stroke();
-      // Horizontal
-      ctx.beginPath();
-      ctx.moveTo(0, (height / gridSize) * i);
-      ctx.lineTo(width, (height / gridSize) * i);
-      ctx.stroke();
-    }
-
-    // Draw detection boxes if available
-    if (detection.boxes && detection.boxes.length > 0) {
-      ctx.strokeStyle = '#22c55e'; // Green
-      ctx.lineWidth = 3;
-      ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
-
-      detection.boxes.forEach((box, index) => {
-        ctx.beginPath();
-        ctx.rect(box.x, box.y, box.width, box.height);
-        ctx.fill();
-        ctx.stroke();
-
-        // Draw number label
-        ctx.fillStyle = '#22c55e';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.fillText(`${index + 1}`, box.x + 5, box.y + 25);
-      });
-    }
-
-    // Draw count indicator at top
-    const countBgHeight = 60;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, width, countBgHeight);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Détecté: ${detection.count} ${linenTypeName}`, width / 2, 40);
-
-    // Draw confidence bar
-    const barWidth = width * 0.6;
-    const barHeight = 8;
-    const barX = (width - barWidth) / 2;
-    const barY = countBgHeight - 15;
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.fillRect(barX, barY, barWidth, barHeight);
-
-    const confidenceColor = detection.confidence >= 0.7 ? '#22c55e' : 
-                           detection.confidence >= 0.5 ? '#f59e0b' : '#ef4444';
-    ctx.fillStyle = confidenceColor;
-    ctx.fillRect(barX, barY, barWidth * detection.confidence, barHeight);
-
-    ctx.textAlign = 'left';
-  };
+    startCamera();
+    return () => stopCamera();
+  }, []);
 
   const startCamera = async () => {
     try {
-      console.log('🎥 startCamera: init');
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.log('Camera API not available');
-        setIsInitializing(false);
+      if (!navigator.mediaDevices?.getUserMedia) {
         setCameraFailed(true);
         return;
       }
 
-      let stream: MediaStream | null = null;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      }).catch(() => 
+        navigator.mediaDevices.getUserMedia({ video: true })
+      );
       
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          }
-        });
-      } catch (envError) {
-        console.log('Trying fallback camera config:', envError);
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 } }
-          });
-        } catch (fallbackError) {
-          console.log('All camera attempts failed:', fallbackError);
-          setIsInitializing(false);
-          setCameraFailed(true);
-          return;
-        }
-      }
-      
-      const video = videoRef.current;
-      if (!video || !stream) {
-        console.log('❌ startCamera: videoRef missing or stream null');
-        setIsInitializing(false);
+      if (!stream || !videoRef.current) {
         setCameraFailed(true);
         return;
       }
 
-      // Attach stream
       streamRef.current = stream;
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      setIsStreaming(true);
       setCameraFailed(false);
-
-      // Wait for metadata + ensure play succeeds
-      const waitForReady = () =>
-        new Promise<void>((resolve, reject) => {
-          let resolved = false;
-
-          const cleanup = () => {
-            video.removeEventListener('loadedmetadata', onReady);
-            video.removeEventListener('canplay', onReady);
-            video.removeEventListener('error', onError);
-          };
-
-          const onError = () => {
-            if (resolved) return;
-            resolved = true;
-            cleanup();
-            reject(new Error('Video element error'));
-          };
-
-          const onReady = async () => {
-            if (resolved) return;
-            resolved = true;
-            cleanup();
-            try {
-              await video.play();
-              resolve();
-            } catch (e) {
-              reject(e);
-            }
-          };
-
-          video.addEventListener('loadedmetadata', onReady, { once: true });
-          video.addEventListener('canplay', onReady, { once: true });
-          video.addEventListener('error', onError, { once: true });
-
-          // In case metadata is already available
-          if (video.readyState >= 1) {
-            onReady();
-          }
-        });
-
-      // Important: set srcObject after listeners are attached
-      video.srcObject = stream;
-
-      try {
-        await Promise.race([
-          waitForReady(),
-          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Timeout waiting for video')), 8000))
-        ]);
-
-        // Clear the timeout since camera started successfully
-        if (initTimeoutRef.current) {
-          clearTimeout(initTimeoutRef.current);
-        }
-
-        setIsInitializing(false);
-        setIsStreaming(true);
-        console.log('✅ startCamera: streaming started');
-      } catch (playError) {
-        console.error('❌ startCamera: video play failed:', playError);
-        stopCamera();
-        setIsInitializing(false);
-        setCameraFailed(true);
-      }
-    } catch (error: any) {
-      console.error('Erreur accès caméra:', error);
-      setIsInitializing(false);
+    } catch (error) {
+      console.error('Camera error:', error);
       setCameraFailed(true);
     }
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
     setIsStreaming(false);
-    setLiveDetection(null);
-    lastDetectionRef.current = null;
   };
 
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) {
-      toast({ title: "Erreur", description: "Caméra non initialisée", variant: "destructive" });
-      return;
-    }
-
+  const capturePhoto = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      toast({ title: "Erreur", description: "La vidéo n'est pas encore prête.", variant: "destructive" });
-      return;
-    }
-    
+    if (!video || !canvas) return;
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0);
-    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedImage(imageDataUrl);
-    stopCamera();
+    const imageData = canvas.toDataURL('image/jpeg', 0.85);
     
-    // Use live detection result if available, otherwise run full analysis
-    if (liveDetection && liveDetection.confidence >= 0.5) {
-      setResult({
-        count: liveDetection.count,
-        confidence: liveDetection.confidence,
-        notes: `Détection en temps réel`
-      });
-      toast({
-        title: "✅ Photo capturée",
-        description: `${liveDetection.count} ${linenTypeName} détecté(s)`,
-      });
-    } else {
-      handleCount(imageDataUrl);
-    }
-  };
+    setCapturedImage(imageData);
+    stopCamera();
+    analyzeImage(imageData);
+  }, []);
 
-  const handleCount = async (imageData: string) => {
-    setIsCounting(true);
-    setResult(null);
-
+  const analyzeImage = async (imageData: string) => {
+    setIsAnalyzing(true);
     try {
       const { data, error } = await supabase.functions.invoke('count-linen', {
-        body: { 
-          image: imageData, 
-          linenTypeId, 
-          hotelId,
-          useRuler: useRulerMode // Pass ruler mode flag
-        }
+        body: { image: imageData, linenTypeId, hotelId }
       });
 
-      if (error) {
-        // Gestion erreur 402 (crédits IA insuffisants)
-        const errorMsg = error.message || '';
-        if (errorMsg.includes('402') || errorMsg.includes('credits') || errorMsg.includes('Payment')) {
-          toast({ 
-            title: "Crédits IA insuffisants", 
-            description: "Utilisez le mode manuel pour compter le linge.", 
-            variant: "default" 
-          });
-          setMode('manual');
-          return;
-        }
-        throw error;
-      }
+      if (error) throw error;
 
-      // Handle ruler-specific response fields
-      if (data.ruler_detected) {
-        setRulerDetected(true);
-        setPileHeightCm(data.pile_height_cm || null);
-        setItemThicknessCm(data.item_thickness_cm || 2.0);
-      }
-
-      setResult({
-        count: data.count,
-        confidence: data.confidence,
-        notes: data.notes
-      });
-
-      if (data.confidence >= 0.7) {
-        const methodNote = data.ruler_detected ? " (📏 règle détectée)" : "";
-        toast({ title: "✅ Comptage réussi", description: `${data.count} ${linenTypeName} détecté(s)${methodNote}` });
-      } else if (data.confidence >= 0.5) {
-        toast({ title: "⚠️ Confiance moyenne", description: "Vérifiez le résultat", variant: "default" });
-      } else {
-        toast({ title: "⚠️ Confiance faible", description: "Recommandé de reprendre ou utiliser la règle", variant: "destructive" });
-      }
-    } catch (error: any) {
-      console.error('Erreur comptage:', error);
-      toast({ 
-        title: "Erreur", 
-        description: "Impossible de compter. Utilisez le mode manuel.", 
-        variant: "destructive" 
-      });
-      setMode('manual');
+      const count = data?.count || 0;
+      const confidence = data?.confidence || 0;
+      setResult({ count, confidence });
+      setEditCount(count);
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast({ title: "Erreur d'analyse", description: "Réessayez ou comptez manuellement", variant: "destructive" });
+      setResult({ count: 0, confidence: 0 });
+      setEditCount(0);
     } finally {
-      setIsCounting(false);
+      setIsAnalyzing(false);
     }
   };
 
-  // Handle smart detection validation - capture when user confirms
-  const handleSmartValidate = () => {
-    if (!detectionState || detectionState.status !== 'ready') return;
-    
-    // Mark as confirmed
-    setDetectionState(prev => prev ? { ...prev, status: 'confirmed' } : null);
-    
-    // Capture the photo with high quality
-    capturePhotoWithQuality(FINAL_QUALITY);
-  };
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // Handle instant capture (skip stabilization)
-  const handleInstantCapture = () => {
-    if (!detectionState || detectionState.estimatedCount === 0) {
-      toast({ title: "⚠️ Aucune pile détectée", description: "Attendez une détection", variant: "default" });
-      return;
-    }
-    
-    setDetectionState(prev => prev ? { ...prev, status: 'confirmed' } : null);
-    capturePhotoWithQuality(FINAL_QUALITY);
-  };
-
-  // Capture with configurable quality
-  const capturePhotoWithQuality = (quality: number) => {
-    if (!videoRef.current || !canvasRef.current) {
-      toast({ title: "Erreur", description: "Caméra non initialisée", variant: "destructive" });
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      toast({ title: "Erreur", description: "La vidéo n'est pas encore prête.", variant: "destructive" });
-      return;
-    }
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-    const imageDataUrl = canvas.toDataURL('image/jpeg', quality);
-    setCapturedImage(imageDataUrl);
-    stopCamera();
-    
-    // Use smart detection result if available
-    if (detectionState && detectionState.estimatedCount > 0 && detectionState.confidence >= 0.5) {
-      setResult({
-        count: detectionState.estimatedCount,
-        confidence: detectionState.confidence,
-        notes: `Smart detection (${Math.round(detectionState.confidence * 100)}%)`
-      });
-      toast({
-        title: "✅ Photo capturée",
-        description: `${detectionState.estimatedCount} ${linenTypeName} détecté(s)`,
-      });
-    } else if (liveDetection && liveDetection.confidence >= 0.5) {
-      setResult({
-        count: liveDetection.count,
-        confidence: liveDetection.confidence,
-        notes: `Détection en temps réel`
-      });
-      toast({
-        title: "✅ Photo capturée",
-        description: `${liveDetection.count} ${linenTypeName} détecté(s)`,
-      });
-    } else {
-      handleCount(imageDataUrl);
-    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = ev.target?.result as string;
+      setCapturedImage(data);
+      stopCamera();
+      analyzeImage(data);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRetake = () => {
     setCapturedImage(null);
     setResult(null);
-    setCameraFailed(false);
-    setIsInitializing(true);
-    setLiveDetection(null);
-    lastDetectionRef.current = null;
-    // Reset smart detection state
-    setDetectionState(null);
-    setStableFrameCount(0);
-    lastDetectionValuesRef.current = null;
-    setImageQuality(null);
     startCamera();
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageData = e.target?.result as string;
-      setCapturedImage(imageData);
-      stopCamera();
-      handleCount(imageData);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Fonction pour sauvegarder la correction d'apprentissage
-  const saveTrainingSample = async (aiCount: number, actualCount: number, photoUrl: string) => {
-    if (aiCount === actualCount) return; // Pas de correction nécessaire
-    
-    try {
-      const { error } = await supabase
-        .from('linen_training_samples')
-        .insert({
-          hotel_id: hotelId,
-          linen_type_id: linenTypeId,
-          ai_predicted_count: aiCount,
-          actual_count: actualCount,
-          image_url: photoUrl || 'no-image',
-          notes: `Correction: IA a compté ${aiCount}, réel: ${actualCount}`,
-          created_by: 'housekeeper'
-        });
-      
-      if (error) {
-        console.error('Erreur sauvegarde apprentissage:', error);
-      } else {
-        console.log('✅ Correction sauvegardée pour apprentissage');
-        toast({
-          title: "🧠 Apprentissage enregistré",
-          description: "Le système apprendra de cette correction",
-        });
-      }
-    } catch (err) {
-      console.error('Erreur sauvegarde sample:', err);
-    }
-  };
-
   const handleConfirm = async () => {
-    // For manual mode
-    if (mode === 'manual') {
-      onCountComplete({
-        count: manualCount,
-        confidence: 1.0,
-        photoUrl: '',
-        notes: 'Comptage manuel'
-      });
-      toast({
-        title: "✅ Comptage enregistré",
-        description: `${manualCount} ${linenTypeName} (manuel)`,
-      });
-      return;
-    }
-
-    // For camera/photo mode
-    if (!result || !capturedImage) return;
-    
-    // Déterminer le compte final (corrigé ou original)
-    const finalCount = showCorrectionInput ? correctedCount : result.count;
-    const wasCorrection = showCorrectionInput && correctedCount !== result.count;
+    if (!capturedImage) return;
 
     try {
+      // Upload image
       const response = await fetch(capturedImage);
       const blob = await response.blob();
-      
       const fileName = `linen-${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from('linen-images')
-        .upload(fileName, blob, { contentType: 'image/jpeg', upsert: false });
-
-      let publicUrl = '';
-      if (!uploadError) {
-        const { data } = supabase.storage.from('linen-images').getPublicUrl(fileName);
-        publicUrl = data.publicUrl;
-      }
-
-      // Si c'était une correction, sauvegarder pour apprentissage
-      if (wasCorrection) {
-        await saveTrainingSample(result.count, correctedCount, publicUrl);
-      }
-
-      if (uploadError) {
-        toast({ title: "⚠️ Photo non sauvegardée", description: "Comptage enregistré sans photo", variant: "default" });
-      }
       
-      onCountComplete({ 
-        count: finalCount, 
-        confidence: wasCorrection ? 1.0 : result.confidence, 
-        photoUrl: publicUrl, 
-        notes: wasCorrection ? `Corrigé manuellement (IA: ${result.count})` : result.notes 
-      });
-      
-      toast({ 
-        title: wasCorrection ? "✏️ Correction enregistrée" : "Photo enregistrée", 
-        description: `Comptage: ${finalCount} ${linenTypeName}` 
+      await supabase.storage.from('linen-images').upload(fileName, blob, { contentType: 'image/jpeg' });
+      const { data } = supabase.storage.from('linen-images').getPublicUrl(fileName);
+
+      onCountComplete({
+        count: editCount,
+        confidence: result?.confidence || 1,
+        photoUrl: data.publicUrl,
+        notes: editCount !== result?.count ? `Corrigé (IA: ${result?.count})` : undefined
       });
     } catch (error) {
-      console.error('Erreur upload photo:', error);
-      onCountComplete({ count: finalCount, confidence: result.confidence, photoUrl: '', notes: result.notes });
+      // Still complete even if upload fails
+      onCountComplete({ count: editCount, confidence: result?.confidence || 1, photoUrl: '' });
     }
   };
 
-  // Fonction pour activer le mode correction
-  const handleEnableCorrection = () => {
-    if (result) {
-      setCorrectedCount(result.count);
-      setShowCorrectionInput(true);
-    }
-  };
+  const getConfidenceColor = (c: number) => c >= 0.7 ? 'bg-green-500' : c >= 0.5 ? 'bg-orange-500' : 'bg-red-500';
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.7) return 'bg-green-500';
-    if (confidence >= 0.5) return 'bg-orange-500';
-    return 'bg-red-500';
-  };
-
-  const getConfidenceText = (confidence: number) => {
-    if (confidence >= 0.7) return 'Excellente';
-    if (confidence >= 0.5) return 'Moyenne';
-    return 'Faible';
-  };
-
-  // Manual counting UI
-  if (mode === 'manual') {
-    return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col">
-        <div className="p-4 border-b flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold">Comptage manuel</h2>
-            <p className="text-sm text-muted-foreground">{linenTypeName}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setMode('camera')}>
-              <Camera className="h-4 w-4 mr-1" />
-              Caméra
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-6 w-6" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
-          <div className="text-6xl mb-8">📦</div>
-          <p className="text-lg text-muted-foreground mb-8">Comptez le linge manuellement</p>
-          
-          <div className="flex items-center gap-4 mb-8">
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-16 w-16 rounded-full"
-              onClick={() => setManualCount(Math.max(0, manualCount - 1))}
-            >
-              <Minus className="h-8 w-8" />
-            </Button>
-            
-            <div className="text-center">
-              <Input
-                type="number"
-                value={manualCount}
-                onChange={(e) => setManualCount(Math.max(0, parseInt(e.target.value) || 0))}
-                className="text-4xl font-bold text-center h-20 w-32"
-                min={0}
-              />
-              <p className="text-sm text-muted-foreground mt-2">pièces</p>
-            </div>
-            
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-16 w-16 rounded-full"
-              onClick={() => setManualCount(manualCount + 1)}
-            >
-              <Plus className="h-8 w-8" />
-            </Button>
-          </div>
-
-          {/* Quick add buttons */}
-          <div className="flex gap-2 mb-8">
-            {[5, 10, 20, 50].map(num => (
-              <Button
-                key={num}
-                variant="secondary"
-                onClick={() => setManualCount(manualCount + num)}
-              >
-                +{num}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-4 border-t">
-          <Button
-            onClick={handleConfirm}
-            disabled={manualCount === 0}
-            size="lg"
-            className="w-full h-14 text-lg"
-          >
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Confirmer {manualCount} pièces
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Camera mode UI
   return (
-    <div className="fixed inset-0 z-50 bg-black">
-      <div className="relative h-full w-full flex flex-col">
-        {/* Header */}
-        <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-4">
-          <div className="flex items-center justify-between text-white">
-            <div>
-              <h2 className="text-xl font-bold">Scanner {linenTypeName}</h2>
-              <p className="text-sm opacity-80">
-                {isStreaming && liveDetection ? (
-                  <span className="flex items-center gap-1">
-                    <Eye className="h-4 w-4 animate-pulse" />
-                    Détection en temps réel active
-                  </span>
-                ) : (
-                  'Prenez une photo claire de la pile'
-                )}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {/* Smart detection toggle */}
-              <Button
-                variant={useSmartDetection ? "default" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  setUseSmartDetection(!useSmartDetection);
-                  if (!useSmartDetection) {
-                    // Reset when enabling
-                    setDetectionState(null);
-                    setStableFrameCount(0);
-                  }
-                }}
-                className={useSmartDetection ? "bg-purple-600 text-white" : "text-white hover:bg-white/20"}
-              >
-                <Scan className="h-4 w-4 mr-1" />
-                {useSmartDetection ? "Smart ON" : "Smart"}
-              </Button>
-              {/* Ruler precision mode toggle */}
-              <Button
-                variant={useRulerMode ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setUseRulerMode(!useRulerMode)}
-                className={useRulerMode ? "bg-blue-600 text-white" : "text-white hover:bg-white/20"}
-              >
-                <Ruler className="h-4 w-4 mr-1" />
-                {useRulerMode ? "Règle ON" : "Règle"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setMode('manual')}
-                className="text-white hover:bg-white/20"
-              >
-                <Hash className="h-4 w-4 mr-1" />
-                Manuel
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="text-white hover:bg-white/20"
-              >
-                <X className="h-6 w-6" />
-              </Button>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Header with close button */}
+      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
+        <div className="text-white">
+          <h2 className="text-lg font-bold">{linenTypeName}</h2>
+          <p className="text-sm opacity-70">
+            {isAnalyzing ? 'Analyse en cours...' : capturedImage ? 'Vérifiez le comptage' : 'Prenez une photo'}
+          </p>
         </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/20 h-12 w-12">
+          <X className="h-7 w-7" />
+        </Button>
+      </div>
 
-        <input
-          ref={fileInputRef}
-          id={fileInputId}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          onChange={handleFileSelect}
-        />
-
-        {/* Helper function to trigger file input */}
-        {(() => {
-          const triggerFileInput = () => {
-            fileInputRef.current?.click();
-          };
-          
-          return (
-            <>
-              {/* Video with overlay */}
-              <div className="flex-1 relative flex items-center justify-center bg-black">
-                {!capturedImage && (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-full object-contain transition-opacity duration-300 ${isStreaming ? 'opacity-100' : 'opacity-0'}`}
-                    />
-                    <canvas
-                      ref={overlayCanvasRef}
-                      className={`absolute inset-0 w-full h-full object-contain pointer-events-none transition-opacity duration-300 ${isStreaming ? 'opacity-100' : 'opacity-0'}`}
-                    />
-                    {/* Ruler guide overlay when precision mode is active */}
-                    {isStreaming && useRulerMode && (
-                      <RulerGuide
-                        isVisible={true}
-                        detectedRuler={rulerDetected}
-                        pileHeightCm={pileHeightCm || undefined}
-                      />
-                    )}
-                    
-                    {/* Smart detection overlay - ID scanner style */}
-                    {isStreaming && useSmartDetection && !capturedImage && (
-                      <LinenDetectionOverlay
-                        detection={detectionState}
-                        isActive={true}
-                        onValidate={handleSmartValidate}
-                        linenTypeName={linenTypeName}
-                        imageQuality={imageQuality}
-                        instantMode={instantMode}
-                        onInstantCapture={handleInstantCapture}
-                      />
-                    )}
-                  </>
-                )}
-                
-                {/* Show ruler calculation result on captured image */}
-                {capturedImage && result && rulerDetected && pileHeightCm && (
-                  <RulerCalculationOverlay
-                    isVisible={true}
-                    pileHeightCm={pileHeightCm}
-                    itemThicknessCm={itemThicknessCm}
-                    calculatedCount={result.count}
-                    confidence={result.confidence}
-                  />
-                )}
-                
-                {/* Fallback: caméra indisponible */}
-                {cameraFailed && !capturedImage && !isStreaming && (
-                  <div className="flex flex-col items-center justify-center text-white p-8 text-center">
-                    <Camera className="h-16 w-16 mb-4 opacity-50" />
-                    <p className="text-lg mb-2">Caméra non disponible</p>
-                    <p className="text-sm opacity-70 mb-6">Utilisez le mode manuel ou sélectionnez une photo</p>
-                    <div className="flex flex-col gap-3 w-full max-w-sm">
-                      <Button 
-                        size="lg" 
-                        variant="secondary"
-                        onClick={triggerFileInput}
-                      >
-                        <Camera className="h-5 w-5 mr-2" />
-                        Ouvrir l'appareil photo
-                      </Button>
-                      <Button onClick={() => setMode('manual')} variant="secondary" size="lg">
-                        <Hash className="h-5 w-5 mr-2" />
-                        Passer en mode manuel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Fallback: en cours d'initialisation (évite un écran noir) */}
-                {isInitializing && !cameraFailed && !capturedImage && !isStreaming && (
-                  <div className="flex flex-col items-center justify-center text-white p-8 text-center">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/80 mb-4" />
-                    <p className="text-lg mb-2">Initialisation de la caméra…</p>
-                    <p className="text-sm opacity-70 mb-6">Cela peut prendre quelques secondes...</p>
-                      <div className="flex flex-col gap-3 w-full max-w-sm">
-                        <Button
-                          size="lg"
-                          variant="secondary"
-                          onClick={() => {
-                            setCameraFailed(false);
-                            setIsInitializing(true);
-                            startCamera();
-                          }}
-                        >
-                          <RotateCcw className="h-5 w-5 mr-2" />
-                          Relancer la caméra
-                        </Button>
-                        <Button
-                          size="lg"
-                          variant="secondary"
-                          onClick={triggerFileInput}
-                        >
-                          <Camera className="h-5 w-5 mr-2" />
-                          Prendre une photo directement
-                        </Button>
-                      </div>
-                  </div>
-                )}
-          
-          {capturedImage && (
-            <img src={capturedImage} alt="Captured" className="w-full h-full object-contain" />
-          )}
-
-          <canvas ref={canvasRef} className="hidden" />
-
-          {isCounting && (
-            <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-              <Card className="p-6 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                <p className="text-lg font-semibold">Analyse en cours...</p>
-                <p className="text-sm text-muted-foreground">L'IA compte le linge</p>
-              </Card>
-            </div>
-          )}
-        </div>
-
-        {/* Live detection indicator */}
-        {isStreaming && liveDetection && !capturedImage && (
-          <div className="absolute top-20 left-4 right-4 z-10">
-            <Card className="p-3 bg-black/80 text-white backdrop-blur border-green-500">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-2xl font-bold">{liveDetection.count}</span>
-                  <span className="text-sm opacity-80">{linenTypeName}</span>
-                </div>
-                <Badge className={getConfidenceColor(liveDetection.confidence)}>
-                  {Math.round(liveDetection.confidence * 100)}%
-                </Badge>
+      {/* Camera / Image view */}
+      <div className="flex-1 relative">
+        {capturedImage ? (
+          <img src={capturedImage} alt="Captured" className="w-full h-full object-contain" />
+        ) : (
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            {/* Centering guide */}
+            {isStreaming && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="border-2 border-dashed border-white/50 rounded-xl w-[80%] h-[60%]" />
               </div>
-            </Card>
+            )}
+          </>
+        )}
+        
+        {/* Loading overlay */}
+        {isAnalyzing && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <div className="text-center text-white">
+              <Loader2 className="h-12 w-12 animate-spin mx-auto mb-3" />
+              <p className="text-lg font-medium">Comptage IA...</p>
+            </div>
           </div>
         )}
 
-        {/* Result Display with Correction Option */}
-        {result && capturedImage && !isCounting && (
-          <div className="absolute top-20 left-4 right-4 z-10">
-            <Card className="p-4 bg-white/95 backdrop-blur">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  {showCorrectionInput ? (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-10 w-10 rounded-full"
-                        onClick={() => setCorrectedCount(Math.max(0, correctedCount - 1))}
-                      >
-                        <Minus className="h-5 w-5" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={correctedCount}
-                        onChange={(e) => setCorrectedCount(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-20 h-10 text-xl font-bold text-center"
-                        min={0}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-10 w-10 rounded-full"
-                        onClick={() => setCorrectedCount(correctedCount + 1)}
-                      >
-                        <Plus className="h-5 w-5" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold text-primary">{result.count} pièces</p>
-                      <p className="text-sm text-muted-foreground">{linenTypeName}</p>
-                    </>
+        {/* Camera fallback */}
+        {cameraFailed && !capturedImage && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+            <div className="text-center text-white p-6">
+              <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
+              <p className="mb-4">Caméra indisponible</p>
+              <Button onClick={() => fileInputRef.current?.click()}>
+                📷 Choisir une photo
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Hidden canvas and file input */}
+      <canvas ref={canvasRef} className="hidden" />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Bottom controls */}
+      <div className="bg-black p-4 pb-8">
+        {!capturedImage ? (
+          <div className="flex gap-3 justify-center">
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              variant="outline"
+              className="h-14 px-6 bg-white/10 border-white/30 text-white"
+            >
+              📁 Galerie
+            </Button>
+            <Button
+              onClick={capturePhoto}
+              disabled={!isStreaming}
+              className="h-16 w-16 rounded-full bg-white text-black hover:bg-gray-200"
+            >
+              <Camera className="h-8 w-8" />
+            </Button>
+          </div>
+        ) : result && !isAnalyzing ? (
+          <div className="space-y-4">
+            {/* Result display with edit controls */}
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full bg-white/10 border-white/30 text-white"
+                onClick={() => setEditCount(Math.max(0, editCount - 1))}
+              >
+                <Minus className="h-5 w-5" />
+              </Button>
+              
+              <div className="text-center">
+                <Input
+                  type="number"
+                  value={editCount}
+                  onChange={(e) => setEditCount(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="text-3xl font-bold text-center h-14 w-24 bg-white/10 border-white/30 text-white"
+                  min={0}
+                />
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <Badge className={`${getConfidenceColor(result.confidence)} text-white text-xs`}>
+                    {Math.round(result.confidence * 100)}% confiance
+                  </Badge>
+                  {editCount !== result.count && (
+                    <Badge variant="outline" className="border-orange-400 text-orange-400 text-xs">
+                      Modifié
+                    </Badge>
                   )}
                 </div>
-                <div className="text-right">
-                  <Badge className={getConfidenceColor(result.confidence)}>
-                    {getConfidenceText(result.confidence)}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {Math.round(result.confidence * 100)}% confiance
-                  </p>
-                </div>
               </div>
               
-              {/* Bouton de correction */}
-              {!showCorrectionInput && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full text-orange-600 border-orange-300 hover:bg-orange-50"
-                  onClick={handleEnableCorrection}
-                >
-                  ✏️ Corriger le comptage
-                </Button>
-              )}
-              
-              {showCorrectionInput && correctedCount !== result.count && (
-                <div className="text-sm text-orange-600 mt-2 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  L'IA apprendra de cette correction !
-                </div>
-              )}
-              
-              {result.notes && !showCorrectionInput && (
-                <p className="text-sm text-muted-foreground border-t pt-2 mt-2">💡 {result.notes}</p>
-              )}
-            </Card>
-          </div>
-        )}
-
-        {/* Controls - hide when smart detection is active and ready */}
-        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6 ${
-          useSmartDetection && detectionState?.status === 'ready' && !capturedImage ? 'opacity-0 pointer-events-none' : ''
-        }`}>
-          {!capturedImage && (
-            <div className="flex flex-col gap-3">
-              {isStreaming && !useSmartDetection && (
-                <Button onClick={capturePhoto} size="lg" className="w-full h-16 text-lg rounded-full">
-                  <Camera className="h-6 w-6 mr-2" />
-                  {liveDetection ? `Capturer (${liveDetection.count} détecté)` : 'Capturer la photo'}
-                </Button>
-              )}
-              
-              {isStreaming && useSmartDetection && detectionState?.status !== 'ready' && (
-                <div className="text-center text-white/80 text-sm">
-                  <p>Placez le linge dans le cadre et attendez la stabilisation</p>
-                </div>
-              )}
-              
               <Button
-                size="lg"
-                variant={cameraFailed ? "default" : "outline"}
-                className={`w-full h-14 ${cameraFailed ? 'rounded-full' : ''} ${useSmartDetection && isStreaming ? 'opacity-50' : ''}`}
-                onClick={triggerFileInput}
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full bg-white/10 border-white/30 text-white"
+                onClick={() => setEditCount(editCount + 1)}
               >
-                <ImagePlus className="h-5 w-5 mr-2" />
-                {cameraFailed ? "Ouvrir l'appareil photo" : "Photo depuis galerie"}
+                <Plus className="h-5 w-5" />
               </Button>
             </div>
-          )}
 
-          {capturedImage && result && (
+            {/* Action buttons */}
             <div className="flex gap-3">
-              <Button onClick={handleRetake} variant="outline" size="lg" className="flex-1 h-14">
-                <RotateCcw className="h-5 w-5 mr-2" />
+              <Button
+                variant="outline"
+                onClick={handleRetake}
+                className="flex-1 h-12 bg-white/10 border-white/30 text-white"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
                 Reprendre
               </Button>
-              <Button onClick={handleConfirm} size="lg" className="flex-1 h-14" disabled={result.confidence < 0.3}>
-                <CheckCircle className="h-5 w-5 mr-2" />
-                Confirmer
+              <Button
+                onClick={handleConfirm}
+                className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Valider {editCount}
               </Button>
             </div>
-          )}
-
-          {result && result.confidence < 0.6 && (
-            <div className="mt-3 flex items-center justify-center gap-2 text-white text-sm">
-              <AlertCircle className="h-4 w-4" />
-              <span>
-                {result.confidence < 0.5 
-                  ? "Confiance faible - Recommandé de reprendre ou passer en mode manuel" 
-                  : "Vérifiez le résultat avant de confirmer"}
-              </span>
-            </div>
-          )}
-        </div>
-            </>
-          );
-        })()}
+          </div>
+        ) : null}
       </div>
     </div>
   );
