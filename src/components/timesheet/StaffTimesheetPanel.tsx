@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,17 +9,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Clock, 
   Download, 
   CalendarDays, 
   Users, 
   Home,
-  ArrowUpDown,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CheckCircle,
+  Edit2,
+  XCircle,
+  AlertCircle,
+  User
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 
 interface StaffTimesheetPanelProps {
@@ -39,6 +49,13 @@ interface Timesheet {
   rooms_depart: number;
   rooms_inspected: number;
   notes: string | null;
+  status: string;
+  validated_at: string | null;
+  validated_by_name: string | null;
+  modified_at: string | null;
+  modified_by_name: string | null;
+  original_start_time: string | null;
+  original_end_time: string | null;
 }
 
 const STAFF_TYPES = [
@@ -54,10 +71,54 @@ const VIEW_MODES = [
   { value: 'month', label: 'Mois' },
 ];
 
+const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
+  pending: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle },
+  validated: { label: 'Validé', color: 'bg-green-100 text-green-800', icon: CheckCircle },
+  modified: { label: 'Modifié', color: 'bg-blue-100 text-blue-800', icon: Edit2 },
+  rejected: { label: 'Rejeté', color: 'bg-red-100 text-red-800', icon: XCircle },
+};
+
 export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState('day');
   const [staffFilter, setStaffFilter] = useState('all');
+  const [editingTimesheet, setEditingTimesheet] = useState<Timesheet | null>(null);
+  const [editForm, setEditForm] = useState({
+    start_time: '',
+    end_time: '',
+    break_minutes: 0,
+    rooms_cleaned: 0,
+    rooms_recouche: 0,
+    rooms_depart: 0,
+    notes: '',
+  });
+
+  // Fetch current user name (admin or sub-account)
+  const { data: currentUserName } = useQuery({
+    queryKey: ["current-user-name", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return 'Admin';
+      
+      // Check if sub-account first
+      const { data: subAccount } = await supabase
+        .from('sub_accounts')
+        .select('first_name, last_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (subAccount) {
+        return `${subAccount.first_name} ${subAccount.last_name}`.trim();
+      }
+      
+      // Otherwise use email or Admin
+      return user.email?.split('@')[0] || 'Admin';
+    },
+    enabled: !!user?.id,
+  });
 
   // Calculate date range based on view mode
   const getDateRange = () => {
@@ -83,7 +144,7 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
   const dateRange = getDateRange();
 
   // Fetch timesheets
-  const { data: timesheets, isLoading } = useQuery({
+  const { data: timesheets, isLoading, refetch } = useQuery({
     queryKey: ["staff-timesheets", hotelId, format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd'), staffFilter],
     queryFn: async () => {
       let query = supabase
@@ -160,11 +221,144 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
     }
   };
 
+  // Handle edit dialog open
+  const handleEdit = (timesheet: Timesheet) => {
+    setEditingTimesheet(timesheet);
+    setEditForm({
+      start_time: timesheet.start_time ? format(parseISO(timesheet.start_time), 'HH:mm') : '',
+      end_time: timesheet.end_time ? format(parseISO(timesheet.end_time), 'HH:mm') : '',
+      break_minutes: timesheet.break_minutes || 0,
+      rooms_cleaned: timesheet.rooms_cleaned || 0,
+      rooms_recouche: timesheet.rooms_recouche || 0,
+      rooms_depart: timesheet.rooms_depart || 0,
+      notes: timesheet.notes || '',
+    });
+  };
+
+  // Handle save edit
+  const handleSaveEdit = async () => {
+    if (!editingTimesheet || !user?.id) return;
+
+    try {
+      const workDate = editingTimesheet.work_date;
+      
+      // Build full timestamps
+      const startTime = editForm.start_time 
+        ? new Date(`${workDate}T${editForm.start_time}:00`).toISOString()
+        : null;
+      const endTime = editForm.end_time 
+        ? new Date(`${workDate}T${editForm.end_time}:00`).toISOString()
+        : null;
+
+      const { error } = await supabase
+        .from('staff_timesheets')
+        .update({
+          start_time: startTime,
+          end_time: endTime,
+          break_minutes: editForm.break_minutes,
+          rooms_cleaned: editForm.rooms_cleaned,
+          rooms_recouche: editForm.rooms_recouche,
+          rooms_depart: editForm.rooms_depart,
+          notes: editForm.notes,
+          status: 'modified',
+          modified_at: new Date().toISOString(),
+          modified_by: user.id,
+          modified_by_name: currentUserName || 'Admin',
+          original_start_time: editingTimesheet.original_start_time || editingTimesheet.start_time,
+          original_end_time: editingTimesheet.original_end_time || editingTimesheet.end_time,
+        })
+        .eq('id', editingTimesheet.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pointage modifié",
+        description: `Les modifications ont été enregistrées par ${currentUserName}`,
+      });
+      
+      setEditingTimesheet(null);
+      refetch();
+    } catch (error) {
+      console.error('Erreur modification:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le pointage",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle validate
+  const handleValidate = async (timesheet: Timesheet) => {
+    if (!user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from('staff_timesheets')
+        .update({
+          status: 'validated',
+          validated_at: new Date().toISOString(),
+          validated_by: user.id,
+          validated_by_name: currentUserName || 'Admin',
+        })
+        .eq('id', timesheet.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pointage validé",
+        description: `Validé par ${currentUserName}`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Erreur validation:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider le pointage",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle reject
+  const handleReject = async (timesheet: Timesheet) => {
+    if (!user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from('staff_timesheets')
+        .update({
+          status: 'rejected',
+          validated_at: new Date().toISOString(),
+          validated_by: user.id,
+          validated_by_name: currentUserName || 'Admin',
+        })
+        .eq('id', timesheet.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pointage rejeté",
+        description: `Rejeté par ${currentUserName}`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Erreur rejet:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de rejeter le pointage",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Export to CSV
   const exportToCSV = () => {
     if (!timesheets || timesheets.length === 0) return;
 
-    const headers = ['Date', 'Type', 'Nom', 'Début', 'Fin', 'Pause (min)', 'Durée', 'Chambres', 'Recouches', 'Départs'];
+    const headers = ['Date', 'Type', 'Nom', 'Début', 'Fin', 'Pause (min)', 'Durée', 'Chambres', 'Recouches', 'Départs', 'Statut', 'Validé par'];
     const rows = timesheets.map(ts => [
       format(parseISO(ts.work_date), 'dd/MM/yyyy'),
       ts.staff_type === 'housekeeper' ? 'FdC' : ts.staff_type === 'governess' ? 'Gouv' : 'Tech',
@@ -176,6 +370,8 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
       ts.rooms_cleaned || 0,
       ts.rooms_recouche || 0,
       ts.rooms_depart || 0,
+      STATUS_LABELS[ts.status]?.label || ts.status,
+      ts.validated_by_name || ts.modified_by_name || '',
     ]);
 
     const csvContent = [
@@ -202,6 +398,8 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
       recouche: number;
       depart: number;
       days: number;
+      pendingCount: number;
+      validatedCount: number;
     }> = {};
 
     timesheets.forEach(ts => {
@@ -215,6 +413,8 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
           recouche: 0,
           depart: 0,
           days: 0,
+          pendingCount: 0,
+          validatedCount: 0,
         };
       }
 
@@ -227,15 +427,28 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
       grouped[key].recouche += ts.rooms_recouche || 0;
       grouped[key].depart += ts.rooms_depart || 0;
       grouped[key].days += 1;
+      if (ts.status === 'pending') grouped[key].pendingCount += 1;
+      if (ts.status === 'validated') grouped[key].validatedCount += 1;
     });
 
     return Object.values(grouped).sort((a, b) => b.totalMinutes - a.totalMinutes);
   };
 
   const staffSummary = groupByStaff();
+  const pendingCount = timesheets?.filter(t => t.status === 'pending').length || 0;
 
   return (
     <div className="space-y-4">
+      {/* Pending Alert */}
+      {pendingCount > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 text-yellow-600" />
+          <span className="text-sm text-yellow-800">
+            <strong>{pendingCount}</strong> pointage{pendingCount > 1 ? 's' : ''} en attente de validation
+          </span>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Popover>
@@ -350,9 +563,11 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                           <Home className="h-3 w-3" />
                           {staff.rooms} ch.
                         </span>
-                        <Badge variant="secondary" className="text-xs">
-                          R: {staff.recouche} | B: {staff.depart}
-                        </Badge>
+                        {staff.pendingCount > 0 && (
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                            {staff.pendingCount} en attente
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -367,7 +582,7 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
               <CardTitle className="text-sm">Détail des pointages</CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-[400px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -376,33 +591,110 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                       <TableHead>Début</TableHead>
                       <TableHead>Fin</TableHead>
                       <TableHead>Durée</TableHead>
-                      <TableHead className="text-center">Chambres</TableHead>
-                      <TableHead className="text-center">R</TableHead>
-                      <TableHead className="text-center">B</TableHead>
+                      <TableHead className="text-center">Ch.</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Validé par</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {timesheets.map(ts => (
-                      <TableRow key={ts.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {format(parseISO(ts.work_date), 'dd/MM', { locale: fr })}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
-                              {ts.staff_type === 'housekeeper' ? 'FdC' : ts.staff_type === 'governess' ? 'Gouv' : 'Tech'}
+                    {timesheets.map(ts => {
+                      const statusInfo = STATUS_LABELS[ts.status] || STATUS_LABELS.pending;
+                      const StatusIcon = statusInfo.icon;
+                      
+                      return (
+                        <TableRow key={ts.id} className={ts.status === 'pending' ? 'bg-yellow-50/50' : ''}>
+                          <TableCell className="whitespace-nowrap">
+                            {format(parseISO(ts.work_date), 'dd/MM', { locale: fr })}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {ts.staff_type === 'housekeeper' ? 'FdC' : ts.staff_type === 'governess' ? 'Gouv' : 'Tech'}
+                              </Badge>
+                              {ts.staff_name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span>{formatTime(ts.start_time)}</span>
+                              {ts.original_start_time && ts.original_start_time !== ts.start_time && (
+                                <span className="text-xs text-muted-foreground line-through">
+                                  {formatTime(ts.original_start_time)}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span>{formatTime(ts.end_time)}</span>
+                              {ts.original_end_time && ts.original_end_time !== ts.end_time && (
+                                <span className="text-xs text-muted-foreground line-through">
+                                  {formatTime(ts.original_end_time)}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{calculateDuration(ts.start_time, ts.end_time, ts.break_minutes)}</TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="font-medium">{ts.rooms_cleaned || 0}</span>
+                              <span className="text-xs text-muted-foreground">
+                                R:{ts.rooms_recouche || 0} B:{ts.rooms_depart || 0}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${statusInfo.color} flex items-center gap-1 w-fit`}>
+                              <StatusIcon className="h-3 w-3" />
+                              {statusInfo.label}
                             </Badge>
-                            {ts.staff_name}
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatTime(ts.start_time)}</TableCell>
-                        <TableCell>{formatTime(ts.end_time)}</TableCell>
-                        <TableCell>{calculateDuration(ts.start_time, ts.end_time, ts.break_minutes)}</TableCell>
-                        <TableCell className="text-center font-medium">{ts.rooms_cleaned || 0}</TableCell>
-                        <TableCell className="text-center text-blue-600">{ts.rooms_recouche || 0}</TableCell>
-                        <TableCell className="text-center text-amber-600">{ts.rooms_depart || 0}</TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            {(ts.validated_by_name || ts.modified_by_name) && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                {ts.modified_by_name || ts.validated_by_name}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(ts)}
+                                title="Modifier"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              {ts.status === 'pending' && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleValidate(ts)}
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    title="Valider"
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleReject(ts)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    title="Rejeter"
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </ScrollArea>
@@ -418,6 +710,111 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
           </div>
         </Card>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingTimesheet} onOpenChange={(open) => !open && setEditingTimesheet(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier le pointage</DialogTitle>
+          </DialogHeader>
+          
+          {editingTimesheet && (
+            <div className="space-y-4">
+              <div className="bg-muted p-3 rounded-lg">
+                <p className="text-sm font-medium">{editingTimesheet.staff_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {format(parseISO(editingTimesheet.work_date), 'EEEE d MMMM yyyy', { locale: fr })}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start_time">Heure de début</Label>
+                  <Input
+                    id="start_time"
+                    type="time"
+                    value={editForm.start_time}
+                    onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end_time">Heure de fin</Label>
+                  <Input
+                    id="end_time"
+                    type="time"
+                    value={editForm.end_time}
+                    onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="break_minutes">Pause (minutes)</Label>
+                <Input
+                  id="break_minutes"
+                  type="number"
+                  min="0"
+                  value={editForm.break_minutes}
+                  onChange={(e) => setEditForm({ ...editForm, break_minutes: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="rooms_cleaned">Chambres</Label>
+                  <Input
+                    id="rooms_cleaned"
+                    type="number"
+                    min="0"
+                    value={editForm.rooms_cleaned}
+                    onChange={(e) => setEditForm({ ...editForm, rooms_cleaned: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rooms_recouche">Recouches</Label>
+                  <Input
+                    id="rooms_recouche"
+                    type="number"
+                    min="0"
+                    value={editForm.rooms_recouche}
+                    onChange={(e) => setEditForm({ ...editForm, rooms_recouche: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rooms_depart">Départs</Label>
+                  <Input
+                    id="rooms_depart"
+                    type="number"
+                    min="0"
+                    value={editForm.rooms_depart}
+                    onChange={(e) => setEditForm({ ...editForm, rooms_depart: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  placeholder="Remarques sur ce pointage..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingTimesheet(null)}>
+              Annuler
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Enregistrer les modifications
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
