@@ -132,7 +132,7 @@ export default function Order() {
     }
   };
 
-  // Handle PDF upload and analysis
+  // Handle PDF upload and analysis using local parsing
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -146,85 +146,85 @@ export default function Order() {
     setPdfAnalysisResult(null);
 
     try {
-      // Read the file as base64
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64 = (e.target?.result as string)?.split(',')[1];
-        
-        if (!base64) {
-          toast.error("Erreur lors de la lecture du fichier");
-          setLoadingPdf(false);
-          return;
-        }
+      // Import pdfjs-dist for text extraction
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-        // Call the parse-report edge function
-        const { data, error } = await supabase.functions.invoke('parse-report', {
-          body: {
-            fileBase64: base64,
-            hotelId,
-            fileName: file.name,
-          },
-        });
+      // Read file as ArrayBuffer for pdfjs
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      // Extract text from all pages
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
 
-        if (error) {
-          console.error('Error parsing PDF:', error);
-          toast.error("Erreur lors de l'analyse du PDF");
-          setLoadingPdf(false);
-          return;
-        }
-
-        // Count room types from parsed data
-        const rooms = data?.rooms || data?.data?.rooms || [];
-        const departures = rooms.filter((r: any) => 
-          r.cleaningType?.toLowerCase().includes('blanc') || 
-          r.cleaning_type?.toLowerCase().includes('blanc') ||
-          r.status?.toLowerCase().includes('départ')
-        ).length;
-        const stayovers = rooms.filter((r: any) => 
-          r.cleaningType?.toLowerCase().includes('recouche') || 
-          r.cleaning_type?.toLowerCase().includes('recouche') ||
-          r.status?.toLowerCase().includes('recouche')
-        ).length;
-        const arrivals = rooms.filter((r: any) => 
-          r.status?.toLowerCase().includes('arrivée') ||
-          r.arrivalDate || r.arrival_date
-        ).length;
-
-        const totalRooms = rooms.length;
-        
-        // Calculate recommendation: departures are heavier (1.5x), stayovers normal
-        const weightedRooms = departures * 1.5 + stayovers + (totalRooms - departures - stayovers);
-        const recommended = Math.max(1, Math.ceil(weightedRooms / 11));
-
-        setPdfAnalysisResult({
-          totalRooms,
-          departures,
-          stayovers,
-          arrivals,
-        });
-
-        setRecommendedCount(recommended);
-        setHousekeeperCount(recommended);
-
-        toast.success(`PDF analysé : ${totalRooms} chambres détectées`);
+      if (!fullText.trim()) {
+        toast.error("Aucun texte trouvé dans le PDF");
         setLoadingPdf(false);
-      };
+        return;
+      }
 
-      reader.onerror = () => {
-        toast.error("Erreur lors de la lecture du fichier");
+      // Call the parse-report edge function with extracted text
+      const { data, error } = await supabase.functions.invoke('parse-report', {
+        body: {
+          text: fullText,
+          hotelId,
+          reportDate: format(selectedDate, 'yyyy-MM-dd'),
+        },
+      });
+
+      if (error) {
+        console.error('Error parsing PDF:', error);
+        toast.error("Erreur lors de l'analyse du PDF");
         setLoadingPdf(false);
-      };
+        return;
+      }
 
-      reader.readAsDataURL(file);
+      // Count room types from parsed data
+      const rooms = data?.rooms || [];
+      const departures = rooms.filter((r: any) => 
+        r.cleaningType === 'a_blanc' || 
+        r.cleaning_type === 'a_blanc'
+      ).length;
+      const stayovers = rooms.filter((r: any) => 
+        r.cleaningType === 'recouche' || 
+        r.cleaning_type === 'recouche'
+      ).length;
+      const arrivals = rooms.filter((r: any) => 
+        r.arrivalDate || r.arrival_date
+      ).length;
+
+      const totalRooms = rooms.length;
+      
+      // Calculate recommendation: departures are heavier (1.5x), stayovers normal
+      const weightedRooms = departures * 1.5 + stayovers + (totalRooms - departures - stayovers);
+      const recommended = Math.max(1, Math.ceil(weightedRooms / 11));
+
+      setPdfAnalysisResult({
+        totalRooms,
+        departures,
+        stayovers,
+        arrivals,
+      });
+
+      setRecommendedCount(recommended);
+      setHousekeeperCount(recommended);
+
+      toast.success(`PDF analysé : ${totalRooms} chambres détectées`);
     } catch (error) {
       console.error('Error handling PDF:', error);
       toast.error("Erreur lors de l'analyse du PDF");
+    } finally {
       setLoadingPdf(false);
-    }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
