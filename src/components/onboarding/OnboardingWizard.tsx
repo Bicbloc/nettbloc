@@ -10,7 +10,6 @@ import {
   ChevronLeft, 
   Check, 
   Building2,
-  CreditCard,
   Phone,
   Sparkles,
   Gift,
@@ -38,10 +37,11 @@ interface BillingInfo {
   contactEmail: string;
 }
 
+// SIRET et infos de facturation sont optionnels pendant l'essai
+// Ils seront demandés à la fin de la période d'essai avant le paiement
 const STEPS = [
   { id: 'welcome', title: 'Bienvenue', icon: Sparkles },
   { id: 'company', title: 'Entreprise', icon: Building2 },
-  { id: 'billing', title: 'Facturation', icon: CreditCard },
   { id: 'contact', title: 'Contact', icon: Phone },
   { id: 'trial', title: 'Essai gratuit', icon: Gift },
 ];
@@ -71,13 +71,11 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
     switch (currentStep) {
       case 0:
         return true;
-      case 1: // Company
-        return billingInfo.companyName.length > 2 && billingInfo.siret.length >= 9;
-      case 2: // Billing
-        return billingInfo.address.length > 5 && billingInfo.postalCode.length >= 4 && billingInfo.city.length > 1;
-      case 3: // Contact
+      case 1: // Company - only company name is required, SIRET is optional during trial
+        return billingInfo.companyName.length > 2;
+      case 2: // Contact - name and phone required
         return billingInfo.contactName.length > 2 && billingInfo.phone.length >= 10;
-      case 4:
+      case 3:
         return true;
       default:
         return true;
@@ -167,12 +165,12 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
 
             <div className="text-center text-sm text-muted-foreground">
               <Calendar className="inline-block h-4 w-4 mr-1" />
-              Environ 2 minutes
+              Environ 1 minute
             </div>
           </div>
         );
 
-      case 1:
+      case 1: // Entreprise - SIRET optionnel
         return (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -186,7 +184,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="siret">SIRET *</Label>
+              <Label htmlFor="siret">SIRET (optionnel pendant l'essai)</Label>
               <Input
                 id="siret"
                 value={billingInfo.siret}
@@ -194,7 +192,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                 placeholder="12345678901234"
                 maxLength={14}
               />
-              <p className="text-xs text-muted-foreground">14 chiffres</p>
+              <p className="text-xs text-muted-foreground">Sera demandé à la fin de l'essai pour la facturation</p>
             </div>
 
             <div className="space-y-2">
@@ -209,58 +207,11 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
           </div>
         );
 
-      case 2:
+      case 2: // Contact
         return (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="address">Adresse de facturation *</Label>
-              <Input
-                id="address"
-                value={billingInfo.address}
-                onChange={(e) => updateField('address', e.target.value)}
-                placeholder="123 Avenue des Champs-Élysées"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="postalCode">Code postal *</Label>
-                <Input
-                  id="postalCode"
-                  value={billingInfo.postalCode}
-                  onChange={(e) => updateField('postalCode', e.target.value)}
-                  placeholder="75008"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="city">Ville *</Label>
-                <Input
-                  id="city"
-                  value={billingInfo.city}
-                  onChange={(e) => updateField('city', e.target.value)}
-                  placeholder="Paris"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="country">Pays</Label>
-              <Input
-                id="country"
-                value={billingInfo.country}
-                onChange={(e) => updateField('country', e.target.value)}
-                placeholder="France"
-              />
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="contactName">Nom du contact facturation *</Label>
+              <Label htmlFor="contactName">Nom du contact *</Label>
               <Input
                 id="contactName"
                 value={billingInfo.contactName}
@@ -293,7 +244,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
           </div>
         );
 
-      case 4:
+      case 3: // Récapitulatif et essai
         return (
           <div className="space-y-6 py-4">
             <div className="text-center space-y-4">
@@ -317,10 +268,6 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
                     <span className="font-medium">{billingInfo.companyName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">SIRET</span>
-                    <span className="font-medium">{billingInfo.siret}</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-muted-foreground">Contact</span>
                     <span className="font-medium">{billingInfo.contactName}</span>
                   </div>
@@ -333,7 +280,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
             </Card>
 
             <p className="text-xs text-center text-muted-foreground">
-              À la fin de l'essai, vous serez invité à choisir un plan et configurer le prélèvement.
+              À la fin de l'essai, vous serez invité à compléter les informations de facturation (SIRET, IBAN) et choisir un plan.
             </p>
           </div>
         );

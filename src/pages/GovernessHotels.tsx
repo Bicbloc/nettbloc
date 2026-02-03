@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, LogOut, User, Loader2, CheckCircle2, Crown, Clock, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { UserTypeGuard } from '@/hooks/use-user-type-guard';
+// Gouvernantes use localStorage auth, not Supabase Auth - no UserTypeGuard needed
 
 interface GovernessProfile {
   id: string;
@@ -412,11 +412,7 @@ function GovernessHotelsContent() {
   );
 }
 
-// Wrapper avec le guard de type d'utilisateur
+// Gouvernantes use localStorage auth - no Supabase Auth guard needed
 export default function GovernessHotels() {
-  return (
-    <UserTypeGuard expectedType="governess">
-      <GovernessHotelsContent />
-    </UserTypeGuard>
-  );
+  return <GovernessHotelsContent />;
 }
