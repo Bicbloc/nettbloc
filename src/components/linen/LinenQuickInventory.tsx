@@ -81,7 +81,16 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
   });
 
   const handleSave = async () => {
-    if (!realTaskId || Object.keys(entries).length === 0) {
+    if (!realTaskId) {
+      toast({ 
+        title: "Session non prête", 
+        description: "Veuillez patienter quelques secondes et réessayer",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (Object.keys(entries).length === 0) {
       toast({ title: "Aucune donnée", description: "Scannez au moins un type de linge" });
       return;
     }
@@ -90,7 +99,15 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
 
     try {
       // Delete existing entries
-      await supabase.from('linen_inventory_entries').delete().eq('task_id', realTaskId);
+      const { error: deleteError } = await supabase
+        .from('linen_inventory_entries')
+        .delete()
+        .eq('task_id', realTaskId);
+      
+      if (deleteError) {
+        console.error('Delete error:', deleteError);
+        // Continue anyway - might not have existing entries
+      }
 
       // Insert new entries
       const entriesToInsert = Object.entries(entries)
@@ -109,24 +126,39 @@ export const LinenQuickInventory: React.FC<LinenQuickInventoryProps> = ({
         }));
 
       if (entriesToInsert.length > 0) {
-        const { error } = await supabase.from('linen_inventory_entries').insert(entriesToInsert);
-        if (error) throw error;
+        const { error: insertError } = await supabase
+          .from('linen_inventory_entries')
+          .insert(entriesToInsert);
+        
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw new Error(`Erreur insertion: ${insertError.message}`);
+        }
       }
 
       // Mark task complete
-      await supabase
+      const { error: updateError } = await supabase
         .from('linen_inventory_tasks')
         .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', realTaskId);
+      
+      if (updateError) {
+        console.error('Update error:', updateError);
+        // Non-critical, continue
+      }
 
       queryClient.invalidateQueries({ queryKey: ['linen-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['linen-entries'] });
       
       toast({ title: "✅ Inventaire enregistré", description: `${entriesToInsert.length} type(s) sauvegardé(s)` });
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Save error:', error);
-      toast({ title: "Erreur", description: "Impossible d'enregistrer", variant: "destructive" });
+      toast({ 
+        title: "Erreur d'enregistrement", 
+        description: error?.message || "Impossible d'enregistrer les données", 
+        variant: "destructive" 
+      });
     } finally {
       setIsSaving(false);
     }
