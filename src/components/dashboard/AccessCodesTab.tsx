@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Check, X, Clock, Loader2, RefreshCw, UserPlus, Crown, Wrench, Trash2, Ban } from "lucide-react";
+import { Bell, Check, X, Clock, Loader2, RefreshCw, UserPlus, Crown, Wrench, Trash2, Ban, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHotel } from "@/contexts/HotelContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -408,6 +408,76 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
     }
   };
 
+  // Revoke suspension handlers
+  const handleRevokeSuspensionHousekeeper = async (request: HousekeeperRequest) => {
+    setProcessingId(request.id);
+    try {
+      await supabase
+        .from('housekeeper_access_requests')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq('id', request.id);
+      
+      // Reactivate the housekeeper record
+      await supabase
+        .from('housekeepers')
+        .update({ is_active: true })
+        .eq('user_id', request.housekeeper_profile_id)
+        .eq('hotel_id', request.hotel_id);
+      
+      toast.success('Suspension révoquée - accès rétabli');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la révocation');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRevokeSuspensionGoverness = async (request: GovernessRequest) => {
+    setProcessingId(request.id);
+    try {
+      await supabase
+        .from('governess_access_requests')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+        .eq('id', request.id);
+      
+      // Reactivate or create governess session
+      const { data: hotel } = await supabase.from('hotels').select('name').eq('id', request.hotel_id).single();
+      
+      await supabase.from('governess_hotel_sessions').upsert({
+        governess_profile_id: request.governess_profile_id,
+        hotel_id: request.hotel_id,
+        hotel_name: hotel?.name || 'Hôtel',
+        is_active: true,
+        started_at: new Date().toISOString()
+      }, { onConflict: 'governess_profile_id,hotel_id' });
+      
+      toast.success('Suspension révoquée - accès rétabli');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la révocation');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRevokeSuspensionTechnician = async (request: TechnicianRequest) => {
+    setProcessingId(request.id);
+    try {
+      await supabase
+        .from('technician_access_requests')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq('id', request.id);
+      
+      toast.success('Suspension révoquée - accès rétabli');
+      loadAllRequests();
+    } catch (error) {
+      toast.error('Erreur lors de la révocation');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -442,7 +512,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
     onApprove: (req: any) => void,
     onReject: (id: string) => void,
     onSuspend: (req: any) => void,
-    onDelete: (id: string) => void
+    onDelete: (id: string) => void,
+    onRevoke: (req: any) => void
   ) => {
     const profileKey = type === 'housekeeper' ? 'housekeeper_profiles' : type === 'governess' ? 'governess_profiles' : 'technician_profiles';
 
@@ -491,7 +562,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
                       </Button>
                       <Button
                         size="sm"
-                        className="h-7 bg-green-600 hover:bg-green-700"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                         onClick={() => onApprove(request)}
                         disabled={processingId === request.id}
                         title="Approuver"
@@ -511,19 +583,51 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
                       className="h-7 w-7 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                       onClick={() => onSuspend(request)}
                       disabled={processingId === request.id}
-                      title="Suspendre"
+                      title="Suspendre l'accès"
                     >
-                      <Ban className="h-4 w-4" />
+                      {processingId === request.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Ban className="h-4 w-4" />
+                      )}
                     </Button>
                   )}
-                  {(request.status === 'rejected' || request.status === 'suspended') && (
+                  {request.status === 'suspended' && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => onRevoke(request)}
+                        disabled={processingId === request.id}
+                        title="Révoquer la suspension"
+                      >
+                        {processingId === request.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => onDelete(request.id)}
+                        disabled={processingId === request.id}
+                        title="Supprimer définitivement"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                  {request.status === 'rejected' && (
                     <Button
                       size="sm"
                       variant="ghost"
                       className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                       onClick={() => onDelete(request.id)}
                       disabled={processingId === request.id}
-                      title="Supprimer"
+                      title="Supprimer définitivement"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -588,7 +692,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
               handleApproveHousekeeper,
               handleRejectHousekeeper,
               handleSuspendHousekeeper,
-              handleDeleteHousekeeper
+              handleDeleteHousekeeper,
+              handleRevokeSuspensionHousekeeper
             )}
           </CardContent>
         </Card>
@@ -615,7 +720,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
               handleApproveGoverness,
               handleRejectGoverness,
               handleSuspendGoverness,
-              handleDeleteGoverness
+              handleDeleteGoverness,
+              handleRevokeSuspensionGoverness
             )}
           </CardContent>
         </Card>
@@ -642,7 +748,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
               handleApproveTechnician,
               handleRejectTechnician,
               handleSuspendTechnician,
-              handleDeleteTechnician
+              handleDeleteTechnician,
+              handleRevokeSuspensionTechnician
             )}
           </CardContent>
         </Card>
