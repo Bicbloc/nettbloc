@@ -4126,9 +4126,15 @@ export type Database = {
           created_at: string
           end_time: string | null
           hotel_id: string
+          housekeeper_profile_id: string | null
           id: string
           incidents_reported: number | null
+          modified_at: string | null
+          modified_by: string | null
+          modified_by_name: string | null
           notes: string | null
+          original_end_time: string | null
+          original_start_time: string | null
           rooms_cleaned: number | null
           rooms_depart: number | null
           rooms_inspected: number | null
@@ -4137,7 +4143,11 @@ export type Database = {
           staff_name: string
           staff_type: string
           start_time: string | null
+          status: string
           updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+          validated_by_name: string | null
           work_date: string
         }
         Insert: {
@@ -4145,9 +4155,15 @@ export type Database = {
           created_at?: string
           end_time?: string | null
           hotel_id: string
+          housekeeper_profile_id?: string | null
           id?: string
           incidents_reported?: number | null
+          modified_at?: string | null
+          modified_by?: string | null
+          modified_by_name?: string | null
           notes?: string | null
+          original_end_time?: string | null
+          original_start_time?: string | null
           rooms_cleaned?: number | null
           rooms_depart?: number | null
           rooms_inspected?: number | null
@@ -4156,7 +4172,11 @@ export type Database = {
           staff_name: string
           staff_type: string
           start_time?: string | null
+          status?: string
           updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validated_by_name?: string | null
           work_date?: string
         }
         Update: {
@@ -4164,9 +4184,15 @@ export type Database = {
           created_at?: string
           end_time?: string | null
           hotel_id?: string
+          housekeeper_profile_id?: string | null
           id?: string
           incidents_reported?: number | null
+          modified_at?: string | null
+          modified_by?: string | null
+          modified_by_name?: string | null
           notes?: string | null
+          original_end_time?: string | null
+          original_start_time?: string | null
           rooms_cleaned?: number | null
           rooms_depart?: number | null
           rooms_inspected?: number | null
@@ -4175,7 +4201,11 @@ export type Database = {
           staff_name?: string
           staff_type?: string
           start_time?: string | null
+          status?: string
           updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validated_by_name?: string | null
           work_date?: string
         }
         Relationships: [
@@ -4191,6 +4221,13 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_timesheets_housekeeper_profile_id_fkey"
+            columns: ["housekeeper_profile_id"]
+            isOneToOne: false
+            referencedRelation: "housekeeper_profiles"
             referencedColumns: ["id"]
           },
         ]

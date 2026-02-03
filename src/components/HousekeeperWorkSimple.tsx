@@ -109,20 +109,165 @@ const HousekeeperWorkContent: React.FC = () => {
     if (savedEnd) setEndTime(savedEnd);
   }, [housekeeperName]);
 
-  const handleStartPointage = () => {
-    const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    const today = new Date().toISOString().split('T')[0];
-    setStartTime(now);
-    localStorage.setItem(`pointage_start_${today}_${housekeeperName}`, now);
-    addToActivityLog(`⏰ Pointage début: ${now}`, 'success');
+  // ID du timesheet courant
+  const [currentTimesheetId, setCurrentTimesheetId] = useState<string | null>(null);
+
+  // Charger le timesheet existant de la base de données
+  useEffect(() => {
+    const loadExistingTimesheet = async () => {
+      if (!hotelId || !housekeeperProfile?.id) return;
+      
+      const today = new Date().toISOString().split('T')[0];
+      
+      try {
+        const { data: existing } = await supabase
+          .from('staff_timesheets')
+          .select('*')
+          .eq('hotel_id', hotelId)
+          .eq('housekeeper_profile_id', housekeeperProfile.id)
+          .eq('work_date', today)
+          .maybeSingle();
+        
+        if (existing) {
+          setCurrentTimesheetId(existing.id);
+          if (existing.start_time) {
+            const startDate = new Date(existing.start_time);
+            setStartTime(startDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+          }
+          if (existing.end_time) {
+            const endDate = new Date(existing.end_time);
+            setEndTime(endDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+          }
+        }
+      } catch (error) {
+        console.error('Erreur chargement timesheet:', error);
+      }
+    };
+    
+    loadExistingTimesheet();
+  }, [hotelId, housekeeperProfile?.id]);
+
+  const handleStartPointage = async () => {
+    const now = new Date();
+    const nowTime = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const today = now.toISOString().split('T')[0];
+    
+    setStartTime(nowTime);
+    localStorage.setItem(`pointage_start_${today}_${housekeeperName}`, nowTime);
+    addToActivityLog(`⏰ Pointage début: ${nowTime}`, 'success');
+    
+    // Sauvegarder en base de données
+    if (hotelId && housekeeperProfile?.id) {
+      try {
+        const { data, error } = await supabase
+          .from('staff_timesheets')
+          .upsert({
+            hotel_id: hotelId,
+            staff_type: 'housekeeper',
+            staff_name: housekeeperName,
+            staff_id: housekeeperProfile.id,
+            housekeeper_profile_id: housekeeperProfile.id,
+            work_date: today,
+            start_time: now.toISOString(),
+            status: 'pending',
+            rooms_cleaned: 0,
+            rooms_recouche: 0,
+            rooms_depart: 0,
+          }, { 
+            onConflict: 'hotel_id,staff_id,work_date',
+            ignoreDuplicates: false 
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          // Si conflit, chercher et mettre à jour
+          const { data: existing } = await supabase
+            .from('staff_timesheets')
+            .select('id')
+            .eq('hotel_id', hotelId)
+            .eq('housekeeper_profile_id', housekeeperProfile.id)
+            .eq('work_date', today)
+            .maybeSingle();
+          
+          if (existing) {
+            await supabase
+              .from('staff_timesheets')
+              .update({ start_time: now.toISOString() })
+              .eq('id', existing.id);
+            setCurrentTimesheetId(existing.id);
+          }
+        } else if (data) {
+          setCurrentTimesheetId(data.id);
+        }
+        
+        console.log('✅ Pointage début enregistré en base');
+      } catch (error) {
+        console.error('Erreur sauvegarde pointage:', error);
+      }
+    }
   };
 
-  const handleEndPointage = () => {
-    const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    const today = new Date().toISOString().split('T')[0];
-    setEndTime(now);
-    localStorage.setItem(`pointage_end_${today}_${housekeeperName}`, now);
-    addToActivityLog(`⏰ Pointage fin: ${now}`, 'success');
+  const handleEndPointage = async () => {
+    const now = new Date();
+    const nowTime = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const today = now.toISOString().split('T')[0];
+    
+    setEndTime(nowTime);
+    localStorage.setItem(`pointage_end_${today}_${housekeeperName}`, nowTime);
+    addToActivityLog(`⏰ Pointage fin: ${nowTime}`, 'success');
+    
+    // Mettre à jour en base de données
+    if (hotelId && housekeeperProfile?.id) {
+      try {
+        // Compter les chambres nettoyées
+        const cleanedRooms = rooms.filter(r => r.status === 'clean');
+        const recoucheCount = cleanedRooms.filter(r => r.cleaning_type === 'recouche' || r.cleaning_type === 'occupied').length;
+        const departCount = cleanedRooms.filter(r => r.cleaning_type === 'depart' || r.cleaning_type === 'checkout').length;
+        
+        // Chercher l'enregistrement existant
+        const { data: existing } = await supabase
+          .from('staff_timesheets')
+          .select('id')
+          .eq('hotel_id', hotelId)
+          .eq('housekeeper_profile_id', housekeeperProfile.id)
+          .eq('work_date', today)
+          .maybeSingle();
+        
+        if (existing) {
+          await supabase
+            .from('staff_timesheets')
+            .update({ 
+              end_time: now.toISOString(),
+              rooms_cleaned: cleanedRooms.length,
+              rooms_recouche: recoucheCount,
+              rooms_depart: departCount,
+            })
+            .eq('id', existing.id);
+          
+          console.log('✅ Pointage fin enregistré en base');
+        } else {
+          // Créer un nouveau si inexistant
+          await supabase
+            .from('staff_timesheets')
+            .insert({
+              hotel_id: hotelId,
+              staff_type: 'housekeeper',
+              staff_name: housekeeperName,
+              staff_id: housekeeperProfile.id,
+              housekeeper_profile_id: housekeeperProfile.id,
+              work_date: today,
+              end_time: now.toISOString(),
+              status: 'pending',
+              rooms_cleaned: cleanedRooms.length,
+              rooms_recouche: recoucheCount,
+              rooms_depart: departCount,
+            });
+        }
+      } catch (error) {
+        console.error('Erreur sauvegarde pointage fin:', error);
+      }
+    }
   };
 
   // Vérification de l'authentification au montage
