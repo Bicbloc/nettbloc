@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, LogOut, Building2, AlertTriangle } from 'lucide-react';
+import { Wrench, LogOut, Building2, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IncidentList } from '@/components/incident/IncidentList';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
@@ -49,6 +49,16 @@ function TechnicianDashboardContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 p-4">
         <div className="max-w-4xl mx-auto space-y-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/technician/login')}
+            className="flex items-center gap-2 mb-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Retour</span>
+          </Button>
+          
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -78,6 +88,17 @@ function TechnicianDashboardContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 p-4">
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* Bouton Retour */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate('/technician/login')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Retour</span>
+        </Button>
+
         {/* Header */}
         <Card>
           <CardHeader>

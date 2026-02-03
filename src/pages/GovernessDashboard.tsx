@@ -25,7 +25,8 @@ import {
   FileText,
   Package,
   Shirt,
-  ClipboardCheck
+  ClipboardCheck,
+  ArrowLeft
 } from 'lucide-react';
 import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
 import { GovernessRoomManagement } from '@/components/governess/GovernessRoomManagement';
@@ -320,6 +321,15 @@ function GovernessDashboardContent() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/governess/hotels')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Retour</span>
+              </Button>
               <div className="bg-amber-100 p-2 rounded-full">
                 <Crown className="h-6 w-6 text-amber-600" />
               </div>

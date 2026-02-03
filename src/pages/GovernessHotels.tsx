@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, LogOut, User, Loader2, CheckCircle2, Crown, Clock } from 'lucide-react';
+import { Building2, Plus, LogOut, User, Loader2, CheckCircle2, Crown, Clock, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
@@ -221,6 +221,17 @@ function GovernessHotelsContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-3 sm:p-4 lg:p-6">
       <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        {/* Bouton Retour */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate('/governess/auth')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Retour</span>
+        </Button>
+
         {/* Profil */}
         <Card>
           <CardHeader>
