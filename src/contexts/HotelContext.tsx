@@ -152,7 +152,19 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
             .update({ current_hotel_id: foundHotel.id })
             .eq('id', user.id);
         } else {
-          // Créer un nouvel hôtel
+          // Ne PAS créer d'hôtel si l'utilisateur est un sous-compte
+          const isSubAccountUser = user.user_metadata?.is_sub_account === true;
+          
+          if (isSubAccountUser) {
+            console.log('⚠️ HotelContext: Sous-compte sans hôtel lié, en attente...');
+            // Pour les sous-comptes, attendre que sub_accounts soit mis à jour
+            // Ne pas créer de nouvel hôtel
+            setIsLoading(false);
+            setHasAttemptedLoad(true);
+            return;
+          }
+          
+          // Créer un nouvel hôtel (seulement pour les comptes admin)
           const hotelName = user.user_metadata?.company_name || `Établissement de ${user.email}`;
           const hotelCode = `HTL${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
 

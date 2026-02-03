@@ -90,6 +90,10 @@ export default function ActivateAccount() {
     setIsActivating(true);
 
     try {
+      // Clear any existing cache to prevent stale hotel data
+      localStorage.removeItem('nettbloc_hotel');
+      localStorage.removeItem('nettbloc-hotel');
+      
       // Create Supabase auth user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -98,6 +102,7 @@ export default function ActivateAccount() {
           data: {
             first_name: subAccount.first_name,
             last_name: subAccount.last_name,
+            is_sub_account: true, // Mark as sub-account to prevent hotel creation
           },
         },
       });
@@ -128,6 +133,22 @@ export default function ActivateAccount() {
 
       if (updateError) {
         console.error("Error updating sub_account:", updateError);
+      }
+
+      // Create a profile for the sub-account linked to parent's hotel
+      // This prevents HotelContext from creating a new hotel
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: authData.user.id,
+          email: email,
+          current_hotel_id: subAccount.hotel_id,
+          onboarding_completed_at: new Date().toISOString(), // Skip onboarding
+          company_name: subAccount.hotels?.name || null,
+        });
+
+      if (profileError) {
+        console.error("Error creating profile:", profileError);
       }
 
       // Mark invitation as accepted
