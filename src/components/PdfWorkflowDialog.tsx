@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf, getLastParsedLines } from "@/services/pdfService";
-import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles, Map, Zap, Settings2, UserCheck } from "lucide-react";
+import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles, Map as MapIcon, Zap, Settings2, UserCheck, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import {
   normalizeRoomNumber
 } from "@/utils/roomFormatUtils";
 import { GovernessAssignmentStep } from "@/components/workflow/GovernessAssignmentStep";
+import { NewRoomsConfirmationDialog } from "@/components/NewRoomsConfirmationDialog";
 
 interface GovernessAssignment {
   governessName: string;
@@ -78,6 +79,10 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [retryCount, setRetryCount] = useState(0);
   const [savedPdfData, setSavedPdfData] = useState<any>(null);
   const [previewFilter, setPreviewFilter] = useState<'all' | 'a_blanc' | 'recouche'>('all');
+  const [showNewRoomsDialog, setShowNewRoomsDialog] = useState(false);
+  const [pendingNewRooms, setPendingNewRooms] = useState<any[]>([]);
+  const [registryCount, setRegistryCount] = useState(0);
+  const [pendingFilteredData, setPendingFilteredData] = useState<any[]>([]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -305,39 +310,39 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         const result = await RoomArchiveService.replaceAllRooms(effectiveHotelId, filteredData, selectedFile?.name || 'pdf_import');
         insertedCount = result.inserted;
         
+        // Vérifier si des nouvelles chambres ont été détectées
+        if (result.newRoomsForRegistry && result.newRoomsForRegistry.length > 0) {
+          // Sauvegarder les données pour le dialog
+          const regCount = await RoomArchiveService.getRegistryCount(effectiveHotelId);
+          setRegistryCount(regCount);
+          setPendingNewRooms(result.newRoomsForRegistry);
+          setPendingFilteredData(filteredData);
+          setShowNewRoomsDialog(true);
+          setIsUploading(false);
+          return; // Attendre la confirmation avant de continuer
+        }
+        
         toast({
           title: "✅ Chambres remplacées",
           description: `${result.deleted} anciennes supprimées, ${result.inserted} nouvelles ajoutées.`,
         });
       } else {
         // Mode update (upsert)
-        console.log('🔄 Début enregistrement dans hotel_rooms_registry pour', filteredData.length, 'chambres');
+        console.log('🔄 Début enregistrement pour', filteredData.length, 'chambres');
         
-        const roomsData = filteredData.map((room: any) => {
-          const rawRoomNumber = room.roomNumber || room.room_number || room.number;
-          // Normaliser le numéro (05 → 5, 01 → 1, etc.)
-          const roomNumber = normalizeRoomNumber(rawRoomNumber);
-          return {
-            hotel_id: effectiveHotelId,
-            room_number: roomNumber,
-            floor: room.floor ?? null,
-            room_type: room.type || room.room_type || null,
-            building: room.building || null,
-            zone: room.zone || null,
-            source: 'pdf_import',
-            imported_from: selectedFile?.name || 'pdf_import',
-            metadata: { status: room.status, raw_data: room },
-          };
-        }).filter(r => !!r.room_number);
-
-        // Préparer les données pour la table rooms
-        // IMPORTANT: Sauvegarder le cleaningType appris par l'IA
+        // D'abord, récupérer le registre existant pour détecter les nouvelles chambres
+        const { data: existingRegistry } = await supabase
+          .from('hotel_rooms_registry')
+          .select('room_number')
+          .eq('hotel_id', effectiveHotelId);
+        
+        const existingRoomNumbers = new Set(existingRegistry?.map(r => r.room_number) || []);
+        
+        // Préparer les données pour la table rooms (TOUJOURS)
         const roomsForSync = filteredData.map((room: any) => {
           const rawRoomNumber = room.roomNumber || room.room_number || room.number;
-          // Normaliser le numéro (05 → 5, 01 → 1, etc.)
           const roomNumber = normalizeRoomNumber(rawRoomNumber);
           
-          // Mapper le cleaningType pour la base de données
           let dbCleaningType = 'a_blanc';
           if (room.cleaningType === 'none' || room.notUrgent === true) {
             dbCleaningType = 'none';
@@ -357,32 +362,62 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             room_type: room.type || room.room_type || null,
             cleaning_priority: room.priority === 'high' ? 2 : 1,
             notes: room.notes || null,
-            cleaning_type: dbCleaningType // CRUCIAL: Sauvegarder le type de nettoyage IA
+            cleaning_type: dbCleaningType
           };
         }).filter(r => !!r.room_number);
 
-        // Exécuter les deux upserts EN PARALLÈLE avec timeout court
-        setUploadStatus(`💾 Enregistrement de ${roomsData.length} chambres...`);
+        // Sauvegarder les chambres dans la table rooms
+        setUploadStatus(`💾 Enregistrement de ${roomsForSync.length} chambres...`);
         
         const timeout = 15000;
-        
-        const [registryResult, roomsResult] = await Promise.all([
-          Promise.race([
-            supabase.from('hotel_rooms_registry').upsert(roomsData, { onConflict: 'hotel_id,room_number' }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout registry')), timeout))
-          ]),
-          Promise.race([
-            supabase.from('rooms').upsert(roomsForSync, { onConflict: 'hotel_id,room_number', ignoreDuplicates: false }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout rooms')), timeout))
-          ])
-        ]) as any[];
+        const roomsResult = await Promise.race([
+          supabase.from('rooms').upsert(roomsForSync, { onConflict: 'hotel_id,room_number', ignoreDuplicates: false }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout rooms')), timeout))
+        ]) as any;
 
-        if (registryResult.error) throw registryResult.error;
         if (roomsResult.error) throw roomsResult.error;
         
-        insertedCount = roomsData.length;
-        setUploadProgress(90);
+        insertedCount = roomsForSync.length;
+        setUploadProgress(85);
 
+        // Identifier les NOUVELLES chambres (pas dans le registre existant)
+        const newRoomsForRegistry = filteredData
+          .map((room: any) => {
+            const rawRoomNumber = room.roomNumber || room.room_number || room.number;
+            const roomNumber = normalizeRoomNumber(rawRoomNumber);
+            if (!roomNumber || existingRoomNumbers.has(roomNumber)) {
+              return null;
+            }
+            return {
+              room_number: roomNumber,
+              floor: room.floor ?? null,
+              room_type: room.type || room.room_type || null,
+              building: room.building || null,
+              zone: room.zone || null,
+            };
+          })
+          .filter((r): r is NonNullable<typeof r> => r !== null);
+        
+        // Dédupliquer
+        const uniqueNewRooms = Array.from(
+          new Map(newRoomsForRegistry.map(r => [r.room_number, r])).values()
+        );
+
+        console.log(`📋 ${uniqueNewRooms.length} nouvelles chambres détectées (mode update)`);
+
+        // Si des nouvelles chambres sont détectées, demander confirmation
+        if (uniqueNewRooms.length > 0) {
+          const regCount = await RoomArchiveService.getRegistryCount(effectiveHotelId);
+          setRegistryCount(regCount);
+          setPendingNewRooms(uniqueNewRooms);
+          setPendingFilteredData(filteredData);
+          setUploadProgress(90);
+          setShowNewRoomsDialog(true);
+          setIsUploading(false);
+          return; // Attendre la confirmation
+        }
+        
+        setUploadProgress(90);
         toast({
           title: "✅ Analyse terminée",
           description: `${insertedCount} chambres enregistrées.`,
@@ -408,6 +443,43 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setStep('housekeepers');
       loadExistingHousekeepers();
     }, 500);
+  };
+
+  // Handler pour confirmer l'ajout des nouvelles chambres au registre
+  const handleConfirmNewRooms = async (selectedRooms: any[]) => {
+    const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId') || localStorage.getItem('currentHotelId');
+    
+    if (effectiveHotelId && selectedRooms.length > 0) {
+      try {
+        await RoomArchiveService.addRoomsToRegistry(effectiveHotelId, selectedRooms, selectedFile?.name || 'pdf_import');
+        toast({
+          title: "✅ Registre mis à jour",
+          description: `${selectedRooms.length} chambre(s) ajoutée(s) au registre permanent.`,
+        });
+      } catch (error) {
+        console.error('Erreur ajout au registre:', error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible d'ajouter les chambres au registre.",
+        });
+      }
+    }
+    
+    setShowNewRoomsDialog(false);
+    setPendingNewRooms([]);
+    proceedToHousekeepers(pendingFilteredData);
+  };
+
+  // Handler pour ignorer l'ajout au registre
+  const handleSkipNewRooms = () => {
+    setShowNewRoomsDialog(false);
+    setPendingNewRooms([]);
+    toast({
+      title: "ℹ️ Registre inchangé",
+      description: "Les nouvelles chambres sont utilisées pour aujourd'hui uniquement.",
+    });
+    proceedToHousekeepers(pendingFilteredData);
   };
 
   const addHousekeeper = () => {
@@ -1077,7 +1149,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <Map className="h-5 w-5 text-primary" />
+          <MapIcon className="h-5 w-5 text-primary" />
           <Badge variant="secondary" className="text-xs">Étape 3/5</Badge>
           Mapping des statuts PMS
         </DialogTitle>
@@ -1908,24 +1980,36 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button>
-          <FileUp className="mr-2 h-4 w-4" />
-          Importer les chambres
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
-        {step === 'choice' && renderChoiceStep()}
-        {step === 'upload' && renderUploadStep()}
-        {step === 'preview' && renderPreviewStep()}
-        {step === 'mapping' && renderMappingStep()}
-        {step === 'import-mode' && renderImportModeStep()}
-        {step === 'housekeepers' && renderHousekeepersStep()}
-        {step === 'governess' && renderGovernessStep()}
-        {step === 'distribution' && renderDistributionStep()}
-        {step === 'linen-inventory' && renderLinenInventoryStep()}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogTrigger asChild>
+          <Button>
+            <FileUp className="mr-2 h-4 w-4" />
+            Importer les chambres
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] mx-auto">
+          {step === 'choice' && renderChoiceStep()}
+          {step === 'upload' && renderUploadStep()}
+          {step === 'preview' && renderPreviewStep()}
+          {step === 'mapping' && renderMappingStep()}
+          {step === 'import-mode' && renderImportModeStep()}
+          {step === 'housekeepers' && renderHousekeepersStep()}
+          {step === 'governess' && renderGovernessStep()}
+          {step === 'distribution' && renderDistributionStep()}
+          {step === 'linen-inventory' && renderLinenInventoryStep()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmation pour les nouvelles chambres */}
+      <NewRoomsConfirmationDialog
+        isOpen={showNewRoomsDialog}
+        onClose={() => setShowNewRoomsDialog(false)}
+        newRooms={pendingNewRooms}
+        existingRoomsCount={registryCount}
+        onConfirm={handleConfirmNewRooms}
+        onSkip={handleSkipNewRooms}
+      />
+    </>
   );
 }
