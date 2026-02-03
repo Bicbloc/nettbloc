@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText } from 'lucide-react';
+import { User, Mail, Building, Calendar, Edit2, Save, X, Settings, Bell, LogOut, FileText, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ import { SubscriptionBadge } from '@/components/SubscriptionBadge';
 import { useSubscription } from '@/hooks/useSubscription';
 import { NotificationBell } from '@/components/NotificationBell';
 import { PremiumLimitGuard } from '@/components/PremiumLimitGuard';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface UserProfile {
   id: string;
@@ -37,6 +38,39 @@ const Profile = () => {
   const [editedCompanyName, setEditedCompanyName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubAccount, setIsSubAccount] = useState(false);
+  const [parentEmail, setParentEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Vérifier si c'est un sous-compte
+    if (user) {
+      const isSubAccountFlag = user.user_metadata?.is_sub_account === true;
+      setIsSubAccount(isSubAccountFlag);
+
+      if (isSubAccountFlag) {
+        // Récupérer l'email de l'admin parent
+        supabase
+          .from('sub_accounts')
+          .select('parent_user_id')
+          .eq('user_id', user.id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data?.parent_user_id) {
+              supabase
+                .from('profiles')
+                .select('email')
+                .eq('id', data.parent_user_id)
+                .maybeSingle()
+                .then(({ data: parentProfile }) => {
+                  if (parentProfile?.email) {
+                    setParentEmail(parentProfile.email);
+                  }
+                });
+            }
+          });
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     loadProfile();
@@ -225,7 +259,16 @@ const Profile = () => {
                         Établissement
                       </Label>
                       <div className="md:col-span-2">
-                        {isEditing ? (
+                        {isSubAccount ? (
+                          <div className="space-y-2">
+                            <span className="text-foreground">
+                              {profile.company_name || 'Non défini'}
+                            </span>
+                            <p className="text-xs text-muted-foreground">
+                              Seul l'administrateur peut modifier ce champ
+                            </p>
+                          </div>
+                        ) : isEditing ? (
                           <div className="space-y-3">
                             <Input
                               value={editedCompanyName}
@@ -324,32 +367,56 @@ const Profile = () => {
                 </Card>
               </div>
 
-              {/* Colonne latérale */}
-              <div className="space-y-6">
-                <SubscriptionCard />
-              </div>
+              {/* Colonne latérale - cachée pour les sous-comptes */}
+              {!isSubAccount && (
+                <div className="space-y-6">
+                  <SubscriptionCard />
+                </div>
+              )}
             </div>
           </TabsContent>
 
           {/* Onglet Facturation */}
           <TabsContent value="billing" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Facturation
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Gérez vos informations de facturation et consultez vos factures.
-                </p>
-                <Button onClick={() => navigate('/invoices')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Voir mes factures
-                </Button>
-              </CardContent>
-            </Card>
+            {isSubAccount ? (
+              <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                <ShieldAlert className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  <p className="font-medium mb-2">Accès restreint</p>
+                  <p className="text-sm mb-3">
+                    Vous n'avez pas accès à la facturation en tant que sous-compte.
+                    Pour toute question concernant la facturation, contactez l'administrateur de votre compte.
+                  </p>
+                  {parentEmail && (
+                    <a 
+                      href={`mailto:${parentEmail}`}
+                      className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+                    >
+                      <Mail className="h-4 w-4" />
+                      {parentEmail}
+                    </a>
+                  )}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Facturation
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Gérez vos informations de facturation et consultez vos factures.
+                  </p>
+                  <Button onClick={() => navigate('/invoices')}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Voir mes factures
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Onglet Paramètres */}
