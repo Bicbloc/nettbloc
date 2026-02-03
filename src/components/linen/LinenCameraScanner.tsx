@@ -34,6 +34,12 @@ const parseWidthFromDimensions = (dimensions: string | null): number | null => {
   return match ? parseInt(match[1], 10) : null;
 };
 
+// Guide frame constants (percentage of video area)
+const GUIDE_LEFT = 10; // 10%
+const GUIDE_TOP = 15; // 15%
+const GUIDE_WIDTH = 80; // 80%
+const GUIDE_HEIGHT = 70; // 70%
+
 export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   linenTypeId,
   linenTypeName,
@@ -100,7 +106,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     }
 
     const detectedWidth = liveResult.widthCm;
-    const tolerance = 10; // 10cm tolerance
+    const tolerance = 15; // 15cm tolerance
 
     const matches = linenTypes.filter(lt => {
       const width = parseWidthFromDimensions(lt.dimensions);
@@ -132,7 +138,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     return () => stopCamera();
   }, [scanMode]);
 
-  // Live scan loop (calls Edge Function periodically while streaming)
+  // Live scan loop
   useEffect(() => {
     if (!isStreaming || !isLiveScanning || cameraFailed || scanMode !== 'live') return;
 
@@ -162,16 +168,19 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         const confidence = Number(data?.confidence ?? 0);
         const widthCm = data?.dimensions?.width_cm ?? null;
 
-        const pileBounds = data?.pile_bounds
-          ? {
-              x: Number(data.pile_bounds.x ?? 0),
-              y: Number(data.pile_bounds.y ?? 0),
-              w: Number(data.pile_bounds.w ?? 0),
-              h: Number(data.pile_bounds.h ?? 0),
-            }
-          : null;
+        // Parse pile bounds - these are relative to full image (0-1)
+        const rawBounds = data?.pile_bounds;
+        let pileBounds = null;
+        if (rawBounds && (rawBounds.w > 0 || rawBounds.h > 0)) {
+          pileBounds = {
+            x: Number(rawBounds.x ?? 0),
+            y: Number(rawBounds.y ?? 0),
+            w: Number(rawBounds.w ?? 0),
+            h: Number(rawBounds.h ?? 0),
+          };
+        }
 
-        const pileDetected = Boolean(data?.pile_detected);
+        const pileDetected = Boolean(data?.pile_detected) || count > 0;
 
         setLiveResult({
           count,
@@ -185,17 +194,15 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         setLastUpdateAt(Date.now());
         setHasShownLiveError(false);
 
-        // Keep editCount in sync with live count unless user edited manually
         if (!hasManualOverride) {
           setEditCount(count);
         }
       } catch (err: any) {
         console.error('Live scan error:', err);
-        // Do not spam toasts in a loop; only show once.
         if (!hasShownLiveError) {
           toast({
             title: "Erreur du scanner",
-            description: "Impossible d'analyser en temps réel. Essayez de relancer la caméra.",
+            description: "Impossible d'analyser. Réessayez ou utilisez le mode photo.",
             variant: 'destructive',
           });
           setHasShownLiveError(true);
@@ -206,12 +213,10 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       }
     };
 
-    // Run a first tick quickly, then interval.
     tick();
-    const id = window.setInterval(tick, 1200);
+    const id = window.setInterval(tick, 1500); // Slightly slower for better accuracy
     return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStreaming, isLiveScanning, cameraFailed, selectedLinenTypeId, hotelId, hasManualOverride, scanMode]);
+  }, [isStreaming, isLiveScanning, cameraFailed, selectedLinenTypeId, hotelId, hasManualOverride, scanMode, hasShownLiveError, toast]);
 
   const startCamera = async () => {
     try {
@@ -253,8 +258,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     const canvas = canvasRef.current;
     if (!video || !canvas) return null;
 
-    // Downscale for speed & bandwidth
-    const maxW = 640;
+    const maxW = 800;
     const ratio = video.videoWidth / video.videoHeight;
     const w = Math.min(maxW, video.videoWidth);
     const h = Math.round(w / ratio);
@@ -265,7 +269,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, w, h);
 
-    return canvas.toDataURL('image/jpeg', 0.6);
+    return canvas.toDataURL('image/jpeg', 0.75);
   };
 
   const handleCapturePhoto = async () => {
@@ -381,30 +385,37 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   const getConfidenceVariant = (c: number) => (c >= 0.7 ? 'default' : c >= 0.5 ? 'secondary' : 'outline');
 
-  // Constrain bounds to stay within the guide frame (80% x 60%)
+  // Convert AI bounds (relative to full image) to position inside the white guide frame
   const boundsStyle = useMemo(() => {
     const b = liveResult?.pileBounds;
     if (!b || !liveResult?.pileDetected) return null;
+    if (b.w <= 0 && b.h <= 0) return null;
     
-    // Guide frame is centered at 10% from left, 20% from top, 80% width, 60% height
-    const guideLeft = 0.10;
-    const guideTop = 0.20;
-    const guideWidth = 0.80;
-    const guideHeight = 0.60;
+    // The guide frame position (in % of container)
+    const guideL = GUIDE_LEFT / 100;
+    const guideT = GUIDE_TOP / 100;
+    const guideW = GUIDE_WIDTH / 100;
+    const guideH = GUIDE_HEIGHT / 100;
     
-    // Clamp bounds within guide
-    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+    // AI returns bounds relative to full image (0-1)
+    // We need to constrain them inside the guide frame
+    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
     
-    const left = clamp(b.x, guideLeft, guideLeft + guideWidth - 0.05);
-    const top = clamp(b.y, guideTop, guideTop + guideHeight - 0.05);
-    const maxW = Math.min(b.w, guideLeft + guideWidth - left);
-    const maxH = Math.min(b.h, guideTop + guideHeight - top);
+    // Convert bounds to be relative to guide frame
+    // If AI bounds are within the guide area, show them inside the guide
+    const relX = clamp(b.x, guideL, guideL + guideW);
+    const relY = clamp(b.y, guideT, guideT + guideH);
+    const maxW = Math.min(b.w, guideL + guideW - relX);
+    const maxH = Math.min(b.h, guideT + guideH - relY);
+    
+    // Only show if bounds have meaningful size
+    if (maxW < 0.05 || maxH < 0.05) return null;
     
     return {
-      left: `${left * 100}%`,
-      top: `${top * 100}%`,
-      width: `${clamp(maxW, 0, guideWidth) * 100}%`,
-      height: `${clamp(maxH, 0, guideHeight) * 100}%`,
+      left: `${relX * 100}%`,
+      top: `${relY * 100}%`,
+      width: `${clamp(maxW, 0.05, guideW) * 100}%`,
+      height: `${clamp(maxH, 0.05, guideH) * 100}%`,
     } as React.CSSProperties;
   }, [liveResult?.pileBounds, liveResult?.pileDetected]);
 
@@ -416,21 +427,20 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     if (!isLiveScanning) return 'Pause';
     if (isAnalyzing) return 'Analyse…';
     if (liveResult?.pileDetected === false) return 'Aucune pile détectée';
+    if (liveResult?.count && liveResult.count > 0) return `${liveResult.count} détecté(s)`;
     return 'Scan en temps réel';
-  }, [scanMode, capturedPhoto, cameraFailed, isStreaming, isLiveScanning, isAnalyzing, liveResult?.pileDetected]);
+  }, [scanMode, capturedPhoto, cameraFailed, isStreaming, isLiveScanning, isAnalyzing, liveResult?.pileDetected, liveResult?.count]);
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col">
-      {/* Header with close button */}
-      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between bg-gradient-to-b from-background/90 to-transparent">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between bg-gradient-to-b from-background/95 to-transparent">
         <div className="text-foreground">
           <h2 className="text-lg font-bold">{selectedLinenTypeName}</h2>
-          <p className="text-sm opacity-70">
-            {statusLabel}
-          </p>
+          <p className="text-sm opacity-70">{statusLabel}</p>
         </div>
-        <Button variant="destructive" size="icon" onClick={onClose} className="h-12 w-12">
-          <X className="h-7 w-7" />
+        <Button variant="destructive" size="icon" onClick={onClose} className="h-12 w-12 rounded-full">
+          <X className="h-6 w-6" />
         </Button>
       </div>
 
@@ -479,7 +489,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       </div>
 
       {/* Camera view / Manual mode */}
-      <div className="flex-1 relative mt-32">
+      <div className="flex-1 relative mt-28">
         {scanMode !== 'manual' ? (
           <>
             {capturedPhoto ? (
@@ -488,61 +498,74 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             )}
 
-            {/* Centering guide - positioned at 10%/20% with 80%/60% */}
+            {/* FIXED white guide frame - pile must be inside this */}
             {isStreaming && !capturedPhoto && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div 
-                  className="rounded-xl border-2 border-dashed border-white/70 bg-white/5"
-                  style={{
-                    position: 'absolute',
-                    left: '10%',
-                    top: '20%',
-                    width: '80%',
-                    height: '60%',
-                  }}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center text-white/50 text-sm">
-                    Positionnez la pile ici
+              <div 
+                className="absolute pointer-events-none border-4 border-white/90 rounded-2xl shadow-lg"
+                style={{
+                  left: `${GUIDE_LEFT}%`,
+                  top: `${GUIDE_TOP}%`,
+                  width: `${GUIDE_WIDTH}%`,
+                  height: `${GUIDE_HEIGHT}%`,
+                }}
+              >
+                {/* Corner markers for better visibility */}
+                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl" />
+                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl" />
+                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl" />
+                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl" />
+                
+                {/* Center text */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/40 backdrop-blur-sm px-4 py-2 rounded-lg">
+                    <span className="text-white text-sm font-medium">
+                      📍 Placez la pile ici
+                    </span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Pile bounds overlay - constrained to guide */}
+            {/* MOVING purple/violet detection bounds - stays INSIDE white frame */}
             {boundsStyle && !capturedPhoto && (
               <div
-                className="absolute border-2 border-primary rounded-lg pointer-events-none animate-pulse"
-                style={boundsStyle}
-              />
+                className="absolute border-4 border-primary rounded-xl pointer-events-none shadow-lg"
+                style={{
+                  ...boundsStyle,
+                  boxShadow: '0 0 20px rgba(147, 51, 234, 0.5)',
+                }}
+              >
+                {/* Pulse animation indicator */}
+                <div className="absolute inset-0 border-2 border-primary/50 rounded-xl animate-ping" />
+              </div>
             )}
 
-            {/* Live HUD */}
-            {(scanMode === 'live' || capturedPhoto) && (
-              <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3 pointer-events-none">
-                <div className="pointer-events-none rounded-xl bg-background/90 backdrop-blur px-3 py-2 border border-border shadow-lg">
-                  <div className="text-xs text-muted-foreground">{selectedLinenTypeName}</div>
-                  <div className="flex items-baseline gap-2">
-                    <div className="text-3xl font-bold tabular-nums">{liveResult?.count ?? 0}</div>
-                    <div className="text-sm text-muted-foreground">pièces</div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge variant={getConfidenceVariant(liveResult?.confidence ?? 0)} className="text-xs">
-                      {Math.round((liveResult?.confidence ?? 0) * 100)}% confiance
-                    </Badge>
-                    {typeof liveResult?.widthCm === 'number' && liveResult.widthCm > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        largeur ≈ {Math.round(liveResult.widthCm)} cm
+            {/* Live result HUD */}
+            {(scanMode === 'live' || capturedPhoto) && liveResult && (
+              <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
+                <div className="rounded-2xl bg-background/95 backdrop-blur-md px-4 py-3 border border-border shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">{selectedLinenTypeName}</div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-bold tabular-nums">{liveResult.count}</span>
+                        <span className="text-sm text-muted-foreground">pièces</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={getConfidenceVariant(liveResult.confidence)} className="text-xs">
+                        {Math.round(liveResult.confidence * 100)}%
                       </Badge>
-                    )}
-                    {liveResult?.pilePosition && (
-                      <Badge variant="outline" className="text-xs">
-                        {liveResult.pilePosition}
-                      </Badge>
-                    )}
+                      {typeof liveResult.widthCm === 'number' && liveResult.widthCm > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          ≈ {Math.round(liveResult.widthCm)} cm
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   {lastUpdateAt && scanMode === 'live' && !capturedPhoto && (
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      mis à jour il y a {Math.max(0, Math.round((Date.now() - lastUpdateAt) / 1000))}s
+                    <div className="mt-2 text-[11px] text-muted-foreground text-center">
+                      Dernière analyse: il y a {Math.max(0, Math.round((Date.now() - lastUpdateAt) / 1000))}s
                     </div>
                   )}
                 </div>
@@ -550,7 +573,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             )}
             
             {/* Loading overlay */}
-            {isAnalyzing && (
+            {isAnalyzing && !liveResult && (
               <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
                 <div className="text-center text-foreground">
                   <Loader2 className="h-12 w-12 animate-spin mx-auto mb-3" />
@@ -578,15 +601,15 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             <div className="text-center p-8">
               <div className="text-6xl mb-4">📋</div>
               <h3 className="text-xl font-bold mb-2">Comptage manuel</h3>
-              <p className="text-muted-foreground mb-4">
-                Utilisez les boutons +/- ci-dessous pour compter le linge
+              <p className="text-muted-foreground">
+                Utilisez les boutons +/- ci-dessous
               </p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Hidden canvas and file input */}
+      {/* Hidden elements */}
       <canvas ref={canvasRef} className="hidden" />
       <input
         ref={fileInputRef}
@@ -598,7 +621,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
       />
 
       {/* Bottom controls */}
-      <div className="bg-background/95 backdrop-blur border-t border-border p-4 pb-8">
+      <div className="bg-background border-t border-border p-4 pb-8">
         <div className="space-y-4">
           {/* Photo mode capture button */}
           {scanMode === 'photo' && !capturedPhoto && isStreaming && (
@@ -612,7 +635,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             </Button>
           )}
 
-          {/* Retake button for captured photo */}
+          {/* Retake button */}
           {capturedPhoto && (
             <Button 
               onClick={handleRetakePhoto} 
@@ -624,18 +647,18 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             </Button>
           )}
 
-          {/* Live count + edit */}
-          <div className="flex items-center justify-center gap-4">
+          {/* Manual count controls */}
+          <div className="flex items-center justify-center gap-6">
             <Button
               variant="outline"
               size="icon"
-              className="h-14 w-14 rounded-full"
+              className="h-16 w-16 rounded-full text-2xl"
               onClick={() => {
                 setHasManualOverride(true);
                 setEditCount(Math.max(0, editCount - 1));
               }}
             >
-              <Minus className="h-6 w-6" />
+              <Minus className="h-8 w-8" />
             </Button>
 
             <div className="text-center">
@@ -646,37 +669,30 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                   setHasManualOverride(true);
                   setEditCount(Math.max(0, parseInt(e.target.value) || 0));
                 }}
-                className="text-4xl font-bold text-center h-16 w-28 tabular-nums"
+                className="text-5xl font-bold text-center h-20 w-32 tabular-nums"
                 min={0}
               />
-              <div className="flex items-center justify-center gap-2 mt-1">
-                {liveResult && (
-                  <Badge variant={getConfidenceVariant(liveResult.confidence)} className="text-xs">
-                    {Math.round(liveResult.confidence * 100)}% confiance
-                  </Badge>
-                )}
-                {hasManualOverride && (
-                  <Badge variant="outline" className="text-xs">
-                    Ajusté
-                  </Badge>
-                )}
-              </div>
+              {hasManualOverride && (
+                <Badge variant="outline" className="mt-2 text-xs">
+                  Modifié manuellement
+                </Badge>
+              )}
             </div>
 
             <Button
               variant="outline"
               size="icon"
-              className="h-14 w-14 rounded-full"
+              className="h-16 w-16 rounded-full text-2xl"
               onClick={() => {
                 setHasManualOverride(true);
                 setEditCount(editCount + 1);
               }}
             >
-              <Plus className="h-6 w-6" />
+              <Plus className="h-8 w-8" />
             </Button>
           </div>
 
-          {/* Actions */}
+          {/* Action buttons */}
           <div className="flex gap-3">
             {scanMode === 'live' && (
               <Button
@@ -688,39 +704,29 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                   }
                   setIsLiveScanning((v) => !v);
                 }}
-                className="flex-1 h-12"
+                className="h-14"
                 disabled={cameraFailed}
               >
-                {isLiveScanning ? (
-                  <>
-                    <Pause className="h-4 w-4 mr-2" />
-                    Pause
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Reprendre
-                  </>
-                )}
+                {isLiveScanning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
               </Button>
             )}
 
             <Button 
               variant="outline"
               onClick={onClose} 
-              className={scanMode === 'live' ? 'h-12' : 'flex-1 h-12'}
+              className="flex-1 h-14"
             >
-              <X className="h-4 w-4 mr-2" />
+              <X className="h-5 w-5 mr-2" />
               Quitter
             </Button>
 
-            <Button onClick={handleConfirm} className="flex-1 h-12">
-              <CheckCircle className="h-4 w-4 mr-2" />
+            <Button onClick={handleConfirm} className="flex-1 h-14 text-lg">
+              <CheckCircle className="h-5 w-5 mr-2" />
               Valider {editCount}
             </Button>
           </div>
 
-          {/* Optional fallback */}
+          {/* Import fallback */}
           {scanMode !== 'manual' && !cameraFailed && !capturedPhoto && (
             <Button
               onClick={() => fileInputRef.current?.click()}
@@ -728,7 +734,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               className="w-full"
             >
               <ImageIcon className="h-4 w-4 mr-2" />
-              Importer une photo (secours)
+              Importer une photo
             </Button>
           )}
         </div>
@@ -743,8 +749,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               Plusieurs types de linge détectés
             </DialogTitle>
             <DialogDescription>
-              La largeur détectée (≈ {Math.round(liveResult?.widthCm || 0)} cm) correspond à plusieurs types de linge.
-              Veuillez sélectionner le bon type :
+              Largeur détectée: ≈ {Math.round(liveResult?.widthCm || 0)} cm
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
@@ -759,7 +764,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                   <div className="font-medium">{lt.name}</div>
                   {lt.dimensions && (
                     <div className="text-sm text-muted-foreground">
-                      Dimensions: {lt.dimensions} cm
+                      {lt.dimensions} cm
                     </div>
                   )}
                 </div>
@@ -771,7 +776,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
             className="w-full mt-2"
             onClick={() => setShowLinenTypeSelector(false)}
           >
-            Garder le type actuel ({selectedLinenTypeName})
+            Garder: {selectedLinenTypeName}
           </Button>
         </DialogContent>
       </Dialog>
