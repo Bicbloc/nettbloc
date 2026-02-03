@@ -24,7 +24,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     name: 'freemium',
     displayName: 'Découverte',
     price: 0,
-    maxRooms: 30,
+    maxRooms: 15,
     features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
   },
   basic: {
@@ -94,7 +94,7 @@ export function useSubscription() {
     loading: true,
     isInTrial: false,
     isTrialExpired: false,
-    maxRooms: 30,
+    maxRooms: 15,
     featuresEnabled: DEFAULT_FEATURES,
     planConfig: PLAN_CONFIGS.freemium,
     subscriptionStatus: 'none'
@@ -108,7 +108,7 @@ export function useSubscription() {
         loading: false,
         isInTrial: false,
         isTrialExpired: false,
-        maxRooms: 30,
+        maxRooms: 15,
         featuresEnabled: DEFAULT_FEATURES,
         planConfig: PLAN_CONFIGS.freemium,
         subscriptionStatus: 'none'
@@ -181,7 +181,9 @@ export function useSubscription() {
         planType = 'freemium';
       }
 
-      const planConfig = PLAN_CONFIGS[planType];
+      // During trial, use platinum plan (full access)
+      const effectivePlan = isInTrial ? 'platinum' : planType;
+      const planConfig = PLAN_CONFIGS[effectivePlan];
       const isPaid = planType !== 'freemium';
       const isSubscribed = isPaid || isInTrial;
 
@@ -191,15 +193,16 @@ export function useSubscription() {
         ...planConfig.features
       };
 
-      // During trial, grant premium features
+      // During trial, grant all platinum features (unlimited)
       if (isInTrial) {
         featuresEnabled.incidents = true;
         featuresEnabled.linen_inventory = true;
         featuresEnabled.inspection = true;
+        featuresEnabled.api_access = true;
       }
 
       setSubscription({
-        plan: planType,
+        plan: isInTrial ? 'platinum' : planType,
         subscribed: isSubscribed,
         loading: false,
         isInTrial,
@@ -207,7 +210,7 @@ export function useSubscription() {
         trialStartDate: profile?.trial_start_date,
         trialEndDate: trialEndDate?.toISOString(),
         trialDaysRemaining,
-        maxRooms: planConfig.maxRooms || 999999,
+        maxRooms: isInTrial ? 999999 : (planConfig.maxRooms || 999999),
         featuresEnabled,
         planConfig,
         subscriptionStatus
@@ -220,7 +223,7 @@ export function useSubscription() {
         loading: false,
         isInTrial: false,
         isTrialExpired: false,
-        maxRooms: 30,
+        maxRooms: 15,
         featuresEnabled: DEFAULT_FEATURES,
         planConfig: PLAN_CONFIGS.freemium,
         subscriptionStatus: 'none'
