@@ -4450,7 +4450,10 @@ export type Database = {
       }
       task_templates: {
         Row: {
+          assigned_to_all: boolean | null
           assigned_to_type: string
+          assigned_to_user_id: string | null
+          assigned_user_name: string | null
           created_at: string
           created_by: string | null
           days_of_week: number[]
@@ -4467,7 +4470,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_to_all?: boolean | null
           assigned_to_type?: string
+          assigned_to_user_id?: string | null
+          assigned_user_name?: string | null
           created_at?: string
           created_by?: string | null
           days_of_week?: number[]
@@ -4484,7 +4490,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_to_all?: boolean | null
           assigned_to_type?: string
+          assigned_to_user_id?: string | null
+          assigned_user_name?: string | null
           created_at?: string
           created_by?: string | null
           days_of_week?: number[]

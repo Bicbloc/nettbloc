@@ -15,9 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Plus, Trash2, Edit, Calendar as CalendarIcon, 
-  Repeat, Clock, MapPin, User, Loader2, CheckCircle, Save
+  Repeat, Clock, MapPin, User, Loader2, CheckCircle, Save, Users
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -34,12 +35,21 @@ interface TaskTemplate {
   location_type: string;
   location_reference: string | null;
   assigned_to_type: string;
+  assigned_to_user_id: string | null;
+  assigned_to_all: boolean;
+  assigned_user_name: string | null;
   priority: string;
   days_of_week: number[];
   is_active: boolean;
   is_one_time: boolean;
   one_time_date: string | null;
   created_at: string;
+}
+
+interface StaffMember {
+  id: string;
+  name: string;
+  type: 'housekeeper' | 'governess' | 'technician';
 }
 
 const DAYS_OF_WEEK = [
@@ -87,6 +97,9 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
     location_type: 'lobby',
     location_reference: '',
     assigned_to_type: 'housekeeper',
+    assigned_to_all: true,
+    assigned_to_user_id: null as string | null,
+    assigned_user_name: null as string | null,
     priority: 'normal',
     days_of_week: [] as number[],
     is_one_time: false,
@@ -111,6 +124,61 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
     },
   });
 
+  // Fetch staff members for assignment
+  const { data: staffMembers } = useQuery({
+    queryKey: ["staff-members", hotelId, formData.assigned_to_type],
+    queryFn: async () => {
+      const members: StaffMember[] = [];
+
+      if (formData.assigned_to_type === 'housekeeper') {
+        const { data } = await supabase
+          .from("housekeepers")
+          .select("id, name")
+          .eq("hotel_id", hotelId)
+          .eq("is_active", true);
+        
+        data?.forEach(h => members.push({ id: h.id, name: h.name, type: 'housekeeper' }));
+      } else if (formData.assigned_to_type === 'governess') {
+        // Get governesses with active sessions for this hotel
+        const { data } = await supabase
+          .from("governess_hotel_sessions")
+          .select("governess_profile_id, governess_profiles(id, name)")
+          .eq("hotel_id", hotelId)
+          .eq("is_active", true);
+        
+        data?.forEach((g: any) => {
+          if (g.governess_profiles) {
+            members.push({ 
+              id: g.governess_profiles.id, 
+              name: g.governess_profiles.name, 
+              type: 'governess' 
+            });
+          }
+        });
+      } else if (formData.assigned_to_type === 'technician') {
+        // Get technicians with approved access to this hotel
+        const { data } = await supabase
+          .from("technician_access_requests")
+          .select("technician_profile_id, technician_profiles(id, name)")
+          .eq("hotel_id", hotelId)
+          .eq("status", "approved");
+        
+        data?.forEach((t: any) => {
+          if (t.technician_profiles) {
+            members.push({ 
+              id: t.technician_profiles.id, 
+              name: t.technician_profiles.name, 
+              type: 'technician' 
+            });
+          }
+        });
+      }
+
+      return members;
+    },
+    enabled: showDialog,
+  });
+
   // Create/Update mutation
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData & { id?: string }) => {
@@ -121,6 +189,9 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
         location_type: data.location_type,
         location_reference: data.location_reference || null,
         assigned_to_type: data.assigned_to_type,
+        assigned_to_all: data.assigned_to_all,
+        assigned_to_user_id: data.assigned_to_all ? null : data.assigned_to_user_id,
+        assigned_user_name: data.assigned_to_all ? null : data.assigned_user_name,
         priority: data.priority,
         days_of_week: data.days_of_week,
         is_one_time: data.is_one_time,
@@ -173,6 +244,9 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
       location_type: 'lobby',
       location_reference: '',
       assigned_to_type: 'housekeeper',
+      assigned_to_all: true,
+      assigned_to_user_id: null,
+      assigned_user_name: null,
       priority: 'normal',
       days_of_week: [],
       is_one_time: isOneTime,
@@ -190,6 +264,9 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
       location_type: template.location_type,
       location_reference: template.location_reference || '',
       assigned_to_type: template.assigned_to_type,
+      assigned_to_all: template.assigned_to_all ?? true,
+      assigned_to_user_id: template.assigned_to_user_id,
+      assigned_user_name: template.assigned_user_name,
       priority: template.priority,
       days_of_week: template.days_of_week || [],
       is_one_time: template.is_one_time,
@@ -229,9 +306,33 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
       return;
     }
 
+    if (!formData.assigned_to_all && !formData.assigned_to_user_id) {
+      toast({ variant: "destructive", title: "Sélectionnez un membre du personnel" });
+      return;
+    }
+
     saveMutation.mutate({
       ...formData,
       id: editingTemplate?.id
+    });
+  };
+
+  const handleStaffTypeChange = (value: string) => {
+    setFormData({ 
+      ...formData, 
+      assigned_to_type: value,
+      assigned_to_user_id: null,
+      assigned_user_name: null,
+      assigned_to_all: true
+    });
+  };
+
+  const handleUserSelect = (userId: string) => {
+    const member = staffMembers?.find(m => m.id === userId);
+    setFormData({
+      ...formData,
+      assigned_to_user_id: userId,
+      assigned_user_name: member?.name || null
     });
   };
 
@@ -460,12 +561,20 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <Separator />
+
+            {/* Staff assignment section */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Attribution de la tâche
+              </Label>
+
               <div className="space-y-2">
-                <Label>Type de personnel</Label>
+                <Label className="text-sm text-muted-foreground">Type de personnel</Label>
                 <Select
                   value={formData.assigned_to_type}
-                  onValueChange={(v) => setFormData({ ...formData, assigned_to_type: v })}
+                  onValueChange={handleStaffTypeChange}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -480,22 +589,81 @@ export function TaskTemplateManager({ hotelId }: TaskTemplateManagerProps) {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Priorité</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(v) => setFormData({ ...formData, priority: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITIES.map(p => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <RadioGroup
+                value={formData.assigned_to_all ? "all" : "specific"}
+                onValueChange={(v) => setFormData({ 
+                  ...formData, 
+                  assigned_to_all: v === "all",
+                  assigned_to_user_id: v === "all" ? null : formData.assigned_to_user_id,
+                  assigned_user_name: v === "all" ? null : formData.assigned_user_name
+                })}
+                className="space-y-2"
+              >
+                <div className="flex items-center space-x-2 p-2 rounded-md border hover:bg-muted/50">
+                  <RadioGroupItem value="all" id="all" />
+                  <Label htmlFor="all" className="flex items-center gap-2 cursor-pointer flex-1">
+                    <Users className="h-4 w-4" />
+                    Toutes les {STAFF_TYPES.find(s => s.value === formData.assigned_to_type)?.label}s
+                    <Badge variant="secondary" className="ml-auto">
+                      Distribution via affectation
+                    </Badge>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-2 rounded-md border hover:bg-muted/50">
+                  <RadioGroupItem value="specific" id="specific" />
+                  <Label htmlFor="specific" className="flex items-center gap-2 cursor-pointer">
+                    <User className="h-4 w-4" />
+                    Une personne spécifique
+                  </Label>
+                </div>
+              </RadioGroup>
+
+              {/* Specific user selection */}
+              {!formData.assigned_to_all && (
+                <div className="space-y-2 pl-6">
+                  <Label className="text-sm">Choisir le membre</Label>
+                  {staffMembers && staffMembers.length > 0 ? (
+                    <Select
+                      value={formData.assigned_to_user_id || ""}
+                      onValueChange={handleUserSelect}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staffMembers.map(member => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-muted-foreground p-2 bg-muted rounded">
+                      Aucun(e) {STAFF_TYPES.find(s => s.value === formData.assigned_to_type)?.label} disponible
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>Priorité</Label>
+              <Select
+                value={formData.priority}
+                onValueChange={(v) => setFormData({ ...formData, priority: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map(p => (
+                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -575,8 +743,17 @@ function TemplateCard({
             </span>
 
             <span className="flex items-center gap-1">
-              <User className="h-4 w-4" />
-              {staffType?.icon} {staffType?.label}
+              {template.assigned_to_all ? (
+                <>
+                  <Users className="h-4 w-4" />
+                  Toutes {staffType?.label}s
+                </>
+              ) : (
+                <>
+                  <User className="h-4 w-4" />
+                  {template.assigned_user_name || staffType?.label}
+                </>
+              )}
             </span>
           </div>
 
