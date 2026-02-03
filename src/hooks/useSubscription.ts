@@ -117,10 +117,21 @@ export function useSubscription() {
     }
 
     try {
+      // Check if user is a sub-account
+      const { data: subAccountData } = await supabase
+        .from('sub_accounts')
+        .select('id, parent_user_id, hotel_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      // If sub-account, fetch parent's profile for subscription
+      const profileUserId = subAccountData?.parent_user_id || user.id;
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('plan, subscription_type, subscription_status, trial_start_date, trial_duration_months, trial_end_date, max_rooms, features_enabled, created_at, onboarding_completed_at')
-        .eq('id', user.id)
+        .eq('id', profileUserId)
         .single();
 
       // Check trial status
