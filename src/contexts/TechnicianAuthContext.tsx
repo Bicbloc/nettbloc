@@ -171,6 +171,8 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
     try {
       const redirectUrl = `${window.location.origin}/technician/login`;
       
+      // The profile is created automatically via database trigger (handle_technician_signup)
+      // when role='technician' is set in user metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -181,22 +183,6 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
       });
 
       if (authError) throw authError;
-
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('technician_profiles')
-          .insert({
-            id: authData.user.id,
-            name,
-            email,
-            phone: phone || null,
-            is_active: true,
-            specialties: [],
-            certifications: []
-          });
-
-        if (profileError) throw profileError;
-      }
 
       return { error: null };
     } catch (error: any) {
