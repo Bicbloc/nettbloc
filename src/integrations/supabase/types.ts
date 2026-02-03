@@ -5022,6 +5022,7 @@ export type Database = {
         }[]
       }
       calculate_level: { Args: { total_xp: number }; Returns: number }
+      can_access_hotel: { Args: { p_hotel_id: string }; Returns: boolean }
       can_manage_hotel_data: {
         Args: { target_hotel_id: string }
         Returns: boolean
