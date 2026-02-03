@@ -64,8 +64,8 @@ const handler = async (req: Request): Promise<Response> => {
       })
       .eq('id', subAccountId);
 
-    // Build activation URL
-    const baseUrl = "https://nettbloc.lovable.app";
+    // Build activation URL - Use production domain
+    const baseUrl = "https://nettobloc.bicbloc.eu";
     const activationUrl = `${baseUrl}/activate-account?code=${invitationCode}`;
 
     // Send invitation email
