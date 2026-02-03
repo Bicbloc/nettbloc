@@ -38,7 +38,7 @@ import { LostItemReportWizard } from '@/components/lost-and-found/LostItemReport
 import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
 import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
 import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
-import { UserTypeGuard } from '@/hooks/use-user-type-guard';
+// Gouvernantes use localStorage auth, not Supabase Auth - no UserTypeGuard needed
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 
 interface GovernessProfile {
@@ -817,11 +817,7 @@ function GovernessDashboardContent() {
   );
 }
 
-// Wrapper avec le guard de type d'utilisateur
+// Gouvernantes use localStorage auth - no Supabase Auth guard needed
 export default function GovernessDashboard() {
-  return (
-    <UserTypeGuard expectedType="governess">
-      <GovernessDashboardContent />
-    </UserTypeGuard>
-  );
+  return <GovernessDashboardContent />;
 }
