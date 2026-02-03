@@ -24,6 +24,7 @@ interface Room {
   notes?: string;
   cleaning_priority: number;
   cleaning_type?: string;
+  is_twin?: boolean;
 }
 
 interface ActivityLogEntry {
@@ -159,49 +160,50 @@ const HousekeeperWorkContent: React.FC = () => {
     // Sauvegarder en base de données
     if (hotelId && housekeeperProfile?.id) {
       try {
-        const { data, error } = await supabase
+        // Vérifier si un enregistrement existe déjà pour aujourd'hui
+        const { data: existing } = await supabase
           .from('staff_timesheets')
-          .upsert({
-            hotel_id: hotelId,
-            staff_type: 'housekeeper',
-            staff_name: housekeeperName,
-            staff_id: housekeeperProfile.id,
-            housekeeper_profile_id: housekeeperProfile.id,
-            work_date: today,
-            start_time: now.toISOString(),
-            status: 'pending',
-            rooms_cleaned: 0,
-            rooms_recouche: 0,
-            rooms_depart: 0,
-          }, { 
-            onConflict: 'hotel_id,staff_id,work_date',
-            ignoreDuplicates: false 
-          })
-          .select()
-          .single();
+          .select('id')
+          .eq('hotel_id', hotelId)
+          .eq('housekeeper_profile_id', housekeeperProfile.id)
+          .eq('work_date', today)
+          .maybeSingle();
         
-        if (error) {
-          // Si conflit, chercher et mettre à jour
-          const { data: existing } = await supabase
+        if (existing) {
+          // Mettre à jour l'existant
+          await supabase
             .from('staff_timesheets')
-            .select('id')
-            .eq('hotel_id', hotelId)
-            .eq('housekeeper_profile_id', housekeeperProfile.id)
-            .eq('work_date', today)
-            .maybeSingle();
+            .update({ start_time: now.toISOString() })
+            .eq('id', existing.id);
+          setCurrentTimesheetId(existing.id);
+          console.log('✅ Pointage début mis à jour en base');
+        } else {
+          // Créer un nouvel enregistrement
+          const { data, error } = await supabase
+            .from('staff_timesheets')
+            .insert({
+              hotel_id: hotelId,
+              staff_type: 'housekeeper',
+              staff_name: housekeeperName,
+              staff_id: housekeeperProfile.id,
+              housekeeper_profile_id: housekeeperProfile.id,
+              work_date: today,
+              start_time: now.toISOString(),
+              status: 'pending',
+              rooms_cleaned: 0,
+              rooms_recouche: 0,
+              rooms_depart: 0,
+            })
+            .select()
+            .single();
           
-          if (existing) {
-            await supabase
-              .from('staff_timesheets')
-              .update({ start_time: now.toISOString() })
-              .eq('id', existing.id);
-            setCurrentTimesheetId(existing.id);
+          if (error) {
+            console.error('Erreur création pointage:', error);
+          } else if (data) {
+            setCurrentTimesheetId(data.id);
+            console.log('✅ Pointage début créé en base');
           }
-        } else if (data) {
-          setCurrentTimesheetId(data.id);
         }
-        
-        console.log('✅ Pointage début enregistré en base');
       } catch (error) {
         console.error('Erreur sauvegarde pointage:', error);
       }
@@ -599,7 +601,8 @@ const HousekeeperWorkContent: React.FC = () => {
             status,
             notes,
             cleaning_priority,
-            cleaning_type
+            cleaning_type,
+            is_twin
           )
         `)
         .eq('hotel_id', hotelId)
@@ -646,7 +649,8 @@ const HousekeeperWorkContent: React.FC = () => {
           status: a.rooms.status || 'needs-cleaning',
           notes: a.rooms.notes,
           cleaning_priority: a.rooms.cleaning_priority || 5,
-          cleaning_type: a.rooms.cleaning_type
+          cleaning_type: a.rooms.cleaning_type,
+          is_twin: a.rooms.is_twin || false
         }));
 
       // Log détaillé pour debug

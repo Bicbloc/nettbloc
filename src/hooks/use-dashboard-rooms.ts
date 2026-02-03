@@ -204,7 +204,7 @@ export function useDashboardRooms({
             notes: r.notes || undefined,
             isUrgent: r.cleaning_priority === 10,
             notUrgent: notUrgent,
-            isTwin: false,
+            isTwin: r.is_twin || false,
             priority: r.cleaning_priority === 10 ? 'high' as const : undefined
           };
         });

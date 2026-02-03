@@ -35,6 +35,7 @@ export class RoomSyncService {
         status: room.status,
         notes: room.notes || null,
         cleaning_priority: room.isUrgent ? 10 : (room.notUrgent ? 1 : 5),
+        is_twin: room.isTwin || false,
         updated_at: new Date().toISOString()
       };
 
