@@ -44,7 +44,10 @@ import {
   Mail,
   CheckCircle,
   Send,
-  Loader2
+  Loader2,
+  Copy,
+  Link2,
+  RotateCcw
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +63,7 @@ interface SubAccount {
   created_at: string;
   last_login_at: string | null;
   invitation_status?: string;
+  invitation_code?: string | null;
 }
 
 interface RoleTemplate {
@@ -109,6 +113,9 @@ export function SubAccountsManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSending, setIsSending] = useState(false);
+
+  const activationBaseUrl = "https://nettobloc.bicbloc.eu";
+  const getActivationUrl = (code: string) => `${activationBaseUrl}/activate-account?code=${encodeURIComponent(code)}`;
   
   const [formData, setFormData] = useState({
     email: '',
@@ -204,7 +211,7 @@ export function SubAccountsManager() {
         await supabase.from('sub_account_permissions').insert(permissionOverrides);
       }
 
-      const { error: inviteError } = await supabase.functions.invoke(
+      const { data: inviteData, error: inviteError } = await supabase.functions.invoke(
         'send-subaccount-invitation',
         {
           body: {
@@ -225,9 +232,11 @@ export function SubAccountsManager() {
           description: `L'email d'invitation n'a pas pu être envoyé. Réessayez plus tard.`,
         });
       } else {
+        const code = (inviteData as any)?.invitationCode as string | undefined;
+        const hint = code ? ` Code: ${code} (visible/copier dans la liste).` : '';
         toast({
           title: "✅ Invitation envoyée",
-          description: `Un email a été envoyé à ${formData.email} pour activer son compte.`,
+          description: `Un email a été envoyé à ${formData.email} pour activer son compte.${hint}`,
         });
       }
 
@@ -329,10 +338,60 @@ export function SubAccountsManager() {
     switch (status) {
       case 'invited':
         return <Badge variant="outline" className="border-orange-400 text-orange-600">En attente</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="border-orange-400 text-orange-600">En attente</Badge>;
       case 'active':
         return <Badge className="bg-green-100 text-green-800">Actif</Badge>;
       default:
         return <Badge variant="secondary">Invité</Badge>;
+    }
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Copié", description: `${label} copié dans le presse-papiers.` });
+    } catch (e) {
+      console.warn('Clipboard failed', e);
+      // Fallback (older browsers)
+      window.prompt(`Copiez ${label} :`, text);
+    }
+  };
+
+  const handleResendInvitation = async (account: SubAccount) => {
+    if (!user) return;
+    try {
+      setIsSending(true);
+      const { data: hotelData } = await supabase
+        .from('hotels')
+        .select('name')
+        .eq('user_id', user.id)
+        .single();
+
+      const { data, error } = await supabase.functions.invoke('send-subaccount-invitation', {
+        body: {
+          subAccountId: account.id,
+          email: account.email,
+          firstName: account.first_name,
+          lastName: account.last_name,
+          roleName: roleTemplates.find(r => r.role_name === account.role_name)?.display_name || account.role_name,
+          hotelName: hotelData?.name || 'NettBloc',
+        },
+      });
+
+      if (error) throw error;
+
+      const code = (data as any)?.invitationCode as string | undefined;
+      toast({
+        title: "📨 Invitation renvoyée",
+        description: code ? `Nouvelle invitation envoyée. Code: ${code}` : "Nouvelle invitation envoyée.",
+      });
+      loadData();
+    } catch (error: any) {
+      console.error('Resend invitation error:', error);
+      toast({ variant: "destructive", title: "Erreur", description: error.message || "Impossible de renvoyer l'invitation." });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -371,7 +430,7 @@ export function SubAccountsManager() {
             <div className="flex-shrink-0 py-4">
               <div className="flex items-center justify-between mb-2">
                 {STEPS.map((step, idx) => (
-                  <React.Fragment key={step.id}>
+                  <div key={step.id} className="contents">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
                         currentStep >= step.id 
@@ -391,7 +450,7 @@ export function SubAccountsManager() {
                         currentStep > step.id ? 'bg-primary' : 'bg-muted'
                       }`} />
                     )}
-                  </React.Fragment>
+                  </div>
                 ))}
               </div>
               <Progress value={(currentStep / STEPS.length) * 100} className="h-1" />
@@ -639,6 +698,7 @@ export function SubAccountsManager() {
               <TableHead>Email</TableHead>
               <TableHead>Rôle</TableHead>
               <TableHead>Statut</TableHead>
+              <TableHead>Code</TableHead>
               <TableHead>Dernière connexion</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -664,6 +724,33 @@ export function SubAccountsManager() {
                     <Badge variant="secondary">Inactif</Badge>
                   )}
                 </TableCell>
+                <TableCell>
+                  {(account.invitation_status === 'pending' || account.invitation_status === 'invited') && account.invitation_code ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono tracking-widest">
+                        {account.invitation_code}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(account.invitation_code as string, 'le code')}
+                        title="Copier le code"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(getActivationUrl(account.invitation_code as string), 'le lien')}
+                        title="Copier le lien d'activation"
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   {account.last_login_at 
                     ? new Date(account.last_login_at).toLocaleDateString('fr-FR')
@@ -672,6 +759,17 @@ export function SubAccountsManager() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex gap-1 justify-end">
+                    {(account.invitation_status === 'pending' || account.invitation_status === 'invited') && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleResendInvitation(account)}
+                        title="Renvoyer l'invitation"
+                        disabled={isSending}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
