@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Bell, Check, X, Clock, Ban } from 'lucide-react';
+import { useHousekeeping } from '@/contexts/HousekeepingContext';
 
 interface AccessRequest {
   id: string;
@@ -30,6 +31,7 @@ export const HousekeeperAccessRequests = () => {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { refreshHousekeepers } = useHousekeeping();
 
   // Écouter les nouvelles demandes en temps réel
   useEffect(() => {
@@ -202,6 +204,10 @@ export const HousekeeperAccessRequests = () => {
       }
 
       toast.success('Demande approuvée ! La femme de chambre peut maintenant accéder à l\'hôtel.');
+      
+      // CRITICAL: Rafraîchir immédiatement la liste des femmes de chambre
+      await refreshHousekeepers();
+      
       loadRequests();
     } catch (error) {
       console.error('Error approving request:', error);
