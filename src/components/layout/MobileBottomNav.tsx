@@ -7,7 +7,7 @@ import { useState } from "react";
 import { 
   Layers, Bed, UserIcon, MoreHorizontal,
   Key, AlertTriangle, FileText, Brain, Archive, 
-  ClipboardCheck, Package
+  ClipboardCheck, Package, Repeat
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export type TabValue = 
   | 'overview' | 'rooms' | 'assignment' | 'access-codes' 
   | 'linen' | 'incidents' | 'reports' | 'training' 
-  | 'archives' | 'inspections' | 'lost-found';
+  | 'archives' | 'inspections' | 'lost-found' | 'templates';
 
 interface MobileBottomNavProps {
   activeTab: TabValue;
@@ -71,6 +71,7 @@ export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBot
     {
       categoryKey: 'tools',
       items: [
+        { value: 'templates', labelKey: 'reports', shortLabelKey: 'reports', icon: <Repeat className="h-5 w-5" /> },
         { value: 'reports', labelKey: 'reports', shortLabelKey: 'reports', icon: <FileText className="h-5 w-5" /> },
         { value: 'archives', labelKey: 'archives', shortLabelKey: 'archives', icon: <Archive className="h-5 w-5" /> },
         { value: 'training', labelKey: 'aiTraining', shortLabelKey: 'ia', icon: <Brain className="h-5 w-5" /> },

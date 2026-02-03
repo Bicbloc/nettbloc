@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { 
   Layers, Bed, UserIcon, Key, AlertTriangle, FileText, 
   Brain, Archive, ClipboardCheck, Package, 
-  ChevronRight, Settings
+  ChevronRight, Settings, Repeat
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import { Separator } from "@/components/ui/separator";
 export type TabValue = 
   | 'overview' | 'rooms' | 'assignment' | 'access-codes' 
   | 'linen' | 'incidents' | 'reports' | 'training' 
-  | 'archives' | 'inspections' | 'lost-found';
+  | 'archives' | 'inspections' | 'lost-found' | 'templates';
 
 interface NavItem {
   value: TabValue;
@@ -67,6 +67,7 @@ export function AppSidebar({
 
   // Outils avancés
   const toolsItems: NavItem[] = [
+    { value: 'templates', label: 'Templates', icon: <Repeat className="h-5 w-5" /> },
     { value: 'reports', label: t.dashboard.reports, icon: <FileText className="h-5 w-5" /> },
     { value: 'archives', label: t.dashboard.archives, icon: <Archive className="h-5 w-5" /> },
     { value: 'training', label: t.dashboard.aiTraining, icon: <Brain className="h-5 w-5" /> },
