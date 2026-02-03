@@ -354,11 +354,19 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           
           console.log(`📝 Chambre ${roomNumber}: cleaningType=${room.cleaningType} → DB=${dbCleaningType}`);
           
+          // IMPORTANT: Le statut "checkout" ne doit JAMAIS être automatique
+          // Seul l'admin peut manuellement définir "client sorti"
+          // On garde uniquement le cleaningType (a_blanc/recouche) pour le type de nettoyage
+          let finalStatus = room.status || 'dirty';
+          if (finalStatus === 'checkout' || finalStatus === 'checkout_arrival' || finalStatus === 'checkout_checkin') {
+            finalStatus = 'dirty'; // Toujours "à nettoyer" par défaut
+          }
+          
           return {
             hotel_id: effectiveHotelId,
             room_number: roomNumber,
             floor: room.floor ?? null,
-            status: room.status || 'dirty',
+            status: finalStatus,
             room_type: room.type || room.room_type || null,
             cleaning_priority: room.priority === 'high' ? 2 : 1,
             notes: room.notes || null,
