@@ -487,7 +487,7 @@ export function SubAccountsManager() {
 
                   <Separator className="my-4" />
 
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium text-sm">Permissions</h4>
                       {Object.keys(customPermissions).length > 0 && (
@@ -497,31 +497,35 @@ export function SubAccountsManager() {
                       )}
                     </div>
 
-                    {Object.entries(permissionsByCategory).map(([category, perms]) => (
-                      <div key={category} className="space-y-2">
-                        <h5 className="text-sm font-medium text-muted-foreground">{category}</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {perms.map((perm) => {
-                            const enabled = isPermissionEnabled(perm.key);
-                            const isOverridden = customPermissions[perm.key] !== undefined;
-                            return (
-                              <div
-                                key={perm.key}
-                                className={`flex items-center justify-between p-2 rounded-md border ${
-                                  isOverridden ? 'border-primary bg-primary/5' : 'border-border'
-                                }`}
-                              >
-                                <span className="text-sm">{perm.label}</span>
-                                <Switch
-                                  checked={enabled}
-                                  onCheckedChange={() => togglePermission(perm.key)}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
+                    <ScrollArea className="h-[280px] border rounded-lg p-3">
+                      <div className="space-y-4 pr-3">
+                        {Object.entries(permissionsByCategory).map(([category, perms]) => (
+                          <div key={category} className="space-y-2">
+                            <h5 className="text-sm font-medium text-muted-foreground sticky top-0 bg-background py-1">{category}</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {perms.map((perm) => {
+                                const enabled = isPermissionEnabled(perm.key);
+                                const isOverridden = customPermissions[perm.key] !== undefined;
+                                return (
+                                  <div
+                                    key={perm.key}
+                                    className={`flex items-center justify-between p-2 rounded-md border ${
+                                      isOverridden ? 'border-primary bg-primary/5' : 'border-border'
+                                    }`}
+                                  >
+                                    <span className="text-sm">{perm.label}</span>
+                                    <Switch
+                                      checked={enabled}
+                                      onCheckedChange={() => togglePermission(perm.key)}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </ScrollArea>
                   </div>
                 </div>
               )}
