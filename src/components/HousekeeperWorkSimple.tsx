@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package } from 'lucide-react';
-import { IncidentReportDialogSimple } from './incident/IncidentReportDialogSimple';
+import { IncidentReportWizard } from './incident/IncidentReportWizard';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { storageService } from '@/services/storageService';
-import { ReportLostItemDialog } from './lost-and-found/ReportLostItemDialog';
+import { LostItemReportWizard } from './lost-and-found/LostItemReportWizard';
 import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } from './RoomStatusTabs';
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
@@ -1051,11 +1051,18 @@ const HousekeeperWorkContent: React.FC = () => {
               </Button>
               {hotelId && (
                 <>
-                  <IncidentReportDialogSimple 
+                  <IncidentReportWizard 
                     hotelId={hotelId}
                     userType="housekeeper"
+                    userName={housekeeperName}
+                    trigger={
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        Incident
+                      </Button>
+                    }
                   />
-                  <ReportLostItemDialog
+                  <LostItemReportWizard
                     hotelId={hotelId}
                     reporterName={housekeeperName}
                     reporterType="housekeeper"
