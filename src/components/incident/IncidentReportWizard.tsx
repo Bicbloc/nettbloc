@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -39,7 +39,9 @@ import {
   MapPin,
   Wrench,
   Tag,
-  Users
+  Users,
+  Search,
+  Layers
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
@@ -64,11 +66,12 @@ interface IncidentReportWizardProps {
   onSuccess?: () => void;
 }
 
-// Step-by-step wizard: Photo → AI → Location → Item → Type → Title → Assignment → Description → Confirm
+// Step-by-step wizard: Photo → AI → Location → Category → Item → Type → Title → Assignment → Description → Confirm
 type WizardStep = 
   | 'photo' 
   | 'analysis' 
   | 'location' 
+  | 'category'
   | 'item' 
   | 'type' 
   | 'title' 
@@ -76,7 +79,7 @@ type WizardStep =
   | 'description' 
   | 'confirm';
 
-const STEPS: WizardStep[] = ['photo', 'analysis', 'location', 'item', 'type', 'title', 'assignment', 'description', 'confirm'];
+const STEPS: WizardStep[] = ['photo', 'analysis', 'location', 'category', 'item', 'type', 'title', 'assignment', 'description', 'confirm'];
 
 export function IncidentReportWizard({
   hotelId,
@@ -105,6 +108,10 @@ export function IncidentReportWizard({
 
   useIncidentDefaults(hotelId);
 
+  // State for category and item filtering
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [itemSearchQuery, setItemSearchQuery] = useState("");
+
   const form = useForm<z.infer<typeof incidentSchema>>({
     resolver: zodResolver(incidentSchema),
     defaultValues: {
@@ -125,6 +132,8 @@ export function IncidentReportWizard({
       setImagePreview(null);
       setAiSuggestion(null);
       setIsAnalyzing(false);
+      setSelectedCategoryId("");
+      setItemSearchQuery("");
       form.reset({ location_reference: defaultLocation || '' });
     }
   }, [isOpen, form, defaultLocation]);
@@ -171,6 +180,19 @@ export function IncidentReportWizard({
       }));
     },
   });
+
+  // Filter items by selected category and search query
+  const filteredItems = useMemo(() => {
+    if (!categoriesWithItems || !selectedCategoryId) return [];
+    const category = categoriesWithItems.find(c => c.id === selectedCategoryId);
+    if (!category) return [];
+    
+    if (!itemSearchQuery.trim()) return category.items;
+    
+    return category.items.filter((item: any) => 
+      item.name.toLowerCase().includes(itemSearchQuery.toLowerCase())
+    );
+  }, [categoriesWithItems, selectedCategoryId, itemSearchQuery]);
 
   const { data: types } = useQuery({
     queryKey: ["incident-types", hotelId],
@@ -461,6 +483,8 @@ export function IncidentReportWizard({
         return { icon: Sparkles, title: "Analyse IA", subtitle: "Identification automatique..." };
       case 'location':
         return { icon: MapPin, title: "Où est le problème ?", subtitle: "Sélectionnez la chambre ou le lieu" };
+      case 'category':
+        return { icon: Layers, title: "Quel domaine ?", subtitle: "Choisissez la catégorie" };
       case 'item':
         return { icon: Tag, title: "Quel élément ?", subtitle: "Identifiez l'élément concerné" };
       case 'type':
@@ -494,6 +518,7 @@ export function IncidentReportWizard({
   const canProceed = () => {
     switch (currentStep) {
       case 'location': return !!form.watch('location_reference');
+      case 'category': return !!selectedCategoryId;
       case 'item': return !!form.watch('item_id');
       case 'type': return !!form.watch('type_id');
       case 'title': return form.watch('title')?.length >= 3;
@@ -501,6 +526,10 @@ export function IncidentReportWizard({
       case 'description': return true; // Optional
       default: return true;
     }
+  };
+
+  const getCategoryName = (categoryId: string) => {
+    return categoriesWithItems?.find(c => c.id === categoryId)?.name || '';
   };
 
   const stepConfig = getStepConfig();
@@ -664,28 +693,75 @@ export function IncidentReportWizard({
               </div>
             )}
 
+            {/* STEP: Category */}
+            {currentStep === 'category' && (
+              <div className="space-y-3">
+                <ScrollArea className="h-[300px] pr-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {categoriesWithItems?.map((category) => (
+                      <Button
+                        key={category.id}
+                        variant={selectedCategoryId === category.id ? "default" : "outline"}
+                        className="h-16 flex-col gap-1 text-left"
+                        onClick={() => {
+                          setSelectedCategoryId(category.id);
+                          setItemSearchQuery("");
+                          form.setValue('item_id', '');
+                        }}
+                      >
+                        <span className="text-xl">{category.icon || "📦"}</span>
+                        <span className="text-xs font-medium text-center">{category.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
             {/* STEP: Item */}
             {currentStep === 'item' && (
               <div className="space-y-3">
-                {categoriesWithItems?.map((category) => (
-                  <div key={category.id}>
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">
-                      {category.icon} {category.name}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {category.items.map((item: any) => (
-                        <Button
-                          key={item.id}
-                          variant={form.watch('item_id') === item.id ? "default" : "outline"}
-                          className="h-12 justify-start text-left"
-                          onClick={() => form.setValue('item_id', item.id)}
-                        >
-                          {item.name}
-                        </Button>
-                      ))}
-                    </div>
+                {/* Search bar */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher un élément..."
+                    value={itemSearchQuery}
+                    onChange={(e) => setItemSearchQuery(e.target.value)}
+                    className="pl-10 h-11"
+                  />
+                </div>
+
+                {/* Category badge */}
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {categoriesWithItems?.find(c => c.id === selectedCategoryId)?.icon} {getCategoryName(selectedCategoryId)}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {filteredItems.length} élément(s)
+                  </span>
+                </div>
+
+                {/* Items list with scroll */}
+                <ScrollArea className="h-[250px] pr-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {filteredItems.map((item: any) => (
+                      <Button
+                        key={item.id}
+                        variant={form.watch('item_id') === item.id ? "default" : "outline"}
+                        className="h-12 justify-start text-left"
+                        onClick={() => form.setValue('item_id', item.id)}
+                      >
+                        {item.name}
+                      </Button>
+                    ))}
+                    {filteredItems.length === 0 && (
+                      <div className="col-span-2 text-center py-8 text-muted-foreground">
+                        Aucun élément trouvé
+                      </div>
+                    )}
                   </div>
-                ))}
+                </ScrollArea>
               </div>
             )}
 
@@ -786,6 +862,10 @@ export function IncidentReportWizard({
                     <div className="flex justify-between py-1 border-b">
                       <span className="text-muted-foreground">Chambre:</span>
                       <span className="font-medium">{form.getValues('location_reference')}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b">
+                      <span className="text-muted-foreground">Catégorie:</span>
+                      <span className="font-medium">{getCategoryName(selectedCategoryId)}</span>
                     </div>
                     <div className="flex justify-between py-1 border-b">
                       <span className="text-muted-foreground">Élément:</span>
