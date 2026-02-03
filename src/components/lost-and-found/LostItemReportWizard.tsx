@@ -572,19 +572,21 @@ export function LostItemReportWizard({
 
             {/* STEP: Location Type */}
             {currentStep === 'location_type' && (
-              <div className="grid grid-cols-2 gap-2">
-                {LOCATION_TYPES.map((loc) => (
-                  <Button
-                    key={loc.value}
-                    variant={locationType === loc.value ? "default" : "outline"}
-                    className="h-16 flex-col gap-1"
-                    onClick={() => setLocationType(loc.value)}
-                  >
-                    <span className="text-xl">{loc.icon}</span>
-                    <span className="text-sm">{loc.label}</span>
-                  </Button>
-                ))}
-              </div>
+              <ScrollArea className="h-[300px] pr-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {LOCATION_TYPES.map((loc) => (
+                    <Button
+                      key={loc.value}
+                      variant={locationType === loc.value ? "default" : "outline"}
+                      className="h-16 flex-col gap-1"
+                      onClick={() => setLocationType(loc.value)}
+                    >
+                      <span className="text-xl">{loc.icon}</span>
+                      <span className="text-sm">{loc.label}</span>
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
 
             {/* STEP: Room Number */}
@@ -742,80 +744,82 @@ export function LostItemReportWizard({
 
             {/* STEP: Confirm */}
             {currentStep === 'confirm' && (
-              <div className="space-y-4">
-                <Card className="p-4 bg-amber-50 border-amber-200">
-                  <h4 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
-                    <Check className="h-4 w-4" />
-                    Récapitulatif
-                  </h4>
-                  
-                  <div className="space-y-3 text-sm">
-                    {imagePreview && (
-                      <div className="flex justify-center pb-2">
-                        <img 
-                          src={imagePreview} 
-                          alt="Objet trouvé" 
-                          className="max-h-24 rounded-lg"
-                        />
-                      </div>
-                    )}
+              <ScrollArea className="h-[300px] pr-2">
+                <div className="space-y-4">
+                  <Card className="p-4 bg-amber-50 border-amber-200">
+                    <h4 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Récapitulatif
+                    </h4>
+                    
+                    <div className="space-y-3 text-sm">
+                      {imagePreview && (
+                        <div className="flex justify-center pb-2">
+                          <img 
+                            src={imagePreview} 
+                            alt="Objet trouvé" 
+                            className="max-h-24 rounded-lg"
+                          />
+                        </div>
+                      )}
 
-                    <div className="flex items-start gap-2 py-1 border-b border-amber-200">
-                      <Package className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <span className="font-medium">Objet: </span>
-                        <span>{objectDescription}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 py-1 border-b border-amber-200">
-                      <Tag className="h-4 w-4 text-amber-700 flex-shrink-0" />
-                      <span className="font-medium">Catégorie: </span>
-                      <Badge variant="secondary">
-                        {OBJECT_CATEGORIES.find(c => c.value === objectCategory)?.icon} {getCategoryLabel(objectCategory)}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-start gap-2 py-1 border-b border-amber-200">
-                      <MapPin className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="font-medium">Lieu: </span>
-                        <span>
-                          {getLocationLabel(locationType)}
-                          {roomNumber && ` - Chambre ${roomNumber}`}
-                          {locationDetails && ` (${locationDetails})`}
-                        </span>
-                      </div>
-                    </div>
-
-                    {(guestFirstName || guestName) && (
-                      <div className="flex items-start gap-2 py-1">
-                        <User className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <span className="font-medium">Client: </span>
-                          <span>{guestFirstName} {guestName}</span>
-                          {(guestCheckIn || guestCheckOut) && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                              <Calendar className="h-3 w-3" />
-                              {guestCheckIn && `Du ${new Date(guestCheckIn).toLocaleDateString('fr-FR')}`}
-                              {guestCheckOut && ` au ${new Date(guestCheckOut).toLocaleDateString('fr-FR')}`}
-                            </div>
-                          )}
+                      <div className="flex items-start gap-2 py-1 border-b border-amber-200">
+                        <Package className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <span className="font-medium">Objet: </span>
+                          <span>{objectDescription}</span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </Card>
 
-                {aiSuggestion && aiSuggestion.confidence < 0.6 && (
-                  <Card className="p-3 bg-orange-50 border-orange-200">
-                    <div className="flex items-center gap-2 text-orange-800 text-sm">
-                      <Sparkles className="h-4 w-4" />
-                      <span>L'IA n'a pas pu identifier l'objet avec certitude - l'admin vérifiera</span>
+                      <div className="flex items-center gap-2 py-1 border-b border-amber-200">
+                        <Tag className="h-4 w-4 text-amber-700 flex-shrink-0" />
+                        <span className="font-medium">Catégorie: </span>
+                        <Badge variant="secondary">
+                          {OBJECT_CATEGORIES.find(c => c.value === objectCategory)?.icon} {getCategoryLabel(objectCategory)}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-start gap-2 py-1 border-b border-amber-200">
+                        <MapPin className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <span className="font-medium">Lieu: </span>
+                          <span>
+                            {getLocationLabel(locationType)}
+                            {roomNumber && ` - Chambre ${roomNumber}`}
+                            {locationDetails && ` (${locationDetails})`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {(guestFirstName || guestName) && (
+                        <div className="flex items-start gap-2 py-1">
+                          <User className="h-4 w-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium">Client: </span>
+                            <span>{guestFirstName} {guestName}</span>
+                            {(guestCheckIn || guestCheckOut) && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                <Calendar className="h-3 w-3" />
+                                {guestCheckIn && `Du ${new Date(guestCheckIn).toLocaleDateString('fr-FR')}`}
+                                {guestCheckOut && ` au ${new Date(guestCheckOut).toLocaleDateString('fr-FR')}`}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </Card>
-                )}
-              </div>
+
+                  {aiSuggestion && aiSuggestion.confidence < 0.6 && (
+                    <Card className="p-3 bg-orange-50 border-orange-200">
+                      <div className="flex items-center gap-2 text-orange-800 text-sm">
+                        <Sparkles className="h-4 w-4" />
+                        <span>L'IA n'a pas pu identifier l'objet avec certitude - l'admin vérifiera</span>
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              </ScrollArea>
             )}
           </div>
         </ScrollArea>

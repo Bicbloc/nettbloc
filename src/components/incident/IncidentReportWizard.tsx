@@ -670,18 +670,20 @@ export function IncidentReportWizard({
             {currentStep === 'location' && (
               <div className="space-y-4">
                 {registeredRooms && registeredRooms.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-2">
-                    {registeredRooms.map((room) => (
-                      <Button
-                        key={room.id}
-                        variant={form.watch('location_reference') === room.room_number ? "default" : "outline"}
-                        className="h-14 text-lg font-bold"
-                        onClick={() => form.setValue('location_reference', room.room_number)}
-                      >
-                        {room.room_number}
-                      </Button>
-                    ))}
-                  </div>
+                  <ScrollArea className="h-[300px] pr-2">
+                    <div className="grid grid-cols-4 gap-2">
+                      {registeredRooms.map((room) => (
+                        <Button
+                          key={room.id}
+                          variant={form.watch('location_reference') === room.room_number ? "default" : "outline"}
+                          className="h-14 text-lg font-bold"
+                          onClick={() => form.setValue('location_reference', room.room_number)}
+                        >
+                          {room.room_number}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 ) : (
                   <Input 
                     placeholder="Numéro de chambre ou lieu..." 
@@ -767,22 +769,24 @@ export function IncidentReportWizard({
 
             {/* STEP: Type */}
             {currentStep === 'type' && (
-              <div className="grid grid-cols-1 gap-2">
-                {types?.map((type) => (
-                  <Button
-                    key={type.id}
-                    variant={form.watch('type_id') === type.id ? "default" : "outline"}
-                    className="h-14 justify-start text-left gap-3"
-                    onClick={() => form.setValue('type_id', type.id)}
-                  >
-                    <div
-                      className="w-4 h-4 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: type.color || '#gray' }}
-                    />
-                    <span className="font-medium">{type.name}</span>
-                  </Button>
-                ))}
-              </div>
+              <ScrollArea className="h-[300px] pr-2">
+                <div className="grid grid-cols-1 gap-2">
+                  {types?.map((type) => (
+                    <Button
+                      key={type.id}
+                      variant={form.watch('type_id') === type.id ? "default" : "outline"}
+                      className="h-14 justify-start text-left gap-3"
+                      onClick={() => form.setValue('type_id', type.id)}
+                    >
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: type.color || '#gray' }}
+                      />
+                      <span className="font-medium">{type.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
 
             {/* STEP: Title */}
@@ -810,25 +814,27 @@ export function IncidentReportWizard({
 
             {/* STEP: Assignment */}
             {currentStep === 'assignment' && (
-              <div className="space-y-2">
-                <Button
-                  variant={!form.watch('assigned_to_role_id') ? "default" : "outline"}
-                  className="w-full h-12 justify-start"
-                  onClick={() => form.setValue('assigned_to_role_id', '')}
-                >
-                  Aucune assignation
-                </Button>
-                {staffRoles?.map((role) => (
+              <ScrollArea className="h-[300px] pr-2">
+                <div className="space-y-2">
                   <Button
-                    key={role.id}
-                    variant={form.watch('assigned_to_role_id') === role.id ? "default" : "outline"}
+                    variant={!form.watch('assigned_to_role_id') ? "default" : "outline"}
                     className="w-full h-12 justify-start"
-                    onClick={() => form.setValue('assigned_to_role_id', role.id)}
+                    onClick={() => form.setValue('assigned_to_role_id', '')}
                   >
-                    {role.name}
+                    Aucune assignation
                   </Button>
-                ))}
-              </div>
+                  {staffRoles?.map((role) => (
+                    <Button
+                      key={role.id}
+                      variant={form.watch('assigned_to_role_id') === role.id ? "default" : "outline"}
+                      className="w-full h-12 justify-start"
+                      onClick={() => form.setValue('assigned_to_role_id', role.id)}
+                    >
+                      {role.name}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
 
             {/* STEP: Description */}
