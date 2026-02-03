@@ -53,6 +53,7 @@ import { ArchivesTab } from "@/components/dashboard/ArchivesTab";
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
 import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
+import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
@@ -762,6 +763,11 @@ const IndexDashboard = () => {
           {/* Archives Tab */}
           {activeTab === 'archives' && (
             <ArchivesTab currentHotelId={currentHotelId} />
+          )}
+
+          {/* Templates Tab */}
+          {activeTab === 'templates' && currentHotelId && (
+            <TaskTemplateManager hotelId={currentHotelId} />
           )}
 
 

@@ -4448,6 +4448,75 @@ export type Database = {
           },
         ]
       }
+      task_templates: {
+        Row: {
+          assigned_to_type: string
+          created_at: string
+          created_by: string | null
+          days_of_week: number[]
+          description: string | null
+          hotel_id: string
+          id: string
+          is_active: boolean
+          is_one_time: boolean
+          location_reference: string | null
+          location_type: string
+          one_time_date: string | null
+          priority: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to_type?: string
+          created_at?: string
+          created_by?: string | null
+          days_of_week?: number[]
+          description?: string | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          is_one_time?: boolean
+          location_reference?: string | null
+          location_type?: string
+          one_time_date?: string | null
+          priority?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to_type?: string
+          created_at?: string
+          created_by?: string | null
+          days_of_week?: number[]
+          description?: string | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          is_one_time?: boolean
+          location_reference?: string | null
+          location_type?: string
+          one_time_date?: string | null
+          priority?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technician_access_requests: {
         Row: {
           created_at: string | null
