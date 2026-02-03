@@ -87,32 +87,22 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
     
     setIsSubmitting(true);
     try {
-      // Sauvegarder les infos de facturation
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          billing_company_name: billingInfo.companyName,
-          billing_address: billingInfo.address,
-          billing_postal_code: billingInfo.postalCode,
-          billing_city: billingInfo.city,
-          billing_country: billingInfo.country,
-          siret: billingInfo.siret,
-          billing_tva_number: billingInfo.tvaNumber,
-          billing_phone: billingInfo.phone,
-          billing_contact_name: billingInfo.contactName,
-          billing_contact_email: billingInfo.contactEmail,
-          onboarding_completed_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
-
-      // Démarrer la période d'essai
-      const { error: trialError } = await supabase.rpc('start_trial_period', {
-        p_user_id: user.id
+      // Utiliser la fonction SECURITY DEFINER qui gère tout (création profil + trial)
+      const { data, error } = await supabase.rpc('complete_onboarding', {
+        p_user_id: user.id,
+        p_company_name: billingInfo.companyName || null,
+        p_contact_name: billingInfo.contactName || null,
+        p_contact_email: billingInfo.contactEmail || null,
+        p_phone: billingInfo.phone || null,
+        p_siret: billingInfo.siret || null,
+        p_tva_number: billingInfo.tvaNumber || null
       });
 
-      if (trialError) throw trialError;
+      if (error) throw error;
+      
+      if (data === false) {
+        throw new Error('La configuration a échoué');
+      }
 
       toast({
         title: "🎉 Bienvenue chez NettoBloc !",
@@ -125,7 +115,7 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
       toast({
         variant: "destructive",
         title: "Erreur",
-        description: "Impossible de terminer la configuration."
+        description: "Impossible de terminer la configuration. Veuillez réessayer."
       });
     } finally {
       setIsSubmitting(false);
