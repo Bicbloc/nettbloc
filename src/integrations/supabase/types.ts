@@ -1245,8 +1245,10 @@ export type Database = {
           id: string
           import_mode: string | null
           name: string
+          phone: string | null
           settings: Json | null
           status: string | null
+          supplier_email: string | null
           updated_at: string
           user_id: string | null
         }
@@ -1258,8 +1260,10 @@ export type Database = {
           id?: string
           import_mode?: string | null
           name: string
+          phone?: string | null
           settings?: Json | null
           status?: string | null
+          supplier_email?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1271,8 +1275,10 @@ export type Database = {
           id?: string
           import_mode?: string | null
           name?: string
+          phone?: string | null
           settings?: Json | null
           status?: string | null
+          supplier_email?: string | null
           updated_at?: string
           user_id?: string | null
         }

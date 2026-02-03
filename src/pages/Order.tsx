@@ -3,20 +3,19 @@
  * Permet de commander des femmes de chambre avec email automatique
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { 
   ArrowLeft, Calendar, Users, Mail, Copy, Send, 
-  FileDown, CheckCircle2, Building, ExternalLink,
-  Sparkles, Phone, MapPin
+  FileUp, CheckCircle2, Building, ExternalLink,
+  Sparkles, Phone, MapPin, Save, Loader2, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +32,7 @@ export default function Order() {
   const { user } = useAuth();
   const { hotelId, hotelName, hotelCode } = useHotel();
   const { t } = useLanguage();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [selectedDate, setSelectedDate] = useState<Date>(addDays(new Date(), 1));
@@ -43,14 +43,71 @@ export default function Order() {
   const [hotelPhone, setHotelPhone] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadingPdf, setLoadingPdf] = useState(false);
+  const [pdfAnalysisResult, setPdfAnalysisResult] = useState<{
+    totalRooms: number;
+    departures: number;
+    stayovers: number;
+    arrivals: number;
+  } | null>(null);
 
-  // Load hotel data
+  // Load hotel data from database
   useEffect(() => {
     if (hotelId) {
-      // Load recommended count based on upcoming rooms
+      loadHotelInfo();
       loadRecommendation();
     }
   }, [hotelId, selectedDate]);
+
+  // Load hotel info (address, phone, supplier email) from database
+  const loadHotelInfo = async () => {
+    if (!hotelId) return;
+
+    try {
+      const { data: hotel, error } = await supabase
+        .from('hotels')
+        .select('address, phone, supplier_email')
+        .eq('id', hotelId)
+        .single();
+
+      if (error) throw error;
+
+      if (hotel) {
+        setHotelAddress(hotel.address || "");
+        setHotelPhone(hotel.phone || "");
+        setSupplierEmail(hotel.supplier_email || "");
+      }
+    } catch (error) {
+      console.error('Error loading hotel info:', error);
+    }
+  };
+
+  // Save hotel info to database
+  const saveHotelInfo = async () => {
+    if (!hotelId) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('hotels')
+        .update({
+          address: hotelAddress.trim() || null,
+          phone: hotelPhone.trim() || null,
+          supplier_email: supplierEmail.trim() || null,
+        })
+        .eq('id', hotelId);
+
+      if (error) throw error;
+
+      toast.success("Informations enregistrées !");
+    } catch (error) {
+      console.error('Error saving hotel info:', error);
+      toast.error("Erreur lors de l'enregistrement");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Calculate recommendation based on rooms for the selected date
   const loadRecommendation = async () => {
@@ -75,13 +132,114 @@ export default function Order() {
     }
   };
 
+  // Handle PDF upload and analysis
+  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.includes('pdf')) {
+      toast.error("Veuillez sélectionner un fichier PDF");
+      return;
+    }
+
+    setLoadingPdf(true);
+    setPdfAnalysisResult(null);
+
+    try {
+      // Read the file as base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = (e.target?.result as string)?.split(',')[1];
+        
+        if (!base64) {
+          toast.error("Erreur lors de la lecture du fichier");
+          setLoadingPdf(false);
+          return;
+        }
+
+        // Call the parse-report edge function
+        const { data, error } = await supabase.functions.invoke('parse-report', {
+          body: {
+            fileBase64: base64,
+            hotelId,
+            fileName: file.name,
+          },
+        });
+
+        if (error) {
+          console.error('Error parsing PDF:', error);
+          toast.error("Erreur lors de l'analyse du PDF");
+          setLoadingPdf(false);
+          return;
+        }
+
+        // Count room types from parsed data
+        const rooms = data?.rooms || data?.data?.rooms || [];
+        const departures = rooms.filter((r: any) => 
+          r.cleaningType?.toLowerCase().includes('blanc') || 
+          r.cleaning_type?.toLowerCase().includes('blanc') ||
+          r.status?.toLowerCase().includes('départ')
+        ).length;
+        const stayovers = rooms.filter((r: any) => 
+          r.cleaningType?.toLowerCase().includes('recouche') || 
+          r.cleaning_type?.toLowerCase().includes('recouche') ||
+          r.status?.toLowerCase().includes('recouche')
+        ).length;
+        const arrivals = rooms.filter((r: any) => 
+          r.status?.toLowerCase().includes('arrivée') ||
+          r.arrivalDate || r.arrival_date
+        ).length;
+
+        const totalRooms = rooms.length;
+        
+        // Calculate recommendation: departures are heavier (1.5x), stayovers normal
+        const weightedRooms = departures * 1.5 + stayovers + (totalRooms - departures - stayovers);
+        const recommended = Math.max(1, Math.ceil(weightedRooms / 11));
+
+        setPdfAnalysisResult({
+          totalRooms,
+          departures,
+          stayovers,
+          arrivals,
+        });
+
+        setRecommendedCount(recommended);
+        setHousekeeperCount(recommended);
+
+        toast.success(`PDF analysé : ${totalRooms} chambres détectées`);
+        setLoadingPdf(false);
+      };
+
+      reader.onerror = () => {
+        toast.error("Erreur lors de la lecture du fichier");
+        setLoadingPdf(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error handling PDF:', error);
+      toast.error("Erreur lors de l'analyse du PDF");
+      setLoadingPdf(false);
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // Generate email content
   const emailContent = useMemo(() => {
     const displayHotelName = hotelName || "Notre hôtel";
     const formattedDate = format(selectedDate, "EEEE d MMMM yyyy", { locale: fr });
     
-    return `Bonjour,\n\nC'est l'hôtel ${displayHotelName}${hotelAddress ? `, situé au ${hotelAddress}` : ""}.\n\nNous souhaiterions vous commander ${housekeeperCount} femme${housekeeperCount > 1 ? 's' : ''} de chambre pour le ${formattedDate}.\n\nMerci de nous confirmer la disponibilité.\n\nCordialement,\n\n${displayHotelName}\n${hotelAddress ? `📍 ${hotelAddress}` : ""}\n${hotelPhone ? `📞 ${hotelPhone}` : ""}\n\n---\nGéré via NettoBloc\n🔗 https://nettobloc.bicbloc.eu`;
-  }, [hotelName, selectedDate, housekeeperCount, hotelAddress, hotelPhone]);
+    let roomDetails = "";
+    if (pdfAnalysisResult) {
+      roomDetails = `\n\nDétail des chambres :\n- ${pdfAnalysisResult.departures} départs (à blanc)\n- ${pdfAnalysisResult.stayovers} recouches\n- Total : ${pdfAnalysisResult.totalRooms} chambres`;
+    }
+    
+    return `Bonjour,\n\nC'est l'hôtel ${displayHotelName}${hotelAddress ? `, situé au ${hotelAddress}` : ""}.\n\nNous souhaiterions vous commander ${housekeeperCount} femme${housekeeperCount > 1 ? 's' : ''} de chambre pour le ${formattedDate}.${roomDetails}\n\nMerci de nous confirmer la disponibilité.\n\nCordialement,\n\n${displayHotelName}\n${hotelAddress ? `📍 ${hotelAddress}` : ""}\n${hotelPhone ? `📞 ${hotelPhone}` : ""}\n\n---\nGéré via NettoBloc\n🔗 https://nettobloc.bicbloc.eu`;
+  }, [hotelName, selectedDate, housekeeperCount, hotelAddress, hotelPhone, pdfAnalysisResult]);
 
   // Copy email to clipboard
   const handleCopyEmail = async () => {
@@ -103,8 +261,8 @@ export default function Order() {
     window.open(mailto, '_blank');
   };
 
-  // Send directly via support@bicbloc.eu (edge function)
-  const handleSendDirect = async () => {
+  // Send directly via support@bicbloc.eu
+  const handleSendViaBicBloc = async () => {
     if (!supplierEmail) {
       toast.error("Veuillez renseigner l'email du fournisseur");
       return;
@@ -112,22 +270,18 @@ export default function Order() {
 
     setSending(true);
     try {
-      // For now, open mailto with CC to support
+      // Open mailto with BicBloc as sender and supplier as recipient
       const subject = encodeURIComponent(`Commande personnel - ${hotelName || 'Hôtel'} - ${format(selectedDate, "d MMMM yyyy", { locale: fr })}`);
       const body = encodeURIComponent(emailContent);
+      // Send to supplier with CC to support@bicbloc.eu for tracking
       const mailto = `mailto:${supplierEmail}?cc=support@bicbloc.eu&subject=${subject}&body=${body}`;
       window.open(mailto, '_blank');
-      toast.success("Ouverture de votre client email...");
+      toast.success("Ouverture de votre client email avec copie à BicBloc...");
     } catch (error) {
       toast.error("Erreur lors de l'envoi");
     } finally {
       setSending(false);
     }
-  };
-
-  // Generate PDF for upcoming days
-  const handleDownloadPDF = async () => {
-    toast.info("Fonctionnalité PDF à venir - Utilisez l'export depuis les rapports pour l'instant");
   };
 
   if (!user) {
@@ -147,7 +301,7 @@ export default function Order() {
             <div>
               <h1 className="text-xl font-bold">Commander du personnel</h1>
               <p className="text-sm text-muted-foreground">
-                Générez une demande pour vos prestataires
+                Analysez votre PDF et générez une demande
               </p>
             </div>
           </div>
@@ -155,13 +309,122 @@ export default function Order() {
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
+        {/* PDF Analysis Card - First */}
+        <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Analyse du rapport PMS
+            </CardTitle>
+            <CardDescription>
+              Importez le PDF du jour pour calculer automatiquement le nombre de femmes de chambre
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={handlePdfUpload}
+              ref={fileInputRef}
+              className="hidden"
+            />
+            
+            <Button
+              variant="outline"
+              className="w-full h-20 border-dashed border-2 hover:border-primary hover:bg-primary/5"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loadingPdf}
+            >
+              {loadingPdf ? (
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span>Analyse en cours...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <FileUp className="h-8 w-8 text-primary" />
+                  <span>Cliquez pour importer votre rapport PDF</span>
+                </div>
+              )}
+            </Button>
+
+            {pdfAnalysisResult && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-card rounded-lg p-3 text-center border">
+                  <div className="text-2xl font-bold text-primary">
+                    {pdfAnalysisResult.totalRooms}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Total chambres</div>
+                </div>
+                <div className="bg-card rounded-lg p-3 text-center border">
+                  <div className="text-2xl font-bold text-orange-500">
+                    {pdfAnalysisResult.departures}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Départs (blanc)</div>
+                </div>
+                <div className="bg-card rounded-lg p-3 text-center border">
+                  <div className="text-2xl font-bold text-blue-500">
+                    {pdfAnalysisResult.stayovers}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Recouches</div>
+                </div>
+                <div className="bg-card rounded-lg p-3 text-center border">
+                  <div className="text-2xl font-bold text-green-500">
+                    {pdfAnalysisResult.arrivals}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Arrivées</div>
+                </div>
+              </div>
+            )}
+
+            {/* Recommendation based on PDF */}
+            <div className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <span className="font-medium">Recommandation</span>
+                {pdfAnalysisResult && (
+                  <Badge variant="secondary" className="ml-auto">Basé sur le PDF</Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className="text-lg px-4 py-2 bg-primary">
+                  {recommendedCount} femme{recommendedCount > 1 ? 's' : ''} de chambre
+                </Badge>
+                {!pdfAnalysisResult && (
+                  <span className="text-sm text-muted-foreground">
+                    (estimation basée sur {hotelName || "votre hôtel"})
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Hotel Info Card */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5 text-primary" />
-              Informations de l'hôtel
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5 text-primary" />
+                Informations de l'hôtel
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={saveHotelInfo}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Enregistrer
+              </Button>
+            </div>
+            <CardDescription>
+              Ces informations seront pré-remplies pour vos prochaines commandes
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
@@ -198,6 +461,20 @@ export default function Order() {
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="supplier-email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email du fournisseur (enregistré)
+              </Label>
+              <Input
+                id="supplier-email"
+                type="email"
+                placeholder="contact@prestataire.com"
+                value={supplierEmail}
+                onChange={(e) => setSupplierEmail(e.target.value)}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -232,22 +509,6 @@ export default function Order() {
               </Popover>
             </div>
 
-            {/* Recommendation */}
-            <div className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <span className="font-medium">Recommandation intelligente</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-3">
-                Basé sur votre registre de {hotelName || "votre hôtel"}, nous recommandons :
-              </p>
-              <div className="flex items-center gap-3">
-                <Badge className="text-lg px-4 py-2 bg-primary">
-                  {recommendedCount} femme{recommendedCount > 1 ? 's' : ''} de chambre
-                </Badge>
-              </div>
-            </div>
-
             {/* Manual Count */}
             <div className="space-y-2">
               <Label htmlFor="count" className="flex items-center gap-2">
@@ -279,21 +540,6 @@ export default function Order() {
                   +
                 </Button>
               </div>
-            </div>
-
-            {/* Supplier Email */}
-            <div className="space-y-2">
-              <Label htmlFor="supplier-email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Email du fournisseur
-              </Label>
-              <Input
-                id="supplier-email"
-                type="email"
-                placeholder="contact@prestataire.com"
-                value={supplierEmail}
-                onChange={(e) => setSupplierEmail(e.target.value)}
-              />
             </div>
           </CardContent>
         </Card>
@@ -343,11 +589,15 @@ export default function Order() {
               </Button>
 
               <Button
-                onClick={handleSendDirect}
+                onClick={handleSendViaBicBloc}
                 disabled={!supplierEmail || sending}
-                className="bg-primary"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
               >
-                <Send className="mr-2 h-4 w-4" />
+                {sending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
                 Envoyer via BicBloc
               </Button>
             </div>
@@ -388,16 +638,6 @@ export default function Order() {
                 </a>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Download PDF */}
-        <Card>
-          <CardContent className="p-4">
-            <Button variant="outline" className="w-full" onClick={handleDownloadPDF}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Télécharger le planning PDF des jours à venir
-            </Button>
           </CardContent>
         </Card>
       </div>
