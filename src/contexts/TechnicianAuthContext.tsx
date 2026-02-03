@@ -86,11 +86,20 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
   const loadTechnicianProfile = async (userId: string) => {
     try {
-      // Use the dedicated technician_profiles table
+      // Get user email first to query by email (RLS policy uses email verification)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        console.log('ℹ️ Pas d\'email utilisateur disponible');
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      
+      // Use email to query (matches RLS policy which uses email verification)
       const { data: profileData, error: profileError } = await supabase
         .from('technician_profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('email', user.email)
         .maybeSingle();
 
       if (profileError && profileError.code !== 'PGRST116') {
