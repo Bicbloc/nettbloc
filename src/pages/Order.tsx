@@ -10,7 +10,8 @@ import { fr } from "date-fns/locale";
 import { 
   ArrowLeft, Calendar, Users, Mail, Copy, Send, 
   FileUp, CheckCircle2, Building, ExternalLink,
-  Sparkles, Phone, MapPin, Save, Loader2, FileText
+  Sparkles, Phone, MapPin, Save, Loader2, FileText,
+  MessageCircle, UserPlus, DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -261,7 +262,7 @@ export default function Order() {
     window.open(mailto, '_blank');
   };
 
-  // Send directly via support@bicbloc.eu
+  // Send directly via NettoBloc edge function
   const handleSendViaBicBloc = async () => {
     if (!supplierEmail) {
       toast.error("Veuillez renseigner l'email du fournisseur");
@@ -270,15 +271,30 @@ export default function Order() {
 
     setSending(true);
     try {
-      // Open mailto with BicBloc as sender and supplier as recipient
-      const subject = encodeURIComponent(`Commande personnel - ${hotelName || 'Hôtel'} - ${format(selectedDate, "d MMMM yyyy", { locale: fr })}`);
-      const body = encodeURIComponent(emailContent);
-      // Send to supplier with CC to support@bicbloc.eu for tracking
-      const mailto = `mailto:${supplierEmail}?cc=support@bicbloc.eu&subject=${subject}&body=${body}`;
-      window.open(mailto, '_blank');
-      toast.success("Ouverture de votre client email avec copie à BicBloc...");
-    } catch (error) {
-      toast.error("Erreur lors de l'envoi");
+      const subject = `Commande personnel - ${hotelName || 'Hôtel'} - ${format(selectedDate, "d MMMM yyyy", { locale: fr })}`;
+      
+      const { data: hotel } = await supabase
+        .from('hotels')
+        .select('email')
+        .eq('id', hotelId)
+        .single();
+      
+      const { data, error } = await supabase.functions.invoke('send-order-email', {
+        body: {
+          supplierEmail,
+          subject,
+          body: emailContent,
+          hotelName: hotelName || 'Hôtel',
+          hotelEmail: hotel?.email
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success("✅ Email envoyé avec succès !");
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      toast.error("Erreur lors de l'envoi. Utilisez le client email.");
     } finally {
       setSending(false);
     }
@@ -604,37 +620,87 @@ export default function Order() {
           </CardContent>
         </Card>
 
-        {/* BicBloc Promotion */}
+        {/* BicBloc Ordering Options */}
         <Card className="bg-gradient-to-br from-blue-500/10 via-indigo-500/10 to-purple-500/10 border-primary/30">
           <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="flex-1">
+            <div className="flex flex-col gap-4">
+              <div>
                 <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
                   Commander chez BicBloc
                 </h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-sm text-muted-foreground mb-4">
                   Profitez des meilleurs tarifs pour vos prestations de nettoyage
                 </p>
-                <ul className="text-sm space-y-1 mb-4">
-                  <li>✅ Personnel qualifié et vérifié</li>
-                  <li>✅ Tarifs compétitifs</li>
-                  <li>✅ Intégration automatique avec NettoBloc</li>
-                </ul>
               </div>
-              <div className="flex flex-col gap-2">
+              
+              {/* Action Buttons Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* See Rates */}
                 <Button 
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  onClick={() => window.open('https://www.bicbloc.eu', '_blank')}
+                  variant="outline"
+                  className="h-auto py-3 flex flex-col items-center gap-1"
+                  onClick={() => window.open('https://bicbloc.eu/simulateur/', '_blank')}
                 >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Voir les tarifs
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  <span className="font-medium">Voir les tarifs</span>
+                  <span className="text-xs text-muted-foreground">Simulateur en ligne</span>
                 </Button>
+
+                {/* Create Account */}
+                <Button 
+                  variant="outline"
+                  className="h-auto py-3 flex flex-col items-center gap-1"
+                  onClick={() => window.open('https://bicbloc.eu', '_blank')}
+                >
+                  <UserPlus className="h-5 w-5 text-blue-600" />
+                  <span className="font-medium">Créer un compte</span>
+                  <span className="text-xs text-muted-foreground">bicbloc.eu</span>
+                </Button>
+              </div>
+
+              <Separator />
+              
+              {/* Already have account section */}
+              <div>
+                <p className="text-sm font-medium mb-3 text-muted-foreground">
+                  J'ai déjà un compte, je commande via :
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* WhatsApp */}
+                  <Button 
+                    className="h-auto py-3 flex items-center gap-3 bg-green-600 hover:bg-green-700"
+                    onClick={() => window.open('https://wa.me/message/6NVCFWNZRB75K1', '_blank')}
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    <div className="text-left">
+                      <div className="font-medium">WhatsApp</div>
+                      <div className="text-xs opacity-90">Réponse rapide</div>
+                    </div>
+                  </Button>
+
+                  {/* Ubeya */}
+                  <Button 
+                    variant="outline"
+                    className="h-auto py-3 flex items-center gap-3"
+                    onClick={() => window.open('https://auth.ubeya.com/login/admin', '_blank')}
+                  >
+                    <ExternalLink className="h-5 w-5 text-primary" />
+                    <div className="text-left">
+                      <div className="font-medium">Ubeya</div>
+                      <div className="text-xs text-muted-foreground">Plateforme de gestion</div>
+                    </div>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Contact */}
+              <div className="text-center pt-2">
                 <a 
                   href="mailto:support@bicbloc.eu?subject=Demande de devis personnel" 
-                  className="text-xs text-center text-muted-foreground hover:text-primary"
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
-                  support@bicbloc.eu
+                  📧 support@bicbloc.eu
                 </a>
               </div>
             </div>
