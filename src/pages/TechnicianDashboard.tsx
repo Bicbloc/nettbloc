@@ -10,6 +10,7 @@ import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { TechnicianAccessRequest } from '@/components/TechnicianAccessRequest';
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
+import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 
 function TechnicianDashboardContent() {
   const navigate = useNavigate();
@@ -100,6 +101,14 @@ function TechnicianDashboardContent() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Tâches du jour */}
+        <StaffTasksList
+          hotelId={currentHotelSession.hotel_id}
+          staffType="technician"
+          staffId={profile.id}
+          staffName={profile.name}
+        />
 
         {/* Main Content */}
         <Tabs defaultValue="incidents" className="space-y-4">
