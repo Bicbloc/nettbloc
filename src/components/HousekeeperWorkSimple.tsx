@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package } from 'lucide-react';
+import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi, WifiOff, Sparkles, ScrollText, X, RefreshCw, Package, ClipboardList, Info } from 'lucide-react';
 import { IncidentReportWizard } from './incident/IncidentReportWizard';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
@@ -34,6 +34,112 @@ interface ActivityLogEntry {
   type: 'info' | 'success' | 'warning' | 'error';
 }
 
+// Composant pour afficher les consignes du jour
+const InstructionsTabContent: React.FC<{ hotelId: string }> = ({ hotelId }) => {
+  const [instructions, setInstructions] = useState<{
+    instructions: string | null;
+    to_know: string | null;
+    todo_list: string | null;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadInstructions = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('daily_instructions')
+        .select('instructions, to_know, todo_list')
+        .eq('hotel_id', hotelId)
+        .eq('instruction_date', today)
+        .maybeSingle();
+      
+      if (!error) {
+        setInstructions(data);
+      }
+      setIsLoading(false);
+    };
+    loadInstructions();
+  }, [hotelId]);
+
+  if (isLoading) {
+    return (
+      <Card className="p-8 text-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+      </Card>
+    );
+  }
+
+  if (!instructions || (!instructions.instructions && !instructions.to_know && !instructions.todo_list)) {
+    return (
+      <Card className="p-8 text-center">
+        <ScrollText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="font-semibold text-lg mb-2">Aucune consigne</h3>
+        <p className="text-muted-foreground">
+          Pas de consignes pour aujourd'hui
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <Card className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-amber-500 text-white">
+            <ScrollText className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">Consignes du jour</h3>
+            <p className="text-sm text-muted-foreground">
+              Instructions, informations et tâches générales
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Consignes */}
+      {instructions.instructions && (
+        <Card className="p-4 border-l-4 border-l-red-500">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+            <div>
+              <h4 className="font-medium text-red-700 mb-2">⚠️ Consignes</h4>
+              <p className="text-sm whitespace-pre-wrap">{instructions.instructions}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* À savoir */}
+      {instructions.to_know && (
+        <Card className="p-4 border-l-4 border-l-blue-500">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+            <div>
+              <h4 className="font-medium text-blue-700 mb-2">💡 À savoir</h4>
+              <p className="text-sm whitespace-pre-wrap">{instructions.to_know}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* To-do */}
+      {instructions.todo_list && (
+        <Card className="p-4 border-l-4 border-l-green-500">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+            <div>
+              <h4 className="font-medium text-green-700 mb-2">✅ To-do du jour</h4>
+              <p className="text-sm whitespace-pre-wrap">{instructions.todo_list}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+};
+
 const HousekeeperWorkContent: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -51,8 +157,10 @@ const HousekeeperWorkContent: React.FC = () => {
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
-  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory'>('rooms');
+  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions'>('rooms');
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
+  const [hasNewInstructions, setHasNewInstructions] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   
   // Pointage
@@ -343,8 +451,66 @@ const HousekeeperWorkContent: React.FC = () => {
         hotelId: hotelId
       });
       loadWorkData();
+      loadTasksAndInstructions();
     }
   }, [isAuthChecked, housekeeperProfile, hotelId]);
+
+  // Charger les tâches et instructions pour les badges
+  const loadTasksAndInstructions = async () => {
+    if (!hotelId || !housekeeperProfile) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const currentDayOfWeek = new Date().getDay();
+    
+    try {
+      // Charger les tâches
+      const { data: templates, error: tasksError } = await supabase
+        .from('task_templates')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true)
+        .or(`assigned_to_type.eq.housekeeper,assigned_to_all.eq.true`);
+      
+      if (!tasksError && templates) {
+        // Filtrer les tâches pour aujourd'hui
+        const todaysTasks = templates.filter(t => {
+          if (t.is_one_time) {
+            return t.one_time_date === today;
+          }
+          return t.days_of_week?.includes(currentDayOfWeek);
+        });
+        
+        // Vérifier lesquelles sont complétées
+        const taskIds = todaysTasks.map(t => t.id);
+        const { data: completions } = await supabase
+          .from('task_completions')
+          .select('task_template_id')
+          .in('task_template_id', taskIds)
+          .eq('completion_date', today);
+        
+        const completedIds = new Set(completions?.map(c => c.task_template_id) || []);
+        const pendingTasks = todaysTasks.filter(t => !completedIds.has(t.id));
+        setPendingTasksCount(pendingTasks.length);
+      }
+      
+      // Charger les instructions
+      const { data: instructions, error: instructionsError } = await supabase
+        .from('daily_instructions')
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('instruction_date', today)
+        .maybeSingle();
+      
+      if (!instructionsError && instructions) {
+        const hasContent = instructions.instructions || instructions.to_know || instructions.todo_list;
+        const dismissedKey = `instructions_dismissed_${hotelId}_${today}`;
+        const wasDismissed = localStorage.getItem(dismissedKey) === 'true';
+        setHasNewInstructions(!!hasContent && !wasDismissed);
+      }
+    } catch (error) {
+      console.error('Error loading tasks/instructions:', error);
+    }
+  };
 
   // Normaliser un nom pour comparaison
   const normalizeName = (name: string | null | undefined): string => {
@@ -1066,37 +1232,82 @@ const HousekeeperWorkContent: React.FC = () => {
           </div>
         </Card>
 
-        {/* Tabs - Show inventory always (housekeeper can start inventory anytime) */}
-        <div className="flex gap-2">
+        {/* Tabs - 4 boutons en grille */}
+        <div className="grid grid-cols-4 gap-2">
           <Button 
             variant={activeTab === 'rooms' ? 'default' : 'outline'}
             onClick={() => setActiveTab('rooms')}
-            className="flex-1 h-12"
+            className="h-14 flex flex-col items-center justify-center gap-1 p-2"
           >
-            <Home className="h-4 w-4 mr-2" />
-            Chambres ({totalRooms})
+            <Home className="h-5 w-5" />
+            <span className="text-xs">Chambres</span>
+            {totalRooms > 0 && (
+              <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px]">
+                {totalRooms}
+              </Badge>
+            )}
           </Button>
+          
+          <Button 
+            variant={activeTab === 'tasks' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('tasks')}
+            className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
+          >
+            <ClipboardList className="h-5 w-5" />
+            <span className="text-xs">Tâches</span>
+            {pendingTasksCount > 0 && (
+              <Badge 
+                variant="destructive" 
+                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px] animate-pulse"
+              >
+                {pendingTasksCount}
+              </Badge>
+            )}
+          </Button>
+          
+          <Button 
+            variant={activeTab === 'instructions' ? 'default' : 'outline'}
+            onClick={() => {
+              setActiveTab('instructions');
+              // Marquer comme vu
+              if (hotelId) {
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem(`instructions_dismissed_${hotelId}_${today}`, 'true');
+                setHasNewInstructions(false);
+              }
+            }}
+            className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
+          >
+            <Info className="h-5 w-5" />
+            <span className="text-xs">Consignes</span>
+            {hasNewInstructions && (
+              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 animate-ping" />
+            )}
+            {hasNewInstructions && (
+              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500" />
+            )}
+          </Button>
+          
           <Button 
             variant={activeTab === 'inventory' ? 'default' : 'outline'}
             onClick={() => {
               setActiveTab('inventory');
-              // Si pas de tâche active, créer une tâche temporaire
               if (!activeLinenTask) {
                 setActiveLinenTask(`temp_${Date.now()}`);
               }
             }}
-            className="flex-1 h-12 relative"
+            className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
           >
-            <Package className="h-4 w-4 mr-2" />
-            Inventaire
-            <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1.5 text-[10px] bg-orange-500 text-white">
+            <Package className="h-5 w-5" />
+            <span className="text-xs">Inventaire</span>
+            <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1 text-[10px] bg-orange-500 text-white">
               📷
             </Badge>
           </Button>
         </div>
 
-        {/* Contenu */}
-        {activeTab === 'rooms' ? (
+        {/* Contenu selon l'onglet actif */}
+        {activeTab === 'rooms' && (
           <>
             {/* Onglets de filtrage par statut */}
             <RoomStatusTabs
@@ -1176,40 +1387,71 @@ const HousekeeperWorkContent: React.FC = () => {
               </div>
             )}
           </>
-        ) : (
-          /* Inventaire linge avec scan NettoBloc */
-          hotelId && (
-            <div className="space-y-4">
-              {/* Header inventaire */}
-              <Card className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-xl bg-orange-500 text-white">
-                    <Package className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg">Inventaire Linge</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Scannez chaque type de linge avec l'appareil photo
-                    </p>
-                  </div>
+        )}
+
+        {activeTab === 'tasks' && hotelId && (
+          <div className="space-y-4">
+            <Card className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-blue-500 text-white">
+                  <ClipboardList className="h-6 w-6" />
                 </div>
-              </Card>
-              
-              {/* Composant inventaire avec scan */}
-              <LinenQuickInventory
-                taskId={activeLinenTask || `manual_${Date.now()}`}
-                hotelId={hotelId}
-                onClose={() => {
-                  setActiveLinenTask(null);
-                  setActiveTab('rooms');
-                  toast({
-                    title: "✅ Inventaire terminé",
-                    description: "Merci pour votre travail!"
-                  });
-                }}
-              />
-            </div>
-          )
+                <div>
+                  <h3 className="font-semibold text-lg">Tâches du jour</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {pendingTasksCount > 0 
+                      ? `${pendingTasksCount} tâche(s) à effectuer` 
+                      : 'Toutes les tâches sont terminées'
+                    }
+                  </p>
+                </div>
+              </div>
+            </Card>
+            
+            <StaffTasksList
+              hotelId={hotelId}
+              staffType="housekeeper"
+              staffId={housekeeperProfile?.id}
+              staffName={housekeeperName}
+            />
+          </div>
+        )}
+
+        {activeTab === 'instructions' && hotelId && (
+          <InstructionsTabContent hotelId={hotelId} />
+        )}
+
+        {activeTab === 'inventory' && hotelId && (
+          <div className="space-y-4">
+            {/* Header inventaire */}
+            <Card className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-orange-500 text-white">
+                  <Package className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Inventaire Linge</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Scannez chaque type de linge avec l'appareil photo
+                  </p>
+                </div>
+              </div>
+            </Card>
+            
+            {/* Composant inventaire avec scan */}
+            <LinenQuickInventory
+              taskId={activeLinenTask || `manual_${Date.now()}`}
+              hotelId={hotelId}
+              onClose={() => {
+                setActiveLinenTask(null);
+                setActiveTab('rooms');
+                toast({
+                  title: "✅ Inventaire terminé",
+                  description: "Merci pour votre travail!"
+                });
+              }}
+            />
+          </div>
         )}
 
         {/* Chambres disponibles (client sorti) */}
