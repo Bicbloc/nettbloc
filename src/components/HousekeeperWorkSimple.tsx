@@ -272,6 +272,24 @@ const HousekeeperWorkContent: React.FC = () => {
     }
   };
 
+  // Calculer la durée de travail
+  const calculateWorkDuration = (start: string, end: string): string => {
+    try {
+      const [startH, startM] = start.split(':').map(Number);
+      const [endH, endM] = end.split(':').map(Number);
+      
+      let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+      if (totalMinutes < 0) totalMinutes += 24 * 60; // Passage minuit
+      
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      
+      return `${hours}h${minutes > 0 ? String(minutes).padStart(2, '0') : ''}`;
+    } catch {
+      return '';
+    }
+  };
+
   // Vérification de l'authentification au montage
   useEffect(() => {
     const checkAuth = async () => {
@@ -980,25 +998,71 @@ const HousekeeperWorkContent: React.FC = () => {
 
         {/* Pointage */}
         <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <span className="font-medium">Pointage</span>
+          <div className="space-y-3">
+            {/* Header avec boutons */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">Pointage</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!startTime && (
+                  <Button size="sm" onClick={handleStartPointage}>
+                    ▶️ Commencer
+                  </Button>
+                )}
+                {startTime && !endTime && (
+                  <Button size="sm" variant="secondary" onClick={handleEndPointage}>
+                    ⏹️ Terminer
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {startTime && <Badge variant="outline">Début: {startTime}</Badge>}
-              {endTime && <Badge variant="outline">Fin: {endTime}</Badge>}
-              {!startTime && (
-                <Button size="sm" onClick={handleStartPointage}>
-                  Commencer
-                </Button>
-              )}
-              {startTime && !endTime && (
-                <Button size="sm" variant="secondary" onClick={handleEndPointage}>
-                  Terminer
-                </Button>
-              )}
-            </div>
+
+            {/* Horaires */}
+            {(startTime || endTime) && (
+              <div className="flex flex-wrap gap-2">
+                {startTime && (
+                  <Badge variant="outline" className="text-sm">
+                    🟢 Début: {startTime}
+                  </Badge>
+                )}
+                {endTime && (
+                  <Badge variant="outline" className="text-sm">
+                    🔴 Fin: {endTime}
+                  </Badge>
+                )}
+                {startTime && endTime && (
+                  <Badge variant="secondary" className="text-sm">
+                    ⏱️ {calculateWorkDuration(startTime, endTime)}
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            {/* Statistiques chambres nettoyées */}
+            {startTime && (
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                <div className="text-center p-2 bg-muted/50 rounded-lg">
+                  <div className="text-lg font-bold text-primary">
+                    {rooms.filter(r => r.status === 'clean').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Total</div>
+                </div>
+                <div className="text-center p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                  <div className="text-lg font-bold text-blue-600">
+                    {rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'recouche' || r.cleaning_type === 'occupied')).length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Recouches</div>
+                </div>
+                <div className="text-center p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                  <div className="text-lg font-bold text-amber-600">
+                    {rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'depart' || r.cleaning_type === 'checkout' || r.cleaning_type === 'a_blanc')).length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Départs</div>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
