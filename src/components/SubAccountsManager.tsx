@@ -47,7 +47,8 @@ import {
   Loader2,
   Copy,
   Link2,
-  RotateCcw
+  RotateCcw,
+  Pencil
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -111,8 +112,11 @@ export function SubAccountsManager() {
   const [roleTemplates, setRoleTemplates] = useState<RoleTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<SubAccount | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSending, setIsSending] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Always use production domain for activation URLs
   const activationBaseUrl = 'https://nettobloc.bicbloc.eu';
@@ -125,7 +129,8 @@ export function SubAccountsManager() {
     role_name: 'staff',
   });
   const [customPermissions, setCustomPermissions] = useState<Record<string, boolean>>({});
-
+  const [editFormData, setEditFormData] = useState({ role_name: '' });
+  const [editCustomPermissions, setEditCustomPermissions] = useState<Record<string, boolean>>({});
   useEffect(() => {
     loadData();
   }, [user]);
@@ -397,6 +402,105 @@ export function SubAccountsManager() {
       toast({ variant: "destructive", title: "Erreur", description: error.message || "Impossible de renvoyer l'invitation." });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const openEditDialog = async (account: SubAccount) => {
+    setEditingAccount(account);
+    setEditFormData({ role_name: account.role_name });
+    
+    // Load existing permission overrides
+    try {
+      const { data: overrides } = await supabase
+        .from('sub_account_permissions')
+        .select('permission_key, is_allowed')
+        .eq('sub_account_id', account.id);
+      
+      const permMap: Record<string, boolean> = {};
+      (overrides || []).forEach(o => {
+        permMap[o.permission_key] = o.is_allowed;
+      });
+      setEditCustomPermissions(permMap);
+    } catch (error) {
+      console.error('Error loading permissions:', error);
+      setEditCustomPermissions({});
+    }
+    
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingAccount) return;
+    
+    setIsSaving(true);
+    try {
+      // Update role
+      const { error: updateError } = await supabase
+        .from('sub_accounts')
+        .update({ role_name: editFormData.role_name })
+        .eq('id', editingAccount.id);
+      
+      if (updateError) throw updateError;
+
+      // Delete existing permission overrides
+      await supabase
+        .from('sub_account_permissions')
+        .delete()
+        .eq('sub_account_id', editingAccount.id);
+
+      // Insert new permission overrides
+      const permissionOverrides = Object.entries(editCustomPermissions)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, is_allowed]) => ({
+          sub_account_id: editingAccount.id,
+          permission_key: key,
+          is_allowed,
+        }));
+
+      if (permissionOverrides.length > 0) {
+        await supabase.from('sub_account_permissions').insert(permissionOverrides);
+      }
+
+      toast({
+        title: "✅ Modifications enregistrées",
+        description: `Les permissions de ${editingAccount.first_name} ${editingAccount.last_name} ont été mises à jour.`,
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingAccount(null);
+      loadData();
+    } catch (error: any) {
+      console.error('Error saving edit:', error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de sauvegarder les modifications.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getEditRoleDefaultPermissions = (roleName: string): string[] => {
+    return roleTemplates.find(r => r.role_name === roleName)?.default_permissions || [];
+  };
+
+  const isEditPermissionEnabled = (permKey: string): boolean => {
+    if (editCustomPermissions[permKey] !== undefined) return editCustomPermissions[permKey];
+    return getEditRoleDefaultPermissions(editFormData.role_name).includes(permKey);
+  };
+
+  const toggleEditPermission = (permKey: string) => {
+    const roleDefault = getEditRoleDefaultPermissions(editFormData.role_name).includes(permKey);
+    const current = editCustomPermissions[permKey];
+    
+    if (current === undefined) {
+      setEditCustomPermissions({ ...editCustomPermissions, [permKey]: !roleDefault });
+    } else if (current === !roleDefault) {
+      const { [permKey]: _, ...rest } = editCustomPermissions;
+      setEditCustomPermissions(rest);
+    } else {
+      setEditCustomPermissions({ ...editCustomPermissions, [permKey]: !current });
     }
   };
 
@@ -764,6 +868,14 @@ export function SubAccountsManager() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex gap-1 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditDialog(account)}
+                      title="Modifier le rôle et les permissions"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     {(account.invitation_status === 'pending' || account.invitation_status === 'invited') && (
                       <Button
                         variant="ghost"
@@ -802,6 +914,128 @@ export function SubAccountsManager() {
           </TableBody>
         </Table>
       )}
+
+      {/* Dialog d'édition */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { 
+        setIsEditDialogOpen(open); 
+        if (!open) {
+          setEditingAccount(null);
+          setEditCustomPermissions({});
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Modifier {editingAccount?.first_name} {editingAccount?.last_name}
+            </DialogTitle>
+            <DialogDescription>
+              Modifiez le rôle et les permissions de ce membre.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4 py-2">
+              <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                <h3 className="font-medium flex items-center gap-2 mb-1">
+                  <Shield className="h-4 w-4" />
+                  Rôle et permissions
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Modifiez le rôle de base et personnalisez les accès.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Rôle de base</Label>
+                <Select
+                  value={editFormData.role_name}
+                  onValueChange={(value) => {
+                    setEditFormData({ ...editFormData, role_name: value });
+                    setEditCustomPermissions({});
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleTemplates.map((role) => (
+                      <SelectItem key={role.role_name} value={role.role_name}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{role.display_name}</span>
+                          <span className="text-xs text-muted-foreground">{role.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm">Permissions</h4>
+                  {Object.keys(editCustomPermissions).length > 0 && (
+                    <Badge variant="secondary">
+                      {Object.keys(editCustomPermissions).length} modifiée(s)
+                    </Badge>
+                  )}
+                </div>
+
+                <ScrollArea className="h-[300px] border rounded-lg p-3">
+                  <div className="space-y-4 pr-3">
+                    {Object.entries(permissionsByCategory).map(([category, perms]) => (
+                      <div key={category} className="space-y-2">
+                        <h5 className="text-sm font-medium text-muted-foreground sticky top-0 bg-background py-1">{category}</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {perms.map((perm) => {
+                            const enabled = isEditPermissionEnabled(perm.key);
+                            const isOverridden = editCustomPermissions[perm.key] !== undefined;
+                            return (
+                              <div
+                                key={perm.key}
+                                className={`flex items-center justify-between p-2 rounded-md border ${
+                                  isOverridden ? 'border-primary bg-primary/5' : 'border-border'
+                                }`}
+                              >
+                                <span className="text-sm">{perm.label}</span>
+                                <Switch
+                                  checked={enabled}
+                                  onCheckedChange={() => toggleEditPermission(perm.key)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="flex-shrink-0 pt-4">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>
+              Annuler
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSaving} className="gap-2">
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Enregistrement...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Enregistrer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
