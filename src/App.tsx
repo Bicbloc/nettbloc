@@ -44,6 +44,11 @@ import ResetPassword from "./pages/ResetPassword";
 import LegalPage from "./pages/LegalPage";
 import ActivateAccount from "./pages/ActivateAccount";
 
+// Access Pages
+import HousekeeperAccessPage from "./pages/access/HousekeeperAccessPage";
+import GovernessAccessPage from "./pages/access/GovernessAccessPage";
+import TechnicianAccessPage from "./pages/access/TechnicianAccessPage";
+
 // Netto Count App
 import NettoCountAuth from "./pages/netto-count/NettoCountAuth";
 import NettoCountSetup from "./pages/netto-count/NettoCountSetup";
@@ -86,6 +91,10 @@ const App = () => (
                               <Route path="/invoices" element={<Invoices />} />
                               <Route path="/team" element={<Team />} />
                               <Route path="/order" element={<Order />} />
+                              {/* Access request pages */}
+                              <Route path="/access/housekeepers" element={<HousekeeperAccessPage />} />
+                              <Route path="/access/governesses" element={<GovernessAccessPage />} />
+                              <Route path="/access/technicians" element={<TechnicianAccessPage />} />
                               <Route path="/housekeeper/login" element={<Navigate to="/housekeeper/auth" replace />} />
                               <Route path="/housekeeper/auth" element={<HousekeeperAuth />} />
                               <Route path="/housekeeper/signup" element={<HousekeeperSignup />} />
