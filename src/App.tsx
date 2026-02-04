@@ -31,6 +31,7 @@ import TechnicianSignup from "./pages/TechnicianSignup";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
 import TechnicianHotels from "./pages/TechnicianHotels";
 import TechnicianWork from "./pages/TechnicianWork";
+import TechnicianProfile from "./pages/TechnicianProfile";
 import GovernessAuth from "./pages/GovernessAuth";
 import GovernessDashboard from "./pages/GovernessDashboard";
 import GovernessHotels from "./pages/GovernessHotels";
@@ -106,6 +107,7 @@ const App = () => (
                               <Route path="/technician/login" element={<TechnicianLogin />} />
                               <Route path="/technician/hotels" element={<TechnicianHotels />} />
                               <Route path="/technician/work" element={<TechnicianWork />} />
+                              <Route path="/technician/profile" element={<TechnicianProfile />} />
                               <Route path="/technician/dashboard" element={<TechnicianDashboard />} />
                               <Route path="/governess/auth" element={<GovernessAuth />} />
                               <Route path="/governess/hotels" element={<GovernessHotels />} />

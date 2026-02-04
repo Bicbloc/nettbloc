@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,9 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
-  Wrench, LogOut, Building2, AlertTriangle, Home, Bell, 
+  Wrench, LogOut, Building2, AlertTriangle, Home, 
   CheckCircle, Clock, AlertCircle, Calendar, RefreshCw,
-  MessageSquare, Filter, ArrowLeft
+  MessageSquare, Filter, ArrowLeft, Package, LayoutGrid
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -18,8 +18,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { storageService } from '@/services/storageService';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
-import { IncidentCardModern } from '@/components/incident/IncidentCardModern';
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
+import { TechnicianSpacesView } from '@/components/technician/TechnicianSpacesView';
+import { TechnicianIncidentActions } from '@/components/technician/TechnicianIncidentActions';
+import { cn } from '@/lib/utils';
 
 interface Incident {
   id: string;
@@ -71,7 +73,7 @@ function TechnicianWorkContent() {
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'incidents' | 'rooms' | 'report'>('incidents');
+  const [activeTab, setActiveTab] = useState<'incidents' | 'spaces' | 'report'>('incidents');
   
   // Comment dialog
   const [showCommentDialog, setShowCommentDialog] = useState(false);
@@ -307,10 +309,12 @@ function TechnicianWorkContent() {
     return true;
   });
 
-  // Count by status
+  // Count by status (including new technician-specific statuses)
   const countByStatus = {
     new: incidents.filter(i => i.status === 'new').length,
     in_progress: incidents.filter(i => i.status === 'in_progress').length,
+    postponed: incidents.filter(i => i.status === 'postponed').length,
+    parts_ordered: incidents.filter(i => i.status === 'parts_ordered').length,
     resolved: incidents.filter(i => i.status === 'resolved').length,
   };
 
@@ -437,15 +441,15 @@ function TechnicianWorkContent() {
             <TabsTrigger value="incidents" className="gap-2">
               <AlertTriangle className="h-4 w-4" />
               <span className="hidden sm:inline">Incidents</span>
-              {countByStatus.new + countByStatus.in_progress > 0 && (
+              {countByStatus.new + countByStatus.in_progress + countByStatus.postponed + countByStatus.parts_ordered > 0 && (
                 <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-xs">
-                  {countByStatus.new + countByStatus.in_progress}
+                  {countByStatus.new + countByStatus.in_progress + countByStatus.postponed + countByStatus.parts_ordered}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="rooms" className="gap-2">
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Chambres</span>
+            <TabsTrigger value="spaces" className="gap-2">
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Espaces</span>
             </TabsTrigger>
             <TabsTrigger value="report" className="gap-2">
               <Wrench className="h-4 w-4" />
@@ -461,13 +465,15 @@ function TechnicianWorkContent() {
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[140px] h-9">
+                    <SelectTrigger className="w-[150px] h-9">
                       <SelectValue placeholder="Statut" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tous statuts</SelectItem>
                       <SelectItem value="new">📌 Nouveau</SelectItem>
                       <SelectItem value="in_progress">⏳ En cours</SelectItem>
+                      <SelectItem value="postponed">📅 Reporté</SelectItem>
+                      <SelectItem value="parts_ordered">📦 Pièce commandée</SelectItem>
                       <SelectItem value="resolved">✅ Résolu</SelectItem>
                     </SelectContent>
                   </Select>
@@ -489,8 +495,8 @@ function TechnicianWorkContent() {
 
             {/* Priority Summary */}
             {countByPriority.urgent > 0 && (
-              <Card className="p-3 bg-red-50 border-red-200">
-                <div className="flex items-center gap-2 text-red-700">
+              <Card className="p-3 border-destructive/50 bg-destructive/5">
+                <div className="flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-5 w-5" />
                   <span className="font-medium">
                     {countByPriority.urgent} incident{countByPriority.urgent > 1 ? 's' : ''} urgent{countByPriority.urgent > 1 ? 's' : ''} à traiter
@@ -526,42 +532,19 @@ function TechnicianWorkContent() {
             </div>
           </TabsContent>
 
-          {/* Rooms Tab */}
-          <TabsContent value="rooms" className="space-y-4">
-            {/* Room Status Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Card className="p-3 bg-amber-50 border-amber-200">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-700">{roomCounts.stayover}</p>
-                  <p className="text-xs text-amber-600">Recouche</p>
-                </div>
-              </Card>
-              <Card className="p-3 bg-red-50 border-red-200">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-red-700">{roomCounts.checkout}</p>
-                  <p className="text-xs text-red-600">Départ</p>
-                </div>
-              </Card>
-              <Card className="p-3 bg-blue-50 border-blue-200">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-700">{roomCounts.cleaning}</p>
-                  <p className="text-xs text-blue-600">En cours</p>
-                </div>
-              </Card>
-              <Card className="p-3 bg-green-50 border-green-200">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-700">{roomCounts.clean}</p>
-                  <p className="text-xs text-green-600">Propre</p>
-                </div>
-              </Card>
-            </div>
-
-            {/* Rooms Grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-              {rooms.map((room) => (
-                <RoomStatusCard key={room.id} room={room} />
-              ))}
-            </div>
+          {/* Spaces Tab */}
+          <TabsContent value="spaces" className="space-y-4">
+            {hotel?.id && (
+              <TechnicianSpacesView 
+                hotelId={hotel.id} 
+                onSpaceClick={(space) => {
+                  // Filter incidents for this space
+                  setStatusFilter('all');
+                  // Could navigate to a space detail view
+                  console.log('Space clicked:', space);
+                }}
+              />
+            )}
           </TabsContent>
 
           {/* Report Tab */}
@@ -645,7 +628,7 @@ function TechnicianWorkContent() {
   );
 }
 
-// Technician-specific incident card component
+// Technician-specific incident card component with enhanced actions
 function TechnicianIncidentCard({ 
   incident, 
   onStatusChange, 
@@ -659,23 +642,19 @@ function TechnicianIncidentCard({
   onUpdateDueDate: () => void;
   profileName: string;
 }) {
-  const priorityColors: Record<string, string> = {
-    urgent: 'bg-red-500 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-white',
-    low: 'bg-blue-500 text-white',
+  const priorityConfig: Record<string, { color: string; emoji: string }> = {
+    urgent: { color: 'bg-destructive text-destructive-foreground', emoji: '🔴' },
+    high: { color: 'bg-orange-500 text-white', emoji: '🟠' },
+    medium: { color: 'bg-yellow-500 text-white', emoji: '🟡' },
+    low: { color: 'bg-blue-500 text-white', emoji: '🔵' },
   };
 
-  const statusColors: Record<string, string> = {
-    new: 'bg-red-100 text-red-700 border-red-200',
-    in_progress: 'bg-amber-100 text-amber-700 border-amber-200',
-    resolved: 'bg-green-100 text-green-700 border-green-200',
-  };
-
-  const statusLabels: Record<string, string> = {
-    new: 'Nouveau',
-    in_progress: 'En cours',
-    resolved: 'Résolu',
+  const statusConfig: Record<string, { color: string; label: string; emoji: string }> = {
+    new: { color: 'border-destructive/50 bg-destructive/10 text-destructive', label: 'Nouveau', emoji: '📌' },
+    in_progress: { color: 'border-amber-500/50 bg-amber-100 text-amber-700', label: 'En cours', emoji: '⏳' },
+    resolved: { color: 'border-green-500/50 bg-green-100 text-green-700', label: 'Résolu', emoji: '✅' },
+    postponed: { color: 'border-purple-500/50 bg-purple-100 text-purple-700', label: 'Reporté', emoji: '📅' },
+    parts_ordered: { color: 'border-blue-500/50 bg-blue-100 text-blue-700', label: 'Pièce commandée', emoji: '📦' },
   };
 
   const formatDate = (date: string) => {
@@ -687,19 +666,24 @@ function TechnicianIncidentCard({
     });
   };
 
+  const priority = priorityConfig[incident.priority || 'medium'] || priorityConfig.medium;
+  const status = statusConfig[incident.status || 'new'] || statusConfig.new;
+
   return (
-    <Card className={`p-4 ${incident.priority === 'urgent' ? 'border-red-300 bg-red-50/50' : ''}`}>
+    <Card className={cn(
+      "p-4",
+      incident.priority === 'urgent' && "border-destructive/50 bg-destructive/5"
+    )}>
       <div className="space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge className={priorityColors[incident.priority || 'medium']}>
-                {incident.priority === 'urgent' ? '🔴' : incident.priority === 'high' ? '🟠' : incident.priority === 'medium' ? '🟡' : '🔵'}
-                {' '}{incident.priority || 'medium'}
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <Badge className={priority.color}>
+                {priority.emoji} {incident.priority || 'medium'}
               </Badge>
-              <Badge variant="outline" className={statusColors[incident.status || 'new']}>
-                {statusLabels[incident.status || 'new']}
+              <Badge variant="outline" className={status.color}>
+                {status.emoji} {status.label}
               </Badge>
             </div>
             <h4 className="font-semibold">{incident.title}</h4>
@@ -758,30 +742,78 @@ function TechnicianIncidentCard({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex flex-wrap gap-2 pt-2 border-t">
-          <Select 
-            value={incident.status || 'new'} 
-            onValueChange={(value) => onStatusChange(incident.id, value)}
+        {/* Quick Action Buttons */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t">
+          <Button
+            variant={incident.status === 'resolved' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onStatusChange(incident.id, 'resolved')}
+            className={cn(
+              "gap-1",
+              incident.status === 'resolved' && "bg-green-600 hover:bg-green-700"
+            )}
           >
-            <SelectTrigger className="w-[140px] h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="new">📌 Nouveau</SelectItem>
-              <SelectItem value="in_progress">⏳ En cours</SelectItem>
-              <SelectItem value="resolved">✅ Résolu</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Button variant="outline" size="sm" onClick={onAddComment}>
-            <MessageSquare className="h-4 w-4 mr-1" />
+            <CheckCircle className="h-4 w-4" />
+            Résolu
+          </Button>
+
+          <Button
+            variant={incident.status === 'postponed' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onStatusChange(incident.id, 'postponed')}
+            className={cn(
+              "gap-1",
+              incident.status === 'postponed' && "bg-purple-600 hover:bg-purple-700"
+            )}
+          >
+            <Calendar className="h-4 w-4" />
+            Reporter
+          </Button>
+
+          <Button
+            variant={incident.status === 'parts_ordered' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onStatusChange(incident.id, 'parts_ordered')}
+            className={cn(
+              "gap-1",
+              incident.status === 'parts_ordered' && "bg-blue-600 hover:bg-blue-700"
+            )}
+          >
+            <Package className="h-4 w-4" />
+            Pièce
+          </Button>
+
+          <Button
+            variant={incident.status === 'in_progress' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onStatusChange(incident.id, 'in_progress')}
+            className={cn(
+              "gap-1",
+              incident.status === 'in_progress' && "bg-amber-600 hover:bg-amber-700"
+            )}
+          >
+            <Clock className="h-4 w-4" />
+            En cours
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAddComment}
+            className="gap-1"
+          >
+            <MessageSquare className="h-4 w-4" />
             Commenter
           </Button>
-          
-          <Button variant="outline" size="sm" onClick={onUpdateDueDate}>
-            <Calendar className="h-4 w-4 mr-1" />
-            Suivi
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onUpdateDueDate}
+            className="gap-1"
+          >
+            <Calendar className="h-4 w-4" />
+            Planifier
           </Button>
         </div>
       </div>
