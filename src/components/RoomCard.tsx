@@ -192,9 +192,9 @@ export function RoomCard({
     });
   };
 
-  // Détermine l'étage à partir du numéro de chambre
+  // Determine floor from room number
   const floor = room.floor !== undefined ? room.floor : (room.number ? parseInt(room.number[0]) : 0);
-  const floorDisplay = floor === 0 ? "RDC" : `${floor}`;
+  const floorDisplay = floor === 0 ? t.rooms.groundFloor : `${floor}`;
 
   // Détecte si la chambre est en cours de nettoyage
   const isInProgress = room.status === 'in_progress' || room.status === 'in-progress';
@@ -239,7 +239,7 @@ export function RoomCard({
           {room.status === 'clean' && room.inspectedAt && (
             <span 
               className="text-xs bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 border border-emerald-400"
-              title={`Inspectée ✓`}
+              title={`${t.rooms.inspectionOk} ✓`}
             >
               <Star className="h-2.5 w-2.5 fill-emerald-600 text-emerald-600" /> OK
             </span>
@@ -247,7 +247,7 @@ export function RoomCard({
           {room.status === 'needs-cleaning' && room.inspectedAt === null && room.remark && (
             <span 
               className="text-xs bg-red-200 text-red-800 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5 border border-red-400"
-              title="Inspection échouée"
+              title={t.rooms.inspectionFailed}
             >
               <Star className="h-2.5 w-2.5 fill-red-600 text-red-600" /> KO
             </span>
@@ -265,7 +265,7 @@ export function RoomCard({
           {room.isTwin && <Bed className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
           {room.status === 'needs-attention' && room.remark && (
             <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
-              <AlertCircle className="h-2 w-2" /> Remarque
+              <AlertCircle className="h-2 w-2" /> {t.rooms.remark}
             </span>
           )}
           {room.status === 'ready-to-clean' && (
@@ -276,17 +276,17 @@ export function RoomCard({
           <span className="text-xs text-muted-foreground font-medium flex-shrink-0 ml-auto">{floorDisplay}</span>
         </div>
         
-        {/* Afficher les notes/commentaires de la femme de chambre - cliquable pour modifier */}
+        {/* Notes/comments display - clickable to edit */}
         {room.notes ? (
           <button 
             className="text-xs bg-purple-100 text-purple-800 border border-purple-300 px-2 py-1.5 rounded-lg text-left w-full hover:bg-purple-200 transition-colors cursor-pointer" 
-            title="Cliquer pour modifier"
+            title={t.common.edit}
             onClick={(e) => {
               e.stopPropagation();
               setShowNoteDialog(true);
             }}
           >
-            <span className="font-semibold">💬 Commentaire:</span> {room.notes}
+            <span className="font-semibold">💬 {t.rooms.comment}:</span> {room.notes}
           </button>
         ) : showActions && (
           <button
@@ -297,7 +297,7 @@ export function RoomCard({
             }}
           >
             <MessageSquare className="h-3 w-3" />
-            Ajouter un commentaire
+            {t.rooms.addComment}
           </button>
         )}
         
@@ -335,10 +335,10 @@ export function RoomCard({
                     status: 'needs-cleaning'
                   });
                   toast({
-                    description: `❌ Chambre ${room.number} - Annulé "Propre"`
+                    description: `❌ ${t.rooms.room} ${room.number} - ${t.rooms.cancelClean}`
                   });
                 }}
-                title="Annuler propre"
+                title={t.rooms.cancelClean}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -352,10 +352,10 @@ export function RoomCard({
                     status: 'clean'
                   });
                   toast({
-                    description: `Chambre ${room.number} marquée comme propre`
+                    description: `${t.rooms.room} ${room.number} ${t.rooms.markAsClean}`
                   });
                 }}
-                title="Marquer comme propre"
+                title={t.rooms.markAsClean}
               >
                 <Check className="h-3 w-3" />
               </button>
@@ -372,10 +372,10 @@ export function RoomCard({
                     status: 'needs-cleaning'
                   });
                   toast({
-                    description: `❌ Chambre ${room.number} - Annulé "Client sorti"`
+                    description: `❌ ${t.rooms.room} ${room.number} - ${t.rooms.cancelGuestOut}`
                   });
                 }}
-                title="Annuler client sorti"
+                title={t.rooms.cancelGuestOut}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -389,10 +389,10 @@ export function RoomCard({
                     status: 'ready-to-clean'
                   });
                   toast({
-                    description: `Chambre ${room.number} marquée comme prête à nettoyer (client sorti)`
+                    description: `${t.rooms.room} ${room.number} - ${t.rooms.readyToClean}`
                   });
                 }}
-                title="Client sorti - Prêt à nettoyer"
+                title={t.rooms.guestOut}
               >
                 🚪
               </button>
@@ -410,7 +410,7 @@ export function RoomCard({
                   e.stopPropagation();
                   setShowIncidentsDialog(true);
                 }}
-                title={incidentCount > 0 ? `${incidentCount} incident(s)` : "Voir les incidents"}
+                title={incidentCount > 0 ? `${incidentCount} incident(s)` : t.rooms.viewIncidents}
               >
                 <Wrench className="h-3 w-3" />
                 {incidentCount > 0 && (
@@ -421,7 +421,7 @@ export function RoomCard({
               </button>
             )}
             
-            {/* Boutons de gestion des chambres en mode compact */}
+            {/* Room management buttons in compact mode */}
             {onLinkRooms && (
               <button
                 className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-blue-700 transition-colors"
@@ -429,7 +429,7 @@ export function RoomCard({
                   e.stopPropagation();
                   setShowLinkDialog(true);
                 }}
-                title="Lier avec d'autres chambres"
+                title={t.rooms.linkWithRooms}
               >
                 <Link className="h-3 w-3" />
               </button>
@@ -442,20 +442,20 @@ export function RoomCard({
                   e.stopPropagation();
                   setShowDeleteDialog(true);
                 }}
-                title="Supprimer la chambre"
+                title={t.rooms.deleteRoom}
               >
                 <Trash2 className="h-3 w-3" />
               </button>
             )}
             
-            {/* Menu de réassignation si la chambre est assignée */}
+            {/* Reassignment menu if room is assigned */}
             {room.assignedTo && onReassign && housekeeperNames.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     className="h-6 w-6 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
                     onClick={(e) => e.stopPropagation()}
-                    title="Options de réassignation"
+                    title={t.rooms.reassignmentOptions}
                   >
                     <MoreVertical className="h-3 w-3" />
                   </button>
@@ -469,7 +469,7 @@ export function RoomCard({
                     className="text-orange-600"
                   >
                     <UserX className="mr-2 h-4 w-4" />
-                    Désassigner
+                    {t.rooms.unassign}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {housekeeperNames
@@ -481,12 +481,12 @@ export function RoomCard({
                         e.stopPropagation();
                         onReassign(room, name);
                         toast({
-                          description: `Chambre ${room.number} réassignée à ${name}`
+                          description: `${t.rooms.room} ${room.number} → ${name}`
                         });
                       }}
                     >
                       <ArrowRight className="mr-2 h-4 w-4" />
-                      Réassigner à {name}
+                      {t.rooms.reassignTo} {name}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>

@@ -757,14 +757,14 @@ export const TrainingStep2Annotate = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="a_blanc">À blanc</SelectItem>
-                  <SelectItem value="recouche">Recouche</SelectItem>
-                  <SelectItem value="none">Aucun</SelectItem>
+                  <SelectItem value="a_blanc">Check-out</SelectItem>
+                  <SelectItem value="recouche">Stayover</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                 </SelectContent>
               </Select>
               <Button size="sm" onClick={addRoomFromLine} className="h-8">
                 <Plus className="w-4 h-4 mr-1" />
-                Ajouter
+                Add
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setClickedLine(null)} className="h-8">
                 <X className="w-4 h-4" />
@@ -894,10 +894,10 @@ export const TrainingStep2Annotate = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              <SelectItem value="a_blanc">À blanc</SelectItem>
-              <SelectItem value="recouche">Recouche</SelectItem>
-              <SelectItem value="none">Aucun</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="a_blanc">Check-out</SelectItem>
+              <SelectItem value="recouche">Stayover</SelectItem>
+              <SelectItem value="none">None</SelectItem>
             </SelectContent>
           </Select>
         </div>

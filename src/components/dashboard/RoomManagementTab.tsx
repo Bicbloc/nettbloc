@@ -1,6 +1,6 @@
 /**
- * Composant Gestion des chambres
- * Extrait de Index.tsx pour modularité
+ * Room Management Tab Component
+ * Extracted from Index.tsx for modularity
  */
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,6 +25,7 @@ import { RoomFilters } from "@/components/RoomFilters";
 import { RoomCard } from "@/components/RoomCard";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface RoomManagementTabProps {
   rooms: Room[];
@@ -53,6 +54,7 @@ export function RoomManagementTab({
   onDeleteRoom,
   onLinkRooms,
 }: RoomManagementTabProps) {
+  const { t } = useLanguage();
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [importMode, setImportMode] = useState<'auto' | 'manual'>('auto');
 
@@ -71,16 +73,17 @@ export function RoomManagementTab({
     };
     loadImportMode();
   }, [currentHotelId]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'needs-cleaning':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">À Nettoyer</Badge>;
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">{t.rooms.dirty}</Badge>;
       case 'clean':
-        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">Propre</Badge>;
+        return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">{t.rooms.clean}</Badge>;
       case 'occupied':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Occupé</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">{t.rooms.occupied}</Badge>;
       case 'maintenance':
-        return <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">Maintenance</Badge>;
+        return <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">{t.rooms.maintenance}</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -90,12 +93,12 @@ export function RoomManagementTab({
     switch (type) {
       case 'full':
       case 'a_blanc':
-        return <Badge variant="outline" className="bg-red-100 text-red-800">À blanc</Badge>;
+        return <Badge variant="outline" className="bg-red-100 text-red-800">{t.rooms.fullClean}</Badge>;
       case 'quick':
       case 'recouche':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Recouche</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">{t.rooms.quickClean}</Badge>;
       case 'none':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Aucun</Badge>;
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800">{t.common.none}</Badge>;
       default:
         return <Badge variant="outline">{type || 'N/A'}</Badge>;
     }
@@ -122,7 +125,7 @@ export function RoomManagementTab({
       />
 
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion des chambres</h2>
+        <h2 className="text-2xl font-bold">{t.rooms.roomManagement}</h2>
         <div className="flex gap-2">
           <AddRoomDialog 
             onAddRoom={onAddRoom} 
@@ -146,7 +149,7 @@ export function RoomManagementTab({
             disabled={housekeeperNames.length === 0}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Assignation manuelle
+            {t.rooms.manualAssignment}
           </Button>
         </div>
       </div>
@@ -157,9 +160,9 @@ export function RoomManagementTab({
             {importMode === 'auto' ? (
               <>
                 <Sparkles className="h-12 w-12 text-primary mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Importez vos chambres</h3>
+                <h3 className="text-lg font-semibold mb-2">{t.importMode.importYourRooms}</h3>
                 <p className="text-muted-foreground text-center mb-6 max-w-md">
-                  Téléchargez un rapport PDF de votre PMS. L'IA extraira automatiquement les chambres et statuts.
+                  {t.importMode.importYourRoomsDesc}
                 </p>
                 <div className="flex flex-wrap gap-1 mb-4 justify-center">
                   <Badge variant="secondary" className="text-xs">Mews</Badge>
@@ -175,14 +178,14 @@ export function RoomManagementTab({
             ) : (
               <>
                 <ClipboardList className="h-12 w-12 text-secondary-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Saisissez vos chambres</h3>
+                <h3 className="text-lg font-semibold mb-2">{t.importMode.enterYourRooms}</h3>
                 <p className="text-muted-foreground text-center mb-6 max-w-md">
-                  Ajoutez vos chambres manuellement avec leur numéro, type de nettoyage et statut.
+                  {t.importMode.enterYourRoomsDesc}
                 </p>
                 <div className="flex flex-wrap gap-1 mb-4 justify-center">
-                  <Badge variant="outline" className="text-xs">🚪 À blanc</Badge>
-                  <Badge variant="outline" className="text-xs">🛏️ Recouche</Badge>
-                  <Badge variant="outline" className="text-xs">✅ Propre</Badge>
+                  <Badge variant="outline" className="text-xs">🚪 {t.rooms.fullClean}</Badge>
+                  <Badge variant="outline" className="text-xs">🛏️ {t.rooms.quickClean}</Badge>
+                  <Badge variant="outline" className="text-xs">✅ {t.rooms.clean}</Badge>
                 </div>
                 <ManualRoomEntryDialog 
                   hotelId={currentHotelId}
@@ -195,7 +198,7 @@ export function RoomManagementTab({
             {/* Quick add single room */}
             <div className="mt-6 pt-4 border-t w-full max-w-md">
               <p className="text-sm text-muted-foreground text-center mb-3">
-                Ou ajoutez une seule chambre :
+                {t.common.addSingle}
               </p>
               <div className="flex justify-center">
                 <AddRoomDialog 
@@ -210,7 +213,7 @@ export function RoomManagementTab({
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Filtres et options</CardTitle>
+              <CardTitle>{t.rooms.filtersAndOptions}</CardTitle>
             </CardHeader>
             <CardContent>
               <RoomFilters 
@@ -224,15 +227,15 @@ export function RoomManagementTab({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>N° Chambre</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Type de nettoyage</TableHead>
-                  <TableHead>Priorité</TableHead>
-                  <TableHead>Assignée à</TableHead>
+                  <TableHead>{t.rooms.roomNumberShort}</TableHead>
+                  <TableHead>{t.rooms.status}</TableHead>
+                  <TableHead>{t.rooms.cleaningType}</TableHead>
+                  <TableHead>{t.rooms.priority}</TableHead>
+                  <TableHead>{t.rooms.assignedTo}</TableHead>
                   <TableHead>Twin</TableHead>
-                  <TableHead>Chambres liées</TableHead>
-                  <TableHead>Actions rapides</TableHead>
-                  <TableHead>Gestion</TableHead>
+                  <TableHead>{t.rooms.linkedRooms}</TableHead>
+                  <TableHead>{t.rooms.quickActions}</TableHead>
+                  <TableHead>{t.common.management}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -243,16 +246,16 @@ export function RoomManagementTab({
                     <TableCell>{getCleaningTypeBadge(room.cleaningType)}</TableCell>
                     <TableCell>
                       {room.priority === 'high' ? (
-                        <Badge variant="destructive">Élevée</Badge>
+                        <Badge variant="destructive">{t.common.high}</Badge>
                       ) : (
-                        <Badge variant="secondary">Normale</Badge>
+                        <Badge variant="secondary">{t.common.normal}</Badge>
                       )}
                     </TableCell>
                     <TableCell>
                       {room.assignedTo ? (
                         <Badge variant="outline">{room.assignedTo}</Badge>
                       ) : (
-                        <span className="text-muted-foreground">Non assignée</span>
+                        <span className="text-muted-foreground">{t.rooms.unassigned}</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -273,7 +276,7 @@ export function RoomManagementTab({
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-sm">Aucune</span>
+                        <span className="text-muted-foreground text-sm">{t.common.none}</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -294,7 +297,7 @@ export function RoomManagementTab({
                           variant="ghost"
                           size="icon"
                           onClick={() => onLinkRooms(room.number)}
-                          title="Lier des chambres"
+                          title={t.rooms.linkWithRooms}
                         >
                           <Link className="h-4 w-4" />
                         </Button>
@@ -303,7 +306,7 @@ export function RoomManagementTab({
                           size="icon"
                           onClick={() => onDeleteRoom(room.number)}
                           className="text-destructive hover:text-destructive"
-                          title="Supprimer la chambre"
+                          title={t.rooms.deleteRoom}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

@@ -411,15 +411,15 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
       {/* Stats temps réel */}
       <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
         <StatCard value={stats.total} label="Total" className="bg-slate-50" />
-        <StatCard value={stats.full} label="À blanc" className="bg-orange-50 text-orange-700" />
-        <StatCard value={stats.quick} label="Recouche" className="bg-blue-50 text-blue-700" />
-        <StatCard value={stats.none} label="Aucun" className="bg-gray-50 text-gray-700" />
-        <StatCard value={stats.oos} label="H.S." className="bg-purple-50 text-purple-700" />
-        <StatCard value={stats.excluded} label="Exclues" className="bg-red-50 text-red-700" />
+        <StatCard value={stats.full} label="Check-out" className="bg-orange-50 text-orange-700" />
+        <StatCard value={stats.quick} label="Stayover" className="bg-blue-50 text-blue-700" />
+        <StatCard value={stats.none} label="None" className="bg-gray-50 text-gray-700" />
+        <StatCard value={stats.oos} label="OOS" className="bg-purple-50 text-purple-700" />
+        <StatCard value={stats.excluded} label="Excluded" className="bg-red-50 text-red-700" />
         <StatCard 
           value={stats.unmapped} 
-          label="À mapper" 
-          className={stats.unmapped > 0 ? "bg-yellow-50 text-yellow-700 ring-2 ring-yellow-400" : "bg-green-50 text-green-700"} 
+          label="To map" 
+          className={stats.unmapped > 0 ? "bg-yellow-50 text-yellow-700 ring-2 ring-yellow-400" : "bg-green-50 text-green-700"}
         />
       </div>
 

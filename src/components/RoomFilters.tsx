@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Room } from "@/services/pdfService";
 import { getAvailableFloors } from "@/utils/roomUtils";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface RoomFiltersProps {
   rooms: Room[];
@@ -14,6 +15,7 @@ interface RoomFiltersProps {
 }
 
 export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterFloor, setFilterFloor] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -22,34 +24,34 @@ export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
 
   const availableFloors = getAvailableFloors(rooms);
 
-  // Appliquer les filtres
+  // Apply filters
   useEffect(() => {
     let filtered = [...rooms];
 
-    // Filtre par recherche
+    // Filter by search
     if (searchTerm) {
       filtered = filtered.filter(room => 
         room.number.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    // Filtre par étage
+    // Filter by floor
     if (filterFloor !== 'all') {
       const floor = parseInt(filterFloor);
       filtered = filtered.filter(room => Math.floor(parseInt(room.number) / 100) === floor);
     }
 
-    // Filtre par statut
+    // Filter by status
     if (filterStatus !== 'all') {
       filtered = filtered.filter(room => room.status === filterStatus);
     }
 
-    // Filtre par type de nettoyage
+    // Filter by cleaning type
     if (filterCleaningType !== 'all') {
       filtered = filtered.filter(room => room.cleaningType === filterCleaningType);
     }
 
-    // Tri par défaut par numéro de chambre (croissant)
+    // Sort by room number (ascending by default)
     filtered.sort((a, b) => {
       const comparison = parseInt(a.number) - parseInt(b.number);
       return sortOrder === 'asc' ? comparison : sortOrder === 'desc' ? -comparison : comparison;
@@ -67,26 +69,26 @@ export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       <div>
-        <Label htmlFor="search">Recherche</Label>
+        <Label htmlFor="search">{t.common.search}</Label>
         <Input
           id="search"
-          placeholder="N° de chambre..."
+          placeholder={`${t.rooms.roomNumberShort}...`}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
       
       <div>
-        <Label htmlFor="floor-filter">Étage</Label>
+        <Label htmlFor="floor-filter">{t.rooms.floor}</Label>
         <Select value={filterFloor} onValueChange={setFilterFloor}>
           <SelectTrigger id="floor-filter">
-            <SelectValue placeholder="Tous les étages" />
+            <SelectValue placeholder={t.rooms.allFloors} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les étages</SelectItem>
+            <SelectItem value="all">{t.rooms.allFloors}</SelectItem>
             {availableFloors.map(floor => (
               <SelectItem key={floor} value={floor.toString()}>
-                {floor === 0 ? "RDC" : `Étage ${floor}`}
+                {floor === 0 ? t.rooms.groundFloor : `${t.rooms.floor} ${floor}`}
               </SelectItem>
             ))}
           </SelectContent>
@@ -94,37 +96,37 @@ export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
       </div>
       
       <div>
-        <Label htmlFor="status-filter">Statut</Label>
+        <Label htmlFor="status-filter">{t.rooms.status}</Label>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger id="status-filter">
-            <SelectValue placeholder="Tous les statuts" />
+            <SelectValue placeholder={t.rooms.allStatuses} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les statuts</SelectItem>
-            <SelectItem value="needs-cleaning">À nettoyer</SelectItem>
-            <SelectItem value="clean">Propre</SelectItem>
-            <SelectItem value="occupied">Occupé</SelectItem>
-            <SelectItem value="maintenance">Maintenance</SelectItem>
+            <SelectItem value="all">{t.rooms.allStatuses}</SelectItem>
+            <SelectItem value="needs-cleaning">{t.rooms.needsCleaning}</SelectItem>
+            <SelectItem value="clean">{t.rooms.clean}</SelectItem>
+            <SelectItem value="occupied">{t.rooms.occupied}</SelectItem>
+            <SelectItem value="maintenance">{t.rooms.maintenance}</SelectItem>
           </SelectContent>
         </Select>
       </div>
       
       <div>
-        <Label htmlFor="cleaning-type-filter">Type de nettoyage</Label>
+        <Label htmlFor="cleaning-type-filter">{t.rooms.cleaningType}</Label>
         <Select value={filterCleaningType} onValueChange={setFilterCleaningType}>
           <SelectTrigger id="cleaning-type-filter">
-            <SelectValue placeholder="Tous les types" />
+            <SelectValue placeholder={t.rooms.allTypes} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les types</SelectItem>
-            <SelectItem value="full">À Blanc</SelectItem>
-            <SelectItem value="quick">Recouche</SelectItem>
+            <SelectItem value="all">{t.rooms.allTypes}</SelectItem>
+            <SelectItem value="full">{t.rooms.fullClean}</SelectItem>
+            <SelectItem value="quick">{t.rooms.quickClean}</SelectItem>
           </SelectContent>
         </Select>
       </div>
       
       <div>
-        <Label htmlFor="sort-order">Tri par n°</Label>
+        <Label htmlFor="sort-order">{t.common.sortBy} #</Label>
         <Button
           variant="outline"
           className="w-full justify-start"
@@ -132,8 +134,8 @@ export function RoomFilters({ rooms, onFiltersChange }: RoomFiltersProps) {
           >
             {sortOrder === 'asc' && <ArrowUp className="h-4 w-4 mr-2" />}
             {sortOrder === 'desc' && <ArrowDown className="h-4 w-4 mr-2" />}
-            {sortOrder === 'asc' && 'Croissant'}
-            {sortOrder === 'desc' && 'Décroissant'}
+            {sortOrder === 'asc' && t.common.sortAsc}
+            {sortOrder === 'desc' && t.common.sortDesc}
           </Button>
       </div>
     </div>
