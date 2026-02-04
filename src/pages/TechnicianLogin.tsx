@@ -137,7 +137,7 @@ export default function TechnicianLogin() {
         description: "Bienvenue"
       });
 
-      navigate('/technician/dashboard');
+      navigate('/technician/hotels');
     } catch (error: any) {
       console.error('Erreur connexion:', error);
       toast({
