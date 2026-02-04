@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,15 +6,29 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Bell, Check, X, Clock, Ban } from 'lucide-react';
+import { Bell, Check, X, Clock, Ban, RotateCcw, Trash2 } from 'lucide-react';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AccessRequest {
   id: string;
   housekeeper_profile_id: string;
   hotel_id: string;
   hotel_code: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
   requested_at: string;
   housekeeper_profiles: {
     name: string;
@@ -33,7 +46,6 @@ export const HousekeeperAccessRequests = () => {
   const { user } = useAuth();
   const { refreshHousekeepers } = useHousekeeping();
 
-  // Écouter les nouvelles demandes en temps réel
   useEffect(() => {
     if (!user) return;
 
@@ -63,7 +75,6 @@ export const HousekeeperAccessRequests = () => {
     if (!user) return;
 
     try {
-      // Charger les demandes d'accès pour les hôtels de l'utilisateur
       const { data: userHotels, error: hotelsError } = await supabase
         .from('hotels')
         .select('id')
@@ -103,7 +114,7 @@ export const HousekeeperAccessRequests = () => {
 
       setRequests((data as any[])?.map(req => ({
         ...req,
-        status: req.status as 'pending' | 'approved' | 'rejected'
+        status: req.status as 'pending' | 'approved' | 'rejected' | 'suspended'
       })) || []);
     } catch (error) {
       console.error('Error loading requests:', error);
@@ -115,11 +126,9 @@ export const HousekeeperAccessRequests = () => {
 
   const handleApproveRequest = async (requestId: string) => {
     try {
-      // Récupérer les détails de la demande
       const request = requests.find(r => r.id === requestId);
       if (!request) return;
 
-      // Appeler le RPC pour approuver la demande
       const { data, error } = await supabase.rpc('approve_housekeeper_access_request', {
         request_id: requestId,
         admin_user_id: user?.id
@@ -131,7 +140,6 @@ export const HousekeeperAccessRequests = () => {
         return;
       }
 
-      // Créer une entrée dans housekeeper_hotel_history
       await supabase
         .from('housekeeper_hotel_history')
         .insert({
@@ -141,8 +149,6 @@ export const HousekeeperAccessRequests = () => {
           rooms_cleaned: 0
         });
 
-      // IMPORTANT: Créer ou mettre à jour une entrée dans housekeepers pour l'assignation
-      // Vérifier si elle n'existe pas déjà par user_id OU par nom
       const { data: existingByUserId } = await supabase
         .from('housekeepers')
         .select('id, name')
@@ -160,16 +166,13 @@ export const HousekeeperAccessRequests = () => {
         .maybeSingle();
 
       if (existingByUserId) {
-        // Mettre à jour le nom si différent
         if (existingByUserId.name !== request.housekeeper_profiles.name) {
           await supabase
             .from('housekeepers')
             .update({ name: request.housekeeper_profiles.name, updated_at: new Date().toISOString() })
             .eq('id', existingByUserId.id);
         }
-        console.log('✅ Housekeeper already exists for this profile:', request.housekeeper_profiles.name);
       } else if (existingByName && !existingByName.user_id) {
-        // Une entrée existe avec ce nom mais sans user_id lié - la mettre à jour
         await supabase
           .from('housekeepers')
           .update({ 
@@ -177,14 +180,12 @@ export const HousekeeperAccessRequests = () => {
             updated_at: new Date().toISOString() 
           })
           .eq('id', existingByName.id);
-        console.log('✅ Housekeeper entry linked to profile:', request.housekeeper_profiles.name);
       } else if (!existingByName) {
-        // Aucune entrée existante - créer une nouvelle
         const nameInitials = request.housekeeper_profiles.name.toUpperCase().slice(0, 3);
         const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
         const accessCode = `${request.hotel_code}-${nameInitials}-${randomSuffix}`;
 
-        const { error: housekeeperError } = await supabase
+        await supabase
           .from('housekeepers')
           .insert({
             hotel_id: request.hotel_id,
@@ -193,21 +194,10 @@ export const HousekeeperAccessRequests = () => {
             user_id: request.housekeeper_profile_id,
             is_active: true
           });
-
-        if (housekeeperError) {
-          console.error('Error creating housekeeper entry:', housekeeperError);
-        } else {
-          console.log('✅ Housekeeper entry created:', request.housekeeper_profiles.name);
-        }
-      } else {
-        console.log('ℹ️ Housekeeper with same name exists with different profile');
       }
 
-      toast.success('Demande approuvée ! La femme de chambre peut maintenant accéder à l\'hôtel.');
-      
-      // CRITICAL: Rafraîchir immédiatement la liste des femmes de chambre
+      toast.success('Demande approuvée !');
       await refreshHousekeepers();
-      
       loadRequests();
     } catch (error) {
       console.error('Error approving request:', error);
@@ -236,33 +226,133 @@ export const HousekeeperAccessRequests = () => {
     }
   };
 
+  const handleSuspendRequest = async (requestId: string) => {
+    try {
+      const request = requests.find(r => r.id === requestId);
+      if (!request) return;
+
+      // Update request status to suspended
+      const { error } = await supabase
+        .from('housekeeper_access_requests')
+        .update({ 
+          status: 'suspended',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id 
+        })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      // Deactivate the housekeeper in the hotel
+      await supabase
+        .from('housekeepers')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('hotel_id', request.hotel_id)
+        .eq('user_id', request.housekeeper_profile_id);
+
+      // End any active sessions
+      await supabase
+        .from('hotel_access_sessions')
+        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .eq('hotel_id', request.hotel_id)
+        .eq('housekeeper_profile_id', request.housekeeper_profile_id)
+        .eq('is_active', true);
+
+      toast.success('Accès suspendu');
+      await refreshHousekeepers();
+      loadRequests();
+    } catch (error) {
+      console.error('Error suspending request:', error);
+      toast.error('Erreur lors de la suspension');
+    }
+  };
+
+  const handleRevokeSuspension = async (requestId: string) => {
+    try {
+      const request = requests.find(r => r.id === requestId);
+      if (!request) return;
+
+      // Restore request status to approved
+      const { error } = await supabase
+        .from('housekeeper_access_requests')
+        .update({ 
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id 
+        })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      // Reactivate the housekeeper in the hotel
+      await supabase
+        .from('housekeepers')
+        .update({ is_active: true, updated_at: new Date().toISOString() })
+        .eq('hotel_id', request.hotel_id)
+        .eq('user_id', request.housekeeper_profile_id);
+
+      toast.success('Suspension révoquée - Accès rétabli');
+      await refreshHousekeepers();
+      loadRequests();
+    } catch (error) {
+      console.error('Error revoking suspension:', error);
+      toast.error('Erreur lors de la révocation');
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('housekeeper_access_requests')
+        .delete()
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast.success('Demande supprimée');
+      loadRequests();
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
   useEffect(() => {
     loadRequests();
   }, [user]);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Clock className="h-4 w-4" />;
+        return (
+          <Badge variant="secondary" className="gap-1 bg-amber-100 text-amber-800 border-amber-300">
+            <Clock className="h-3 w-3" />
+            En attente
+          </Badge>
+        );
       case 'approved':
-        return <Check className="h-4 w-4" />;
+        return (
+          <Badge className="gap-1 bg-emerald-100 text-emerald-800 border-emerald-300">
+            <Check className="h-3 w-3" />
+            Approuvée
+          </Badge>
+        );
       case 'rejected':
-        return <X className="h-4 w-4" />;
+        return (
+          <Badge variant="destructive" className="gap-1">
+            <X className="h-3 w-3" />
+            Rejetée
+          </Badge>
+        );
+      case 'suspended':
+        return (
+          <Badge className="gap-1 bg-orange-100 text-orange-800 border-orange-300">
+            <Ban className="h-3 w-3" />
+            Suspendue
+          </Badge>
+        );
       default:
-        return <Bell className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'secondary';
-      case 'approved':
-        return 'default';
-      case 'rejected':
-        return 'destructive';
-      default:
-        return 'secondary';
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
@@ -284,7 +374,7 @@ export const HousekeeperAccessRequests = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            <h2 className="text-xl font-semibold">Demandes d'accès</h2>
+            <h2 className="text-xl font-semibold">Demandes d'accès - Femmes de chambre</h2>
             {pendingRequests.length > 0 && (
               <Badge variant="destructive" className="animate-pulse">
                 {pendingRequests.length} nouvelle{pendingRequests.length > 1 ? 's' : ''}
@@ -294,11 +384,10 @@ export const HousekeeperAccessRequests = () => {
         </div>
 
         {pendingRequests.length > 0 && (
-          <Alert className="bg-orange-50 border-orange-200">
-            <Bell className="h-4 w-4 text-orange-600" />
-            <AlertDescription className="text-orange-800">
-              <strong>{pendingRequests.length} demande{pendingRequests.length > 1 ? 's' : ''} en attente</strong> de validation. 
-              Les femmes de chambre pourront accéder à votre hôtel après votre approbation.
+          <Alert className="bg-amber-50 border-amber-200">
+            <Bell className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800">
+              <strong>{pendingRequests.length} demande{pendingRequests.length > 1 ? 's' : ''} en attente</strong> de validation.
             </AlertDescription>
           </Alert>
         )}
@@ -307,60 +396,127 @@ export const HousekeeperAccessRequests = () => {
           <div className="text-center py-8">
             <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <p className="text-muted-foreground">Aucune demande d'accès pour le moment</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Les nouvelles demandes apparaîtront ici automatiquement
-            </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {requests.map((request) => (
-              <div
-                key={request.id}
-                className="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-medium text-lg">{request.housekeeper_profiles.name}</h3>
-                    <Badge variant={getStatusVariant(request.status)} className="gap-1">
-                      {getStatusIcon(request.status)}
-                      {request.status === 'pending' ? '🔔 En attente' : 
-                       request.status === 'approved' ? '✅ Validée' : '❌ Suspendue'}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {request.housekeeper_profiles.email}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Hôtel: {request.hotels.name} ({request.hotel_code})
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Demandé le {new Date(request.requested_at).toLocaleDateString()}
-                  </p>
-                </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[150px]">Nom</TableHead>
+                  <TableHead className="min-w-[180px]">Email</TableHead>
+                  <TableHead className="min-w-[140px]">Hôtel</TableHead>
+                  <TableHead className="min-w-[100px]">Statut</TableHead>
+                  <TableHead className="min-w-[100px]">Date</TableHead>
+                  <TableHead className="min-w-[140px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {requests.map((request) => (
+                  <TableRow key={request.id}>
+                    <TableCell className="font-medium">
+                      {request.housekeeper_profiles.name}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {request.housekeeper_profiles.email}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{request.hotels.name}</span>
+                      <span className="text-xs text-muted-foreground block">{request.hotel_code}</span>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(request.status)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(request.requested_at).toLocaleDateString('fr-FR')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        <TooltipProvider>
+                          {request.status === 'pending' && (
+                            <>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => handleApproveRequest(request.id)}
+                                    className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Approuver</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => handleRejectRequest(request.id)}
+                                    className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-100"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Refuser</TooltipContent>
+                              </Tooltip>
+                            </>
+                          )}
 
-                {request.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleRejectRequest(request.id)}
-                      className="gap-1"
-                    >
-                      <Ban className="h-4 w-4" />
-                      Suspendre
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleApproveRequest(request.id)}
-                      className="gap-1 bg-green-600 hover:bg-green-700"
-                    >
-                      <Check className="h-4 w-4" />
-                      Valider
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
+                          {request.status === 'approved' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleSuspendRequest(request.id)}
+                                  className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-100"
+                                >
+                                  <Ban className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Suspendre</TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {request.status === 'suspended' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleRevokeSuspension(request.id)}
+                                  className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Révoquer la suspension</TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {(request.status === 'rejected' || request.status === 'suspended') && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteRequest(request.id)}
+                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-100"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Supprimer</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
