@@ -101,14 +101,14 @@ export function RoomIncidentsDialog({ open, onOpenChange, hotelId, roomNumber }:
         userName = user.email || "Admin";
         userType = "admin";
       } else if (housekeeperSession?.id) {
-        // Femme de chambre (non authentifiée via Supabase Auth)
+        // Housekeeper (not authenticated via Supabase Auth)
         userId = housekeeperSession.id;
-        userName = housekeeperSession.name || "Femme de chambre";
+        userName = housekeeperSession.name || "Housekeeper";
         userType = "housekeeper";
       } else {
         // Fallback
         userId = crypto.randomUUID();
-        userName = "Anonyme";
+        userName = "Anonymous";
         userType = "guest";
       }
       

@@ -310,9 +310,9 @@ export const LinePatternMapper = ({
                   <SelectValue placeholder="Assigner..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="a_blanc">À blanc (départ)</SelectItem>
-                  <SelectItem value="recouche">Recouche (occupé)</SelectItem>
-                  <SelectItem value="none">Aucun nettoyage</SelectItem>
+                  <SelectItem value="a_blanc">Check-out (departure)</SelectItem>
+                  <SelectItem value="recouche">Stayover (occupied)</SelectItem>
+                  <SelectItem value="none">No cleaning</SelectItem>
                 </SelectContent>
               </Select>
             </>

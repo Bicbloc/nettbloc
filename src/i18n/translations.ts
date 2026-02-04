@@ -21,6 +21,25 @@ type TranslationSchema = {
     phone: string;
     verification: string;
     loadingEstablishment: string;
+    none: string;
+    all: string;
+    actions: string;
+    management: string;
+    options: string;
+    filters: string;
+    sortAsc: string;
+    sortDesc: string;
+    sortBy: string;
+    normal: string;
+    high: string;
+    error: string;
+    success: string;
+    link: string;
+    manual: string;
+    auto: string;
+    import: string;
+    enter: string;
+    addSingle: string;
   };
   auth: {
     login: string;
@@ -75,11 +94,13 @@ type TranslationSchema = {
     hotelCode: string;
     pendingRequests: string;
     staffArea: string;
+    housekeeperLabel: string;
   };
   rooms: {
     room: string;
     rooms: string;
     roomNumber: string;
+    roomNumberShort: string;
     status: string;
     cleaningType: string;
     cleaningTypeLabel: string;
@@ -140,6 +161,46 @@ type TranslationSchema = {
     unassign: string;
     reassignTo: string;
     reassignmentOptions: string;
+    needsCleaning: string;
+    maintenance: string;
+    quickActions: string;
+    roomManagement: string;
+    importRooms: string;
+    manualAssignment: string;
+    filtersAndOptions: string;
+    allFloors: string;
+    allStatuses: string;
+    allTypes: string;
+    groundFloor: string;
+    floorNumber: string;
+    cancelClean: string;
+    cancelGuestOut: string;
+    markedClean: string;
+    markedReadyToClean: string;
+    cancelledClean: string;
+    cancelledGuestOut: string;
+    inspectionOk: string;
+    inspectionFailed: string;
+  };
+  importMode: {
+    title: string;
+    subtitle: string;
+    aiEnabled: string;
+    aiEnabledDesc: string;
+    manualEnabled: string;
+    manualEnabledDesc: string;
+    manualFreeNote: string;
+    importYourRooms: string;
+    importYourRoomsDesc: string;
+    enterYourRooms: string;
+    enterYourRoomsDesc: string;
+    orAddSingleRoom: string;
+    modeActivated: string;
+    aiModeActivated: string;
+    manualModeActivated: string;
+    aiModeDesc: string;
+    manualModeDesc: string;
+    errorChangingMode: string;
   };
   dashboard: {
     title: string;
@@ -262,6 +323,25 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       phone: "Téléphone",
       verification: "Vérification...",
       loadingEstablishment: "Chargement de votre établissement...",
+      none: "Aucun",
+      all: "Tous",
+      actions: "Actions",
+      management: "Gestion",
+      options: "Options",
+      filters: "Filtres",
+      sortAsc: "Croissant",
+      sortDesc: "Décroissant",
+      sortBy: "Tri par",
+      normal: "Normale",
+      high: "Élevée",
+      error: "Erreur",
+      success: "Succès",
+      link: "Lier",
+      manual: "Manuel",
+      auto: "Auto",
+      import: "Importer",
+      enter: "Saisir",
+      addSingle: "Ou ajoutez une seule chambre :",
     },
     
     // Auth
@@ -322,6 +402,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       hotelCode: "Code de l'hôtel",
       pendingRequests: "Demandes en attente",
       staffArea: "Espace Personnel",
+      housekeeperLabel: "Femme de chambre",
     },
     
     // Rooms
@@ -329,15 +410,16 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       room: "Chambre",
       rooms: "Chambres",
       roomNumber: "Numéro de chambre",
+      roomNumberShort: "N° Chambre",
       status: "Statut",
       cleaningType: "Type de nettoyage",
       cleaningTypeLabel: "Type de nettoyage",
       fullClean: "À blanc",
-      fullCleanShort: "B",
+      fullCleanShort: "CO",
       quickClean: "Recouche",
-      quickCleanShort: "R",
+      quickCleanShort: "SO",
       noClean: "Aucun",
-      dirty: "Sale",
+      dirty: "À Nettoyer",
       clean: "Propre",
       inspected: "Inspecté",
       occupied: "Occupé",
@@ -354,7 +436,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       remark: "Remarque",
       housekeeperComment: "Commentaire femme de chambre",
       remarkReported: "Remarque signalée",
-      priority: "Prioritaire",
+      priority: "Priorité",
       priorityHigh: "Haute",
       priorityMedium: "Moyenne",
       priorityLow: "Basse",
@@ -389,6 +471,48 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       unassign: "Désassigner",
       reassignTo: "Réassigner à",
       reassignmentOptions: "Options de réassignation",
+      needsCleaning: "À nettoyer",
+      maintenance: "Maintenance",
+      quickActions: "Actions rapides",
+      roomManagement: "Gestion des chambres",
+      importRooms: "Importer les chambres",
+      manualAssignment: "Assignation manuelle",
+      filtersAndOptions: "Filtres et options",
+      allFloors: "Tous les étages",
+      allStatuses: "Tous les statuts",
+      allTypes: "Tous les types",
+      groundFloor: "RDC",
+      floorNumber: "Étage {floor}",
+      cancelClean: "Annuler propre",
+      cancelGuestOut: "Annuler client sorti",
+      markedClean: "Chambre {room} marquée comme propre",
+      markedReadyToClean: "Chambre {room} marquée comme prête à nettoyer (client sorti)",
+      cancelledClean: "Chambre {room} - Annulé \"Propre\"",
+      cancelledGuestOut: "Chambre {room} - Annulé \"Client sorti\"",
+      inspectionOk: "Inspectée",
+      inspectionFailed: "Inspection échouée",
+    },
+    
+    // Import Mode
+    importMode: {
+      title: "Mode d'import des chambres",
+      subtitle: "Choisissez comment ajouter vos chambres quotidiennement",
+      aiEnabled: "Reconnaissance IA activée",
+      aiEnabledDesc: "Importez un rapport PDF de votre PMS. L'IA extraira automatiquement les chambres, statuts et types de nettoyage (À blanc, Recouche).",
+      manualEnabled: "Saisie manuelle activée",
+      manualEnabledDesc: "Entrez vos chambres une par une avec leur numéro, type de nettoyage (À blanc, Recouche, Propre) et statut.",
+      manualFreeNote: "Le mode manuel est inclus dans tous les plans sans frais IA.",
+      importYourRooms: "Importez vos chambres",
+      importYourRoomsDesc: "Téléchargez un rapport PDF de votre PMS. L'IA extraira automatiquement les chambres et statuts.",
+      enterYourRooms: "Saisissez vos chambres",
+      enterYourRoomsDesc: "Ajoutez vos chambres manuellement avec leur numéro, type de nettoyage et statut.",
+      orAddSingleRoom: "Ou ajoutez une seule chambre :",
+      modeActivated: "Mode activé",
+      aiModeActivated: "🤖 Mode IA activé",
+      manualModeActivated: "📝 Mode Manuel activé",
+      aiModeDesc: "L'extraction automatique des chambres est activée.",
+      manualModeDesc: "Vous pouvez saisir les chambres manuellement.",
+      errorChangingMode: "Impossible de modifier le mode d'import.",
     },
     
     // Dashboard
@@ -524,6 +648,25 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       phone: "Phone",
       verification: "Verifying...",
       loadingEstablishment: "Loading your establishment...",
+      none: "None",
+      all: "All",
+      actions: "Actions",
+      management: "Management",
+      options: "Options",
+      filters: "Filters",
+      sortAsc: "Ascending",
+      sortDesc: "Descending",
+      sortBy: "Sort by",
+      normal: "Normal",
+      high: "High",
+      error: "Error",
+      success: "Success",
+      link: "Link",
+      manual: "Manual",
+      auto: "Auto",
+      import: "Import",
+      enter: "Enter",
+      addSingle: "Or add a single room:",
     },
     
     // Auth
@@ -584,6 +727,7 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       hotelCode: "Hotel code",
       pendingRequests: "Pending requests",
       staffArea: "Staff Area",
+      housekeeperLabel: "Housekeeper",
     },
     
     // Rooms
@@ -591,15 +735,16 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       room: "Room",
       rooms: "Rooms",
       roomNumber: "Room number",
+      roomNumberShort: "Room #",
       status: "Status",
       cleaningType: "Cleaning type",
       cleaningTypeLabel: "Cleaning type",
-      fullClean: "Check-out cleaning",
+      fullClean: "Check-out",
       fullCleanShort: "CO",
-      quickClean: "Stayover cleaning",
+      quickClean: "Stayover",
       quickCleanShort: "SO",
       noClean: "None",
-      dirty: "Dirty",
+      dirty: "To Clean",
       clean: "Clean",
       inspected: "Inspected",
       occupied: "Occupied",
@@ -651,6 +796,48 @@ export const translations: Record<'fr' | 'en', TranslationSchema> = {
       unassign: "Unassign",
       reassignTo: "Reassign to",
       reassignmentOptions: "Reassignment options",
+      needsCleaning: "Needs cleaning",
+      maintenance: "Maintenance",
+      quickActions: "Quick actions",
+      roomManagement: "Room management",
+      importRooms: "Import rooms",
+      manualAssignment: "Manual assignment",
+      filtersAndOptions: "Filters and options",
+      allFloors: "All floors",
+      allStatuses: "All statuses",
+      allTypes: "All types",
+      groundFloor: "GF",
+      floorNumber: "Floor {floor}",
+      cancelClean: "Cancel clean",
+      cancelGuestOut: "Cancel guest out",
+      markedClean: "Room {room} marked as clean",
+      markedReadyToClean: "Room {room} marked as ready to clean (guest out)",
+      cancelledClean: "Room {room} - Cancelled 'Clean'",
+      cancelledGuestOut: "Room {room} - Cancelled 'Guest out'",
+      inspectionOk: "Inspected",
+      inspectionFailed: "Inspection failed",
+    },
+    
+    // Import Mode
+    importMode: {
+      title: "Room import mode",
+      subtitle: "Choose how to add your rooms daily",
+      aiEnabled: "AI recognition enabled",
+      aiEnabledDesc: "Upload a PDF report from your PMS. AI will automatically extract rooms, statuses and cleaning types (Check-out, Stayover).",
+      manualEnabled: "Manual entry enabled",
+      manualEnabledDesc: "Enter your rooms one by one with their number, cleaning type (Check-out, Stayover, Clean) and status.",
+      manualFreeNote: "Manual mode is included in all plans without AI fees.",
+      importYourRooms: "Import your rooms",
+      importYourRoomsDesc: "Upload a PDF report from your PMS. AI will automatically extract rooms and statuses.",
+      enterYourRooms: "Enter your rooms",
+      enterYourRoomsDesc: "Add your rooms manually with their number, cleaning type and status.",
+      orAddSingleRoom: "Or add a single room:",
+      modeActivated: "Mode activated",
+      aiModeActivated: "🤖 AI Mode activated",
+      manualModeActivated: "📝 Manual Mode activated",
+      aiModeDesc: "Automatic room extraction is enabled.",
+      manualModeDesc: "You can enter rooms manually.",
+      errorChangingMode: "Unable to change import mode.",
     },
     
     // Dashboard

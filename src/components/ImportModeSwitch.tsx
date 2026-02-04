@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, ClipboardList, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ImportModeSwitchProps {
   hotelId: string | null;
@@ -14,6 +15,8 @@ interface ImportModeSwitchProps {
 }
 
 export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportModeSwitchProps) {
+  const { t } = useLanguage();
+
   const handleToggle = async (checked: boolean) => {
     const newMode = checked ? 'auto' : 'manual';
     
@@ -27,17 +30,17 @@ export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportM
         if (error) throw error;
 
         toast({
-          title: newMode === 'auto' ? "🤖 Mode IA activé" : "📝 Mode Manuel activé",
+          title: newMode === 'auto' ? t.importMode.aiModeActivated : t.importMode.manualModeActivated,
           description: newMode === 'auto' 
-            ? "L'extraction automatique des chambres est activée."
-            : "Vous pouvez saisir les chambres manuellement.",
+            ? t.importMode.aiModeDesc
+            : t.importMode.manualModeDesc,
         });
       } catch (error: any) {
         console.error('Error updating import mode:', error);
         toast({
           variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de modifier le mode d'import.",
+          title: t.common.error,
+          description: t.importMode.errorChangingMode,
         });
         return;
       }
@@ -52,10 +55,10 @@ export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportM
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <CardTitle className="text-base flex items-center gap-2">
-              Mode d'import des chambres
+              {t.importMode.title}
             </CardTitle>
             <CardDescription>
-              Choisissez comment ajouter vos chambres quotidiennement
+              {t.importMode.subtitle}
             </CardDescription>
           </div>
           <div className="flex items-center gap-3">
@@ -65,7 +68,7 @@ export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportM
                 : 'text-muted-foreground'
             }`}>
               <ClipboardList className="h-4 w-4" />
-              <span className="text-sm font-medium">Manuel</span>
+              <span className="text-sm font-medium">{t.common.manual}</span>
             </div>
             
             <Switch
@@ -80,7 +83,7 @@ export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportM
                 : 'text-muted-foreground'
             }`}>
               <Sparkles className="h-4 w-4" />
-              <span className="text-sm font-medium">IA Auto</span>
+              <span className="text-sm font-medium">{t.dashboard.ia} {t.common.auto}</span>
             </div>
           </div>
         </div>
@@ -95,10 +98,9 @@ export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportM
             <div className="flex items-start gap-3">
               <Sparkles className="h-5 w-5 text-primary mt-0.5" />
               <div>
-                <p className="text-sm font-medium">Reconnaissance IA activée</p>
+                <p className="text-sm font-medium">{t.importMode.aiEnabled}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Importez un rapport PDF de votre PMS. L'IA extraira automatiquement les chambres, 
-                  statuts et types de nettoyage (À blanc, Recouche).
+                  {t.importMode.aiEnabledDesc}
                 </p>
                 <div className="flex gap-2 mt-2">
                   <Badge variant="secondary" className="text-xs">Mews</Badge>
@@ -112,15 +114,14 @@ export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportM
             <div className="flex items-start gap-3">
               <ClipboardList className="h-5 w-5 text-secondary-foreground mt-0.5" />
               <div>
-                <p className="text-sm font-medium">Saisie manuelle activée</p>
+                <p className="text-sm font-medium">{t.importMode.manualEnabled}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Entrez vos chambres une par une avec leur numéro, type de nettoyage 
-                  (À blanc, Recouche, Propre) et statut.
+                  {t.importMode.manualEnabledDesc}
                 </p>
                 <div className="flex gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs">🚪 À blanc</Badge>
-                  <Badge variant="outline" className="text-xs">🛏️ Recouche</Badge>
-                  <Badge variant="outline" className="text-xs">✅ Propre</Badge>
+                  <Badge variant="outline" className="text-xs">🚪 {t.rooms.fullClean}</Badge>
+                  <Badge variant="outline" className="text-xs">🛏️ {t.rooms.quickClean}</Badge>
+                  <Badge variant="outline" className="text-xs">✅ {t.rooms.clean}</Badge>
                 </div>
               </div>
             </div>
@@ -130,7 +131,7 @@ export function ImportModeSwitch({ hotelId, currentMode, onModeChange }: ImportM
         {currentMode === 'manual' && (
           <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
             <Info className="h-3 w-3" />
-            <span>Le mode manuel est inclus dans tous les plans sans frais IA.</span>
+            <span>{t.importMode.manualFreeNote}</span>
           </div>
         )}
       </CardContent>

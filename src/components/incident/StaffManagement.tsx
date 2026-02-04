@@ -38,8 +38,8 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
         .order("name");
       
       if (error) throw error;
-      // Exclure le rôle "Femme de chambre" de la gestion du personnel
-      return data?.filter(role => role.name.toLowerCase() !== "femme de chambre") || [];
+      // Exclude "Femme de chambre" (Housekeeper) role from staff management
+      return data?.filter(role => role.name.toLowerCase() !== "femme de chambre" && role.name.toLowerCase() !== "housekeeper") || [];
     },
   });
 
@@ -55,9 +55,9 @@ export function StaffManagement({ hotelId }: StaffManagementProps) {
 
       if (rolesError) throw rolesError;
 
-      // Trouver les IDs des rôles non-femmes de chambre
+      // Find IDs of non-housekeeper roles
       const staffRoleIds = allRoles
-        ?.filter(role => role.name.toLowerCase() !== "femme de chambre")
+        ?.filter(role => role.name.toLowerCase() !== "femme de chambre" && role.name.toLowerCase() !== "housekeeper")
         .map(role => role.id) || [];
 
       // Récupérer uniquement le personnel (pas les femmes de chambre)
