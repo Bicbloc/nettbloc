@@ -62,7 +62,17 @@ const GovernessAccessPage = () => {
         .order('requested_at', { ascending: false });
 
       if (error) throw error;
-      setRequests(data as any[] || []);
+      
+      // Dédupliquer: garder seulement la dernière demande par (profil, hôtel)
+      const seen = new Map<string, boolean>();
+      const uniqueRequests = (data as any[] || []).filter((req) => {
+        const key = `${req.governess_profile_id}-${req.hotel_id}`;
+        if (seen.has(key)) return false;
+        seen.set(key, true);
+        return true;
+      });
+      
+      setRequests(uniqueRequests);
     } catch (error) {
       console.error('Error loading requests:', error);
       toast.error('Erreur lors du chargement');
@@ -307,7 +317,7 @@ const GovernessAccessPage = () => {
                                           <Ban className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent>Suspendre</TooltipContent>
+                                      <TooltipContent>Désactiver l'accès</TooltipContent>
                                     </Tooltip>
                                   )}
                                   {request.status === 'suspended' && (
@@ -317,19 +327,17 @@ const GovernessAccessPage = () => {
                                           <RotateCcw className="h-4 w-4" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent>Révoquer suspension</TooltipContent>
+                                      <TooltipContent>Réactiver l'accès</TooltipContent>
                                     </Tooltip>
                                   )}
-                                  {(request.status === 'rejected' || request.status === 'suspended') && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-100" onClick={() => handleDelete(request.id)}>
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Supprimer</TooltipContent>
-                                    </Tooltip>
-                                  )}
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-100" onClick={() => handleDelete(request.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Supprimer</TooltipContent>
+                                  </Tooltip>
                                 </>
                               )}
                             </div>
