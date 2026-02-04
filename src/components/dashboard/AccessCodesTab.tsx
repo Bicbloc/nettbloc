@@ -481,13 +481,29 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> En attente</Badge>;
+        return (
+          <Badge variant="secondary" className="gap-1">
+            <Clock className="h-3 w-3" /> En attente
+          </Badge>
+        );
       case 'approved':
-        return <Badge className="bg-green-100 text-green-700 gap-1"><Check className="h-3 w-3" /> Approuvé</Badge>;
+        return (
+          <Badge variant="outline" className="gap-1 border-success/30 bg-success/10 text-success">
+            <Check className="h-3 w-3" /> Approuvé
+          </Badge>
+        );
       case 'rejected':
-        return <Badge variant="destructive" className="gap-1"><X className="h-3 w-3" /> Refusé</Badge>;
+        return (
+          <Badge variant="destructive" className="gap-1">
+            <X className="h-3 w-3" /> Refusé
+          </Badge>
+        );
       case 'suspended':
-        return <Badge className="bg-orange-100 text-orange-700 gap-1"><Ban className="h-3 w-3" /> Suspendu</Badge>;
+        return (
+          <Badge variant="outline" className="gap-1 border-warning/30 bg-warning/10 text-warning">
+            <Ban className="h-3 w-3" /> Suspendu
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -526,118 +542,123 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
     }
 
     return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nom</TableHead>
-            <TableHead>Statut</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {requests.map((request) => (
-            <TableRow key={request.id}>
-              <TableCell>
-                <div>
-                  <div className="font-medium">{request[profileKey]?.name || 'N/A'}</div>
-                  <div className="text-xs text-muted-foreground">{request[profileKey]?.email || ''}</div>
-                </div>
-              </TableCell>
-              <TableCell>
-                {getStatusBadge(request.status)}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex gap-1 justify-end">
-                  {request.status === 'pending' && (
-                    <>
+      <div className="w-full overflow-x-auto">
+        <Table className="w-full table-fixed">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="min-w-[220px]">Nom</TableHead>
+              <TableHead className="w-[140px]">Statut</TableHead>
+              <TableHead className="w-[120px] text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {requests.map((request) => (
+              <TableRow key={request.id}>
+                <TableCell className="min-w-[220px]">
+                  <div>
+                    <div className="font-medium">{request[profileKey]?.name || 'N/A'}</div>
+                    <div className="text-xs text-muted-foreground break-all">{request[profileKey]?.email || ''}</div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {getStatusBadge(request.status)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex gap-1 justify-end">
+                    {request.status === 'pending' && (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                          onClick={() => onReject(request.id)}
+                          disabled={processingId === request.id}
+                          title="Refuser"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-success hover:text-success/90 hover:bg-success/10"
+                          onClick={() => onApprove(request)}
+                          disabled={processingId === request.id}
+                          title="Approuver"
+                        >
+                          {processingId === request.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </>
+                    )}
+
+                    {request.status === 'approved' && (
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="ghost"
-                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => onReject(request.id)}
+                        className="h-8 w-8 text-warning hover:text-warning/90 hover:bg-warning/10"
+                        onClick={() => onSuspend(request)}
                         disabled={processingId === request.id}
-                        title="Refuser"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                        onClick={() => onApprove(request)}
-                        disabled={processingId === request.id}
-                        title="Approuver"
-                      >
-                        {processingId === request.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </>
-                  )}
-                  {request.status === 'approved' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                      onClick={() => onSuspend(request)}
-                      disabled={processingId === request.id}
-                      title="Suspendre l'accès"
-                    >
-                      {processingId === request.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Ban className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
-                  {request.status === 'suspended' && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                        onClick={() => onRevoke(request)}
-                        disabled={processingId === request.id}
-                        title="Révoquer la suspension"
+                        title="Suspendre l'accès"
                       >
                         {processingId === request.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <RotateCcw className="h-4 w-4" />
+                          <Ban className="h-4 w-4" />
                         )}
                       </Button>
+                    )}
+
+                    {request.status === 'suspended' && (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-success hover:text-success/90 hover:bg-success/10"
+                          onClick={() => onRevoke(request)}
+                          disabled={processingId === request.id}
+                          title="Révoquer la suspension"
+                        >
+                          {processingId === request.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                          onClick={() => onDelete(request.id)}
+                          disabled={processingId === request.id}
+                          title="Supprimer définitivement"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+
+                    {request.status === 'rejected' && (
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="ghost"
-                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
                         onClick={() => onDelete(request.id)}
                         disabled={processingId === request.id}
                         title="Supprimer définitivement"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </>
-                  )}
-                  {request.status === 'rejected' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => onDelete(request.id)}
-                      disabled={processingId === request.id}
-                      title="Supprimer définitivement"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     );
   };
 
@@ -660,22 +681,22 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
       </div>
 
       {totalPending > 0 && (
-        <Alert className="bg-orange-50 border-orange-200">
-          <Bell className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-800">
+        <Alert className="border-warning/20 bg-warning/10">
+          <Bell className="h-4 w-4 text-warning" />
+          <AlertDescription>
             <strong>{totalPending} demande{totalPending > 1 ? 's' : ''}</strong> en attente de validation
           </AlertDescription>
         </Alert>
       )}
 
       {/* 3 Columns Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* Housekeepers Column */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <UserPlus className="h-4 w-4 text-blue-600" />
+              <div className="p-2 rounded-lg bg-info/10">
+                <UserPlus className="h-4 w-4 text-info" />
               </div>
               Femmes de chambre
               {pendingHousekeepers.length > 0 && (
@@ -702,8 +723,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <div className="p-2 rounded-lg bg-amber-100">
-                <Crown className="h-4 w-4 text-amber-600" />
+              <div className="p-2 rounded-lg bg-warning/10">
+                <Crown className="h-4 w-4 text-warning" />
               </div>
               Gouvernantes
               {pendingGovernesses.length > 0 && (
@@ -730,8 +751,8 @@ export function AccessCodesTab({ currentHotelId }: AccessCodesTabProps) {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <Wrench className="h-4 w-4 text-purple-600" />
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Wrench className="h-4 w-4 text-primary" />
               </div>
               Techniciens
               {pendingTechnicians.length > 0 && (
