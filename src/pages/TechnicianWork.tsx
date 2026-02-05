@@ -537,12 +537,6 @@ function TechnicianWorkContent() {
             {hotel?.id && (
               <TechnicianSpacesView 
                 hotelId={hotel.id} 
-                onSpaceClick={(space) => {
-                  // Filter incidents for this space
-                  setStatusFilter('all');
-                  // Could navigate to a space detail view
-                  console.log('Space clicked:', space);
-                }}
               />
             )}
           </TabsContent>
