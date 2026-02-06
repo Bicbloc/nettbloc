@@ -140,6 +140,8 @@ export function IncidentCardModern({
         return { label: 'Femme de chambre', className: 'bg-blue-500 text-white' };
       case 'technician':
         return { label: 'Technicien', className: 'bg-orange-500 text-white' };
+      case 'governess':
+        return { label: 'Gouvernante', className: 'bg-pink-500 text-white' };
       default:
         return { label: type, className: 'bg-gray-500 text-white' };
     }

@@ -295,7 +295,12 @@ export function IncidentDashboard({ hotelId }: IncidentDashboardProps) {
                   <div>
                     <div className="font-medium text-sm">{reporter.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {reporter.count} incidents • {reporter.type === 'housekeeper' ? 'Femme de chambre' : 'Admin'}
+                      {reporter.count} incidents • {
+                        reporter.type === 'housekeeper' ? 'Femme de chambre' : 
+                        reporter.type === 'technician' ? 'Technicien' :
+                        reporter.type === 'governess' ? 'Gouvernante' :
+                        'Admin'
+                      }
                     </div>
                   </div>
                 </div>
