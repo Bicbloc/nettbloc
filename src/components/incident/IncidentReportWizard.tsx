@@ -268,40 +268,81 @@ export function IncidentReportWizard({
     }
   };
 
-  // Apply AI suggestions to form
+  // Apply AI suggestions to form - PRE-SELECT category, item, type
   const applyAiSuggestions = (result: any) => {
     let foundItem = false;
     let usedAutreItem = false;
+    let matchedCategoryId = "";
     
+    // First try to match the category from AI suggestion
+    if (categoriesWithItems && result.category) {
+      const matchingCategory = categoriesWithItems.find((cat: any) =>
+        cat.name.toLowerCase().includes(result.category.toLowerCase()) ||
+        result.category.toLowerCase().includes(cat.name.toLowerCase())
+      );
+      if (matchingCategory) {
+        matchedCategoryId = matchingCategory.id;
+        setSelectedCategoryId(matchingCategory.id);
+      }
+    }
+    
+    // Then try to find the item within that category or all categories
     if (categoriesWithItems && result.item) {
-      for (const category of categoriesWithItems) {
-        const matchingItem = category.items.find((item: any) => 
-          item.name.toLowerCase().includes(result.item.toLowerCase()) ||
-          result.item.toLowerCase().includes(item.name.toLowerCase())
-        );
-        if (matchingItem) {
-          form.setValue('item_id', matchingItem.id);
-          foundItem = true;
-          break;
+      // First search in matched category
+      if (matchedCategoryId) {
+        const category = categoriesWithItems.find((c: any) => c.id === matchedCategoryId);
+        if (category) {
+          const matchingItem = category.items.find((item: any) => 
+            item.name.toLowerCase().includes(result.item.toLowerCase()) ||
+            result.item.toLowerCase().includes(item.name.toLowerCase())
+          );
+          if (matchingItem) {
+            form.setValue('item_id', matchingItem.id);
+            foundItem = true;
+          }
+        }
+      }
+      
+      // If not found in matched category, search all categories
+      if (!foundItem) {
+        for (const category of categoriesWithItems) {
+          const matchingItem = category.items.find((item: any) => 
+            item.name.toLowerCase().includes(result.item.toLowerCase()) ||
+            result.item.toLowerCase().includes(item.name.toLowerCase())
+          );
+          if (matchingItem) {
+            form.setValue('item_id', matchingItem.id);
+            // Also set the category for this item
+            setSelectedCategoryId(category.id);
+            foundItem = true;
+            break;
+          }
         }
       }
     }
     
+    // Fallback to "Autre" item if not found
     if (!foundItem && categoriesWithItems) {
-      for (const category of categoriesWithItems) {
-        const autreItem = category.items.find((item: any) => 
+      // If we have a matched category, use its "Autre" item
+      const targetCategory = matchedCategoryId 
+        ? categoriesWithItems.find((c: any) => c.id === matchedCategoryId)
+        : categoriesWithItems[0];
+      
+      if (targetCategory) {
+        const autreItem = targetCategory.items.find((item: any) => 
           item.name.toLowerCase() === 'autre' || 
           item.name.toLowerCase() === 'autres'
         );
         if (autreItem) {
           form.setValue('item_id', autreItem.id);
+          setSelectedCategoryId(targetCategory.id);
           usedAutreItem = true;
           form.setValue('description', `[IA: ${result.item}] ${form.getValues('description') || ''}`.trim());
-          break;
         }
       }
     }
 
+    // Match problem type
     let foundType = false;
     if (types && result.problem_type) {
       const matchingType = types.find((type: any) =>
@@ -324,14 +365,21 @@ export function IncidentReportWizard({
       }
     }
 
+    // Set suggested title
     if (result.suggested_title) {
       form.setValue('title', result.suggested_title);
     }
 
-    if (usedAutreItem) {
+    // Notify user about AI detection
+    if (foundItem && !usedAutreItem) {
+      toast({
+        title: "✨ Détection IA réussie",
+        description: `Élément détecté: ${result.item}. Vérifiez la présélection.`,
+      });
+    } else if (usedAutreItem) {
       toast({
         title: "⚠️ Élément non reconnu",
-        description: `L'IA a détecté "${result.item}" - l'admin devra classifier`,
+        description: `L'IA a détecté "${result.item}" - vérifiez la catégorie`,
       });
     }
   };

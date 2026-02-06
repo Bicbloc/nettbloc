@@ -273,8 +273,9 @@ export function LostItemReportWizard({
     }
   };
 
-  // Apply AI suggestions to form
+  // Apply AI suggestions to form - PRE-SELECT category and description
   const applyAiSuggestions = (result: any) => {
+    // Build rich description from AI
     if (result.object_name) {
       let description = result.object_name;
       if (result.brand) description += ` - ${result.brand}`;
@@ -283,8 +284,27 @@ export function LostItemReportWizard({
       setObjectDescription(description);
     }
 
-    if (result.category && OBJECT_CATEGORIES.find(c => c.value === result.category)) {
-      setObjectCategory(result.category);
+    // PRE-SELECT the category detected by AI
+    if (result.category) {
+      const matchingCategory = OBJECT_CATEGORIES.find(c => 
+        c.value === result.category ||
+        c.label.toLowerCase().includes(result.category.toLowerCase()) ||
+        result.category.toLowerCase().includes(c.label.toLowerCase())
+      );
+      if (matchingCategory) {
+        setObjectCategory(matchingCategory.value);
+        toast({
+          title: "✨ Détection IA réussie",
+          description: `Catégorie: ${matchingCategory.label}. Vérifiez la présélection.`,
+        });
+      } else {
+        // Default to "other" but notify user
+        setObjectCategory("other");
+        toast({
+          title: "⚠️ Catégorie non reconnue",
+          description: `L'IA a détecté "${result.category}" - sélectionnez manuellement`,
+        });
+      }
     }
   };
 
