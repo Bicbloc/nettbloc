@@ -10,10 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileDown, AlertTriangle, Clock, FileText } from "lucide-react";
+import { FileDown, AlertTriangle, Clock, FileText, ListTodo, Save, Loader2 } from "lucide-react";
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { StaffTimesheetPanel } from "@/components/timesheet/StaffTimesheetPanel";
 import { InstructionTemplateSelector } from "@/components/templates/InstructionTemplateSelector";
+import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 interface ReportsTabProps {
   rooms: Room[];
@@ -35,6 +38,7 @@ export function ReportsTab({
   onGenerateAllReports,
 }: ReportsTabProps) {
   const [activeTab, setActiveTab] = useState("reports");
+  const [templateSubTab, setTemplateSubTab] = useState("instructions");
 
   const getHousekeeperRooms = (name: string) => {
     return rooms.filter(room => room.assignedTo === name);
@@ -160,14 +164,35 @@ export function ReportsTab({
         {/* Templates Tab */}
         <TabsContent value="templates">
           {hotelId ? (
-            <Card className="p-4">
-              <h3 className="font-medium mb-4">Gérer les templates de consignes</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Créez et gérez vos templates pour les consignes du jour, à savoir et to-do. 
-                Ces templates peuvent être réutilisés dans le workflow quotidien.
-              </p>
-              <TemplateManagerSection hotelId={hotelId} />
-            </Card>
+            <div className="space-y-4">
+              <Tabs value={templateSubTab} onValueChange={setTemplateSubTab}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="instructions" className="flex-1 gap-2">
+                    <FileText className="h-4 w-4" />
+                    Consignes
+                  </TabsTrigger>
+                  <TabsTrigger value="tasks" className="flex-1 gap-2">
+                    <ListTodo className="h-4 w-4" />
+                    Tâches
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="instructions" className="mt-4">
+                  <Card className="p-4">
+                    <h3 className="font-medium mb-4">Gérer les templates de consignes</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Créez et gérez vos templates pour les consignes du jour, à savoir et to-do. 
+                      Ces templates peuvent être réutilisés dans le workflow quotidien.
+                    </p>
+                    <InstructionTemplateManagerSection hotelId={hotelId} />
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="tasks" className="mt-4">
+                  <TaskTemplateManager hotelId={hotelId} />
+                </TabsContent>
+              </Tabs>
+            </div>
           ) : (
             <Alert>
               <AlertTriangle className="h-4 w-4" />
@@ -180,21 +205,80 @@ export function ReportsTab({
   );
 }
 
-// Separate Template Manager for the dedicated section
-function TemplateManagerSection({ hotelId }: { hotelId: string }) {
+// Instruction Template Manager with Save functionality
+function InstructionTemplateManagerSection({ hotelId }: { hotelId: string }) {
   const [instructions, setInstructions] = useState("");
   const [toKnow, setToKnow] = useState("");
   const [todoList, setTodoList] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveAsToday = async () => {
+    if (!instructions && !toKnow && !todoList) {
+      toast({
+        variant: "destructive",
+        title: "Aucun contenu",
+        description: "Remplissez au moins un champ avant de sauvegarder."
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await supabase.from('daily_instructions').upsert({
+        hotel_id: hotelId,
+        instruction_date: today,
+        instructions: instructions || null,
+        to_know: toKnow || null,
+        todo_list: todoList || null,
+        created_by: user?.id
+      }, { onConflict: 'hotel_id,instruction_date' });
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Consignes enregistrées",
+        description: "Les consignes du jour ont été sauvegardées."
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de sauvegarder les consignes."
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
-    <InstructionTemplateSelector
-      hotelId={hotelId}
-      instructions={instructions}
-      toKnow={toKnow}
-      todoList={todoList}
-      onInstructionsChange={setInstructions}
-      onToKnowChange={setToKnow}
-      onTodoListChange={setTodoList}
-    />
+    <div className="space-y-4">
+      <InstructionTemplateSelector
+        hotelId={hotelId}
+        instructions={instructions}
+        toKnow={toKnow}
+        todoList={todoList}
+        onInstructionsChange={setInstructions}
+        onToKnowChange={setToKnow}
+        onTodoListChange={setTodoList}
+      />
+      
+      <div className="flex justify-end pt-4 border-t">
+        <Button 
+          onClick={handleSaveAsToday}
+          disabled={isSaving || (!instructions && !toKnow && !todoList)}
+        >
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
+          Sauvegarder comme consignes du jour
+        </Button>
+      </div>
+    </div>
   );
 }
