@@ -15,11 +15,12 @@ import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMes
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 
 const EstablishmentAuth = () => {
-  const { signIn, signUp, isAuthenticated, loading, isInitialized } = useAuth();
+  const { signIn, signUp, signOut, isAuthenticated, loading, isInitialized, user } = useAuth();
   const { refreshHotel, isHotelReady } = useHotel();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [isWaitingForHotel, setIsWaitingForHotel] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -30,6 +31,47 @@ const EstablishmentAuth = () => {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Vérifier si l'utilisateur actuel a le droit d'accéder à cette interface
+  // Si non, le déconnecter pour permettre une nouvelle connexion
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      if (!isInitialized || loading) return;
+      
+      // Pas de session = OK pour afficher le formulaire
+      if (!user) {
+        setIsCheckingAccess(false);
+        return;
+      }
+
+      // Vérifier si c'est un compte établissement
+      const email = user.email?.trim().toLowerCase();
+      if (!email) {
+        setIsCheckingAccess(false);
+        return;
+      }
+
+      const { data: hotelData } = await supabase
+        .from('hotels')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (hotelData) {
+        // C'est bien un établissement, rediriger vers le dashboard
+        navigate('/', { replace: true });
+        return;
+      }
+
+      // L'utilisateur connecté n'est PAS un établissement
+      // Déconnecter pour permettre une connexion avec le bon compte
+      console.log('⚠️ Session existante non-établissement détectée, déconnexion...');
+      await signOut();
+      setIsCheckingAccess(false);
+    };
+
+    checkExistingSession();
+  }, [isInitialized, loading, user, navigate, signOut]);
 
   // Handle password reset from URL
   useEffect(() => {
@@ -87,8 +129,16 @@ const EstablishmentAuth = () => {
   }, [toast]);
 
   // IMPORTANT: en recovery, l'utilisateur est authentifié mais doit voir l'écran "nouveau mot de passe"
-  if (!loading && isAuthenticated && !isPasswordReset) {
-    return <Navigate to="/" replace />;
+  // On ne redirige plus automatiquement ici - la vérification se fait dans checkExistingSession
+  
+  // Afficher loading pendant la vérification d'accès initiale
+  if (isCheckingAccess || loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <p className="text-white/80">Vérification de l'authentification...</p>
+      </div>
+    );
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
