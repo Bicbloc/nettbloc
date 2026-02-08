@@ -94,21 +94,39 @@ export function GovernessAssignmentStep({
     }
   });
 
-  // Load today's existing instructions
+  // Load today's existing instructions OR fallback to the most recent ones
   useEffect(() => {
     const loadExistingInstructions = async () => {
       const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
+      
+      // First try to load today's instructions
+      const { data: todayData } = await supabase
         .from("daily_instructions")
         .select("*")
         .eq("hotel_id", hotelId)
         .eq("instruction_date", today)
         .maybeSingle();
 
-      if (data) {
-        setInstructions(data.instructions || "");
-        setToKnow(data.to_know || "");
-        setTodoList(data.todo_list || "");
+      if (todayData) {
+        setInstructions(todayData.instructions || "");
+        setToKnow(todayData.to_know || "");
+        setTodoList(todayData.todo_list || "");
+        return;
+      }
+
+      // Fallback: load the most recent instructions (last used template)
+      const { data: lastData } = await supabase
+        .from("daily_instructions")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .order("instruction_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastData) {
+        setInstructions(lastData.instructions || "");
+        setToKnow(lastData.to_know || "");
+        setTodoList(lastData.todo_list || "");
       }
     };
     loadExistingInstructions();
