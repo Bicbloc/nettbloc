@@ -374,18 +374,23 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           };
         }).filter(r => !!r.room_number);
 
+        // Dédupliquer les chambres (garder la dernière occurrence de chaque room_number)
+        const deduplicatedRooms = Array.from(
+          new Map(roomsForSync.map(r => [`${r.hotel_id}-${r.room_number}`, r])).values()
+        );
+        
         // Sauvegarder les chambres dans la table rooms
-        setUploadStatus(`💾 Enregistrement de ${roomsForSync.length} chambres...`);
+        setUploadStatus(`💾 Enregistrement de ${deduplicatedRooms.length} chambres...`);
         
         const timeout = 15000;
         const roomsResult = await Promise.race([
-          supabase.from('rooms').upsert(roomsForSync, { onConflict: 'hotel_id,room_number', ignoreDuplicates: false }),
+          supabase.from('rooms').upsert(deduplicatedRooms, { onConflict: 'hotel_id,room_number', ignoreDuplicates: false }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout rooms')), timeout))
         ]) as any;
 
         if (roomsResult.error) throw roomsResult.error;
         
-        insertedCount = roomsForSync.length;
+        insertedCount = deduplicatedRooms.length;
         setUploadProgress(85);
 
         // Identifier les NOUVELLES chambres (pas dans le registre existant)

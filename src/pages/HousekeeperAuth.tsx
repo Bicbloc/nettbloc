@@ -382,7 +382,7 @@ export default function HousekeeperAuth() {
 
       <div className="absolute top-4 left-4 z-10">
         <BackButton 
-          to="/" 
+          to="/auth" 
           variant="secondary"
           className="bg-white/90 hover:bg-white text-gray-800 shadow-md backdrop-blur-sm" 
         />
