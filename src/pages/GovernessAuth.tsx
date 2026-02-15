@@ -25,10 +25,18 @@ export default function GovernessAuth() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Vérifier si déjà connecté
+    // Vérifier si déjà connecté avec un profil gouvernante valide
     const profile = localStorage.getItem('governess_profile');
     if (profile && !isRecoveryMode) {
-      navigate('/governess/hotels');
+      // Vérifier que la session Supabase est aussi active
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          navigate('/governess/hotels');
+        } else {
+          // Session expirée, nettoyer le profil local
+          localStorage.removeItem('governess_profile');
+        }
+      });
     }
   }, [navigate, isRecoveryMode]);
 
@@ -168,6 +176,9 @@ export default function GovernessAuth() {
         if (profileError) throw profileError;
 
         if (profileData) {
+          // Nettoyer les profils d'autres rôles pour éviter les conflits
+          localStorage.removeItem('housekeeper_profile');
+          localStorage.removeItem('technician_profile');
           localStorage.setItem('governess_profile', JSON.stringify(profileData));
           
           toast({

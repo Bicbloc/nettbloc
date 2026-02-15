@@ -92,11 +92,12 @@ const Auth = () => {
     void handleRecovery();
   }, [toast, language]);
 
-  // Si authentifié, rediriger immédiatement
-  // IMPORTANT: en mode recovery, l'utilisateur est authentifié, mais doit voir l'écran "Nouveau mot de passe"
-  if (isAuthenticated && mode !== 'new-password') {
-    return <Navigate to="/" replace />;
-  }
+  // Ne PAS rediriger automatiquement ici - la page /auth est le point d'entrée de sélection.
+  // Si l'utilisateur est authentifié et veut changer de type de compte, il doit pouvoir rester ici.
+  // Chaque sous-page (establishment, housekeeper, etc.) gère sa propre redirection.
+  // Exception: en mode new-password, on reste sur cette page.
+  // On ne redirige que depuis la page de SÉLECTION (mode === 'select') et seulement si authentifié
+  // pour permettre le switch de compte depuis les sous-formulaires.
 
   // Afficher loading uniquement pendant la soumission
   if (isLoading) {

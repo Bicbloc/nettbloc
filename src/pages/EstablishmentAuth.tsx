@@ -66,15 +66,18 @@ const EstablishmentAuth = () => {
       // L'utilisateur connecté n'est PAS un établissement
       // Déconnecter pour permettre une connexion avec le bon compte
       console.log('⚠️ Session existante non-établissement détectée, déconnexion...');
+      // Nettoyer TOUS les profils locaux d'abord
+      localStorage.removeItem('housekeeper_profile');
+      localStorage.removeItem('governess_profile');
+      localStorage.removeItem('technician_profile');
       try {
         await supabase.auth.signOut();
       } catch (err) {
         console.warn('⚠️ Erreur signOut, forçage nettoyage local:', err);
-        // Forcer le nettoyage local même si signOut échoue
-        localStorage.removeItem('housekeeper_profile');
-        localStorage.removeItem('governess_profile');
         localStorage.removeItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
       }
+      // Petit délai pour laisser le listener auth mettre à jour l'état
+      await new Promise(resolve => setTimeout(resolve, 300));
       setIsCheckingAccess(false);
     };
 
