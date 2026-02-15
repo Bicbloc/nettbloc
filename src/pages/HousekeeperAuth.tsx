@@ -186,6 +186,9 @@ export default function HousekeeperAuth() {
         }
 
         if (profileResult.data) {
+          // Nettoyer les profils d'autres rôles pour éviter les conflits
+          localStorage.removeItem('governess_profile');
+          localStorage.removeItem('technician_profile');
           localStorage.setItem('housekeeper_profile', JSON.stringify(profileResult.data));
           
           toast({

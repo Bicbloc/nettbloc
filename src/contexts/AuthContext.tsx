@@ -214,10 +214,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = useCallback(async () => {
     stopTokenRefresh();
-    const hotelData = storageService.getHotel();
-    await supabase.auth.signOut();
-    if (hotelData) {
-      storageService.saveHotel(hotelData);
+    // Nettoyer TOUS les profils de rôles pour éviter les conflits de session
+    try {
+      localStorage.removeItem('housekeeper_profile');
+      localStorage.removeItem('governess_profile');
+      localStorage.removeItem('technician_profile');
+      storageService.clearHotel();
+      storageService.clearVolatile();
+    } catch (e) {
+      console.warn('⚠️ Erreur nettoyage localStorage:', e);
+    }
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('⚠️ Erreur signOut Supabase:', e);
+      // Forcer le nettoyage du token même si signOut échoue
+      localStorage.removeItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
     }
   }, [stopTokenRefresh]);
 
