@@ -38,6 +38,27 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 let lastExtractedText: string = '';
 let lastParsedLines: RoomLine[] = [];
 
+// Coverage metadata from last parse
+export interface CoverageMetadata {
+  phase0RoomCount: number;
+  trainedModelRoomCount: number;
+  finalRoomCount: number;
+  supplementedByTraining: number;
+  trainedModelUsed: boolean;
+  formatDetected: string;
+  formatConfidence: number;
+  trainedPatternCount: number;
+  missingFromPhase0: string[];   // rooms found by training but not by phase0
+  missingFromTraining: string[]; // rooms found by phase0 but not by training
+  perPatternStats: { keyword: string; matchedCount: number; totalRooms: number }[];
+}
+
+let lastCoverageMetadata: CoverageMetadata | null = null;
+
+export function getLastCoverageMetadata(): CoverageMetadata | null {
+  return lastCoverageMetadata;
+}
+
 export function getLastExtractedText(): string {
   return lastExtractedText;
 }
@@ -562,6 +583,9 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     
     lastExtractedText = fullText;
     
+    // Reset coverage metadata
+    lastCoverageMetadata = null;
+
     // ===== PHASE 0: Détection du format avec ReportFormatDetector (COMME ENTRAÎNEMENT IA) =====
     const formatDetection = detectReportFormat(fullText);
     console.log(`🔍 Format détecté: ${formatDetection.format} (confiance: ${formatDetection.confidence}%)`);
@@ -577,51 +601,90 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       let rooms = parsedRows.map(convertParsedRowToRoom);
       
       // ===== SUPPLEMENTER AVEC LES PATTERNS ENTRAINÉS =====
-      // Le modèle entraîné (unifiedParserService) peut avoir appris des chambres 
-      // que le parser de format ne détecte pas (ex: formats spéciaux, lignes coupées)
+      const phase0RoomCount = rooms.length;
+      const phase0Numbers = new Set(rooms.map(r => r.number));
+      let trainedModelRoomCount = 0;
+      let supplementedCount = 0;
+      let trainedModelUsed = false;
+      let trainedPatternCount = 0;
+      let missingFromPhase0: string[] = [];
+      let missingFromTraining: string[] = [];
+      let perPatternStats: CoverageMetadata['perPatternStats'] = [];
+
       if (hotelId) {
         try {
           await unifiedParserService.loadHotelPatterns(hotelId);
           const trainedResult = await unifiedParserService.parseReportHybrid(fullText, hotelId, false);
+          trainedPatternCount = unifiedParserService.getLearnedPatternCount();
           
           if (trainedResult.rooms.length > 0) {
+            trainedModelUsed = true;
             const trainedRooms = convertExtractedRoomsToRooms(trainedResult.rooms);
+            trainedModelRoomCount = trainedRooms.length;
+            const trainedNumbers = new Set(trainedRooms.map(r => r.number));
             const existingNumbers = new Set(rooms.map(r => r.number));
             
-            // Ajouter les chambres trouvées par le modèle entraîné mais pas par Phase 0
-            let supplemented = 0;
+            // Gap analysis
+            missingFromPhase0 = trainedRooms.filter(r => !existingNumbers.has(r.number)).map(r => r.number);
+            missingFromTraining = rooms.filter(r => !trainedNumbers.has(r.number)).map(r => r.number);
+            
+            // Add rooms found by trained model but not by Phase 0
             for (const trainedRoom of trainedRooms) {
               if (!existingNumbers.has(trainedRoom.number)) {
                 rooms.push(trainedRoom);
                 existingNumbers.add(trainedRoom.number);
-                supplemented++;
+                supplementedCount++;
               }
             }
             
-            if (supplemented > 0) {
-              console.log(`🧠 Modèle entraîné: +${supplemented} chambres supplémentaires (total: ${rooms.length})`);
+            if (supplementedCount > 0) {
+              console.log(`🧠 Modèle entraîné: +${supplementedCount} chambres supplémentaires (total: ${rooms.length})`);
             }
             
-            // Si le modèle entraîné a trouvé PLUS de chambres au total, 
-            // utiliser ses résultats comme base (il connaît mieux le format)
+            // If trained model found MORE rooms, use its results as base
             if (trainedRooms.length > rooms.length) {
               console.log(`🧠 Le modèle entraîné a trouvé plus de chambres (${trainedRooms.length} vs ${rooms.length}), utilisation de ses résultats`);
-              // Fusionner: garder les données enrichies de Phase 0 quand disponibles
               const phase0Map = new Map(rooms.map(r => [r.number, r]));
               rooms = trainedRooms.map(tr => {
                 const phase0Room = phase0Map.get(tr.number);
                 if (phase0Room) {
-                  // Garder les données enrichies de Phase 0 (guest name, dates, etc.)
                   return { ...tr, ...phase0Room };
                 }
                 return tr;
               });
             }
+
+            // Per-pattern stats: check keyword hit rates
+            const statusCodes = new Map<string, number>();
+            for (const line of parsedRows) {
+              const code = (line.cleaningStatus || '').toUpperCase();
+              if (code) statusCodes.set(code, (statusCodes.get(code) || 0) + 1);
+            }
+            perPatternStats = Array.from(statusCodes.entries()).map(([keyword, matchedCount]) => ({
+              keyword,
+              matchedCount,
+              totalRooms: rooms.length,
+            }));
           }
         } catch (err) {
           console.warn('⚠️ Erreur chargement patterns entraînés:', err);
         }
       }
+
+      // Build coverage metadata
+      lastCoverageMetadata = {
+        phase0RoomCount,
+        trainedModelRoomCount,
+        finalRoomCount: rooms.length,
+        supplementedByTraining: supplementedCount,
+        trainedModelUsed,
+        formatDetected: formatDetection.format,
+        formatConfidence: formatDetection.confidence,
+        trainedPatternCount,
+        missingFromPhase0,
+        missingFromTraining,
+        perPatternStats,
+      };
       
       // ===== APPLIQUER LES RÈGLES DE COMBINAISON DE L'HÔTEL =====
       if (hotelId) {

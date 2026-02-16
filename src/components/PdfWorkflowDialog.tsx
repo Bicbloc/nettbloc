@@ -10,7 +10,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { processPdf, getLastParsedLines } from "@/services/pdfService";
+import { processPdf, getLastParsedLines, getLastCoverageMetadata, CoverageMetadata } from "@/services/pdfService";
+import { TrainingCoverageReport } from "@/components/TrainingCoverageReport";
 import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles, Map as MapIcon, Zap, Settings2, UserCheck, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +84,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [pendingNewRooms, setPendingNewRooms] = useState<any[]>([]);
   const [registryCount, setRegistryCount] = useState(0);
   const [pendingFilteredData, setPendingFilteredData] = useState<any[]>([]);
+  const [coverageMetadata, setCoverageMetadata] = useState<CoverageMetadata | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -149,6 +151,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       setParsedLines(lines);
       setPdfData(data);
       setSavedPdfData(data);
+      setCoverageMetadata(getLastCoverageMetadata());
       
       setUploadProgress(70);
       setUploadStatus('✅ Extraction terminée');
@@ -581,6 +584,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setExistingRoomsCount(0);
     setRetryCount(0);
     setPreviewFilter('all');
+    setCoverageMetadata(null);
     setPmsMapping({});
   };
 
@@ -1122,6 +1126,11 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           )}
         </div>
       </ScrollArea>
+
+      {/* Training coverage report */}
+      {coverageMetadata && (
+        <TrainingCoverageReport coverage={coverageMetadata} />
+      )}
 
       {/* Avertissement si confiance basse */}
       {extractionStats && extractionStats.avgConfidence < 70 && (

@@ -64,6 +64,10 @@ class UnifiedParserService {
   private debugLogs: string[] = [];
   private isLoading = false;
 
+  getLearnedPatternCount(): number {
+    return this.learnedPatterns.size + this.permanentRules.size;
+  }
+
   private log(message: string): void {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
     const logEntry = `[${timestamp}] ${message}`;
