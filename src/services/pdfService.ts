@@ -576,6 +576,53 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       const parsedRows = formatDetection.parsedData.rows;
       let rooms = parsedRows.map(convertParsedRowToRoom);
       
+      // ===== SUPPLEMENTER AVEC LES PATTERNS ENTRAINÉS =====
+      // Le modèle entraîné (unifiedParserService) peut avoir appris des chambres 
+      // que le parser de format ne détecte pas (ex: formats spéciaux, lignes coupées)
+      if (hotelId) {
+        try {
+          await unifiedParserService.loadHotelPatterns(hotelId);
+          const trainedResult = await unifiedParserService.parseReportHybrid(fullText, hotelId, false);
+          
+          if (trainedResult.rooms.length > 0) {
+            const trainedRooms = convertExtractedRoomsToRooms(trainedResult.rooms);
+            const existingNumbers = new Set(rooms.map(r => r.number));
+            
+            // Ajouter les chambres trouvées par le modèle entraîné mais pas par Phase 0
+            let supplemented = 0;
+            for (const trainedRoom of trainedRooms) {
+              if (!existingNumbers.has(trainedRoom.number)) {
+                rooms.push(trainedRoom);
+                existingNumbers.add(trainedRoom.number);
+                supplemented++;
+              }
+            }
+            
+            if (supplemented > 0) {
+              console.log(`🧠 Modèle entraîné: +${supplemented} chambres supplémentaires (total: ${rooms.length})`);
+            }
+            
+            // Si le modèle entraîné a trouvé PLUS de chambres au total, 
+            // utiliser ses résultats comme base (il connaît mieux le format)
+            if (trainedRooms.length > rooms.length) {
+              console.log(`🧠 Le modèle entraîné a trouvé plus de chambres (${trainedRooms.length} vs ${rooms.length}), utilisation de ses résultats`);
+              // Fusionner: garder les données enrichies de Phase 0 quand disponibles
+              const phase0Map = new Map(rooms.map(r => [r.number, r]));
+              rooms = trainedRooms.map(tr => {
+                const phase0Room = phase0Map.get(tr.number);
+                if (phase0Room) {
+                  // Garder les données enrichies de Phase 0 (guest name, dates, etc.)
+                  return { ...tr, ...phase0Room };
+                }
+                return tr;
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('⚠️ Erreur chargement patterns entraînés:', err);
+        }
+      }
+      
       // ===== APPLIQUER LES RÈGLES DE COMBINAISON DE L'HÔTEL =====
       if (hotelId) {
         const combinationRules = await loadHotelCombinationRules(hotelId);
@@ -594,28 +641,33 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       console.log(`🔵 À blanc: ${aBlancCount} | 🟢 Recouche: ${recoucheCount} | ⚪ Aucun: ${noneCount}`);
       
       // Créer des RoomLines synthétiques pour la prévisualisation
-      lastParsedLines = parsedRows.map(row => ({
-        roomNumber: row.roomNumber,
-        rawText: row.rawLine,
-        fullText: row.rawLine,
-        cleaningType: row.detectedCleaningType === 'full' ? 'a_blanc' : 
-                      row.detectedCleaningType === 'quick' ? 'recouche' : 
-                      row.detectedCleaningType === 'none' ? 'none' : 'a_blanc',
-        cleaningReason: row.statusIndicator,
-        statusCode: row.cleaningStatus,
-        statusLabel: row.statusIndicator,
-        roomType: row.roomType,
-        guestName: row.guestName,
-        arrivalDate: row.arrivalDate,
-        departureDate: row.departureDate,
-        checkInTime: row.arrivalTime,
-        checkOutTime: row.departureTime,
-        confidence: row.confidence * 100,
-        linkedRooms: [],
-        notes: [],
-        isLastNight: row.hasDepartingGuest,
-        isFirstNight: row.hasArrivingGuest,
-      } as RoomLine));
+      // Inclure TOUTES les chambres (Phase 0 + patterns entraînés)
+      lastParsedLines = rooms.map(room => {
+        // Chercher la parsedRow correspondante pour les données enrichies
+        const matchingRow = parsedRows.find(r => r.roomNumber === room.number);
+        return {
+          roomNumber: room.number,
+          rawText: matchingRow?.rawLine || `${room.number} ${room.cleaningType}`,
+          fullText: matchingRow?.rawLine || `${room.number} ${room.cleaningType}`,
+          cleaningType: room.cleaningType === 'a_blanc' ? 'a_blanc' : 
+                        room.cleaningType === 'recouche' ? 'recouche' : 
+                        room.cleaningType === 'none' ? 'none' : 'a_blanc',
+          cleaningReason: room.cleaningReason || matchingRow?.statusIndicator || '',
+          statusCode: matchingRow?.cleaningStatus || '',
+          statusLabel: matchingRow?.statusIndicator || room.cleaningReason || '',
+          roomType: room.roomType || matchingRow?.roomType || '',
+          guestName: room.guestName || matchingRow?.guestName || '',
+          arrivalDate: room.arrivalDate || matchingRow?.arrivalDate || '',
+          departureDate: room.departureDate || matchingRow?.departureDate || '',
+          checkInTime: room.checkInTime || matchingRow?.arrivalTime || '',
+          checkOutTime: room.checkOutTime || matchingRow?.departureTime || '',
+          confidence: matchingRow ? matchingRow.confidence * 100 : 75,
+          linkedRooms: [],
+          notes: [],
+          isLastNight: matchingRow?.hasDepartingGuest || false,
+          isFirstNight: matchingRow?.hasArrivingGuest || false,
+        } as RoomLine;
+      });
       
       toast({
         title: "Extraction IA réussie",
