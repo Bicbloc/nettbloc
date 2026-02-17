@@ -68,34 +68,34 @@ const t = {
     pricing: {
       title: 'Des tarifs adaptés à votre établissement',
       subtitle: 'Choisissez le plan qui correspond à la taille et aux besoins de votre hôtel.',
-      perMonth: '/mois',
+      perMonth: 'HT / mois',
       rooms: 'chambres',
-      unlimited: 'Illimité',
+      unlimited: 'Chambres illimitées',
       popular: 'Populaire',
       enterprise: 'Sur mesure',
-      startFree: 'Commencer gratuitement',
+      startFree: 'Continuer gratuit',
       contact: 'Nous contacter',
-      choose: 'Choisir ce plan',
+      choose: 'Choisir',
       featuresLabel: 'Fonctionnalités incluses',
+      threeMonthsFree: '3 mois offerts',
+      euNote: 'Paiement par GoCardless. UE : HT + TVA 20%. Hors UE : HT uniquement.',
       features: {
-        rooms: 'Gestion des chambres',
-        distribution: 'Répartition en 1 clic',
-        cleaning: 'Suivi de la propreté',
-        reports: 'Rapports quotidiens',
-        housekeeperPortal: 'Portail femme de chambre',
-        governessPortal: 'Portail gouvernante',
-        incidents: 'Gestion des incidents',
-        maintenance: 'Gestion maintenance',
-        lostFound: 'Objets perdus',
-        qualityControl: 'Contrôle qualité',
-        aiRecognition: 'Reconnaissance IA',
-        aiRecommendation: 'Recommandation IA',
-        technicianPortal: 'Portail technicien',
-        linenCount: 'Comptage linge IA',
-        pmsImport: 'Import PMS automatique',
-        multiHotel: 'Multi-établissements',
+        pdfAnalysis: 'Analyse PDF automatique',
+        distribution: 'Distribution automatique',
+        reports: 'Téléchargement rapports',
+        rooms: 'Jusqu\'à {n} chambres',
+        roomsUnlimited: 'Chambres illimitées',
+        incidents: 'Gestion incidents',
+        linen: 'Inventaire linge',
+        inspection: 'Inspection chambres',
         apiAccess: 'Accès API',
-        prioritySupport: 'Support prioritaire',
+      },
+      planSubtitles: {
+        freemium: 'Pour tester la plateforme',
+        essentiel: 'Petits établissements',
+        confort: 'Établissements moyens',
+        business: 'Grands établissements',
+        entreprise: 'Groupes & chaînes hôtelières',
       },
     },
     testimonials: {
@@ -193,34 +193,34 @@ const t = {
     pricing: {
       title: 'Pricing tailored to your property',
       subtitle: 'Choose the plan that matches your hotel\'s size and needs.',
-      perMonth: '/month',
+      perMonth: 'excl. tax / month',
       rooms: 'rooms',
-      unlimited: 'Unlimited',
+      unlimited: 'Unlimited rooms',
       popular: 'Popular',
       enterprise: 'Custom',
-      startFree: 'Start for free',
+      startFree: 'Continue free',
       contact: 'Contact us',
-      choose: 'Choose this plan',
+      choose: 'Choose',
       featuresLabel: 'Included features',
+      threeMonthsFree: '3 months free',
+      euNote: 'Payment via GoCardless. EU: excl. tax + 20% VAT. Non-EU: excl. tax only.',
       features: {
-        rooms: 'Room management',
-        distribution: '1-click distribution',
-        cleaning: 'Cleanliness tracking',
-        reports: 'Daily reports',
-        housekeeperPortal: 'Housekeeper portal',
-        governessPortal: 'Governess portal',
+        pdfAnalysis: 'Automatic PDF analysis',
+        distribution: 'Automatic distribution',
+        reports: 'Report downloads',
+        rooms: 'Up to {n} rooms',
+        roomsUnlimited: 'Unlimited rooms',
         incidents: 'Incident management',
-        maintenance: 'Maintenance management',
-        lostFound: 'Lost & Found',
-        qualityControl: 'Quality control',
-        aiRecognition: 'AI recognition',
-        aiRecommendation: 'AI recommendation',
-        technicianPortal: 'Technician portal',
-        linenCount: 'AI linen counting',
-        pmsImport: 'Automatic PMS import',
-        multiHotel: 'Multi-property',
+        linen: 'Linen inventory',
+        inspection: 'Room inspection',
         apiAccess: 'API access',
-        prioritySupport: 'Priority support',
+      },
+      planSubtitles: {
+        freemium: 'To test the platform',
+        essentiel: 'Small properties',
+        confort: 'Medium properties',
+        business: 'Large properties',
+        entreprise: 'Groups & hotel chains',
       },
     },
     testimonials: {
@@ -349,17 +349,25 @@ const Landing = () => {
 
   const popularPlan = 'confort';
 
-  // Feature availability per plan tier
+  // Feature availability per plan tier (matching screenshot)
   const planFeatures: Record<string, string[]> = {
-    freemium: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal'],
-    manual_entry: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal'],
-    essentiel: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'lostFound', 'pmsImport'],
-    confort: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'technicianPortal', 'pmsImport', 'aiRecommendation'],
-    business: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'linenCount', 'pmsImport'],
-    entreprise: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'linenCount', 'pmsImport', 'multiHotel', 'apiAccess', 'prioritySupport'],
+    freemium: ['pdfAnalysis', 'distribution', 'reports', 'rooms'],
+    manual_entry: ['pdfAnalysis', 'distribution', 'reports', 'rooms'],
+    essentiel: ['pdfAnalysis', 'distribution', 'reports', 'rooms'],
+    confort: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection'],
+    business: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection'],
+    entreprise: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection', 'apiAccess'],
   };
 
-  const allFeatureKeys = ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'linenCount', 'pmsImport', 'multiHotel', 'apiAccess', 'prioritySupport'] as const;
+  const allFeatureKeys = ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection', 'apiAccess'] as const;
+
+  const planIcons: Record<string, React.ReactNode> = {
+    freemium: <Zap className="w-8 h-8 text-muted-foreground" />,
+    essentiel: <ClipboardList className="w-8 h-8 text-muted-foreground" />,
+    confort: <Star className="w-8 h-8 text-muted-foreground" />,
+    business: <Award className="w-8 h-8 text-muted-foreground" />,
+    entreprise: <Crown className="w-8 h-8 text-primary" />,
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -478,71 +486,99 @@ const Landing = () => {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.pricing.subtitle}</p>
           </div>
           {plans.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-6xl mx-auto">
-              {plans.map((plan) => {
-                const isPopular = plan.plan_name === popularPlan;
-                const isEnterprise = plan.plan_name === 'entreprise';
-                const displayName = planDisplayNames[lang]?.[plan.plan_name] || plan.plan_name;
-                return (
-                  <div
-                    key={plan.plan_name}
-                    className={`relative rounded-2xl border p-6 bg-card flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
-                      isPopular ? 'border-primary shadow-lg shadow-primary/10 ring-2 ring-primary/20' : 'border-border/60'
-                    }`}
-                  >
-                    {isPopular && (
-                      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1">
-                        <Star className="w-3 h-3 mr-1" />
-                        {c.pricing.popular}
-                      </Badge>
-                    )}
-                    <h3 className="text-xl font-bold mb-1">{displayName}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {plan.max_rooms
-                        ? `${lang === 'fr' ? 'Jusqu\'à' : 'Up to'} ${plan.max_rooms} ${c.pricing.rooms}`
-                        : c.pricing.unlimited}
-                    </p>
-                    <div className="mb-6">
-                      {isEnterprise ? (
-                        <span className="text-2xl font-extrabold">{c.pricing.enterprise}</span>
-                      ) : plan.price_monthly === 0 ? (
-                        <span className="text-3xl font-extrabold">{lang === 'fr' ? 'Gratuit' : 'Free'}</span>
-                      ) : (
-                        <>
-                          <span className="text-3xl font-extrabold">{plan.price_monthly}€</span>
-                          <span className="text-muted-foreground text-sm">{c.pricing.perMonth}</span>
-                        </>
-                      )}
+            <>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 max-w-7xl mx-auto">
+                {plans.map((plan) => {
+                  const isPopular = plan.plan_name === popularPlan;
+                  const isEnterprise = plan.plan_name === 'entreprise';
+                  const isFree = plan.price_monthly === 0;
+                  const isPaid = plan.price_monthly > 0;
+                  const displayName = planDisplayNames[lang]?.[plan.plan_name] || plan.plan_name;
+                  const subtitle = (c.pricing as any).planSubtitles?.[plan.plan_name] || '';
+                  const featuresList = planFeatures[plan.plan_name] || [];
+
+                  return (
+                    <div
+                      key={plan.plan_name}
+                      className={`relative rounded-2xl border p-6 bg-card flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+                        isPopular ? 'border-primary shadow-lg shadow-primary/10 ring-2 ring-primary/20' : isEnterprise ? 'border-primary/40' : 'border-border/60'
+                      }`}
+                    >
+                      {isPopular ? (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                          <Badge className="bg-primary text-primary-foreground px-2 py-0.5 text-xs">
+                            {c.pricing.popular}
+                          </Badge>
+                          <Badge className="bg-amber-500 text-white px-2 py-0.5 text-xs">
+                            {(c.pricing as any).threeMonthsFree}
+                          </Badge>
+                        </div>
+                      ) : isPaid && !isEnterprise ? (
+                        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white px-3 py-0.5 text-xs whitespace-nowrap">
+                          {(c.pricing as any).threeMonthsFree}
+                        </Badge>
+                      ) : null}
+
+                      <div className="mb-3">
+                        {planIcons[plan.plan_name] || <Zap className="w-8 h-8 text-muted-foreground" />}
+                      </div>
+
+                      <h3 className="text-xl font-bold mb-0.5">{displayName}</h3>
+                      <p className="text-xs text-muted-foreground mb-4">{subtitle}</p>
+
+                      <div className="mb-5">
+                        {isFree ? (
+                          <span className="text-3xl font-extrabold">{lang === 'fr' ? 'Gratuit' : 'Free'}</span>
+                        ) : (
+                          <>
+                            <span className="text-3xl font-extrabold">{plan.price_monthly}€</span>
+                            <div className="text-xs text-muted-foreground">{c.pricing.perMonth}</div>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="mb-6 space-y-2 flex-1">
+                        {allFeatureKeys.map((fk) => {
+                          const included = featuresList.includes(fk);
+                          let label = (c.pricing.features as Record<string, string>)[fk] || fk;
+                          if (fk === 'rooms') {
+                            if (plan.max_rooms) {
+                              label = label.replace('{n}', String(plan.max_rooms));
+                            } else {
+                              label = (c.pricing.features as Record<string, string>)['roomsUnlimited'] || c.pricing.unlimited;
+                            }
+                          }
+                          return (
+                            <div key={fk} className={`flex items-center gap-2 text-xs ${included ? 'text-foreground' : 'text-muted-foreground/40 line-through'}`}>
+                              {included ? (
+                                <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                              ) : (
+                                <span className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center text-muted-foreground/30">✕</span>
+                              )}
+                              {label}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-auto">
+                        <Button
+                          className="w-full gap-2"
+                          variant={isPopular ? 'default' : 'outline'}
+                          onClick={() => isEnterprise ? window.location.href = 'mailto:support@bicbloc.eu' : navigate('/auth')}
+                        >
+                          {isFree ? c.pricing.startFree : isEnterprise ? c.pricing.contact : c.pricing.choose}
+                          {!isFree && !isEnterprise && <ArrowRight className="w-4 h-4" />}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="mb-6 space-y-1.5 flex-1">
-                      <p className="text-xs font-semibold text-foreground mb-2">{c.pricing.featuresLabel}</p>
-                      {allFeatureKeys.map((fk) => {
-                        const included = (planFeatures[plan.plan_name] || []).includes(fk);
-                        return (
-                          <div key={fk} className={`flex items-center gap-2 text-xs ${included ? 'text-foreground' : 'text-muted-foreground/40 line-through'}`}>
-                            {included ? (
-                              <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                            ) : (
-                              <span className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center text-muted-foreground/30">✕</span>
-                            )}
-                            {(c.pricing.features as Record<string, string>)[fk]}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-auto">
-                      <Button
-                        className="w-full"
-                        variant={isPopular ? 'default' : 'outline'}
-                        onClick={() => isEnterprise ? window.location.href = 'mailto:support@bicbloc.eu' : navigate('/auth')}
-                      >
-                        {plan.price_monthly === 0 ? c.pricing.startFree : isEnterprise ? c.pricing.contact : c.pricing.choose}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <p className="text-center text-xs text-muted-foreground mt-8">
+                {(c.pricing as any).euNote}
+              </p>
+            </>
           ) : (
             <div className="text-center text-muted-foreground py-8">
               <Clock className="w-6 h-6 mx-auto mb-2 animate-spin" />
