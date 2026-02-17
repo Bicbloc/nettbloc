@@ -39,7 +39,7 @@ export function PlanRestrictionGuard({
   }
 
   // Vérifier si l'essai est expiré
-  const isTrialExpired = !isInTrial && !subscribed && plan === 'freemium';
+  const isTrialExpired = !isInTrial && !subscribed && plan === 'decouverte';
   
   // Vérifier si on est après la période d'essai sans abonnement
   if (isTrialExpired && trialDaysRemaining !== undefined && trialDaysRemaining <= 0) {
@@ -79,7 +79,7 @@ export function PlanRestrictionGuard({
 
   // Vérification du plan requis
   if (requiredPlan) {
-    const planOrder: PlanType[] = ['freemium', 'basic', 'basic_plus', 'premium', 'platinum'];
+    const planOrder: PlanType[] = ['decouverte', 'essentiel', 'confort', 'business', 'entreprise'];
     const currentPlanIndex = planOrder.indexOf(plan);
     const requiredPlanIndex = planOrder.indexOf(requiredPlan);
     

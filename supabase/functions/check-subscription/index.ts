@@ -79,7 +79,7 @@ serve(async (req) => {
 
         if (gcSubscription.status === "active") {
           hasActiveSubscription = true;
-          plan = subscription.plan || "premium";
+          plan = subscription.plan || "confort";
           
           // Calculate next payment date
           const upcomingPayments = gcSubscription.upcoming_payments || [];
@@ -127,7 +127,7 @@ serve(async (req) => {
             // Mandate was created, now create subscription
             logStep("Mandate created, creating subscription", { mandateId: billingRequest.links.mandate });
 
-            const planConfig = PLAN_PRICES[pending.plan_type] || PLAN_PRICES.premium;
+            const planConfig = PLAN_PRICES[pending.plan_type] || PLAN_PRICES.confort;
             
             // Calculate start_date: 1st of next month for end-of-month billing
             const now = new Date();
@@ -225,8 +225,8 @@ serve(async (req) => {
 
 // Plan prices reference
 const PLAN_PRICES: Record<string, { name: string }> = {
-  basic: { name: "Plan Basic Nettobloc" },
-  basic_plus: { name: "Plan Basic+ Nettobloc" },
-  premium: { name: "Plan Premium Nettobloc" },
-  platinum: { name: "Plan Platinum Nettobloc" }
+  essentiel: { name: "Plan Essentiel Nettobloc" },
+  confort: { name: "Plan Confort Nettobloc" },
+  business: { name: "Plan Business Nettobloc" },
+  entreprise: { name: "Plan Entreprise Nettobloc" }
 };

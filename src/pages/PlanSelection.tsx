@@ -101,7 +101,7 @@ const PlanSelectionContent = () => {
 
   const handleSubscribe = async (planType: PlanType) => {
     // Vérifier si l'utilisateur doit obligatoirement prendre Entreprise
-    if (requiresEnterprise && planType !== 'platinum') {
+    if (requiresEnterprise && planType !== 'entreprise') {
       toast({
         variant: 'destructive',
         title: 'Plan insuffisant',
@@ -110,7 +110,7 @@ const PlanSelectionContent = () => {
       return;
     }
 
-    if (planType === 'freemium') {
+    if (planType === 'decouverte') {
       window.location.href = '/';
       return;
     }
@@ -163,30 +163,30 @@ const PlanSelectionContent = () => {
   // Plans ordonnés par prix croissant avec logique claire
   const plans: { type: PlanType; icon: typeof Crown; popular?: boolean; trial?: boolean; description: string }[] = [
     { 
-      type: 'freemium', 
+      type: 'decouverte', 
       icon: Zap,
       description: 'Pour tester la plateforme'
     },
     { 
-      type: 'basic', 
+      type: 'essentiel', 
       icon: Building2, 
       trial: true,
       description: 'Petits établissements'
     },
     { 
-      type: 'premium', 
+      type: 'confort', 
       icon: Star, 
       popular: true, 
       trial: true,
       description: 'Établissements moyens'
     },
     { 
-      type: 'basic_plus', 
+      type: 'business', 
       icon: Crown,
       description: 'Grands établissements'
     },
     { 
-      type: 'platinum', 
+      type: 'entreprise', 
       icon: Diamond,
       description: 'Groupes & chaînes hôtelières'
     }
@@ -225,7 +225,7 @@ const PlanSelectionContent = () => {
   // Vérifie si un plan est accessible (pas bloqué par le seuil)
   const isPlanAccessible = (planType: PlanType) => {
     if (!requiresEnterprise) return true;
-    return planType === 'platinum';
+    return planType === 'entreprise';
   };
 
   return (
@@ -372,7 +372,7 @@ const PlanSelectionContent = () => {
                       'Capacité insuffisante'
                     ) : !isPlanActive ? (
                       'Indisponible'
-                    ) : type === 'freemium' ? (
+                    ) : type === 'decouverte' ? (
                       'Continuer gratuit'
                     ) : (
                       <>

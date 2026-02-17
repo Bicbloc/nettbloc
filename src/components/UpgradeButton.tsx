@@ -17,7 +17,7 @@ export function UpgradeButton({ variant = 'default', size = 'default', className
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const { byPlan: pricingByPlan } = usePricingConfig();
-  const premiumActive = pricingByPlan.premium?.is_active ?? true;
+  const premiumActive = pricingByPlan.confort?.is_active ?? true;
 
   const handleUpgrade = async () => {
     if (!user) {

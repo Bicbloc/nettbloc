@@ -19,8 +19,8 @@ export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSel
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'premium' | null>(null);
   const { byPlan: pricingByPlan } = usePricingConfig();
-  const premiumActive = pricingByPlan.premium?.is_active ?? true;
-  const premiumPrice = PLAN_CONFIGS.premium.price;
+  const premiumActive = pricingByPlan.confort?.is_active ?? true;
+  const premiumPrice = PLAN_CONFIGS.confort.price;
 
   const handlePlanSelect = async (plan: 'free' | 'premium') => {
     setSelectedPlan(plan);

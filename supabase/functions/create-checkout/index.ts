@@ -10,20 +10,20 @@ const GOCARDLESS_API_URL = "https://api.gocardless.com";
 
 // Plan display names (amounts come from pricing_config table)
 const PLAN_NAMES: Record<string, { name: string; description: string }> = {
-  basic: { 
-    name: "Plan Basic Nettobloc",
+  essentiel: { 
+    name: "Plan Essentiel Nettobloc",
     description: "70 chambres max, PDF, distribution, rapports"
   },
-  basic_plus: { 
-    name: "Plan Basic+ Nettobloc",
-    description: "170 chambres max, PDF, distribution, rapports"
-  },
-  premium: { 
-    name: "Plan Premium Nettobloc",
+  confort: { 
+    name: "Plan Confort Nettobloc",
     description: "150 chambres, incidents, inventaire linge, inspection"
   },
-  platinum: { 
-    name: "Plan Platinum Nettobloc",
+  business: { 
+    name: "Plan Business Nettobloc",
+    description: "170 chambres max, PDF, distribution, rapports"
+  },
+  entreprise: { 
+    name: "Plan Entreprise Nettobloc",
     description: "Chambres illimitées, toutes fonctionnalités, API"
   }
 };
@@ -63,7 +63,7 @@ serve(async (req) => {
 
     // Parse request body
     const body = await req.json().catch(() => ({}));
-    const planType = body.planType || 'premium';
+    const planType = body.planType || 'confort';
 
     // Get plan configuration from pricing_config table
     const planNames = PLAN_NAMES[planType];
@@ -104,7 +104,6 @@ serve(async (req) => {
     const origin = req.headers.get("origin") || "http://localhost:3000";
 
     // Create a GoCardless Billing Request Flow
-    // This creates a hosted checkout page for mandate setup
     const billingRequestResponse = await fetch(`${GOCARDLESS_API_URL}/billing_requests`, {
       method: "POST",
       headers: {

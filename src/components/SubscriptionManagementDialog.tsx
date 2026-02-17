@@ -153,10 +153,10 @@ export function SubscriptionManagementDialog({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'trial': return <Clock className="h-4 w-4" />;
-      case 'premium': return <Crown className="h-4 w-4 text-amber-500" />;
-      case 'platinum': return <Crown className="h-4 w-4 text-purple-500" />;
-      case 'basic': return <CreditCard className="h-4 w-4" />;
-      case 'basic_plus': return <CreditCard className="h-4 w-4 text-blue-500" />;
+      case 'confort': return <Crown className="h-4 w-4 text-amber-500" />;
+      case 'entreprise': return <Crown className="h-4 w-4 text-purple-500" />;
+      case 'essentiel': return <CreditCard className="h-4 w-4" />;
+      case 'business': return <CreditCard className="h-4 w-4 text-blue-500" />;
       case 'free': return <Gift className="h-4 w-4" />;
       default: return null;
     }
@@ -165,10 +165,10 @@ export function SubscriptionManagementDialog({
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'trial': return 'Période d\'essai';
-      case 'premium': return 'Premium';
-      case 'platinum': return 'Platinum';
-      case 'basic': return 'Basic';
-      case 'basic_plus': return 'Basic+';
+      case 'confort': return 'Confort';
+      case 'entreprise': return 'Entreprise';
+      case 'essentiel': return 'Essentiel';
+      case 'business': return 'Business';
       case 'free': return 'Gratuit';
       default: return status;
     }
@@ -270,28 +270,28 @@ export function SubscriptionManagementDialog({
                           Période d'essai
                         </div>
                       </SelectItem>
-                      <SelectItem value="basic">
+                      <SelectItem value="essentiel">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4" />
-                          Basic
+                          Essentiel
                         </div>
                       </SelectItem>
-                      <SelectItem value="basic_plus">
+                      <SelectItem value="confort">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-blue-500" />
-                          Basic+
+                          Confort
                         </div>
                       </SelectItem>
-                      <SelectItem value="premium">
+                      <SelectItem value="business">
                         <div className="flex items-center gap-2">
                           <Crown className="h-4 w-4 text-amber-500" />
-                          Premium
+                          Business
                         </div>
                       </SelectItem>
-                      <SelectItem value="platinum">
+                      <SelectItem value="entreprise">
                         <div className="flex items-center gap-2">
                           <Crown className="h-4 w-4 text-purple-500" />
-                          Platinum
+                          Entreprise
                         </div>
                       </SelectItem>
                     </SelectContent>

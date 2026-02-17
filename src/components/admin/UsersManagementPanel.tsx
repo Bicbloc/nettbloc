@@ -47,11 +47,11 @@ interface HotelInfo {
 
 const PLAN_CONFIGS = {
   free: { label: 'Gratuit', color: 'bg-gray-100 text-gray-700', icon: null },
-  freemium: { label: 'Freemium', color: 'bg-gray-100 text-gray-700', icon: null },
-  basic: { label: 'Basic', color: 'bg-blue-100 text-blue-700', icon: Zap },
-  basic_plus: { label: 'Basic+', color: 'bg-blue-200 text-blue-800', icon: Zap },
-  premium: { label: 'Premium', color: 'bg-amber-100 text-amber-700', icon: Star },
-  platinum: { label: 'Platinum', color: 'bg-purple-100 text-purple-700', icon: Crown },
+  decouverte: { label: 'Découverte', color: 'bg-gray-100 text-gray-700', icon: null },
+  essentiel: { label: 'Essentiel', color: 'bg-blue-100 text-blue-700', icon: Zap },
+  confort: { label: 'Confort', color: 'bg-blue-200 text-blue-800', icon: Zap },
+  business: { label: 'Business', color: 'bg-amber-100 text-amber-700', icon: Star },
+  entreprise: { label: 'Entreprise', color: 'bg-purple-100 text-purple-700', icon: Crown },
 };
 
 const USER_TYPE_CONFIGS = {
