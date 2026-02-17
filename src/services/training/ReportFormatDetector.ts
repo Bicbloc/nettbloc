@@ -783,52 +783,154 @@ function parseMedialogReport(text: string): ParsedReportData {
 
 
 /**
- * Parser générique - renforcé pour éviter les faux positifs
- * Rejette les numéros à 1 chiffre (1-9) et exige un contexte minimum
+ * Détecte la ligne d'en-tête d'un tableau et retourne l'index de la colonne "chambre"
+ */
+function detectTableHeader(lines: string[]): { headerLineIndex: number; roomColumnIndex: number; delimiter: string } | null {
+  const HEADER_KEYWORDS = ['chambre', 'room', 'zimmer', 'nb pers', 'statut', 'etat', 'état', 'date', 'client', 'type', 'assignee', 'arrivée', 'départ', 'recouche', 'blanc'];
+  const ROOM_COLUMN_KEYWORDS = ['chambre', 'room', 'zimmer', 'ch.', 'n°'];
+
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    const line = lines[i].trim().toLowerCase();
+    if (!line) continue;
+
+    // Count how many header keywords appear in this line
+    const matchCount = HEADER_KEYWORDS.filter(kw => line.includes(kw)).length;
+    if (matchCount < 2) continue;
+
+    // Try tab delimiter first, then multiple spaces
+    let delimiter = '\t';
+    let columns = lines[i].split('\t').map(c => c.trim());
+    if (columns.length < 3) {
+      delimiter = '  '; // 2+ spaces
+      columns = lines[i].split(/\s{2,}/).map(c => c.trim());
+    }
+    if (columns.length < 3) continue;
+
+    // Find the room column index
+    const roomColIdx = columns.findIndex(col => 
+      ROOM_COLUMN_KEYWORDS.some(kw => col.toLowerCase().includes(kw))
+    );
+
+    if (roomColIdx !== -1) {
+      console.log(`📋 En-tête tableau détecté ligne ${i}: "${lines[i].trim().substring(0, 80)}" — colonne chambre: ${roomColIdx}`);
+      return { headerLineIndex: i, roomColumnIndex: roomColIdx, delimiter };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Filtre de cohérence d'étage: si >70% des chambres ont 3+ chiffres,
+ * rejeter les nombres à 2 chiffres sans statut explicite
+ */
+function applyFloorCoherenceFilter(rows: ParsedRow[]): ParsedRow[] {
+  if (rows.length < 3) return rows;
+
+  const threeDigitCount = rows.filter(r => r.roomNumber.replace(/\D/g, '').length >= 3).length;
+  const ratio = threeDigitCount / rows.length;
+
+  if (ratio < 0.7) return rows; // Not enough 3-digit rooms to apply filter
+
+  const EXPLICIT_STATUSES = /\b(libre|recouche|depart|départ|parti|checkout|stayover|occupé|occ|blanc|arrivée|arrival|clean|propre|sale|dirty|ooo|hors.service|maintenance)\b/i;
+
+  const filtered = rows.filter(r => {
+    const digits = r.roomNumber.replace(/\D/g, '');
+    if (digits.length >= 3) return true; // Keep 3+ digit rooms always
+
+    // 2-digit room: only keep if it has an explicit status
+    const hasExplicitStatus = EXPLICIT_STATUSES.test(r.rawLine);
+    if (!hasExplicitStatus) {
+      console.log(`🧹 Cohérence étage: rejet "${r.roomNumber}" (2 chiffres sans statut explicite)`);
+    }
+    return hasExplicitStatus;
+  });
+
+  if (filtered.length < rows.length) {
+    console.log(`🧹 Cohérence étage: ${rows.length - filtered.length} faux positifs rejetés (${threeDigitCount}/${rows.length} = ${Math.round(ratio * 100)}% à 3+ chiffres)`);
+  }
+
+  return filtered;
+}
+
+/**
+ * Parser générique - renforcé avec détection d'en-tête, filtrage contextuel et cohérence d'étage
  */
 function parseGenericReport(text: string): ParsedReportData {
   const lines = text.split('\n');
-  const rows: ParsedRow[] = [];
+  let rows: ParsedRow[] = [];
   
-  // Pattern générique pour numéro de chambre — minimum 2 chiffres
-  // Supporte: début de ligne, après tab, ou dans une colonne
-  const roomPattern = /(?:^|\t)(\d{2,4}[A-Z]?)\b/;
+  // === PHASE 1: Détecter l'en-tête du tableau ===
+  const headerInfo = detectTableHeader(lines);
   
-  // Pattern pour détecter des chambres liées type "104 / 105"
-  const linkedRoomPattern = /(\d{2,4})\s*[\/\-]\s*(\d{2,4})/;
+  // Pattern pour détecter les dates (pour filtrer les faux positifs)
+  const DATE_PART_PATTERN = /\d{2}[\/\.\-]\d{2}[\/\.\-]\d{2,4}/;
   
   // Context keywords that indicate a line is about a room
   const ROOM_CONTEXT_KEYWORDS = /\b(départ|depart|parti|checkout|libéré|recouche|stayover|occupé|occ|ooo|out\s*of\s*order|hors\s*service|maintenance|libre|vacant|propre|clean|sale|dirty|arrivée|arrival|checkin|chambre|room|dbl|sgl|tpl|twn|suite|fam|dup|blanc|draps)\b/i;
   
   // Date pattern as context indicator
   const DATE_CONTEXT = /\d{2}[\/\.\-]\d{2}[\/\.\-]\d{4}/;
+
+  const startLine = headerInfo ? headerInfo.headerLineIndex + 1 : 0;
   
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.length < 5) continue;
+  for (let i = startLine; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed || trimmed.length < 3) continue;
     if (isHeaderLine(trimmed)) continue;
     
-    const roomMatch = trimmed.match(roomPattern);
-    if (!roomMatch) continue;
+    let roomNumber = '';
     
-    const roomNumber = roomMatch[1];
-    
-    // REINFORCEMENT: Reject isolated numbers without context
-    // The line must contain at least one room-context keyword or a date,
-    // or have enough content beyond just the number (multiple columns)
-    const textAfterNumber = trimmed.substring(roomMatch[0].length).trim();
-    const hasContextKeyword = ROOM_CONTEXT_KEYWORDS.test(trimmed);
-    const hasDateContext = DATE_CONTEXT.test(trimmed);
-    const hasMultipleColumns = textAfterNumber.length >= 5; // At least 5 chars of additional content
-    
-    if (!hasContextKeyword && !hasDateContext && !hasMultipleColumns) {
-      // This is likely a page number, counter, or isolated number - skip it
-      continue;
-    }
-    
-    // Additional check: reject lines that are just a number + very short text (pagination, counters)
-    if (trimmed.length < 10 && !hasContextKeyword) {
-      continue;
+    if (headerInfo) {
+      // === MODE EN-TÊTE DÉTECTÉ: extraire uniquement depuis la colonne identifiée ===
+      const columns = headerInfo.delimiter === '\t' 
+        ? trimmed.split('\t').map(c => c.trim())
+        : trimmed.split(/\s{2,}/).map(c => c.trim());
+      
+      if (columns.length <= headerInfo.roomColumnIndex) continue;
+      
+      const candidate = columns[headerInfo.roomColumnIndex].replace(/\s/g, '');
+      // Must be a 2-4 digit number (optionally with letter suffix)
+      if (/^\d{2,4}[A-Z]?$/.test(candidate)) {
+        roomNumber = candidate;
+      } else {
+        continue;
+      }
+    } else {
+      // === MODE SANS EN-TÊTE: regex sur la ligne ===
+      const roomPattern = /(?:^|\t)(\d{2,4}[A-Z]?)\b/;
+      const roomMatch = trimmed.match(roomPattern);
+      if (!roomMatch) continue;
+      
+      roomNumber = roomMatch[1];
+      
+      // FILTRE DATE: rejeter si le nombre fait partie d'une date (ex: "16/02/2026")
+      // Check if the matched number is immediately followed by a date separator
+      const matchIdx = trimmed.indexOf(roomMatch[0]);
+      const afterMatch = trimmed.substring(matchIdx + roomMatch[0].length);
+      if (/^[\/\.\-]\d{2}[\/\.\-]\d{2,4}/.test(afterMatch)) {
+        continue; // This is a day in a date, not a room number
+      }
+      
+      // Also check: if the number is preceded by a date separator
+      const beforeMatch = trimmed.substring(0, matchIdx + (roomMatch[0].startsWith('\t') ? 1 : 0));
+      if (/\d{2}[\/\.\-]$/.test(beforeMatch)) {
+        continue; // This is part of a date
+      }
+      
+      // Context validation (only in headerless mode)
+      const textAfterNumber = trimmed.substring(matchIdx + roomMatch[0].length).trim();
+      const hasContextKeyword = ROOM_CONTEXT_KEYWORDS.test(trimmed);
+      const hasDateContext = DATE_CONTEXT.test(trimmed);
+      const hasMultipleColumns = textAfterNumber.length >= 5;
+      
+      if (!hasContextKeyword && !hasDateContext && !hasMultipleColumns) {
+        continue;
+      }
+      
+      if (trimmed.length < 10 && !hasContextKeyword) {
+        continue;
+      }
     }
     
     // Chercher des indicateurs de statut
@@ -845,12 +947,15 @@ function parseGenericReport(text: string): ParsedReportData {
       detectedType = 'out_of_service';
       statusIndicator = 'H.S.';
     } else if (/\b(libre|vacant|propre|clean)\b/i.test(trimmed)) {
-      detectedType = 'none';
+      detectedType = 'full'; // "Libre" = chambre vide = à blanc
       statusIndicator = 'Libre';
+    } else if (/\b(blanc|à\s*blanc)\b/i.test(trimmed)) {
+      detectedType = 'full';
+      statusIndicator = 'À blanc';
     }
     
     rows.push({
-      rawLine: line,
+      rawLine: lines[i],
       roomNumber,
       roomType: '',
       cleaningStatus: statusIndicator,
@@ -874,6 +979,26 @@ function parseGenericReport(text: string): ParsedReportData {
       assignee: '',
     });
   }
+  
+  // === PHASE 2: Dédoublonner par numéro de chambre (garder la meilleure confiance) ===
+  const roomMap = new Map<string, ParsedRow>();
+  for (const row of rows) {
+    const existing = roomMap.get(row.roomNumber);
+    if (!existing || row.confidence > existing.confidence) {
+      roomMap.set(row.roomNumber, row);
+    }
+  }
+  rows = Array.from(roomMap.values());
+  
+  // === PHASE 3: Appliquer le filtre de cohérence d'étage ===
+  rows = applyFloorCoherenceFilter(rows);
+  
+  // Trier par numéro de chambre
+  rows.sort((a, b) => {
+    const numA = parseInt(a.roomNumber.replace(/\D/g, ''));
+    const numB = parseInt(b.roomNumber.replace(/\D/g, ''));
+    return numA - numB;
+  });
   
   return {
     headers: ['N° Chambre', 'Statut', 'Type nettoyage'],

@@ -90,8 +90,45 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
     const detection = detectReportFormat(trainingData.rawText);
     console.log('Detection result:', detection.format, 'rows:', detection.parsedData.rows.length);
     
-    // Le fallback est désormais géré dans parseReportByFormat() de ReportFormatDetector
-    // Si le parser spécifique retourne 0 lignes, il bascule automatiquement sur le parser générique
+    // Fallback ultime: si toujours 0 lignes, parser le texte brut ligne par ligne
+    if (detection.parsedData.rows.length === 0 && trainingData.rawText.trim().length > 0) {
+      console.warn('⚠️ 0 chambres détectées — fallback raw line split pour l\'entrainement');
+      const rawLines = trainingData.rawText.split('\n').filter(l => l.trim().length > 3);
+      const fallbackRows = rawLines.map((line, idx) => {
+        // Try to extract any number from the line as potential room
+        const numMatch = line.match(/\b(\d{2,4}[A-Z]?)\b/);
+        return {
+          rawLine: line,
+          roomNumber: numMatch ? numMatch[1] : `L${idx + 1}`,
+          roomType: '',
+          cleaningStatus: '',
+          columns: [{ value: numMatch ? numMatch[1] : line.substring(0, 20), type: 'room_number' as const, confidence: 0.2 }],
+          detectedCleaningType: 'unknown' as const,
+          confidence: 0.2,
+          statusIndicator: '',
+          guestName: '',
+          arrivalDate: '',
+          departureDate: '',
+          arrivalTime: '',
+          departureTime: '',
+          nightInfo: '',
+          hasCurrentGuest: false,
+          hasDepartingGuest: false,
+          hasArrivingGuest: false,
+          isOutOfOrder: false,
+          assignee: '',
+        };
+      });
+      
+      return {
+        ...detection,
+        parsedData: {
+          ...detection.parsedData,
+          rows: fallbackRows,
+          summary: { totalRooms: fallbackRows.length, departures: 0, stayovers: 0, arrivals: 0, vacant: 0, outOfService: 0, unknown: fallbackRows.length },
+        },
+      };
+    }
     
     return detection;
   }, [trainingData.rawText]);
