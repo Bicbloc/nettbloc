@@ -90,8 +90,51 @@ const DEFAULT_VALIDATION_RULES: ValidationRule[] = [
   }
 ];
 
+// Floor coherence validation rule
+const FLOOR_COHERENCE_RULE: ValidationRule = {
+  name: 'floor_coherence',
+  check: (room, ctx) => {
+    // Extract floor from room number
+    const num = parseInt(room.roomNumber, 10);
+    if (isNaN(num) || num < 100) return true; // Skip if we can't determine floor
+    
+    const floor = Math.floor(num / 100);
+    
+    // Count cleaning types on same floor
+    const sameFloorRooms = ctx.allRooms.filter(r => {
+      const rNum = parseInt(r.roomNumber, 10);
+      return !isNaN(rNum) && rNum >= 100 && Math.floor(rNum / 100) === floor;
+    });
+    
+    if (sameFloorRooms.length < 3) return true; // Not enough rooms on floor for analysis
+    
+    // Count types
+    const fullCount = sameFloorRooms.filter(r => r.cleaningType === 'full' || r.cleaningType === 'a_blanc').length;
+    const quickCount = sameFloorRooms.filter(r => r.cleaningType === 'quick' || r.cleaningType === 'recouche').length;
+    const total = fullCount + quickCount;
+    
+    if (total === 0) return true;
+    
+    // If this room's cleaning type is the outlier (< 20% of floor)
+    const isFullType = room.cleaningType === 'full' || room.cleaningType === 'a_blanc';
+    const isQuickType = room.cleaningType === 'quick' || room.cleaningType === 'recouche';
+    
+    if (isFullType && fullCount <= 1 && quickCount >= 4) {
+      // Isolated "à blanc" in a floor of "recouche" — slight confidence penalty
+      return false;
+    }
+    if (isQuickType && quickCount <= 1 && fullCount >= 4) {
+      // Isolated "recouche" in a floor of "à blanc" — slight confidence penalty
+      return false;
+    }
+    
+    return true;
+  },
+  penalty: 5 // Small penalty - just flags for review, doesn't invalidate
+};
+
 class RoomValidator {
-  private rules: ValidationRule[] = DEFAULT_VALIDATION_RULES;
+  private rules: ValidationRule[] = [...DEFAULT_VALIDATION_RULES, FLOOR_COHERENCE_RULE];
 
   /**
    * Valide et filtre les chambres extraites

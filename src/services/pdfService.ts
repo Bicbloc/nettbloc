@@ -51,6 +51,10 @@ export interface CoverageMetadata {
   missingFromPhase0: string[];   // rooms found by training but not by phase0
   missingFromTraining: string[]; // rooms found by phase0 but not by training
   perPatternStats: { keyword: string; matchedCount: number; totalRooms: number }[];
+  // NEW: confidence breakdown for 99% accuracy tracking
+  confidenceBreakdown?: { high: number; medium: number; low: number };
+  crossValidationMatches?: number;
+  crossValidationDivergences?: { roomNumber: string; phase0Type: string; trainedType: string }[];
 }
 
 let lastCoverageMetadata: CoverageMetadata | null = null;
@@ -517,7 +521,64 @@ function getRoomFloor(roomNumber: string): number {
 }
 
 /**
- * Extract text from PDF file
+ * Calcule un seuil Y dynamique basé sur la taille de police médiane des items
+ * Au lieu d'un seuil fixe de 3.5px, on s'adapte au PDF
+ */
+function computeDynamicYThreshold(items: { str: string; x: number; y: number; fontSize: number }[]): number {
+  if (items.length === 0) return 3.5;
+  
+  // Collecter les tailles de police
+  const fontSizes = items.map(it => it.fontSize).filter(s => s > 0);
+  if (fontSizes.length === 0) return 3.5;
+  
+  // Taille médiane
+  fontSizes.sort((a, b) => a - b);
+  const median = fontSizes[Math.floor(fontSizes.length / 2)];
+  
+  // Le seuil = ~40% de la taille médiane de police (empirique)
+  // Pour une police 10pt → seuil ~4px, pour 8pt → ~3.2px, pour 12pt → ~4.8px
+  const threshold = Math.max(2, Math.min(8, median * 0.4));
+  return threshold;
+}
+
+/**
+ * Détecte les colonnes par clustering des positions X (mode table-aware)
+ * Retourne les bordures de colonnes triées
+ */
+function detectColumnBoundaries(items: { x: number }[]): number[] {
+  if (items.length < 10) return [];
+  
+  // Collecter toutes les positions X arrondies
+  const xPositions = items.map(it => Math.round(it.x));
+  
+  // Clustering simple: regrouper les X proches (< 5px d'écart)
+  const sorted = [...new Set(xPositions)].sort((a, b) => a - b);
+  const clusters: number[] = [];
+  let lastCluster = sorted[0];
+  let clusterCount = 1;
+  
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] - lastCluster < 15) {
+      // Même cluster
+      clusterCount++;
+    } else {
+      // Nouveau cluster si au moins 3 items s'alignent ici
+      if (clusterCount >= 3) {
+        clusters.push(lastCluster);
+      }
+      lastCluster = sorted[i];
+      clusterCount = 1;
+    }
+  }
+  if (clusterCount >= 3) {
+    clusters.push(lastCluster);
+  }
+  
+  return clusters;
+}
+
+/**
+ * Extract text from PDF file with dynamic Y threshold and table-aware mode
  */
 export async function extractPdfText(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
@@ -529,13 +590,22 @@ export async function extractPdfText(file: File): Promise<string> {
     const textContent = await page.getTextContent();
 
     // Reconstruire des lignes à partir des coordonnées (Y puis X)
+    // AMÉLIORATION: inclure la taille de police pour le seuil dynamique
     const items = (textContent.items as any[])
       .map((item) => ({
         str: String(item.str ?? ''),
         x: Array.isArray(item.transform) ? Number(item.transform[4]) : 0,
         y: Array.isArray(item.transform) ? Number(item.transform[5]) : 0,
+        fontSize: item.height || (Array.isArray(item.transform) ? Math.abs(Number(item.transform[3])) : 0),
       }))
       .filter((it) => it.str.trim().length > 0);
+
+    // Calculer le seuil Y dynamique basé sur la taille de police
+    const yThreshold = computeDynamicYThreshold(items);
+    
+    // Détecter les colonnes pour le mode table-aware
+    const columnBoundaries = detectColumnBoundaries(items);
+    const isTableMode = columnBoundaries.length >= 3;
 
     // PDF.js: Y décroissant ~ lignes de haut en bas
     items.sort((a, b) => (b.y - a.y) || (a.x - b.x));
@@ -544,16 +614,31 @@ export async function extractPdfText(file: File): Promise<string> {
     let lineParts: string[] = [];
 
     const flushLine = () => {
-      const line = lineParts.join(' ').replace(/\s+/g, ' ').trim();
+      let line: string;
+      if (isTableMode && lineParts.length > 1) {
+        // En mode table, ajouter un séparateur de tabulation entre les colonnes
+        line = lineParts.join('\t').replace(/\t+/g, '\t').trim();
+      } else {
+        line = lineParts.join(' ').replace(/\s+/g, ' ').trim();
+      }
       if (line) fullText += line + '\n';
       lineParts = [];
     };
 
     for (const it of items) {
       const currentY = it.y;
-      if (lastY !== null && Math.abs(currentY - lastY) > 3.5) {
+      if (lastY !== null && Math.abs(currentY - lastY) > yThreshold) {
         flushLine();
       }
+      
+      // En mode table, ajouter un séparateur si on saute une colonne
+      if (isTableMode && lineParts.length > 0 && lastY !== null && Math.abs(currentY - lastY) <= yThreshold) {
+        const lastX = items.find(item => item.str === lineParts[lineParts.length - 1])?.x || 0;
+        if (it.x - lastX > 30) {
+          lineParts.push('\t');
+        }
+      }
+      
       lineParts.push(it.str);
       lastY = currentY;
     }
@@ -610,6 +695,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       let missingFromPhase0: string[] = [];
       let missingFromTraining: string[] = [];
       let perPatternStats: CoverageMetadata['perPatternStats'] = [];
+      let trainedRoomsForCrossValidation: Room[] = [];
 
       if (hotelId) {
         try {
@@ -620,6 +706,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
           if (trainedResult.rooms.length > 0) {
             trainedModelUsed = true;
             const trainedRooms = convertExtractedRoomsToRooms(trainedResult.rooms);
+            trainedRoomsForCrossValidation = trainedRooms;
             trainedModelRoomCount = trainedRooms.length;
             const trainedNumbers = new Set(trainedRooms.map(r => r.number));
             const existingNumbers = new Set(rooms.map(r => r.number));
@@ -671,6 +758,41 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
         }
       }
 
+      // Cross-validation: compare Phase 0 vs Trained model cleaning types
+      const crossValidationDivergences: CoverageMetadata['crossValidationDivergences'] = [];
+      let crossValidationMatches = 0;
+      if (trainedModelUsed) {
+        const trainedRoomsMap = new Map(trainedRoomsForCrossValidation.map(r => [r.number, r]));
+        for (const room of rooms) {
+          const trainedRoom = trainedRoomsMap.get(room.number);
+          if (trainedRoom) {
+            if (trainedRoom.cleaningType === room.cleaningType) {
+              crossValidationMatches++;
+            } else {
+              crossValidationDivergences.push({
+                roomNumber: room.number,
+                phase0Type: room.cleaningType || 'unknown',
+                trainedType: trainedRoom.cleaningType || 'unknown',
+              });
+              // If trained model has higher confidence, use its cleaning type
+              console.log(`⚠️ Divergence chambre ${room.number}: Phase0=${room.cleaningType} vs Trained=${trainedRoom.cleaningType}`);
+            }
+          }
+        }
+        if (crossValidationDivergences.length > 0) {
+          console.log(`🔍 Cross-validation: ${crossValidationMatches} concordances, ${crossValidationDivergences.length} divergences`);
+        }
+      }
+
+      // Confidence breakdown
+      const confidenceBreakdown = { high: 0, medium: 0, low: 0 };
+      for (const line of parsedRows) {
+        const conf = (line.confidence || 0) * 100;
+        if (conf >= 90) confidenceBreakdown.high++;
+        else if (conf >= 70) confidenceBreakdown.medium++;
+        else confidenceBreakdown.low++;
+      }
+
       // Build coverage metadata
       lastCoverageMetadata = {
         phase0RoomCount,
@@ -684,6 +806,9 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
         missingFromPhase0,
         missingFromTraining,
         perPatternStats,
+        confidenceBreakdown,
+        crossValidationMatches,
+        crossValidationDivergences,
       };
       
       // ===== APPLIQUER LES RÈGLES DE COMBINAISON DE L'HÔTEL =====

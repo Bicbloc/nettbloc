@@ -678,6 +678,63 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     });
   };
 
+  // Feedback loop: sauvegarde asynchrone des corrections de mapping
+  const saveMappingCorrections = async (mapping: Record<string, string>) => {
+    if (!hotelId) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      // Convertir le mapping en cleaning rules - insert only new ones
+      for (const [keyword, cleaningType] of Object.entries(mapping)) {
+        const resultType = cleaningType === 'a_blanc' ? 'full' : 
+                           cleaningType === 'recouche' ? 'quick' : 'none';
+        
+        // Check if rule already exists for this keyword
+        const ruleName = `auto_mapping_${keyword}`;
+        const { data: existing } = await supabase
+          .from('hotel_cleaning_rules')
+          .select('id')
+          .eq('hotel_id', hotelId)
+          .eq('rule_name', ruleName)
+          .maybeSingle();
+        
+        if (existing) {
+          // Update existing rule
+          await supabase
+            .from('hotel_cleaning_rules')
+            .update({
+              conditions: { keywords: [keyword] },
+              result_cleaning_type: resultType,
+              result_status: cleaningType === 'a_blanc' ? 'checkout' : 
+                             cleaningType === 'recouche' ? 'stayover' : 'clean',
+              is_active: true,
+            })
+            .eq('id', existing.id);
+        } else {
+          // Insert new rule
+          await supabase
+            .from('hotel_cleaning_rules')
+            .insert({
+              hotel_id: hotelId,
+              rule_name: ruleName,
+              conditions: { keywords: [keyword] },
+              result_cleaning_type: resultType,
+              result_status: cleaningType === 'a_blanc' ? 'checkout' : 
+                             cleaningType === 'recouche' ? 'stayover' : 'clean',
+              is_active: true,
+              priority: 40,
+              description: `Auto-appris depuis le mapping PDF`,
+              created_by: user.id,
+            });
+        }
+      }
+      console.log(`💾 Feedback loop: ${Object.keys(mapping).length} corrections sauvegardées`);
+    } catch (err) {
+      console.warn('⚠️ Feedback loop: erreur sauvegarde', err);
+    }
+  };
+
   const proceedFromMapping = async () => {
     // Appliquer le mapping final aux données
     const mappedData = applyMappingToRooms(pmsMapping);
@@ -699,6 +756,13 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       return { ...line, cleaningType: mappedType };
     });
     setParsedLines(updatedLines);
+
+    // ===== FEEDBACK LOOP: Sauvegarder les corrections de mapping =====
+    // Chaque mapping keyword → cleaningType est sauvegardé dans hotel_cleaning_rules
+    // pour améliorer automatiquement les futurs parsings
+    if (hotelId && Object.keys(pmsMapping).length > 0) {
+      saveMappingCorrections(pmsMapping);
+    }
 
     // Continuer vers import-mode
     if (!hotelId || !mappedData || mappedData.length === 0) {
