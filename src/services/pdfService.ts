@@ -676,7 +676,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     console.log(`🔍 Format détecté: ${formatDetection.format} (confiance: ${formatDetection.confidence}%)`);
     
     // Si format Apaleo/Mews détecté avec bonne confiance, utiliser le parser dédié
-    if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat', 'misterbooking_housekeeping'].includes(formatDetection.format) && 
+    if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat'].includes(formatDetection.format) && 
         formatDetection.confidence >= 50 && 
         formatDetection.parsedData.rows.length > 0) {
       
