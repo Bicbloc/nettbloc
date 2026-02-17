@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 import {
   BedDouble, Users, AlertTriangle, Shield, Wrench, ClipboardList,
   Sparkles, Zap, Globe, ArrowRight, CheckCircle, Brain, Eye,
   LayoutDashboard, Package, Mail, ChevronDown, Star, Clock,
-  Smartphone, MousePointerClick, Bot, Search
+  Smartphone, MousePointerClick, Bot, Search, ShieldCheck, Brush,
+  Settings, Award, MessageSquareQuote, Building2, Hotel, Crown
 } from 'lucide-react';
 
 const t = {
   fr: {
-    nav: { features: 'Fonctionnalités', portals: 'Portails', ai: 'Intelligence IA', contact: 'Contact', login: 'Se connecter', tryFree: 'Essayer gratuitement' },
+    nav: { features: 'Fonctionnalités', portals: 'Portails', pricing: 'Tarifs', ai: 'Intelligence IA', contact: 'Contact', login: 'Se connecter', tryFree: 'Essayer gratuitement' },
     hero: {
       badge: 'Propulsé par l\'Intelligence Artificielle',
       title1: 'La révolution',
@@ -24,7 +26,7 @@ const t = {
       stats: [
         { value: '10x', label: 'Plus rapide' },
         { value: '1 clic', label: 'Répartition' },
-        { value: '24/7', label: 'Suivi en temps réel' },
+        { value: '24/7', label: 'Suivi temps réel' },
         { value: 'IA', label: 'Reconnaissance visuelle' },
       ]
     },
@@ -34,9 +36,12 @@ const t = {
       items: [
         { icon: 'bed', title: 'Gestion des chambres', desc: 'Suivez l\'état de chaque chambre en temps réel : check-out, recouche, propre, en cours. Importez vos listes PMS automatiquement.' },
         { icon: 'users', title: 'Répartition en 1 clic', desc: 'Distribuez les chambres aux femmes de chambre présentes en un seul clic. L\'algorithme intelligent équilibre la charge de travail.' },
+        { icon: 'brush', title: 'Gestion de la propreté', desc: 'Suivi complet du nettoyage chambre par chambre, validation gouvernante, contrôle des standards de propreté en temps réel.' },
+        { icon: 'wrench', title: 'Gestion de la maintenance', desc: 'Signalez, assignez et suivez chaque intervention technique. Historique complet, priorités et statuts pour une maintenance sans faille.' },
+        { icon: 'search', title: 'Gestion des objets perdus', desc: 'Module dédié aux objets trouvés : description, photo, localisation, suivi de restitution au client. Ne perdez plus rien.' },
+        { icon: 'shieldCheck', title: 'Contrôle qualité', desc: 'Inspections gouvernante, checklist de conformité, rapports d\'audit et scoring qualité pour garantir l\'excellence de service.' },
         { icon: 'brain', title: 'Recommandation IA', desc: 'Nettobloc recommande le nombre optimal de femmes de chambre nécessaires selon le volume et le type de nettoyage.' },
         { icon: 'alert', title: 'Suivi des incidents', desc: 'Signalez et suivez chaque incident avec photos, priorité et assignation. Historique complet pour chaque chambre.' },
-        { icon: 'search', title: 'Objets perdus', desc: 'Module dédié aux objets trouvés avec description, photo et suivi du retour au client. Ne perdez plus rien.' },
         { icon: 'eye', title: 'Reconnaissance IA', desc: 'Identifiez automatiquement les incidents et objets trouvés grâce à l\'intelligence artificielle visuelle intégrée.' },
       ]
     },
@@ -60,6 +65,46 @@ const t = {
         { title: 'Répartition optimisée', desc: 'L\'algorithme analyse la charge et recommande la meilleure distribution des chambres.' },
       ]
     },
+    pricing: {
+      title: 'Des tarifs adaptés à votre établissement',
+      subtitle: 'Choisissez le plan qui correspond à la taille et aux besoins de votre hôtel.',
+      perMonth: '/mois',
+      rooms: 'chambres',
+      unlimited: 'Illimité',
+      popular: 'Populaire',
+      enterprise: 'Sur mesure',
+      startFree: 'Commencer gratuitement',
+      contact: 'Nous contacter',
+      choose: 'Choisir ce plan',
+      includesAll: 'Toutes les fonctionnalités incluses',
+    },
+    testimonials: {
+      title: 'Ils nous font confiance',
+      subtitle: 'Découvrez pourquoi les meilleurs établissements choisissent Nettobloc.',
+      items: [
+        {
+          quote: 'Nettobloc a transformé notre gestion quotidienne. La répartition en 1 clic nous fait gagner 45 minutes chaque matin. L\'IA de reconnaissance des incidents est bluffante.',
+          name: 'Sophie Laurent',
+          role: 'Directrice Housekeeping',
+          hotel: 'Grand Hôtel du Palais ★★★★',
+          icon: 'hotel4',
+        },
+        {
+          quote: 'La qualité de service est notre obsession. Le module de contrôle qualité et le portail gouvernante nous permettent de maintenir nos standards 5 étoiles sans effort supplémentaire.',
+          name: 'Jean-Marc Dubois',
+          role: 'Directeur Général',
+          hotel: 'Le Majestic Resort & Spa ★★★★★',
+          icon: 'hotel5',
+        },
+        {
+          quote: 'Déployé sur nos 12 établissements en 2 semaines. La synchronisation temps réel et les rapports consolidés sont exactement ce qu\'il nous manquait pour piloter le groupe.',
+          name: 'Caroline Mercier',
+          role: 'VP Opérations',
+          hotel: 'Groupe Hôtelier Prestige Collection',
+          icon: 'group',
+        },
+      ]
+    },
     cta: {
       title: 'Prêt à révolutionner votre hôtel ?',
       subtitle: 'Rejoignez les établissements qui ont choisi l\'efficacité.',
@@ -74,7 +119,7 @@ const t = {
     }
   },
   en: {
-    nav: { features: 'Features', portals: 'Portals', ai: 'AI Intelligence', contact: 'Contact', login: 'Log in', tryFree: 'Try for free' },
+    nav: { features: 'Features', portals: 'Portals', pricing: 'Pricing', ai: 'AI Intelligence', contact: 'Contact', login: 'Log in', tryFree: 'Try for free' },
     hero: {
       badge: 'Powered by Artificial Intelligence',
       title1: 'The hospitality',
@@ -96,9 +141,12 @@ const t = {
       items: [
         { icon: 'bed', title: 'Room Management', desc: 'Track every room status in real-time: check-out, stayover, clean, in progress. Import your PMS lists automatically.' },
         { icon: 'users', title: '1-Click Distribution', desc: 'Distribute rooms to available housekeepers in a single click. The smart algorithm balances workload evenly.' },
+        { icon: 'brush', title: 'Cleanliness Management', desc: 'Complete room-by-room cleaning tracking, governess validation, real-time cleanliness standards monitoring.' },
+        { icon: 'wrench', title: 'Maintenance Management', desc: 'Report, assign and track every technical intervention. Full history, priorities and statuses for seamless maintenance.' },
+        { icon: 'search', title: 'Lost & Found Management', desc: 'Dedicated module for found items: description, photo, location, return tracking to guests. Never lose anything again.' },
+        { icon: 'shieldCheck', title: 'Quality Control', desc: 'Governess inspections, compliance checklists, audit reports and quality scoring to guarantee service excellence.' },
         { icon: 'brain', title: 'AI Recommendation', desc: 'Nettobloc recommends the optimal number of housekeepers needed based on volume and cleaning type.' },
         { icon: 'alert', title: 'Incident Tracking', desc: 'Report and track every incident with photos, priority and assignment. Complete history for each room.' },
-        { icon: 'search', title: 'Lost & Found', desc: 'Dedicated module for found items with description, photo and return tracking. Never lose anything again.' },
         { icon: 'eye', title: 'AI Recognition', desc: 'Automatically identify incidents and found objects thanks to built-in visual artificial intelligence.' },
       ]
     },
@@ -120,6 +168,46 @@ const t = {
         { title: 'Found Item Identification', desc: 'Photograph a found item, the AI categorizes it and generates the description.' },
         { title: 'Smart Linen Counting', desc: 'Scan your linen piles, the AI automatically counts each piece by type.' },
         { title: 'Optimized Distribution', desc: 'The algorithm analyzes workload and recommends the best room distribution.' },
+      ]
+    },
+    pricing: {
+      title: 'Pricing tailored to your property',
+      subtitle: 'Choose the plan that matches your hotel\'s size and needs.',
+      perMonth: '/month',
+      rooms: 'rooms',
+      unlimited: 'Unlimited',
+      popular: 'Popular',
+      enterprise: 'Custom',
+      startFree: 'Start for free',
+      contact: 'Contact us',
+      choose: 'Choose this plan',
+      includesAll: 'All features included',
+    },
+    testimonials: {
+      title: 'Trusted by the best',
+      subtitle: 'Discover why leading properties choose Nettobloc.',
+      items: [
+        {
+          quote: 'Nettobloc transformed our daily management. 1-click distribution saves us 45 minutes every morning. The AI incident recognition is stunning.',
+          name: 'Sophie Laurent',
+          role: 'Housekeeping Director',
+          hotel: 'Grand Hôtel du Palais ★★★★',
+          icon: 'hotel4',
+        },
+        {
+          quote: 'Service quality is our obsession. The quality control module and governess portal help us maintain our 5-star standards effortlessly.',
+          name: 'Jean-Marc Dubois',
+          role: 'General Manager',
+          hotel: 'Le Majestic Resort & Spa ★★★★★',
+          icon: 'hotel5',
+        },
+        {
+          quote: 'Deployed across our 12 properties in 2 weeks. Real-time sync and consolidated reports are exactly what we needed to manage the group.',
+          name: 'Caroline Mercier',
+          role: 'VP Operations',
+          hotel: 'Prestige Collection Hotel Group',
+          icon: 'group',
+        },
       ]
     },
     cta: {
@@ -144,6 +232,9 @@ const featureIcons: Record<string, React.ReactNode> = {
   alert: <AlertTriangle className="w-7 h-7" />,
   search: <Search className="w-7 h-7" />,
   eye: <Eye className="w-7 h-7" />,
+  brush: <Brush className="w-7 h-7" />,
+  wrench: <Wrench className="w-7 h-7" />,
+  shieldCheck: <ShieldCheck className="w-7 h-7" />,
 };
 
 const portalIcons: Record<string, React.ReactNode> = {
@@ -167,10 +258,56 @@ const portalIconColors: Record<string, string> = {
   warning: 'text-amber-600',
 };
 
+const testimonialIcons: Record<string, React.ReactNode> = {
+  hotel4: <Hotel className="w-6 h-6" />,
+  hotel5: <Crown className="w-6 h-6" />,
+  group: <Building2 className="w-6 h-6" />,
+};
+
+interface PricingPlan {
+  plan_name: string;
+  price_monthly: number;
+  max_rooms: number | null;
+  is_active: boolean;
+}
+
+const planDisplayNames: Record<string, Record<string, string>> = {
+  fr: {
+    freemium: 'Découverte',
+    essentiel: 'Essentiel',
+    confort: 'Confort',
+    business: 'Business',
+    entreprise: 'Entreprise',
+    manual_entry: 'Saisie Manuelle',
+  },
+  en: {
+    freemium: 'Discovery',
+    essentiel: 'Essential',
+    confort: 'Comfort',
+    business: 'Business',
+    entreprise: 'Enterprise',
+    manual_entry: 'Manual Entry',
+  }
+};
+
 const Landing = () => {
   const [lang, setLang] = useState<'fr' | 'en'>('fr');
+  const [plans, setPlans] = useState<PricingPlan[]>([]);
   const navigate = useNavigate();
   const c = t[lang];
+
+  useEffect(() => {
+    supabase
+      .from('pricing_config')
+      .select('plan_name, price_monthly, max_rooms, is_active')
+      .eq('is_active', true)
+      .order('price_monthly', { ascending: true })
+      .then(({ data }) => {
+        if (data) setPlans(data as PricingPlan[]);
+      });
+  }, []);
+
+  const popularPlan = 'confort';
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -186,68 +323,46 @@ const Landing = () => {
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">{c.nav.features}</a>
             <a href="#portals" className="hover:text-foreground transition-colors">{c.nav.portals}</a>
+            <a href="#pricing" className="hover:text-foreground transition-colors">{c.nav.pricing}</a>
             <a href="#ai" className="hover:text-foreground transition-colors">{c.nav.ai}</a>
             <a href="#contact" className="hover:text-foreground transition-colors">{c.nav.contact}</a>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
-              className="gap-1.5"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')} className="gap-1.5">
               <Globe className="w-4 h-4" />
               {lang === 'fr' ? 'EN' : 'FR'}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
-              {c.nav.login}
-            </Button>
-            <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              {c.nav.tryFree}
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>{c.nav.login}</Button>
+            <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90 text-primary-foreground">{c.nav.tryFree}</Button>
           </div>
         </div>
       </nav>
 
       {/* Hero */}
       <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 overflow-hidden">
-        {/* Background effects */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute top-20 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/10 blur-[120px]" />
           <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[100px]" />
         </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <Badge variant="secondary" className="mb-6 px-4 py-1.5 text-sm font-medium gap-2 bg-primary/10 text-primary border-primary/20">
             <Bot className="w-4 h-4" />
             {c.hero.badge}
           </Badge>
-
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6">
             {c.hero.title1}{' '}
-            <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-              {c.hero.title2}
-            </span>
-            <br />
-            {c.hero.title3}
+            <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">{c.hero.title2}</span>
+            <br />{c.hero.title3}
           </h1>
-
-          <p className="max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed">
-            {c.hero.subtitle}
-          </p>
-
+          <p className="max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed">{c.hero.subtitle}</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
             <Button size="lg" onClick={() => navigate('/auth')} className="text-base px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2">
-              {c.hero.cta}
-              <ArrowRight className="w-5 h-5" />
+              {c.hero.cta}<ArrowRight className="w-5 h-5" />
             </Button>
             <Button size="lg" variant="outline" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-base px-8 py-6 gap-2">
-              {c.hero.ctaSecondary}
-              <ChevronDown className="w-5 h-5" />
+              {c.hero.ctaSecondary}<ChevronDown className="w-5 h-5" />
             </Button>
           </div>
-
-          {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
             {c.hero.stats.map((stat, i) => (
               <div key={i} className="text-center p-4 rounded-2xl bg-card border border-border/50 shadow-sm">
@@ -291,10 +406,7 @@ const Landing = () => {
           </div>
           <div className="grid md:grid-cols-2 gap-6">
             {c.portals.items.map((item, i) => (
-              <div
-                key={i}
-                className={`relative rounded-2xl border p-8 bg-gradient-to-br ${portalColors[item.color]} transition-all duration-300 hover:shadow-lg hover:-translate-y-1`}
-              >
+              <div key={i} className={`relative rounded-2xl border p-8 bg-gradient-to-br ${portalColors[item.color]} transition-all duration-300 hover:shadow-lg hover:-translate-y-1`}>
                 <div className={`w-14 h-14 rounded-2xl bg-background/80 flex items-center justify-center mb-5 ${portalIconColors[item.color]}`}>
                   {portalIcons[item.icon]}
                 </div>
@@ -303,6 +415,76 @@ const Landing = () => {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Pricing - synced with DB */}
+      <section id="pricing" className="py-20 md:py-28 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.pricing.title}</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.pricing.subtitle}</p>
+          </div>
+          {plans.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-6xl mx-auto">
+              {plans.map((plan) => {
+                const isPopular = plan.plan_name === popularPlan;
+                const isEnterprise = plan.plan_name === 'entreprise';
+                const displayName = planDisplayNames[lang]?.[plan.plan_name] || plan.plan_name;
+                return (
+                  <div
+                    key={plan.plan_name}
+                    className={`relative rounded-2xl border p-6 bg-card flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+                      isPopular ? 'border-primary shadow-lg shadow-primary/10 ring-2 ring-primary/20' : 'border-border/60'
+                    }`}
+                  >
+                    {isPopular && (
+                      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1">
+                        <Star className="w-3 h-3 mr-1" />
+                        {c.pricing.popular}
+                      </Badge>
+                    )}
+                    <h3 className="text-xl font-bold mb-1">{displayName}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {plan.max_rooms
+                        ? `${lang === 'fr' ? 'Jusqu\'à' : 'Up to'} ${plan.max_rooms} ${c.pricing.rooms}`
+                        : c.pricing.unlimited}
+                    </p>
+                    <div className="mb-6">
+                      {isEnterprise ? (
+                        <span className="text-2xl font-extrabold">{c.pricing.enterprise}</span>
+                      ) : plan.price_monthly === 0 ? (
+                        <span className="text-3xl font-extrabold">{lang === 'fr' ? 'Gratuit' : 'Free'}</span>
+                      ) : (
+                        <>
+                          <span className="text-3xl font-extrabold">{plan.price_monthly}€</span>
+                          <span className="text-muted-foreground text-sm">{c.pricing.perMonth}</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-6 flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-primary" />
+                      {c.pricing.includesAll}
+                    </p>
+                    <div className="mt-auto">
+                      <Button
+                        className="w-full"
+                        variant={isPopular ? 'default' : 'outline'}
+                        onClick={() => isEnterprise ? window.location.href = 'mailto:support@bicbloc.eu' : navigate('/auth')}
+                      >
+                        {plan.price_monthly === 0 ? c.pricing.startFree : isEnterprise ? c.pricing.contact : c.pricing.choose}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-8">
+              <Clock className="w-6 h-6 mx-auto mb-2 animate-spin" />
+              {lang === 'fr' ? 'Chargement des tarifs...' : 'Loading pricing...'}
+            </div>
+          )}
         </div>
       </section>
 
@@ -336,19 +518,44 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section className="py-20 md:py-28 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.testimonials.title}</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.testimonials.subtitle}</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {c.testimonials.items.map((item, i) => (
+              <div key={i} className="rounded-2xl border border-border/60 bg-card p-8 flex flex-col hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <MessageSquareQuote className="w-8 h-8 text-primary/40 mb-4" />
+                <p className="text-sm leading-relaxed text-muted-foreground mb-6 flex-1 italic">
+                  "{item.quote}"
+                </p>
+                <div className="flex items-center gap-3 pt-4 border-t border-border/50">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                    {testimonialIcons[item.icon]}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-sm">{item.name}</div>
+                    <div className="text-xs text-muted-foreground">{item.role}</div>
+                    <div className="text-xs text-primary font-medium">{item.hotel}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-20 md:py-28">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="rounded-3xl bg-gradient-to-br from-primary to-primary/80 p-12 md:p-16 text-primary-foreground shadow-2xl shadow-primary/20">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">{c.cta.title}</h2>
             <p className="text-lg opacity-90 mb-8 max-w-xl mx-auto">{c.cta.subtitle}</p>
-            <Button
-              size="lg"
-              onClick={() => navigate('/auth')}
-              className="bg-background text-foreground hover:bg-background/90 text-base px-10 py-6 shadow-lg gap-2"
-            >
-              {c.cta.button}
-              <ArrowRight className="w-5 h-5" />
+            <Button size="lg" onClick={() => navigate('/auth')} className="bg-background text-foreground hover:bg-background/90 text-base px-10 py-6 shadow-lg gap-2">
+              {c.cta.button}<ArrowRight className="w-5 h-5" />
             </Button>
           </div>
         </div>
@@ -370,8 +577,7 @@ const Landing = () => {
             <div>
               <h4 className="font-semibold mb-3">{c.footer.contact}</h4>
               <a href="mailto:support@bicbloc.eu" className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                support@bicbloc.eu
+                <Mail className="w-4 h-4" />support@bicbloc.eu
               </a>
             </div>
             <div>
@@ -382,9 +588,7 @@ const Landing = () => {
               </div>
             </div>
           </div>
-          <div className="mt-10 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground">
-            {c.footer.rights}
-          </div>
+          <div className="mt-10 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground">{c.footer.rights}</div>
         </div>
       </footer>
     </div>
