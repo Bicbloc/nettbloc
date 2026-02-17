@@ -815,9 +815,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           className="w-full p-4 rounded-lg border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
           onClick={() => {
             setOpen(false);
-            // Navigate to room management tab where PmsApiConfigPanel is
-            const configPanel = document.querySelector('[data-pms-config]');
-            if (configPanel) configPanel.scrollIntoView({ behavior: 'smooth' });
+            window.dispatchEvent(new CustomEvent('navigate-to-pms-config'));
           }}
         >
           <div className="flex items-start gap-4">
