@@ -53,6 +53,7 @@ export interface ParsedRow {
   hasArrivingGuest: boolean;
   isOutOfOrder: boolean;
   assignee: string;
+  linkedRooms?: string[]; // Chambres communicantes (ex: 107+108)
 }
 
 export interface ColumnValue {
@@ -455,27 +456,68 @@ function parseMewsReport(text: string): ParsedReportData {
       { value: nightInfo, type: 'night_info', confidence: 0.9 },
     ];
     
-    rows.push({
-      rawLine: entry,
-      roomNumber,
-      roomType,
-      cleaningStatus: status,
-      columns,
-      detectedCleaningType: detectedType,
-      confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
-      statusIndicator,
-      guestName,
-      arrivalDate,
-      departureDate,
-      arrivalTime: times[0] || '',
-      departureTime: times[1] || times[0] || '',
-      nightInfo,
-      hasCurrentGuest: hasGuest,
-      hasDepartingGuest: isLastNight,
-      hasArrivingGuest: currentNight === 1,
-      isOutOfOrder: false,
-      assignee,
-    });
+    // Detect connected rooms (e.g., "107+108", "003+004")
+    const plusParts = roomNumber.split('+');
+    if (plusParts.length >= 2 && plusParts.every(p => /^\d{2,4}[A-Z]?$/.test(p.trim()))) {
+      // Create individual rooms with linkedRooms pointing to each other
+      const allParts = plusParts.map(p => p.trim());
+      for (const part of allParts) {
+        const otherParts = allParts.filter(p => p !== part);
+        rows.push({
+          rawLine: entry,
+          roomNumber: part,
+          roomType,
+          cleaningStatus: status,
+          columns: [
+            { value: part, type: 'room_number', confidence: 1 },
+            { value: roomType, type: 'room_type', confidence: 1 },
+            { value: status, type: 'status', confidence: 1 },
+            { value: assignee, type: 'assignee', confidence: 0.8 },
+            { value: guestName, type: 'guest_name', confidence: 0.9 },
+            { value: arrivalDate, type: 'arrival_date', confidence: 0.8 },
+            { value: departureDate, type: 'departure_date', confidence: 0.8 },
+            { value: nightInfo, type: 'night_info', confidence: 0.9 },
+          ],
+          detectedCleaningType: detectedType,
+          confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
+          statusIndicator,
+          guestName,
+          arrivalDate,
+          departureDate,
+          arrivalTime: times[0] || '',
+          departureTime: times[1] || times[0] || '',
+          nightInfo,
+          hasCurrentGuest: hasGuest,
+          hasDepartingGuest: isLastNight,
+          hasArrivingGuest: currentNight === 1,
+          isOutOfOrder: false,
+          assignee,
+          linkedRooms: otherParts,
+        });
+      }
+    } else {
+      rows.push({
+        rawLine: entry,
+        roomNumber,
+        roomType,
+        cleaningStatus: status,
+        columns,
+        detectedCleaningType: detectedType,
+        confidence: detectedType !== 'unknown' ? 0.85 : 0.3,
+        statusIndicator,
+        guestName,
+        arrivalDate,
+        departureDate,
+        arrivalTime: times[0] || '',
+        departureTime: times[1] || times[0] || '',
+        nightInfo,
+        hasCurrentGuest: hasGuest,
+        hasDepartingGuest: isLastNight,
+        hasArrivingGuest: currentNight === 1,
+        isOutOfOrder: false,
+        assignee,
+      });
+    }
   }
   
   // Calculer le résumé
