@@ -85,6 +85,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
   const [registryCount, setRegistryCount] = useState(0);
   const [pendingFilteredData, setPendingFilteredData] = useState<any[]>([]);
   const [coverageMetadata, setCoverageMetadata] = useState<CoverageMetadata | null>(null);
+  const [excludedRooms, setExcludedRooms] = useState<Set<string>>(new Set());
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -586,6 +587,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setPreviewFilter('all');
     setCoverageMetadata(null);
     setPmsMapping({});
+    setExcludedRooms(new Set());
   };
 
   // Mots-clés PMS couramment utilisés
@@ -797,35 +799,68 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     }
   };
 
-  // Statistiques de l'extraction IA
+  // Statistiques de l'extraction IA (en excluant les chambres exclues)
   const extractionStats = useMemo(() => {
     if (!parsedLines.length) return null;
     
-    const aBlancCount = parsedLines.filter(l => l.cleaningType === 'a_blanc').length;
-    const recoucheCount = parsedLines.filter(l => l.cleaningType === 'recouche').length;
-    const noneCount = parsedLines.filter(l => l.cleaningType === 'none' || l.cleaningType === 'inspection').length;
-    const avgConfidence = parsedLines.reduce((sum, l) => sum + l.confidence, 0) / parsedLines.length;
-    const withGuest = parsedLines.filter(l => l.guestName).length;
-    const withDates = parsedLines.filter(l => l.arrivalDate || l.departureDate).length;
+    const activeParsedLines = parsedLines.filter(l => !excludedRooms.has(l.roomNumber));
+    const aBlancCount = activeParsedLines.filter(l => l.cleaningType === 'a_blanc').length;
+    const recoucheCount = activeParsedLines.filter(l => l.cleaningType === 'recouche').length;
+    const noneCount = activeParsedLines.filter(l => l.cleaningType === 'none' || l.cleaningType === 'inspection').length;
+    const avgConfidence = activeParsedLines.length > 0 
+      ? activeParsedLines.reduce((sum, l) => sum + l.confidence, 0) / activeParsedLines.length 
+      : 0;
+    const withGuest = activeParsedLines.filter(l => l.guestName).length;
+    const withDates = activeParsedLines.filter(l => l.arrivalDate || l.departureDate).length;
     
     return {
-      total: parsedLines.length,
+      total: activeParsedLines.length,
       aBlancCount,
       recoucheCount,
       noneCount,
       avgConfidence,
       withGuest,
-      withDates
+      withDates,
+      excludedCount: excludedRooms.size
     };
-  }, [parsedLines]);
+  }, [parsedLines, excludedRooms]);
 
   // Lignes filtrées pour la prévisualisation
   const filteredLines = useMemo(() => {
-    if (previewFilter === 'all') return parsedLines;
-    return parsedLines.filter(l => l.cleaningType === previewFilter);
+    let lines = parsedLines;
+    if (previewFilter === 'a_blanc') lines = lines.filter(l => l.cleaningType === 'a_blanc');
+    else if (previewFilter === 'recouche') lines = lines.filter(l => l.cleaningType === 'recouche');
+    return lines;
   }, [parsedLines, previewFilter]);
 
+  const toggleRoomExclusion = (roomNumber: string) => {
+    setExcludedRooms(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(roomNumber)) {
+        newSet.delete(roomNumber);
+      } else {
+        newSet.add(roomNumber);
+      }
+      return newSet;
+    });
+  };
+
   const proceedFromPreview = () => {
+    // Filter out excluded rooms from pdfData before continuing
+    if (excludedRooms.size > 0 && pdfData) {
+      const filteredData = pdfData.filter((room: any) => {
+        const roomNumber = room.roomNumber || room.room_number || room.number;
+        return !excludedRooms.has(roomNumber);
+      });
+      setPdfData(filteredData);
+      setSavedPdfData(filteredData);
+      
+      // Also update parsedLines
+      setParsedLines(prev => prev.filter(l => !excludedRooms.has(l.roomNumber)));
+      
+      console.log(`🚫 ${excludedRooms.size} chambres exclues manuellement`);
+    }
+    
     // Initialiser le mapping automatiquement et passer à l'étape mapping
     if (detectedKeywords.length > 0) {
       const initialMapping = initializeMapping();
@@ -1055,138 +1090,164 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         </div>
       )}
 
-      {/* Filtres */}
-      <div className="flex gap-2">
-        <Button
-          variant={previewFilter === 'all' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setPreviewFilter('all')}
-        >
-          Tous ({parsedLines.length})
-        </Button>
-        <Button
-          variant={previewFilter === 'a_blanc' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setPreviewFilter('a_blanc')}
-          className={previewFilter === 'a_blanc' ? 'bg-orange-500 hover:bg-orange-600' : ''}
-        >
-          À blanc ({extractionStats?.aBlancCount || 0})
-        </Button>
-        <Button
-          variant={previewFilter === 'recouche' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setPreviewFilter('recouche')}
-          className={previewFilter === 'recouche' ? 'bg-green-500 hover:bg-green-600' : ''}
-        >
-          Recouches ({extractionStats?.recoucheCount || 0})
-        </Button>
+      {/* Filtres + exclusion info */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex gap-2">
+          <Button
+            variant={previewFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPreviewFilter('all')}
+          >
+            Tous ({parsedLines.length})
+          </Button>
+          <Button
+            variant={previewFilter === 'a_blanc' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPreviewFilter('a_blanc')}
+            className={previewFilter === 'a_blanc' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+          >
+            À blanc ({extractionStats?.aBlancCount || 0})
+          </Button>
+          <Button
+            variant={previewFilter === 'recouche' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPreviewFilter('recouche')}
+            className={previewFilter === 'recouche' ? 'bg-green-500 hover:bg-green-600' : ''}
+          >
+            Recouches ({extractionStats?.recoucheCount || 0})
+          </Button>
+        </div>
+        {excludedRooms.size > 0 && (
+          <Badge variant="destructive" className="text-xs">
+            <X className="h-3 w-3 mr-1" />
+            {excludedRooms.size} exclue(s)
+          </Badge>
+        )}
       </div>
 
-      {/* Liste des chambres */}
+      {/* Liste des chambres avec exclusion */}
       <ScrollArea className="h-[300px] border rounded-lg">
         <div className="p-2 space-y-2">
-          {filteredLines.map((line, idx) => (
-            <Card 
-              key={`${line.roomNumber}-${idx}`} 
-              className={`p-3 ${
-                line.cleaningType === 'a_blanc' 
-                  ? 'border-l-4 border-l-orange-500 bg-orange-50/30' 
-                  : line.cleaningType === 'recouche'
-                    ? 'border-l-4 border-l-green-500 bg-green-50/30'
-                    : 'border-l-4 border-l-gray-300'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                {/* Numéro et type */}
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono font-bold text-lg px-3 py-1">
-                    {line.roomNumber}
-                  </Badge>
-                  {line.roomType && (
-                    <Badge variant="secondary" className="text-xs">
-                      {line.roomType}{line.roomCategory ? `-${line.roomCategory}` : ''}
+          {filteredLines.map((line, idx) => {
+            const isExcluded = excludedRooms.has(line.roomNumber);
+            return (
+              <Card 
+                key={`${line.roomNumber}-${idx}`} 
+                className={`p-3 transition-opacity ${isExcluded ? 'opacity-40' : ''} ${
+                  line.cleaningType === 'a_blanc' 
+                    ? 'border-l-4 border-l-orange-500 bg-orange-50/30' 
+                    : line.cleaningType === 'recouche'
+                      ? 'border-l-4 border-l-green-500 bg-green-50/30'
+                      : 'border-l-4 border-l-gray-300'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  {/* Numéro et type */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleRoomExclusion(line.roomNumber)}
+                      className={`flex items-center justify-center w-6 h-6 rounded border transition-colors ${
+                        isExcluded 
+                          ? 'bg-destructive/10 border-destructive text-destructive' 
+                          : 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                      }`}
+                      title={isExcluded ? 'Réinclure cette chambre' : 'Exclure cette chambre'}
+                    >
+                      {isExcluded ? <X className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                    </button>
+                    <Badge variant="outline" className={`font-mono font-bold text-lg px-3 py-1 ${isExcluded ? 'line-through' : ''}`}>
+                      {line.roomNumber}
                     </Badge>
-                  )}
+                    {line.roomType && (
+                      <Badge variant="secondary" className="text-xs">
+                        {line.roomType}{line.roomCategory ? `-${line.roomCategory}` : ''}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* Type de nettoyage */}
+                  <Badge 
+                    className={`${
+                      line.cleaningType === 'a_blanc' 
+                        ? 'bg-orange-500 text-white' 
+                        : line.cleaningType === 'recouche'
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-400 text-white'
+                    }`}
+                  >
+                    {line.cleaningType === 'a_blanc' ? '🔶 À blanc' : 
+                     line.cleaningType === 'recouche' ? '🔄 Recouche' : 
+                     '⏸️ Aucun'}
+                  </Badge>
                 </div>
                 
-                {/* Type de nettoyage */}
-                <Badge 
-                  className={`${
-                    line.cleaningType === 'a_blanc' 
-                      ? 'bg-orange-500 text-white' 
-                      : line.cleaningType === 'recouche'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-400 text-white'
-                  }`}
-                >
-                  {line.cleaningType === 'a_blanc' ? '🔶 À blanc' : 
-                   line.cleaningType === 'recouche' ? '🔄 Recouche' : 
-                   '⏸️ Aucun'}
-                </Badge>
-              </div>
-              
-              {/* Détails */}
-              <div className="mt-2 flex flex-wrap gap-2">
-                {line.guestName && (
-                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                    <User className="h-3 w-3 mr-1" />
-                    {line.guestName}
-                  </Badge>
+                {/* Détails */}
+                {!isExcluded && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {line.guestName && (
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        <User className="h-3 w-3 mr-1" />
+                        {line.guestName}
+                      </Badge>
+                    )}
+                    
+                    {line.departureDate && (
+                      <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        Départ: {line.departureDate}
+                      </Badge>
+                    )}
+                    
+                    {line.arrivalDate && (
+                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        Arrivée: {line.arrivalDate}
+                      </Badge>
+                    )}
+                    
+                    {line.checkOutTime && (
+                      <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Départ: {line.checkOutTime}
+                      </Badge>
+                    )}
+                    
+                    {line.checkInTime && (
+                      <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Arrivée: {line.checkInTime}
+                      </Badge>
+                    )}
+                    
+                    {line.nightInfo && (
+                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                        Nuit {line.nightInfo.current}/{line.nightInfo.total}
+                      </Badge>
+                    )}
+                    
+                    {(line.adults || line.children) && (
+                      <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                        {line.adults || 0} Ad. {line.children ? `+ ${line.children} Enf.` : ''}
+                      </Badge>
+                    )}
+                    
+                    {line.statusCode && (
+                      <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600">
+                        {line.statusCode}
+                      </Badge>
+                    )}
+                  </div>
                 )}
                 
-                {line.departureDate && (
-                  <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    Départ: {line.departureDate}
-                  </Badge>
+                {/* Raison du type de nettoyage */}
+                {!isExcluded && (
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    {line.cleaningReason}
+                  </p>
                 )}
-                
-                {line.arrivalDate && (
-                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    Arrivée: {line.arrivalDate}
-                  </Badge>
-                )}
-                
-                {line.checkOutTime && (
-                  <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Départ: {line.checkOutTime}
-                  </Badge>
-                )}
-                
-                {line.checkInTime && (
-                  <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Arrivée: {line.checkInTime}
-                  </Badge>
-                )}
-                
-                {line.nightInfo && (
-                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                    Nuit {line.nightInfo.current}/{line.nightInfo.total}
-                  </Badge>
-                )}
-                
-                {(line.adults || line.children) && (
-                  <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
-                    {line.adults || 0} Ad. {line.children ? `+ ${line.children} Enf.` : ''}
-                  </Badge>
-                )}
-                
-                {line.statusCode && (
-                  <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600">
-                    {line.statusCode}
-                  </Badge>
-                )}
-              </div>
-              
-              {/* Raison du type de nettoyage */}
-              <p className="text-xs text-muted-foreground mt-2 italic">
-                {line.cleaningReason}
-              </p>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
           
           {filteredLines.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
