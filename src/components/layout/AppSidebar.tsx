@@ -72,7 +72,7 @@ export function AppSidebar({
     { value: 'templates', label: 'Templates', icon: <Repeat className="h-5 w-5" /> },
     { value: 'reports', label: t.dashboard.reports, icon: <FileText className="h-5 w-5" /> },
     { value: 'archives', label: t.dashboard.archives, icon: <Archive className="h-5 w-5" /> },
-    { value: 'training', label: t.dashboard.aiTraining, icon: <Brain className="h-5 w-5" /> },
+    // Training IA retiré de la nav — accessible via Gestion des chambres > Config avancée
   ];
 
   // Handle order navigation
