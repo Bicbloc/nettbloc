@@ -520,6 +520,28 @@ function parseMewsReport(text: string): ParsedReportData {
     }
   }
   
+  // Post-processing: propager linkedRooms des lignes groupe (107+108) vers les chambres individuelles
+  const linkedGroupMap = new Map<string, string[]>();
+  for (const row of rows) {
+    if (row.linkedRooms && row.linkedRooms.length > 0) {
+      linkedGroupMap.set(row.roomNumber, row.linkedRooms);
+    }
+  }
+  // Pour chaque chambre individuelle sans linkedRooms, vérifier si elle apparaît dans un groupe
+  for (const row of rows) {
+    if (!row.linkedRooms || row.linkedRooms.length === 0) {
+      // Chercher dans les groupes existants
+      for (const [groupRoom, linkedList] of linkedGroupMap.entries()) {
+        if (linkedList.includes(row.roomNumber) || groupRoom === row.roomNumber) {
+          // Cette chambre fait partie d'un groupe
+          const allGroupMembers = [groupRoom, ...linkedList];
+          row.linkedRooms = allGroupMembers.filter(r => r !== row.roomNumber);
+          break;
+        }
+      }
+    }
+  }
+
   // Calculer le résumé
   const summary = calculateSummary(rows);
   
