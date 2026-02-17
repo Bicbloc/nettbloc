@@ -822,14 +822,22 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       
       // ===== POST-EXTRACTION FILTER: Reject false positives =====
       rooms = rooms.filter(room => {
-        // Reject rooms with no cleaning info and low confidence indicators
+        const roomNumDigits = room.number.replace(/\D/g, '');
+        const roomNumInt = parseInt(roomNumDigits);
+        
+        // Reject single-digit room numbers (1-9) — these are almost always false positives
+        // (e.g. "Nb pers" column values, page counters, table indices)
+        if (roomNumDigits.length === 1) {
+          console.log(`🚫 Chambre ${room.number} rejetée (numéro à 1 chiffre = faux positif)`);
+          return false;
+        }
+        
+        // Reject 2-digit room numbers < 20 without strong context
         const hasCleaningInfo = room.cleaningType && room.cleaningType !== 'none';
         const hasNotes = room.notes && room.notes.length > 0;
         const hasGuestData = room.guestName || room.arrivalDate || room.departureDate;
         
-        // Very short room numbers (1-2 digits) without any context are suspicious
-        const roomNumDigits = room.number.replace(/\D/g, '');
-        if (roomNumDigits.length <= 2 && parseInt(roomNumDigits) < 20 && !hasCleaningInfo && !hasGuestData && !hasNotes) {
+        if (roomNumDigits.length <= 2 && roomNumInt < 20 && !hasCleaningInfo && !hasGuestData && !hasNotes) {
           console.log(`🚫 Chambre ${room.number} rejetée (numéro suspect sans contexte)`);
           return false;
         }
