@@ -51,6 +51,8 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isRequestInFlightRef = useRef(false);
+  const recentCountsRef = useRef<number[]>([]);
+  const stableCountRef = useRef<number | null>(null);
   
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLiveScanning, setIsLiveScanning] = useState(true);
@@ -72,6 +74,9 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [hasShownLiveError, setHasShownLiveError] = useState(false);
   const [scanMode, setScanMode] = useState<'live' | 'photo' | 'manual'>('live');
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [isStabilized, setIsStabilized] = useState(false);
+  const [stabilizationProgress, setStabilizationProgress] = useState(0);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   
   const [linenTypes, setLinenTypes] = useState<LinenType[]>([]);
   const [matchingLinenTypes, setMatchingLinenTypes] = useState<LinenType[]>([]);
@@ -128,9 +133,21 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     return () => stopCamera();
   }, [scanMode]);
 
+  // Stabilization: require 3 consistent counts before accepting result
+  const STABILIZATION_REQUIRED = 3;
+  const COOLDOWN_DURATION = 5; // seconds to pause after stable result
+
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setTimeout(() => setCooldownSeconds(prev => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownSeconds]);
+
   // Live scan loop
   useEffect(() => {
     if (!isStreaming || !isLiveScanning || cameraFailed || scanMode !== 'live') return;
+    if (isStabilized || cooldownSeconds > 0) return; // pause during cooldown
 
     const tick = async () => {
       if (isRequestInFlightRef.current) return;
@@ -171,6 +188,18 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
         const pileDetected = Boolean(data?.pile_detected) || count > 0;
 
+        // Stabilization logic: track recent counts
+        const recent = recentCountsRef.current;
+        recent.push(count);
+        if (recent.length > STABILIZATION_REQUIRED) {
+          recent.shift();
+        }
+        
+        const allSame = recent.length >= STABILIZATION_REQUIRED && 
+          recent.every(c => c === recent[0]) && recent[0] > 0;
+        
+        setStabilizationProgress(recent.length);
+
         setLiveResult({
           count,
           confidence,
@@ -183,7 +212,13 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         setLastUpdateAt(Date.now());
         setHasShownLiveError(false);
 
-        if (!hasManualOverride) {
+        if (allSame) {
+          // Result is stable - auto-pause for validation
+          stableCountRef.current = count;
+          setIsStabilized(true);
+          setEditCount(count);
+          setHasManualOverride(false);
+        } else if (!hasManualOverride) {
           setEditCount(count);
         }
       } catch (err: any) {
@@ -203,9 +238,9 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     };
 
     tick();
-    const id = window.setInterval(tick, 1500);
+    const id = window.setInterval(tick, 2500); // slower interval for better stability
     return () => window.clearInterval(id);
-  }, [isStreaming, isLiveScanning, cameraFailed, selectedLinenTypeId, hotelId, hasManualOverride, scanMode, hasShownLiveError, toast]);
+  }, [isStreaming, isLiveScanning, cameraFailed, selectedLinenTypeId, hotelId, hasManualOverride, scanMode, hasShownLiveError, toast, isStabilized, cooldownSeconds]);
 
   const startCamera = async () => {
     try {
@@ -352,6 +387,19 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     setLiveResult(null);
     setEditCount(0);
     setHasManualOverride(false);
+    setIsStabilized(false);
+    setStabilizationProgress(0);
+    setCooldownSeconds(0);
+    recentCountsRef.current = [];
+    stableCountRef.current = null;
+  };
+
+  const handleResumeScan = () => {
+    setIsStabilized(false);
+    setStabilizationProgress(0);
+    setCooldownSeconds(COOLDOWN_DURATION);
+    recentCountsRef.current = [];
+    stableCountRef.current = null;
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -486,10 +534,28 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
       {/* PROMINENT REAL-TIME COUNT DISPLAY */}
       <div className="absolute top-20 left-0 right-0 z-20 flex justify-center pointer-events-none">
-        <div className="bg-primary text-primary-foreground rounded-2xl px-8 py-4 shadow-2xl">
+        <div className={`rounded-2xl px-8 py-4 shadow-2xl ${isStabilized ? 'bg-green-600 text-white' : 'bg-primary text-primary-foreground'}`}>
           <div className="text-center">
             <div className="text-6xl font-black tabular-nums">{displayCount}</div>
-            <div className="text-lg font-medium opacity-90">pièces détectées</div>
+            <div className="text-lg font-medium opacity-90">
+              {isStabilized ? '✅ Résultat stabilisé' : 'pièces détectées'}
+            </div>
+            {!isStabilized && scanMode === 'live' && stabilizationProgress > 0 && (
+              <div className="flex items-center justify-center gap-1 mt-2">
+                {Array.from({ length: STABILIZATION_REQUIRED }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-2 w-6 rounded-full ${i < stabilizationProgress ? 'bg-white' : 'bg-white/30'}`}
+                  />
+                ))}
+                <span className="text-xs ml-2 opacity-75">Stabilisation...</span>
+              </div>
+            )}
+            {cooldownSeconds > 0 && !isStabilized && (
+              <div className="text-sm mt-2 opacity-75">
+                ⏳ Reprise dans {cooldownSeconds}s
+              </div>
+            )}
             {liveResult?.confidence && liveResult.confidence > 0 && (
               <Badge variant="secondary" className="mt-2">
                 {Math.round(liveResult.confidence * 100)}% confiance
@@ -604,12 +670,22 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
               </div>
             )}
 
-            {/* VALIDATE BUTTON - Shown when result is available */}
+            {/* VALIDATE BUTTON - Shown when stabilized or result available */}
             {liveResult && liveResult.count > 0 && !isAnalyzing && !capturedPhoto && (
-              <div className="absolute bottom-6 left-4 right-4 z-20">
+              <div className="absolute bottom-6 left-4 right-4 z-20 space-y-2">
+                {isStabilized && (
+                  <Button 
+                    onClick={handleResumeScan} 
+                    variant="outline"
+                    className="w-full h-10 text-white border-white/50 bg-black/40 hover:bg-black/60"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Re-scanner
+                  </Button>
+                )}
                 <Button 
                   onClick={handleConfirm} 
-                  className="w-full h-14 text-lg bg-green-600 hover:bg-green-700 shadow-2xl"
+                  className={`w-full h-14 text-lg shadow-2xl ${isStabilized ? 'bg-green-600 hover:bg-green-700 animate-pulse' : 'bg-green-600/70 hover:bg-green-700'}`}
                   disabled={isUploading}
                 >
                   {isUploading ? (
