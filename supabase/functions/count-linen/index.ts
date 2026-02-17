@@ -71,62 +71,81 @@ serve(async (req) => {
     // Model selection - Use better model for counting accuracy
     let model = 'google/gemini-2.5-flash';
     if (quickDetect) {
-      model = 'google/gemini-2.5-flash'; // Better model for accuracy
+      model = 'google/gemini-2.5-flash';
     } else if (detectMode || liveMode) {
       model = 'google/gemini-2.5-flash';
     } else if (useRuler) {
       model = 'google/gemini-2.5-pro';
     }
     
-    // ========== IMPROVED PROMPTS FOR COUNTING ==========
+    // ========== IMPROVED PROMPTS WITH NUMBERED ANNOTATION ==========
     
-    // QUICK DETECT - Clear counting instructions
-    const quickDetectPrompt = `You are an expert at counting folded linen items (${linenType.name}) in stacks/piles.
+    // Core counting methodology shared across modes
+    const countingMethodology = `
+MÉTHODE DE COMPTAGE PRÉCISE (OBLIGATOIRE):
+Tu dois compter les articles de linge un par un en les NUMÉROTANT mentalement.
 
-TASK: Count the EXACT number of individual ${linenType.name} items visible in this image.
+ÉTAPE 1 - IDENTIFIER LE TYPE D'EMPILEMENT:
+- "stacked_flat": Articles pliés empilés horizontalement (le plus courant dans les lingeries d'hôtel).
+- "stacked_vertical": Articles debout côte à côte.
+- "rolled": Articles roulés en cylindres.
+- "loose": Articles en vrac.
 
-STEP 1 - IDENTIFY PILE TYPE:
-- "stacked_flat": Items folded and stacked horizontally one on top of another (most common). Count visible layers from the side.
-- "stacked_vertical": Items standing upright side by side (like books on a shelf). Count each upright item.
-- "rolled": Items rolled into cylinders and grouped. Count each individual roll.
-- "loose": Items loosely placed/overlapping without clear stacking. Count each distinct item.
-- "single": Only one item visible.
+ÉTAPE 2 - COMPTER EN NUMÉROTANT:
+Pour stacked_flat (le plus fréquent):
+  1. Regarde le CÔTÉ de la pile pour voir les couches.
+  2. Commence par le BAS de la pile.
+  3. Numérote chaque article: "#1" (en bas), "#2" (au-dessus), "#3"...
+  4. Chaque pli/séparation visible = une frontière entre 2 articles.
+  5. ATTENTION: un article plié peut avoir un pli au milieu qui crée une fausse séparation. Un vrai article a un bord arrondi/replié distinct.
+  6. Épaisseur typique d'un article: ≈ ${avgThickness}cm.
 
-STEP 2 - COUNT PRECISELY:
-For stacked_flat: Look at the SIDE of the pile. Each horizontal separation line = boundary between 2 items. Count layers carefully. Each item ≈ ${avgThickness}cm thick.
-For stacked_vertical: Count each upright rectangle/fold visible from the front.
-For rolled: Count each cylindrical roll individually.
-For loose: Trace edges of each item to separate overlapping pieces.
+ÉTAPE 3 - DOUBLE VÉRIFICATION:
+  1. Recompte depuis le HAUT vers le BAS.
+  2. Si les deux comptages diffèrent, recompte une 3ème fois.
+  3. Liste mentalement: "#1 bas, #2, #3... #N haut" = N articles.
 
-STEP 3 - ESTIMATE DIMENSIONS:
-Estimate the total width of the pile/items in centimeters.
+PIÈGES À ÉVITER:
+- Un drap plié en deux peut ressembler à 2 draps → vérifie que les bords sont continus.
+- Des draps très fins peuvent sembler collés → regarde les ombres entre les couches.
+- Le haut et le bas de la pile peuvent être partiellement cachés → estime si un article est coupé.
+`;
 
-RESPOND WITH ONLY THIS JSON (no other text):
-{"pile":true,"count":NUMBER,"confidence":0.0-1.0,"width_cm":WIDTH_IN_CM,"pile_type":"stacked_flat|stacked_vertical|rolled|loose|single","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}
+    // QUICK DETECT
+    const quickDetectPrompt = `Tu es un expert en comptage de linge d'hôtellerie. Article: ${linenType.name}.
+${countingMethodology}
+ÉTAPE 4 - Estime la largeur totale de la pile en centimètres.
 
-If NO linen pile visible:
+RÉPONDS UNIQUEMENT avec ce JSON (aucun autre texte):
+{"pile":true,"count":NOMBRE,"confidence":0.0-1.0,"width_cm":LARGEUR_CM,"pile_type":"stacked_flat|stacked_vertical|rolled|loose|single","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1 bas, #2, ... #N haut"}
+
+Si AUCUNE pile visible:
 {"pile":false,"count":0,"confidence":0,"width_cm":0,"pile_type":"none","position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
     
     // Detection mode
-    const detectPrompt = `Count linen items precisely. Identify arrangement: stacked_flat (horizontal layers), stacked_vertical (upright like books), rolled (cylinders), or loose (scattered).
-For stacked_flat: count side layers. For stacked_vertical: count upright items. For rolled: count rolls. Each item ≈ ${avgThickness}cm thick.
-Estimate width in cm. Common: sheets 200-240cm, towels 50-100cm, pillowcases 50cm.
-JSON only: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}`;
+    const detectPrompt = `Compte précisément les articles de linge. Article: ${linenType.name}.
+${countingMethodology}
+Estime la largeur en cm. Draps typiques: 200-240cm, serviettes: 50-100cm, taies: 50cm.
+JSON uniquement: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8},"counting_detail":"#1, #2, ..."}`;
     
     // Live mode
-    const livePrompt = `Count ${linenType.name} items. Identify pile type: stacked_flat (horizontal layers), stacked_vertical (upright), rolled, or loose. Count accordingly. Each item ≈ ${avgThickness}cm thick.
-JSON only: {"count":N,"confidence":0.X,"pile_type":"stacked_flat|stacked_vertical|rolled|loose"}`;
+    const livePrompt = `Compte les ${linenType.name} en numérotant chaque article du bas vers le haut.
+${countingMethodology}
+JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","counting_detail":"#1, #2, ..."}`;
     
     // RULER MODE
-    const rulerPrompt = `Count ${linenType.name} using ruler measurement. Each item ≈ ${avgThickness}cm thick.
-Calculate: pile_height_cm / ${avgThickness} = count
-JSON only: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,"measurement_method":"ruler_calculation"}`;
+    const rulerPrompt = `Compte les ${linenType.name} avec la règle. Chaque article ≈ ${avgThickness}cm d'épaisseur.
+Calcul: hauteur_pile_cm / ${avgThickness} = nombre d'articles.
+Vérifie visuellement en numérotant les couches.
+JSON uniquement: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,"measurement_method":"ruler_calculation","counting_detail":"#1, #2, ..."}`;
 
-    // VALIDATION mode
-    let fullPrompt = `Expert linen counting for ${linenType.name}.
-First identify arrangement: stacked_flat (horizontal layers viewed from side), stacked_vertical (upright like books), rolled (cylinders), or loose (scattered).
-For stacked_flat: count each visible horizontal layer separation from the side. For stacked_vertical: count each upright item. For rolled: count each roll. Each item ≈ ${avgThickness}cm thick.
-Be precise. JSON only: {"count":N,"confidence":0.X,"pile_type":"type","notes":"description"}`;
+    // VALIDATION mode (full precision)
+    let fullPrompt = `Tu es un expert en comptage de linge d'hôtellerie. Article à compter: ${linenType.name}.
+${countingMethodology}
+IMPORTANT: Dans le champ "counting_detail", liste CHAQUE article numéroté pour prouver ton comptage.
+Exemple pour 10 articles: "#1 bas, #2, #3, #4, #5, #6, #7, #8, #9, #10 haut"
+
+JSON uniquement: {"count":N,"confidence":0.X,"pile_type":"type","notes":"description","counting_detail":"#1 bas, #2, ... #N haut"}`;
 
     // Get training samples + corrections for improved accuracy (not in quick/live mode)
     if (!liveMode && !quickDetect) {
@@ -276,6 +295,7 @@ Be precise. JSON only: {"count":N,"confidence":0.X,"pile_type":"type","notes":"d
         count: result.count || 0,
         confidence: result.confidence || 0,
         notes: result.notes || '',
+        counting_detail: result.counting_detail || '',
         linenType: linenType.name,
         model: model,
         mode: modeLabel.toLowerCase(),
