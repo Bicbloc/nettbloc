@@ -1,0 +1,394 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  BedDouble, Users, AlertTriangle, Shield, Wrench, ClipboardList,
+  Sparkles, Zap, Globe, ArrowRight, CheckCircle, Brain, Eye,
+  LayoutDashboard, Package, Mail, ChevronDown, Star, Clock,
+  Smartphone, MousePointerClick, Bot, Search
+} from 'lucide-react';
+
+const t = {
+  fr: {
+    nav: { features: 'Fonctionnalités', portals: 'Portails', ai: 'Intelligence IA', contact: 'Contact', login: 'Se connecter', tryFree: 'Essayer gratuitement' },
+    hero: {
+      badge: 'Propulsé par l\'Intelligence Artificielle',
+      title1: 'La révolution',
+      title2: 'de l\'hôtellerie',
+      title3: 'est arrivée.',
+      subtitle: 'Nettobloc est le premier outil intelligent jamais conçu pour la gestion complète du housekeeping hôtelier. Simple. Rapide. Révolutionnaire.',
+      cta: 'Commencer gratuitement',
+      ctaSecondary: 'Découvrir les fonctionnalités',
+      stats: [
+        { value: '10x', label: 'Plus rapide' },
+        { value: '1 clic', label: 'Répartition' },
+        { value: '24/7', label: 'Suivi en temps réel' },
+        { value: 'IA', label: 'Reconnaissance visuelle' },
+      ]
+    },
+    features: {
+      title: 'Tout ce dont vous avez besoin',
+      subtitle: 'Une suite complète d\'outils pensés pour simplifier votre quotidien.',
+      items: [
+        { icon: 'bed', title: 'Gestion des chambres', desc: 'Suivez l\'état de chaque chambre en temps réel : check-out, recouche, propre, en cours. Importez vos listes PMS automatiquement.' },
+        { icon: 'users', title: 'Répartition en 1 clic', desc: 'Distribuez les chambres aux femmes de chambre présentes en un seul clic. L\'algorithme intelligent équilibre la charge de travail.' },
+        { icon: 'brain', title: 'Recommandation IA', desc: 'Nettobloc recommande le nombre optimal de femmes de chambre nécessaires selon le volume et le type de nettoyage.' },
+        { icon: 'alert', title: 'Suivi des incidents', desc: 'Signalez et suivez chaque incident avec photos, priorité et assignation. Historique complet pour chaque chambre.' },
+        { icon: 'search', title: 'Objets perdus', desc: 'Module dédié aux objets trouvés avec description, photo et suivi du retour au client. Ne perdez plus rien.' },
+        { icon: 'eye', title: 'Reconnaissance IA', desc: 'Identifiez automatiquement les incidents et objets trouvés grâce à l\'intelligence artificielle visuelle intégrée.' },
+      ]
+    },
+    portals: {
+      title: 'Un portail pour chaque rôle',
+      subtitle: 'Chaque membre de votre équipe accède à son interface dédiée, optimisée pour son métier.',
+      items: [
+        { icon: 'layout', title: 'Portail Administrateur', desc: 'Vue complète de l\'établissement, rapports, statistiques, gestion des équipes et configuration avancée.', color: 'primary' },
+        { icon: 'shield', title: 'Portail Gouvernante', desc: 'Inspection des chambres, suivi du personnel, validation du nettoyage et contrôle qualité en temps réel.', color: 'accent' },
+        { icon: 'clipboard', title: 'Portail Femme de chambre / Équipier', desc: 'Liste des chambres assignées, marquage du nettoyage, signalement d\'incidents depuis le mobile.', color: 'success' },
+        { icon: 'wrench', title: 'Portail Technicien', desc: 'Interventions assignées, suivi des réparations, historique des incidents techniques par espace.', color: 'warning' },
+      ]
+    },
+    ai: {
+      title: 'L\'IA au service de votre hôtel',
+      subtitle: 'Des fonctionnalités intelligentes qui changent la donne.',
+      items: [
+        { title: 'Reconnaissance d\'incidents', desc: 'Prenez une photo, l\'IA identifie automatiquement le problème et pré-remplit le rapport.' },
+        { title: 'Identification d\'objets trouvés', desc: 'Photographiez un objet trouvé, l\'IA le catégorise et génère la description.' },
+        { title: 'Comptage intelligent du linge', desc: 'Scannez vos piles de linge, l\'IA compte automatiquement chaque pièce par type.' },
+        { title: 'Répartition optimisée', desc: 'L\'algorithme analyse la charge et recommande la meilleure distribution des chambres.' },
+      ]
+    },
+    cta: {
+      title: 'Prêt à révolutionner votre hôtel ?',
+      subtitle: 'Rejoignez les établissements qui ont choisi l\'efficacité.',
+      button: 'Démarrer maintenant',
+    },
+    footer: {
+      tagline: 'L\'outil intelligent pour l\'hôtellerie moderne.',
+      contact: 'Contact',
+      legal: 'Mentions légales',
+      privacy: 'Politique de confidentialité',
+      rights: '© 2025 Nettobloc. Tous droits réservés.',
+    }
+  },
+  en: {
+    nav: { features: 'Features', portals: 'Portals', ai: 'AI Intelligence', contact: 'Contact', login: 'Log in', tryFree: 'Try for free' },
+    hero: {
+      badge: 'Powered by Artificial Intelligence',
+      title1: 'The hospitality',
+      title2: 'revolution',
+      title3: 'has arrived.',
+      subtitle: 'Nettobloc is the first intelligent tool ever designed for complete hotel housekeeping management. Simple. Fast. Revolutionary.',
+      cta: 'Get started for free',
+      ctaSecondary: 'Discover features',
+      stats: [
+        { value: '10x', label: 'Faster' },
+        { value: '1 click', label: 'Distribution' },
+        { value: '24/7', label: 'Real-time tracking' },
+        { value: 'AI', label: 'Visual recognition' },
+      ]
+    },
+    features: {
+      title: 'Everything you need',
+      subtitle: 'A complete suite of tools designed to simplify your daily operations.',
+      items: [
+        { icon: 'bed', title: 'Room Management', desc: 'Track every room status in real-time: check-out, stayover, clean, in progress. Import your PMS lists automatically.' },
+        { icon: 'users', title: '1-Click Distribution', desc: 'Distribute rooms to available housekeepers in a single click. The smart algorithm balances workload evenly.' },
+        { icon: 'brain', title: 'AI Recommendation', desc: 'Nettobloc recommends the optimal number of housekeepers needed based on volume and cleaning type.' },
+        { icon: 'alert', title: 'Incident Tracking', desc: 'Report and track every incident with photos, priority and assignment. Complete history for each room.' },
+        { icon: 'search', title: 'Lost & Found', desc: 'Dedicated module for found items with description, photo and return tracking. Never lose anything again.' },
+        { icon: 'eye', title: 'AI Recognition', desc: 'Automatically identify incidents and found objects thanks to built-in visual artificial intelligence.' },
+      ]
+    },
+    portals: {
+      title: 'A portal for every role',
+      subtitle: 'Each team member accesses their dedicated interface, optimized for their job.',
+      items: [
+        { icon: 'layout', title: 'Admin Portal', desc: 'Complete property overview, reports, statistics, team management and advanced configuration.', color: 'primary' },
+        { icon: 'shield', title: 'Governess Portal', desc: 'Room inspection, staff tracking, cleaning validation and real-time quality control.', color: 'accent' },
+        { icon: 'clipboard', title: 'Housekeeper Portal', desc: 'Assigned room list, cleaning status updates, incident reporting from mobile.', color: 'success' },
+        { icon: 'wrench', title: 'Technician Portal', desc: 'Assigned interventions, repair tracking, technical incident history by space.', color: 'warning' },
+      ]
+    },
+    ai: {
+      title: 'AI at the service of your hotel',
+      subtitle: 'Intelligent features that change the game.',
+      items: [
+        { title: 'Incident Recognition', desc: 'Take a photo, the AI automatically identifies the problem and pre-fills the report.' },
+        { title: 'Found Item Identification', desc: 'Photograph a found item, the AI categorizes it and generates the description.' },
+        { title: 'Smart Linen Counting', desc: 'Scan your linen piles, the AI automatically counts each piece by type.' },
+        { title: 'Optimized Distribution', desc: 'The algorithm analyzes workload and recommends the best room distribution.' },
+      ]
+    },
+    cta: {
+      title: 'Ready to revolutionize your hotel?',
+      subtitle: 'Join the properties that chose efficiency.',
+      button: 'Start now',
+    },
+    footer: {
+      tagline: 'The intelligent tool for modern hospitality.',
+      contact: 'Contact',
+      legal: 'Legal notices',
+      privacy: 'Privacy policy',
+      rights: '© 2025 Nettobloc. All rights reserved.',
+    }
+  }
+};
+
+const featureIcons: Record<string, React.ReactNode> = {
+  bed: <BedDouble className="w-7 h-7" />,
+  users: <Users className="w-7 h-7" />,
+  brain: <Brain className="w-7 h-7" />,
+  alert: <AlertTriangle className="w-7 h-7" />,
+  search: <Search className="w-7 h-7" />,
+  eye: <Eye className="w-7 h-7" />,
+};
+
+const portalIcons: Record<string, React.ReactNode> = {
+  layout: <LayoutDashboard className="w-8 h-8" />,
+  shield: <Shield className="w-8 h-8" />,
+  clipboard: <ClipboardList className="w-8 h-8" />,
+  wrench: <Wrench className="w-8 h-8" />,
+};
+
+const portalColors: Record<string, string> = {
+  primary: 'from-primary/20 to-primary/5 border-primary/30',
+  accent: 'from-accent to-accent/30 border-accent-foreground/20',
+  success: 'from-emerald-500/15 to-emerald-500/5 border-emerald-500/30',
+  warning: 'from-amber-500/15 to-amber-500/5 border-amber-500/30',
+};
+
+const portalIconColors: Record<string, string> = {
+  primary: 'text-primary',
+  accent: 'text-accent-foreground',
+  success: 'text-emerald-600',
+  warning: 'text-amber-600',
+};
+
+const Landing = () => {
+  const [lang, setLang] = useState<'fr' | 'en'>('fr');
+  const navigate = useNavigate();
+  const c = t[lang];
+
+  return (
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* Navbar */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold tracking-tight">Nettobloc</span>
+          </div>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
+            <a href="#features" className="hover:text-foreground transition-colors">{c.nav.features}</a>
+            <a href="#portals" className="hover:text-foreground transition-colors">{c.nav.portals}</a>
+            <a href="#ai" className="hover:text-foreground transition-colors">{c.nav.ai}</a>
+            <a href="#contact" className="hover:text-foreground transition-colors">{c.nav.contact}</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+              className="gap-1.5"
+            >
+              <Globe className="w-4 h-4" />
+              {lang === 'fr' ? 'EN' : 'FR'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+              {c.nav.login}
+            </Button>
+            <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              {c.nav.tryFree}
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 overflow-hidden">
+        {/* Background effects */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-20 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/10 blur-[120px]" />
+          <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[100px]" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Badge variant="secondary" className="mb-6 px-4 py-1.5 text-sm font-medium gap-2 bg-primary/10 text-primary border-primary/20">
+            <Bot className="w-4 h-4" />
+            {c.hero.badge}
+          </Badge>
+
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6">
+            {c.hero.title1}{' '}
+            <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+              {c.hero.title2}
+            </span>
+            <br />
+            {c.hero.title3}
+          </h1>
+
+          <p className="max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground mb-10 leading-relaxed">
+            {c.hero.subtitle}
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+            <Button size="lg" onClick={() => navigate('/auth')} className="text-base px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 gap-2">
+              {c.hero.cta}
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-base px-8 py-6 gap-2">
+              {c.hero.ctaSecondary}
+              <ChevronDown className="w-5 h-5" />
+            </Button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+            {c.hero.stats.map((stat, i) => (
+              <div key={i} className="text-center p-4 rounded-2xl bg-card border border-border/50 shadow-sm">
+                <div className="text-2xl md:text-3xl font-extrabold text-primary">{stat.value}</div>
+                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="py-20 md:py-28 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.features.title}</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.features.subtitle}</p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {c.features.items.map((item, i) => (
+              <Card key={i} className="border border-border/60 bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group">
+                <CardContent className="p-6">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                    {featureIcons[item.icon]}
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Portals */}
+      <section id="portals" className="py-20 md:py-28">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.portals.title}</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.portals.subtitle}</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            {c.portals.items.map((item, i) => (
+              <div
+                key={i}
+                className={`relative rounded-2xl border p-8 bg-gradient-to-br ${portalColors[item.color]} transition-all duration-300 hover:shadow-lg hover:-translate-y-1`}
+              >
+                <div className={`w-14 h-14 rounded-2xl bg-background/80 flex items-center justify-center mb-5 ${portalIconColors[item.color]}`}>
+                  {portalIcons[item.icon]}
+                </div>
+                <h3 className="text-xl font-bold mb-2">{item.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* AI Section */}
+      <section id="ai" className="py-20 md:py-28 relative overflow-hidden">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[150px]" />
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge variant="secondary" className="mb-4 px-4 py-1.5 bg-primary/10 text-primary border-primary/20 gap-2">
+              <Sparkles className="w-4 h-4" />
+              AI-Powered
+            </Badge>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">{c.ai.title}</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{c.ai.subtitle}</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {c.ai.items.map((item, i) => (
+              <div key={i} className="flex gap-4 p-6 rounded-2xl bg-card border border-border/60 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mt-0.5">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 md:py-28">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="rounded-3xl bg-gradient-to-br from-primary to-primary/80 p-12 md:p-16 text-primary-foreground shadow-2xl shadow-primary/20">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{c.cta.title}</h2>
+            <p className="text-lg opacity-90 mb-8 max-w-xl mx-auto">{c.cta.subtitle}</p>
+            <Button
+              size="lg"
+              onClick={() => navigate('/auth')}
+              className="bg-background text-foreground hover:bg-background/90 text-base px-10 py-6 shadow-lg gap-2"
+            >
+              {c.cta.button}
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer id="contact" className="border-t border-border/50 bg-muted/30 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-3 gap-8 items-start">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <span className="text-lg font-bold">Nettobloc</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{c.footer.tagline}</p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-3">{c.footer.contact}</h4>
+              <a href="mailto:support@bicbloc.eu" className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                support@bicbloc.eu
+              </a>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-3">Legal</h4>
+              <div className="space-y-2">
+                <a href="/legal/mentions-legales" className="block text-sm text-muted-foreground hover:text-primary transition-colors">{c.footer.legal}</a>
+                <a href="/legal/politique-de-confidentialite" className="block text-sm text-muted-foreground hover:text-primary transition-colors">{c.footer.privacy}</a>
+              </div>
+            </div>
+          </div>
+          <div className="mt-10 pt-6 border-t border-border/50 text-center text-xs text-muted-foreground">
+            {c.footer.rights}
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default Landing;

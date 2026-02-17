@@ -81,7 +81,7 @@ const Index = () => {
 
   // Redirection si pas authentifié
   if (!isAuthenticated && !isGuestMode) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/landing" replace />;
   }
 
   // Vérifier le type d'utilisateur (seulement pour les authentifiés, pas en guest mode)
