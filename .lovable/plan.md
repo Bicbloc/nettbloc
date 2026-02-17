@@ -1,73 +1,91 @@
 
-# Correction du parsing MisterBooking et amelioration de la precision
 
-## Probleme identifie
+# Parser universel configurable par l'etablissement
 
-Le PDF vient de **MisterBooking** (`new.misterbooking.com`), un PMS non reconnu par le systeme. Il tombe dans le parser `generic_table`, qui utilise un regex trop permissif : `^(\d{2,4}[A-Z]?)\b`. Cela fait que des numeros parasites comme "01" et "14" (numeros de page, compteurs, indices de tableau) sont detectes comme des chambres.
+## Probleme actuel
 
-## Cause racine
+Le systeme contient des parsers specifiques codes en dur pour Mews, Apaleo, Medialog et Opera dans `ReportFormatDetector.ts`. Pour tout rapport non reconnu (comme MisterBooking), le parser generique detecte des faux positifs (chambres "1", "2", "3", "4" qui sont en realite des colonnes "Nb pers" ou des compteurs).
 
-1. **Pas de signature MisterBooking** dans `FORMAT_SIGNATURES` du `ReportFormatDetector.ts`
-2. Le parser generique accepte n'importe quel nombre de 2+ chiffres en debut de ligne comme numero de chambre
-3. Pas de validation contextuelle : le systeme ne verifie pas si la ligne contient aussi des mots-cles de statut/nettoyage avant de considerer qu'il s'agit d'une chambre
+L'approche actuelle ne peut pas fonctionner a grande echelle car chaque hotel utilise un PMS different avec un format de rapport unique.
+
+## Vision cible
+
+Un parser **universel** qui fonctionne pour n'importe quel rapport, ou chaque etablissement configure/entraine le systeme a comprendre SON format de rapport specifique.
 
 ## Plan de correction
 
-### Etape 1 - Ajouter la signature MisterBooking
+### Etape 1 — Supprimer la dependance aux parsers PMS hard-codes
 
-Ajouter un nouveau format `misterbooking_housekeeping` dans `ReportFormatDetector.ts` :
-- Signatures : `misterbooking.com`, `femme de chambre`, patterns specifiques au format MisterBooking
-- Parser dedie qui comprend la structure du rapport MisterBooking (colonnes, statuts)
+Dans `pdfService.ts` (`processPdf()`), modifier la logique pour :
+- **Ne plus privilegier** les parsers Mews/Apaleo/Medialog automatiquement
+- **Toujours verifier d'abord** si l'hotel a un modele entraine (patterns sauvegardes via le TrainingWizard)
+- Si un modele entraine existe : l'utiliser en priorite absolue
+- Si aucun modele entraine : utiliser le parser generique + afficher la suggestion d'entrainement dans la preview
 
-### Etape 2 - Renforcer le parser generique
+Concretement dans `processPdf()` :
 
-Modifier `parseGenericReport()` pour ne pas accepter un numero seul en debut de ligne :
-- Exiger qu'un numero de chambre soit suivi d'au moins un indicateur de contexte (statut, type de chambre, nom de client, date)
-- Ajouter des filtres d'exclusion : ignorer les lignes qui ressemblent a des en-tetes, numeros de page, ou texte libre
-- Verifier que le nombre n'est pas isole (il doit etre accompagne d'autres colonnes)
+```text
+AVANT:
+  1. Detecter format (Mews/Apaleo/Medialog/generic)
+  2. Si format connu -> parser dedie
+  3. Sinon -> fallback generique
 
-### Etape 3 - Ameliorer isHeaderLine()
+APRES:
+  1. Charger les patterns entraines de l'hotel (si hotelId)
+  2. Si patterns entraines existent -> les utiliser en priorite
+  3. Sinon -> detecter format et parser (generique ou dedie)
+  4. Dans tous les cas -> appliquer les filtres post-extraction
+```
 
-Ajouter des patterns de detection d'en-tetes MisterBooking et generiques :
-- `femme de chambre`, `intendance`, `misterbooking`
-- Numeros isoles en debut ou fin de page (pagination)
-- Lignes trop courtes (moins de 10 caracteres utiles) ne contenant qu'un nombre
+### Etape 2 — Renforcer le parser generique contre les faux positifs
 
-### Etape 4 - Validation post-extraction
+Dans `ReportFormatDetector.ts`, renforcer `parseGenericReport()` :
+- Rejeter les numeros a 1 chiffre (1-9) qui sont presque toujours des faux positifs
+- Exiger un minimum de contexte (mot-cle de statut, date, type de chambre) a cote du numero
+- Ne pas accepter les lignes avec moins de 3 "colonnes" de donnees
 
-Ajouter un filtre dans `processPdf()` apres l'extraction :
-- Eliminer les chambres dont le numero ne correspond pas au pattern attendu de l'hotel (si le registre des chambres `hotel_rooms_registry` existe)
-- Eliminer les chambres sans aucun indicateur de statut/nettoyage et avec une confiance inferieure a 40%
-- Logger les chambres rejetees pour transparence
+### Etape 3 — Ameliorer la preview avec exclusion plus visible
+
+Dans `PdfWorkflowDialog.tsx`, ameliorer l'interface de preview :
+- Ajouter un bouton "Tout exclure" / "Tout inclure" pour faciliter la selection
+- Afficher un avertissement clair si des chambres suspectes sont detectees (numeros courts, confiance basse)
+- Mettre en evidence les chambres avec confiance < 50% pour attirer l'attention de l'utilisateur
+- Rendre le bouton "Entrainer" plus visible et toujours present (pas seulement quand confiance < 70%)
+
+### Etape 4 — Afficher les chambres suspectes en premier
+
+Trier les chambres dans la preview par confiance croissante, pour que les faux positifs potentiels soient en haut et facilement exclus par l'utilisateur.
 
 ## Details techniques
 
 ### Fichiers modifies
 
-- `src/services/training/ReportFormatDetector.ts` : ajout signature MisterBooking + parser dedie + renforcement `isHeaderLine()`
-- `src/services/pdfService.ts` : ajout filtre post-extraction avec validation contre le registre des chambres
-- `src/services/pms/RoomLineParser.ts` : renforcement de la validation contextuelle dans `parseSection()` (rejeter les numeros isoles sans statut ni type)
+1. **`src/services/pdfService.ts`** — Reorganiser `processPdf()` pour prioriser les patterns entraines
+2. **`src/services/training/ReportFormatDetector.ts`** — Renforcer `parseGenericReport()` (rejeter les numeros courts sans contexte)
+3. **`src/components/PdfWorkflowDialog.tsx`** — Ameliorer la preview : tri par confiance, boutons bulk exclusion, avertissements visuels, bouton "Entrainer" toujours visible
 
-### Logique du parser MisterBooking
-
-Le parser analysera la structure specifique des rapports MisterBooking :
-- Detecter les colonnes par position (numero, type chambre, statut, client, dates)
-- Utiliser les mots-cles MisterBooking pour le cleaning type
-- Ignorer les en-tetes et pieds de page propres a ce PMS
-
-### Filtre post-extraction
+### Logique de priorite du parsing
 
 ```text
-Pour chaque chambre detectee :
-  SI hotel_rooms_registry existe ET contient des chambres :
-    SI la chambre n'est PAS dans le registre :
-      Marquer avec confiance basse (flag de verification)
-  SI aucun statut/mot-cle detecte ET confiance < 40% :
-    Rejeter la chambre (faux positif probable)
+processPdf(file, hotelId):
+  1. Extraire texte brut du PDF
+  2. SI hotelId:
+     a. Charger patterns entraines (hotel_trained_patterns)
+     b. SI patterns existent ET nombre > 0:
+        -> Parser avec le modele entraine (unifiedParserService)
+        -> Marquer formatDetected = 'trained_model'
+        -> Continuer vers filtrage
+  3. Detecter format (Mews/Apaleo/etc. OU generique)
+  4. Parser selon le format detecte
+  5. Appliquer filtres post-extraction (rejeter faux positifs)
+  6. Appliquer regles de combinaison hotel
+  7. Retourner les chambres
 ```
 
 ### Impact
 
-- Les chambres "01" et "14" seront rejetees car elles n'ont pas de contexte de nettoyage
-- Les vrais numeros de chambre du rapport MisterBooking seront correctement detectes
-- Les autres formats (Mews, Apaleo, etc.) ne sont pas affectes
+- Les parsers Mews/Apaleo/Medialog restent disponibles comme fallback mais ne sont plus prioritaires
+- Chaque hotel qui entraine son systeme aura un parsing precise adapte a SON rapport
+- Les faux positifs (1, 2, 3, 4, 01, 14) seront soit rejetes automatiquement soit facilement exclus manuellement
+- Le bouton "Entrainer" est toujours visible pour encourager la configuration
+
