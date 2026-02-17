@@ -505,6 +505,30 @@ function mapStatus(status: string): string {
 }
 
 /**
+ * Filtre de cohérence d'étage pour les Room[]: si >70% ont 3+ chiffres, rejeter les 2 chiffres suspects
+ */
+function applyFloorCoherenceFilterRooms(rooms: Room[]): Room[] {
+  if (rooms.length < 3) return rooms.filter(r => r.number.replace(/\D/g, '').length > 1);
+
+  const threeDigitCount = rooms.filter(r => r.number.replace(/\D/g, '').length >= 3).length;
+  const ratio = threeDigitCount / rooms.length;
+
+  return rooms.filter(room => {
+    const digits = room.number.replace(/\D/g, '');
+    if (digits.length <= 1) return false; // Always reject 1-digit
+    if (digits.length >= 3) return true; // Always keep 3+ digits
+    if (ratio < 0.7) return true; // Not enough 3-digit rooms to filter
+
+    // 2-digit room in a 3-digit dominant set: only keep if it has meaningful status
+    const hasStatus = room.cleaningType && room.cleaningType !== 'none';
+    if (!hasStatus) {
+      console.log(`🧹 Cohérence étage (pdfService): rejet "${room.number}"`);
+    }
+    return hasStatus;
+  });
+}
+
+/**
  * Détermine l'étage à partir du numéro de chambre
  */
 function getRoomFloor(roomNumber: string): number {
@@ -722,12 +746,8 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
             rooms = applyHotelCombinationRules(rooms, combinationRules, []);
           }
           
-          // Post-extraction filter
-          rooms = rooms.filter(room => {
-            const roomNumDigits = room.number.replace(/\D/g, '');
-            if (roomNumDigits.length === 1) return false;
-            return true;
-          });
+          // Post-extraction filter: reject 1-digit rooms + floor coherence
+          rooms = applyFloorCoherenceFilterRooms(rooms);
           
           // Créer des RoomLines pour la prévisualisation
           lastParsedLines = rooms.map(room => ({
