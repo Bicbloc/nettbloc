@@ -12,7 +12,7 @@ import {
 
 import { toast } from "@/components/ui/use-toast";
 import { processPdf } from "@/services/pdfService";
-import { FileUp, Sparkles, FileText, Plug, Clock, ArrowLeft, Zap, Trash2 } from "lucide-react";
+import { FileUp, Sparkles, FileText, Plug, ArrowLeft, Zap, Trash2 } from "lucide-react";
 import { HousekeeperSetupDialog } from './HousekeeperSetupDialog';
 import { unifiedParserService } from "@/services/pms";
 import { detectionCache } from "@/services/pms/DetectionCache";
@@ -201,37 +201,43 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
           </div>
         </button>
 
-        {/* Option API - Coming Soon */}
-        <div className="w-full p-4 rounded-lg border-2 border-dashed border-border bg-muted/30 relative overflow-hidden">
+        {/* Option API - Configurer */}
+        <button
+          className="w-full p-4 rounded-lg border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
+          onClick={() => {
+            setOpen(false);
+            const configPanel = document.querySelector('[data-pms-config]');
+            if (configPanel) configPanel.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
           <div className="flex items-start gap-4">
-            <div className="p-3 rounded-lg bg-muted text-muted-foreground">
+            <div className="p-3 rounded-lg bg-primary/10 text-primary">
               <Plug className="h-6 w-6" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-muted-foreground">Connexion API</h3>
-                <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-500/10">
-                  <Clock className="h-3 w-3 mr-1" />
-                  Bientôt disponible
+                <h3 className="font-semibold">Connexion API</h3>
+                <Badge variant="outline" className="text-xs border-primary/50 text-primary bg-primary/10">
+                  Configurer l'API
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 Synchronisation automatique avec votre PMS
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-3">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-background border text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-background border text-xs">
                   <img 
                     src="/lovable-uploads/fab4ce53-a146-478a-a585-fab338cb0095.png" 
                     alt="Mews" 
-                    className="h-4 w-4 object-contain grayscale opacity-60"
+                    className="h-4 w-4 object-contain"
                   />
                   Mews
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-background border text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-background border text-xs">
                   <img 
                     src="/lovable-uploads/d6290f4a-190e-4ad8-99a9-51307a4cbcc8.png" 
                     alt="Apaleo" 
-                    className="h-4 w-4 object-contain grayscale opacity-60"
+                    className="h-4 w-4 object-contain"
                   />
                   Apaleo
                 </div>
@@ -239,7 +245,7 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
               </div>
             </div>
           </div>
-        </div>
+        </button>
       </div>
     </>
   );
