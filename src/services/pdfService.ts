@@ -767,7 +767,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     const formatDetection = detectReportFormat(fullText);
     console.log(`🔍 Format détecté: ${formatDetection.format} (confiance: ${formatDetection.confidence}%)`);
     
-    // Utiliser le parser dédié si format reconnu avec bonne confiance
+    // Utiliser le parser dédié si format reconnu avec bonne confiance ET résultats non vides
     if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat'].includes(formatDetection.format) && 
         formatDetection.confidence >= 50 && 
         formatDetection.parsedData.rows.length > 0) {

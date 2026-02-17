@@ -88,7 +88,11 @@ export const TrainingStep1bColumnMapping: React.FC<TrainingStep1bColumnMappingPr
   const analysis = useMemo(() => {
     console.log('Analyzing report...');
     const detection = detectReportFormat(trainingData.rawText);
-    console.log('Detection result:', detection);
+    console.log('Detection result:', detection.format, 'rows:', detection.parsedData.rows.length);
+    
+    // Le fallback est désormais géré dans parseReportByFormat() de ReportFormatDetector
+    // Si le parser spécifique retourne 0 lignes, il bascule automatiquement sur le parser générique
+    
     return detection;
   }, [trainingData.rawText]);
 
