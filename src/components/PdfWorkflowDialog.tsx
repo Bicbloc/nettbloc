@@ -1262,13 +1262,31 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         <TrainingCoverageReport coverage={coverageMetadata} />
       )}
 
-      {/* Avertissement si confiance basse */}
-      {extractionStats && extractionStats.avgConfidence < 70 && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            La confiance moyenne est faible ({extractionStats.avgConfidence.toFixed(0)}%). 
-            Utilisez l'entraînement IA pour améliorer la reconnaissance de ce format.
+      {/* Suggestion d'entraînement */}
+      {extractionStats && (extractionStats.avgConfidence < 70 || coverageMetadata?.formatDetected === 'generic_table' || coverageMetadata?.formatDetected === 'unknown') && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <Brain className="h-4 w-4 text-primary" />
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span className="text-sm">
+              {extractionStats.avgConfidence < 70 
+                ? `Confiance faible (${extractionStats.avgConfidence.toFixed(0)}%). Entraînez le parser pour améliorer la reconnaissance.`
+                : 'Format non reconnu automatiquement. Entraînez le parser pour ce format de rapport.'
+              }
+            </span>
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="shrink-0 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+              onClick={() => {
+                setOpen(false);
+                resetDialog();
+                // Dispatch event to navigate to training tab
+                window.dispatchEvent(new CustomEvent('navigate-to-training'));
+              }}
+            >
+              <Settings2 className="h-4 w-4 mr-1" />
+              Entraîner
+            </Button>
           </AlertDescription>
         </Alert>
       )}

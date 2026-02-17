@@ -169,6 +169,15 @@ const IndexDashboard = () => {
     window.addEventListener('navigate-to-pms-config', handler);
     return () => window.removeEventListener('navigate-to-pms-config', handler);
   }, []);
+
+  // Listen for navigate-to-training events from PDF workflow
+  useEffect(() => {
+    const handler = () => {
+      setActiveTab('training' as TabValue);
+    };
+    window.addEventListener('navigate-to-training', handler);
+    return () => window.removeEventListener('navigate-to-training', handler);
+  }, []);
   
   const { 
     housekeeperNames, 
