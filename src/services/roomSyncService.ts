@@ -39,11 +39,13 @@ export class RoomSyncService {
         updated_at: new Date().toISOString()
       };
 
-      // Ajouter cleaning_type selon cleaningType
-      if (room.cleaningType === 'full') {
-        updateData.cleaning_type = 'full';
-      } else if (room.cleaningType === 'quick') {
-        updateData.cleaning_type = 'quick';
+      // Ajouter cleaning_type selon cleaningType (normaliser a_blanc→full, recouche→quick)
+      if (room.cleaningType === 'full' || room.cleaningType === 'a_blanc') {
+        updateData.cleaning_type = 'a_blanc';
+      } else if (room.cleaningType === 'quick' || room.cleaningType === 'recouche') {
+        updateData.cleaning_type = 'recouche';
+      } else if (room.cleaningType === 'none') {
+        updateData.cleaning_type = 'none';
       }
 
       // Mettre à jour last_cleaned_at si la chambre est propre
