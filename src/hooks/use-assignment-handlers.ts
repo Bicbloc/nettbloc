@@ -30,6 +30,30 @@ export const useAssignmentHandlers = ({
 }: UseAssignmentHandlersProps) => {
   
   const handleManualAssign = useCallback(async (housekeeperName: string, selectedRooms: Room[]) => {
+    // Auto-include linked rooms that aren't already selected
+    const selectedNumbers = new Set(selectedRooms.map(r => r.number));
+    const linkedToAdd: Room[] = [];
+    for (const room of selectedRooms) {
+      if (room.linkedRooms && room.linkedRooms.length > 0) {
+        for (const linkedNum of room.linkedRooms) {
+          if (!selectedNumbers.has(linkedNum)) {
+            const linkedRoom = rooms.find(r => r.number === linkedNum);
+            if (linkedRoom) {
+              linkedToAdd.push(linkedRoom);
+              selectedNumbers.add(linkedNum);
+              console.log(`🔗 Auto-inclusion chambre liée ${linkedNum} (liée à ${room.number})`);
+            }
+          }
+        }
+      }
+    }
+    if (linkedToAdd.length > 0) {
+      selectedRooms = [...selectedRooms, ...linkedToAdd];
+      toast({
+        description: `${linkedToAdd.length} chambre(s) communicante(s) ajoutée(s) automatiquement: ${linkedToAdd.map(r => r.number).join(', ')}`,
+      });
+    }
+
     console.log('🔄 Assignation manuelle:', { housekeeperName, roomCount: selectedRooms.length, hotelId });
     
     // Bloquer le rechargement automatique pendant l'assignation

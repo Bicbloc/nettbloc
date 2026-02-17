@@ -141,6 +141,14 @@ export function distributeRoomsByFloor(
     assignments[name] = [];
   });
 
+  // Build linked rooms map for auto-grouping
+  const linkedMap = new Map<string, string[]>();
+  for (const room of availableRooms) {
+    if (room.linkedRooms && room.linkedRooms.length > 0) {
+      linkedMap.set(room.number, room.linkedRooms);
+    }
+  }
+
   // Group rooms by floor
   const roomsByFloor: Record<number, Room[]> = {};
   availableRooms.forEach(room => {
@@ -181,18 +189,33 @@ export function distributeRoomsByFloor(
         
         // Check if adding these rooms would exceed the limit
         // If so, only add what can fit - remaining will be unassigned
+        const assignedInThisFloor = new Set<string>();
         roomsOnFloor.forEach(room => {
-          if (assignments[housekeeper].length < Math.ceil(availableRooms.length / numHousekeepers) + 5) { // Allow some flexibility
+          if (assignedInThisFloor.has(room.number)) return; // Already assigned via linked room
+          if (assignments[housekeeper].length < Math.ceil(availableRooms.length / numHousekeepers) + 5) {
             assignments[housekeeper].push(room);
+            assignedInThisFloor.add(room.number);
+            
+            // Auto-include linked rooms with the same housekeeper
+            const linked = linkedMap.get(room.number);
+            if (linked) {
+              for (const linkedNum of linked) {
+                if (!assignedInThisFloor.has(linkedNum)) {
+                  const linkedRoom = availableRooms.find(r => r.number === linkedNum);
+                  if (linkedRoom) {
+                    assignments[housekeeper].push(linkedRoom);
+                    assignedInThisFloor.add(linkedNum);
+                    console.log(`🔗 Auto-lié: ${linkedNum} avec ${room.number} → ${housekeeper}`);
+                  }
+                }
+              }
+            }
           } else {
-            // Rooms that can't fit with current housekeeper will remain unassigned
-            // and show up in the unassigned section
             console.log(`Room ${room.number} exceeds capacity for ${housekeeper}, leaving unassigned`);
           }
         });
         
-        console.log(`Added ${roomsOnFloor.length} rooms from floor ${floor} to ${housekeeper}`);
-        console.log(`Room numbers: ${roomsOnFloor.map(r => r.number).join(', ')}`);
+        console.log(`Added ${assignedInThisFloor.size} rooms from floor ${floor} to ${housekeeper}`);
       }
     }
     
