@@ -530,6 +530,55 @@ function applyFloorCoherenceFilterRooms(rooms: Room[]): Room[] {
 }
 
 /**
+ * Propage les linkedRooms entre chambres communicantes.
+ * Si 107+108 crée des entrées liées, mais 107 et 108 existent aussi individuellement,
+ * cette fonction s'assure que les chambres individuelles héritent du lien.
+ */
+function propagateLinkedRooms(rooms: Room[]): Room[] {
+  const linkedGroupMap = new Map<string, Set<string>>();
+  
+  for (const room of rooms) {
+    if (room.linkedRooms && room.linkedRooms.length > 0) {
+      const group = new Set([room.number, ...room.linkedRooms]);
+      for (const member of group) {
+        if (linkedGroupMap.has(member)) {
+          const existing = linkedGroupMap.get(member)!;
+          for (const m of group) existing.add(m);
+          for (const m of existing) linkedGroupMap.set(m, existing);
+        }
+      }
+      for (const member of group) linkedGroupMap.set(member, group);
+    }
+  }
+  
+  for (const room of rooms) {
+    const group = linkedGroupMap.get(room.number);
+    if (group && group.size > 1) {
+      room.linkedRooms = Array.from(group).filter(r => r !== room.number);
+    }
+  }
+  
+  // Deduplicate: keep first occurrence, merge linkedRooms
+  const seen = new Map<string, Room>();
+  for (const room of rooms) {
+    if (!seen.has(room.number)) {
+      seen.set(room.number, room);
+    } else {
+      const existing = seen.get(room.number)!;
+      if (room.linkedRooms && room.linkedRooms.length > 0) {
+        const merged = new Set([...(existing.linkedRooms || []), ...room.linkedRooms]);
+        existing.linkedRooms = Array.from(merged);
+      }
+      if (room.cleaningType && room.cleaningType !== 'none' && existing.cleaningType === 'none') {
+        Object.assign(existing, { ...room, linkedRooms: existing.linkedRooms });
+      }
+    }
+  }
+  
+  return Array.from(seen.values());
+}
+
+/**
  * Détermine l'étage à partir du numéro de chambre
  */
 function getRoomFloor(roomNumber: string): number {
@@ -723,7 +772,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
         const trainedResult = await unifiedParserService.parseReportHybrid(fullText, hotelId, false);
         
         if (trainedResult.rooms.length > 0) {
-          let rooms = convertExtractedRoomsToRooms(trainedResult.rooms);
+          let rooms = propagateLinkedRooms(convertExtractedRoomsToRooms(trainedResult.rooms));
           const trainedPatternCount = unifiedParserService.getLearnedPatternCount();
           
           // Build coverage metadata
@@ -798,6 +847,9 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       const parsedRows = formatDetection.parsedData.rows;
       let rooms = parsedRows.map(convertParsedRowToRoom);
       
+      // Post-processing: propager les liaisons chambres communicantes
+      rooms = propagateLinkedRooms(rooms);
+
       // ===== SUPPLEMENTER AVEC LES PATTERNS ENTRAINÉS =====
       const phase0RoomCount = rooms.length;
       const phase0Numbers = new Set(rooms.map(r => r.number));
