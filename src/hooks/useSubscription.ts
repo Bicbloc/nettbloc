@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { addMonths, differenceInDays } from 'date-fns';
 
-export type PlanType = 'freemium' | 'basic' | 'basic_plus' | 'premium' | 'platinum';
+export type PlanType = 'decouverte' | 'essentiel' | 'confort' | 'business' | 'entreprise';
 
 interface PlanConfig {
   name: string;
@@ -20,36 +20,36 @@ interface PlanConfig {
 }
 
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
-  freemium: {
-    name: 'freemium',
+  decouverte: {
+    name: 'decouverte',
     displayName: 'Découverte',
     price: 0,
     maxRooms: 15,
     features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
   },
-  basic: {
-    name: 'basic',
+  essentiel: {
+    name: 'essentiel',
     displayName: 'Essentiel',
     price: 150,
     maxRooms: 70,
     features: { incidents: false, linen_inventory: false, inspection: false, api_access: false, unlimited_rooms: false }
   },
-  basic_plus: {
-    name: 'basic_plus',
-    displayName: 'Business',
-    price: 250,
-    maxRooms: 170,
-    features: { incidents: true, linen_inventory: true, inspection: false, api_access: false, unlimited_rooms: false }
-  },
-  premium: {
-    name: 'premium',
+  confort: {
+    name: 'confort',
     displayName: 'Confort',
     price: 200,
     maxRooms: 150,
     features: { incidents: true, linen_inventory: true, inspection: true, api_access: false, unlimited_rooms: false }
   },
-  platinum: {
-    name: 'platinum',
+  business: {
+    name: 'business',
+    displayName: 'Business',
+    price: 250,
+    maxRooms: 170,
+    features: { incidents: true, linen_inventory: true, inspection: false, api_access: false, unlimited_rooms: false }
+  },
+  entreprise: {
+    name: 'entreprise',
     displayName: 'Entreprise',
     price: 400,
     maxRooms: null,
@@ -86,31 +86,46 @@ const DEFAULT_FEATURES = {
   linen: false
 };
 
+// Map old plan names to new ones for backward compatibility
+const PLAN_NAME_MAP: Record<string, PlanType> = {
+  freemium: 'decouverte',
+  basic: 'essentiel',
+  premium: 'confort',
+  basic_plus: 'business',
+  platinum: 'entreprise',
+  free: 'decouverte',
+  decouverte: 'decouverte',
+  essentiel: 'essentiel',
+  confort: 'confort',
+  business: 'business',
+  entreprise: 'entreprise',
+};
+
 export function useSubscription() {
   const { user, isAuthenticated } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionState>({
-    plan: 'freemium',
+    plan: 'decouverte',
     subscribed: false,
     loading: true,
     isInTrial: false,
     isTrialExpired: false,
     maxRooms: 15,
     featuresEnabled: DEFAULT_FEATURES,
-    planConfig: PLAN_CONFIGS.freemium,
+    planConfig: PLAN_CONFIGS.decouverte,
     subscriptionStatus: 'none'
   });
 
   const checkSubscription = async () => {
     if (!isAuthenticated || !user) {
       setSubscription({ 
-        plan: 'freemium', 
+        plan: 'decouverte', 
         subscribed: false, 
         loading: false,
         isInTrial: false,
         isTrialExpired: false,
         maxRooms: 15,
         featuresEnabled: DEFAULT_FEATURES,
-        planConfig: PLAN_CONFIGS.freemium,
+        planConfig: PLAN_CONFIGS.decouverte,
         subscriptionStatus: 'none'
       });
       return;
@@ -142,7 +157,7 @@ export function useSubscription() {
       let subscriptionStatus: SubscriptionState['subscriptionStatus'] = 'none';
 
       // If user has active subscription
-      if (profile?.subscription_status === 'active' || profile?.subscription_type === 'premium') {
+      if (profile?.subscription_status === 'active' || profile?.subscription_type === 'confort') {
         subscriptionStatus = 'active';
       } else if (profile?.trial_end_date) {
         trialEndDate = new Date(profile.trial_end_date);
@@ -169,22 +184,20 @@ export function useSubscription() {
         }
       }
 
-      // Determine plan
-      let planType: PlanType = 'freemium';
+      // Determine plan - resolve through name map for backward compat
+      let planType: PlanType = 'decouverte';
       const profilePlan = profile?.plan as string;
       
-      if (profilePlan && profilePlan in PLAN_CONFIGS) {
+      if (profilePlan && PLAN_NAME_MAP[profilePlan]) {
+        planType = PLAN_NAME_MAP[profilePlan];
+      } else if (profilePlan && profilePlan in PLAN_CONFIGS) {
         planType = profilePlan as PlanType;
-      } else if (profile?.subscription_type === 'premium') {
-        planType = 'premium';
-      } else if (profilePlan === 'free') {
-        planType = 'freemium';
       }
 
-      // During trial, use platinum plan (full access)
-      const effectivePlan = isInTrial ? 'platinum' : planType;
+      // During trial, use entreprise plan (full access)
+      const effectivePlan = isInTrial ? 'entreprise' : planType;
       const planConfig = PLAN_CONFIGS[effectivePlan];
-      const isPaid = planType !== 'freemium';
+      const isPaid = planType !== 'decouverte';
       const isSubscribed = isPaid || isInTrial;
 
       // Features based on plan
@@ -193,7 +206,7 @@ export function useSubscription() {
         ...planConfig.features
       };
 
-      // During trial, grant all platinum features (unlimited)
+      // During trial, grant all entreprise features (unlimited)
       if (isInTrial) {
         featuresEnabled.incidents = true;
         featuresEnabled.linen_inventory = true;
@@ -202,7 +215,7 @@ export function useSubscription() {
       }
 
       setSubscription({
-        plan: isInTrial ? 'platinum' : planType,
+        plan: isInTrial ? 'entreprise' : planType,
         subscribed: isSubscribed,
         loading: false,
         isInTrial,
@@ -218,14 +231,14 @@ export function useSubscription() {
     } catch (error) {
       console.error('Error checking subscription:', error);
       setSubscription({
-        plan: 'freemium',
+        plan: 'decouverte',
         subscribed: false,
         loading: false,
         isInTrial: false,
         isTrialExpired: false,
         maxRooms: 15,
         featuresEnabled: DEFAULT_FEATURES,
-        planConfig: PLAN_CONFIGS.freemium,
+        planConfig: PLAN_CONFIGS.decouverte,
         subscriptionStatus: 'none'
       });
     }
@@ -243,7 +256,7 @@ export function useSubscription() {
   const canAccessFeature = (feature: string) => {
     if (!isAuthenticated) return false;
     
-    // During trial: premium features
+    // During trial: all features
     if (subscription.isInTrial) {
       return true;
     }
@@ -274,7 +287,7 @@ export function useSubscription() {
     return subscription.featuresEnabled[feature] === true;
   };
 
-  const isPaidPlan = ['basic', 'basic_plus', 'premium', 'platinum'].includes(subscription.plan);
+  const isPaidPlan = ['essentiel', 'confort', 'business', 'entreprise'].includes(subscription.plan);
 
   return {
     ...subscription,
@@ -282,13 +295,13 @@ export function useSubscription() {
     refreshSubscription,
     canAccessFeature,
     hasFeature,
-    isPremium: ['premium', 'platinum'].includes(subscription.plan) && subscription.subscribed,
-    isFree: subscription.plan === 'freemium' && !subscription.isInTrial,
+    isPremium: ['confort', 'entreprise'].includes(subscription.plan) && subscription.subscribed,
+    isFree: subscription.plan === 'decouverte' && !subscription.isInTrial,
     isInTrial: subscription.isInTrial,
     isTrialExpired: subscription.isTrialExpired,
-    isPlatinum: subscription.plan === 'platinum',
-    isBasic: subscription.plan === 'basic',
-    isBasicPlus: subscription.plan === 'basic_plus',
+    isPlatinum: subscription.plan === 'entreprise',
+    isBasic: subscription.plan === 'essentiel',
+    isBasicPlus: subscription.plan === 'business',
     isPaidPlan,
     subscriptionStatus: subscription.subscriptionStatus,
   };

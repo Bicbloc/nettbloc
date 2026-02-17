@@ -345,20 +345,20 @@ const Profile = () => {
                   <CardContent>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="text-center p-4 bg-muted/30 rounded-lg">
-                        <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
-                          {subscribed && plan === 'premium' ? '∞' : '1'}
+                      <div className={`text-2xl font-bold ${subscribed && plan === 'confort' ? 'text-premium' : 'text-primary'}`}>
+                          {subscribed && plan === 'confort' ? '∞' : '1'}
                         </div>
                         <p className="text-sm text-muted-foreground">Hôtels</p>
                       </div>
                       <div className="text-center p-4 bg-muted/30 rounded-lg">
-                        <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
-                          {subscribed && plan === 'premium' ? '∞' : '50'}
+                        <div className={`text-2xl font-bold ${subscribed && plan === 'confort' ? 'text-premium' : 'text-primary'}`}>
+                          {subscribed && plan === 'confort' ? '∞' : '50'}
                         </div>
                         <p className="text-sm text-muted-foreground">Chambres</p>
                       </div>
                       <div className="text-center p-4 bg-muted/30 rounded-lg">
-                        <div className={`text-2xl font-bold ${subscribed && plan === 'premium' ? 'text-premium' : 'text-primary'}`}>
-                          {subscribed && plan === 'premium' ? '∞' : '10'}
+                        <div className={`text-2xl font-bold ${subscribed && plan === 'confort' ? 'text-premium' : 'text-primary'}`}>
+                          {subscribed && plan === 'confort' ? '∞' : '10'}
                         </div>
                         <p className="text-sm text-muted-foreground">Personnel</p>
                       </div>

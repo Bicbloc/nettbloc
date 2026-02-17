@@ -44,7 +44,7 @@ export function PromoCodesPanel() {
   const [formDiscountValue, setFormDiscountValue] = useState('');
   const [formMaxUses, setFormMaxUses] = useState('');
   const [formValidUntil, setFormValidUntil] = useState('');
-  const [formApplicablePlans, setFormApplicablePlans] = useState<string[]>(['basic', 'basic_plus', 'premium', 'platinum']);
+  const [formApplicablePlans, setFormApplicablePlans] = useState<string[]>(['essentiel', 'confort', 'business', 'entreprise']);
 
   const loadPromoCodes = async () => {
     setLoading(true);
@@ -79,7 +79,7 @@ export function PromoCodesPanel() {
     setFormDiscountValue('');
     setFormMaxUses('');
     setFormValidUntil('');
-    setFormApplicablePlans(['basic', 'basic_plus', 'premium', 'platinum']);
+    setFormApplicablePlans(['essentiel', 'confort', 'business', 'entreprise']);
     setEditingCode(null);
   };
 

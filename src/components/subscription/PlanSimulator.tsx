@@ -24,27 +24,27 @@ interface PricingPlan {
 }
 
 const PLAN_DISPLAY_NAMES: Record<string, string> = {
-  freemium: "Découverte",
-  basic: "Essentiel",
-  basic_plus: "Confort",
-  premium: "Business",
-  platinum: "Entreprise"
+  decouverte: "Découverte",
+  essentiel: "Essentiel",
+  confort: "Confort",
+  business: "Business",
+  entreprise: "Entreprise"
 };
 
 const PLAN_FEATURES: Record<string, { incidents: boolean; linen_inventory: boolean; inspection: boolean }> = {
-  freemium: { incidents: false, linen_inventory: false, inspection: false },
-  basic: { incidents: false, linen_inventory: false, inspection: false },
-  basic_plus: { incidents: true, linen_inventory: true, inspection: false },
-  premium: { incidents: true, linen_inventory: true, inspection: true },
-  platinum: { incidents: true, linen_inventory: true, inspection: true }
+  decouverte: { incidents: false, linen_inventory: false, inspection: false },
+  essentiel: { incidents: false, linen_inventory: false, inspection: false },
+  confort: { incidents: true, linen_inventory: true, inspection: true },
+  business: { incidents: true, linen_inventory: true, inspection: false },
+  entreprise: { incidents: true, linen_inventory: true, inspection: true }
 };
 
 const PLAN_ICONS: Record<string, React.ElementType> = {
-  freemium: Sparkles,
-  basic: Zap,
-  basic_plus: Star,
-  premium: Crown,
-  platinum: Building2
+  decouverte: Sparkles,
+  essentiel: Zap,
+  confort: Star,
+  business: Crown,
+  entreprise: Building2
 };
 
 interface PlanSimulatorProps {

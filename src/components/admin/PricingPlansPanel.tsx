@@ -13,19 +13,19 @@ import { RefreshCw, CreditCard, Edit2, Save, X, Check, Infinity, Crown, Star, Za
 import { usePricingConfig, type PricingConfigRow } from "@/hooks/use-pricing-config";
 
 const PLAN_DISPLAY_NAMES: Record<string, string> = {
-  freemium: "Découverte",
-  basic: "Essentiel",
-  basic_plus: "Confort",
-  premium: "Business",
-  platinum: "Entreprise"
+  decouverte: "Découverte",
+  essentiel: "Essentiel",
+  confort: "Confort",
+  business: "Business",
+  entreprise: "Entreprise"
 };
 
 const PLAN_ICONS: Record<string, React.ElementType> = {
-  freemium: Sparkles,
-  basic: Zap,
-  basic_plus: Star,
-  premium: Crown,
-  platinum: Building
+  decouverte: Sparkles,
+  essentiel: Zap,
+  confort: Star,
+  business: Crown,
+  entreprise: Building
 };
 
 export function PricingPlansPanel() {
