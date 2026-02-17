@@ -74,7 +74,7 @@ export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBot
         { value: 'templates', labelKey: 'reports', shortLabelKey: 'reports', icon: <Repeat className="h-5 w-5" /> },
         { value: 'reports', labelKey: 'reports', shortLabelKey: 'reports', icon: <FileText className="h-5 w-5" /> },
         { value: 'archives', labelKey: 'archives', shortLabelKey: 'archives', icon: <Archive className="h-5 w-5" /> },
-        { value: 'training', labelKey: 'aiTraining', shortLabelKey: 'ia', icon: <Brain className="h-5 w-5" /> },
+        // Training IA retiré — accessible via Gestion des chambres > Config avancée
       ]
     }
   ];

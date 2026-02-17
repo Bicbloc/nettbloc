@@ -6,6 +6,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -15,7 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, FileText, Trash2, Link, Sparkles, ClipboardList, FileUp } from "lucide-react";
+import { Plus, FileText, Trash2, Link, Sparkles, ClipboardList, FileUp, Brain, ChevronDown } from "lucide-react";
+import { ReportTrainingPanel } from "@/components/ReportTrainingPanel";
 import { Room } from "@/services/pdfService";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
@@ -27,6 +29,7 @@ import { RoomCard } from "@/components/RoomCard";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 
 interface RoomManagementTabProps {
   rooms: Room[];
@@ -58,6 +61,7 @@ export function RoomManagementTab({
   const { t } = useLanguage();
   const [filteredRooms, setFilteredRooms] = useState<Room[] | null>(null);
   const [importMode, setImportMode] = useState<'auto' | 'manual'>('auto');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Load hotel's import mode preference
   useEffect(() => {
@@ -322,6 +326,24 @@ export function RoomManagementTab({
             </Table>
           </div>
         </>
+      )}
+
+      {/* Configuration avancée — Entraînement IA */}
+      {currentHotelId && (
+        <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" className="w-full justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Brain className="h-4 w-4" />
+                Configuration avancée — Entraînement IA
+              </span>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-180")} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <ReportTrainingPanel hotelId={currentHotelId} />
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );
