@@ -810,38 +810,45 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           </div>
         </button>
 
-        {/* Option API - Coming Soon */}
-        <div className="w-full p-4 rounded-lg border-2 border-dashed border-border bg-muted/30 relative overflow-hidden">
+        {/* Option API - Configurer */}
+        <button
+          className="w-full p-4 rounded-lg border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
+          onClick={() => {
+            setOpen(false);
+            // Navigate to room management tab where PmsApiConfigPanel is
+            const configPanel = document.querySelector('[data-pms-config]');
+            if (configPanel) configPanel.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
           <div className="flex items-start gap-4">
-            <div className="p-3 rounded-lg bg-muted text-muted-foreground">
+            <div className="p-3 rounded-lg bg-primary/10 text-primary">
               <Plug className="h-6 w-6" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-muted-foreground">Connexion API directe</h3>
-                <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-500/10">
-                  <Clock className="h-3 w-3 mr-1" />
-                  Bientôt disponible
+                <h3 className="font-semibold">Connexion API directe</h3>
+                <Badge variant="outline" className="text-xs border-primary/50 text-primary bg-primary/10">
+                  Configurer l'API
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 Synchronisation automatique avec votre PMS en temps réel
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-3">
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs">
                   <span className="font-medium">Mews</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs">
                   <span className="font-medium">Apaleo</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-background border text-xs">
                   <span className="font-medium">Opera</span>
                 </div>
                 <span className="text-xs text-muted-foreground">et plus...</span>
               </div>
             </div>
           </div>
-        </div>
+        </button>
       </div>
     </>
   );

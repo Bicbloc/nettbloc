@@ -220,7 +220,7 @@ export function PmsApiConfigPanel() {
 
   return (
     <FeatureGuard feature="api_access">
-      <Card>
+      <Card data-pms-config>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
