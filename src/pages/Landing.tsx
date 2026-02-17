@@ -85,10 +85,21 @@ const t = {
         reports: 'Téléchargement rapports',
         rooms: 'Jusqu\'à {n} chambres',
         roomsUnlimited: 'Chambres illimitées',
+        housekeeperPortal: 'Portail femme de chambre',
+        governessPortal: 'Portail gouvernante',
         incidents: 'Gestion incidents',
+        pmsImport: 'Import PMS automatique',
+        maintenance: 'Gestion maintenance',
+        lostFound: 'Objets perdus',
+        qualityControl: 'Contrôle qualité',
         linen: 'Inventaire linge',
         inspection: 'Inspection chambres',
+        aiRecognition: 'Reconnaissance IA',
+        aiRecommendation: 'Recommandation IA',
+        technicianPortal: 'Portail technicien',
+        multiHotel: 'Multi-établissements',
         apiAccess: 'Accès API',
+        prioritySupport: 'Support prioritaire',
       },
       planSubtitles: {
         freemium: 'Pour tester la plateforme',
@@ -210,10 +221,21 @@ const t = {
         reports: 'Report downloads',
         rooms: 'Up to {n} rooms',
         roomsUnlimited: 'Unlimited rooms',
+        housekeeperPortal: 'Housekeeper portal',
+        governessPortal: 'Governess portal',
         incidents: 'Incident management',
+        pmsImport: 'Automatic PMS import',
+        maintenance: 'Maintenance management',
+        lostFound: 'Lost & Found',
+        qualityControl: 'Quality control',
         linen: 'Linen inventory',
         inspection: 'Room inspection',
+        aiRecognition: 'AI recognition',
+        aiRecommendation: 'AI recommendation',
+        technicianPortal: 'Technician portal',
+        multiHotel: 'Multi-property',
         apiAccess: 'API access',
+        prioritySupport: 'Priority support',
       },
       planSubtitles: {
         freemium: 'To test the platform',
@@ -351,15 +373,15 @@ const Landing = () => {
 
   // Feature availability per plan tier (matching screenshot)
   const planFeatures: Record<string, string[]> = {
-    freemium: ['pdfAnalysis', 'distribution', 'reports', 'rooms'],
-    manual_entry: ['pdfAnalysis', 'distribution', 'reports', 'rooms'],
-    essentiel: ['pdfAnalysis', 'distribution', 'reports', 'rooms'],
-    confort: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection'],
-    business: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection'],
-    entreprise: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection', 'apiAccess'],
+    freemium: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal'],
+    manual_entry: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal'],
+    essentiel: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport'],
+    confort: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection'],
+    business: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection', 'aiRecognition', 'aiRecommendation', 'technicianPortal'],
+    entreprise: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'multiHotel', 'apiAccess', 'prioritySupport'],
   };
 
-  const allFeatureKeys = ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'incidents', 'linen', 'inspection', 'apiAccess'] as const;
+  const allFeatureKeys = ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'multiHotel', 'apiAccess', 'prioritySupport'] as const;
 
   const planIcons: Record<string, React.ReactNode> = {
     freemium: <Zap className="w-8 h-8 text-muted-foreground" />,
