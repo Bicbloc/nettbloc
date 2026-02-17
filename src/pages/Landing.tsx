@@ -76,7 +76,27 @@ const t = {
       startFree: 'Commencer gratuitement',
       contact: 'Nous contacter',
       choose: 'Choisir ce plan',
-      includesAll: 'Toutes les fonctionnalités incluses',
+      featuresLabel: 'Fonctionnalités incluses',
+      features: {
+        rooms: 'Gestion des chambres',
+        distribution: 'Répartition en 1 clic',
+        cleaning: 'Suivi de la propreté',
+        reports: 'Rapports quotidiens',
+        housekeeperPortal: 'Portail femme de chambre',
+        governessPortal: 'Portail gouvernante',
+        incidents: 'Gestion des incidents',
+        maintenance: 'Gestion maintenance',
+        lostFound: 'Objets perdus',
+        qualityControl: 'Contrôle qualité',
+        aiRecognition: 'Reconnaissance IA',
+        aiRecommendation: 'Recommandation IA',
+        technicianPortal: 'Portail technicien',
+        linenCount: 'Comptage linge IA',
+        pmsImport: 'Import PMS automatique',
+        multiHotel: 'Multi-établissements',
+        apiAccess: 'Accès API',
+        prioritySupport: 'Support prioritaire',
+      },
     },
     testimonials: {
       title: 'Ils nous font confiance',
@@ -181,7 +201,27 @@ const t = {
       startFree: 'Start for free',
       contact: 'Contact us',
       choose: 'Choose this plan',
-      includesAll: 'All features included',
+      featuresLabel: 'Included features',
+      features: {
+        rooms: 'Room management',
+        distribution: '1-click distribution',
+        cleaning: 'Cleanliness tracking',
+        reports: 'Daily reports',
+        housekeeperPortal: 'Housekeeper portal',
+        governessPortal: 'Governess portal',
+        incidents: 'Incident management',
+        maintenance: 'Maintenance management',
+        lostFound: 'Lost & Found',
+        qualityControl: 'Quality control',
+        aiRecognition: 'AI recognition',
+        aiRecommendation: 'AI recommendation',
+        technicianPortal: 'Technician portal',
+        linenCount: 'AI linen counting',
+        pmsImport: 'Automatic PMS import',
+        multiHotel: 'Multi-property',
+        apiAccess: 'API access',
+        prioritySupport: 'Priority support',
+      },
     },
     testimonials: {
       title: 'Trusted by the best',
@@ -308,6 +348,18 @@ const Landing = () => {
   }, []);
 
   const popularPlan = 'confort';
+
+  // Feature availability per plan tier
+  const planFeatures: Record<string, string[]> = {
+    freemium: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal'],
+    manual_entry: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal'],
+    essentiel: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'lostFound', 'pmsImport'],
+    confort: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'technicianPortal', 'pmsImport', 'aiRecommendation'],
+    business: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'linenCount', 'pmsImport'],
+    entreprise: ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'linenCount', 'pmsImport', 'multiHotel', 'apiAccess', 'prioritySupport'],
+  };
+
+  const allFeatureKeys = ['rooms', 'distribution', 'cleaning', 'reports', 'housekeeperPortal', 'governessPortal', 'incidents', 'maintenance', 'lostFound', 'qualityControl', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'linenCount', 'pmsImport', 'multiHotel', 'apiAccess', 'prioritySupport'] as const;
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -462,10 +514,22 @@ const Landing = () => {
                         </>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mb-6 flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-primary" />
-                      {c.pricing.includesAll}
-                    </p>
+                    <div className="mb-6 space-y-1.5 flex-1">
+                      <p className="text-xs font-semibold text-foreground mb-2">{c.pricing.featuresLabel}</p>
+                      {allFeatureKeys.map((fk) => {
+                        const included = (planFeatures[plan.plan_name] || []).includes(fk);
+                        return (
+                          <div key={fk} className={`flex items-center gap-2 text-xs ${included ? 'text-foreground' : 'text-muted-foreground/40 line-through'}`}>
+                            {included ? (
+                              <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                            ) : (
+                              <span className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center text-muted-foreground/30">✕</span>
+                            )}
+                            {(c.pricing.features as Record<string, string>)[fk]}
+                          </div>
+                        );
+                      })}
+                    </div>
                     <div className="mt-auto">
                       <Button
                         className="w-full"
