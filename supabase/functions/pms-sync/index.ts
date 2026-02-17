@@ -1,0 +1,422 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+interface PmsCredentials {
+  clientToken?: string;
+  accessToken?: string;
+  clientId?: string;
+  clientSecret?: string;
+  apiKey?: string;
+  propertyId?: string;
+  baseUrl?: string;
+}
+
+interface ExtractedRoom {
+  roomNumber: string;
+  status: string;
+  cleaningType: string;
+  floor?: number;
+  roomType?: string;
+  guestName?: string;
+  arrivalDate?: string;
+  departureDate?: string;
+  notes?: string;
+}
+
+// ─── Mews Connector ───────────────────────────────────────────────
+async function fetchMewsRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
+  const baseUrl = credentials.baseUrl || 'https://api.mews.com/api/connector/v1';
+  
+  // 1. Fetch spaces (rooms)
+  const spacesRes = await fetch(`${baseUrl}/spaces/getAll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ClientToken: credentials.clientToken,
+      AccessToken: credentials.accessToken,
+      LanguageCode: 'fr-FR',
+      Extent: {
+        Spaces: true,
+        SpaceCategories: true,
+        SpaceFeatures: true,
+      }
+    }),
+  });
+
+  if (!spacesRes.ok) {
+    const errBody = await spacesRes.text();
+    throw new Error(`Mews spaces/getAll failed [${spacesRes.status}]: ${errBody}`);
+  }
+
+  const spacesData = await spacesRes.json();
+  const spaces = spacesData.Spaces || [];
+  const categories = spacesData.SpaceCategories || [];
+
+  // Build category map
+  const categoryMap: Record<string, string> = {};
+  for (const cat of categories) {
+    categoryMap[cat.Id] = cat.ShortName || cat.Name || 'Standard';
+  }
+
+  // 2. Fetch reservations for today
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+  const reservationsRes = await fetch(`${baseUrl}/reservations/getAll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ClientToken: credentials.clientToken,
+      AccessToken: credentials.accessToken,
+      StartUtc: `${today}T00:00:00Z`,
+      EndUtc: `${tomorrow}T23:59:59Z`,
+      Extent: {
+        Reservations: true,
+        Customers: true,
+      },
+      States: ['Confirmed', 'Started'],
+    }),
+  });
+
+  let reservations: any[] = [];
+  let customers: any[] = [];
+  if (reservationsRes.ok) {
+    const resData = await reservationsRes.json();
+    reservations = resData.Reservations || [];
+    customers = resData.Customers || [];
+  }
+
+  // Build customer map
+  const customerMap: Record<string, string> = {};
+  for (const c of customers) {
+    customerMap[c.Id] = `${c.LastName || ''} ${c.FirstName || ''}`.trim();
+  }
+
+  // Build reservation map by space (room)
+  const reservationBySpace: Record<string, any> = {};
+  for (const r of reservations) {
+    if (r.AssignedSpaceId) {
+      reservationBySpace[r.AssignedSpaceId] = r;
+    }
+  }
+
+  // 3. Map to ExtractedRoom[]
+  return spaces
+    .filter((s: any) => s.Type === 'Room' || !s.Type)
+    .map((space: any) => {
+      const reservation = reservationBySpace[space.Id];
+      const hasReservation = !!reservation;
+      
+      let cleaningType = 'recouche';
+      let status = 'occupied';
+
+      if (!hasReservation) {
+        cleaningType = 'depart';
+        status = 'vacant';
+      } else if (reservation) {
+        const checkIn = reservation.StartUtc?.split('T')[0];
+        const checkOut = reservation.EndUtc?.split('T')[0];
+        if (checkOut === today) {
+          cleaningType = 'depart';
+          status = 'checkout';
+        } else if (checkIn === today) {
+          cleaningType = 'arrivee';
+          status = 'arrival';
+        }
+      }
+
+      const floor = space.FloorNumber || (space.Number ? parseInt(space.Number.toString().slice(0, -2)) || undefined : undefined);
+
+      return {
+        roomNumber: space.Number || space.Name || space.Id,
+        status,
+        cleaningType,
+        floor,
+        roomType: categoryMap[space.CategoryId] || undefined,
+        guestName: reservation ? customerMap[reservation.CustomerId] : undefined,
+        arrivalDate: reservation?.StartUtc?.split('T')[0],
+        departureDate: reservation?.EndUtc?.split('T')[0],
+      };
+    });
+}
+
+// ─── Apaleo Connector ─────────────────────────────────────────────
+async function fetchApaleoRooms(credentials: PmsCredentials): Promise<ExtractedRoom[]> {
+  // 1. Get OAuth token
+  const tokenRes = await fetch('https://identity.apaleo.com/connect/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: credentials.clientId || '',
+      client_secret: credentials.clientSecret || '',
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const errBody = await tokenRes.text();
+    throw new Error(`Apaleo auth failed [${tokenRes.status}]: ${errBody}`);
+  }
+
+  const { access_token } = await tokenRes.json();
+  const propertyId = credentials.propertyId;
+  const headers = { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' };
+
+  // 2. Fetch units (rooms)
+  const unitsRes = await fetch(
+    `https://api.apaleo.com/inventory/v1/units?propertyId=${propertyId}&pageSize=200`,
+    { headers }
+  );
+
+  if (!unitsRes.ok) {
+    const errBody = await unitsRes.text();
+    throw new Error(`Apaleo units fetch failed [${unitsRes.status}]: ${errBody}`);
+  }
+
+  const unitsData = await unitsRes.json();
+  const units = unitsData.units || [];
+
+  // 3. Fetch reservations for today
+  const today = new Date().toISOString().split('T')[0];
+  const reservationsRes = await fetch(
+    `https://api.apaleo.com/booking/v1/reservations?propertyIds=${propertyId}&dateFilter=Stay&from=${today}&to=${today}&status=Confirmed,InHouse&pageSize=200`,
+    { headers }
+  );
+
+  let reservations: any[] = [];
+  if (reservationsRes.ok) {
+    const resData = await reservationsRes.json();
+    reservations = resData.reservations || [];
+  }
+
+  // Build reservation map by unit
+  const reservationByUnit: Record<string, any> = {};
+  for (const r of reservations) {
+    if (r.unit?.id) {
+      reservationByUnit[r.unit.id] = r;
+    }
+  }
+
+  return units.map((unit: any) => {
+    const reservation = reservationByUnit[unit.id];
+    let cleaningType = 'depart';
+    let status = 'vacant';
+
+    if (reservation) {
+      const departure = reservation.departure?.split('T')[0];
+      const arrival = reservation.arrival?.split('T')[0];
+      if (departure === today) {
+        cleaningType = 'depart';
+        status = 'checkout';
+      } else if (arrival === today) {
+        cleaningType = 'arrivee';
+        status = 'arrival';
+      } else {
+        cleaningType = 'recouche';
+        status = 'occupied';
+      }
+    }
+
+    return {
+      roomNumber: unit.name || unit.id,
+      status,
+      cleaningType,
+      floor: unit.floor ? parseInt(unit.floor) : undefined,
+      roomType: unit.unitGroup?.name,
+      guestName: reservation?.primaryGuest ? `${reservation.primaryGuest.lastName || ''} ${reservation.primaryGuest.firstName || ''}`.trim() : undefined,
+      arrivalDate: reservation?.arrival?.split('T')[0],
+      departureDate: reservation?.departure?.split('T')[0],
+    };
+  });
+}
+
+// ─── Main handler ─────────────────────────────────────────────────
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Validate auth
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    // Verify user
+    const userClient = createClient(supabaseUrl, supabaseAnon, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(authHeader.replace('Bearer ', ''));
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+    const userId = claimsData.claims.sub as string;
+
+    // Parse request
+    const { hotel_id, action } = await req.json();
+    if (!hotel_id) {
+      return new Response(JSON.stringify({ error: 'hotel_id required' }), { status: 400, headers: corsHeaders });
+    }
+
+    // Use service role for DB operations
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify hotel ownership
+    const { data: hotel } = await adminClient
+      .from('hotels')
+      .select('id, user_id')
+      .eq('id', hotel_id)
+      .single();
+
+    if (!hotel || hotel.user_id !== userId) {
+      return new Response(JSON.stringify({ error: 'Not authorized for this hotel' }), { status: 403, headers: corsHeaders });
+    }
+
+    // Get PMS config
+    const { data: pmsConfig } = await adminClient
+      .from('hotel_pms_configs')
+      .select('*')
+      .eq('hotel_id', hotel_id)
+      .eq('is_active', true)
+      .single();
+
+    if (!pmsConfig) {
+      return new Response(JSON.stringify({ error: 'No active PMS config found' }), { status: 404, headers: corsHeaders });
+    }
+
+    // Test connection only
+    if (action === 'test') {
+      try {
+        const credentials = pmsConfig.credentials as PmsCredentials;
+        let rooms: ExtractedRoom[] = [];
+
+        switch (pmsConfig.pms_type) {
+          case 'mews':
+            rooms = await fetchMewsRooms(credentials);
+            break;
+          case 'apaleo':
+            rooms = await fetchApaleoRooms(credentials);
+            break;
+          default:
+            return new Response(JSON.stringify({ error: `PMS type '${pmsConfig.pms_type}' not yet supported for API sync` }), { status: 400, headers: corsHeaders });
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: `Connexion réussie : ${rooms.length} chambres trouvées`,
+          rooms_count: rooms.length 
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        return new Response(JSON.stringify({ success: false, error: msg }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // Full sync
+    // Create sync log
+    const { data: syncLog } = await adminClient
+      .from('pms_sync_logs')
+      .insert({
+        hotel_id,
+        pms_type: pmsConfig.pms_type,
+        status: 'running',
+      })
+      .select('id')
+      .single();
+
+    try {
+      const credentials = pmsConfig.credentials as PmsCredentials;
+      let rooms: ExtractedRoom[] = [];
+
+      switch (pmsConfig.pms_type) {
+        case 'mews':
+          rooms = await fetchMewsRooms(credentials);
+          break;
+        case 'apaleo':
+          rooms = await fetchApaleoRooms(credentials);
+          break;
+        default:
+          throw new Error(`PMS type '${pmsConfig.pms_type}' not supported`);
+      }
+
+      // Upsert rooms into the rooms table
+      for (const room of rooms) {
+        await adminClient
+          .from('rooms')
+          .upsert({
+            hotel_id,
+            room_number: room.roomNumber,
+            status: room.cleaningType || 'recouche',
+            floor: room.floor,
+            room_type: room.roomType,
+            guest_name: room.guestName,
+            arrival_date: room.arrivalDate,
+            departure_date: room.departureDate,
+            notes: room.notes,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'hotel_id,room_number' });
+      }
+
+      // Update sync status
+      await adminClient
+        .from('pms_sync_logs')
+        .update({
+          status: 'success',
+          sync_ended_at: new Date().toISOString(),
+          rooms_synced: rooms.length,
+        })
+        .eq('id', syncLog?.id);
+
+      await adminClient
+        .from('hotel_pms_configs')
+        .update({
+          last_sync_at: new Date().toISOString(),
+          last_sync_status: 'success',
+          last_sync_error: null,
+        })
+        .eq('id', pmsConfig.id);
+
+      return new Response(JSON.stringify({
+        success: true,
+        rooms_synced: rooms.length,
+        message: `${rooms.length} chambres synchronisées avec succès`,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Sync failed';
+
+      await adminClient
+        .from('pms_sync_logs')
+        .update({
+          status: 'error',
+          sync_ended_at: new Date().toISOString(),
+          error_message: msg,
+        })
+        .eq('id', syncLog?.id);
+
+      await adminClient
+        .from('hotel_pms_configs')
+        .update({
+          last_sync_status: 'error',
+          last_sync_error: msg,
+        })
+        .eq('id', pmsConfig.id);
+
+      return new Response(JSON.stringify({ success: false, error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal error';
+    console.error('pms-sync error:', msg);
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+});

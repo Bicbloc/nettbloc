@@ -21,6 +21,7 @@ import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { AddRoomDialog } from "@/components/AddRoomDialog";
 import { ManualRoomEntryDialog } from "@/components/ManualRoomEntryDialog";
 import { ImportModeSwitch } from "@/components/ImportModeSwitch";
+import { PmsApiConfigPanel } from "@/components/pms/PmsApiConfigPanel";
 import { RoomFilters } from "@/components/RoomFilters";
 import { RoomCard } from "@/components/RoomCard";
 import { useState, useEffect } from "react";
@@ -117,6 +118,9 @@ export function RoomManagementTab({
 
   return (
     <div className="space-y-6">
+      {/* PMS API Config Panel (Entreprise only) */}
+      <PmsApiConfigPanel />
+
       {/* Import Mode Switch */}
       <ImportModeSwitch 
         hotelId={currentHotelId}
