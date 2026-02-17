@@ -189,7 +189,13 @@ export function useDashboardRooms({
           
            // Si cleaningType = 'none', le statut devrait être 'clean'
            // Sinon, si une assignation est en cours, forcer l'affichage "en cours" côté admin.
+           // IMPORTANT: Les chambres importées du PMS avec statut 'checkout' restent en 'needs-cleaning'
+           // L'utilisateur doit manuellement appuyer sur "Client sorti" pour marquer 'ready-to-clean'
            let status = cleaningType === 'none' ? 'clean' : r.status;
+           // Convertir 'checkout' en 'needs-cleaning' - le statut "client sorti" doit être activé manuellement
+           if (status === 'checkout') {
+             status = 'needs-cleaning';
+           }
            if (assignmentInProgress) status = 'in_progress';
           const notUrgent = cleaningType === 'none';
 
