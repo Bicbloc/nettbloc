@@ -99,6 +99,7 @@ export type ReportFormat =
   | 'apaleo_housekeeping'
   | 'medialog_etat'
   | 'opera_housekeeping'
+  | 'misterbooking_housekeeping'
   | 'generic_table'
   | 'unknown';
 
@@ -140,6 +141,17 @@ const FORMAT_SIGNATURES: Record<ReportFormat, { patterns: RegExp[]; weight: numb
     { patterns: [/Opera/i, /Oracle/i], weight: 10 },
     { patterns: [/Housekeeping\s+Report/i], weight: 5 },
     { patterns: [/\b(VD|OD|VC|OC)\b/], weight: 8 },
+  ],
+  misterbooking_housekeeping: [
+    { patterns: [/misterbooking/i], weight: 15 },
+    { patterns: [/RAPPORT\s+MéNAGE/i, /RAPPORT\s+MENAGE/i], weight: 12 },
+    { patterns: [/femme\s+de\s+chambre/i], weight: 10 },
+    { patterns: [/intendance/i], weight: 8 },
+    { patterns: [/RECOUCHE\s+BLANC/i], weight: 12 },
+    { patterns: [/État\s+de\s+la\s+chambre/i, /Etat\s+de\s+la\s+chambre/i], weight: 8 },
+    { patterns: [/Fermé\s+à\s+la\s+vente/i], weight: 8 },
+    { patterns: [/Action\s+à\s+faire/i], weight: 5 },
+    { patterns: [/Date\s+de\s+début\s+de\s+sejour/i], weight: 5 },
   ],
   generic_table: [
     { patterns: [/chambre|room/i], weight: 2 },
@@ -216,6 +228,8 @@ function parseReportByFormat(text: string, format: ReportFormat): ParsedReportDa
       return parseApaleoReport(text);
     case 'medialog_etat':
       return parseMedialogReport(text);
+    case 'misterbooking_housekeeping':
+      return parseMisterBookingReport(text);
     default:
       return parseGenericReport(text);
   }
@@ -768,7 +782,146 @@ function parseMedialogReport(text: string): ParsedReportData {
 }
 
 /**
- * Parser générique
+ * Parser MisterBooking Housekeeping
+ * Format tableau: Chambre | Nb pers | RECOUCHE BLANC | Dayuse | Assignée à | Action à faire | État de la chambre | Dates
+ */
+function parseMisterBookingReport(text: string): ParsedReportData {
+  const lines = text.split('\n');
+  const rows: ParsedRow[] = [];
+
+  // Pattern pour lignes de chambre MisterBooking
+  // Format: "101   2   X   Ana .   non   Propre   16/02/2026   20/02/2026"
+  // ou avec séparateurs tab: "101\t2\tX\t..."
+  // Aussi: "303 / 305" pour chambres connectées
+  const roomPattern = /^\|?\s*(\d{3,4}(?:\s*\/\s*\d{3,4})?)\s*[\|\t]/;
+  // Fallback sans séparateur de tableau
+  const roomPatternAlt = /^(\d{3,4}(?:\s*\/\s*\d{3,4})?)\s+(\d+|Fermé|non\s+occ)/i;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.length < 5) continue;
+    if (isHeaderLine(trimmed)) continue;
+    // Skip table headers
+    if (/^\|?\s*(Chambre|Nb\s|---)/i.test(trimmed)) continue;
+    if (/^\|?\s*Nb\s/i.test(trimmed)) continue;
+
+    let roomMatch = trimmed.match(roomPattern);
+    if (!roomMatch) {
+      roomMatch = trimmed.match(roomPatternAlt);
+    }
+    if (!roomMatch) continue;
+
+    const roomNumber = roomMatch[1].replace(/\s+/g, '');
+
+    // Skip "Fermé à la vente" rooms
+    if (/Fermé\s+à\s+la\s+vente/i.test(trimmed)) continue;
+
+    // Detect cleaning type from "RECOUCHE BLANC" column (X marker) and "État de la chambre"
+    let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
+    let statusIndicator = '';
+    let hasDepartingGuest = false;
+    let hasArrivingGuest = false;
+    let hasCurrentGuest = false;
+
+    const isSale = /\bSale\b/i.test(trimmed);
+    const isPropre = /\bPropre\b/i.test(trimmed);
+    const hasRecoucheBlanc = /\bX\b/.test(trimmed); // X marker in RECOUCHE BLANC column
+    const isDepart = /\bDépart\b/i.test(trimmed);
+    const isNonOcc = /\bnon\s+occ/i.test(trimmed);
+
+    if (isDepart) {
+      detectedType = 'full';
+      statusIndicator = 'Départ';
+      hasDepartingGuest = true;
+    } else if (isSale && isDepart) {
+      detectedType = 'full';
+      statusIndicator = 'Départ (Sale)';
+      hasDepartingGuest = true;
+    } else if (isSale) {
+      // Sale = needs cleaning. Check dates to determine if departure
+      const dateMatches = trimmed.match(/(\d{2}\/\d{2}\/\d{4})/g);
+      if (dateMatches && dateMatches.length >= 2) {
+        const today = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const endDate = dateMatches[dateMatches.length - 1];
+        if (endDate === today) {
+          detectedType = 'full';
+          statusIndicator = 'Départ (Sale)';
+          hasDepartingGuest = true;
+        } else {
+          detectedType = 'quick';
+          statusIndicator = 'Recouche (Sale)';
+          hasCurrentGuest = true;
+        }
+      } else {
+        detectedType = 'full';
+        statusIndicator = 'Sale';
+      }
+    } else if (isPropre && hasRecoucheBlanc) {
+      detectedType = 'quick';
+      statusIndicator = 'Recouche';
+      hasCurrentGuest = true;
+    } else if (isPropre) {
+      detectedType = 'none';
+      statusIndicator = 'Propre';
+    } else if (isNonOcc) {
+      detectedType = 'full';
+      statusIndicator = 'Non occupé';
+    }
+
+    // Extract dates
+    const dateMatches = trimmed.match(/(\d{2}\/\d{2}\/\d{4})/g);
+    const arrivalDate = dateMatches?.[0] || '';
+    const departureDate = dateMatches?.[1] || '';
+
+    // Extract assignee (look for names like "Ana .")
+    let assignee = '';
+    const assigneeMatch = trimmed.match(/(?:Ana|Marie|Julie|Sophie|Fatima|Amina)\s*\.?/i);
+    if (assigneeMatch) {
+      assignee = assigneeMatch[0].trim();
+    }
+
+    // Extract nb persons
+    const nbPersMatch = trimmed.match(/\|\s*(\d+)\s*\|/);
+    const guestCount = nbPersMatch ? parseInt(nbPersMatch[1]) : undefined;
+
+    rows.push({
+      rawLine: trimmed,
+      roomNumber,
+      roomType: '',
+      cleaningStatus: statusIndicator,
+      columns: [
+        { value: roomNumber, type: 'room_number', confidence: 1 },
+        { value: statusIndicator, type: 'status', confidence: 0.9 },
+        { value: assignee, type: 'assignee', confidence: 0.8 },
+        { value: arrivalDate, type: 'arrival_date', confidence: 0.9 },
+        { value: departureDate, type: 'departure_date', confidence: 0.9 },
+      ],
+      detectedCleaningType: detectedType,
+      confidence: detectedType !== 'unknown' ? 0.85 : 0.4,
+      statusIndicator,
+      guestName: '',
+      arrivalDate,
+      departureDate,
+      arrivalTime: '',
+      departureTime: '',
+      nightInfo: '',
+      hasCurrentGuest,
+      hasDepartingGuest,
+      hasArrivingGuest,
+      isOutOfOrder: false,
+      assignee,
+    });
+  }
+
+  return {
+    headers: ['N° Chambre', 'Statut', 'Assignée', 'Arrivée', 'Départ', 'Type nettoyage'],
+    rows,
+    summary: calculateSummary(rows),
+  };
+}
+
+/**
+ * Parser générique - renforcé pour éviter les faux positifs
  */
 function parseGenericReport(text: string): ParsedReportData {
   const lines = text.split('\n');
@@ -776,6 +929,12 @@ function parseGenericReport(text: string): ParsedReportData {
   
   // Pattern générique pour numéro de chambre
   const roomPattern = /^(\d{2,4}[A-Z]?)\b/;
+  
+  // Context keywords that indicate a line is about a room
+  const ROOM_CONTEXT_KEYWORDS = /\b(départ|depart|parti|checkout|libéré|recouche|stayover|occupé|occ|ooo|out\s*of\s*order|hors\s*service|maintenance|libre|vacant|propre|clean|sale|dirty|arrivée|arrival|checkin|chambre|room|dbl|sgl|tpl|twn|suite|fam|dup)\b/i;
+  
+  // Date pattern as context indicator
+  const DATE_CONTEXT = /\d{2}[\/\.\-]\d{2}[\/\.\-]\d{4}/;
   
   for (const line of lines) {
     const trimmed = line.trim();
@@ -786,6 +945,24 @@ function parseGenericReport(text: string): ParsedReportData {
     if (!roomMatch) continue;
     
     const roomNumber = roomMatch[1];
+    
+    // REINFORCEMENT: Reject isolated numbers without context
+    // The line must contain at least one room-context keyword or a date,
+    // or have enough content beyond just the number (multiple columns)
+    const textAfterNumber = trimmed.substring(roomMatch[0].length).trim();
+    const hasContextKeyword = ROOM_CONTEXT_KEYWORDS.test(trimmed);
+    const hasDateContext = DATE_CONTEXT.test(trimmed);
+    const hasMultipleColumns = textAfterNumber.length >= 5; // At least 5 chars of additional content
+    
+    if (!hasContextKeyword && !hasDateContext && !hasMultipleColumns) {
+      // This is likely a page number, counter, or isolated number - skip it
+      continue;
+    }
+    
+    // Additional check: reject lines that are just a number + very short text (pagination, counters)
+    if (trimmed.length < 10 && !hasContextKeyword) {
+      continue;
+    }
     
     // Chercher des indicateurs de statut
     let detectedType: 'full' | 'quick' | 'none' | 'out_of_service' | 'unknown' = 'unknown';
@@ -843,7 +1020,6 @@ function isHeaderLine(line: string): boolean {
     /^(page|imprimé|total|résumé|summary|printed)/i,
     /^\d+\s+chambre\(s\)/i,
     /^(floor|étage)\s+spaces/i,
-    /fermé\s+à\s+la\s+vente/i,
     /^[-=_|]{5,}$/,
     /literie\s+\d+\s*×/i,
     /\d+\s*×\s*lit/i,
@@ -853,6 +1029,19 @@ function isHeaderLine(line: string): boolean {
     /^Étage\s+Espaces/i,
     /Space\s+status\s+-/i,
     /Statut\s+des\s+espaces\s+-/i,
+    // MisterBooking headers
+    /femme\s+de\s+chambre/i,
+    /intendance/i,
+    /misterbooking/i,
+    /RAPPORT\s+(JOURNALIER|MéNAGE|MENAGE)/i,
+    /^Chambre\s+Nb\s+pers/i,
+    /RECOUCHE\s+BLANC.*Dayuse/i,
+    /Action\s+à\s+faire/i,
+    /État\s+de\s+la\s+chambre/i,
+    // Generic: isolated page numbers
+    /^\d{1,2}\s*$/,
+    /^Page\s+\d+/i,
+    /^\d+\s*\/\s*\d+\s*$/,
   ];
   
   return patterns.some(p => p.test(line));
@@ -875,7 +1064,7 @@ function buildStructure(parsedData: ParsedReportData, format: ReportFormat): Rep
     columnCount: columnTypes.length,
     suggestedColumns: columnTypes,
     roomNumberPattern: '^\\d{2,4}',
-    lineParseStrategy: format === 'mews_space_status' ? 'mews' : format === 'apaleo_housekeeping' ? 'apaleo' : format === 'medialog_etat' ? 'medialog' : 'generic',
+    lineParseStrategy: format === 'mews_space_status' ? 'mews' : format === 'apaleo_housekeeping' ? 'apaleo' : format === 'medialog_etat' ? 'medialog' : format === 'misterbooking_housekeeping' ? 'generic' : 'generic',
     delimiter: null,
   };
 }
@@ -1003,6 +1192,10 @@ export function getFormatDescription(format: ReportFormat): { name: string; desc
     opera_housekeeping: {
       name: 'Opera Housekeeping',
       description: 'VD=Vacant Dirty • OD=Occupied Dirty • VC=Vacant Clean',
+    },
+    misterbooking_housekeeping: {
+      name: 'MisterBooking Ménage',
+      description: 'Sale=À nettoyer • Propre+X=Recouche • Départ=À blanc',
     },
     generic_table: {
       name: 'Format générique',

@@ -676,7 +676,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     console.log(`🔍 Format détecté: ${formatDetection.format} (confiance: ${formatDetection.confidence}%)`);
     
     // Si format Apaleo/Mews détecté avec bonne confiance, utiliser le parser dédié
-    if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat'].includes(formatDetection.format) && 
+    if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat', 'misterbooking_housekeeping'].includes(formatDetection.format) && 
         formatDetection.confidence >= 50 && 
         formatDetection.parsedData.rows.length > 0) {
       
@@ -819,6 +819,23 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
           rooms = applyHotelCombinationRules(rooms, combinationRules, parsedRows);
         }
       }
+      
+      // ===== POST-EXTRACTION FILTER: Reject false positives =====
+      rooms = rooms.filter(room => {
+        // Reject rooms with no cleaning info and low confidence indicators
+        const hasCleaningInfo = room.cleaningType && room.cleaningType !== 'none';
+        const hasNotes = room.notes && room.notes.length > 0;
+        const hasGuestData = room.guestName || room.arrivalDate || room.departureDate;
+        
+        // Very short room numbers (1-2 digits) without any context are suspicious
+        const roomNumDigits = room.number.replace(/\D/g, '');
+        if (roomNumDigits.length <= 2 && parseInt(roomNumDigits) < 20 && !hasCleaningInfo && !hasGuestData && !hasNotes) {
+          console.log(`🚫 Chambre ${room.number} rejetée (numéro suspect sans contexte)`);
+          return false;
+        }
+        
+        return true;
+      });
       
       // Statistiques après application des règles
       const aBlancCount = rooms.filter(r => r.cleaningType === 'a_blanc').length;
