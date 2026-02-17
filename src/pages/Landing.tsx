@@ -457,6 +457,30 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* PMS Compatibility */}
+      <section className="py-12 md:py-16 border-y border-border/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
+              {lang === 'fr' ? 'Compatible avec tous les PMS' : 'Compatible with all PMS'}
+            </h2>
+            <p className="text-muted-foreground">
+              {lang === 'fr' ? 'Importez vos rapports depuis n\'importe quel logiciel hôtelier' : 'Import your reports from any hotel software'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4">
+            {['Mews', 'Opera', 'Opera Cloud', 'Medialog', 'Misterbooking', 'Jazz Hotel', 'Hotel Easy', 'Protel', 'Apaleo', 'FOLS', 'HotSoft', 'Clock PMS', 'RMS', 'Fidelio'].map((pms) => (
+              <Badge key={pms} variant="secondary" className="px-4 py-2 text-sm font-medium bg-muted hover:bg-muted/80 border border-border/50">
+                {pms}
+              </Badge>
+            ))}
+            <Badge variant="outline" className="px-4 py-2 text-sm font-medium text-primary border-primary/30">
+              {lang === 'fr' ? '+ bien d\'autres' : '+ many more'}
+            </Badge>
+          </div>
+        </div>
+      </section>
+
       {/* Portals */}
       <section id="portals" className="py-20 md:py-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
