@@ -1152,8 +1152,35 @@ class UnifiedParserService {
       return { status: 'dirty', cleaningType: 'a_blanc', reason: 'dirty keyword → À blanc' };
     }
     
-    // Par défaut, ne pas forcer a_blanc → recouche plus conservateur
-    return { status: 'unknown', cleaningType: 'recouche', reason: 'default' };
+    // Default intelligent: utiliser le ratio a_blanc/recouche des chambres déjà détectées
+    // au lieu de toujours forcer "recouche"
+    return { status: 'unknown', cleaningType: this.getIntelligentDefault(), reason: 'default intelligent (basé sur ratio)' };
+  }
+
+  /**
+   * Calcule un default intelligent basé sur le ratio a_blanc/recouche
+   * des chambres déjà détectées dans le parsing courant
+   */
+  private getIntelligentDefault(): CleaningType {
+    // Compter les types déjà détectés dans les patterns appris
+    let fullCount = 0;
+    let quickCount = 0;
+    
+    for (const pattern of this.learnedPatterns.values()) {
+      if (pattern.cleaningType === 'full' || pattern.cleaningType === 'a_blanc') fullCount++;
+      else if (pattern.cleaningType === 'quick' || pattern.cleaningType === 'recouche') quickCount++;
+    }
+    
+    const total = fullCount + quickCount;
+    if (total === 0) return 'recouche'; // Pas d'historique, default conservateur
+    
+    // Si >60% des chambres sont des recouches, default = recouche
+    // Si >60% des chambres sont des à blanc, default = full
+    const quickRatio = quickCount / total;
+    if (quickRatio >= 0.6) return 'recouche';
+    if (quickRatio <= 0.4) return 'full';
+    
+    return 'recouche'; // Cas ambigu, rester conservateur
   }
 
   /**
@@ -1164,42 +1191,83 @@ class UnifiedParserService {
   }
 
   /**
-   * Appelle l'edge function IA pour le fallback
+   * Appelle l'edge function IA pour le fallback avec support de chunking
+   * Au lieu d'envoyer 6000 chars tronqués, on envoie des chunks de 15000 chars
+   * et on fusionne les résultats
    */
   private async callAiFallback(text: string, hotelId: string): Promise<ExtractedRoom[]> {
     try {
-      const { data, error } = await supabase.functions.invoke('learn-pattern', {
-        body: {
-          reportText: text.substring(0, 6000), // Augmenté pour plus de contexte
-          hotelId,
-          mode: 'extract'
-        }
-      });
-
-      if (error) {
-        this.log(`❌ Erreur appel learn-pattern: ${error.message}`);
-        return [];
-      }
-
-      if (data?.rooms && Array.isArray(data.rooms)) {
-        return data.rooms.map((r: any) => ({
-          roomNumber: String(r.roomNumber || r.room_number),
-          status: r.status || 'unknown',
-          cleaningType: r.cleaningType || r.cleaning_type || 'full',
-          confidence: r.confidence || 70,
-          originalText: r.reason || '',
-          debugInfo: {
-            rawLine: '',
-            cleanedLine: '',
-            detectedKeywords: r.rawStatuses || [],
-            source: 'ai' as const,
-            confidence: r.confidence || 70,
-            appliedRule: r.reason || 'AI extraction'
+      const CHUNK_SIZE = 15000;
+      const allRooms: ExtractedRoom[] = [];
+      const seenRoomNumbers = new Set<string>();
+      
+      // Découper le texte en chunks (par pages/lignes)
+      const chunks: string[] = [];
+      if (text.length <= CHUNK_SIZE) {
+        chunks.push(text);
+      } else {
+        // Découper intelligemment aux sauts de ligne
+        let start = 0;
+        while (start < text.length) {
+          let end = Math.min(start + CHUNK_SIZE, text.length);
+          // Chercher le dernier saut de ligne avant la limite
+          if (end < text.length) {
+            const lastNewline = text.lastIndexOf('\n', end);
+            if (lastNewline > start) {
+              end = lastNewline + 1;
+            }
           }
-        }));
+          chunks.push(text.substring(start, end));
+          start = end;
+        }
+      }
+      
+      this.log(`📦 Chunking IA: ${chunks.length} chunk(s) de ~${CHUNK_SIZE} chars`);
+      
+      for (let i = 0; i < chunks.length; i++) {
+        const { data, error } = await supabase.functions.invoke('learn-pattern', {
+          body: {
+            reportText: chunks[i],
+            hotelId,
+            mode: 'extract'
+          }
+        });
+
+        if (error) {
+          this.log(`❌ Erreur chunk ${i + 1}: ${error.message}`);
+          continue;
+        }
+
+        if (data?.rooms && Array.isArray(data.rooms)) {
+          for (const r of data.rooms) {
+            const roomNumber = String(r.roomNumber || r.room_number);
+            const normalized = this.normalizeRoomNumber(roomNumber);
+            
+            // Dédupliquer entre chunks
+            if (seenRoomNumbers.has(normalized)) continue;
+            seenRoomNumbers.add(normalized);
+            
+            allRooms.push({
+              roomNumber,
+              status: r.status || 'unknown',
+              cleaningType: r.cleaningType || r.cleaning_type || 'full',
+              confidence: r.confidence || 70,
+              originalText: r.reason || '',
+              debugInfo: {
+                rawLine: '',
+                cleanedLine: '',
+                detectedKeywords: r.rawStatuses || [],
+                source: 'ai' as const,
+                confidence: r.confidence || 70,
+                appliedRule: r.reason || `AI extraction (chunk ${i + 1}/${chunks.length})`
+              }
+            });
+          }
+        }
       }
 
-      return [];
+      this.log(`✅ Fallback IA: ${allRooms.length} chambres extraites de ${chunks.length} chunk(s)`);
+      return allRooms;
     } catch (error) {
       this.log(`❌ Exception appel IA: ${error}`);
       return [];
