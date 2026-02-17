@@ -76,7 +76,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [isStabilized, setIsStabilized] = useState(false);
   const [stabilizationProgress, setStabilizationProgress] = useState(0);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  
   
   const [linenTypes, setLinenTypes] = useState<LinenType[]>([]);
   const [matchingLinenTypes, setMatchingLinenTypes] = useState<LinenType[]>([]);
@@ -135,19 +135,11 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
 
   // Stabilization: require 3 consistent counts before accepting result
   const STABILIZATION_REQUIRED = 3;
-  const COOLDOWN_DURATION = 5; // seconds to pause after stable result
-
-  // Cooldown timer
-  useEffect(() => {
-    if (cooldownSeconds <= 0) return;
-    const timer = setTimeout(() => setCooldownSeconds(prev => prev - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [cooldownSeconds]);
 
   // Live scan loop
   useEffect(() => {
     if (!isStreaming || !isLiveScanning || cameraFailed || scanMode !== 'live') return;
-    if (isStabilized || cooldownSeconds > 0) return; // pause during cooldown
+    if (isStabilized) return; // pause when stabilized
 
     const tick = async () => {
       if (isRequestInFlightRef.current) return;
@@ -238,9 +230,9 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     };
 
     tick();
-    const id = window.setInterval(tick, 2500); // slower interval for better stability
+    const id = window.setInterval(tick, 1500);
     return () => window.clearInterval(id);
-  }, [isStreaming, isLiveScanning, cameraFailed, selectedLinenTypeId, hotelId, hasManualOverride, scanMode, hasShownLiveError, toast, isStabilized, cooldownSeconds]);
+  }, [isStreaming, isLiveScanning, cameraFailed, selectedLinenTypeId, hotelId, hasManualOverride, scanMode, hasShownLiveError, toast, isStabilized]);
 
   const startCamera = async () => {
     try {
@@ -389,7 +381,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
     setHasManualOverride(false);
     setIsStabilized(false);
     setStabilizationProgress(0);
-    setCooldownSeconds(0);
+    
     recentCountsRef.current = [];
     stableCountRef.current = null;
   };
@@ -397,7 +389,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
   const handleResumeScan = () => {
     setIsStabilized(false);
     setStabilizationProgress(0);
-    setCooldownSeconds(COOLDOWN_DURATION);
     recentCountsRef.current = [];
     stableCountRef.current = null;
   };
@@ -551,11 +542,7 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
                 <span className="text-xs ml-2 opacity-75">Stabilisation...</span>
               </div>
             )}
-            {cooldownSeconds > 0 && !isStabilized && (
-              <div className="text-sm mt-2 opacity-75">
-                ⏳ Reprise dans {cooldownSeconds}s
-              </div>
-            )}
+            
             {liveResult?.confidence && liveResult.confidence > 0 && (
               <Badge variant="secondary" className="mt-2">
                 {Math.round(liveResult.confidence * 100)}% confiance
