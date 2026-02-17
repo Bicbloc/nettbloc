@@ -671,16 +671,108 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     // Reset coverage metadata
     lastCoverageMetadata = null;
 
-    // ===== PHASE 0: Détection du format avec ReportFormatDetector (COMME ENTRAÎNEMENT IA) =====
+    // ===== PHASE 0: Vérifier d'abord si l'hôtel a un modèle entraîné =====
+    let useTrainedModel = false;
+    
+    if (hotelId) {
+      try {
+        // Check if hotel has trained patterns via unifiedParserService
+        await unifiedParserService.loadHotelPatterns(hotelId);
+        const patternCount = unifiedParserService.getLearnedPatternCount();
+        
+        if (patternCount > 0) {
+          console.log(`🧠 ${patternCount} patterns entraînés trouvés pour cet hôtel — utilisation prioritaire`);
+          useTrainedModel = true;
+        }
+      } catch (err) {
+        console.warn('⚠️ Erreur chargement patterns entraînés:', err);
+      }
+    }
+    
+    // ===== Si modèle entraîné existe, l'utiliser en PRIORITÉ ABSOLUE =====
+    if (useTrainedModel && hotelId) {
+      console.log(`🎯 Utilisation du modèle entraîné de l'hôtel (priorité absolue)`);
+      
+      try {
+        await unifiedParserService.loadHotelPatterns(hotelId);
+        const trainedResult = await unifiedParserService.parseReportHybrid(fullText, hotelId, false);
+        
+        if (trainedResult.rooms.length > 0) {
+          let rooms = convertExtractedRoomsToRooms(trainedResult.rooms);
+          const trainedPatternCount = unifiedParserService.getLearnedPatternCount();
+          
+          // Build coverage metadata
+          lastCoverageMetadata = {
+            phase0RoomCount: 0,
+            trainedModelRoomCount: rooms.length,
+            finalRoomCount: rooms.length,
+            supplementedByTraining: 0,
+            trainedModelUsed: true,
+            formatDetected: 'trained_model',
+            formatConfidence: 95,
+            trainedPatternCount,
+            missingFromPhase0: [],
+            missingFromTraining: [],
+            perPatternStats: [],
+          };
+          
+          // Appliquer les règles de combinaison
+          const combinationRules = await loadHotelCombinationRules(hotelId);
+          if (combinationRules.length > 0) {
+            rooms = applyHotelCombinationRules(rooms, combinationRules, []);
+          }
+          
+          // Post-extraction filter
+          rooms = rooms.filter(room => {
+            const roomNumDigits = room.number.replace(/\D/g, '');
+            if (roomNumDigits.length === 1) return false;
+            return true;
+          });
+          
+          // Créer des RoomLines pour la prévisualisation
+          lastParsedLines = rooms.map(room => ({
+            roomNumber: room.number,
+            rawText: `${room.number} ${room.cleaningType}`,
+            fullText: `${room.number} ${room.cleaningType}`,
+            cleaningType: room.cleaningType === 'a_blanc' ? 'a_blanc' : room.cleaningType === 'recouche' ? 'recouche' : 'none',
+            cleaningReason: room.cleaningReason || '',
+            statusCode: '',
+            statusLabel: room.cleaningReason || '',
+            roomType: room.roomType || '',
+            guestName: room.guestName || '',
+            arrivalDate: room.arrivalDate || '',
+            departureDate: room.departureDate || '',
+            checkInTime: room.checkInTime || '',
+            checkOutTime: room.checkOutTime || '',
+            confidence: 90,
+            linkedRooms: [],
+            notes: [],
+            isLastNight: false,
+            isFirstNight: false,
+          } as RoomLine));
+          
+          toast({
+            title: "Extraction via modèle entraîné",
+            description: `${rooms.length} chambres extraites avec le modèle personnalisé de votre établissement`,
+          });
+          
+          return rooms;
+        }
+      } catch (err) {
+        console.warn('⚠️ Erreur parsing avec modèle entraîné, fallback vers détection automatique:', err);
+      }
+    }
+
+    // ===== PHASE 0b: Détection du format avec ReportFormatDetector =====
     const formatDetection = detectReportFormat(fullText);
     console.log(`🔍 Format détecté: ${formatDetection.format} (confiance: ${formatDetection.confidence}%)`);
     
-    // Si format Apaleo/Mews détecté avec bonne confiance, utiliser le parser dédié
+    // Utiliser le parser dédié si format reconnu avec bonne confiance
     if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat'].includes(formatDetection.format) && 
         formatDetection.confidence >= 50 && 
         formatDetection.parsedData.rows.length > 0) {
       
-      console.log(`🎯 Utilisation du parser ${formatDetection.format} (comme entraînement IA)`);
+      console.log(`🎯 Utilisation du parser ${formatDetection.format}`);
       
       const parsedRows = formatDetection.parsedData.rows;
       let rooms = parsedRows.map(convertParsedRowToRoom);
