@@ -1,127 +1,101 @@
 
 
-# Integration API PMS - Plan d'implementation
+# Amelioration de la precision du parsing PDF a 99%
 
-## Situation actuelle
+## Analyse de l'architecture actuelle
 
-Le systeme dispose deja d'une architecture d'adapters PMS solide pour le **parsing de rapports PDF** (Mews, Apaleo, Opera, Protel, Medialog, Fidelio). Cependant, l'acces API direct aux PMS n'est pas encore implemente -- la methode `fetchRoomsFromApi()` existe dans le code mais aucun adapter ne l'implemente.
-
-## Comment ca va marcher
-
-Chaque PMS a sa propre API avec son propre systeme d'authentification. Voici le fonctionnement prevu :
+Le systeme de parsing est deja tres sophistique avec une architecture multi-couches :
 
 ```text
-+-------------------+       +-------------------+       +------------------+
-|  Frontend         |       |  Edge Function    |       |  API PMS         |
-|  (Dashboard)      | ----> |  pms-sync         | ----> |  (Mews, Apaleo,  |
-|                   |       |  (Supabase)       |       |   Opera, etc.)   |
-+-------------------+       +-------------------+       +------------------+
-        |                          |
-        |                          v
-        |                   +------------------+
-        +-----------------> |  Base de donnees |
-                            |  (rooms, config) |
-                            +------------------+
+Phase 0: ReportFormatDetector (Apaleo/Mews/Medialog)
+    |
+    +-- Supplementation par patterns entraines (UnifiedParserService)
+    |
+Phase 1: RoomLineParser (fallback)
+    |
+Phase 2: UnifiedParserService + AI fallback (learn-pattern)
+    |
+Post-traitement: Regles de combinaison + Mappings personnalises
 ```
 
-### Flux de donnees
+## Points forts actuels
+- Detection multi-PMS (Mews, Apaleo, Opera, Medialog, Protel, Fidelio)
+- Systeme d'apprentissage (patterns valides, regles permanentes, patterns contextuels)
+- Fallback IA automatique quand la confiance est faible
+- Regles de combinaison configurables par hotel
+- Fusion intelligente entre parsing local et IA
+- Validation post-extraction avec scoring de confiance
 
-1. L'hotel configure ses identifiants API PMS dans son profil (cle API, ID propriete, etc.)
-2. Les identifiants sont stockes de facon securisee dans la base de donnees (chiffres)
-3. Une **Edge Function** `pms-sync` appelle l'API du PMS avec les identifiants
-4. Les donnees des chambres sont synchronisees automatiquement dans la base de donnees
-5. Le dashboard affiche les donnees en temps reel
+## Faiblesses identifiees
 
-### Authentification par PMS
+### 1. Formats PDF non-standards
+Quand le texte extrait par pdf.js est mal structure (colonnes fusionnees, espaces irreguliers), les regex echouent. Le seuil Y de 3.5px pour le regroupement de lignes est fixe et ne s'adapte pas aux differents PDFs.
 
-| PMS | Type d'auth | Ce dont l'hotel a besoin |
-|-----|-------------|--------------------------|
-| **Mews** | OAuth2 / API Key | Client Token + Access Token |
-| **Apaleo** | OAuth2 | Client ID + Client Secret |
-| **Opera Cloud** | OAuth2 + OHIP | Client ID + Secret + Property ID |
-| **Mister Booking** | API Key | Cle API + ID Etablissement |
-| **Protel** | API Key | URL serveur + Token |
-| **Medialog** | API Key | Cle API proprietaire |
+### 2. Cleaning type par defaut = "recouche"
+Dans `analyzeLineContext()` (ligne 1156), le defaut est `recouche` avec `status: 'unknown'`. Si aucun mot-cle n'est detecte, la chambre est classee en recouche par defaut, ce qui peut etre incorrect.
 
-## Plan d'implementation
+### 3. Pas de validation croisee
+Le systeme ne compare pas les resultats du Phase 0 (ReportFormatDetector) avec ceux de l'UnifiedParserService pour detecter les incoherences.
 
-### Etape 1 - Table de configuration PMS API
-Creer une table `hotel_pms_configs` pour stocker les identifiants API de chaque hotel :
-- `hotel_id`, `pms_type`, `credentials` (JSONB chiffre), `is_active`, `sync_frequency`
-- Securisee par RLS (seul le proprietaire peut voir/modifier)
+### 4. Le fallback IA est limite a 6000 caracteres
+Le texte envoye a l'edge function `learn-pattern` est tronque a 6000 chars, ce qui fait manquer des chambres sur les gros rapports.
 
-### Etape 2 - Edge Function `pms-sync`
-Creer une edge function qui :
-- Recoit le `hotel_id` et le `pms_type`
-- Recupere les identifiants depuis la base
-- Appelle l'API du PMS correspondant
-- Transforme les donnees au format unifie `ExtractedRoom[]`
-- Met a jour la table `rooms` avec les donnees fraiches
+### 5. Pas de feedback loop
+Quand l'utilisateur corrige manuellement une chambre dans l'etape de mapping, cette correction n'est pas reinjectee dans le systeme d'apprentissage pour ameliorer les futurs parsings.
 
-### Etape 3 - Implementer les connecteurs API par PMS
-Commencer par les 2 PMS les plus demandes :
+## Plan d'amelioration
 
-**Mews Connector API** :
-- Endpoint : `https://api.mews.com/api/connector/v1/`
-- Appels : `spaces/getAll`, `reservations/getAll`
-- Retourne les chambres avec statut de menage en temps reel
+### Etape 1 - Extraction PDF amelioree
+Ameliorer `extractPdfText()` dans `pdfService.ts` :
+- Adapter dynamiquement le seuil Y de regroupement (3.5px) en fonction de la taille de police detectee
+- Ajouter un mode "table-aware" qui detecte les colonnes par clustering des positions X
+- Cela ameliorera la precision pour tous les formats de PMS
 
-**Apaleo API** :
-- Endpoint : `https://api.apaleo.com/`
-- OAuth2 avec Client Credentials
-- Appels : `inventory/v1/properties/{id}/units`, `housekeeping/v1/properties/{id}`
+### Etape 2 - Validation croisee Phase 0 vs UnifiedParser
+Dans `processPdf()`, comparer les resultats de Phase 0 et de l'UnifiedParserService :
+- Si une chambre est detectee par les deux avec des cleaningTypes differents, prendre celui avec la plus haute confiance
+- Si une chambre n'est detectee que par un seul, verifier qu'elle existe bien dans le texte brut
+- Logger les divergences pour diagnostic
 
-### Etape 4 - Interface de configuration
-Ajouter dans le dashboard (onglet Parametres) :
-- Un formulaire pour choisir son PMS et entrer ses identifiants API
-- Un bouton "Tester la connexion" pour valider les identifiants
-- Un toggle pour activer/desactiver la synchronisation automatique
-- Un choix de frequence de synchro (toutes les 15min, 30min, 1h)
+### Etape 3 - Feedback loop depuis le mapping
+Dans l'etape "mapping" du PdfWorkflowDialog :
+- Quand l'utilisateur change le cleaningType d'un mot-cle (ex: "DIR" de recouche vers a_blanc), sauvegarder automatiquement cette correction dans `hotel_cleaning_rules`
+- Cela cree un apprentissage continu sans passer par le wizard d'entrainement complet
 
-### Etape 5 - Synchronisation automatique
-- Utiliser un **cron Supabase** (pg_cron) pour declencher la synchro periodiquement
-- Ou un webhook depuis le PMS (si supporte) pour du temps reel
-- Journaliser chaque synchro dans une table `pms_sync_logs`
+### Etape 4 - Augmenter la couverture IA
+- Augmenter la limite de texte envoye au fallback IA (6000 -> 15000 chars) ou envoyer par pages
+- Ajouter un mode "chunk" qui decoupe le texte en sections et les envoie sequentiellement
+- Chaque chunk est parse independamment puis les resultats sont fusionnes
+
+### Etape 5 - Scoring de confiance renforce
+Modifier `RoomValidator.ts` pour :
+- Ajouter une regle "coherence etage" : si 80% des chambres du meme etage sont en recouche, une chambre isolee en a_blanc devrait avoir un flag de verification
+- Ajouter une regle "coherence historique" : comparer avec les patterns des jours precedents
+- Exposer le score de confiance par chambre dans l'UI de preview
+
+### Etape 6 - Default cleaning type intelligent
+Remplacer le defaut `recouche` par une logique basee sur :
+- Le ratio a_blanc/recouche des chambres deja detectees dans le meme rapport
+- L'historique de l'hotel (si 70% des chambres sont habituellement en recouche, utiliser recouche comme defaut)
+- Stocker ce ratio dans `hotel_pms_configs` ou un champ dedie
 
 ## Details techniques
 
-### Structure de la table `hotel_pms_configs`
+### Fichiers concernes
+- `src/services/pdfService.ts` : extraction PDF + validation croisee + feedback loop
+- `src/services/pms/UnifiedParserService.ts` : default intelligent + augmentation IA
+- `src/services/pms/RoomValidator.ts` : nouvelles regles de coherence
+- `src/services/training/ReportFormatDetector.ts` : extraction table-aware
+- `src/components/PdfWorkflowDialog.tsx` : sauvegarde des corrections de mapping
 
-```text
-hotel_pms_configs
-  - id (uuid, PK)
-  - hotel_id (uuid, FK hotels)
-  - pms_type (text) : mews, apaleo, opera, mister_booking...
-  - credentials (jsonb) : identifiants chiffres
-  - base_url (text) : URL API personnalisee si necessaire
-  - property_id (text) : ID propriete dans le PMS
-  - is_active (boolean)
-  - sync_frequency (integer) : en minutes
-  - last_sync_at (timestamptz)
-  - last_sync_status (text) : success, error, pending
-  - last_sync_error (text)
-  - created_at, updated_at
-```
+### Impact sur les performances
+- Le parsing restera rapide car les ameliorations sont principalement algorithmiques
+- Le fallback IA sera appele moins souvent grace a la meilleure precision locale
+- Le feedback loop est asynchrone (sauvegarde en arriere-plan)
 
-### Extension des adapters existants
-
-Chaque adapter PMS existant (MewsAdapter, ApaleoAdapter, etc.) sera etendu avec l'implementation concrete de `fetchRoomsFromApi()`. L'architecture actuelle supporte deja cette methode optionnelle -- il suffit de l'implementer dans chaque adapter.
-
-### Restriction au plan Entreprise
-
-L'acces API est reserve au plan `entreprise`. Le guard existant `FeatureGuard` sera utilise pour controler l'acces a cette fonctionnalite, avec le feature flag `apiAccess` deja defini dans `planFeatures`.
-
-### Securite
-
-- Les identifiants API ne transitent jamais par le frontend
-- Stockage chiffre en base (pgcrypto)
-- L'edge function est la seule a acceder aux identifiants
-- RLS strict : seul le proprietaire de l'hotel peut configurer ses identifiants
-
-## Ordre de priorite
-
-1. **Phase 1** : Table + Edge Function + Mews API (le plus utilise)
-2. **Phase 2** : Apaleo API + Opera Cloud API
-3. **Phase 3** : Mister Booking + autres PMS
-4. **Phase 4** : Synchronisation automatique (cron) + webhooks
+### Mesure de la precision
+Ajouter un compteur dans `CoverageMetadata` :
+- `confidenceBreakdown` : nombre de chambres par tranche de confiance (90%+, 70-90%, <70%)
+- `crossValidationMatches` : nombre de chambres validees par les deux parsers
+- Afficher ces stats dans le `TrainingCoverageReport`
 
