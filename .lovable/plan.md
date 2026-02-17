@@ -1,101 +1,73 @@
 
+# Correction du parsing MisterBooking et amelioration de la precision
 
-# Amelioration de la precision du parsing PDF a 99%
+## Probleme identifie
 
-## Analyse de l'architecture actuelle
+Le PDF vient de **MisterBooking** (`new.misterbooking.com`), un PMS non reconnu par le systeme. Il tombe dans le parser `generic_table`, qui utilise un regex trop permissif : `^(\d{2,4}[A-Z]?)\b`. Cela fait que des numeros parasites comme "01" et "14" (numeros de page, compteurs, indices de tableau) sont detectes comme des chambres.
 
-Le systeme de parsing est deja tres sophistique avec une architecture multi-couches :
+## Cause racine
 
-```text
-Phase 0: ReportFormatDetector (Apaleo/Mews/Medialog)
-    |
-    +-- Supplementation par patterns entraines (UnifiedParserService)
-    |
-Phase 1: RoomLineParser (fallback)
-    |
-Phase 2: UnifiedParserService + AI fallback (learn-pattern)
-    |
-Post-traitement: Regles de combinaison + Mappings personnalises
-```
+1. **Pas de signature MisterBooking** dans `FORMAT_SIGNATURES` du `ReportFormatDetector.ts`
+2. Le parser generique accepte n'importe quel nombre de 2+ chiffres en debut de ligne comme numero de chambre
+3. Pas de validation contextuelle : le systeme ne verifie pas si la ligne contient aussi des mots-cles de statut/nettoyage avant de considerer qu'il s'agit d'une chambre
 
-## Points forts actuels
-- Detection multi-PMS (Mews, Apaleo, Opera, Medialog, Protel, Fidelio)
-- Systeme d'apprentissage (patterns valides, regles permanentes, patterns contextuels)
-- Fallback IA automatique quand la confiance est faible
-- Regles de combinaison configurables par hotel
-- Fusion intelligente entre parsing local et IA
-- Validation post-extraction avec scoring de confiance
+## Plan de correction
 
-## Faiblesses identifiees
+### Etape 1 - Ajouter la signature MisterBooking
 
-### 1. Formats PDF non-standards
-Quand le texte extrait par pdf.js est mal structure (colonnes fusionnees, espaces irreguliers), les regex echouent. Le seuil Y de 3.5px pour le regroupement de lignes est fixe et ne s'adapte pas aux differents PDFs.
+Ajouter un nouveau format `misterbooking_housekeeping` dans `ReportFormatDetector.ts` :
+- Signatures : `misterbooking.com`, `femme de chambre`, patterns specifiques au format MisterBooking
+- Parser dedie qui comprend la structure du rapport MisterBooking (colonnes, statuts)
 
-### 2. Cleaning type par defaut = "recouche"
-Dans `analyzeLineContext()` (ligne 1156), le defaut est `recouche` avec `status: 'unknown'`. Si aucun mot-cle n'est detecte, la chambre est classee en recouche par defaut, ce qui peut etre incorrect.
+### Etape 2 - Renforcer le parser generique
 
-### 3. Pas de validation croisee
-Le systeme ne compare pas les resultats du Phase 0 (ReportFormatDetector) avec ceux de l'UnifiedParserService pour detecter les incoherences.
+Modifier `parseGenericReport()` pour ne pas accepter un numero seul en debut de ligne :
+- Exiger qu'un numero de chambre soit suivi d'au moins un indicateur de contexte (statut, type de chambre, nom de client, date)
+- Ajouter des filtres d'exclusion : ignorer les lignes qui ressemblent a des en-tetes, numeros de page, ou texte libre
+- Verifier que le nombre n'est pas isole (il doit etre accompagne d'autres colonnes)
 
-### 4. Le fallback IA est limite a 6000 caracteres
-Le texte envoye a l'edge function `learn-pattern` est tronque a 6000 chars, ce qui fait manquer des chambres sur les gros rapports.
+### Etape 3 - Ameliorer isHeaderLine()
 
-### 5. Pas de feedback loop
-Quand l'utilisateur corrige manuellement une chambre dans l'etape de mapping, cette correction n'est pas reinjectee dans le systeme d'apprentissage pour ameliorer les futurs parsings.
+Ajouter des patterns de detection d'en-tetes MisterBooking et generiques :
+- `femme de chambre`, `intendance`, `misterbooking`
+- Numeros isoles en debut ou fin de page (pagination)
+- Lignes trop courtes (moins de 10 caracteres utiles) ne contenant qu'un nombre
 
-## Plan d'amelioration
+### Etape 4 - Validation post-extraction
 
-### Etape 1 - Extraction PDF amelioree
-Ameliorer `extractPdfText()` dans `pdfService.ts` :
-- Adapter dynamiquement le seuil Y de regroupement (3.5px) en fonction de la taille de police detectee
-- Ajouter un mode "table-aware" qui detecte les colonnes par clustering des positions X
-- Cela ameliorera la precision pour tous les formats de PMS
-
-### Etape 2 - Validation croisee Phase 0 vs UnifiedParser
-Dans `processPdf()`, comparer les resultats de Phase 0 et de l'UnifiedParserService :
-- Si une chambre est detectee par les deux avec des cleaningTypes differents, prendre celui avec la plus haute confiance
-- Si une chambre n'est detectee que par un seul, verifier qu'elle existe bien dans le texte brut
-- Logger les divergences pour diagnostic
-
-### Etape 3 - Feedback loop depuis le mapping
-Dans l'etape "mapping" du PdfWorkflowDialog :
-- Quand l'utilisateur change le cleaningType d'un mot-cle (ex: "DIR" de recouche vers a_blanc), sauvegarder automatiquement cette correction dans `hotel_cleaning_rules`
-- Cela cree un apprentissage continu sans passer par le wizard d'entrainement complet
-
-### Etape 4 - Augmenter la couverture IA
-- Augmenter la limite de texte envoye au fallback IA (6000 -> 15000 chars) ou envoyer par pages
-- Ajouter un mode "chunk" qui decoupe le texte en sections et les envoie sequentiellement
-- Chaque chunk est parse independamment puis les resultats sont fusionnes
-
-### Etape 5 - Scoring de confiance renforce
-Modifier `RoomValidator.ts` pour :
-- Ajouter une regle "coherence etage" : si 80% des chambres du meme etage sont en recouche, une chambre isolee en a_blanc devrait avoir un flag de verification
-- Ajouter une regle "coherence historique" : comparer avec les patterns des jours precedents
-- Exposer le score de confiance par chambre dans l'UI de preview
-
-### Etape 6 - Default cleaning type intelligent
-Remplacer le defaut `recouche` par une logique basee sur :
-- Le ratio a_blanc/recouche des chambres deja detectees dans le meme rapport
-- L'historique de l'hotel (si 70% des chambres sont habituellement en recouche, utiliser recouche comme defaut)
-- Stocker ce ratio dans `hotel_pms_configs` ou un champ dedie
+Ajouter un filtre dans `processPdf()` apres l'extraction :
+- Eliminer les chambres dont le numero ne correspond pas au pattern attendu de l'hotel (si le registre des chambres `hotel_rooms_registry` existe)
+- Eliminer les chambres sans aucun indicateur de statut/nettoyage et avec une confiance inferieure a 40%
+- Logger les chambres rejetees pour transparence
 
 ## Details techniques
 
-### Fichiers concernes
-- `src/services/pdfService.ts` : extraction PDF + validation croisee + feedback loop
-- `src/services/pms/UnifiedParserService.ts` : default intelligent + augmentation IA
-- `src/services/pms/RoomValidator.ts` : nouvelles regles de coherence
-- `src/services/training/ReportFormatDetector.ts` : extraction table-aware
-- `src/components/PdfWorkflowDialog.tsx` : sauvegarde des corrections de mapping
+### Fichiers modifies
 
-### Impact sur les performances
-- Le parsing restera rapide car les ameliorations sont principalement algorithmiques
-- Le fallback IA sera appele moins souvent grace a la meilleure precision locale
-- Le feedback loop est asynchrone (sauvegarde en arriere-plan)
+- `src/services/training/ReportFormatDetector.ts` : ajout signature MisterBooking + parser dedie + renforcement `isHeaderLine()`
+- `src/services/pdfService.ts` : ajout filtre post-extraction avec validation contre le registre des chambres
+- `src/services/pms/RoomLineParser.ts` : renforcement de la validation contextuelle dans `parseSection()` (rejeter les numeros isoles sans statut ni type)
 
-### Mesure de la precision
-Ajouter un compteur dans `CoverageMetadata` :
-- `confidenceBreakdown` : nombre de chambres par tranche de confiance (90%+, 70-90%, <70%)
-- `crossValidationMatches` : nombre de chambres validees par les deux parsers
-- Afficher ces stats dans le `TrainingCoverageReport`
+### Logique du parser MisterBooking
 
+Le parser analysera la structure specifique des rapports MisterBooking :
+- Detecter les colonnes par position (numero, type chambre, statut, client, dates)
+- Utiliser les mots-cles MisterBooking pour le cleaning type
+- Ignorer les en-tetes et pieds de page propres a ce PMS
+
+### Filtre post-extraction
+
+```text
+Pour chaque chambre detectee :
+  SI hotel_rooms_registry existe ET contient des chambres :
+    SI la chambre n'est PAS dans le registre :
+      Marquer avec confiance basse (flag de verification)
+  SI aucun statut/mot-cle detecte ET confiance < 40% :
+    Rejeter la chambre (faux positif probable)
+```
+
+### Impact
+
+- Les chambres "01" et "14" seront rejetees car elles n'ont pas de contexte de nettoyage
+- Les vrais numeros de chambre du rapport MisterBooking seront correctement detectes
+- Les autres formats (Mews, Apaleo, etc.) ne sont pas affectes
