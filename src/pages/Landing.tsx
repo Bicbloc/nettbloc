@@ -103,10 +103,10 @@ const t = {
       },
       planSubtitles: {
         freemium: 'Pour tester la plateforme',
-        essentiel: 'Petits établissements',
-        confort: 'Établissements moyens',
-        business: 'Grands établissements',
-        entreprise: 'Groupes & chaînes hôtelières',
+        basic: 'Petits établissements',
+        premium: 'Établissements moyens',
+        basic_plus: 'Grands établissements',
+        platinum: 'Groupes & chaînes hôtelières',
       },
     },
     testimonials: {
@@ -239,10 +239,10 @@ const t = {
       },
       planSubtitles: {
         freemium: 'To test the platform',
-        essentiel: 'Small properties',
-        confort: 'Medium properties',
-        business: 'Large properties',
-        entreprise: 'Groups & hotel chains',
+        basic: 'Small properties',
+        premium: 'Medium properties',
+        basic_plus: 'Large properties',
+        platinum: 'Groups & hotel chains',
       },
     },
     testimonials: {
@@ -336,18 +336,18 @@ interface PricingPlan {
 const planDisplayNames: Record<string, Record<string, string>> = {
   fr: {
     freemium: 'Découverte',
-    essentiel: 'Essentiel',
-    confort: 'Confort',
-    business: 'Business',
-    entreprise: 'Entreprise',
+    basic: 'Essentiel',
+    premium: 'Confort',
+    basic_plus: 'Business',
+    platinum: 'Entreprise',
     manual_entry: 'Saisie Manuelle',
   },
   en: {
     freemium: 'Discovery',
-    essentiel: 'Essential',
-    confort: 'Comfort',
-    business: 'Business',
-    entreprise: 'Enterprise',
+    basic: 'Essential',
+    premium: 'Comfort',
+    basic_plus: 'Business',
+    platinum: 'Enterprise',
     manual_entry: 'Manual Entry',
   }
 };
@@ -369,15 +369,19 @@ const Landing = () => {
       });
   }, []);
 
-  const popularPlan = 'confort';
+  const popularPlan = 'premium';
 
   // Feature availability per plan tier (matching screenshot)
   const planFeatures: Record<string, string[]> = {
     freemium: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal'],
     manual_entry: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal'],
+    basic: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport'],
     essentiel: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport'],
+    premium: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection'],
     confort: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection'],
+    basic_plus: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection', 'aiRecognition', 'aiRecommendation', 'technicianPortal'],
     business: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection', 'aiRecognition', 'aiRecommendation', 'technicianPortal'],
+    platinum: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'multiHotel', 'apiAccess', 'prioritySupport'],
     entreprise: ['pdfAnalysis', 'distribution', 'reports', 'rooms', 'housekeeperPortal', 'governessPortal', 'incidents', 'pmsImport', 'maintenance', 'lostFound', 'qualityControl', 'linen', 'inspection', 'aiRecognition', 'aiRecommendation', 'technicianPortal', 'multiHotel', 'apiAccess', 'prioritySupport'],
   };
 
@@ -385,10 +389,10 @@ const Landing = () => {
 
   const planIcons: Record<string, React.ReactNode> = {
     freemium: <Zap className="w-8 h-8 text-muted-foreground" />,
-    essentiel: <ClipboardList className="w-8 h-8 text-muted-foreground" />,
-    confort: <Star className="w-8 h-8 text-muted-foreground" />,
-    business: <Award className="w-8 h-8 text-muted-foreground" />,
-    entreprise: <Crown className="w-8 h-8 text-primary" />,
+    basic: <ClipboardList className="w-8 h-8 text-muted-foreground" />,
+    premium: <Star className="w-8 h-8 text-muted-foreground" />,
+    basic_plus: <Award className="w-8 h-8 text-muted-foreground" />,
+    platinum: <Crown className="w-8 h-8 text-primary" />,
   };
 
   return (
@@ -536,7 +540,7 @@ const Landing = () => {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 max-w-7xl mx-auto">
                 {plans.map((plan) => {
                   const isPopular = plan.plan_name === popularPlan;
-                  const isEnterprise = plan.plan_name === 'entreprise';
+                  const isEnterprise = plan.plan_name === 'platinum';
                   const isFree = plan.price_monthly === 0;
                   const isPaid = plan.price_monthly > 0;
                   const displayName = planDisplayNames[lang]?.[plan.plan_name] || plan.plan_name;
