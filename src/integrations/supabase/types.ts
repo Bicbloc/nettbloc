@@ -993,6 +993,69 @@ export type Database = {
           },
         ]
       }
+      hotel_pms_configs: {
+        Row: {
+          base_url: string | null
+          created_at: string
+          credentials: Json
+          hotel_id: string
+          id: string
+          is_active: boolean
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          pms_type: string
+          property_id: string | null
+          sync_frequency: number
+          updated_at: string
+        }
+        Insert: {
+          base_url?: string | null
+          created_at?: string
+          credentials?: Json
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          pms_type: string
+          property_id?: string | null
+          sync_frequency?: number
+          updated_at?: string
+        }
+        Update: {
+          base_url?: string | null
+          created_at?: string
+          credentials?: Json
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          pms_type?: string
+          property_id?: string | null
+          sync_frequency?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_pms_configs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_pms_configs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_report_configs: {
         Row: {
           column_mappings: Json
@@ -3352,6 +3415,57 @@ export type Database = {
           },
           {
             foreignKeyName: "pms_rules_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pms_sync_logs: {
+        Row: {
+          details: Json | null
+          error_message: string | null
+          hotel_id: string
+          id: string
+          pms_type: string
+          rooms_synced: number | null
+          status: string
+          sync_ended_at: string | null
+          sync_started_at: string
+        }
+        Insert: {
+          details?: Json | null
+          error_message?: string | null
+          hotel_id: string
+          id?: string
+          pms_type: string
+          rooms_synced?: number | null
+          status?: string
+          sync_ended_at?: string | null
+          sync_started_at?: string
+        }
+        Update: {
+          details?: Json | null
+          error_message?: string | null
+          hotel_id?: string
+          id?: string
+          pms_type?: string
+          rooms_synced?: number | null
+          status?: string
+          sync_ended_at?: string | null
+          sync_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pms_sync_logs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pms_sync_logs_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels_stats_view"
