@@ -770,12 +770,13 @@ function parseMedialogReport(text: string): ParsedReportData {
 
 /**
  * Parser générique - renforcé pour éviter les faux positifs
+ * Rejette les numéros à 1 chiffre (1-9) et exige un contexte minimum
  */
 function parseGenericReport(text: string): ParsedReportData {
   const lines = text.split('\n');
   const rows: ParsedRow[] = [];
   
-  // Pattern générique pour numéro de chambre
+  // Pattern générique pour numéro de chambre — minimum 2 chiffres
   const roomPattern = /^(\d{2,4}[A-Z]?)\b/;
   
   // Context keywords that indicate a line is about a room

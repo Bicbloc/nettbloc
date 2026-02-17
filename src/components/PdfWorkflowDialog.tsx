@@ -825,11 +825,13 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     };
   }, [parsedLines, excludedRooms]);
 
-  // Lignes filtrées pour la prévisualisation
+  // Lignes filtrées pour la prévisualisation — triées par confiance croissante (suspects en premier)
   const filteredLines = useMemo(() => {
-    let lines = parsedLines;
+    let lines = [...parsedLines];
     if (previewFilter === 'a_blanc') lines = lines.filter(l => l.cleaningType === 'a_blanc');
     else if (previewFilter === 'recouche') lines = lines.filter(l => l.cleaningType === 'recouche');
+    // Tri par confiance croissante: chambres suspectes en premier
+    lines.sort((a, b) => (a.confidence || 0) - (b.confidence || 0));
     return lines;
   }, [parsedLines, previewFilter]);
 
@@ -1090,7 +1092,18 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         </div>
       )}
 
-      {/* Filtres + exclusion info */}
+      {/* Alerte chambres suspectes */}
+      {extractionStats && parsedLines.some(l => (l.confidence || 0) < 50) && (
+        <Alert className="border-amber-300 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-sm text-amber-800">
+            <strong>{parsedLines.filter(l => (l.confidence || 0) < 50).length} chambre(s) suspecte(s)</strong> détectée(s) (confiance &lt; 50%). 
+            Elles sont affichées en premier. Excluez celles qui ne sont pas de vraies chambres.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Filtres + bulk actions + exclusion info */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex gap-2">
           <Button
@@ -1117,12 +1130,32 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             Recouches ({extractionStats?.recoucheCount || 0})
           </Button>
         </div>
-        {excludedRooms.size > 0 && (
-          <Badge variant="destructive" className="text-xs">
-            <X className="h-3 w-3 mr-1" />
-            {excludedRooms.size} exclue(s)
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Bulk actions */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const allRoomNumbers = new Set(filteredLines.map(l => l.roomNumber));
+              setExcludedRooms(allRoomNumbers);
+            }}
+          >
+            Tout exclure
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExcludedRooms(new Set())}
+          >
+            Tout inclure
+          </Button>
+          {excludedRooms.size > 0 && (
+            <Badge variant="destructive" className="text-xs">
+              <X className="h-3 w-3 mr-1" />
+              {excludedRooms.size} exclue(s)
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Liste des chambres avec exclusion */}
@@ -1262,34 +1295,39 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         <TrainingCoverageReport coverage={coverageMetadata} />
       )}
 
-      {/* Suggestion d'entraînement */}
-      {extractionStats && (extractionStats.avgConfidence < 70 || coverageMetadata?.formatDetected === 'generic_table' || coverageMetadata?.formatDetected === 'unknown') && (
-        <Alert className="border-primary/30 bg-primary/5">
-          <Brain className="h-4 w-4 text-primary" />
-          <AlertDescription className="flex items-center justify-between gap-3">
-            <span className="text-sm">
-              {extractionStats.avgConfidence < 70 
-                ? `Confiance faible (${extractionStats.avgConfidence.toFixed(0)}%). Entraînez le parser pour améliorer la reconnaissance.`
-                : 'Format non reconnu automatiquement. Entraînez le parser pour ce format de rapport.'
-              }
-            </span>
-            <Button 
-              size="sm" 
-              variant="outline"
-              className="shrink-0 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-              onClick={() => {
-                setOpen(false);
-                resetDialog();
-                // Dispatch event to navigate to training tab
-                window.dispatchEvent(new CustomEvent('navigate-to-training'));
-              }}
-            >
-              <Settings2 className="h-4 w-4 mr-1" />
-              Entraîner
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Bouton Entraîner — TOUJOURS visible */}
+      <Alert className={`${
+        extractionStats && (extractionStats.avgConfidence < 70 || coverageMetadata?.formatDetected === 'generic_table' || coverageMetadata?.formatDetected === 'unknown')
+          ? 'border-amber-300 bg-amber-50'
+          : 'border-primary/30 bg-primary/5'
+      }`}>
+        <Brain className="h-4 w-4 text-primary" />
+        <AlertDescription className="flex items-center justify-between gap-3">
+          <span className="text-sm">
+            {coverageMetadata?.formatDetected === 'trained_model'
+              ? '✅ Modèle entraîné utilisé. Vous pouvez re-entraîner pour ajuster.'
+              : extractionStats && extractionStats.avgConfidence < 70 
+                ? `⚠️ Confiance faible (${extractionStats.avgConfidence.toFixed(0)}%). Entraînez le parser pour améliorer la reconnaissance.`
+                : coverageMetadata?.formatDetected === 'generic_table' || coverageMetadata?.formatDetected === 'unknown'
+                  ? '⚠️ Format non reconnu. Entraînez le parser pour que votre rapport soit parfaitement reconnu.'
+                  : '💡 Entraînez le parser sur votre format de rapport pour une reconnaissance optimale.'
+            }
+          </span>
+          <Button 
+            size="sm" 
+            variant={extractionStats && extractionStats.avgConfidence < 70 ? 'default' : 'outline'}
+            className="shrink-0 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            onClick={() => {
+              setOpen(false);
+              resetDialog();
+              window.dispatchEvent(new CustomEvent('navigate-to-training'));
+            }}
+          >
+            <Settings2 className="h-4 w-4 mr-1" />
+            Entraîner
+          </Button>
+        </AlertDescription>
+      </Alert>
       
       <DialogFooter>
         <Button variant="outline" onClick={() => setStep('upload')}>
