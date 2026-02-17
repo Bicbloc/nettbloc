@@ -156,6 +156,19 @@ const IndexDashboard = () => {
   
   const [activeTab, setActiveTab] = useState<TabValue>(() => storageService.getAdminTab() as TabValue || 'overview');
   const [cleaningConfig, setCleaningConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
+
+  // Listen for navigate-to-pms-config events from dialogs
+  useEffect(() => {
+    const handler = () => {
+      setActiveTab('rooms');
+      setTimeout(() => {
+        const el = document.querySelector('[data-pms-config]');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    };
+    window.addEventListener('navigate-to-pms-config', handler);
+    return () => window.removeEventListener('navigate-to-pms-config', handler);
+  }, []);
   
   const { 
     housekeeperNames, 
