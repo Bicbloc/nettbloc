@@ -131,10 +131,11 @@ const FORMAT_SIGNATURES: Record<ReportFormat, { patterns: RegExp[]; weight: numb
   ],
   medialog_etat: [
     { patterns: [/L'état\s+des\s+chambres/i, /état\s+des\s+chambres/i], weight: 15 },
-    { patterns: [/\b(PARTI|RECOUCHE|DEPART|DRAPS)\b/], weight: 10 },
+    { patterns: [/\b(PARTI|RECOUCHE|DEPART|DRAPS)\b/], weight: 3 },
     { patterns: [/Medialog/i], weight: 15 },
     { patterns: [/MEMO\s+GOUVERNANTE/i], weight: 5 },
     { patterns: [/S\s*=\s*Sale/i], weight: 5 },
+    { patterns: [/^\d{3}\s+(?:PARTI|RECOUCHE|DEPART|DRAPS)\s+[A-Z]\s+[A-Z]{3}/m], weight: 10 },
   ],
   opera_housekeeping: [
     { patterns: [/Opera/i, /Oracle/i], weight: 10 },
@@ -203,22 +204,35 @@ function detectFormat(text: string): ReportFormat {
     }
   }
   
-  return bestScore >= 8 ? bestFormat : 'generic_table';
+  return bestScore >= 15 ? bestFormat : 'generic_table';
 }
 
 // =========== PARSING PAR FORMAT ===========
 
 function parseReportByFormat(text: string, format: ReportFormat): ParsedReportData {
+  let result: ParsedReportData;
+  
   switch (format) {
     case 'mews_space_status':
-      return parseMewsReport(text);
+      result = parseMewsReport(text);
+      break;
     case 'apaleo_housekeeping':
-      return parseApaleoReport(text);
+      result = parseApaleoReport(text);
+      break;
     case 'medialog_etat':
-      return parseMedialogReport(text);
+      result = parseMedialogReport(text);
+      break;
     default:
       return parseGenericReport(text);
   }
+  
+  // Fallback: si le parser spécifique retourne 0 lignes, utiliser le parser générique
+  if (result.rows.length === 0) {
+    console.warn(`⚠️ Le parser ${format} n'a retourné aucune chambre — fallback vers parser générique`);
+    return parseGenericReport(text);
+  }
+  
+  return result;
 }
 
 /**
@@ -777,10 +791,14 @@ function parseGenericReport(text: string): ParsedReportData {
   const rows: ParsedRow[] = [];
   
   // Pattern générique pour numéro de chambre — minimum 2 chiffres
-  const roomPattern = /^(\d{2,4}[A-Z]?)\b/;
+  // Supporte: début de ligne, après tab, ou dans une colonne
+  const roomPattern = /(?:^|\t)(\d{2,4}[A-Z]?)\b/;
+  
+  // Pattern pour détecter des chambres liées type "104 / 105"
+  const linkedRoomPattern = /(\d{2,4})\s*[\/\-]\s*(\d{2,4})/;
   
   // Context keywords that indicate a line is about a room
-  const ROOM_CONTEXT_KEYWORDS = /\b(départ|depart|parti|checkout|libéré|recouche|stayover|occupé|occ|ooo|out\s*of\s*order|hors\s*service|maintenance|libre|vacant|propre|clean|sale|dirty|arrivée|arrival|checkin|chambre|room|dbl|sgl|tpl|twn|suite|fam|dup)\b/i;
+  const ROOM_CONTEXT_KEYWORDS = /\b(départ|depart|parti|checkout|libéré|recouche|stayover|occupé|occ|ooo|out\s*of\s*order|hors\s*service|maintenance|libre|vacant|propre|clean|sale|dirty|arrivée|arrival|checkin|chambre|room|dbl|sgl|tpl|twn|suite|fam|dup|blanc|draps)\b/i;
   
   // Date pattern as context indicator
   const DATE_CONTEXT = /\d{2}[\/\.\-]\d{2}[\/\.\-]\d{4}/;
