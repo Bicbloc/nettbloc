@@ -81,30 +81,41 @@ serve(async (req) => {
     // ========== IMPROVED PROMPTS FOR COUNTING ==========
     
     // QUICK DETECT - Clear counting instructions
-    const quickDetectPrompt = `You are an expert at counting folded linen items in a stack/pile.
+    const quickDetectPrompt = `You are an expert at counting folded linen items (${linenType.name}) in stacks/piles.
 
-TASK: Count the number of ${linenType.name} items in this image.
+TASK: Count the EXACT number of individual ${linenType.name} items visible in this image.
 
-COUNTING METHOD:
-1. Look for a stack/pile of folded fabric
-2. Count the horizontal layers/folds visible from the side
-3. Each distinct horizontal layer = 1 item
-4. If items are ${avgThickness}cm thick each, estimate based on pile height
+STEP 1 - IDENTIFY PILE TYPE:
+- "stacked_flat": Items folded and stacked horizontally one on top of another (most common). Count visible layers from the side.
+- "stacked_vertical": Items standing upright side by side (like books on a shelf). Count each upright item.
+- "rolled": Items rolled into cylinders and grouped. Count each individual roll.
+- "loose": Items loosely placed/overlapping without clear stacking. Count each distinct item.
+- "single": Only one item visible.
+
+STEP 2 - COUNT PRECISELY:
+For stacked_flat: Look at the SIDE of the pile. Each horizontal separation line = boundary between 2 items. Count layers carefully. Each item ≈ ${avgThickness}cm thick.
+For stacked_vertical: Count each upright rectangle/fold visible from the front.
+For rolled: Count each cylindrical roll individually.
+For loose: Trace edges of each item to separate overlapping pieces.
+
+STEP 3 - ESTIMATE DIMENSIONS:
+Estimate the total width of the pile/items in centimeters.
 
 RESPOND WITH ONLY THIS JSON (no other text):
-{"pile":true,"count":NUMBER,"confidence":0.0-1.0,"width_cm":WIDTH_IN_CM,"position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}
+{"pile":true,"count":NUMBER,"confidence":0.0-1.0,"width_cm":WIDTH_IN_CM,"pile_type":"stacked_flat|stacked_vertical|rolled|loose|single","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}
 
-If NO pile visible:
-{"pile":false,"count":0,"confidence":0,"width_cm":0,"position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
+If NO linen pile visible:
+{"pile":false,"count":0,"confidence":0,"width_cm":0,"pile_type":"none","position":"center","bounds":{"x":0,"y":0,"w":0,"h":0}}`;
     
     // Detection mode
-    const detectPrompt = `Count folded linen items. Each layer = 1 item.
+    const detectPrompt = `Count linen items precisely. Identify arrangement: stacked_flat (horizontal layers), stacked_vertical (upright like books), rolled (cylinders), or loose (scattered).
+For stacked_flat: count side layers. For stacked_vertical: count upright items. For rolled: count rolls. Each item ≈ ${avgThickness}cm thick.
 Estimate width in cm. Common: sheets 200-240cm, towels 50-100cm, pillowcases 50cm.
-JSON only: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}`;
+JSON only: {"pile":true,"count":N,"confidence":0.X,"width_cm":N,"pile_type":"stacked_flat|stacked_vertical|rolled|loose","position":"center","bounds":{"x":0.1,"y":0.1,"w":0.8,"h":0.8}}`;
     
     // Live mode
-    const livePrompt = `Count ${linenType.name} items in the pile. Each horizontal fold/layer = 1 item.
-JSON only: {"count":N,"confidence":0.X}`;
+    const livePrompt = `Count ${linenType.name} items. Identify pile type: stacked_flat (horizontal layers), stacked_vertical (upright), rolled, or loose. Count accordingly. Each item ≈ ${avgThickness}cm thick.
+JSON only: {"count":N,"confidence":0.X,"pile_type":"stacked_flat|stacked_vertical|rolled|loose"}`;
     
     // RULER MODE
     const rulerPrompt = `Count ${linenType.name} using ruler measurement. Each item ≈ ${avgThickness}cm thick.
@@ -113,8 +124,9 @@ JSON only: {"count":N,"confidence":0.9,"ruler_detected":true,"pile_height_cm":N,
 
     // VALIDATION mode
     let fullPrompt = `Expert linen counting for ${linenType.name}.
-Count horizontal layers/folds. Each layer = 1 item (${avgThickness}cm thick).
-Be precise. JSON only: {"count":N,"confidence":0.X,"notes":"description"}`;
+First identify arrangement: stacked_flat (horizontal layers viewed from side), stacked_vertical (upright like books), rolled (cylinders), or loose (scattered).
+For stacked_flat: count each visible horizontal layer separation from the side. For stacked_vertical: count each upright item. For rolled: count each roll. Each item ≈ ${avgThickness}cm thick.
+Be precise. JSON only: {"count":N,"confidence":0.X,"pile_type":"type","notes":"description"}`;
 
     // Get training samples + corrections for improved accuracy (not in quick/live mode)
     if (!liveMode && !quickDetect) {
@@ -280,10 +292,16 @@ Be precise. JSON only: {"count":N,"confidence":0.X,"notes":"description"}`;
         response.type_match = result.type_match !== undefined ? result.type_match : true;
         response.dimensions = result.dimensions || { width_cm: result.width_cm || null, height_cm: null };
         response.pile_detected = result.pile_detected ?? result.pile ?? false;
+        response.pile_type = result.pile_type || 'stacked_flat';
         
         // Pile position and bounds for UI display
         response.pile_position = result.position || 'center';
         response.pile_bounds = result.bounds || null;
+      }
+      
+      // Always include pile_type if available
+      if (result.pile_type) {
+        response.pile_type = result.pile_type;
       }
 
       return new Response(
