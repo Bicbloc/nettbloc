@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import BackButton from '@/components/BackButton';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
-import { PASSWORD_RESET_URL } from '@/constants/appUrl';
+import { PASSWORD_RESET_URL, APP_ORIGIN } from '@/constants/appUrl';
 
 export default function GovernessAuth() {
   const [email, setEmail] = useState('');
@@ -244,7 +244,7 @@ export default function GovernessAuth() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/governess/auth`,
+          emailRedirectTo: `${APP_ORIGIN}/governess/auth`,
           data: { name }
         }
       });

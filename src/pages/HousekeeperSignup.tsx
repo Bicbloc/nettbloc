@@ -9,6 +9,7 @@ import { UserPlus, Mail, Lock, User, ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import BackButton from '@/components/BackButton';
 import { validateEmailForUserType, getInterfaceUrl } from '@/services/userTypeValidationService';
+import { APP_ORIGIN } from '@/constants/appUrl';
 
 export default function HousekeeperSignup() {
   const [name, setName] = useState('');
@@ -75,7 +76,7 @@ export default function HousekeeperSignup() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/housekeeper/hotels`,
+          emailRedirectTo: `${APP_ORIGIN}/housekeeper/hotels`,
           data: {
             name: name,
             user_type: 'housekeeper'

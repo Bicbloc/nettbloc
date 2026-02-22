@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { APP_ORIGIN } from '@/constants/appUrl';
 import { useAuth } from './AuthContext';
 
 interface HousekeeperProfile {
@@ -229,7 +230,7 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   };
 
   const signUp = async (email: string, password: string, name: string, phone?: string) => {
-    const redirectUrl = `${window.location.origin}/housekeeper/login`;
+    const redirectUrl = `${APP_ORIGIN}/housekeeper/login`;
     
     const { data, error } = await supabase.auth.signUp({
       email,
