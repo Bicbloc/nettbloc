@@ -24,47 +24,26 @@ const LAST_CLEAN_KEY = 'nettobloc_last_clean';
  * NON-BLOCKING: does not touch auth tokens, AuthContext handles that
  */
 export const AppBoot = ({ children }: { children: React.ReactNode }) => {
-  const [isReady, setIsReady] = useState(false);
-
   useEffect(() => {
-    // Exécuter le nettoyage de manière non-bloquante
-    const cleanup = () => {
-      try {
-        const currentBuildId = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
-        const storedBuildId = localStorage.getItem(BUILD_ID_KEY);
+    try {
+      const currentBuildId = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
+      const storedBuildId = localStorage.getItem(BUILD_ID_KEY);
 
-        // If build ID changed (new deployment)
-        if (storedBuildId && storedBuildId !== currentBuildId) {
-          console.log('🧹 AppBoot: New build, cleaning cache...');
-          VOLATILE_KEYS.forEach(key => {
-            try {
-              localStorage.removeItem(key);
-            } catch {
-              // Ignore
-            }
-          });
-          storageService.cleanupLegacyKeys();
-          localStorage.setItem(LAST_CLEAN_KEY, new Date().toISOString());
-        }
-
-        localStorage.setItem(BUILD_ID_KEY, currentBuildId);
+      if (storedBuildId && storedBuildId !== currentBuildId) {
+        console.log('🧹 AppBoot: New build, cleaning cache...');
+        VOLATILE_KEYS.forEach(key => {
+          try { localStorage.removeItem(key); } catch { /* ignore */ }
+        });
         storageService.cleanupLegacyKeys();
-      } catch (error) {
-        console.error('❌ AppBoot error:', error);
+        localStorage.setItem(LAST_CLEAN_KEY, new Date().toISOString());
       }
-    };
 
-    // Exécuter le nettoyage en arrière-plan
-    cleanup();
-    
-    // Rendre immédiatement sans bloquer
-    setIsReady(true);
+      localStorage.setItem(BUILD_ID_KEY, currentBuildId);
+      storageService.cleanupLegacyKeys();
+    } catch (error) {
+      console.error('❌ AppBoot error:', error);
+    }
   }, []);
-
-  // Rendre immédiatement pour éviter tout blocage
-  if (!isReady) {
-    return null;
-  }
 
   return <>{children}</>;
 };
