@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Package, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { APP_ORIGIN } from '@/constants/appUrl';
 import { useToast } from "@/hooks/use-toast";
 
 // Google reCAPTCHA Site Key - Production key should be stored as secret
@@ -150,7 +151,7 @@ export default function NettoCountAuth() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/netto-count/setup`,
+          emailRedirectTo: `${APP_ORIGIN}/netto-count/setup`,
           data: {
             full_name: fullName,
             app_type: "netto_count",

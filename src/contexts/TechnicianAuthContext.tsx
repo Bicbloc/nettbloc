@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { APP_ORIGIN } from '@/constants/appUrl';
 import { useToast } from '@/hooks/use-toast';
 import { storageService } from '@/services/storageService';
 
@@ -169,7 +170,7 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
   const signUp = async (email: string, password: string, name: string, phone?: string) => {
     try {
-      const redirectUrl = `${window.location.origin}/technician/login`;
+      const redirectUrl = `${APP_ORIGIN}/technician/login`;
       
       // The profile is created automatically via database trigger (handle_technician_signup)
       // when role='technician' is set in user metadata
