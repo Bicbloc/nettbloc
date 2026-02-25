@@ -242,84 +242,84 @@ const Auth = () => {
             <button
               type="button"
               onClick={() => navigate('/auth/establishment')}
-              className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
+              className="w-full p-4 sm:p-5 rounded-xl border-2 border-emerald-200 bg-card hover:bg-emerald-50 hover:border-emerald-400 transition-all text-left group active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
                     <Building className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium">{language === 'en' ? 'Establishment' : 'Établissement'}</p>
+                    <p className="font-semibold">{language === 'en' ? 'Establishment' : 'Établissement'}</p>
                     <p className="text-xs text-muted-foreground">
                       {language === 'en' ? 'Manager, supervisor' : 'Gérant, responsable'}
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <ArrowRight className="h-4 w-4 text-emerald-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
 
             <button
               type="button"
               onClick={() => navigate('/housekeeper/auth')}
-              className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
+              className="w-full p-4 sm:p-5 rounded-xl border-2 border-violet-200 bg-card hover:bg-violet-50 hover:border-violet-400 transition-all text-left group active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-secondary/50 text-secondary-foreground">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md">
                     <Users className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium">{language === 'en' ? 'Team' : 'Équipe'}</p>
+                    <p className="font-semibold">{language === 'en' ? 'Team' : 'Équipe'}</p>
                     <p className="text-xs text-muted-foreground">
                       {language === 'en' ? 'Housekeeper' : 'Femme/valet de chambre'}
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <ArrowRight className="h-4 w-4 text-violet-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
 
             <button
               type="button"
               onClick={() => navigate('/governess/auth')}
-              className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
+              className="w-full p-4 sm:p-5 rounded-xl border-2 border-amber-200 bg-card hover:bg-amber-50 hover:border-amber-400 transition-all text-left group active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md">
                     <Crown className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium">{language === 'en' ? 'Governess' : 'Gouvernante'}</p>
+                    <p className="font-semibold">{language === 'en' ? 'Governess' : 'Gouvernante'}</p>
                     <p className="text-xs text-muted-foreground">
                       {language === 'en' ? 'Inspection & incidents' : 'Inspection & incidents'}
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <ArrowRight className="h-4 w-4 text-amber-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
 
             <button
               type="button"
               onClick={() => navigate('/technician/login')}
-              className="w-full p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-left group"
+              className="w-full p-4 sm:p-5 rounded-xl border-2 border-blue-200 bg-card hover:bg-blue-50 hover:border-blue-400 transition-all text-left group active:scale-[0.98]"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md">
                     <Wrench className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-medium">{language === 'en' ? 'Technician' : 'Technicien'}</p>
+                    <p className="font-semibold">{language === 'en' ? 'Technician' : 'Technicien'}</p>
                     <p className="text-xs text-muted-foreground">
                       {language === 'en' ? 'Maintenance & incidents' : 'Maintenance & incidents'}
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <ArrowRight className="h-4 w-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
           </div>

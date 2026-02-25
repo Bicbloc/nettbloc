@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Loader2, ArrowLeft } from 'lucide-react';
+import { Wrench, Loader2, ArrowLeft, User, Mail, Phone, Lock } from 'lucide-react';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 
 export default function TechnicianSignup() {
@@ -108,7 +108,7 @@ export default function TechnicianSignup() {
         <CardContent>
           <form onSubmit={handleSignup} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nom complet *</Label>
+              <Label htmlFor="name" className="flex items-center gap-2 font-medium"><User className="h-4 w-4 text-blue-600" />Nom complet *</Label>
               <Input
                 id="name"
                 placeholder="Jean Dupont"
@@ -120,7 +120,7 @@ export default function TechnicianSignup() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email" className="flex items-center gap-2 font-medium"><Mail className="h-4 w-4 text-blue-600" />Email *</Label>
               <Input
                 id="email"
                 type="email"
@@ -133,7 +133,7 @@ export default function TechnicianSignup() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Téléphone (optionnel)</Label>
+              <Label htmlFor="phone" className="flex items-center gap-2 font-medium"><Phone className="h-4 w-4 text-blue-600" />Téléphone (optionnel)</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -145,7 +145,7 @@ export default function TechnicianSignup() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe *</Label>
+              <Label htmlFor="password" className="flex items-center gap-2 font-medium"><Lock className="h-4 w-4 text-blue-600" />Mot de passe *</Label>
               <Input
                 id="password"
                 type="password"
@@ -158,7 +158,7 @@ export default function TechnicianSignup() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
+              <Label htmlFor="confirmPassword" className="flex items-center gap-2 font-medium"><Lock className="h-4 w-4 text-blue-600" />Confirmer le mot de passe *</Label>
               <Input
                 id="confirmPassword"
                 type="password"
