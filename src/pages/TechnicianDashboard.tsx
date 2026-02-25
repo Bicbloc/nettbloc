@@ -11,6 +11,7 @@ import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { TechnicianAccessRequest } from '@/components/TechnicianAccessRequest';
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
+import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 
 function TechnicianDashboardContent() {
   const navigate = useNavigate();
@@ -122,6 +123,9 @@ function TechnicianDashboardContent() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Consignes du jour */}
+        <DailyInstructionsBanner hotelId={currentHotelSession.hotel_id} />
 
         {/* Tâches du jour */}
         <StaffTasksList

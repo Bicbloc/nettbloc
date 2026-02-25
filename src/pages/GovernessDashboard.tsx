@@ -40,6 +40,7 @@ import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
 import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 // Gouvernantes use localStorage auth, not Supabase Auth - no UserTypeGuard needed
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
+import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 
 interface GovernessProfile {
   id: string;
@@ -504,6 +505,11 @@ function GovernessDashboardContent() {
                 </div>
               </Card>
             </div>
+
+            {/* Consignes du jour */}
+            {selectedHotel && (
+              <DailyInstructionsBanner hotelId={selectedHotel.id} />
+            )}
 
             {/* Tâches du jour */}
             {selectedHotel && (
