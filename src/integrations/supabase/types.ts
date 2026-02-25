@@ -2179,6 +2179,7 @@ export type Database = {
           content: string
           created_at: string
           created_by: string | null
+          day_of_week: number | null
           hotel_id: string
           id: string
           is_default: boolean | null
@@ -2190,6 +2191,7 @@ export type Database = {
           content: string
           created_at?: string
           created_by?: string | null
+          day_of_week?: number | null
           hotel_id: string
           id?: string
           is_default?: boolean | null
@@ -2201,6 +2203,7 @@ export type Database = {
           content?: string
           created_at?: string
           created_by?: string | null
+          day_of_week?: number | null
           hotel_id?: string
           id?: string
           is_default?: boolean | null

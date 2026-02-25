@@ -1,0 +1,2 @@
+ALTER TABLE public.instruction_templates ADD COLUMN IF NOT EXISTS day_of_week integer DEFAULT NULL;
+COMMENT ON COLUMN public.instruction_templates.day_of_week IS '0=Sunday, 1=Monday, ..., 6=Saturday. NULL means any day.';

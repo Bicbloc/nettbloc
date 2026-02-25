@@ -46,6 +46,9 @@ const InstructionsTabContent: React.FC<{ hotelId: string }> = ({ hotelId }) => {
   useEffect(() => {
     const loadInstructions = async () => {
       const today = new Date().toISOString().split('T')[0];
+      const currentDay = new Date().getDay();
+      
+      // 1. Try today's manual instructions
       const { data, error } = await supabase
         .from('daily_instructions')
         .select('instructions, to_know, todo_list')
@@ -53,9 +56,40 @@ const InstructionsTabContent: React.FC<{ hotelId: string }> = ({ hotelId }) => {
         .eq('instruction_date', today)
         .maybeSingle();
       
-      if (!error) {
+      if (!error && data && (data.instructions || data.to_know || data.todo_list)) {
         setInstructions(data);
+        setIsLoading(false);
+        return;
       }
+
+      // 2. Fallback to day-of-week or default templates
+      const { data: templates } = await supabase
+        .from('instruction_templates')
+        .select('*')
+        .eq('hotel_id', hotelId);
+
+      if (templates && templates.length > 0) {
+        const findBest = (type: string) => {
+          const dayT = templates.find((t: any) => t.template_type === type && t.day_of_week === currentDay);
+          if (dayT) return dayT.content;
+          const defT = templates.find((t: any) => t.template_type === type && t.is_default);
+          return defT?.content || null;
+        };
+
+        const fallback = {
+          instructions: findBest('instructions'),
+          to_know: findBest('to_know'),
+          todo_list: findBest('todo'),
+        };
+
+        if (fallback.instructions || fallback.to_know || fallback.todo_list) {
+          setInstructions(fallback);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      setInstructions(null);
       setIsLoading(false);
     };
     loadInstructions();
