@@ -1135,6 +1135,7 @@ export type Database = {
           room_number: string
           room_type: string | null
           source: string | null
+          space_category: string | null
           updated_at: string | null
           zone: string | null
         }
@@ -1153,6 +1154,7 @@ export type Database = {
           room_number: string
           room_type?: string | null
           source?: string | null
+          space_category?: string | null
           updated_at?: string | null
           zone?: string | null
         }
@@ -1171,6 +1173,7 @@ export type Database = {
           room_number?: string
           room_type?: string | null
           source?: string | null
+          space_category?: string | null
           updated_at?: string | null
           zone?: string | null
         }
