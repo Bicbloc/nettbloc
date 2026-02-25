@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { APP_ORIGIN } from '@/constants/appUrl';
 import { useToast } from '@/hooks/use-toast';
 import { storageService } from '@/services/storageService';
+import { validateEmailForUserType } from '@/services/userTypeValidationService';
 
 interface TechnicianProfile {
   id: string;
@@ -170,6 +171,12 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
   const signUp = async (email: string, password: string, name: string, phone?: string) => {
     try {
+      // Validate cross-role email exclusivity
+      const validation = await validateEmailForUserType(email, 'technician');
+      if (!validation.isValid) {
+        return { error: new Error(validation.error || "Email déjà utilisé pour un autre rôle") };
+      }
+
       const redirectUrl = `${APP_ORIGIN}/technician/login`;
       
       // The profile is created automatically via database trigger (handle_technician_signup)

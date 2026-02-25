@@ -12,6 +12,7 @@ import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
+import { validateEmailForUserType } from '@/services/userTypeValidationService';
 
 type AuthMode = 'select' | 'hotel-signin' | 'hotel-signup' | 'housekeeper-signin' | 'housekeeper-signup' | 'reset-password' | 'new-password';
 
@@ -126,6 +127,11 @@ const Auth = () => {
         case 'hotel-signup': {
           if (!formData.companyName.trim()) throw new Error(language === 'en' ? "Establishment name required" : "Nom de l'établissement requis");
           if (formData.password !== formData.confirmPassword) throw new Error(t.auth.passwordMismatch);
+          
+          // Cross-role email validation
+          const estValidation = await validateEmailForUserType(formData.email, 'establishment');
+          if (!estValidation.isValid) throw new Error(estValidation.error || "Email déjà utilisé");
+          
           const { error, needsEmailVerification } = await signUp(
             formData.email,
             formData.password,
@@ -160,6 +166,11 @@ const Auth = () => {
           if (!formData.name.trim()) throw new Error(language === 'en' ? "Name required" : "Nom requis");
           if (formData.password !== formData.confirmPassword) throw new Error(t.auth.passwordMismatch);
           if (formData.password.length < 6) throw new Error(t.auth.passwordTooShort);
+          
+          // Cross-role email validation
+          const hkValidation = await validateEmailForUserType(formData.email, 'housekeeper');
+          if (!hkValidation.isValid) throw new Error(hkValidation.error || "Email déjà utilisé");
+          
           const { error } = await housekeeperSignUp(formData.email, formData.password, formData.name);
           if (error) throw error;
           toast({ 
