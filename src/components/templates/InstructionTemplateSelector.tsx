@@ -40,6 +40,7 @@ interface Template {
   template_type: string;
   content: string;
   is_default: boolean;
+  day_of_week: number | null;
 }
 
 export function InstructionTemplateSelector({
@@ -88,16 +89,25 @@ export function InstructionTemplateSelector({
     },
   });
 
-  // Load default templates on mount
+  // Load day-of-week or default templates on mount
   useEffect(() => {
     if (templates && templates.length > 0 && !instructions && !toKnow && !todoList) {
-      const defaultInstruction = templates.find(t => t.template_type === 'instructions' && t.is_default);
-      const defaultToKnow = templates.find(t => t.template_type === 'to_know' && t.is_default);
-      const defaultTodo = templates.find(t => t.template_type === 'todo' && t.is_default);
+      const currentDay = new Date().getDay();
+      
+      // Priority: day-of-week template > default template
+      const findBestTemplate = (type: string) => {
+        const dayTemplate = templates.find(t => t.template_type === type && t.day_of_week === currentDay);
+        if (dayTemplate) return dayTemplate;
+        return templates.find(t => t.template_type === type && t.is_default);
+      };
 
-      if (defaultInstruction) onInstructionsChange(defaultInstruction.content);
-      if (defaultToKnow) onToKnowChange(defaultToKnow.content);
-      if (defaultTodo) onTodoListChange(defaultTodo.content);
+      const bestInstruction = findBestTemplate('instructions');
+      const bestToKnow = findBestTemplate('to_know');
+      const bestTodo = findBestTemplate('todo');
+
+      if (bestInstruction) onInstructionsChange(bestInstruction.content);
+      if (bestToKnow) onToKnowChange(bestToKnow.content);
+      if (bestTodo) onTodoListChange(bestTodo.content);
     }
   }, [templates]);
 
@@ -125,6 +135,10 @@ export function InstructionTemplateSelector({
     }
   };
 
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number | null>(null);
+
+  const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
   const saveAsTemplate = async (type: string, content: string) => {
     if (!newTemplateName.trim() || !content.trim()) {
       toast({ variant: "destructive", title: "Erreur", description: "Nom et contenu requis" });
@@ -141,12 +155,14 @@ export function InstructionTemplateSelector({
           template_type: type,
           content: content,
           is_default: false,
+          day_of_week: selectedDayOfWeek,
         });
 
       if (error) throw error;
 
       toast({ title: "Template sauvegardé" });
       setNewTemplateName("");
+      setSelectedDayOfWeek(null);
       refetch();
     } catch (error) {
       console.error(error);
@@ -359,27 +375,42 @@ export function InstructionTemplateSelector({
                   {/* Save current as template */}
                   {currentContent && (
                     <Card className="p-3 bg-primary/5">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          placeholder="Nom du template..."
-                          value={newTemplateName}
-                          onChange={(e) => setNewTemplateName(e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button 
-                          size="sm" 
-                          onClick={() => saveAsTemplate(type, currentContent)}
-                          disabled={savingType === type}
-                        >
-                          {savingType === type ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 mr-1" />
-                              Sauvegarder
-                            </>
-                          )}
-                        </Button>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Nom du template..."
+                            value={newTemplateName}
+                            onChange={(e) => setNewTemplateName(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button 
+                            size="sm" 
+                            onClick={() => saveAsTemplate(type, currentContent)}
+                            disabled={savingType === type}
+                          >
+                            {savingType === type ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Save className="h-4 w-4 mr-1" />
+                                Sauvegarder
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-muted-foreground whitespace-nowrap">Jour :</Label>
+                          <select
+                            className="text-xs border rounded px-2 py-1 bg-background"
+                            value={selectedDayOfWeek ?? ''}
+                            onChange={(e) => setSelectedDayOfWeek(e.target.value === '' ? null : Number(e.target.value))}
+                          >
+                            <option value="">Tous les jours</option>
+                            {dayNames.map((day, i) => (
+                              <option key={i} value={i}>{day}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </Card>
                   )}
@@ -401,12 +432,17 @@ export function InstructionTemplateSelector({
                           <Card key={template.id} className="p-3">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-medium">{template.name}</span>
                                   {template.is_default && (
                                     <Badge variant="secondary" className="text-xs">
                                       <Star className="h-3 w-3 mr-1" />
                                       Défaut
+                                    </Badge>
+                                  )}
+                                  {template.day_of_week !== null && template.day_of_week !== undefined && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {dayNames[template.day_of_week]}
                                     </Badge>
                                   )}
                                 </div>
