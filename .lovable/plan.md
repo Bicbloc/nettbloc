@@ -1,54 +1,77 @@
 
 
-## Analyse des flux d'inscription par type d'utilisateur
+## Plan: Corrections d'inscription et refonte UX des pages d'authentification
 
-### Problemes identifies
+### Etat actuel des corrections d'inscription
 
-**1. Technician Signup: pas de validation d'email cross-role**
-- `TechnicianSignup.tsx` utilise `useTechnicianAuth().signUp()` qui appelle directement `supabase.auth.signUp` SANS appeler `validateEmailForUserType()`.
-- Consequence: un email deja utilise comme etablissement/gouvernante/femme de chambre peut etre reutilise pour un compte technicien, creant un conflit.
+Les corrections techniques suivantes sont deja en place :
+- Validation cross-role dans TechnicianAuthContext.tsx (deja appliquee)
+- Validation cross-role dans HousekeeperAuthContext.tsx (deja appliquee)
+- Validation cross-role dans Auth.tsx pour hotel-signup et housekeeper-signup (deja appliquee)
+- ID auth lie au profil governess dans GovernessAuth.tsx (deja appliquee)
 
-**2. Technician Signup: pas de creation de profil explicite**
-- Le code commente dit "profile is created automatically via database trigger (handle_technician_signup)" mais il faut verifier que ce trigger existe et fonctionne. Si le trigger ne cree pas le profil, le technicien se connectera mais `loadTechnicianProfile` ne trouvera rien.
+Aucune correction d'inscription supplementaire n'est necessaire.
 
-**3. Governess Signup: creation profil sans lier l'ID auth**
-- Dans `GovernessAuth.tsx` ligne 255-261, le profil est insere avec `email` et `name` mais SANS `id: authData.user.id`. Cela signifie que le profil governess n'est pas lie a l'utilisateur auth, ce qui peut causer des problemes de correspondance.
+### Refonte UX des pages d'authentification
 
-**4. HousekeeperAuthContext depend de AuthContext**
-- `HousekeeperAuthContext.tsx` ligne 67: `const { user, session, loading: authLoading } = useAuth();`
-- Cela signifie que `HousekeeperAuthProvider` DOIT etre imbrique dans `AuthProvider`. C'est le cas dans `App.tsx` (ligne 69 est dans ligne 67), donc pas de probleme structurel ici.
+#### Problemes identifies
 
-**5. Technician Signup: pas de validation email dans le contexte**
-- `TechnicianAuthContext.tsx` signUp (ligne 171-193) ne valide pas l'email avec `validateEmailForUserType` avant l'inscription.
+1. **HousekeeperSignup.tsx** : Design basique (fond violet uni, card simple sans glassmorphism, pas de decorations). Manque les elements visuels presents sur les autres pages (blur effects, backdrop-blur, shadow-2xl, border-0).
 
-**6. Conflit potentiel: Auth.tsx contient aussi un flow housekeeper signup**
-- `Auth.tsx` a un mode `housekeeper-signup` (ligne 159-170) qui utilise `housekeeperSignUp` de `HousekeeperAuthContext`, en parallele de `HousekeeperSignup.tsx` qui fait sa propre inscription. Deux chemins differents pour la meme action.
+2. **Auth.tsx (page de selection)** : Design minimaliste mais correct. Pourrait etre ameliore avec des couleurs de role plus marquees et un meilleur feedback visuel sur mobile.
 
-### Plan de corrections
+3. **Incoherence de responsive** : Certaines pages utilisent `max-w-md`, d'autres `max-w-sm`. Les tailles d'input varient entre `h-11` et `h-12`.
 
-#### A. Ajouter la validation cross-role au signup Technician
-- Fichier: `src/contexts/TechnicianAuthContext.tsx`
-- Dans la methode `signUp` (ligne 171), ajouter un appel a `validateEmailForUserType(email, 'technician')` AVANT `supabase.auth.signUp`.
-- Si la validation echoue, retourner l'erreur.
+#### Fichiers a modifier
 
-#### B. Corriger la creation du profil Governess
-- Fichier: `src/pages/GovernessAuth.tsx`
-- Ligne 255-261: Ajouter `id: data.user?.id` lors de l'insertion dans `governess_profiles` pour lier le profil a l'utilisateur auth (comme c'est fait pour housekeeper dans `HousekeeperSignup.tsx` ligne 96).
+**1. `src/pages/HousekeeperSignup.tsx`** - Refonte complete du design
+- Ajouter le fond gradient violet/purple/indigo coherent avec HousekeeperAuth
+- Ajouter les elements decoratifs (blur circles)
+- Appliquer le glassmorphism sur la card (bg-white/95 backdrop-blur-sm shadow-2xl border-0)
+- Header externe avec icone dans un cercle glassmorphique
+- Inputs h-12 avec bg-muted/50
+- Bouton gradient from-violet-600 to-purple-600
+- Texte d'aide pour le mot de passe
+- Responsiveness: padding adaptatif, tailles de texte adaptees
 
-#### C. Verifier/ajouter la validation cross-role dans HousekeeperAuthContext.signUp
-- Fichier: `src/contexts/HousekeeperAuthContext.tsx`
-- Verifier que le `signUp` de ce contexte (utilise par `Auth.tsx` mode housekeeper-signup) inclut bien `validateEmailForUserType`.
+**2. `src/pages/TechnicianSignup.tsx`** - Ajustements mineurs
+- Ajouter un header externe au-dessus de la card (comme Governess et Housekeeper)
+- Harmoniser la structure avec icone + titre + sous-titre en blanc au-dessus de la card
+- Ajouter des icones aux labels (Mail, Lock, User, Phone)
 
-#### D. Ajouter la validation cross-role dans Auth.tsx flow hotel-signup
-- Le flow `hotel-signup` dans `Auth.tsx` (ligne 129-151) utilise `signUp` de `AuthContext` qui ne fait PAS de validation cross-role. Il faut ajouter `validateEmailForUserType(email, 'establishment')` avant l'appel.
+**3. `src/pages/TechnicianLogin.tsx`** - Ajustements mineurs
+- Ajouter un header externe au-dessus de la card (comme les autres pages)
+- Harmoniser avec la meme structure
+
+**4. `src/pages/Auth.tsx` (page de selection)** - Ameliorations mobile
+- Ajouter des badges de couleur plus forts sur chaque option de role
+- Ameliorer le spacing et padding pour smartphone
+- Ajouter une animation subtile d'entree
+
+**5. `src/pages/EstablishmentAuth.tsx`** - Ajustements mineurs
+- Harmoniser les tailles d'input (h-12 partout)
+- Ajouter des icones Mail et Lock aux labels
 
 ### Details techniques
 
-Fichiers a modifier:
-1. `src/contexts/TechnicianAuthContext.tsx` - Ajouter import + appel `validateEmailForUserType`
-2. `src/pages/GovernessAuth.tsx` - Ajouter `id: data.user?.id` a l'insert governess_profiles
-3. `src/pages/Auth.tsx` - Ajouter validation cross-role pour les modes hotel-signup et housekeeper-signup
-4. Verifier `src/contexts/HousekeeperAuthContext.tsx` signUp pour la validation
+Conventions de design par role :
+```text
+Etablissement : emerald/teal/cyan
+Femme de chambre : violet/purple/indigo  
+Gouvernante : amber/orange/red
+Technicien : blue/indigo/slate
+```
+
+Pattern commun a appliquer :
+```text
+1. Fond: bg-gradient-to-br from-{color1} via-{color2} to-{color3}
+2. Decorations: 3 cercles blur (top-right, bottom-left, center)
+3. Header externe: icone dans cercle glassmorphique + titre blanc + sous-titre blanc/80
+4. Card: bg-white/95 backdrop-blur-sm shadow-2xl border-0
+5. Inputs: h-12 text-base
+6. Bouton: gradient matching, h-12, shadow-lg
+7. Back button: top-left, bg-white/20 ou bg-white/90
+```
 
 Aucune modification de base de donnees requise.
 
