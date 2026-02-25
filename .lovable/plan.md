@@ -1,94 +1,54 @@
 
 
-# Correction du parsing generique pour rapports tabulaires
+## Analyse des flux d'inscription par type d'utilisateur
 
-## Probleme identifie
+### Problemes identifies
 
-Le texte extrait du PDF MisterBooking est en format tabulaire (colonnes separees par des tabulations). Exemple d'une ligne extraite:
+**1. Technician Signup: pas de validation d'email cross-role**
+- `TechnicianSignup.tsx` utilise `useTechnicianAuth().signUp()` qui appelle directement `supabase.auth.signUp` SANS appeler `validateEmailForUserType()`.
+- Consequence: un email deja utilise comme etablissement/gouvernante/femme de chambre peut etre reutilise pour un compte technicien, creant un conflit.
 
-```
-101\t2\tX\t\tnon\tPropre\t\t16/02/2026\t20/02/2026
-```
+**2. Technician Signup: pas de creation de profil explicite**
+- Le code commente dit "profile is created automatically via database trigger (handle_technician_signup)" mais il faut verifier que ce trigger existe et fonctionne. Si le trigger ne cree pas le profil, le technicien se connectera mais `loadTechnicianProfile` ne trouvera rien.
 
-Le parser generique actuel traite chaque ligne avec un simple regex `(?:^|\t)(\d{2,4}[A-Z]?)\b` qui matche N'IMPORTE QUEL nombre de 2+ chiffres sur la ligne, y compris:
-- "16" et "17" provenant de dates "16/02/2026"
-- "15" provenant de la colonne "Nb pers" ou de dates
-- "13", "14" qui sont aussi des fragments de dates
+**3. Governess Signup: creation profil sans lier l'ID auth**
+- Dans `GovernessAuth.tsx` ligne 255-261, le profil est insere avec `email` et `name` mais SANS `id: authData.user.id`. Cela signifie que le profil governess n'est pas lie a l'utilisateur auth, ce qui peut causer des problemes de correspondance.
 
-De plus, certaines chambres comme 203 sont manquees a cause d'un mauvais decoupage de ligne dans l'extraction PDF (colonnes decalees).
+**4. HousekeeperAuthContext depend de AuthContext**
+- `HousekeeperAuthContext.tsx` ligne 67: `const { user, session, loading: authLoading } = useAuth();`
+- Cela signifie que `HousekeeperAuthProvider` DOIT etre imbrique dans `AuthProvider`. C'est le cas dans `App.tsx` (ligne 69 est dans ligne 67), donc pas de probleme structurel ici.
 
-## Solution en 3 etapes
+**5. Technician Signup: pas de validation email dans le contexte**
+- `TechnicianAuthContext.tsx` signUp (ligne 171-193) ne valide pas l'email avec `validateEmailForUserType` avant l'inscription.
 
-### Etape 1 -- Detection intelligente de l'en-tete du tableau
+**6. Conflit potentiel: Auth.tsx contient aussi un flow housekeeper signup**
+- `Auth.tsx` a un mode `housekeeper-signup` (ligne 159-170) qui utilise `housekeeperSignUp` de `HousekeeperAuthContext`, en parallele de `HousekeeperSignup.tsx` qui fait sa propre inscription. Deux chemins differents pour la meme action.
 
-Avant de parser les lignes, le parser generique doit detecter la ligne d'en-tete du tableau (ex: `Chambre\tNb pers\tRECOUCHE\tBLANC\tDayuse\tAssignee...`). En identifiant quelle colonne (index) contient "Chambre" ou "Room", on sait exactement OU chercher le numero de chambre au lieu de prendre le premier nombre venu.
+### Plan de corrections
 
-Concretement, dans `parseGenericReport()`:
-- Chercher une ligne contenant des mots-cles d'en-tete: "chambre", "room", "zimmer", "nb pers", "statut", "etat"
-- Si trouvee: identifier l'index de la colonne "chambre" et ne prendre le numero QUE dans cette colonne
-- Si pas trouvee: fallback sur le comportement actuel (premier nombre de la ligne)
+#### A. Ajouter la validation cross-role au signup Technician
+- Fichier: `src/contexts/TechnicianAuthContext.tsx`
+- Dans la methode `signUp` (ligne 171), ajouter un appel a `validateEmailForUserType(email, 'technician')` AVANT `supabase.auth.signUp`.
+- Si la validation echoue, retourner l'erreur.
 
-### Etape 2 -- Filtrage contextuel des faux positifs
+#### B. Corriger la creation du profil Governess
+- Fichier: `src/pages/GovernessAuth.tsx`
+- Ligne 255-261: Ajouter `id: data.user?.id` lors de l'insertion dans `governess_profiles` pour lier le profil a l'utilisateur auth (comme c'est fait pour housekeeper dans `HousekeeperSignup.tsx` ligne 96).
 
-Ajouter des regles anti-faux-positifs plus intelligentes:
-- Si un nombre de 2 chiffres (10-31) apparait juste avant un pattern de date (`/\d{2}\/\d{4}/`), c'est un jour et non une chambre -- le rejeter
-- Coherence d'etage: si la majorite des chambres detectees ont 3 chiffres (101-606), rejeter les nombres a 2 chiffres qui n'ont pas de statut associe
-- Dedoublonnage: si le meme numero apparait plusieurs fois (ex: 104, 204, 303, 403, 503), ne garder que la premiere occurrence avec le meilleur contexte
+#### C. Verifier/ajouter la validation cross-role dans HousekeeperAuthContext.signUp
+- Fichier: `src/contexts/HousekeeperAuthContext.tsx`
+- Verifier que le `signUp` de ce contexte (utilise par `Auth.tsx` mode housekeeper-signup) inclut bien `validateEmailForUserType`.
 
-### Etape 3 -- Fallback pour l'entrainement
+#### D. Ajouter la validation cross-role dans Auth.tsx flow hotel-signup
+- Le flow `hotel-signup` dans `Auth.tsx` (ligne 129-151) utilise `signUp` de `AuthContext` qui ne fait PAS de validation cross-role. Il faut ajouter `validateEmailForUserType(email, 'establishment')` avant l'appel.
 
-Dans `TrainingStep1bColumnMapping.tsx`, si `analysis.parsedData.rows.length === 0`, re-parser le texte brut en mode "split par lignes" sans aucun filtre, et laisser l'utilisateur mapper manuellement les colonnes. Cela garantit que l'ecran d'entrainement n'est JAMAIS vide.
+### Details techniques
 
-## Details techniques
+Fichiers a modifier:
+1. `src/contexts/TechnicianAuthContext.tsx` - Ajouter import + appel `validateEmailForUserType`
+2. `src/pages/GovernessAuth.tsx` - Ajouter `id: data.user?.id` a l'insert governess_profiles
+3. `src/pages/Auth.tsx` - Ajouter validation cross-role pour les modes hotel-signup et housekeeper-signup
+4. Verifier `src/contexts/HousekeeperAuthContext.tsx` signUp pour la validation
 
-### Fichiers modifies
-
-1. **`src/services/training/ReportFormatDetector.ts`** -- dans `parseGenericReport()`:
-   - Ajouter une phase de detection d'en-tete tabulaire avant la boucle de parsing
-   - Quand un en-tete est detecte, extraire le numero de chambre uniquement depuis la colonne identifiee
-   - Ajouter un filtre "date context": rejeter les nombres qui font partie d'un pattern de date
-   - Ajouter un filtre "coherence d'etage": si >70% des chambres ont 3 chiffres, rejeter les 2 chiffres sans contexte fort
-   - Dedoublonner les chambres en gardant l'entree avec le meilleur `confidence`
-
-2. **`src/services/pdfService.ts`** -- dans le filtre post-extraction:
-   - Ajouter la meme logique de coherence d'etage (si majorite 3 chiffres, rejeter les 2 chiffres suspects)
-
-3. **`src/components/training/TrainingStep1bColumnMapping.tsx`** -- dans le `useMemo`:
-   - Si 0 lignes detectees: parser le texte brut ligne par ligne en mode "raw split" pour afficher QUELQUE CHOSE
-   - Afficher un avertissement invitant l'utilisateur a mapper manuellement les colonnes
-
-### Logique de detection d'en-tete
-
-```text
-parseGenericReport(text):
-  1. Chercher une ligne qui contient >= 3 mots-cles d'en-tete
-     (chambre, room, nb pers, statut, etat, date, client, type, assignee)
-  2. SI trouvee:
-     a. Splitter la ligne par tabulations
-     b. Trouver l'index de la colonne "chambre/room"
-     c. Pour chaque ligne suivante: splitter par tabs, prendre la valeur a cet index
-     d. Verifier que c'est un nombre de 2-4 chiffres
-  3. SINON: utiliser le comportement actuel (regex sur toute la ligne)
-  4. Appliquer les filtres anti-faux-positifs
-  5. Dedoublonner par numero de chambre
-```
-
-### Logique de coherence d'etage
-
-```text
-Apres le premier passage de detection:
-  1. Compter les chambres par longueur de numero (2 chiffres vs 3 chiffres)
-  2. Si > 70% ont 3 chiffres:
-     -> Rejeter les chambres a 2 chiffres SAUF si elles ont un statut explicite
-        (Libre, Recouche, Depart, etc.)
-```
-
-### Impact attendu
-
-- Les nombres 15, 16, 17, 13, 14 seront rejetes car:
-  - Ils sont dans une colonne "date" ou "Nb pers" (si en-tete detecte)
-  - Ils echouent au filtre de coherence d'etage (majorite de chambres a 3 chiffres)
-- La chambre 203 sera correctement detectee car elle est dans la colonne "Chambre"
-- Les chambres liees (104/105, 204/205, etc.) seront traitees comme des entrees valides
-- L'entrainement affichera TOUJOURS des donnees, meme si le parser automatique echoue
+Aucune modification de base de donnees requise.
 
