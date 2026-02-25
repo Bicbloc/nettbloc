@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { APP_ORIGIN } from '@/constants/appUrl';
 import { useAuth } from './AuthContext';
+import { validateEmailForUserType } from '@/services/userTypeValidationService';
 
 interface HousekeeperProfile {
   id: string;
@@ -230,6 +231,12 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   };
 
   const signUp = async (email: string, password: string, name: string, phone?: string) => {
+    // Cross-role email validation
+    const validation = await validateEmailForUserType(email, 'housekeeper');
+    if (!validation.isValid) {
+      return { error: new Error(validation.error || "Email déjà utilisé pour un autre rôle") };
+    }
+
     const redirectUrl = `${APP_ORIGIN}/housekeeper/login`;
     
     const { data, error } = await supabase.auth.signUp({

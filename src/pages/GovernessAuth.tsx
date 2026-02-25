@@ -251,10 +251,11 @@ export default function GovernessAuth() {
 
       if (error) throw error;
 
-      // Créer le profil gouvernante
+      // Créer le profil gouvernante avec l'ID auth pour le lier correctement
       const { error: profileError } = await supabase
         .from('governess_profiles')
         .insert({
+          id: data.user?.id,
           email,
           name,
           is_active: true
