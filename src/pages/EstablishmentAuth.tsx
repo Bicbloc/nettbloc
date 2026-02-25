@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Building, KeyRound, ArrowLeft } from 'lucide-react';
+import { Loader2, Building, KeyRound, ArrowLeft, Mail, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { validateEmailForUserType, validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
@@ -449,7 +449,7 @@ const EstablishmentAuth = () => {
                 <TabsContent value="signin" className="space-y-4">
                   <form onSubmit={handleSignIn} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="signin-email">Email</Label>
+                      <Label htmlFor="signin-email" className="flex items-center gap-2 font-medium"><Mail className="h-4 w-4 text-emerald-600" />Email</Label>
                       <Input
                         id="signin-email"
                         type="email"
@@ -461,7 +461,7 @@ const EstablishmentAuth = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="signin-password">Mot de passe</Label>
+                      <Label htmlFor="signin-password" className="flex items-center gap-2 font-medium"><Lock className="h-4 w-4 text-emerald-600" />Mot de passe</Label>
                       <Input
                         id="signin-password"
                         type="password"
@@ -495,7 +495,7 @@ const EstablishmentAuth = () => {
                 <TabsContent value="signup" className="space-y-4">
                   <form onSubmit={handleSignUp} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="signup-company">Nom de l'établissement</Label>
+                      <Label htmlFor="signup-company" className="flex items-center gap-2 font-medium"><Building className="h-4 w-4 text-emerald-600" />Nom de l'établissement</Label>
                       <Input
                         id="signup-company"
                         type="text"
@@ -507,7 +507,7 @@ const EstablishmentAuth = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
+                      <Label htmlFor="signup-email" className="flex items-center gap-2 font-medium"><Mail className="h-4 w-4 text-emerald-600" />Email</Label>
                       <Input
                         id="signup-email"
                         type="email"
@@ -519,7 +519,7 @@ const EstablishmentAuth = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="signup-password">Mot de passe</Label>
+                      <Label htmlFor="signup-password" className="flex items-center gap-2 font-medium"><Lock className="h-4 w-4 text-emerald-600" />Mot de passe</Label>
                       <Input
                         id="signup-password"
                         type="password"
@@ -532,7 +532,7 @@ const EstablishmentAuth = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="signup-confirm">Confirmer le mot de passe</Label>
+                      <Label htmlFor="signup-confirm" className="flex items-center gap-2 font-medium"><Lock className="h-4 w-4 text-emerald-600" />Confirmer le mot de passe</Label>
                       <Input
                         id="signup-confirm"
                         type="password"

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Loader2, KeyRound, Mail, ArrowLeft } from 'lucide-react';
+import { Wrench, Loader2, KeyRound, Mail, ArrowLeft, Lock } from 'lucide-react';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
@@ -313,7 +313,7 @@ export default function TechnicianLogin() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="flex items-center gap-2 font-medium"><Mail className="h-4 w-4 text-blue-600" />Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -326,7 +326,7 @@ export default function TechnicianLogin() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password" className="flex items-center gap-2 font-medium"><KeyRound className="h-4 w-4 text-blue-600" />Mot de passe</Label>
               <Input
                 id="password"
                 type="password"
