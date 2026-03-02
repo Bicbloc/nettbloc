@@ -453,10 +453,7 @@ const IndexDashboard = () => {
     };
 
     loadRoomsFromDatabase();
-    // Fallback de synchronisation: rafraîchir toutes les 5s (demande produit)
-    // NOTE: loadRoomsFromDatabase s'auto-bloque pendant import/assignation.
-    const interval = setInterval(loadRoomsFromDatabase, 5000);
-    return () => clearInterval(interval);
+    // Realtime sync handles updates — no polling needed
   }, [currentHotelId, isImporting, isAssigning, setRooms, setIsDistributed]);
 
   // handlePdfProcessed is now provided by usePdfWorkflow hook
@@ -584,7 +581,7 @@ const IndexDashboard = () => {
     try {
       if (reportAction === "single") {
         const housekeeperRooms = getHousekeeperRooms(reportHousekeeper);
-        await generateReport(reportHousekeeper, housekeeperRooms, cleaningConfig, customFields);
+        await generateReport(reportHousekeeper, housekeeperRooms, cleaningConfig, customFields, currentHotelId || undefined);
         toast({ title: "Rapport envoyé", description: `Rapport pour ${reportHousekeeper} créé.` });
       } else {
         const housekeepersWithRooms = housekeeperNames.filter(name => getHousekeeperRooms(name).length > 0);
@@ -595,7 +592,8 @@ const IndexDashboard = () => {
         await generateCombinedReport(
           housekeepersWithRooms.map(name => ({ name, rooms: getHousekeeperRooms(name) })), 
           cleaningConfig,
-          customFields
+          customFields,
+          currentHotelId || undefined
         );
         toast({ title: "Rapports créés", description: `${housekeepersWithRooms.length} rapports générés.` });
       }

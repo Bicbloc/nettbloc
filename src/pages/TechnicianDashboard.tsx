@@ -53,7 +53,7 @@ function TechnicianDashboardContent() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate('/technician/login')}
+            onClick={() => navigate('/technician/hotels')}
             className="flex items-center gap-2 mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -93,7 +93,7 @@ function TechnicianDashboardContent() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate('/technician/login')}
+          onClick={() => navigate('/technician/hotels')}
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />

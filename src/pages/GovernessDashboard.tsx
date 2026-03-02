@@ -102,8 +102,10 @@ function GovernessDashboardContent() {
     // Vérifier si un hôtel est déjà sélectionné
     const storedHotel = localStorage.getItem('governess_selected_hotel');
     if (storedHotel) {
-      const hotel = JSON.parse(storedHotel);
-      setSelectedHotel(hotel);
+      try {
+        const hotel = JSON.parse(storedHotel);
+        setSelectedHotel(hotel);
+      } catch { /* ignore */ }
     }
     
     loadHotels(parsedProfile.id);
@@ -134,7 +136,9 @@ function GovernessDashboardContent() {
         setHotels(uniqueHotels);
         
         if (uniqueHotels.length > 0 && !selectedHotel) {
-          setSelectedHotel(uniqueHotels[0]);
+          const h = uniqueHotels[0];
+          setSelectedHotel(h);
+          localStorage.setItem('governess_selected_hotel', JSON.stringify(h));
         }
       }
     } catch (error) {
@@ -534,7 +538,7 @@ function GovernessDashboardContent() {
                         key={hotel.id}
                         variant={selectedHotel?.id === hotel.id ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setSelectedHotel(hotel)}
+                        onClick={() => { setSelectedHotel(hotel); localStorage.setItem('governess_selected_hotel', JSON.stringify(hotel)); }}
                       >
                         {hotel.name}
                       </Button>
