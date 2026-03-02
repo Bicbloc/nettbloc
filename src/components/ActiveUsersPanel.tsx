@@ -227,9 +227,6 @@ export function ActiveUsersPanel() {
                         connection.isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
                       }`} />
                       <span className="font-medium">{connection.name}</span>
-                      <Badge variant={connection.isOnline ? 'default' : 'secondary'} className="text-xs">
-                        {connection.accessCode}
-                      </Badge>
                     </div>
                     <Badge variant="outline" className="text-xs">
                       <Bed className="h-3 w-3 mr-1" />
