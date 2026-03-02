@@ -234,7 +234,6 @@ export const HousekeeperTeamManager: React.FC<HousekeeperTeamManagerProps> = ({
                       )}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Code: {housekeeper.access_code}
                       {housekeeper.invited_email && (
                         <span className="ml-2">• {housekeeper.invited_email}</span>
                       )}

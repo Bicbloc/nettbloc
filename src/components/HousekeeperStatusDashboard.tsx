@@ -268,9 +268,6 @@ export const HousekeeperStatusDashboard: React.FC<HousekeeperStatusDashboardProp
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {housekeeper.email && <span>{housekeeper.email}</span>}
-                        {housekeeper.access_code && (
-                          <span className="ml-2">• Code: {housekeeper.access_code}</span>
-                        )}
                         {housekeeper.rooms_cleaned_today !== undefined && (
                           <span className="ml-2">• {housekeeper.rooms_cleaned_today} chambres aujourd'hui</span>
                         )}
