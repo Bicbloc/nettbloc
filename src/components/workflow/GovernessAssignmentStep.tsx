@@ -114,7 +114,28 @@ export function GovernessAssignmentStep({
         return;
       }
 
-      // Fallback: load the most recent instructions (last used template)
+      // Fallback: try day-of-week template first, then default template
+      const currentDay = new Date().getDay();
+      const { data: templates } = await supabase
+        .from("instruction_templates")
+        .select("*")
+        .eq("hotel_id", hotelId);
+
+      if (templates && templates.length > 0) {
+        // Priority: day-of-week template > default template > most recent instructions
+        const dayTemplate = templates.find((t: any) => t.day_of_week === currentDay);
+        const defaultTemplate = templates.find((t: any) => t.is_default === true);
+        const bestTemplate = dayTemplate || defaultTemplate;
+
+        if (bestTemplate) {
+          setInstructions((bestTemplate as any).instructions || "");
+          setToKnow((bestTemplate as any).to_know || "");
+          setTodoList((bestTemplate as any).todo_list || "");
+          return;
+        }
+      }
+
+      // Last fallback: most recent daily instructions
       const { data: lastData } = await supabase
         .from("daily_instructions")
         .select("*")

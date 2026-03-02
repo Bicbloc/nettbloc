@@ -79,13 +79,48 @@ export async function generateReport(
   housekeeper: string,
   rooms: Room[],
   config: CleaningConfig,
-  customFields?: CustomReportFields
+  customFields?: CustomReportFields,
+  hotelId?: string
 ): Promise<boolean> {
   try {
     // Get language and translations
     const lang = getCurrentReportLanguage();
     const t = getReportTranslations(lang);
     const locale = lang === 'en' ? 'en-US' : 'fr-FR';
+
+    // If customFields are empty/missing, try to load daily_instructions from DB
+    const hasInstructions = customFields?.instructions || customFields?.generalInstructions ||
+      (customFields?.toDoItems && customFields.toDoItems.some(i => i.trim())) ||
+      (customFields?.toKnowItems && customFields.toKnowItems.some(i => i.trim()));
+    
+    if (!hasInstructions && hotelId) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: dailyInstr } = await supabaseClient
+          .from('daily_instructions')
+          .select('*')
+          .eq('hotel_id', hotelId)
+          .eq('instruction_date', today)
+          .maybeSingle();
+
+        if (dailyInstr) {
+          if (!customFields) {
+            customFields = { toDoItems: [], toKnowItems: [] };
+          }
+          if (dailyInstr.instructions) {
+            customFields.generalInstructions = dailyInstr.instructions;
+          }
+          if (dailyInstr.to_know) {
+            customFields.toKnowItems = dailyInstr.to_know.split('\n').filter((l: string) => l.trim());
+          }
+          if (dailyInstr.todo_list) {
+            customFields.toDoItems = dailyInstr.todo_list.split('\n').filter((l: string) => l.trim());
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load daily instructions for PDF:', e);
+      }
+    }
     
     // Get today's date in localized format
     const today = new Date();
@@ -732,7 +767,8 @@ function generateRoomsTablesByFloor(data: ReportData): string {
 export async function generateCombinedReport(
   housekeeperRooms: { name: string; rooms: Room[] }[],
   config: CleaningConfig,
-  customFields?: CustomReportFields
+  customFields?: CustomReportFields,
+  hotelId?: string
 ): Promise<boolean> {
   try {
     // Get language and translations
@@ -750,6 +786,34 @@ export async function generateCombinedReport(
         variant: "destructive"
       });
       return false;
+    }
+
+    // Load daily instructions from DB if customFields are empty
+    const hasInstructions = customFields?.instructions || customFields?.generalInstructions ||
+      (customFields?.toDoItems && customFields.toDoItems.some(i => i.trim())) ||
+      (customFields?.toKnowItems && customFields.toKnowItems.some(i => i.trim()));
+    
+    if (!hasInstructions && hotelId) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: dailyInstr } = await supabaseClient
+          .from('daily_instructions')
+          .select('*')
+          .eq('hotel_id', hotelId)
+          .eq('instruction_date', today)
+          .maybeSingle();
+
+        if (dailyInstr) {
+          if (!customFields) {
+            customFields = { toDoItems: [], toKnowItems: [] };
+          }
+          if (dailyInstr.instructions) customFields.generalInstructions = dailyInstr.instructions;
+          if (dailyInstr.to_know) customFields.toKnowItems = dailyInstr.to_know.split('\n').filter((l: string) => l.trim());
+          if (dailyInstr.todo_list) customFields.toDoItems = dailyInstr.todo_list.split('\n').filter((l: string) => l.trim());
+        }
+      } catch (e) {
+        console.warn('Could not load daily instructions for combined PDF:', e);
+      }
     }
 
     // Create HTML sections for each housekeeper - one per page
