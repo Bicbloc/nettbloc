@@ -75,12 +75,20 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center animate-fade-in"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex flex-col justify-end sm:justify-center sm:items-center animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <Card className="w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[80vh] bg-background border shadow-xl animate-scale-in relative sm:m-4 rounded-b-none sm:rounded-b-lg">
+      {/* Zone cliquable pour fermer sur mobile */}
+      <div className="flex-1 sm:hidden" onClick={onClose} />
+      
+      <Card className="w-full sm:max-w-2xl h-[85vh] sm:h-auto sm:max-h-[80vh] bg-background border shadow-xl animate-scale-in relative sm:m-4 rounded-t-xl sm:rounded-lg rounded-b-none sm:rounded-b-lg flex flex-col">
+        {/* Poignée de fermeture mobile */}
+        <div className="sm:hidden flex justify-center pt-2 pb-1 cursor-pointer" onClick={onClose}>
+          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
+        </div>
+        
         {/* Bouton fermer visible en haut à droite */}
         <Button
           variant="ghost"
@@ -127,8 +135,8 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
           </div>
         </CardHeader>
         
-        <CardContent className="p-0">
-          <ScrollArea className="max-h-[calc(90vh-120px)] sm:max-h-[calc(80vh-120px)] w-full">
+        <CardContent className="p-0 flex-1 overflow-hidden flex flex-col min-h-0">
+          <ScrollArea className="flex-1 w-full">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-center p-4">
                 <BellOff className="h-8 w-8 text-muted-foreground mb-2" />
