@@ -34,90 +34,10 @@ interface ActivityLogEntry {
   type: 'info' | 'success' | 'warning' | 'error';
 }
 
-// Composant pour afficher les consignes du jour
+// Composant pour afficher les consignes du jour - réutilise DailyInstructionsBanner
 const InstructionsTabContent: React.FC<{ hotelId: string }> = ({ hotelId }) => {
-  const [instructions, setInstructions] = useState<{
-    instructions: string | null;
-    to_know: string | null;
-    todo_list: string | null;
-  } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadInstructions = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const currentDay = new Date().getDay();
-      
-      // 1. Try today's manual instructions
-      const { data, error } = await supabase
-        .from('daily_instructions')
-        .select('instructions, to_know, todo_list')
-        .eq('hotel_id', hotelId)
-        .eq('instruction_date', today)
-        .maybeSingle();
-      
-      if (!error && data && (data.instructions || data.to_know || data.todo_list)) {
-        setInstructions(data);
-        setIsLoading(false);
-        return;
-      }
-
-      // 2. Fallback to day-of-week or default templates
-      const { data: templates } = await supabase
-        .from('instruction_templates')
-        .select('*')
-        .eq('hotel_id', hotelId);
-
-      if (templates && templates.length > 0) {
-        const findBest = (type: string) => {
-          const dayT = templates.find((t: any) => t.template_type === type && t.day_of_week === currentDay);
-          if (dayT) return dayT.content;
-          const defT = templates.find((t: any) => t.template_type === type && t.is_default);
-          return defT?.content || null;
-        };
-
-        const fallback = {
-          instructions: findBest('instructions'),
-          to_know: findBest('to_know'),
-          todo_list: findBest('todo'),
-        };
-
-        if (fallback.instructions || fallback.to_know || fallback.todo_list) {
-          setInstructions(fallback);
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      setInstructions(null);
-      setIsLoading(false);
-    };
-    loadInstructions();
-  }, [hotelId]);
-
-  if (isLoading) {
-    return (
-      <Card className="p-8 text-center">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
-      </Card>
-    );
-  }
-
-  if (!instructions || (!instructions.instructions && !instructions.to_know && !instructions.todo_list)) {
-    return (
-      <Card className="p-8 text-center">
-        <ScrollText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h3 className="font-semibold text-lg mb-2">Aucune consigne</h3>
-        <p className="text-muted-foreground">
-          Pas de consignes pour aujourd'hui
-        </p>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* Header */}
       <Card className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-xl bg-amber-500 text-white">
@@ -131,45 +51,7 @@ const InstructionsTabContent: React.FC<{ hotelId: string }> = ({ hotelId }) => {
           </div>
         </div>
       </Card>
-
-      {/* Consignes */}
-      {instructions.instructions && (
-        <Card className="p-4 border-l-4 border-l-red-500">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
-            <div>
-              <h4 className="font-medium text-red-700 mb-2">⚠️ Consignes</h4>
-              <p className="text-sm whitespace-pre-wrap">{instructions.instructions}</p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* À savoir */}
-      {instructions.to_know && (
-        <Card className="p-4 border-l-4 border-l-blue-500">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
-            <div>
-              <h4 className="font-medium text-blue-700 mb-2">💡 À savoir</h4>
-              <p className="text-sm whitespace-pre-wrap">{instructions.to_know}</p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* To-do */}
-      {instructions.todo_list && (
-        <Card className="p-4 border-l-4 border-l-green-500">
-          <div className="flex items-start gap-3">
-            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
-            <div>
-              <h4 className="font-medium text-green-700 mb-2">✅ To-do du jour</h4>
-              <p className="text-sm whitespace-pre-wrap">{instructions.todo_list}</p>
-            </div>
-          </div>
-        </Card>
-      )}
+      <DailyInstructionsBanner hotelId={hotelId} />
     </div>
   );
 };

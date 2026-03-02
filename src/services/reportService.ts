@@ -34,6 +34,7 @@ export async function saveDailyReport(params: {
   roomData: any[];
   assignments: Record<string, any[]>;
   housekeeperNames: string[];
+  hotelId?: string;
 }) {
   try {
     const { data: userData } = await supabaseClient.auth.getUser();
@@ -43,9 +44,9 @@ export async function saveDailyReport(params: {
       return { success: false };
     }
 
-    const hotelId = typeof window !== 'undefined' ? localStorage.getItem('selectedHotelId') : null;
+    const hotelId = params.hotelId || (typeof window !== 'undefined' ? localStorage.getItem('selectedHotelId') : null);
     if (!hotelId) {
-      console.log("Skipping report archive: no selectedHotelId in localStorage");
+      console.log("Skipping report archive: no hotelId provided");
       return { success: false };
     }
 
@@ -211,6 +212,7 @@ export async function generateReport(
       roomData: sortedRooms,
       assignments: { [housekeeper]: sortedRooms },
       housekeeperNames: [housekeeper],
+      hotelId,
     });
     
     return true;
@@ -927,6 +929,7 @@ export async function generateCombinedReport(
       roomData: validHousekeepers.flatMap(h => h.rooms),
       assignments: Object.fromEntries(validHousekeepers.map(h => [h.name, h.rooms])),
       housekeeperNames: validHousekeepers.map(h => h.name),
+      hotelId,
     });
     
     return true;
