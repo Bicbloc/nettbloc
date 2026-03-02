@@ -75,12 +75,12 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 animate-fade-in"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <Card className="w-full max-w-2xl max-h-[80vh] bg-background border shadow-xl animate-scale-in relative">
+      <Card className="w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[80vh] bg-background border shadow-xl animate-scale-in relative sm:m-4 rounded-b-none sm:rounded-b-lg">
         {/* Bouton fermer visible en haut à droite */}
         <Button
           variant="ghost"
@@ -128,7 +128,7 @@ export const ActionLogPanel: React.FC<ActionLogPanelProps> = ({
         </CardHeader>
         
         <CardContent className="p-0">
-          <ScrollArea className="h-[500px] w-full">
+          <ScrollArea className="max-h-[calc(90vh-120px)] sm:max-h-[calc(80vh-120px)] w-full">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-center p-4">
                 <BellOff className="h-8 w-8 text-muted-foreground mb-2" />
