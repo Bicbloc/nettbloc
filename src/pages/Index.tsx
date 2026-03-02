@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useSearchParams, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useHotel } from "@/contexts/HotelContext";
@@ -120,15 +122,31 @@ const Index = () => {
 // Composant séparé pour éviter les problèmes de hooks
 const HotelLoadingScreen = () => {
   const { t } = useLanguage();
+  const [timedOut, setTimedOut] = useState(false);
   
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.warn('⚠️ Hotel loading timeout (8s), forcing refresh');
-      window.location.reload();
-    }, 8000);
+      console.warn('⚠️ Hotel loading timeout (10s)');
+      setTimedOut(true);
+    }, 10000);
     
     return () => clearTimeout(timeout);
   }, []);
+
+  if (timedOut) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
+        <div className="text-center space-y-4 max-w-sm mx-auto px-4">
+          <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
+          <p className="text-foreground font-medium">Impossible de charger l'établissement</p>
+          <p className="text-muted-foreground text-sm">Vérifiez votre connexion ou réessayez.</p>
+          <Button onClick={() => window.location.reload()} variant="outline" className="mt-2">
+            <RefreshCw className="h-4 w-4 mr-2" /> Réessayer
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">

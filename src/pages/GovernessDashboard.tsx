@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,6 +90,15 @@ function GovernessDashboardContent() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Realtime sync for live updates
+  useRealtimeSync({
+    hotelId: selectedHotel?.id,
+    tables: ['rooms', 'incidents', 'assignments', 'lost_and_found', 'room_inspections'],
+    onUpdate: useCallback(() => {
+      loadStats();
+    }, []),
+  });
+
   useEffect(() => {
     const storedProfile = localStorage.getItem('governess_profile');
     if (!storedProfile) {
@@ -118,6 +128,7 @@ function GovernessDashboardContent() {
         .from('governess_hotel_sessions')
         .select(`
           hotel_id,
+          is_active,
           hotels:hotel_id (
             id,
             name,
@@ -131,18 +142,46 @@ function GovernessDashboardContent() {
 
       if (sessions && sessions.length > 0) {
         const uniqueHotels = sessions
+          .filter(s => s.is_active)
           .map(s => s.hotels)
           .filter((h): h is Hotel => h !== null);
         setHotels(uniqueHotels);
         
-        if (uniqueHotels.length > 0 && !selectedHotel) {
+        // Validate currently selected hotel is still active
+        if (selectedHotel) {
+          const stillActive = uniqueHotels.some(h => h.id === selectedHotel.id);
+          if (!stillActive) {
+            toast({
+              title: "Session expirée",
+              description: "Votre accès à cet hôtel a été désactivé.",
+              variant: "destructive"
+            });
+            setSelectedHotel(uniqueHotels.length > 0 ? uniqueHotels[0] : null);
+            if (uniqueHotels.length > 0) {
+              localStorage.setItem('governess_selected_hotel', JSON.stringify(uniqueHotels[0]));
+            } else {
+              localStorage.removeItem('governess_selected_hotel');
+            }
+          }
+        } else if (uniqueHotels.length > 0) {
           const h = uniqueHotels[0];
           setSelectedHotel(h);
           localStorage.setItem('governess_selected_hotel', JSON.stringify(h));
         }
+      } else {
+        setHotels([]);
+        if (selectedHotel) {
+          setSelectedHotel(null);
+          localStorage.removeItem('governess_selected_hotel');
+        }
       }
     } catch (error) {
       console.error('Erreur chargement hôtels:', error);
+      toast({
+        title: "Erreur réseau",
+        description: "Impossible de charger vos hôtels. Vérifiez votre connexion.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
