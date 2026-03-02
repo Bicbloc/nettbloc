@@ -1,25 +1,20 @@
 
 
-# Correction de l'affichage des notifications
+# Supprimer l'affichage des codes d'acces dans la liste des femmes de chambre
 
 ## Probleme
-Le panneau de notifications s'affiche comme un overlay plein ecran (modal centree ou bottom sheet). L'utilisateur veut qu'il s'affiche comme un **dropdown/popover** qui descend directement sous le bouton de notification.
+Les codes d'acces (ex: HTL904-SAL-6645) sont affiches a cote de chaque nom de femme de chambre dans le panneau "Femmes de chambre" de la vue d'ensemble. L'utilisateur ne veut plus les voir.
 
-## Solution
-Transformer le `ActionLogPanel` d'un overlay modal en un **Popover** positionne sous le bouton cloche, en utilisant le composant `Popover` de Radix UI deja installe.
+## Modifications
 
-### Modifications
+### `src/components/ActiveUsersPanel.tsx`
+- **Ligne 230-232** : Supprimer le `Badge` qui affiche `{connection.accessCode}`
 
-**`src/components/NotificationBell.tsx`** :
-- Envelopper le bouton dans un `Popover` + `PopoverTrigger`
-- Remplacer `ActionLogPanel` par un `PopoverContent` contenant le contenu des notifications
-- Supprimer l'etat `isActionLogOpen` (gere par Popover)
+### `src/components/HousekeeperStatusDashboard.tsx`
+- **Lignes 271-273** : Supprimer l'affichage conditionnel du code d'acces (`Code: {housekeeper.access_code}`)
 
-**`src/components/ActionLogPanel.tsx`** :
-- Transformer en composant qui rend directement le contenu (sans overlay/modal)
-- Supprimer le `fixed inset-0`, le backdrop, la Card wrapper
-- Garder le ScrollArea avec une hauteur max (`max-h-[70vh]`)
-- Largeur fixe adaptee (`w-[380px]` sur desktop, pleine largeur sur mobile)
+### `src/components/HousekeeperTeamManager.tsx`
+- **Lignes 236-237** : Supprimer la ligne `Code: {housekeeper.access_code}`
 
-Le panneau apparaitra immediatement sous le bouton cloche, aligne a droite, comme un menu deroulant classique.
+Ces trois composants sont les seuls endroits ou les codes apparaissent dans des listes de personnel. Les codes restent en base de donnees et dans les pages dediees de gestion des codes d'acces.
 
