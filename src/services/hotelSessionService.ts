@@ -110,9 +110,7 @@ export class HotelSessionService {
 
         return existingSession.session_token;
       } else if (existingError) {
-          '⚠️ Vérification session existante échouée (non bloquant):',
-          existingError
-        );
+        // Session check failed (non-blocking)
       }
 
       // 4) Récupérer les assignations d'une session active (si existe) pour préserver l'état
