@@ -464,7 +464,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
   // Handler pour confirmer l'ajout des nouvelles chambres au registre
   const handleConfirmNewRooms = async (selectedRooms: any[]) => {
-    const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId') || localStorage.getItem('currentHotelId');
+    const effectiveHotelId = hotelId || storageService.getHotelId();
     
     if (effectiveHotelId && selectedRooms.length > 0) {
       try {
