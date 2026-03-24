@@ -46,7 +46,23 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
   const handleImportComplete = (data: TrainingData) => {
     setTrainingData(data);
+    
+    // Check if auto-detection is good enough to skip step 2
+    if (data.rawText) {
+      const result = universalParse(data.rawText);
+      if (result.confidence >= 90 && result.rows.length > 0) {
+        setCanSkipStep2(true);
+      } else {
+        setCanSkipStep2(false);
+      }
+    }
+    
     setCurrentStep(2);
+  };
+
+  const handleSkipToValidate = () => {
+    if (!trainingData) return;
+    setCurrentStep(3);
   };
 
   const handleMappingComplete = (updatedData: TrainingData, mappingConfig: MappingConfig) => {
