@@ -297,7 +297,7 @@ export async function generateAndUploadDailyReportPdf(
     const tasks = allTasks.map(t => ({
       title: t.title,
       description: t.description,
-      assigned_to_name: t.assigned_to_name,
+      assigned_to_name: t.assigned_user_name,
       is_completed: completedIds.has(t.id)
     }));
 
