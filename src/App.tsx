@@ -133,13 +133,14 @@ const App = () => (
                           </BrowserRouter>
                         </div>
                       </div>
-                    </TooltipProvider>
-                  </NotificationProvider>
-                </HousekeepingProvider>
-              </TechnicianAuthProvider>
-            </HousekeeperAuthProvider>
-          </HotelProvider>
-        </AuthProvider>
+                      </TooltipProvider>
+                    </NotificationProvider>
+                  </HousekeepingProvider>
+                </TechnicianAuthProvider>
+              </HousekeeperAuthProvider>
+            </HotelProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </QueryClientProvider>
     </LanguageProvider>
   </AppBoot>
