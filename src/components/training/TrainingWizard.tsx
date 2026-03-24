@@ -36,6 +36,7 @@ const DISPLAY_STEPS = [
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [trainingData, setTrainingData] = useState<TrainingData | null>(null);
+  const [canSkipStep2, setCanSkipStep2] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
