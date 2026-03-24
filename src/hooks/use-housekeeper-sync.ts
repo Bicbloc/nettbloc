@@ -3,6 +3,7 @@ import { SupabaseService } from '@/services/supabaseService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/storageService';
 
 interface SyncResult {
   success: boolean;
