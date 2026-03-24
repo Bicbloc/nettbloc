@@ -52,11 +52,7 @@ export class HotelSessionService {
       let effectiveHotelId = hotelId;
       
       if (!effectiveHotelId) {
-        // Essayer depuis localStorage
-        effectiveHotelId = localStorage.getItem('selectedHotelId') || 
-                          localStorage.getItem('currentHotelId') ||
-                          localStorage.getItem('hotelId') || null;
-        
+        effectiveHotelId = storageService.getHotelId();
         console.log('🔍 HotelId depuis localStorage:', effectiveHotelId);
       }
       
