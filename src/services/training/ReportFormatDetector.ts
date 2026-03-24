@@ -897,7 +897,7 @@ function applyFloorCoherenceFilter(rows: ParsedRow[]): ParsedRow[] {
 
   if (ratio < 0.7) return rows; // Not enough 3-digit rooms to apply filter
 
-  const EXPLICIT_STATUSES = /\b(libre|recouche|depart|départ|parti|checkout|stayover|occupé|occ|blanc|arrivée|arrival|clean|propre|sale|dirty|ooo|hors.service|maintenance)\b/i;
+  const EXPLICIT_STATUSES = /\b(libre|recouche|depart|départ|parti|checkout|stayover|occupé|occ|blanc|arrivée|arrival|clean|propre|sale|dirty|ooo|hors.service|maintenance|VD|OD|VC|OC|VR|DI|DIR|INS|PRO|SAL|sauber|schmutzig|limpio|sucio)\b/i;
 
   const filtered = rows.filter(r => {
     const digits = r.roomNumber.replace(/\D/g, '');
