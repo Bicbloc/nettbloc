@@ -9,6 +9,10 @@ import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi,
 import { IncidentReportWizard } from './incident/IncidentReportWizard';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
+import { HousekeeperHeader } from './housekeeper/HousekeeperHeader';
+import { HousekeeperActivityLog } from './housekeeper/HousekeeperActivityLog';
+import { HousekeeperStatsBar } from './housekeeper/HousekeeperStatsBar';
+import { HousekeeperTabNav } from './housekeeper/HousekeeperTabNav';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { storageService } from '@/services/storageService';
 import { LostItemReportWizard } from './lost-and-found/LostItemReportWizard';
@@ -34,27 +38,7 @@ interface ActivityLogEntry {
   type: 'info' | 'success' | 'warning' | 'error';
 }
 
-// Composant pour afficher les consignes du jour - réutilise DailyInstructionsBanner
-const InstructionsTabContent: React.FC<{ hotelId: string }> = ({ hotelId }) => {
-  return (
-    <div className="space-y-4">
-      <Card className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-amber-500 text-white">
-            <ScrollText className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg">Consignes du jour</h3>
-            <p className="text-sm text-muted-foreground">
-              Instructions, informations et tâches générales
-            </p>
-          </div>
-        </div>
-      </Card>
-      <DailyInstructionsBanner hotelId={hotelId} />
-    </div>
-  );
-};
+// InstructionsTabContent removed — uses DailyInstructionsBanner directly
 
 const HousekeeperWorkContent: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -946,87 +930,17 @@ const HousekeeperWorkContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Home className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h1 className="font-semibold text-lg">{hotel?.name || 'Mon Hôtel'}</h1>
-                <p className="text-sm text-muted-foreground">{housekeeperName}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Retour liste établissements */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/housekeeper/hotels')}
-                title="Changer d'établissement"
-                aria-label="Changer d'établissement"
-              >
-                <Building2 className="h-5 w-5" />
-              </Button>
+      <HousekeeperHeader
+        hotelName={hotel?.name || 'Mon Hôtel'}
+        housekeeperName={housekeeperName}
+        isConnected={isConnected}
+        newRoomsCount={newRoomsCount}
+        onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
+        onLogout={handleLogout}
+      />
 
-              {/* Indicateur connexion */}
-              <Badge variant={isConnected ? "default" : "destructive"} className="gap-1">
-                {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                {isConnected ? 'Connecté' : 'Hors ligne'}
-              </Badge>
-              
-              {/* Nouvelles chambres */}
-              {newRoomsCount > 0 && (
-                <Badge variant="secondary" className="animate-pulse bg-green-100 text-green-800">
-                  +{newRoomsCount} nouvelle(s)
-                </Badge>
-              )}
-              
-              <Button variant="ghost" size="icon" onClick={() => setShowActivityLog(!showActivityLog)}>
-                <ScrollText className="h-5 w-5" />
-              </Button>
-              
-              <Button variant="ghost" size="icon" onClick={handleLogout}>
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Journal d'activité */}
       {showActivityLog && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
-          <Card className="w-full max-w-md max-h-[60vh] overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between py-3">
-              <CardTitle className="text-lg">Journal d'activité</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowActivityLog(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="overflow-y-auto max-h-[calc(60vh-80px)]">
-              {activityLog.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">Aucune activité</p>
-              ) : (
-                <div className="space-y-2">
-                  {activityLog.map(entry => (
-                    <div key={entry.id} className="flex items-start gap-2 text-sm">
-                      <span className="text-muted-foreground whitespace-nowrap">{entry.time}</span>
-                      <span className={
-                        entry.type === 'success' ? 'text-green-600' :
-                        entry.type === 'warning' ? 'text-yellow-600' :
-                        entry.type === 'error' ? 'text-red-600' : ''
-                      }>{entry.message}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <HousekeeperActivityLog entries={activityLog} onClose={() => setShowActivityLog(false)} />
       )}
 
       <div className="container mx-auto px-4 py-4 space-y-4">
@@ -1043,173 +957,36 @@ const HousekeeperWorkContent: React.FC = () => {
           />
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <Card className="p-3 text-center">
-            <div className="text-2xl font-bold text-primary">{completedRooms}</div>
-            <div className="text-xs text-muted-foreground">Terminées</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <div className="text-2xl font-bold">{totalRooms - completedRooms}</div>
-            <div className="text-xs text-muted-foreground">Restantes</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <div className="text-2xl font-bold text-green-600">{progressPercent}%</div>
-            <div className="text-xs text-muted-foreground">Progression</div>
-          </Card>
-        </div>
+        <HousekeeperStatsBar
+          completedRooms={completedRooms}
+          totalRooms={totalRooms}
+          progressPercent={progressPercent}
+          startTime={startTime}
+          endTime={endTime}
+          rooms={rooms}
+          onStartPointage={handleStartPointage}
+          onEndPointage={handleEndPointage}
+          calculateWorkDuration={calculateWorkDuration}
+        />
 
-        {/* Barre de progression */}
-        <div className="w-full bg-gray-200 rounded-full h-3">
-          <div 
-            className="bg-gradient-to-r from-primary to-green-500 h-3 rounded-full transition-all duration-500"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-
-        {/* Pointage */}
-        <Card className="p-4">
-          <div className="space-y-3">
-            {/* Header avec boutons */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Pointage</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {!startTime && (
-                  <Button size="sm" onClick={handleStartPointage}>
-                    ▶️ Commencer
-                  </Button>
-                )}
-                {startTime && !endTime && (
-                  <Button size="sm" variant="secondary" onClick={handleEndPointage}>
-                    ⏹️ Terminer
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Horaires */}
-            {(startTime || endTime) && (
-              <div className="flex flex-wrap gap-2">
-                {startTime && (
-                  <Badge variant="outline" className="text-sm">
-                    🟢 Début: {startTime}
-                  </Badge>
-                )}
-                {endTime && (
-                  <Badge variant="outline" className="text-sm">
-                    🔴 Fin: {endTime}
-                  </Badge>
-                )}
-                {startTime && endTime && (
-                  <Badge variant="secondary" className="text-sm">
-                    ⏱️ {calculateWorkDuration(startTime, endTime)}
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            {/* Statistiques chambres nettoyées */}
-            {startTime && (
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t">
-                <div className="text-center p-2 bg-muted/50 rounded-lg">
-                  <div className="text-lg font-bold text-primary">
-                    {rooms.filter(r => r.status === 'clean').length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Total</div>
-                </div>
-                <div className="text-center p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                  <div className="text-lg font-bold text-blue-600">
-                    {rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'recouche' || r.cleaning_type === 'occupied')).length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Recouches</div>
-                </div>
-                <div className="text-center p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                  <div className="text-lg font-bold text-amber-600">
-                    {rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'depart' || r.cleaning_type === 'checkout' || r.cleaning_type === 'a_blanc')).length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Départs</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Tabs - 4 boutons en grille */}
-        <div className="grid grid-cols-4 gap-2">
-          <Button 
-            variant={activeTab === 'rooms' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('rooms')}
-            className="h-14 flex flex-col items-center justify-center gap-1 p-2"
-          >
-            <Home className="h-5 w-5" />
-            <span className="text-xs">Chambres</span>
-            {totalRooms > 0 && (
-              <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px]">
-                {totalRooms}
-              </Badge>
-            )}
-          </Button>
-          
-          <Button 
-            variant={activeTab === 'tasks' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('tasks')}
-            className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
-          >
-            <ClipboardList className="h-5 w-5" />
-            <span className="text-xs">Tâches</span>
-            {pendingTasksCount > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px] animate-pulse"
-              >
-                {pendingTasksCount}
-              </Badge>
-            )}
-          </Button>
-          
-          <Button 
-            variant={activeTab === 'instructions' ? 'default' : 'outline'}
-            onClick={() => {
-              setActiveTab('instructions');
-              // Marquer comme vu
-              if (hotelId) {
-                const today = new Date().toISOString().split('T')[0];
-                localStorage.setItem(`instructions_dismissed_${hotelId}_${today}`, 'true');
-                setHasNewInstructions(false);
-              }
-            }}
-            className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
-          >
-            <Info className="h-5 w-5" />
-            <span className="text-xs">Consignes</span>
-            {hasNewInstructions && (
-              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 animate-ping" />
-            )}
-            {hasNewInstructions && (
-              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500" />
-            )}
-          </Button>
-          
-          <Button 
-            variant={activeTab === 'inventory' ? 'default' : 'outline'}
-            onClick={() => {
-              setActiveTab('inventory');
-              if (!activeLinenTask) {
-                setActiveLinenTask(`temp_${Date.now()}`);
-              }
-            }}
-            className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
-          >
-            <Package className="h-5 w-5" />
-            <span className="text-xs">Inventaire</span>
-            <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1 text-[10px] bg-orange-500 text-white">
-              📷
-            </Badge>
-          </Button>
-        </div>
+        <HousekeeperTabNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          totalRooms={totalRooms}
+          pendingTasksCount={pendingTasksCount}
+          hasNewInstructions={hasNewInstructions}
+          hotelId={hotelId}
+          onInstructionsDismiss={() => {
+            if (hotelId) {
+              const today = new Date().toISOString().split('T')[0];
+              localStorage.setItem(`instructions_dismissed_${hotelId}_${today}`, 'true');
+              setHasNewInstructions(false);
+            }
+          }}
+          onInventoryOpen={() => {
+            if (!activeLinenTask) setActiveLinenTask(`temp_${Date.now()}`);
+          }}
+        />
 
         {/* Contenu selon l'onglet actif */}
         {activeTab === 'rooms' && (
@@ -1323,7 +1100,7 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'instructions' && hotelId && (
-          <InstructionsTabContent hotelId={hotelId} />
+          <DailyInstructionsBanner hotelId={hotelId} />
         )}
 
         {activeTab === 'inventory' && hotelId && (
