@@ -266,6 +266,41 @@ export async function generateAndUploadDailyReportPdf(
   try {
     console.log('📄 Génération du PDF de clôture...');
 
+    // Load daily instructions and tasks from DB
+    const [instructionsResult, tasksResult, completionsResult] = await Promise.all([
+      supabase
+        .from('daily_instructions')
+        .select('instructions, to_know, todo_list')
+        .eq('hotel_id', hotelId)
+        .eq('instruction_date', reportDate)
+        .maybeSingle(),
+      supabase
+        .from('task_templates')
+        .select('id, title, description, assigned_to_name, assigned_to_type, is_one_time, one_time_date, days_of_week')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true),
+      supabase
+        .from('task_completions')
+        .select('task_template_id')
+        .eq('completion_date', reportDate)
+    ]);
+
+    const dailyInstructions = instructionsResult.data || null;
+
+    // Filter tasks for today
+    const currentDayOfWeek = new Date(reportDate).getDay();
+    const allTasks = (tasksResult.data || []).filter(t => {
+      if (t.is_one_time) return t.one_time_date === reportDate;
+      return t.days_of_week?.includes(currentDayOfWeek);
+    });
+    const completedIds = new Set((completionsResult.data || []).map(c => c.task_template_id));
+    const tasks = allTasks.map(t => ({
+      title: t.title,
+      description: t.description,
+      assigned_to_name: t.assigned_to_name,
+      is_completed: completedIds.has(t.id)
+    }));
+
     // Build housekeeper data
     const housekeeperMap = new Map<string, HousekeeperReportData>();
     
@@ -314,7 +349,9 @@ export async function generateAndUploadDailyReportPdf(
         room_number: log.room_number,
         description: log.description,
         created_at: log.created_at
-      }))
+      })),
+      dailyInstructions,
+      tasks
     };
 
     // Generate HTML and convert to PDF
