@@ -42,7 +42,6 @@ import { useUserTypeGuard } from "@/hooks/use-user-type-guard";
 import { MainLayout, TabValue } from "@/components/layout";
 
 // Dashboard tab components — lazy loaded for code splitting
-import { lazy, Suspense } from "react";
 const OverviewTab = lazy(() => import("@/components/dashboard/OverviewTab").then(m => ({ default: m.OverviewTab })));
 const RoomManagementTab = lazy(() => import("@/components/dashboard/RoomManagementTab").then(m => ({ default: m.RoomManagementTab })));
 const AssignmentTab = lazy(() => import("@/components/dashboard/AssignmentTab").then(m => ({ default: m.AssignmentTab })));
