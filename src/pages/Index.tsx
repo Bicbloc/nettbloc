@@ -838,6 +838,7 @@ const IndexDashboard = () => {
             </PremiumLimitGuard>
           )}
         </div>
+        </Suspense>
       </MainLayout>
 
       {/* Dialogs */}
