@@ -371,11 +371,11 @@ function generateReportHTML(data: ReportData, t: ReportTranslations): string {
     
     tasksHtml = `
       <div class="tasks-section" style="margin-top:15px; page-break-inside:avoid;">
-        <h3>✅ ${lang === 'en' ? 'Assigned Tasks' : 'Tâches assignées'}</h3>
+        <h3>✅ Tâches assignées</h3>
         <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #000;">
           <tr>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${lang === 'en' ? 'Task' : 'Tâche'}</th>
-            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:center; width:80px;">${lang === 'en' ? 'Done' : 'Fait'}</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Tâche</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:center; width:80px;">Fait</th>
           </tr>
           ${taskRows}
         </table>
