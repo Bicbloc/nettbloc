@@ -120,7 +120,7 @@ export function useHousekeeperSync() {
 
   // Synchronisation basée sur les événements (plus de polling automatique)
   const checkForSyncNeeded = useCallback(async () => {
-    const selectedHotelId = localStorage.getItem('selectedHotelId');
+    const selectedHotelId = storageService.getHotelId();
     if (!selectedHotelId || housekeeperNames.length === 0) return false;
 
     try {

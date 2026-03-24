@@ -325,7 +325,7 @@ export class HotelSessionService {
   static async updateHousekeeperAssignments(assignments: Record<string, string>, hotelId?: string): Promise<boolean> {
     try {
       // Get hotel ID from parameter or localStorage
-      const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId');
+      const effectiveHotelId = hotelId || storageService.getHotelId();
       if (!effectiveHotelId) {
         console.error('No hotel ID found for updateHousekeeperAssignments');
         return false;

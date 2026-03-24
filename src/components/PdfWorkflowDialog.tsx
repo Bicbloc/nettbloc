@@ -512,7 +512,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
   const loadExistingHousekeepers = async (attempt = 1): Promise<boolean> => {
     // Validation et fallback du hotelId
-    const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId') || localStorage.getItem('currentHotelId');
+    const effectiveHotelId = hotelId || storageService.getHotelId();
     
     if (!effectiveHotelId) {
       console.error('❌ HotelId manquant pour charger les housekeepers');

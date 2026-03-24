@@ -92,7 +92,7 @@ export function ActiveUsersPanel() {
   const fetchActiveSessions = async () => {
     try {
       // Récupérer seulement les sessions de l'hôtel actuel
-      const hotelId = localStorage.getItem('selectedHotelId');
+      const hotelId = storageService.getHotelId();
       if (!hotelId) {
         setSessions([]);
         return;
