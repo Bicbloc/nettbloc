@@ -209,7 +209,8 @@ export async function generateReport(
       instructions: customFields?.instructions || '',
       generalInstructions: customFields?.generalInstructions || '',
       housekeeperInstructions: customFields?.housekeeperInstructions || {},
-      linenInventory: customFields?.linenInventory || []
+      linenInventory: customFields?.linenInventory || [],
+      assignedTasks
     };
     
     // Generate the HTML for the report
