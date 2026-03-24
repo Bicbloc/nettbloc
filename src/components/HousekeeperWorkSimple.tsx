@@ -38,27 +38,7 @@ interface ActivityLogEntry {
   type: 'info' | 'success' | 'warning' | 'error';
 }
 
-// Composant pour afficher les consignes du jour - réutilise DailyInstructionsBanner
-const InstructionsTabContent: React.FC<{ hotelId: string }> = ({ hotelId }) => {
-  return (
-    <div className="space-y-4">
-      <Card className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-amber-500 text-white">
-            <ScrollText className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg">Consignes du jour</h3>
-            <p className="text-sm text-muted-foreground">
-              Instructions, informations et tâches générales
-            </p>
-          </div>
-        </div>
-      </Card>
-      <DailyInstructionsBanner hotelId={hotelId} />
-    </div>
-  );
-};
+// InstructionsTabContent removed — uses DailyInstructionsBanner directly
 
 const HousekeeperWorkContent: React.FC = () => {
   const [searchParams] = useSearchParams();
