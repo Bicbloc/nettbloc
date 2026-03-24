@@ -930,56 +930,14 @@ const HousekeeperWorkContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Home className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h1 className="font-semibold text-lg">{hotel?.name || 'Mon Hôtel'}</h1>
-                <p className="text-sm text-muted-foreground">{housekeeperName}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Retour liste établissements */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/housekeeper/hotels')}
-                title="Changer d'établissement"
-                aria-label="Changer d'établissement"
-              >
-                <Building2 className="h-5 w-5" />
-              </Button>
-
-              {/* Indicateur connexion */}
-              <Badge variant={isConnected ? "default" : "destructive"} className="gap-1">
-                {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                {isConnected ? 'Connecté' : 'Hors ligne'}
-              </Badge>
-              
-              {/* Nouvelles chambres */}
-              {newRoomsCount > 0 && (
-                <Badge variant="secondary" className="animate-pulse bg-green-100 text-green-800">
-                  +{newRoomsCount} nouvelle(s)
-                </Badge>
-              )}
-              
-              <Button variant="ghost" size="icon" onClick={() => setShowActivityLog(!showActivityLog)}>
-                <ScrollText className="h-5 w-5" />
-              </Button>
-              
-              <Button variant="ghost" size="icon" onClick={handleLogout}>
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <HousekeeperHeader
+        hotelName={hotel?.name || 'Mon Hôtel'}
+        housekeeperName={housekeeperName}
+        isConnected={isConnected}
+        newRoomsCount={newRoomsCount}
+        onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
+        onLogout={handleLogout}
+      />
 
       {/* Journal d'activité */}
       {showActivityLog && (
