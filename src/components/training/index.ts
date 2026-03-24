@@ -1,8 +1,7 @@
 export { TrainingWizard } from "./TrainingWizard";
 export { TrainingStep1Import } from "./TrainingStep1Import";
 export { TrainingStep1bColumnMapping } from "./TrainingStep1bColumnMapping";
-export { TrainingStep2Annotate } from "./TrainingStep2Annotate";
-export { TrainingStep3Result } from "./TrainingStep3Result";
+export { TrainingStep3Validate } from "./TrainingStep3Validate";
 export { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 export { TrainingHistory, useExistingTraining } from "./TrainingHistory";
 export { LinePatternMapper } from "./LinePatternMapper";

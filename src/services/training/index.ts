@@ -4,3 +4,4 @@
 
 export * from './ReportFormatDetector';
 export * from './SmartReportParser';
+export * from './UniversalParser';
