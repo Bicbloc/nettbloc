@@ -89,11 +89,13 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non authentifié - veuillez vous reconnecter");
 
+
+      const taskData = {
         hotelId,
         assignedTo: selectedHousekeeper,
         assignedBy: user.id,
         taskDate
-      });
+      };
 
       const { data, error } = await supabase.from("linen_inventory_tasks").insert({
         hotel_id: hotelId,

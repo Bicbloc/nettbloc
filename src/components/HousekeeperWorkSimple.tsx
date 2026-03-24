@@ -641,10 +641,7 @@ const HousekeeperWorkContent: React.FC = () => {
       allPossibleIds = [...new Set(allPossibleIds.filter(Boolean))];
       allPossibleNames = [...new Set(allPossibleNames.filter(Boolean))];
       
-        ids: allPossibleIds, 
-        names: allPossibleNames 
-      });
-
+      
       // Construire le filtre OR pour inclure tous les IDs et noms possibles
       let orFilters: string[] = [];
       allPossibleIds.forEach(id => {

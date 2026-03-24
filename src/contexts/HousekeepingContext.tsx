@@ -81,9 +81,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         await refreshHousekeepers();
         
         setIsInitialized(true);
-          housekeepers: session.housekeeper_names?.length || 0,
-          hotelId: hotelId.slice(0, 8) + '...'
-        });
       }
     } catch (error) {
       console.error('Erreur chargement session:', error);
