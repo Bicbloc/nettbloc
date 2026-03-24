@@ -248,11 +248,7 @@ export class HotelSessionService {
       }
 
       // 2) Fallback robuste via hotel_id (utile après nettoyage cache / multi-onglets)
-      const hotelId =
-        storageService.getHotelId() ||
-        localStorage.getItem('selectedHotelId') ||
-        localStorage.getItem('currentHotelId') ||
-        localStorage.getItem('hotelId');
+      const hotelId = storageService.getHotelId();
 
       if (!hotelId) return null;
 
