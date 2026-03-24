@@ -1,96 +1,65 @@
 
 
-# Renforcement et simplification du systeme d'entrainement
+# Rendre l'entrainement plus rapide, concis et precis a 99%
 
 ## Problemes actuels
 
-1. **Format unique** : seul le PDF est accepte. Pas de copier-coller texte, pas de CSV/Excel.
-2. **Parsers rigides** : 4 parsers specifiques (Mews, Apaleo, Medialog, Opera) + 1 generique faible. Si le rapport ne correspond a aucun, le fallback "raw line split" est quasi inutile.
-3. **UX complexe** : 4 etapes + options avancees + drawer. L'etape 2 (ColumnMapping, 877 lignes) est dense et technique.
-4. **Generic parser trop faible** : il cherche des numeros de chambre par regex et des mots-cles statut en dur. Un rapport avec des termes non prevus (ex: "CHECK", "VR", "DI") ne sera pas compris.
-5. **Pas d'apprentissage interactif** : si 0 chambres detectees, l'utilisateur est bloque. Il ne peut pas "montrer" au systeme ce qu'est une chambre.
+1. **Etape 2 (ColumnMapping) = 877 lignes** : trop complexe avec tabs, drag-and-drop, config manuelle. L'utilisateur se perd.
+2. **UniversalParser sous-utilise** : il existe mais l'import passe encore par `pmsAdapterFactory.detectPms()` (ancien chemin). Le nouveau parser n'est jamais appele.
+3. **Double logique de detection** : `ReportFormatDetector.ts` (1254 lignes) + `UniversalParser.ts` (443 lignes) + adapters PMS specifiques. Trois chemins concurrents.
+4. **Precision faible sur formats inconnus** : le fallback generique rate souvent les statuts non standard.
 
-## Solution : mode hybride "Smart + Manuel"
+## Solution : pipeline unique "auto-magic"
 
-### Architecture simplifiee
+### Principe
+
+Au lieu de 3 etapes avec configuration manuelle, le systeme fait tout automatiquement a l'import. L'etape 2 devient un simple ecran de verification/correction rapide, pas une page de configuration.
 
 ```text
-Etape 1: IMPORTER           Etape 2: CONFIGURER          Etape 3: VALIDER & SAUVER
-┌─────────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐
-│ PDF / Coller texte  │ →  │ Preview tableau      │ →  │ Liste des chambres   │
-│ / CSV / Excel       │    │ Mapping colonnes     │    │ Type nettoyage       │
-│                     │    │ Mapping statuts      │    │ Sauvegarder          │
-│ Auto-detect format  │    │ (pre-rempli si connu)│    │                      │
-└─────────────────────┘    └──────────────────────┘    └──────────────────────┘
+AVANT: Import → Config complexe (877 ln) → Valider
+APRES: Import + Auto-detect → Verifier & corriger → Sauver
 ```
 
-3 etapes au lieu de 4. L'etape "Annotation" et "Sauvegarde" sont fusionnees.
+### Modifications
 
-### Modifications detaillees
+#### 1. `TrainingStep1Import.tsx` — Utiliser UniversalParser
 
-#### 1. `src/components/training/TrainingStep1Import.tsx` — Support multi-format
+- Remplacer `pmsAdapterFactory.detectPms()` par `universalParse()` du UniversalParser
+- Si UniversalParser detecte 0 chambres, fallback sur les adapters PMS specifiques
+- Passer les `rawLines` et `detectedColumns` dans `trainingData` pour l'etape 2
 
-- **Ajouter un champ textarea** "Coller le texte du rapport" en alternative au PDF
-- **Ajouter un input fichier CSV/TXT** en plus du PDF (accept=".pdf,.csv,.txt,.xls,.xlsx")
-- Pour CSV : parser avec `Papa Parse` (deja disponible ou ajoutable)
-- Pour texte colle : passer directement au detecteur
-- **Supprimer la selection PMS** : le systeme detecte automatiquement. Si aucun format reconnu, aller directement en mode "generique ameliore" sans demander a l'utilisateur quel PMS il utilise
-- UI simplifiee : une seule zone de drop/coller avec 3 options (PDF, fichier texte, coller)
+#### 2. `TrainingStep1bColumnMapping.tsx` — Reduire de 877 a ~250 lignes
 
-#### 2. `src/services/training/ReportFormatDetector.ts` — Parser generique renforce
+Remplacement complet par un composant simplifie :
+- **Vue unique** (plus de tabs) : tableau des lignes detectees avec colonnes auto-mappees
+- **Correction inline** : cliquer sur un statut inconnu pour le mapper (dropdown)
+- **Auto-save des mappings statut** dans `hotel_report_config` pour les futurs imports
+- Supprimer : drag-and-drop colonnes, onglets Preview/Statuts/Combinaisons, gestion d'ordre, mode avance
 
-- **Nouveau mode "table intelligente"** : au lieu de chercher des mots-cles specifiques, detecter la structure tabulaire par analyse de positions X (colonnes alignees). Si le texte a des colonnes regulieres, les identifier automatiquement.
-- **Dictionnaire de statuts extensible** : au lieu de patterns regex en dur, utiliser un dictionnaire charge depuis la DB (`hotel_report_config.status_mappings`). A la premiere utilisation, le systeme suggere des mappings, l'utilisateur corrige, et les corrections sont sauvees pour les prochains imports.
-- **Ajouter des patterns manquants** au parser generique :
-  - Opera : VD, OD, VC, OC, VR, DI
-  - Protel : patterns specifiques
-  - Patterns multilingues : Clean/Dirty/Inspected (EN), Sauber/Schmutzig (DE), Limpio/Sucio (ES)
-- **Supprimer la dependance aux parsers PMS specifiques pour l'entrainement** : tout passe par le detecteur generique renforce. Les parsers Mews/Apaleo restent pour l'import PDF automatique mais l'entrainement utilise un chemin unifie.
+#### 3. `UniversalParser.ts` — Renforcer la precision
 
-#### 3. `src/components/training/TrainingStep1bColumnMapping.tsx` — Simplification
+- **Ajouter des codes PMS manquants** : Fidelio (VD/VC/OD/OC), Clock (CI/CO/IH), Hogatex, StayNTouch
+- **Fuzzy matching** : si un mot est a 1 caractere d'un statut connu (ex: "DEPAR" → "DEPART"), le matcher
+- **Charger les mappings hotel** depuis `hotel_report_config.status_mappings` au parse-time pour appliquer les corrections precedentes automatiquement
+- **Detection de colonnes par position X** pour les PDFs (les espaces entre colonnes sont reguliers)
 
-- **Fusionner les tabs "Apercu" et "Statuts"** en une seule vue : tableau avec les donnees et les mappings en ligne
-- **Mode "enseigner"** : si aucune chambre detectee, afficher le texte brut ligne par ligne et permettre a l'utilisateur de cliquer sur un numero pour dire "c'est une chambre" et sur un mot pour dire "c'est le statut". Le systeme apprend le pattern.
-- **Reduire la complexite** : supprimer la gestion de l'ordre des colonnes par drag (peu utile), garder uniquement le mapping type de colonne + mapping statut → nettoyage
-- **Auto-save** : sauvegarder la config automatiquement a chaque modification au lieu du bouton manuel
+#### 4. `TrainingWizard.tsx` — Ajustement mineur
 
-#### 4. `src/components/training/TrainingWizard.tsx` — 3 etapes
+- Si l'auto-detection trouve >90% de chambres avec statut connu, proposer de sauter l'etape 2 et aller directement a l'etape 3 (bouton "Tout est correct → Sauver")
 
-- Passer de 4 a 3 etapes : Import → Configurer → Valider & Sauver
-- Fusionner `TrainingStep2Annotate` et `TrainingStep3Result` en un seul composant `TrainingStep3Validate`
-- Le nouveau composant affiche la liste des chambres detectees avec possibilite de corriger + bouton "Sauvegarder l'entrainement" en bas
-
-#### 5. Nouveau fichier `src/services/training/UniversalParser.ts`
-
-Parser universel qui remplace la logique fragmentee :
-- Detecte automatiquement le separateur (tab, espaces multiples, point-virgule, virgule)
-- Identifie la ligne d'en-tete par heuristique (mots-cles connus dans plusieurs langues)
-- Extrait les colonnes par position ou delimiteur
-- Applique les mappings statut → nettoyage depuis la config hotel (DB) ou les suggestions par defaut
-- Fallback : si rien ne marche, mode "ligne par ligne" ou l'utilisateur peut enseigner
-
-### Impact sur les fichiers existants
+### Fichiers modifies
 
 | Fichier | Action |
 |---------|--------|
-| `TrainingWizard.tsx` | Modifier : 3 etapes au lieu de 4 |
-| `TrainingStep1Import.tsx` | Modifier : ajouter textarea + CSV + supprimer selection PMS |
-| `TrainingStep1bColumnMapping.tsx` | Modifier : simplifier, fusionner tabs, ajouter mode "enseigner" |
-| `TrainingStep2Annotate.tsx` | Fusionner dans nouveau `TrainingStep3Validate.tsx` |
-| `TrainingStep3Result.tsx` | Fusionner dans nouveau `TrainingStep3Validate.tsx` |
-| `ReportFormatDetector.ts` | Modifier : renforcer parser generique, dictionnaire extensible |
-| `UniversalParser.ts` (nouveau) | Creer : parser unifie avec detection separateur/colonnes |
-| `training/index.ts` | Mettre a jour les exports |
+| `TrainingStep1Import.tsx` | Modifier : utiliser UniversalParser + passer rawLines |
+| `TrainingStep1bColumnMapping.tsx` | Recrire : vue simplifiee ~250 lignes |
+| `UniversalParser.ts` | Modifier : fuzzy match + load hotel mappings + codes manquants |
+| `TrainingWizard.tsx` | Modifier : skip etape 2 si auto-detect OK |
+| `TrainingData` (interface) | Ajouter `rawLines` et `detectedColumns` optionnels |
 
-### Ce qui ne change pas
+### Resultat attendu
 
-- La table `report_training_patterns` en DB (structure OK)
-- La table `hotel_report_config` en DB (utilisee pour les mappings)
-- L'historique des entrainements (`TrainingHistory.tsx`)
-- Les options avancees (`AdvancedSettingsDrawer.tsx`)
-- Les parsers PMS specifiques (restent pour l'import automatique hors entrainement)
-
-### Aucune migration SQL requise
-
-Les tables existantes suffisent.
+- **Vitesse** : import → sauvegarde en 2 clics si le format est reconnu
+- **Precision** : 99% grace au dictionnaire elargi + fuzzy match + mappings hotel accumules
+- **Simplicite** : l'etape 2 devient optionnelle, visible uniquement si correction necessaire
 
