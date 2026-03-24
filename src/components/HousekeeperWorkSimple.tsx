@@ -931,18 +931,7 @@ const HousekeeperWorkContent: React.FC = () => {
     return a.room_number.localeCompare(b.room_number, undefined, { numeric: true });
   });
   
-  // Auto-refresh every 5 seconds for real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (hotelId && !isRefreshing) {
-        console.log('🔄 Auto-refresh (5s interval)');
-        loadWorkData();
-        setLastRefreshTime(new Date());
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [hotelId, isRefreshing]);
+  // Realtime handles live updates — no polling needed
 
   if (isLoading) {
     return (

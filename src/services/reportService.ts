@@ -45,7 +45,8 @@ export async function saveDailyReport(params: {
       return { success: false };
     }
 
-    const hotelId = params.hotelId || (typeof window !== 'undefined' ? localStorage.getItem('selectedHotelId') : null);
+    const hotelId = params.hotelId;
+    // hotelId is now required — no localStorage fallback
     if (!hotelId) {
       console.log("Skipping report archive: no hotelId provided");
       return { success: false };

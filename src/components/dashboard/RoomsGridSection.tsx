@@ -31,17 +31,7 @@ export function RoomsGridSection({
   const [activeTab, setActiveTab] = useState<RoomFilterTab>('all');
   const queryClient = useQueryClient();
   
-  // Auto-refresh every 5 seconds for real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (hotelId) {
-        queryClient.invalidateQueries({ queryKey: ['room-incident-counts', hotelId] });
-        queryClient.invalidateQueries({ queryKey: ['rooms', hotelId] });
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [hotelId, queryClient]);
+  // Realtime handles live updates — no polling needed
 
   // Récupérer le nombre d'incidents actifs par chambre
   const { data: incidentCounts, refetch: refetchIncidents } = useQuery({
