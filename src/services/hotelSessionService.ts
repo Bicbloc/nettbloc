@@ -135,10 +135,6 @@ export class HotelSessionService {
         previousHousekeeperNames = Array.isArray(activeSession.housekeeper_names)
           ? (activeSession.housekeeper_names as string[])
           : [];
-          "✅ Assignations récupérées de l'ancienne session:",
-          Object.keys(previousAssignments).length,
-          'chambres'
-        );
       }
 
       // 5) Désactiver seulement les sessions actives de CET utilisateur pour cet hôtel

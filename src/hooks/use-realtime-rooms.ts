@@ -20,13 +20,14 @@ export function useRealtimeRooms({
 }: UseRealtimeRoomsProps): UseRealtimeRoomsReturn {
   
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
+    const updateInfo = {
       roomNumber: payload.new?.room_number,
       status: payload.new?.status,
       cleaning_type: payload.new?.cleaning_type,
       notes: payload.new?.notes,
       assignedTo: payload.new?.housekeeper_name,
       id: payload.new?.id
-    });
+    };
     
     const { eventType, new: newRecord, old: oldRecord } = payload;
     

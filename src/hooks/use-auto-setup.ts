@@ -192,11 +192,11 @@ export const useAutoSetup = () => {
         setLoading(false);
         return;
       }
-
+      const hotelInfo = {
         id: hotelResult.id,
         name: hotelResult.name,
         code: hotelResult.hotel_code
-      });
+      };
 
       // Sauvegarder dans le cache pour prochain chargement
       setHotel(hotelResult);

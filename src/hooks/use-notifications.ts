@@ -159,8 +159,6 @@ export const useNotifications = (hotelId?: string) => {
         if (retryCount < MAX_RETRIES) {
           retryCount++;
           const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-            `🔄 Retrying realtime connection in ${delay}ms (attempt ${retryCount}/${MAX_RETRIES})`
-          );
           retryTimeout = setTimeout(setupRealtime, delay);
         } else {
           // Fallback sur polling après tous les retries

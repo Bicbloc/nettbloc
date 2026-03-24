@@ -378,12 +378,7 @@ class RealtimeManager {
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        '❌ RealtimeManager: Abandon après',
-        this.maxReconnectAttempts,
-        'tentatives'
-      );
       this.notifyStatus('FAILED');
-      // Reset après 2 minutes pour permettre une nouvelle tentative
       setTimeout(() => {
         this.reconnectAttempts = 0;
         this.consecutiveFailures = 0;
@@ -391,12 +386,9 @@ class RealtimeManager {
       return;
     }
 
-    // Backoff réduit: 1s, 2s, 4s, 8s, max 15s pour reconnexion plus rapide
     const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 15000);
     this.reconnectAttempts++;
 
-      `🔄 RealtimeManager: Reconnexion dans ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-    );
     this.notifyStatus('RECONNECTING');
 
     this.reconnectTimeout = setTimeout(() => {
