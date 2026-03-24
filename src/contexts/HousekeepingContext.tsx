@@ -66,32 +66,8 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   }, [isHotelReady, hotelId]);
 
-  // Synchronisation temps réel simplifiée - hotelId vient de HotelContext
-  useEffect(() => {
-    if (!isInitialized || !hotelId) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const session = await HotelSessionService.getSession();
-        if (session) {
-          // Mettre à jour les données si elles ont changé
-          setHousekeeperNames(prev => {
-            const newNames = session.housekeeper_names || [];
-            return JSON.stringify(prev) !== JSON.stringify(newNames) ? newNames : prev;
-          });
-
-          // Rafraîchir les femmes de chambre moins fréquemment
-          if (Math.random() < 0.1) {
-            refreshHousekeepers();
-          }
-        }
-      } catch (error) {
-        console.error('⚠️ Erreur synchronisation:', error);
-      }
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [isInitialized, hotelId]);
+  // Synchronisation via Realtime — plus de polling
+  // Les subscriptions Realtime sur rooms et housekeepers gèrent les mises à jour
 
   // Charger les données de la session - simplifié car hotelId vient de HotelContext
   const loadSessionData = async () => {

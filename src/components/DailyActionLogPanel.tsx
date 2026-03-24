@@ -58,7 +58,7 @@ export const DailyActionLogPanel: React.FC<DailyActionLogPanelProps> = ({
       return (data || []) as ActionLog[];
     },
     enabled: isOpen && !!hotelId,
-    refetchInterval: 10000 // Actualiser toutes les 10 secondes
+    staleTime: 30000,
   });
 
   // Liste unique des utilisateurs pour le filtre
