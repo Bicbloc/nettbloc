@@ -13,8 +13,9 @@ export interface ReportData extends CustomReportFields {
   rooms: Room[];
   currentDate: string;
   config: CleaningConfig;
-  startTime?: string; // Heure de début (premier téléchargement)
+  startTime?: string;
   linenInventory?: LinenInventoryItem[];
+  assignedTasks?: Array<{ title: string; description?: string | null; is_completed: boolean }>;
 }
 
 // Store email in Supabase
