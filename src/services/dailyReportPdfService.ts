@@ -142,6 +142,56 @@ function generateReportHtml(data: DailyReportPdfData): string {
         </div>
       </div>
 
+      ${data.dailyInstructions && (data.dailyInstructions.instructions || data.dailyInstructions.to_know || data.dailyInstructions.todo_list) ? `
+        <div style="margin-top:30px; page-break-inside:avoid;">
+          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">📋 Consignes du jour</h2>
+          ${data.dailyInstructions.instructions ? `
+            <div style="background:#fffbeb; border:1px solid #fbbf24; border-radius:8px; padding:12px; margin:10px 0;">
+              <strong>Instructions :</strong><br/>${data.dailyInstructions.instructions.replace(/\n/g, '<br/>')}
+            </div>
+          ` : ''}
+          ${data.dailyInstructions.to_know ? `
+            <div style="background:#eff6ff; border:1px solid #3b82f6; border-radius:8px; padding:12px; margin:10px 0;">
+              <strong>À savoir :</strong>
+              <ul style="margin:5px 0;">${data.dailyInstructions.to_know.split('\n').filter((l: string) => l.trim()).map((l: string) => `<li>${l}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${data.dailyInstructions.todo_list ? `
+            <div style="background:#f0fdf4; border:1px solid #22c55e; border-radius:8px; padding:12px; margin:10px 0;">
+              <strong>À faire :</strong>
+              <ul style="margin:5px 0;">${data.dailyInstructions.todo_list.split('\n').filter((l: string) => l.trim()).map((l: string) => `<li>${l}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      ${data.tasks && data.tasks.length > 0 ? `
+        <div style="margin-top:30px; page-break-inside:avoid;">
+          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">✅ Tâches du jour</h2>
+          <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+            <thead>
+              <tr style="background:#e5e7eb;">
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Tâche</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Assignée à</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:center;">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.tasks.map(task => `
+                <tr>
+                  <td style="border:1px solid #ddd; padding:8px;">
+                    <strong>${task.title}</strong>
+                    ${task.description ? `<br/><span style="font-size:12px; color:#666;">${task.description}</span>` : ''}
+                  </td>
+                  <td style="border:1px solid #ddd; padding:8px;">${task.assigned_to_name || 'Tout le personnel'}</td>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center;">${task.is_completed ? '✅ Fait' : '⬜ En attente'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+
       ${housekeeperSections}
 
       ${data.actionLogs.length > 0 ? `
