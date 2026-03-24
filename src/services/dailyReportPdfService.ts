@@ -276,7 +276,7 @@ export async function generateAndUploadDailyReportPdf(
         .maybeSingle(),
       supabase
         .from('task_templates')
-        .select('id, title, description, assigned_to_name, assigned_to_type, is_one_time, one_time_date, days_of_week')
+        .select('id, title, description, assigned_user_name, assigned_to_type, is_one_time, one_time_date, days_of_week')
         .eq('hotel_id', hotelId)
         .eq('is_active', true),
       supabase
