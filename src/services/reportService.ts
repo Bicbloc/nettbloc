@@ -13,8 +13,9 @@ export interface ReportData extends CustomReportFields {
   rooms: Room[];
   currentDate: string;
   config: CleaningConfig;
-  startTime?: string; // Heure de début (premier téléchargement)
+  startTime?: string;
   linenInventory?: LinenInventoryItem[];
+  assignedTasks?: Array<{ title: string; description?: string | null; is_completed: boolean }>;
 }
 
 // Store email in Supabase
@@ -122,6 +123,47 @@ export async function generateReport(
         console.warn('Could not load daily instructions for PDF:', e);
       }
     }
+
+    // Load assigned tasks for this housekeeper
+    let assignedTasks: Array<{ title: string; description?: string | null; is_completed: boolean }> = [];
+    if (hotelId) {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const currentDayOfWeek = new Date().getDay();
+        
+        const [tasksRes, completionsRes] = await Promise.all([
+          supabaseClient
+            .from('task_templates')
+            .select('id, title, description, assigned_user_name, assigned_to_all, is_one_time, one_time_date, days_of_week')
+            .eq('hotel_id', hotelId)
+            .eq('is_active', true),
+          supabaseClient
+            .from('task_completions')
+            .select('task_template_id')
+            .eq('completion_date', todayStr)
+        ]);
+
+        const allTasks = (tasksRes.data || []).filter(t => {
+          if (t.is_one_time) return t.one_time_date === todayStr;
+          return t.days_of_week?.includes(currentDayOfWeek);
+        });
+        
+        // Filter tasks for this housekeeper
+        const myTasks = allTasks.filter(t => 
+          t.assigned_to_all || 
+          (t.assigned_user_name && t.assigned_user_name.toLowerCase() === housekeeper.toLowerCase())
+        );
+        
+        const completedIds = new Set((completionsRes.data || []).map(c => c.task_template_id));
+        assignedTasks = myTasks.map(t => ({
+          title: t.title,
+          description: t.description,
+          is_completed: completedIds.has(t.id)
+        }));
+      } catch (e) {
+        console.warn('Could not load tasks for PDF:', e);
+      }
+    }
     
     // Get today's date in localized format
     const today = new Date();
@@ -167,7 +209,8 @@ export async function generateReport(
       instructions: customFields?.instructions || '',
       generalInstructions: customFields?.generalInstructions || '',
       housekeeperInstructions: customFields?.housekeeperInstructions || {},
-      linenInventory: customFields?.linenInventory || []
+      linenInventory: customFields?.linenInventory || [],
+      assignedTasks
     };
     
     // Generate the HTML for the report
@@ -313,6 +356,33 @@ function generateReportHTML(data: ReportData, t: ReportTranslations): string {
     }
   }
   
+  // Process assigned tasks
+  let tasksHtml = '';
+  if (data.assignedTasks && data.assignedTasks.length > 0) {
+    const taskRows = data.assignedTasks.map(task => `
+      <tr>
+        <td style="border:1px solid #000; padding:6px;">
+          ${task.is_completed ? '☑' : '☐'} ${task.title}
+          ${task.description ? `<br/><span style="font-size:11px; color:#666;">${task.description}</span>` : ''}
+        </td>
+        <td style="border:1px solid #000; padding:6px; text-align:center;">${task.is_completed ? '✓' : ''}</td>
+      </tr>
+    `).join('');
+    
+    tasksHtml = `
+      <div class="tasks-section" style="margin-top:15px; page-break-inside:avoid;">
+        <h3>✅ Tâches assignées</h3>
+        <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #000;">
+          <tr>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">Tâche</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:center; width:80px;">Fait</th>
+          </tr>
+          ${taskRows}
+        </table>
+      </div>
+    `;
+  }
+
   // Format current date in a readable format (e.g., "jeudi 15 mai 2025")
   const formattedDate = data.currentDate.split(' ').slice(0, 3).join(' ');
   
@@ -639,6 +709,7 @@ function generateReportHTML(data: ReportData, t: ReportTranslations): string {
         ${instructionsHtml}
         ${todoHtml}
         ${toknowHtml}
+        ${tasksHtml}
         ${linenInventoryHtml}
       </div>
       

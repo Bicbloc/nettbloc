@@ -31,6 +31,17 @@ interface DailyReportPdfData {
     description: string;
     created_at: string;
   }>;
+  dailyInstructions?: {
+    instructions?: string | null;
+    to_know?: string | null;
+    todo_list?: string | null;
+  } | null;
+  tasks?: Array<{
+    title: string;
+    description?: string | null;
+    assigned_to_name?: string | null;
+    is_completed: boolean;
+  }>;
 }
 
 /**
@@ -131,6 +142,56 @@ function generateReportHtml(data: DailyReportPdfData): string {
         </div>
       </div>
 
+      ${data.dailyInstructions && (data.dailyInstructions.instructions || data.dailyInstructions.to_know || data.dailyInstructions.todo_list) ? `
+        <div style="margin-top:30px; page-break-inside:avoid;">
+          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">📋 Consignes du jour</h2>
+          ${data.dailyInstructions.instructions ? `
+            <div style="background:#fffbeb; border:1px solid #fbbf24; border-radius:8px; padding:12px; margin:10px 0;">
+              <strong>Instructions :</strong><br/>${data.dailyInstructions.instructions.replace(/\n/g, '<br/>')}
+            </div>
+          ` : ''}
+          ${data.dailyInstructions.to_know ? `
+            <div style="background:#eff6ff; border:1px solid #3b82f6; border-radius:8px; padding:12px; margin:10px 0;">
+              <strong>À savoir :</strong>
+              <ul style="margin:5px 0;">${data.dailyInstructions.to_know.split('\n').filter((l: string) => l.trim()).map((l: string) => `<li>${l}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${data.dailyInstructions.todo_list ? `
+            <div style="background:#f0fdf4; border:1px solid #22c55e; border-radius:8px; padding:12px; margin:10px 0;">
+              <strong>À faire :</strong>
+              <ul style="margin:5px 0;">${data.dailyInstructions.todo_list.split('\n').filter((l: string) => l.trim()).map((l: string) => `<li>${l}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      ${data.tasks && data.tasks.length > 0 ? `
+        <div style="margin-top:30px; page-break-inside:avoid;">
+          <h2 style="border-bottom:1px solid #ddd; padding-bottom:10px;">✅ Tâches du jour</h2>
+          <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+            <thead>
+              <tr style="background:#e5e7eb;">
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Tâche</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Assignée à</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:center;">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.tasks.map(task => `
+                <tr>
+                  <td style="border:1px solid #ddd; padding:8px;">
+                    <strong>${task.title}</strong>
+                    ${task.description ? `<br/><span style="font-size:12px; color:#666;">${task.description}</span>` : ''}
+                  </td>
+                  <td style="border:1px solid #ddd; padding:8px;">${task.assigned_to_name || 'Tout le personnel'}</td>
+                  <td style="border:1px solid #ddd; padding:8px; text-align:center;">${task.is_completed ? '✅ Fait' : '⬜ En attente'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+
       ${housekeeperSections}
 
       ${data.actionLogs.length > 0 ? `
@@ -205,6 +266,41 @@ export async function generateAndUploadDailyReportPdf(
   try {
     console.log('📄 Génération du PDF de clôture...');
 
+    // Load daily instructions and tasks from DB
+    const [instructionsResult, tasksResult, completionsResult] = await Promise.all([
+      supabase
+        .from('daily_instructions')
+        .select('instructions, to_know, todo_list')
+        .eq('hotel_id', hotelId)
+        .eq('instruction_date', reportDate)
+        .maybeSingle(),
+      supabase
+        .from('task_templates')
+        .select('id, title, description, assigned_user_name, assigned_to_type, is_one_time, one_time_date, days_of_week')
+        .eq('hotel_id', hotelId)
+        .eq('is_active', true),
+      supabase
+        .from('task_completions')
+        .select('task_template_id')
+        .eq('completion_date', reportDate)
+    ]);
+
+    const dailyInstructions = instructionsResult.data || null;
+
+    // Filter tasks for today
+    const currentDayOfWeek = new Date(reportDate).getDay();
+    const allTasks = (tasksResult.data || []).filter(t => {
+      if (t.is_one_time) return t.one_time_date === reportDate;
+      return t.days_of_week?.includes(currentDayOfWeek);
+    });
+    const completedIds = new Set((completionsResult.data || []).map(c => c.task_template_id));
+    const tasks = allTasks.map(t => ({
+      title: t.title,
+      description: t.description,
+      assigned_to_name: t.assigned_user_name,
+      is_completed: completedIds.has(t.id)
+    }));
+
     // Build housekeeper data
     const housekeeperMap = new Map<string, HousekeeperReportData>();
     
@@ -253,7 +349,9 @@ export async function generateAndUploadDailyReportPdf(
         room_number: log.room_number,
         description: log.description,
         created_at: log.created_at
-      }))
+      })),
+      dailyInstructions,
+      tasks
     };
 
     // Generate HTML and convert to PDF
