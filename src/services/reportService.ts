@@ -123,6 +123,47 @@ export async function generateReport(
         console.warn('Could not load daily instructions for PDF:', e);
       }
     }
+
+    // Load assigned tasks for this housekeeper
+    let assignedTasks: Array<{ title: string; description?: string | null; is_completed: boolean }> = [];
+    if (hotelId) {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const currentDayOfWeek = new Date().getDay();
+        
+        const [tasksRes, completionsRes] = await Promise.all([
+          supabaseClient
+            .from('task_templates')
+            .select('id, title, description, assigned_user_name, assigned_to_all, is_one_time, one_time_date, days_of_week')
+            .eq('hotel_id', hotelId)
+            .eq('is_active', true),
+          supabaseClient
+            .from('task_completions')
+            .select('task_template_id')
+            .eq('completion_date', todayStr)
+        ]);
+
+        const allTasks = (tasksRes.data || []).filter(t => {
+          if (t.is_one_time) return t.one_time_date === todayStr;
+          return t.days_of_week?.includes(currentDayOfWeek);
+        });
+        
+        // Filter tasks for this housekeeper
+        const myTasks = allTasks.filter(t => 
+          t.assigned_to_all || 
+          (t.assigned_user_name && t.assigned_user_name.toLowerCase() === housekeeper.toLowerCase())
+        );
+        
+        const completedIds = new Set((completionsRes.data || []).map(c => c.task_template_id));
+        assignedTasks = myTasks.map(t => ({
+          title: t.title,
+          description: t.description,
+          is_completed: completedIds.has(t.id)
+        }));
+      } catch (e) {
+        console.warn('Could not load tasks for PDF:', e);
+      }
+    }
     
     // Get today's date in localized format
     const today = new Date();
