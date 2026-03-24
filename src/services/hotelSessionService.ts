@@ -52,11 +52,7 @@ export class HotelSessionService {
       let effectiveHotelId = hotelId;
       
       if (!effectiveHotelId) {
-        // Essayer depuis localStorage
-        effectiveHotelId = localStorage.getItem('selectedHotelId') || 
-                          localStorage.getItem('currentHotelId') ||
-                          localStorage.getItem('hotelId') || null;
-        
+        effectiveHotelId = storageService.getHotelId();
         console.log('🔍 HotelId depuis localStorage:', effectiveHotelId);
       }
       
@@ -252,11 +248,7 @@ export class HotelSessionService {
       }
 
       // 2) Fallback robuste via hotel_id (utile après nettoyage cache / multi-onglets)
-      const hotelId =
-        storageService.getHotelId() ||
-        localStorage.getItem('selectedHotelId') ||
-        localStorage.getItem('currentHotelId') ||
-        localStorage.getItem('hotelId');
+      const hotelId = storageService.getHotelId();
 
       if (!hotelId) return null;
 
@@ -333,7 +325,7 @@ export class HotelSessionService {
   static async updateHousekeeperAssignments(assignments: Record<string, string>, hotelId?: string): Promise<boolean> {
     try {
       // Get hotel ID from parameter or localStorage
-      const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId');
+      const effectiveHotelId = hotelId || storageService.getHotelId();
       if (!effectiveHotelId) {
         console.error('No hotel ID found for updateHousekeeperAssignments');
         return false;

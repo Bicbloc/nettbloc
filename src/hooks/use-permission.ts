@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/storageService';
 
 export type Permission = 
   | 'rooms:read' 
@@ -78,7 +79,7 @@ export function usePermission() {
         effectiveRole = 'admin';
       } else {
         // Check hotel-specific roles or default to viewer
-        const hotelId = localStorage.getItem('selectedHotelId');
+        const hotelId = storageService.getHotelId();
         if (hotelId) {
           const { data: hotelUsers } = await supabase
             .from('hotel_users')

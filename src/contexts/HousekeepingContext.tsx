@@ -435,17 +435,25 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   }, [hotelId]);
 
-  // Rafraîchissement automatique des housekeepers toutes les 30 secondes
+  // Realtime subscription for housekeepers — replaces 30s polling
   useEffect(() => {
     if (!hotelId) return;
     
-    refreshHousekeepers(); // Appel initial
+    refreshHousekeepers(); // Initial load
     
-    const refreshInterval = setInterval(() => {
-      refreshHousekeepers();
-    }, 30000); // 30 secondes
+    const channel = supabase
+      .channel(`housekeepers-sync-${hotelId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'housekeepers',
+        filter: `hotel_id=eq.${hotelId}`,
+      }, () => {
+        refreshHousekeepers();
+      })
+      .subscribe();
     
-    return () => clearInterval(refreshInterval);
+    return () => { supabase.removeChannel(channel); };
   }, [hotelId, refreshHousekeepers]);
 
   const value = {

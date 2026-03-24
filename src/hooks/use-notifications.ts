@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/storageService';
 import { toast } from './use-toast';
 import { realtimeManager } from '@/services/RealtimeManager';
 
@@ -46,10 +47,10 @@ export const useNotifications = (hotelId?: string) => {
       return hotelId;
     }
 
-    // Fallback temporaire vers localStorage (pour compatibilité)
-    const stored = localStorage.getItem('selectedHotelId');
+    // Fallback via storageService
+    const stored = storageService.getHotelId();
     if (stored && isValidHotelId(stored)) {
-      console.log('⚠️ useNotifications: Fallback localStorage:', stored.slice(0, 8) + '...');
+      console.log('⚠️ useNotifications: Fallback storageService:', stored.slice(0, 8) + '...');
       return stored;
     }
 

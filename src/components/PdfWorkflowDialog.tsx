@@ -22,6 +22,7 @@ import { UnifiedHousekeeperService, HousekeeperWithCode } from "@/services/unifi
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { RoomArchiveService } from "@/services/roomArchiveService";
+import { storageService } from "@/services/storageService";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RoomLine } from "@/services/pms/RoomLineParser";
@@ -464,7 +465,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
   // Handler pour confirmer l'ajout des nouvelles chambres au registre
   const handleConfirmNewRooms = async (selectedRooms: any[]) => {
-    const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId') || localStorage.getItem('currentHotelId');
+    const effectiveHotelId = hotelId || storageService.getHotelId();
     
     if (effectiveHotelId && selectedRooms.length > 0) {
       try {
@@ -512,7 +513,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
 
   const loadExistingHousekeepers = async (attempt = 1): Promise<boolean> => {
     // Validation et fallback du hotelId
-    const effectiveHotelId = hotelId || localStorage.getItem('selectedHotelId') || localStorage.getItem('currentHotelId');
+    const effectiveHotelId = hotelId || storageService.getHotelId();
     
     if (!effectiveHotelId) {
       console.error('❌ HotelId manquant pour charger les housekeepers');

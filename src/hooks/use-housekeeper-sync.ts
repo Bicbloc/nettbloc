@@ -3,6 +3,7 @@ import { SupabaseService } from '@/services/supabaseService';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/storageService';
 
 interface SyncResult {
   success: boolean;
@@ -24,7 +25,7 @@ export function useHousekeeperSync() {
     };
 
     try {
-      const selectedHotelId = localStorage.getItem('selectedHotelId');
+      const selectedHotelId = storageService.getHotelId();
       
       if (!selectedHotelId) {
         result.success = false;
@@ -120,7 +121,7 @@ export function useHousekeeperSync() {
 
   // Synchronisation basée sur les événements (plus de polling automatique)
   const checkForSyncNeeded = useCallback(async () => {
-    const selectedHotelId = localStorage.getItem('selectedHotelId');
+    const selectedHotelId = storageService.getHotelId();
     if (!selectedHotelId || housekeeperNames.length === 0) return false;
 
     try {

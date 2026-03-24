@@ -96,8 +96,41 @@ function GovernessDashboardContent() {
     tables: ['rooms', 'incidents', 'assignments', 'lost_and_found', 'room_inspections'],
     onUpdate: useCallback(() => {
       loadStats();
-    }, []),
+    }, [selectedHotel]),
   });
+
+  // Periodic session validation — check every 5 minutes that session is still active
+  useEffect(() => {
+    if (!profile || !selectedHotel) return;
+    
+    const validateSession = async () => {
+      try {
+        const { data } = await supabase
+          .from('governess_hotel_sessions')
+          .select('is_active')
+          .eq('governess_profile_id', profile.id)
+          .eq('hotel_id', selectedHotel.id)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (!data) {
+          toast({
+            variant: "destructive",
+            title: "Session expirée",
+            description: "Votre accès à cet hôtel a été révoqué."
+          });
+          setSelectedHotel(null);
+          localStorage.removeItem('governess_selected_hotel');
+          loadHotels(profile.id);
+        }
+      } catch (e) {
+        console.warn('Session validation error:', e);
+      }
+    };
+
+    const interval = setInterval(validateSession, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [profile, selectedHotel, toast]);
 
   useEffect(() => {
     const storedProfile = localStorage.getItem('governess_profile');

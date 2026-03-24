@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams, Navigate, useNavigate } from "react-router-dom";
@@ -41,16 +41,16 @@ import { useUserTypeGuard } from "@/hooks/use-user-type-guard";
 // Layout components
 import { MainLayout, TabValue } from "@/components/layout";
 
-// Dashboard tab components
-import { OverviewTab } from "@/components/dashboard/OverviewTab";
-import { RoomManagementTab } from "@/components/dashboard/RoomManagementTab";
-import { AssignmentTab } from "@/components/dashboard/AssignmentTab";
-import { AccessCodesTab } from "@/components/dashboard/AccessCodesTab";
-import { LinenTab } from "@/components/dashboard/LinenTab";
-import { IncidentsTab } from "@/components/dashboard/IncidentsTab";
-import { ReportsTab } from "@/components/dashboard/ReportsTab";
-import { TrainingTab } from "@/components/dashboard/TrainingTab";
-import { ArchivesTab } from "@/components/dashboard/ArchivesTab";
+// Dashboard tab components — lazy loaded for code splitting
+const OverviewTab = lazy(() => import("@/components/dashboard/OverviewTab").then(m => ({ default: m.OverviewTab })));
+const RoomManagementTab = lazy(() => import("@/components/dashboard/RoomManagementTab").then(m => ({ default: m.RoomManagementTab })));
+const AssignmentTab = lazy(() => import("@/components/dashboard/AssignmentTab").then(m => ({ default: m.AssignmentTab })));
+const AccessCodesTab = lazy(() => import("@/components/dashboard/AccessCodesTab").then(m => ({ default: m.AccessCodesTab })));
+const LinenTab = lazy(() => import("@/components/dashboard/LinenTab").then(m => ({ default: m.LinenTab })));
+const IncidentsTab = lazy(() => import("@/components/dashboard/IncidentsTab").then(m => ({ default: m.IncidentsTab })));
+const ReportsTab = lazy(() => import("@/components/dashboard/ReportsTab").then(m => ({ default: m.ReportsTab })));
+const TrainingTab = lazy(() => import("@/components/dashboard/TrainingTab").then(m => ({ default: m.TrainingTab })));
+const ArchivesTab = lazy(() => import("@/components/dashboard/ArchivesTab").then(m => ({ default: m.ArchivesTab })));
 
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
@@ -680,6 +680,7 @@ const IndexDashboard = () => {
         
         <HeroHeader hotelName={hotelName || undefined} isPremium={isPremium} />
         
+        <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
         <div className="space-y-6 mt-6">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
@@ -836,6 +837,7 @@ const IndexDashboard = () => {
             </PremiumLimitGuard>
           )}
         </div>
+        </Suspense>
       </MainLayout>
 
       {/* Dialogs */}

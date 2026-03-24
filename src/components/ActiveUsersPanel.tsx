@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Clock, Wifi, Bed, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/storageService';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useHousekeeping } from '@/contexts/HousekeepingContext';
@@ -92,7 +93,7 @@ export function ActiveUsersPanel() {
   const fetchActiveSessions = async () => {
     try {
       // Récupérer seulement les sessions de l'hôtel actuel
-      const hotelId = localStorage.getItem('selectedHotelId');
+      const hotelId = storageService.getHotelId();
       if (!hotelId) {
         setSessions([]);
         return;
