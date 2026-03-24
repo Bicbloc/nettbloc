@@ -709,6 +709,7 @@ function generateReportHTML(data: ReportData, t: ReportTranslations): string {
         ${instructionsHtml}
         ${todoHtml}
         ${toknowHtml}
+        ${tasksHtml}
         ${linenInventoryHtml}
       </div>
       
