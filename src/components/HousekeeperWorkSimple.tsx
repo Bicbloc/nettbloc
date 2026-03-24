@@ -9,6 +9,10 @@ import { CheckCircle, Clock, Home, LogOut, Building2, MapPin, AlertCircle, Wifi,
 import { IncidentReportWizard } from './incident/IncidentReportWizard';
 import { LinenQuickInventory } from './linen/LinenQuickInventory';
 import { RoomCardEnhanced } from './housekeeper/RoomCardEnhanced';
+import { HousekeeperHeader } from './housekeeper/HousekeeperHeader';
+import { HousekeeperActivityLog } from './housekeeper/HousekeeperActivityLog';
+import { HousekeeperStatsBar } from './housekeeper/HousekeeperStatsBar';
+import { HousekeeperTabNav } from './housekeeper/HousekeeperTabNav';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 import { storageService } from '@/services/storageService';
 import { LostItemReportWizard } from './lost-and-found/LostItemReportWizard';
