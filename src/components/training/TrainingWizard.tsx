@@ -2,11 +2,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Upload, Columns, Tag, CheckCircle, Settings } from "lucide-react";
+import { Brain, Upload, Columns, CheckCircle, Settings } from "lucide-react";
 import { TrainingStep1Import } from "./TrainingStep1Import";
 import { TrainingStep1bColumnMapping, MappingConfig } from "./TrainingStep1bColumnMapping";
-import { TrainingStep2Annotate } from "./TrainingStep2Annotate";
-import { TrainingStep3Result } from "./TrainingStep3Result";
+import { TrainingStep3Validate } from "./TrainingStep3Validate";
 import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 import { TrainingHistory } from "./TrainingHistory";
 import { TrainingStepHelper } from "./TrainingStepHelper";
@@ -26,31 +25,26 @@ export interface TrainingData {
   mappingConfig?: MappingConfig;
 }
 
-// Workflow en 4 étapes: Import → Colonnes/Mapping → Vérifier → Sauvegarder
+// Workflow en 3 étapes: Import → Configurer → Valider & Sauver
 const DISPLAY_STEPS = [
-  { id: 1, label: "Importer", icon: Upload, description: "Chargez votre rapport PDF" },
-  { id: 2, label: "Mapping", icon: Columns, description: "Configurez les correspondances" },
-  { id: 3, label: "Vérifier", icon: Tag, description: "Validez les détections" },
-  { id: 4, label: "Sauvegarder", icon: CheckCircle, description: "Enregistrez l'apprentissage" },
+  { id: 1, label: "Importer", icon: Upload, description: "PDF, CSV ou texte collé" },
+  { id: 2, label: "Configurer", icon: Columns, description: "Mappez les colonnes et statuts" },
+  { id: 3, label: "Valider & Sauver", icon: CheckCircle, description: "Vérifiez et enregistrez" },
 ];
 
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [trainingData, setTrainingData] = useState<TrainingData | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     unifiedParserService.loadHotelPatterns(hotelId);
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setCurrentUserId(data.user.id);
-    });
   }, [hotelId]);
 
   const handleImportComplete = (data: TrainingData) => {
     setTrainingData(data);
-    setCurrentStep(2); // Aller au mapping
+    setCurrentStep(2);
   };
 
   const handleMappingComplete = (updatedData: TrainingData, mappingConfig: MappingConfig) => {
@@ -58,18 +52,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
       ...updatedData,
       mappingConfig,
     });
-    setCurrentStep(3); // Aller à l'annotation
-  };
-
-  const handleAnnotationComplete = (rooms: ExtractedRoom[]) => {
-    if (trainingData) {
-      setTrainingData({
-        ...trainingData,
-        extractedRooms: rooms,
-        validatedCount: rooms.filter(r => r.validated).length,
-      });
-      setCurrentStep(4); // Aller à la sauvegarde
-    }
+    setCurrentStep(3);
   };
 
   const handleReset = () => {
@@ -86,14 +69,8 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
   const handleEditPattern = async (pattern: any) => {
     const rooms: ExtractedRoom[] = Array.isArray(pattern.extracted_data)
-      ? pattern.extracted_data.map((r: any) => ({
-          ...r,
-          validated: true,
-        }))
-      : (pattern.extracted_data?.rooms || []).map((r: any) => ({
-          ...r,
-          validated: true,
-        }));
+      ? pattern.extracted_data.map((r: any) => ({ ...r, validated: true }))
+      : (pattern.extracted_data?.rooms || []).map((r: any) => ({ ...r, validated: true }));
 
     setTrainingData({
       reportName: pattern.report_name,
@@ -103,7 +80,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
       validatedCount: rooms.length,
       existingPatternId: pattern.id,
     });
-    setCurrentStep(3); // Aller directement à l'annotation quand on édite
+    setCurrentStep(3);
   };
 
   return (
@@ -118,7 +95,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
             <div>
               <h2 className="text-xl font-semibold">Entraîner l'IA</h2>
               <p className="text-sm text-muted-foreground">
-                Apprenez au système à reconnaître vos rapports
+                Apprenez au système à reconnaître vos rapports (PDF, CSV, texte)
               </p>
             </div>
           </div>
@@ -135,9 +112,9 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
       </Card>
 
       {/* Training History */}
-      <TrainingHistory 
+      <TrainingHistory
         key={refreshKey}
-        hotelId={hotelId} 
+        hotelId={hotelId}
         onEdit={handleEditPattern}
         onDeleted={() => {
           unifiedParserService.loadHotelPatterns(hotelId);
@@ -187,7 +164,7 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
           })}
         </div>
 
-        {/* Step Helper - Guide contextuel */}
+        {/* Step Helper */}
         <div className="mb-6">
           <TrainingStepHelper currentStep={currentStep} variant="expanded" />
         </div>
@@ -211,20 +188,10 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
           )}
 
           {currentStep === 3 && trainingData && (
-            <TrainingStep2Annotate
+            <TrainingStep3Validate
               trainingData={trainingData}
               hotelId={hotelId}
-              userId={currentUserId}
-              onComplete={handleAnnotationComplete}
               onBack={() => setCurrentStep(2)}
-              onOpenAdvanced={() => setShowAdvanced(true)}
-            />
-          )}
-
-          {currentStep === 4 && trainingData && (
-            <TrainingStep3Result
-              trainingData={trainingData}
-              hotelId={hotelId}
               onReset={handleReset}
             />
           )}
