@@ -23,7 +23,6 @@ export function useIncidentDefaults(hotelId: string | undefined) {
 
         // Si aucun rôle n'existe, créer les données par défaut
         if (!existingRoles || existingRoles.length === 0) {
-          console.log('🔧 Initialisation des données par défaut pour l\'hôtel', hotelId);
           
           const { error } = await supabase
             .rpc('create_hotel_incident_defaults', { p_hotel_id: hotelId });
@@ -31,7 +30,6 @@ export function useIncidentDefaults(hotelId: string | undefined) {
           if (error) {
             console.error('Erreur lors de l\'initialisation des données par défaut:', error);
           } else {
-            console.log('✅ Données par défaut créées avec succès');
           }
         }
       } catch (error) {

@@ -47,7 +47,6 @@ export function usePdfWorkflow({
     housekeeperNames?: string[],
     distributionMethod?: 'random' | 'floor' | 'cleaning-type'
   ) => {
-    console.log("📋 Traitement PDF avec méthode:", distributionMethod || 'aucune', "et femmes de chambre:", housekeeperNames || []);
     
     // Activate flag to block auto-reload
     setIsImporting(true);
@@ -80,7 +79,6 @@ export function usePdfWorkflow({
 
       // Sync each room to Supabase - with obsolete room cleanup
       if (hotelId) {
-        console.log('🔄 Synchronisation des chambres PDF vers Supabase...');
         
         // 1. Récupérer les chambres existantes
         const { data: existingRooms } = await supabase
@@ -95,7 +93,6 @@ export function usePdfWorkflow({
         const roomsToDelete = existingRooms?.filter(r => !newRoomNumbers.has(r.room_number)) || [];
         
         if (roomsToDelete.length > 0) {
-          console.log(`🗑️ Suppression de ${roomsToDelete.length} chambres obsolètes:`, roomsToDelete.map(r => r.room_number));
           
           const roomIdsToDelete = roomsToDelete.map(r => r.id);
           
@@ -113,7 +110,6 @@ export function usePdfWorkflow({
             .eq('hotel_id', hotelId)
             .in('id', roomIdsToDelete);
             
-          console.log('✅ Chambres obsolètes supprimées');
         }
         
         // 3. Upsert les nouvelles chambres
@@ -145,12 +141,10 @@ export function usePdfWorkflow({
         const addedCount = sortedData.filter(r => !existingRoomNumbers.has(r.number)).length;
         const updatedCount = sortedData.filter(r => existingRoomNumbers.has(r.number)).length;
         
-        console.log(`✅ Sync terminée: ${addedCount} ajoutées, ${updatedCount} mises à jour, ${roomsToDelete.length} supprimées`);
       }
 
       // Auto-distribute if method specified
       if (distributionMethod && housekeeperNames && housekeeperNames.length > 0) {
-        console.log("🔄 Auto-distribution selon méthode:", distributionMethod);
         
         // Séparer les chambres propres (ne pas les assigner) des chambres à nettoyer
         const cleanRooms = sortedData.filter(room => 
@@ -160,7 +154,6 @@ export function usePdfWorkflow({
           room.status !== 'clean' && room.cleaningType !== 'none'
         );
         
-        console.log(`📋 ${cleanRooms.length} chambres propres exclues, ${roomsToAssign.length} à assigner`);
         
         // Distribuer uniquement les chambres à nettoyer
         const roomsPerHousekeeper = Math.ceil(roomsToAssign.length / housekeeperNames.length);
@@ -228,7 +221,6 @@ export function usePdfWorkflow({
         setIsImporting(false);
         const { realtimeManager } = await import('@/services/RealtimeManager');
         realtimeManager.resume();
-        console.log('✅ Import terminé, rechargement automatique réactivé après 5s');
       }, 5000); // Augmenté à 5 secondes pour éviter conflits
     }
   }, [hotelId, housekeepers, setRooms, setHousekeeperNames, setIsDistributed, setAvailableFloors]);

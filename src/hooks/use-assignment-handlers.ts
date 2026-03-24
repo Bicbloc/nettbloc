@@ -41,7 +41,6 @@ export const useAssignmentHandlers = ({
             if (linkedRoom) {
               linkedToAdd.push(linkedRoom);
               selectedNumbers.add(linkedNum);
-              console.log(`🔗 Auto-inclusion chambre liée ${linkedNum} (liée à ${room.number})`);
             }
           }
         }
@@ -54,7 +53,6 @@ export const useAssignmentHandlers = ({
       });
     }
 
-    console.log('🔄 Assignation manuelle:', { housekeeperName, roomCount: selectedRooms.length, hotelId });
     
     // Bloquer le rechargement automatique pendant l'assignation
     setIsAssigning?.(true);
@@ -73,7 +71,6 @@ export const useAssignmentHandlers = ({
     let housekeeper = housekeepers.find(h => h.name.toLowerCase() === housekeeperName.toLowerCase());
     
     if (!housekeeper) {
-      console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
       try {
         const { data: accessCode, error: codeError } = await supabase
           .rpc('generate_and_insert_access_code', {
@@ -92,7 +89,6 @@ export const useAssignmentHandlers = ({
           
           if (newHousekeeper) {
             housekeeper = newHousekeeper;
-            console.log('✅ Femme de chambre créée:', newHousekeeper);
             refreshHousekeepers?.();
           }
         }
@@ -130,7 +126,6 @@ export const useAssignmentHandlers = ({
         }
         
         if (roomId) {
-          console.log('✅ Création assignation manuelle:', { housekeeperId: housekeeper.user_id || housekeeper.id, housekeeperName, roomId, roomNumber: room.number });
           await AssignmentService.assignRoom(
             hotelId,
             roomId,
@@ -160,7 +155,6 @@ export const useAssignmentHandlers = ({
   }, [hotelId, rooms, setRooms, housekeepers, refreshHousekeepers, setIsAssigning]);
 
   const handleDirectRoomAssignment = useCallback(async (roomNumber: string, housekeeperName: string) => {
-    console.log('🔄 Tentative assignation directe:', { roomNumber, housekeeperName, hotelId });
     
     // Bloquer le rechargement automatique pendant l'assignation
     setIsAssigning?.(true);
@@ -175,7 +169,6 @@ export const useAssignmentHandlers = ({
     let housekeeper = housekeepers.find(h => h.name.toLowerCase() === housekeeperName.toLowerCase());
     
     if (!housekeeper) {
-      console.log('⚠️ Femme de chambre non trouvée, création automatique:', housekeeperName);
       try {
         const { data: accessCode, error: codeError } = await supabase
           .rpc('generate_and_insert_access_code', {
@@ -194,7 +187,6 @@ export const useAssignmentHandlers = ({
           
           if (newHousekeeper) {
             housekeeper = newHousekeeper;
-            console.log('✅ Femme de chambre créée:', newHousekeeper);
             refreshHousekeepers?.();
           }
         }
@@ -232,7 +224,6 @@ export const useAssignmentHandlers = ({
       }
       
       if (roomId && housekeeper) {
-        console.log('✅ Création assignation directe:', { housekeeperId: housekeeper.user_id || housekeeper.id, housekeeperName, roomId });
         await AssignmentService.assignRoom(
           hotelId,
           roomId,

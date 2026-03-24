@@ -43,12 +43,10 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
   // Charger l'hôtel depuis la base de données
   const loadHotel = useCallback(async () => {
     if (!user?.id) {
-      console.log('🏨 HotelContext: Pas d\'utilisateur, skip load');
       return;
     }
 
     setIsLoading(true);
-    console.log('🏨 HotelContext: Chargement hôtel pour user:', user.id.slice(0, 8) + '...');
 
     try {
       // Phase 0: Vérifier si l'utilisateur est un sous-compte
@@ -60,13 +58,11 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         .maybeSingle();
 
       if (subError) {
-        console.warn('⚠️ HotelContext: Erreur check sous-compte:', subError.message);
       }
 
       if (subAccountData?.hotels) {
         // C'est un sous-compte - utiliser l'hôtel du parent
         const hotelData = subAccountData.hotels as unknown as HotelData;
-        console.log('✅ HotelContext: Sous-compte détecté, hôtel du parent chargé:', hotelData.name, hotelData.hotel_code);
         setHotel(hotelData);
         storageService.saveHotel({
           id: hotelData.id,
@@ -76,7 +72,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         
         // Créer/restaurer la session hôtel
         await HotelSessionService.createSession(hotelData.id);
-        console.log('✅ HotelContext: Hôtel prêt (sous-compte):', hotelData.id.slice(0, 8) + '...');
         
         window.dispatchEvent(new CustomEvent('hotel:ready', { 
           detail: { hotelId: hotelData.id } 
@@ -89,7 +84,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
       
       // Si sub_accounts ne retourne rien, vérifier aussi via le profil (fallback)
       if (user.user_metadata?.is_sub_account === true) {
-        console.log('🏨 HotelContext: Utilisateur marqué comme sous-compte, check via profil...');
         const { data: profileData } = await supabase
           .from('profiles')
           .select('current_hotel_id, hotels!profiles_current_hotel_id_fkey(id, name, hotel_code)')
@@ -98,7 +92,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         
         if (profileData?.hotels) {
           const hotelData = profileData.hotels as unknown as HotelData;
-          console.log('✅ HotelContext: Hôtel trouvé via profil du sous-compte:', hotelData.name);
           setHotel(hotelData);
           storageService.saveHotel({
             id: hotelData.id,
@@ -127,7 +120,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
           .maybeSingle();
 
         if (hotelExists) {
-          console.log('✅ HotelContext: Cache validé');
           const hotelData = {
             id: hotelExists.id,
             name: hotelExists.name,
@@ -140,7 +132,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
         }
         
         // Cache invalide - nettoyer
-        console.log('⚠️ HotelContext: Cache invalide, nettoyage');
         storageService.clearHotel();
       }
 
@@ -163,7 +154,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
 
       if (profileData?.hotels) {
         hotelResult = profileData.hotels as unknown as HotelData;
-        console.log('✅ HotelContext: Hôtel chargé via profil');
       } else {
         // Fallback: chercher par user_id
         const { data: foundHotel } = await supabase
@@ -176,7 +166,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
 
         if (foundHotel) {
           hotelResult = foundHotel;
-          console.log('✅ HotelContext: Hôtel trouvé par user_id');
 
           // Mettre à jour le lien dans profiles
           await supabase
@@ -188,7 +177,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
           const isSubAccountUser = user.user_metadata?.is_sub_account === true;
           
           if (isSubAccountUser) {
-            console.log('⚠️ HotelContext: Sous-compte sans hôtel lié, en attente...');
             // Pour les sous-comptes, attendre que sub_accounts soit mis à jour
             // Ne pas créer de nouvel hôtel
             setIsLoading(false);
@@ -213,7 +201,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
 
           if (newHotel) {
             hotelResult = newHotel;
-            console.log('✅ HotelContext: Nouvel hôtel créé');
 
             // Créer le profil si nécessaire et lier l'hôtel
             await supabase
@@ -238,7 +225,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
 
         // Créer/restaurer la session hôtel
         await HotelSessionService.createSession(hotelResult.id);
-        console.log('✅ HotelContext: Hôtel prêt:', hotelResult.id.slice(0, 8) + '...');
         
         // Émettre un événement pour signaler que l'hôtel est prêt
         window.dispatchEvent(new CustomEvent('hotel:ready', { 
@@ -255,7 +241,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
 
   // Effacer l'hôtel (déconnexion)
   const clearHotel = useCallback(() => {
-    console.log('🏨 HotelContext: Nettoyage hôtel');
     setHotel(null);
     setHasAttemptedLoad(false);
     storageService.clearHotel();
@@ -292,7 +277,6 @@ export const HotelProvider: React.FC<HotelProviderProps> = ({ children }) => {
   // Écouter l'événement SIGNED_OUT pour nettoyer
   useEffect(() => {
     const handleSignOut = () => {
-      console.log('🏨 HotelContext: SIGNED_OUT reçu, nettoyage');
       clearHotel();
     };
 

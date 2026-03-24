@@ -58,8 +58,7 @@ export function RoomsGridSection({
       return counts;
     },
     enabled: !!hotelId,
-    staleTime: 5000, // Refresh toutes les 5 secondes
-    refetchInterval: 5000
+    staleTime: 30000,
   });
   
   // Convertir les rooms pour les fonctions de filtre (avec cleaning_type pour compatibilité BD)

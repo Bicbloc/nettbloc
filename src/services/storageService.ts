@@ -74,7 +74,6 @@ class StorageService {
         return;
       }
 
-      console.log('🔄 StorageService: Migration des clés legacy...');
 
       // Migrer hotel_session ou clés individuelles
       const existingSession = localStorage.getItem('hotel_session');
@@ -127,7 +126,6 @@ class StorageService {
       localStorage.setItem('nettobloc_migration_v1', Date.now().toString());
       this.migrated = true;
       
-      console.log('✅ StorageService: Migration terminée');
     } catch (error) {
       console.error('❌ StorageService: Erreur migration:', error);
     }
@@ -159,7 +157,6 @@ class StorageService {
     // À supprimer dans une future version
     localStorage.setItem('selectedHotelId', hotel.id);
     
-    console.log('✅ StorageService: Hotel saved:', hotel.id.slice(0, 8) + '...');
   }
 
   getHotel(): HotelSession | null {
@@ -320,7 +317,6 @@ class StorageService {
       localStorage.removeItem(key);
     });
     
-    console.log('🧹 StorageService: Données volatiles nettoyées');
   }
 
   /**
@@ -336,7 +332,6 @@ class StorageService {
     for (const key of legacyKeys) {
       const id = localStorage.getItem(key);
       if (id && this.isValidUUID(id)) {
-        console.log('🔄 StorageService: Récupération depuis', key);
         this.saveHotel({ id, name: '', code: '' });
         return id;
       }
@@ -352,7 +347,6 @@ class StorageService {
     LEGACY_KEYS.forEach(key => {
       localStorage.removeItem(key);
     });
-    console.log('🧹 StorageService: Clés legacy nettoyées');
   }
 
   /**

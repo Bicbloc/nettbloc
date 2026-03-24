@@ -117,7 +117,6 @@ export function useDashboardRooms({
   const loadRoomsFromDatabase = useCallback(async () => {
     if (!hotelId || isImporting) return;
     
-    console.log('🔄 Chargement des chambres depuis Supabase pour:', hotelId);
     
     try {
       // Get rooms
@@ -140,7 +139,6 @@ export function useDashboardRooms({
         .in('status', ['assigned', 'in_progress']);
 
       if (assignError) {
-        console.warn('⚠️ Erreur chargement assignations:', assignError);
       }
 
       // Get session data
@@ -225,7 +223,6 @@ export function useDashboardRooms({
         });
         setAvailableFloors(Array.from(floors).sort((a, b) => a - b));
 
-        console.log('✅ Chambres chargées:', mergedRooms.length);
       }
     } catch (error) {
       console.error('❌ Erreur chargement chambres:', error);

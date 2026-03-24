@@ -67,8 +67,6 @@ class PmsAdapterFactory {
       }
     }
 
-    console.log(`🔍 PMS détecté: ${bestDetection.pmsType} (confiance: ${bestDetection.confidence.toFixed(1)}%)`);
-    console.log(`   Mots-clés: ${bestDetection.matchedKeywords.join(', ') || 'aucun'}`);
 
     return { adapter: bestAdapter, detection: bestDetection };
   }

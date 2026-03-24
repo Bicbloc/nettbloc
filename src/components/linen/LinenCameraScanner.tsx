@@ -316,7 +316,6 @@ export const LinenCameraScanner: React.FC<LinenCameraScannerProps> = ({
         console.error('Upload error:', error);
         // Try creating bucket if not exists
         if (error.message?.includes('not found')) {
-          console.log('Bucket may not exist, photo will not be saved');
         }
         return null;
       }

@@ -133,7 +133,6 @@ export function distributeRoomsByFloor(
     return null;
   }
 
-  console.log(`Distributing ${availableRooms.length} rooms`);
   
   // Prepare assignments map
   const assignments: Record<string, Room[]> = {};
@@ -164,7 +163,6 @@ export function distributeRoomsByFloor(
     .map(Number)
     .sort((a, b) => a - b);
   
-  console.log("Available floors:", availableFloors);
   
   if (availableFloors.length > 0 && housekeeperNames.length > 0) {
     const numHousekeepers = housekeeperNames.length;
@@ -177,7 +175,6 @@ export function distributeRoomsByFloor(
       const housekeeper = housekeeperNames[housekeeperIndex];
       const floor = availableFloors[floorIndex];
       
-      console.log(`Assigning floor ${floor} to ${housekeeper} (index ${housekeeperIndex})`);
       
       if (roomsByFloor[floor] && roomsByFloor[floor].length > 0) {
         const roomsOnFloor = roomsByFloor[floor];
@@ -205,23 +202,19 @@ export function distributeRoomsByFloor(
                   if (linkedRoom) {
                     assignments[housekeeper].push(linkedRoom);
                     assignedInThisFloor.add(linkedNum);
-                    console.log(`🔗 Auto-lié: ${linkedNum} avec ${room.number} → ${housekeeper}`);
                   }
                 }
               }
             }
           } else {
-            console.log(`Room ${room.number} exceeds capacity for ${housekeeper}, leaving unassigned`);
           }
         });
         
-        console.log(`Added ${assignedInThisFloor.size} rooms from floor ${floor} to ${housekeeper}`);
       }
     }
     
     // Log final assignments for debugging
     housekeeperNames.forEach(name => {
-      console.log(`FINAL: ${name} is assigned ${assignments[name].length} rooms: ${assignments[name].map(r => r.number).join(', ')}`);
     });
     
     return assignments;

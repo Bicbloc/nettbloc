@@ -72,7 +72,6 @@ class UnifiedParserService {
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
     const logEntry = `[${timestamp}] ${message}`;
     this.debugLogs.push(logEntry);
-    console.log(logEntry);
   }
 
   /**
@@ -400,7 +399,6 @@ class UnifiedParserService {
       const cachedRooms = detectionCache.getParsedRooms(text, hotelId);
       if (cachedRooms) {
         this.log(`📦 [CACHE HIT] ${cachedRooms.length} chambres depuis le cache`);
-        console.log(`📦 [CACHE HIT] ${cachedRooms.length} chambres depuis le cache pour hotel ${hotelId}`);
         return {
           rooms: cachedRooms,
           pmsType: 'cached',

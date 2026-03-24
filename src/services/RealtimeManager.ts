@@ -58,7 +58,6 @@ class RealtimeManager {
         if (document.visibilityState === 'visible' && this.hotelId) {
           const timeSinceLastPing = Date.now() - this.lastSuccessfulPing;
           if (timeSinceLastPing > 60000) {
-            console.log('👁️ RealtimeManager: Page visible, reconnexion après inactivité');
             this.softReconnect();
           }
         }
@@ -81,7 +80,6 @@ class RealtimeManager {
    */
   private setupGlobalAuthListener() {
     window.addEventListener(AUTH_EVENTS.SIGNED_IN, ((event: CustomEvent) => {
-      console.log('🔐 RealtimeManager: AUTH_EVENTS.SIGNED_IN reçu');
       
       // Reset compteurs
       this.reconnectAttempts = 0;
@@ -90,19 +88,16 @@ class RealtimeManager {
       // Si on a un hôtel en attente, se connecter maintenant
       const targetHotel = this.pendingHotelId || this.hotelId;
       if (targetHotel) {
-        console.log('🔗 RealtimeManager: Connexion post-login...');
         setTimeout(() => this.connect(targetHotel), 500);
       }
     }) as EventListener);
 
     window.addEventListener(AUTH_EVENTS.SIGNED_OUT, () => {
-      console.log('🔐 RealtimeManager: AUTH_EVENTS.SIGNED_OUT reçu');
       this.disconnect();
       this.pendingHotelId = null;
     });
 
     window.addEventListener(AUTH_EVENTS.SESSION_REFRESHED, () => {
-      console.log('🔐 RealtimeManager: Session refreshed');
       this.lastSuccessfulPing = Date.now();
       this.consecutiveFailures = 0;
       
@@ -119,7 +114,6 @@ class RealtimeManager {
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'INITIAL_SESSION') return;
 
-      console.log('🔐 RealtimeManager: Supabase auth event:', event);
 
       if (event === 'SIGNED_OUT') {
         this.disconnect();
@@ -133,7 +127,6 @@ class RealtimeManager {
   }
 
   private handleOnline() {
-    console.log('🌐 Réseau: En ligne');
     this.isOnline = true;
     this.consecutiveFailures = 0;
     this.notifyStatus('ONLINE');
@@ -145,7 +138,6 @@ class RealtimeManager {
   }
 
   private handleOffline() {
-    console.log('📵 Réseau: Hors ligne');
     this.isOnline = false;
     this.stopHeartbeat();
     this.notifyStatus('OFFLINE');
@@ -189,7 +181,6 @@ class RealtimeManager {
 
     // Si le canal est SUBSCRIBED et sain, ne rien faire
     if (this.isSubscribed && this.consecutiveFailures < 2) {
-      console.log('✅ RealtimeManager: Connexion active, skip reconnect');
       return;
     }
 
@@ -201,7 +192,6 @@ class RealtimeManager {
    */
   async connect(hotelId: string): Promise<boolean> {
     if (!hotelId || hotelId.length < 10) {
-      console.warn('⚠️ RealtimeManager: hotelId invalide', hotelId);
       return false;
     }
 
@@ -210,11 +200,9 @@ class RealtimeManager {
     // Éviter les connexions simultanées
     if (this.isConnecting) {
       if (this.hotelId === hotelId) {
-        console.log('⏳ RealtimeManager: Connexion déjà en cours, attente...');
         return this.waitForSubscribed(hotelId);
       }
 
-      console.log('⏳ RealtimeManager: Connexion déjà en cours (autre hôtel)');
       return false;
     }
 
@@ -228,13 +216,11 @@ class RealtimeManager {
         return true;
       }
 
-      console.log('⏳ RealtimeManager: Trop tôt pour reconnecter');
       return false;
     }
 
     // Déjà connecté au même hôtel et fonctionnel
     if (this.channel && this.hotelId === hotelId && this.isSubscribed && this.consecutiveFailures === 0) {
-      console.log('✅ RealtimeManager: Déjà connecté');
       return true;
     }
 
@@ -248,7 +234,6 @@ class RealtimeManager {
     } = await supabase.auth.getSession();
 
     if (!session) {
-      console.log('🔐 RealtimeManager: Pas de session, mémorisation hôtel pour après login');
       this.pendingHotelId = hotelId; // Mémoriser pour connexion post-login
       this.isSubscribed = false;
       this.isConnecting = false;
@@ -263,7 +248,6 @@ class RealtimeManager {
 
     // Changement d'hôtel - déconnecter proprement
     if (previousHotelId && previousHotelId !== hotelId) {
-      console.log("🔄 RealtimeManager: Changement d'hôtel");
       await this.cleanupChannel();
     }
 
@@ -272,7 +256,6 @@ class RealtimeManager {
     this.hotelId = hotelId;
     this.isSubscribed = false;
 
-    console.log('🔗 RealtimeManager: Connexion...', hotelId.slice(0, 8) + '...');
     this.notifyStatus('CONNECTING');
 
     // Nettoyer l'ancien canal si existant
@@ -302,7 +285,6 @@ class RealtimeManager {
 
     return new Promise((resolve) => {
       const timeoutId = setTimeout(() => {
-        console.log('⏰ RealtimeManager: Timeout de connexion');
 
         this.isConnecting = false;
         this.isForceReconnecting = false;
@@ -318,12 +300,10 @@ class RealtimeManager {
       }, 15000);
 
       this.channel!.subscribe((status) => {
-        console.log('📡 RealtimeManager statut:', status);
 
         switch (status) {
           case 'SUBSCRIBED':
             clearTimeout(timeoutId);
-            console.log('✅ RealtimeManager: Connecté');
             this.reconnectAttempts = 0;
             this.consecutiveFailures = 0;
             this.isConnecting = false;
@@ -340,12 +320,10 @@ class RealtimeManager {
 
             // CLOSED peut arriver pendant le setup, laisser le timeout gérer
             if (this.isConnecting) {
-              console.log('⚠️ RealtimeManager: CLOSED pendant connexion, attente...');
               this.notifyStatus('CLOSED');
               break;
             }
 
-            console.log('⚠️ RealtimeManager: Canal CLOSED, reconnexion...');
             this.stopHeartbeat();
             this.consecutiveFailures++;
             this.notifyStatus('CLOSED');
@@ -356,7 +334,6 @@ class RealtimeManager {
           case 'CHANNEL_ERROR':
           case 'TIMED_OUT':
             clearTimeout(timeoutId);
-            console.log('❌ RealtimeManager: Erreur', status);
             this.isConnecting = false;
             this.isForceReconnecting = false;
             this.isSubscribed = false;
@@ -397,18 +374,11 @@ class RealtimeManager {
     }
 
     if (!this.isOnline) {
-      console.log('📵 RealtimeManager: Hors ligne, attente...');
       return;
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log(
-        '❌ RealtimeManager: Abandon après',
-        this.maxReconnectAttempts,
-        'tentatives'
-      );
       this.notifyStatus('FAILED');
-      // Reset après 2 minutes pour permettre une nouvelle tentative
       setTimeout(() => {
         this.reconnectAttempts = 0;
         this.consecutiveFailures = 0;
@@ -416,13 +386,9 @@ class RealtimeManager {
       return;
     }
 
-    // Backoff réduit: 1s, 2s, 4s, 8s, max 15s pour reconnexion plus rapide
     const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 15000);
     this.reconnectAttempts++;
 
-    console.log(
-      `🔄 RealtimeManager: Reconnexion dans ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-    );
     this.notifyStatus('RECONNECTING');
 
     this.reconnectTimeout = setTimeout(() => {
@@ -471,12 +437,10 @@ class RealtimeManager {
 
   pause() {
     this.isPaused = true;
-    console.log('⏸️ RealtimeManager: Pause');
   }
 
   resume() {
     this.isPaused = false;
-    console.log('▶️ RealtimeManager: Reprise');
     if (this.consecutiveFailures > 0 && this.hotelId) {
       this.softReconnect();
     }
@@ -503,7 +467,6 @@ class RealtimeManager {
             !!expiresAtMs && expiresAtMs - Date.now() < 5 * 60 * 1000; // 5 min avant expiration
 
           if (shouldRefresh) {
-            console.log('🔄 Heartbeat: Refresh session préventif');
             const { error } = await supabase.auth.refreshSession();
             if (!error) {
               this.lastSuccessfulPing = Date.now();
@@ -516,7 +479,6 @@ class RealtimeManager {
 
         if (pingError || !data?.ok) {
           this.consecutiveFailures++;
-          console.log('💔 Heartbeat: Échec ping edge function', this.consecutiveFailures, pingError?.message);
 
           if (this.consecutiveFailures >= 3) {
             this.scheduleReconnect();
@@ -527,7 +489,6 @@ class RealtimeManager {
         }
       } catch (err) {
         this.consecutiveFailures++;
-        console.log('💔 Heartbeat: Exception', this.consecutiveFailures);
         if (this.consecutiveFailures >= 3) {
           this.scheduleReconnect();
         }
@@ -559,7 +520,6 @@ class RealtimeManager {
     this.stopHeartbeat();
 
     if (this.channel) {
-      console.log('🧹 RealtimeManager: Déconnexion');
       try {
         supabase.removeChannel(this.channel);
       } catch (e) {
@@ -584,7 +544,6 @@ class RealtimeManager {
   forceReconnect() {
     if (!this.hotelId) return;
 
-    console.log('🔄 RealtimeManager: Reconnexion forcée');
     const hotelId = this.hotelId;
 
     this.isForceReconnecting = true;

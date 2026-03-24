@@ -59,7 +59,6 @@ export const HousekeeperAccessRequests = () => {
           table: 'housekeeper_access_requests'
         },
         (payload) => {
-          console.log('Nouvelle demande reçue:', payload);
           toast.success('📨 Nouvelle demande d\'accès reçue !');
           loadRequests();
         }

@@ -15,7 +15,6 @@ export class RoomArchiveService {
   }> {
     const today = new Date().toISOString().split('T')[0];
     
-    console.log('📦 Début de l\'archivage complet pour', hotelId, 'date:', today);
     
     try {
       // 1. Récupérer les chambres actuelles pour l'archivage
@@ -30,7 +29,6 @@ export class RoomArchiveService {
       }
       
       const roomsCount = currentRooms?.length || 0;
-      console.log(`📊 ${roomsCount} chambres à archiver`);
       
       // 2. Récupérer les notifications/remarques du jour pour archivage
       const { data: todayNotifications } = await supabase
@@ -42,7 +40,6 @@ export class RoomArchiveService {
       
       const allNotifications = todayNotifications || [];
       const remarks = allNotifications.filter(n => n.type === 'remark');
-      console.log(`💬 ${remarks.length} commentaires et ${allNotifications.length} notifications à archiver`);
       
       // 3. Récupérer les assignations actuelles pour archivage
       const { data: currentAssignments } = await supabase
@@ -52,7 +49,6 @@ export class RoomArchiveService {
       
       const assignments = currentAssignments || [];
       const housekeeperNames = [...new Set(assignments.map(a => a.housekeeper_name))];
-      console.log(`👥 ${housekeeperNames.length} femme(s) de chambre, ${assignments.length} assignations`);
       
       // 4. Récupérer le journal d'actions du jour
       const { data: todayLogs } = await supabase
@@ -62,7 +58,6 @@ export class RoomArchiveService {
         .eq('log_date', today);
       
       const actionLogs = todayLogs || [];
-      console.log(`📝 ${actionLogs.length} actions du jour`);
       
       // 5. Récupérer les tâches d'inventaire linge du jour
       const { data: linenTasks } = await supabase
@@ -78,7 +73,6 @@ export class RoomArchiveService {
         .eq('task_date', today);
       
       const linenTasksData = linenTasks || [];
-      console.log(`🧺 ${linenTasksData.length} tâches d'inventaire linge du jour`);
       
       // Calculer les totaux d'inventaire linge
       const linenSummary = linenTasksData.reduce((acc, task) => {
@@ -171,9 +165,7 @@ export class RoomArchiveService {
           .insert(archiveData);
         
         if (archiveError) {
-          console.warn('⚠️ Erreur archivage daily_reports:', archiveError);
         } else {
-          console.log('✅ Rapport complet archivé dans daily_reports');
         }
       }
       
@@ -187,9 +179,7 @@ export class RoomArchiveService {
       const assignmentsCleared = deletedAssignments?.length || 0;
       
       if (assignmentsError) {
-        console.warn('⚠️ Erreur suppression assignations:', assignmentsError);
       } else {
-        console.log(`🗑️ ${assignmentsCleared} assignations supprimées`);
       }
       
       // 8. Supprimer les entrées d'inventaire linge liées aux tâches du jour
@@ -207,7 +197,6 @@ export class RoomArchiveService {
           .eq('hotel_id', hotelId)
           .eq('task_date', today);
         
-        console.log(`🧺 ${taskIds.length} tâches d'inventaire linge supprimées`);
       }
       
       // 9. Supprimer les chambres pour vider la page (registre préservé)
@@ -236,7 +225,6 @@ export class RoomArchiveService {
         .eq('hotel_id', hotelId)
         .eq('log_date', today);
       
-      console.log(`✅ Archivage terminé: ${roomsCount} chambres, ${assignmentsCleared} assignations, ${taskIds.length} inventaires linge`);
       
       return {
         archived: roomsCount,
@@ -260,7 +248,6 @@ export class RoomArchiveService {
     sourceName: string,
     skipRegistryUpdate: boolean = false
   ): Promise<{ deleted: number; inserted: number; newRoomsForRegistry: any[] }> {
-    console.log(`🔄 Remplacement de toutes les chambres pour ${hotelId}`);
     
     try {
       // 1. Compter les chambres existantes
@@ -294,7 +281,6 @@ export class RoomArchiveService {
       // NOTE: Le registre des chambres (hotel_rooms_registry) est PRÉSERVÉ
       // Il sert de référence permanente des chambres de l'hôtel
       
-      console.log(`🗑️ ${existingCount || 0} anciennes chambres supprimées (registre préservé)`);
       
       // 5. Insérer les nouvelles chambres dans rooms
       // IMPORTANT: Sauvegarder le cleaningType appris par l'IA
@@ -307,7 +293,6 @@ export class RoomArchiveService {
           // Skip si déjà vu (doublon dans le PDF)
           if (!roomNumber || seenRoomNumbers.has(roomNumber)) {
             if (roomNumber) {
-              console.log(`⚠️ Doublon ignoré: chambre ${roomNumber}`);
             }
             return null;
           }
@@ -326,7 +311,6 @@ export class RoomArchiveService {
           // Déterminer le statut correct selon le cleaningType
           const status = dbCleaningType === 'none' ? 'clean' : 'needs-cleaning';
           
-          console.log(`📝 [Replace] Chambre ${roomNumber}: cleaningType=${room.cleaningType} → DB=${dbCleaningType}, status=${status}`);
           
           return {
             hotel_id: hotelId,
@@ -369,9 +353,7 @@ export class RoomArchiveService {
         new Map(newRoomsForRegistry.map(r => [r.room_number, r])).values()
       );
       
-      console.log(`📋 ${uniqueNewRooms.length} nouvelles chambres détectées (pas dans le registre)`);
       
-      console.log(`✅ ${roomsForInsert.length} chambres insérées pour aujourd'hui`);
       
       return {
         deleted: existingCount || 0,
@@ -416,7 +398,6 @@ export class RoomArchiveService {
 
       if (error) throw error;
 
-      console.log(`✅ ${rooms.length} chambres ajoutées au registre permanent`);
       return rooms.length;
     } catch (error) {
       console.error('❌ Erreur ajout au registre:', error);

@@ -13,7 +13,6 @@ export class HousekeeperAuthService {
   // Créer une session d'accès pour permettre l'accès aux données via RLS
   private static async createAccessSession(hotelId: string, housekeeperId: string, housekeeperName: string, accessCodeUsed: string): Promise<string | null> {
     try {
-      console.log('🔑 Création session d\'accès pour:', { hotelId, housekeeperId, housekeeperName });
       
       // Créer une nouvelle session valide 24h
       const expiresAt = new Date();
@@ -38,9 +37,7 @@ export class HousekeeperAuthService {
       if (error) {
         console.error('❌ Erreur création session d\'accès:', error);
         // Ne pas bloquer la connexion si la session échoue
-        console.warn('⚠️ Poursuite sans session en base - utilisation localStorage uniquement');
       } else {
-        console.log('✅ Session d\'accès créée en base:', { sessionId: data?.id });
       }
       
       // TOUJOURS sauvegarder le token localement - c'est notre source de vérité
@@ -50,7 +47,6 @@ export class HousekeeperAuthService {
       localStorage.setItem('housekeeperSessionHousekeeperId', housekeeperId || 'anonymous');
       localStorage.setItem('housekeeperSessionHousekeeperName', housekeeperName || 'Housekeeper');
       
-      console.log('✅ Session sauvegardée localement:', { sessionToken, expiresAt: expiresAt.toISOString() });
       return sessionToken;
     } catch (err) {
       console.error('💥 Erreur création session:', err);
@@ -65,7 +61,6 @@ export class HousekeeperAuthService {
     
     const isValid = new Date(expiresAt) > new Date();
     if (!isValid) {
-      console.log('⚠️ Session expirée, nettoyage...');
       this.clearSession();
     }
     return isValid;
@@ -95,12 +90,10 @@ export class HousekeeperAuthService {
     localStorage.removeItem('housekeeper');
     localStorage.removeItem('housekeeperProfile');
     localStorage.removeItem('selectedHotelId');
-    console.log('🧹 Session locale nettoyée');
   }
 
   // Authentification avec code complet en s'alignant sur la fonction SQL authenticate_housekeeper_by_code
   static async authenticateWithFullCode(accessCode: string): Promise<HousekeeperAuthResult> {
-    console.log('🔐 Authentification (RPC) avec code complet:', accessCode);
 
     try {
       // Validation basique
@@ -115,19 +108,16 @@ export class HousekeeperAuthService {
       const normalized = accessCode.trim().toUpperCase();
 
       // Utiliser la fonction SQL centralisée
-      console.log('📞 Appel RPC authenticate_housekeeper_by_code avec:', normalized);
       const { data, error } = await supabase.rpc('authenticate_housekeeper_by_code', {
         p_access_code: normalized
       });
 
-      console.log('📊 Réponse RPC brute:', { data, error });
 
       if (error) {
         console.error('💥 Erreur RPC authenticate_housekeeper_by_code:', error);
 
         // Fallback spécifique si la fonction SQL a un bug de colonne ("hotel id" au lieu de "hotel_id")
         if (error.message && error.message.toLowerCase().includes('hotel id')) {
-          console.warn('⚠️ Erreur de colonne dans la fonction RPC, fallback via requête directe sur les tables');
 
           const { data: codeRecord, error: fallbackError } = await supabase
             .from('housekeeper_access_codes')
@@ -179,7 +169,6 @@ export class HousekeeperAuthService {
             role_id: null
           };
 
-          console.log('✅ Authentification réussie via fallback direct:', { hotel, housekeeper });
 
           // Créer une session d'accès pour permettre l'accès aux données via RLS
           await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name, normalized);
@@ -201,7 +190,6 @@ export class HousekeeperAuthService {
 
       const result = (data as any)?.[0];
 
-      console.log('📊 Résultat RPC authenticate_housekeeper_by_code:', result);
 
       if (!result || !result.success) {
         return {
@@ -231,7 +219,6 @@ export class HousekeeperAuthService {
         role_id: null
       };
 
-      console.log('✅ Authentification réussie via RPC:', { hotel, housekeeper, code_source: result.code_source });
 
       // Créer une session d'accès pour permettre l'accès aux données via RLS
       await this.createAccessSession(hotel.id, housekeeper.id, housekeeper.name, normalized);
@@ -254,7 +241,6 @@ export class HousekeeperAuthService {
 
   // Find hotel by code only (for two-step authentication)
   static async findHotelByCode(hotelCodeInput: string): Promise<HousekeeperAuthResult> {
-    console.log('🔍 Recherche hôtel avec code:', hotelCodeInput);
     
     try {
       const normalized = (hotelCodeInput || '').trim().toUpperCase();
@@ -291,7 +277,6 @@ export class HousekeeperAuthService {
         };
       }
 
-      console.log('✅ Hôtel trouvé:', hotel);
       return { success: true, hotel, debugInfo: { hotel } };
 
     } catch (error) {
@@ -302,7 +287,6 @@ export class HousekeeperAuthService {
 
   // Test if access code exists and is valid
   static async testAccessCode(accessCode: string): Promise<HousekeeperAuthResult> {
-    console.log('🧪 Test du code d\'accès:', accessCode);
     
     try {
       // Get all matching codes for debugging

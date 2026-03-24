@@ -29,7 +29,6 @@ export function RoomStatusTabs({ activeTab, onTabChange, counts, compact = false
   ];
 
   const handleTabChange = (value: string) => {
-    console.log('🎯 Tab clicked:', value);
     onTabChange(value as RoomFilterTab);
   };
 
@@ -78,7 +77,6 @@ export function filterRoomsByTab<T extends { status?: string; cleaning_type?: st
 ): T[] {
   if (tab === 'all') return rooms;
   
-  console.log('🔍 Filtering rooms by tab:', tab, 'Total rooms:', rooms.length);
   
   const result = rooms.filter((room) => {
     const status = (room.status || '').toLowerCase().replace(/-/g, '_');
@@ -122,7 +120,6 @@ export function filterRoomsByTab<T extends { status?: string; cleaning_type?: st
     }
   });
   
-  console.log('🔍 Filtered result for', tab, ':', result.length, 'rooms');
   return result;
 }
 
@@ -165,6 +162,5 @@ export function calculateRoomCounts<T extends { status?: string; cleaning_type?:
     }).length,
   };
   
-  console.log('📊 Room counts calculated:', counts);
   return counts;
 }

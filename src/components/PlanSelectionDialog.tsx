@@ -82,7 +82,6 @@ export function PlanSelectionDialog({ isOpen, onClose, onPlanSelected }: PlanSel
                 user_id: user.id
               });
             
-            console.log('✅ Hôtel créé automatiquement:', hotelName);
           }
         }
         

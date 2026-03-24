@@ -79,7 +79,6 @@ export function useUserTypeGuard(expectedType: Exclude<UserType, null>): UserTyp
           return;
         }
 
-        console.log('🔐 Checking user type for:', email);
 
         // Check all profile types in parallel (including technicians)
         const [hotelResult, housekeeperResult, governessResult, technicianResult] = await Promise.all([
@@ -102,14 +101,12 @@ export function useUserTypeGuard(expectedType: Exclude<UserType, null>): UserTyp
           detectedType = 'establishment';
         }
 
-        console.log('🔐 Detected user type:', detectedType, 'Expected:', expectedType);
 
         setUserType(detectedType);
         hasCheckedRef.current = true;
 
         // If detected type doesn't match expected, redirect
         if (detectedType && detectedType !== expectedType) {
-          console.warn(`⚠️ User type mismatch! ${detectedType} trying to access ${expectedType} interface`);
           
           toast({
             variant: "destructive",

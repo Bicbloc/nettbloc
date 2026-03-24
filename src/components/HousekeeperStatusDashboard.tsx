@@ -43,7 +43,6 @@ export const HousekeeperStatusDashboard: React.FC<HousekeeperStatusDashboardProp
 
   const fetchHousekeepersStatus = async () => {
     try {
-      console.log('Fetching housekeeper status for hotel:', hotelId);
       
       const allHousekeepers: HousekeeperStatus[] = [];
 

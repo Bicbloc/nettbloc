@@ -91,7 +91,6 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
       // Get user email first to query by email (RLS policy uses email verification)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) {
-        console.log('ℹ️ Pas d\'email utilisateur disponible');
         setProfile(null);
         setLoading(false);
         return;
@@ -105,11 +104,9 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
         .maybeSingle();
 
       if (profileError && profileError.code !== 'PGRST116') {
-        console.warn('⚠️ Erreur profil technicien:', profileError.message);
       }
       
       if (!profileData) {
-        console.log('ℹ️ Pas de profil technicien pour cet utilisateur');
         setProfile(null);
         setLoading(false);
         return;

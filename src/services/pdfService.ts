@@ -132,14 +132,11 @@ async function loadHotelCombinationRules(hotelId: string): Promise<HotelCombinat
       .order('priority', { ascending: false });
     
     if (error) {
-      console.warn('Erreur lors du chargement des règles de combinaison:', error);
       return [];
     }
     
-    console.log(`📋 ${data?.length || 0} règles de combinaison chargées pour l'hôtel`);
     return (data || []) as HotelCombinationRule[];
   } catch (err) {
-    console.warn('Exception lors du chargement des règles:', err);
     return [];
   }
 }
@@ -251,7 +248,6 @@ function applyHotelCombinationRules(
           room.cleaningType;
         
         if (newCleaningType !== room.cleaningType) {
-          console.log(`🔄 Règle "${rule.rule_name}" appliquée à ${room.number}: ${room.cleaningType} → ${newCleaningType}`);
           appliedCount++;
           
           const newPriority: Room['priority'] = newCleaningType === 'a_blanc' ? 'high' : newCleaningType === 'recouche' ? 'medium' : 'low';
@@ -273,7 +269,6 @@ function applyHotelCombinationRules(
   });
   
   if (appliedCount > 0) {
-    console.log(`✅ ${appliedCount} chambres modifiées par les règles de combinaison`);
   }
   
   return updatedRooms;
@@ -523,7 +518,6 @@ function applyFloorCoherenceFilterRooms(rooms: Room[]): Room[] {
     // 2-digit room in a 3-digit dominant set: only keep if it has meaningful status
     const hasStatus = room.cleaningType && room.cleaningType !== 'none';
     if (!hasStatus) {
-      console.log(`🧹 Cohérence étage (pdfService): rejet "${room.number}"`);
     }
     return hasStatus;
   });
@@ -737,8 +731,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     const preprocessResult = textPreprocessor.preprocess(rawText);
     const fullText = preprocessResult.text;
     
-    console.log(`📄 PDF extrait: ${preprocessResult.stats.originalLength} → ${preprocessResult.stats.processedLength} chars`);
-    console.log(`📝 Patterns appliqués: ${preprocessResult.stats.patternsApplied.join(', ') || 'aucun'}`);
     
     lastExtractedText = fullText;
     
@@ -755,17 +747,14 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
         const patternCount = unifiedParserService.getLearnedPatternCount();
         
         if (patternCount > 0) {
-          console.log(`🧠 ${patternCount} patterns entraînés trouvés pour cet hôtel — utilisation prioritaire`);
           useTrainedModel = true;
         }
       } catch (err) {
-        console.warn('⚠️ Erreur chargement patterns entraînés:', err);
       }
     }
     
     // ===== Si modèle entraîné existe, l'utiliser en PRIORITÉ ABSOLUE =====
     if (useTrainedModel && hotelId) {
-      console.log(`🎯 Utilisation du modèle entraîné de l'hôtel (priorité absolue)`);
       
       try {
         await unifiedParserService.loadHotelPatterns(hotelId);
@@ -829,20 +818,17 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
           return rooms;
         }
       } catch (err) {
-        console.warn('⚠️ Erreur parsing avec modèle entraîné, fallback vers détection automatique:', err);
       }
     }
 
     // ===== PHASE 0b: Détection du format avec ReportFormatDetector =====
     const formatDetection = detectReportFormat(fullText);
-    console.log(`🔍 Format détecté: ${formatDetection.format} (confiance: ${formatDetection.confidence}%)`);
     
     // Utiliser le parser dédié si format reconnu avec bonne confiance ET résultats non vides
     if (['apaleo_housekeeping', 'mews_space_status', 'medialog_etat'].includes(formatDetection.format) && 
         formatDetection.confidence >= 50 && 
         formatDetection.parsedData.rows.length > 0) {
       
-      console.log(`🎯 Utilisation du parser ${formatDetection.format}`);
       
       const parsedRows = formatDetection.parsedData.rows;
       let rooms = parsedRows.map(convertParsedRowToRoom);
@@ -890,12 +876,10 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
             }
             
             if (supplementedCount > 0) {
-              console.log(`🧠 Modèle entraîné: +${supplementedCount} chambres supplémentaires (total: ${rooms.length})`);
             }
             
             // If trained model found MORE rooms, use its results as base
             if (trainedRooms.length > rooms.length) {
-              console.log(`🧠 Le modèle entraîné a trouvé plus de chambres (${trainedRooms.length} vs ${rooms.length}), utilisation de ses résultats`);
               const phase0Map = new Map(rooms.map(r => [r.number, r]));
               rooms = trainedRooms.map(tr => {
                 const phase0Room = phase0Map.get(tr.number);
@@ -919,7 +903,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
             }));
           }
         } catch (err) {
-          console.warn('⚠️ Erreur chargement patterns entraînés:', err);
         }
       }
 
@@ -940,12 +923,10 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
                 trainedType: trainedRoom.cleaningType || 'unknown',
               });
               // If trained model has higher confidence, use its cleaning type
-              console.log(`⚠️ Divergence chambre ${room.number}: Phase0=${room.cleaningType} vs Trained=${trainedRoom.cleaningType}`);
             }
           }
         }
         if (crossValidationDivergences.length > 0) {
-          console.log(`🔍 Cross-validation: ${crossValidationMatches} concordances, ${crossValidationDivergences.length} divergences`);
         }
       }
 
@@ -980,7 +961,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       if (hotelId) {
         const combinationRules = await loadHotelCombinationRules(hotelId);
         if (combinationRules.length > 0) {
-          console.log(`🔧 Application de ${combinationRules.length} règles de combinaison personnalisées...`);
           rooms = applyHotelCombinationRules(rooms, combinationRules, parsedRows);
         }
       }
@@ -993,7 +973,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
         // Reject single-digit room numbers (1-9) — these are almost always false positives
         // (e.g. "Nb pers" column values, page counters, table indices)
         if (roomNumDigits.length === 1) {
-          console.log(`🚫 Chambre ${room.number} rejetée (numéro à 1 chiffre = faux positif)`);
           return false;
         }
         
@@ -1003,7 +982,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
         const hasGuestData = room.guestName || room.arrivalDate || room.departureDate;
         
         if (roomNumDigits.length <= 2 && roomNumInt < 20 && !hasCleaningInfo && !hasGuestData && !hasNotes) {
-          console.log(`🚫 Chambre ${room.number} rejetée (numéro suspect sans contexte)`);
           return false;
         }
         
@@ -1015,8 +993,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       const recoucheCount = rooms.filter(r => r.cleaningType === 'recouche').length;
       const noneCount = rooms.filter(r => r.cleaningType === 'none').length;
       
-      console.log(`📊 Résultat final: ${rooms.length} chambres`);
-      console.log(`🔵 À blanc: ${aBlancCount} | 🟢 Recouche: ${recoucheCount} | ⚪ Aucun: ${noneCount}`);
       
       // Créer des RoomLines synthétiques pour la prévisualisation
       // Inclure TOUTES les chambres (Phase 0 + patterns entraînés)
@@ -1060,7 +1036,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     const roomLines = parseRoomLines(fullText, excludeList);
     lastParsedLines = roomLines;
     
-    console.log(`🧠 RoomLineParser: ${roomLines.length} chambres détectées`);
     
     if (roomLines.length > 0) {
       // Statistiques de confiance
@@ -1068,8 +1043,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       const aBlancCount = roomLines.filter(l => l.cleaningType === 'a_blanc').length;
       const recoucheCount = roomLines.filter(l => l.cleaningType === 'recouche').length;
       
-      console.log(`📊 Confiance moyenne: ${avgConfidence.toFixed(1)}%`);
-      console.log(`🔵 À blanc: ${aBlancCount} | 🟢 Recouche: ${recoucheCount}`);
       
       // Convertir les RoomLines en Rooms
       const rooms = roomLines.map(convertRoomLineToRoom);
@@ -1083,7 +1056,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     }
     
     // ===== PHASE 2: Fallback vers unifiedParserService =====
-    console.log('🔄 Fallback vers unifiedParserService...');
     
     let rooms: Room[] = [];
     
@@ -1091,8 +1063,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       await unifiedParserService.loadHotelPatterns(hotelId);
       const result = await unifiedParserService.parseReport(fullText, hotelId, forceAi);
       
-      console.log(`✅ PMS: ${result.pmsType} (confiance: ${result.confidence.toFixed(1)}%)`);
-      console.log(`📊 ${result.rooms.length} chambres extraites (AI: ${result.usedAi})`);
       
       rooms = convertExtractedRoomsToRooms(result.rooms);
       
@@ -1105,7 +1075,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       }
     } else {
       const detection = unifiedParserService.detectPmsType(fullText);
-      console.log(`🔍 PMS détecté: ${detection.pmsType} (confiance: ${detection.confidence.toFixed(1)}%)`);
       
       const result = await unifiedParserService.parseReport(fullText, 'default', forceAi);
       rooms = convertExtractedRoomsToRooms(result.rooms);
@@ -1120,7 +1089,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     }
     
     // Aucune chambre trouvée
-    console.log("⚠️ Aucune chambre détectée dans le PDF");
     toast({
       variant: "destructive",
       title: "Aucune chambre détectée",

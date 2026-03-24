@@ -121,7 +121,6 @@ export const EnhancedPatternLearning = ({
   useEffect(() => {
     const extractedDate = extractReportDate(rawText);
     setReportDate(extractedDate);
-    console.log('📅 Date du rapport extraite:', extractedDate);
   }, [rawText, extractReportDate]);
   
   // Diviser le texte en lignes pour affichage
@@ -168,7 +167,6 @@ export const EnhancedPatternLearning = ({
   }, [rawText]);
 
   const loadExistingPatterns = async () => {
-    console.log(`🔍 EnhancedPatternLearning: Chargement des patterns pour ${hotelId}`);
     
     // Charger les patterns: créés par cet hôtel OU assignés à cet hôtel OU patterns par défaut
     const { data } = await supabase
@@ -180,7 +178,6 @@ export const EnhancedPatternLearning = ({
       .limit(10);
 
     if (data) {
-      console.log(`✅ ${data.length} pattern(s) trouvé(s)`);
       setExistingPatterns(data);
     }
   };

@@ -48,7 +48,6 @@ export class SupabaseService {
         const { data: rpcCode, error: rpcErr } = await supabase.rpc('generate_short_hotel_id');
         if (!rpcErr && rpcCode) generatedCode = rpcCode as string;
       } catch (e) {
-        console.warn('⚠️ RPC generate_short_hotel_id indisponible, fallback local');
       }
       if (!generatedCode) {
         const rand = Math.floor(1 + Math.random() * 999);
@@ -170,7 +169,6 @@ export class SupabaseService {
 
   static async getHotelByCode(hotelCode: string): Promise<Hotel | null> {
     try {
-      console.log('🏨 Recherche hôtel avec le code:', hotelCode);
       
       const { data, error } = await supabase
         .from('hotels')
@@ -184,11 +182,9 @@ export class SupabaseService {
       }
       
       if (!data) {
-        console.log('❌ Aucun hôtel trouvé avec le code:', hotelCode);
         return null;
       }
       
-      console.log('✅ Hôtel trouvé:', data);
       return data as Hotel;
     } catch (err) {
       console.error('❌ Erreur getHotelByCode:', err);
@@ -245,7 +241,6 @@ export class SupabaseService {
         throw error;
       }
       
-      console.log(`✅ Femme de chambre ${name} créée avec code:`, accessCode);
       housekeepers.push(data);
     }
     
@@ -263,11 +258,9 @@ export class SupabaseService {
       .maybeSingle();
     
     if (existing) {
-      console.log('Femme de chambre existe déjà:', existing.name);
       return existing as Housekeeper;
     }
     try {
-      console.log('🔧 Début création femme de chambre:', { hotelId, name });
       
       // Vérifier la session active d'abord
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -285,7 +278,6 @@ export class SupabaseService {
         throw new Error('Utilisateur non connecté. Veuillez vous reconnecter.');
       }
 
-      console.log('✅ Session valide pour user:', user.email);
 
       // Générer un code d'accès unique avec la nouvelle fonction simplifiée
       const { data: accessCode, error: codeError } = await supabase
@@ -302,7 +294,6 @@ export class SupabaseService {
         throw new Error(`Erreur génération code: ${codeError.message}`);
       }
 
-      console.log('✅ Code d\'accès généré:', accessCode);
 
       const { data, error } = await supabase
         .from('housekeepers')
@@ -315,14 +306,12 @@ export class SupabaseService {
         .select()
         .single();
       
-      console.log('👩‍🏠 Résultat création femme de chambre:', { data, error });
       
       if (error) {
         console.error('❌ Erreur création femme de chambre:', error);
         return null;
       }
       
-      console.log('✅ Femme de chambre créée avec succès:', data);
       return data as Housekeeper;
     } catch (err: any) {
       console.error('❌ Erreur createHousekeeper:', err);
@@ -423,7 +412,6 @@ export class SupabaseService {
   }
 
   static async authenticateHousekeeper(accessCode: string): Promise<Housekeeper | null> {
-    console.log('🔐 Tentative d\'authentification avec code:', accessCode);
     
     try {
       // Nouvelle méthode: chercher dans housekeeper_access_codes d'abord
@@ -442,7 +430,6 @@ export class SupabaseService {
       }
 
       if (accessCodeData?.housekeepers) {
-        console.log('✅ Code trouvé dans housekeeper_access_codes');
         
         // Marquer le code comme utilisé
         await supabase
@@ -450,12 +437,10 @@ export class SupabaseService {
           .update({ used_at: new Date().toISOString() })
           .eq('id', accessCodeData.id);
           
-        console.log('✅ Authentification réussie pour:', accessCodeData.housekeepers.name);
         return accessCodeData.housekeepers as Housekeeper;
       }
 
       // Fallback: chercher directement dans la table housekeepers (ancien système)
-      console.log('🔄 Fallback: recherche dans table housekeepers...');
       const { data: housekeeperData, error: housekeeperError } = await supabase
         .from('housekeepers')
         .select('*, hotels!inner(id, hotel_code)')
@@ -486,7 +471,6 @@ export class SupabaseService {
         }
       }
       
-      console.log('✅ Authentification réussie pour:', housekeeperData.name);
       return housekeeperData as Housekeeper;
       
     } catch (error) {
@@ -533,7 +517,6 @@ export class SupabaseService {
       if (sessionError) {
         console.error('Erreur récupération sessions actives:', sessionError);
       } else if (activeSessions && activeSessions.length > 0) {
-        console.log(`✅ ${activeSessions.length} femme(s) de chambre authentifiée(s) trouvée(s)`);
         
         // Convertir les sessions en format Housekeeper
         for (const session of activeSessions) {
@@ -555,10 +538,8 @@ export class SupabaseService {
     }
     
     if (housekeepers.length === 0) {
-      console.log('⚠️ Aucune femme de chambre trouvée pour l\'hôtel:', hotelId);
     }
     
-    console.log(`✅ Total: ${housekeepers.length} femme(s) de chambre récupérée(s)`);
     return housekeepers;
   }
 

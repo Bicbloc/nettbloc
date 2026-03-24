@@ -126,7 +126,6 @@ const HotelLoadingScreen = () => {
   
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.warn('⚠️ Hotel loading timeout (10s)');
       setTimedOut(true);
     }, 10000);
     
@@ -352,7 +351,6 @@ const IndexDashboard = () => {
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
     // Ignorer les updates realtime pendant l'import
     if (isImporting) {
-      console.log('⏸️ Realtime ignoré pendant import:', table);
       return;
     }
     

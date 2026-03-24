@@ -101,14 +101,12 @@ export const useAutoSetup = () => {
     if (!user || loading) return;
     
     hasAttemptedSetup.current = true;
-    console.log('🏨 Starting optimized hotel setup for user:', user.id);
     setLoading(true);
     
     try {
       // PHASE 1: Vérification RAPIDE du cache localStorage
       const cachedHotel = storageService.getHotel();
       if (cachedHotel && cachedHotel.id && cachedHotel.id.length > 30) {
-        console.log('⚡ CACHE HIT - Vérification propriété:', cachedHotel.id.slice(0, 8) + '...');
         
         // Vérifier que l'hôtel existe ET appartient à l'utilisateur connecté
         const { data: hotelExists, error: hotelExistsError } = await supabase
@@ -119,7 +117,6 @@ export const useAutoSetup = () => {
           .maybeSingle();
 
         if (hotelExists) {
-          console.log('✅ Cache validé - hôtel appartient à l\'utilisateur');
           setHotel({
             id: hotelExists.id,
             name: hotelExists.name,
@@ -138,14 +135,11 @@ export const useAutoSetup = () => {
 
         // IMPORTANT: ne pas "déconnecter" sur une erreur réseau/timeout (on laisse Phase 2 rattraper)
         if (hotelExistsError) {
-          console.warn('⚠️ Vérification cache échouée, on conserve le cache et on continue:', hotelExistsError);
         } else {
-          console.log('⚠️ Cache invalide - hôtel n\'appartient pas à l\'utilisateur, nettoyage...');
           storageService.clearHotel();
         }
       }
 
-      console.log('📡 Cache miss - Chargement depuis base de données...');
 
       // PHASE 2: Requête UNIQUE avec lien direct profiles.current_hotel_id
       const { data: profileData, error: profileError } = await supabase
@@ -176,14 +170,11 @@ export const useAutoSetup = () => {
       // Si l'hôtel est lié au profil, l'utiliser directement
       if (profileData?.hotels) {
         hotelResult = profileData.hotels as unknown as HotelData;
-        console.log('✅ Hôtel chargé via lien direct profiles.current_hotel_id');
       } else {
         // Fallback: chercher par user_id ou email
-        console.log('🔍 Recherche hôtel par user_id/email...');
         hotelResult = await findUserHotel(user);
         
         if (!hotelResult) {
-          console.log('🆕 Création nouvel hôtel...');
           hotelResult = await createHotel(user);
         }
 
@@ -193,7 +184,6 @@ export const useAutoSetup = () => {
             .from('profiles')
             .update({ current_hotel_id: hotelResult.id })
             .eq('id', user.id);
-          console.log('✅ Lien profiles.current_hotel_id mis à jour');
         }
       }
 
@@ -202,12 +192,11 @@ export const useAutoSetup = () => {
         setLoading(false);
         return;
       }
-
-      console.log('✅ Configuration hôtel terminée:', {
+      const hotelInfo = {
         id: hotelResult.id,
         name: hotelResult.name,
         code: hotelResult.hotel_code
-      });
+      };
 
       // Sauvegarder dans le cache pour prochain chargement
       setHotel(hotelResult);
@@ -221,13 +210,11 @@ export const useAutoSetup = () => {
       const activeCode = await getActiveAccessCode(hotelResult.id);
       if (activeCode) {
         setAccessCode(activeCode);
-        console.log('✅ Code d\'accès actif trouvé');
       }
 
       // Phase 1: Create/restore session immediately after hotel setup
       const sessionToken = await HotelSessionService.createSession(hotelResult.id);
       if (sessionToken) {
-        console.log('✅ Session créée/restaurée:', sessionToken);
       }
 
       setIsSetupComplete(true);
@@ -239,13 +226,6 @@ export const useAutoSetup = () => {
   }, [user]);
 
   useEffect(() => {
-    console.log('🔄 useAutoSetup effect déclenché', {
-      authLoading,
-      isAuthenticated,
-      userId: user?.id,
-      lastUserId,
-      hasAttempted: hasAttemptedSetup.current
-    });
 
     // Attendre que l'auth soit complètement initialisée
     if (authLoading) {
@@ -265,7 +245,6 @@ export const useAutoSetup = () => {
 
     // Nouvel utilisateur connecté -> on réinitialise le flag de setup
     if (lastUserId !== user.id) {
-      console.log('👤 Nouvel utilisateur détecté, réinitialisation du setup');
       hasAttemptedSetup.current = false;
       setLastUserId(user.id);
     }

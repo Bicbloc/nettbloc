@@ -95,7 +95,6 @@ export class MedialogAdapter extends PmsAdapter {
         return rooms;
       }
       // Fallback: essayer le parsing de texte collé
-      console.log("📄 MedialogAdapter: Format structuré détecté mais pas de chambres, essai parsing collé...");
       return this.extractFromConcatenatedText(text);
     }
     // Sinon utiliser l'extraction standard
@@ -107,7 +106,6 @@ export class MedialogAdapter extends PmsAdapter {
    * Pattern cible: "01   Chambre twin   17/05/2025..." 
    */
   private extractFromConcatenatedText(text: string): ExtractedRoom[] {
-    console.log("📄 MedialogAdapter: Parsing texte concaténé...");
     
     const roomDataMap = new Map<string, StructuredRoomData[]>();
     
@@ -117,7 +115,6 @@ export class MedialogAdapter extends PmsAdapter {
     
     // Trouver toutes les positions de début
     const matches = [...text.matchAll(roomStartPattern)];
-    console.log(`📄 MedialogAdapter: ${matches.length} entrées de chambre trouvées`);
     
     if (matches.length === 0) {
       // Fallback: essayer un pattern encore plus souple
@@ -183,7 +180,6 @@ export class MedialogAdapter extends PmsAdapter {
    * Fallback pour texte très mal formaté
    */
   private extractFromConcatenatedTextFallback(text: string): ExtractedRoom[] {
-    console.log("📄 MedialogAdapter: Fallback - recherche pattern souple...");
     
     const roomDataMap = new Map<string, StructuredRoomData[]>();
     
@@ -191,7 +187,6 @@ export class MedialogAdapter extends PmsAdapter {
     const loosePattern = /(\d{1,3})\s+Chambre\s+(twin|double|triple|quadruple|simple)/gi;
     const matches = [...text.matchAll(loosePattern)];
     
-    console.log(`📄 MedialogAdapter Fallback: ${matches.length} entrées trouvées`);
     
     for (let i = 0; i < matches.length; i++) {
       const match = matches[i];

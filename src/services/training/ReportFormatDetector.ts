@@ -157,7 +157,6 @@ const FORMAT_SIGNATURES: Record<ReportFormat, { patterns: RegExp[]; weight: numb
 export function detectReportFormat(text: string): FormatDetection {
   // 1. Détecter le format global
   const format = detectFormat(text);
-  console.log('Detected format:', format);
   
   // 2. Parser selon le format spécifique
   const parsedData = parseReportByFormat(text, format);
@@ -199,7 +198,6 @@ function detectFormat(text: string): ReportFormat {
   let bestScore = 0;
   
   for (const [format, score] of formatScores.entries()) {
-    console.log(`Format ${format}: score ${score}`);
     if (score > bestScore) {
       bestScore = score;
       bestFormat = format;
@@ -230,7 +228,6 @@ function parseReportByFormat(text: string, format: ReportFormat): ParsedReportDa
   
   // Fallback: si le parser spécifique retourne 0 lignes, utiliser le parser générique
   if (result.rows.length === 0) {
-    console.warn(`⚠️ Le parser ${format} n'a retourné aucune chambre — fallback vers parser générique`);
     return parseGenericReport(text);
   }
   
@@ -618,7 +615,6 @@ function parseApaleoReport(text: string): ParsedReportData {
     roomEntries.push(currentEntry);
   }
   
-  console.log(`📋 Apaleo: ${roomEntries.length} entrées de chambre trouvées`);
   
   // Parser chaque entrée
   for (const entry of roomEntries) {
@@ -644,7 +640,6 @@ function parseApaleoReport(text: string): ParsedReportData {
     // Normaliser le numéro de chambre (garder les zéros devant)
     roomNumber = roomNumber.padStart(2, '0');
     
-    console.log(`🏠 Chambre détectée: ${roomNumber} - ${roomType}`);
     
     // Extraire le statut
     const statusMatch = entry.match(statusPattern);
@@ -877,7 +872,6 @@ function detectTableHeader(lines: string[]): { headerLineIndex: number; roomColu
     );
 
     if (roomColIdx !== -1) {
-      console.log(`📋 En-tête tableau détecté ligne ${i}: "${lines[i].trim().substring(0, 80)}" — colonne chambre: ${roomColIdx}`);
       return { headerLineIndex: i, roomColumnIndex: roomColIdx, delimiter };
     }
   }
@@ -906,13 +900,11 @@ function applyFloorCoherenceFilter(rows: ParsedRow[]): ParsedRow[] {
     // 2-digit room: only keep if it has an explicit status
     const hasExplicitStatus = EXPLICIT_STATUSES.test(r.rawLine);
     if (!hasExplicitStatus) {
-      console.log(`🧹 Cohérence étage: rejet "${r.roomNumber}" (2 chiffres sans statut explicite)`);
     }
     return hasExplicitStatus;
   });
 
   if (filtered.length < rows.length) {
-    console.log(`🧹 Cohérence étage: ${rows.length - filtered.length} faux positifs rejetés (${threeDigitCount}/${rows.length} = ${Math.round(ratio * 100)}% à 3+ chiffres)`);
   }
 
   return filtered;

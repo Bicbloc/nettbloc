@@ -56,7 +56,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data, error } = await supabase.auth.refreshSession();
       
       if (error) {
-        console.warn('⚠️ Refresh session failed:', error.message);
         if (error.message.includes('invalid') || error.message.includes('expired')) {
           storageService.clearVolatile();
           setSession(null);
@@ -111,7 +110,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       (event, currentSession) => {
         if (!mounted) return;
 
-        console.log('🔐 Auth event:', event);
 
         // Mise à jour synchrone de l'état (y compris INITIAL_SESSION)
         setSession(currentSession);
@@ -140,7 +138,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!mounted) return;
         
         if (error) {
-          console.warn('⚠️ getSession error:', error.message);
           setSession(null);
           setUser(null);
         } else {
@@ -223,12 +220,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       storageService.clearHotel();
       storageService.clearVolatile();
     } catch (e) {
-      console.warn('⚠️ Erreur nettoyage localStorage:', e);
     }
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.warn('⚠️ Erreur signOut Supabase:', e);
       // Forcer le nettoyage du token même si signOut échoue
       localStorage.removeItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
     }

@@ -94,7 +94,6 @@ export class SpaceStatusAdapter extends PmsAdapter {
       }
     }
 
-    console.log(`[SpaceStatusAdapter] Extracted ${rooms.length} rooms`);
     return rooms;
   }
 

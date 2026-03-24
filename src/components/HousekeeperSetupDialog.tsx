@@ -223,7 +223,6 @@ export function HousekeeperSetupDialog({
         if (codeError) {
           console.error('Erreur génération code pour', housekeeperName, ':', codeError);
         } else {
-          console.log('✅ Femme de chambre créée avec code:', housekeeperName, accessCode);
         }
 
       } catch (error) {

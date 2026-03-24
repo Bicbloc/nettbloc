@@ -125,7 +125,6 @@ export const HousekeeperManagement = () => {
 
     setIsLoading(true);
     try {
-      console.log('🔧 Création femme de chambre:', newHousekeeperName);
       
       const housekeeper = await SupabaseService.createHousekeeper(hotel.id, newHousekeeperName);
       
@@ -183,7 +182,6 @@ export const HousekeeperManagement = () => {
 
     setIsGeneratingCodes(true);
     try {
-      console.log('🔄 Génération optimisée des codes...');
       
       // Récupérer les femmes de chambre sans codes
       const missingHousekeepers = housekeepers
@@ -261,7 +259,6 @@ export const HousekeeperManagement = () => {
 
     setIsLoading(true);
     try {
-      console.log('🧹 Nettoyage de toutes les femmes de chambre...');
       
       const result = await SupabaseService.cleanupAllHousekeepers(hotel.id);
       
@@ -288,7 +285,6 @@ export const HousekeeperManagement = () => {
   };
 
   const syncWithContext = async () => {
-    console.log('⚠️ Synchronisation désactivée - création manuelle uniquement');
     toast({
       title: "Synchronisation désactivée",
       description: "Veuillez créer les femmes de chambre manuellement via le bouton 'Ajouter'."

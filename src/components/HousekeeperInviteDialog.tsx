@@ -28,7 +28,6 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
   const { toast } = useToast();
 
   const generateAccessCode = async () => {
-    console.log('Generating access code for hotel:', hotelId, 'and name:', name);
     setIsLoading(true);
     try {
       // Vérifier si la femme de chambre existe déjà
@@ -44,7 +43,6 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
       let housekeeperData: any;
 
       if (existingHousekeeper) {
-        console.log('✅ Femme de chambre déjà existante:', existingHousekeeper);
         generatedCode = existingHousekeeper.access_code;
         housekeeperData = existingHousekeeper;
         
@@ -143,7 +141,6 @@ export const HousekeeperInviteDialog: React.FC<HousekeeperInviteDialogProps> = (
             if (emailError) throw emailError;
             
             emailSent = true;
-            console.log('✅ Email invitation sent successfully');
           } catch (emailError) {
             retries--;
             console.error(`❌ Error sending invitation email (${retries} retries left):`, emailError);

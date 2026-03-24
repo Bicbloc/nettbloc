@@ -13,7 +13,6 @@ export class RoomSyncService {
    */
   static async syncRoom(hotelId: string, room: Room, actorName?: string): Promise<boolean> {
     try {
-      console.log('🔄 Synchronisation chambre:', { hotelId, roomNumber: room.number, status: room.status });
 
       // Trouver l'ID de la chambre dans la base
       const { data: existingRoom } = await supabase
@@ -24,7 +23,6 @@ export class RoomSyncService {
         .single();
 
       if (!existingRoom) {
-        console.warn('⚠️ Chambre non trouvée en base:', room.number);
         return false;
       }
 
@@ -72,7 +70,6 @@ export class RoomSyncService {
         }
       }
 
-      console.log('✅ Chambre synchronisée:', room.number);
       return true;
     } catch (error) {
       console.error('❌ Erreur synchronisation chambre:', error);
@@ -117,7 +114,6 @@ export class RoomSyncService {
         return false;
       }
 
-      console.log('✅ Statut mis à jour:', roomNumber, status);
       return true;
     } catch (error) {
       console.error('❌ Erreur mise à jour statut:', error);
@@ -157,7 +153,6 @@ export class RoomSyncService {
         return false;
       }
 
-      console.log('✅ Type nettoyage mis à jour:', roomNumber, cleaningType);
       return true;
     } catch (error) {
       console.error('❌ Erreur mise à jour type nettoyage:', error);
@@ -170,14 +165,12 @@ export class RoomSyncService {
    */
   static async syncMultipleRooms(hotelId: string, rooms: Room[]): Promise<boolean> {
     try {
-      console.log('🔄 Synchronisation batch de', rooms.length, 'chambres');
 
       const results = await Promise.all(
         rooms.map(room => this.syncRoom(hotelId, room))
       );
 
       const successCount = results.filter(r => r).length;
-      console.log(`✅ ${successCount}/${rooms.length} chambres synchronisées`);
 
       return successCount === rooms.length;
     } catch (error) {

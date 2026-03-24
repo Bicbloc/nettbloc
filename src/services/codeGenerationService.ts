@@ -7,7 +7,6 @@ export class CodeGenerationService {
    */
   static async ensureHotelCodesExist(): Promise<number> {
     try {
-      console.log('🏨 Vérification des codes d\'hôtel...');
       
       // Récupérer tous les hôtels sans hotel_code
       const { data: hotelsWithoutCode, error } = await supabase
@@ -30,14 +29,12 @@ export class CodeGenerationService {
 
           if (updateError) throw updateError;
 
-          console.log(`✅ Code d'hôtel assigné: ${hotel.name} -> ${hotelCode}`);
           fixed++;
         } catch (error) {
           console.error(`❌ Erreur assignation code pour ${hotel.name}:`, error);
         }
       }
 
-      console.log(`✅ ${fixed} codes d'hôtel assignés`);
       return fixed;
       
     } catch (error) {
@@ -51,7 +48,6 @@ export class CodeGenerationService {
    */
   static async cleanupOrphanedCodes(): Promise<number> {
     try {
-      console.log('🧹 Nettoyage des codes orphelins...');
       
       // Supprimer les codes d'accès sans femme de chambre associée
       const { data: orphanedCodes, error: orphanedError } = await supabase
@@ -63,10 +59,8 @@ export class CodeGenerationService {
       if (orphanedError) throw orphanedError;
 
       // Note: fonction de nettoyage des doublons à implémenter si nécessaire
-      console.log('📝 Nettoyage des codes orphelins terminé');
 
       const cleanedCount = orphanedCodes?.length || 0;
-      console.log(`✅ ${cleanedCount} codes orphelins nettoyés`);
       
       return cleanedCount;
     } catch (error) {
@@ -119,7 +113,6 @@ export class CodeGenerationService {
     const results = { generated: 0, errors: [] as string[] };
     
     try {
-      console.log('🔄 Génération forcée de tous les codes manquants...');
       
       // Nettoyer d'abord les codes orphelins
       await this.cleanupOrphanedCodes();
@@ -174,7 +167,6 @@ export class CodeGenerationService {
           if (codeError) throw codeError;
 
           results.generated++;
-          console.log(`✅ Code généré: ${housekeeperAny.name} -> ${accessCode}`);
           
         } catch (error: any) {
           const errorMsg = `Erreur pour ${housekeeperAny.name}: ${error.message}`;
@@ -183,7 +175,6 @@ export class CodeGenerationService {
         }
       }
 
-      console.log(`✅ Génération forcée terminée: ${results.generated} codes générés, ${results.errors.length} erreurs`);
       
     } catch (error: any) {
       results.errors.push(`Erreur globale: ${error.message}`);
@@ -198,11 +189,9 @@ export class CodeGenerationService {
    */
   static async ensureCodesForAssignedHousekeepers(hotelId: string, assignedHousekeepers: string[]): Promise<number> {
     if (!hotelId || !assignedHousekeepers.length) {
-      console.log('🔄 Aucune femme de chambre assignée, aucun code à générer');
       return 0;
     }
 
-    console.log('🔧 Génération codes pour femmes de chambre assignées:', assignedHousekeepers);
     
     try {
       // Récupérer le code de l'hôtel
@@ -221,12 +210,10 @@ export class CodeGenerationService {
       for (const housekeeperName of assignedHousekeepers) {
         // Éviter les doublons dans la même boucle
         if (processedNames.has(housekeeperName)) {
-          console.log('⚠️ Nom déjà traité, ignoré:', housekeeperName);
           continue;
         }
         processedNames.add(housekeeperName);
 
-        console.log('🔍 Vérification code pour:', housekeeperName);
         
         // Vérifier si elle existe déjà avec un code actif (chercher le PREMIER seulement)
         const { data: existingHousekeepers } = await supabase
@@ -241,7 +228,6 @@ export class CodeGenerationService {
         const existingHousekeeper = existingHousekeepers?.[0];
 
         if (existingHousekeeper?.access_code) {
-          console.log('✅ Code déjà existant pour:', housekeeperName, existingHousekeeper.access_code);
           continue;
         }
 
@@ -310,14 +296,12 @@ export class CodeGenerationService {
           }
 
           generated++;
-          console.log(`✅ Code généré pour ${housekeeperName}: ${accessCode}`);
           
         } catch (error) {
           console.error(`❌ Erreur génération code pour ${housekeeperName}:`, error);
         }
       }
 
-      console.log(`🎯 Génération terminée: ${generated} codes créés pour les femmes assignées`);
       return generated;
       
     } catch (error) {
@@ -330,7 +314,6 @@ export class CodeGenerationService {
    * DEPRECATED: Utiliser ensureCodesForAssignedHousekeepers à la place
    */
   static async ensureCodesForHotel(hotelId: string, housekeeperNames: string[]): Promise<number> {
-    console.warn('⚠️ ensureCodesForHotel est dépréciée, utilisez ensureCodesForAssignedHousekeepers');
     return this.ensureCodesForAssignedHousekeepers(hotelId, housekeeperNames);
   }
 }

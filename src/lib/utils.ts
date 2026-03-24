@@ -62,7 +62,6 @@ export function generateHotelId(hotelCode: string): string {
     hex.slice(20, 32)
   ].join('-');
   
-  console.log(`🆔 UUID v4 valide généré pour ${hotelCode}:`, uuid);
   return uuid;
 }
 
@@ -75,7 +74,6 @@ export function cleanupInvalidHotelIds(): void {
   keys.forEach(key => {
     const value = localStorage.getItem(key);
     if (value && value.startsWith('hotel-') && !isValidUUID(value)) {
-      console.log(`🧹 Nettoyage ancien ID invalide (${key}):`, value);
       localStorage.removeItem(key);
     }
   });

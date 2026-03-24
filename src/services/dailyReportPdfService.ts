@@ -264,7 +264,6 @@ export async function generateAndUploadDailyReportPdf(
   hotelName?: string
 ): Promise<string | null> {
   try {
-    console.log('📄 Génération du PDF de clôture...');
 
     // Load daily instructions and tasks from DB
     const [instructionsResult, tasksResult, completionsResult] = await Promise.all([
@@ -378,7 +377,6 @@ export async function generateAndUploadDailyReportPdf(
       .from('daily-reports')
       .getPublicUrl(fileName);
 
-    console.log('✅ PDF uploadé:', uploadData?.path);
     return urlData?.publicUrl || fileName;
 
   } catch (error) {

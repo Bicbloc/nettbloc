@@ -72,7 +72,6 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
       try {
         await navigator.clipboard.writeText(accessCode);
       } catch (error) {
-        console.warn('Impossible de copier automatiquement le code:', error);
       }
       
       // Envoyer un email d'activation si un email est fourni

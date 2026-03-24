@@ -184,7 +184,6 @@ const HousekeeperWorkContent: React.FC = () => {
             .update({ start_time: now.toISOString() })
             .eq('id', existing.id);
           setCurrentTimesheetId(existing.id);
-          console.log('✅ Pointage début mis à jour en base');
         } else {
           // Créer un nouvel enregistrement
           const { data, error } = await supabase
@@ -209,7 +208,6 @@ const HousekeeperWorkContent: React.FC = () => {
             console.error('Erreur création pointage:', error);
           } else if (data) {
             setCurrentTimesheetId(data.id);
-            console.log('✅ Pointage début créé en base');
           }
         }
       } catch (error) {
@@ -255,7 +253,6 @@ const HousekeeperWorkContent: React.FC = () => {
             })
             .eq('id', existing.id);
           
-          console.log('✅ Pointage fin enregistré en base');
         } else {
           // Créer un nouveau si inexistant
           await supabase
@@ -305,7 +302,6 @@ const HousekeeperWorkContent: React.FC = () => {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          console.warn('⚠️ Pas de session Supabase, redirection vers auth');
           navigate('/housekeeper/auth');
           return;
         }
@@ -318,7 +314,6 @@ const HousekeeperWorkContent: React.FC = () => {
           .maybeSingle();
         
         if (error || !profile) {
-          console.warn('⚠️ Profil housekeeper non trouvé, redirection vers signup');
           navigate('/housekeeper/signup');
           return;
         }
@@ -328,7 +323,6 @@ const HousekeeperWorkContent: React.FC = () => {
         // Vérifier qu'un hôtel est sélectionné
         const currentHotelId = storageService.getHotelId() || hotelIdFromUrl;
         if (!currentHotelId || currentHotelId.length < 30) {
-          console.warn('⚠️ Pas d\'hôtel sélectionné, redirection vers hotels');
           navigate('/housekeeper/hotels');
           return;
         }
@@ -346,10 +340,6 @@ const HousekeeperWorkContent: React.FC = () => {
   // Charger les données une fois authentifié
   useEffect(() => {
     if (isAuthChecked && housekeeperProfile && hotelId) {
-      console.log('🔍 Session vérifiée, chargement des données:', {
-        profileId: housekeeperProfile.id,
-        hotelId: hotelId
-      });
       loadWorkData();
       loadTasksAndInstructions();
     }
@@ -419,7 +409,6 @@ const HousekeeperWorkContent: React.FC = () => {
 
   // Gestion intelligente des mises à jour temps réel - SYNC COMPLÈTE avec interface client
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
-    console.log(`📡 [Housekeeper] Mise à jour temps réel ${table}:`, payload);
     const { eventType, new: newRecord, old: oldRecord } = payload;
     
     // Vérifier si cela concerne notre hôtel
@@ -450,7 +439,6 @@ const HousekeeperWorkContent: React.FC = () => {
     if (table === 'assignments') {
       if (eventType === 'INSERT') {
         if (isForMe(newRecord)) {
-          console.log('🆕 Nouvelle assignation reçue! Rechargement...');
           loadWorkDataRef.current();
           addToActivityLog(`🆕 Nouvelle chambre assignée par le responsable`, 'info');
           setNewRoomsCount(prev => prev + 1);
@@ -458,7 +446,6 @@ const HousekeeperWorkContent: React.FC = () => {
         }
       } else if (eventType === 'UPDATE') {
         if (isForMe(newRecord) || isForMe(oldRecord)) {
-          console.log('🔄 Assignation modifiée, rechargement...');
           loadWorkDataRef.current();
           addToActivityLog(`🔄 Assignation mise à jour`, 'info');
         }
@@ -466,7 +453,6 @@ const HousekeeperWorkContent: React.FC = () => {
         // Chambre retirée par le responsable ou clôture journée
         const wasMyAssignment = isForMe(oldRecord);
         if (wasMyAssignment) {
-          console.log('🗑️ Assignation supprimée par le responsable');
           setAssignments(prev => prev.filter(a => a.id !== oldRecord.id));
           setRooms(prev => prev.filter(r => r.id !== oldRecord.room_id));
           addToActivityLog(`🗑️ Chambre retirée par le responsable`, 'warning');
@@ -492,7 +478,6 @@ const HousekeeperWorkContent: React.FC = () => {
         
         // Mise à jour locale si c'est ma chambre - SYNCHRONISATION COMPLÈTE
         if (isMyRoom) {
-          console.log(`📡 [Housekeeper] Mise à jour chambre ${newRecord.room_number}: ${oldRecord?.status} → ${newRecord.status}, type: ${newRecord.cleaning_type}`);
           setRooms(prev => prev.map(r => {
             if (r.id !== newRecord.id) return r;
             // Fusionner en gardant la structure locale
@@ -522,7 +507,6 @@ const HousekeeperWorkContent: React.FC = () => {
     // Écouter les suppressions massives (clôture journée) via daily_reports
     if (table === 'daily_reports') {
       if (eventType === 'INSERT') {
-        console.log('📊 Rapport journalier créé - Journée clôturée!');
         addToActivityLog(`📊 Journée clôturée par le responsable`, 'warning');
         // Réinitialiser l'interface
         setRooms([]);
@@ -657,11 +641,7 @@ const HousekeeperWorkContent: React.FC = () => {
       allPossibleIds = [...new Set(allPossibleIds.filter(Boolean))];
       allPossibleNames = [...new Set(allPossibleNames.filter(Boolean))];
       
-      console.log('🔍 Recherche assignations pour:', { 
-        ids: allPossibleIds, 
-        names: allPossibleNames 
-      });
-
+      
       // Construire le filtre OR pour inclure tous les IDs et noms possibles
       let orFilters: string[] = [];
       allPossibleIds.forEach(id => {
@@ -673,7 +653,6 @@ const HousekeeperWorkContent: React.FC = () => {
       });
       
       const orFilter = orFilters.join(',');
-      console.log('🔍 Filtre assignations:', orFilter);
 
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
@@ -711,7 +690,6 @@ const HousekeeperWorkContent: React.FC = () => {
         return;
       }
 
-      console.log('✅ Assignations trouvées:', assignmentsData?.length || 0);
       
       // Dédupliquer les assignations (garder la plus récente par chambre)
       const uniqueAssignments = assignmentsData?.reduce((acc: any[], curr: any) => {
@@ -741,8 +719,6 @@ const HousekeeperWorkContent: React.FC = () => {
       const aBlancCount = extractedRooms.filter(r => r.cleaning_type === 'full' || r.cleaning_type === 'checkout' || r.cleaning_type === 'À blanc').length;
       const recoucheCount = extractedRooms.filter(r => r.cleaning_type === 'quick' || r.cleaning_type === 'stayover' || r.cleaning_type === 'Recouche').length;
       const otherCount = extractedRooms.length - aBlancCount - recoucheCount;
-      console.log('✅ Chambres extraites:', extractedRooms.length, `(${aBlancCount} à blanc, ${recoucheCount} recouche, ${otherCount} autres)`);
-      console.log('📦 Types de chambres:', extractedRooms.map(r => ({ num: r.room_number, type: r.cleaning_type, status: r.status })));
       
       setAssignments(uniqueAssignments);
       setRooms(extractedRooms);
@@ -894,7 +870,6 @@ const HousekeeperWorkContent: React.FC = () => {
       status: r.status,
       cleaning_type: r.cleaning_type
     })));
-    console.log('📊 Room counts:', counts, 'from rooms:', rooms.map(r => ({ num: r.room_number, status: r.status, type: r.cleaning_type })));
     return counts;
   }, [rooms]);
   
@@ -904,7 +879,6 @@ const HousekeeperWorkContent: React.FC = () => {
       ...r,
       cleaning_type: r.cleaning_type
     })), roomFilterTab);
-    console.log('🎯 Active filter:', roomFilterTab, '→', filtered.length, 'rooms');
     return filtered;
   }, [rooms, roomFilterTab]);
 
@@ -1062,7 +1036,6 @@ const HousekeeperWorkContent: React.FC = () => {
                     housekeeperName={housekeeperName}
                     onUpdateStatus={handleRoomStatusChange}
                     onUnassign={(roomId, roomNumber) => {
-                      console.log('Unassign room:', roomId, roomNumber);
                     }}
                   />
                 ))}

@@ -57,41 +57,15 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   // Initialisation basée sur HotelContext
   useEffect(() => {
     if (isHotelReady && hotelId) {
-      console.log('✅ HousekeepingContext: Hotel prêt via HotelContext:', hotelId.slice(0, 8) + '...');
       setIsInitialized(true);
     } else if (isHotelReady && !hotelId) {
       // Pas d'hôtel (mode invité ou pas connecté)
-      console.log('⚠️ HousekeepingContext: Pas d\'hôtel disponible');
       setIsInitialized(true);
     }
   }, [isHotelReady, hotelId]);
 
-  // Synchronisation temps réel simplifiée - hotelId vient de HotelContext
-  useEffect(() => {
-    if (!isInitialized || !hotelId) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const session = await HotelSessionService.getSession();
-        if (session) {
-          // Mettre à jour les données si elles ont changé
-          setHousekeeperNames(prev => {
-            const newNames = session.housekeeper_names || [];
-            return JSON.stringify(prev) !== JSON.stringify(newNames) ? newNames : prev;
-          });
-
-          // Rafraîchir les femmes de chambre moins fréquemment
-          if (Math.random() < 0.1) {
-            refreshHousekeepers();
-          }
-        }
-      } catch (error) {
-        console.error('⚠️ Erreur synchronisation:', error);
-      }
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [isInitialized, hotelId]);
+  // Synchronisation via Realtime — plus de polling
+  // Les subscriptions Realtime sur rooms et housekeepers gèrent les mises à jour
 
   // Charger les données de la session - simplifié car hotelId vient de HotelContext
   const loadSessionData = async () => {
@@ -107,10 +81,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         await refreshHousekeepers();
         
         setIsInitialized(true);
-        console.log('Données de session chargées:', {
-          housekeepers: session.housekeeper_names?.length || 0,
-          hotelId: hotelId.slice(0, 8) + '...'
-        });
       }
     } catch (error) {
       console.error('Erreur chargement session:', error);
@@ -177,12 +147,10 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         if (codeError) {
           console.error('❌ Erreur génération code pour', name, ':', codeError);
         } else {
-          console.log('✅ Code généré pour', name, ':', accessCode);
         }
       }
 
       if (newNames.length > 0) {
-        console.log(`✅ ${newNames.length} nouvelles femmes de chambre créées dans la base`);
         // Rafraîchir la liste après création
         await refreshHousekeepers();
       }
@@ -219,7 +187,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         // DÉSACTIVÉ: Génération automatique des codes d'accès
         // generateAccessCodesForAssignedHousekeepers();
       }
-      console.log("Session - isDistributed sauvegardé:", isDistributed);
     }
   }, [isDistributed, isInitialized]);
 
@@ -228,17 +195,14 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   const generateAccessCodesForAssignedHousekeepers = async (force = false) => {
     const currentHotelId = hotelId || storageService.getHotelId();
     if (!currentHotelId || housekeeperNames.length === 0) {
-      console.log('⚠️ Génération codes: Conditions non remplies', { currentHotelId, housekeeperCount: housekeeperNames.length });
       return;
     }
 
     // Forcer la génération ou attendre que la distribution soit faite
     if (!force && !isDistributed) {
-      console.log('⚠️ Génération codes: Distribution pas encore faite, attente...');
       return;
     }
 
-    console.log('🔑 Génération automatique des codes d\'accès pour les femmes de chambre...');
 
     try {
       const { supabase } = await import('@/integrations/supabase/client');
@@ -254,7 +218,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       const newHousekeepers = housekeeperNames.filter(name => !existingNames.includes(name));
 
       if (newHousekeepers.length > 0) {
-        console.log('📝 Création de nouvelles femmes de chambre:', newHousekeepers);
         
         // Récupérer le code hôtel
         const { data: hotel } = await supabase
@@ -269,7 +232,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         // const { CodeGenerationService } = await import('@/services/codeGenerationService');
         // const generated = await CodeGenerationService.ensureCodesForHotel(currentHotelId, newHousekeepers);
         
-        console.log('⚠️ Génération automatique désactivée - création manuelle requise');
 
         // DÉSACTIVÉ: Rafraîchir les femmes de chambre automatiquement
         // await refreshHousekeepers();
@@ -281,7 +243,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         //   description: `${newHousekeepers.length} code(s) d'accès généré(s) automatiquement pour les femmes de chambre.`
         // });
       } else {
-        console.log('✅ Toutes les femmes de chambre ont déjà des codes d\'accès');
       }
     } catch (error) {
       console.error('❌ Erreur génération automatique des codes:', error);
@@ -293,7 +254,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   };
 
   const updateRoomStatus = async (roomNumber: string, newStatus: string, housekeeperName?: string, remark?: string) => {
-    console.log('🔄 updateRoomStatus appelé:', { roomNumber, newStatus, housekeeperName, remark, hotelId });
     
     // Mettre à jour localement
     setRooms(prev => prev.map(room => 
@@ -352,7 +312,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
 
     // Ajouter notification pour l'admin - FORMAT AMÉLIORÉ (avec sécurité)
     if (housekeeperName && hotelId && addNotificationFn) {
-      console.log('🔔 Création notification avec hotelId:', hotelId);
       
       let notification;
       
@@ -387,12 +346,10 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
         };
       }
 
-      console.log('📝 Envoi notification:', notification);
       if (addNotificationFn) {
         await addNotificationFn(notification);
       }
     } else {
-      console.warn('⚠️ Notification non créée - manque housekeeperName ou hotelId:', { housekeeperName, hotelId });
     }
   };
 
@@ -410,7 +367,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     if (!currentHotelId) return;
     
     try {
-      console.log('🔄 Rafraîchissement des housekeepers...');
       const { data, error } = await supabase
         .from('housekeepers')
         .select('id, name, access_code, user_id')
@@ -421,7 +377,6 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
       
       if (data && data.length > 0) {
         setHousekeepers(data);
-        console.log(`✅ ${data.length} housekeepers rafraîchis depuis la BD`);
         
         // Mettre à jour aussi housekeeperNames
         const allNames = data.map(h => h.name);

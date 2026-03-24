@@ -34,7 +34,6 @@ export class AssignmentService {
     notes?: string
   ): Promise<{ success: boolean; assignmentId?: string; error?: string }> {
     try {
-      console.log('🔄 Assignation chambre:', { hotelId, roomId, housekeeperId, housekeeperName });
 
       // 1. Vérifier si une assignation active existe déjà pour cette chambre
       const { data: existingAssignment } = await supabase
@@ -57,13 +56,11 @@ export class AssignmentService {
         
         if (hkData) {
           exactHousekeeperName = hkData.name;
-          console.log('✅ Nom exact récupéré:', exactHousekeeperName);
         }
       }
 
       // 2. Si une assignation existe, la mettre à jour (réassigner)
       if (existingAssignment) {
-        console.log('📝 Assignation existante trouvée, mise à jour:', existingAssignment.id);
         
         const { data, error } = await supabase
           .from('assignments')
@@ -82,7 +79,6 @@ export class AssignmentService {
           return { success: false, error: error.message };
         }
 
-        console.log('✅ Assignation mise à jour:', data.id);
         return { success: true, assignmentId: data.id };
       }
 
@@ -111,7 +107,6 @@ export class AssignmentService {
         return { success: false, error: error.message };
       }
 
-      console.log('✅ Assignation créée:', data.id);
 
       // Récupérer le numéro de chambre pour la notification
       const { data: roomData } = await supabase
@@ -167,7 +162,6 @@ export class AssignmentService {
         return false;
       }
 
-      console.log('✅ Assignation supprimée:', assignmentId);
       return true;
     } catch (error) {
       console.error('❌ Erreur désassignation:', error);
@@ -203,7 +197,6 @@ export class AssignmentService {
         return false;
       }
 
-      console.log('✅ Assignation mise à jour:', assignmentId);
       return true;
     } catch (error) {
       console.error('❌ Erreur réassignation:', error);
@@ -291,7 +284,6 @@ export class AssignmentService {
         return false;
       }
 
-      console.log('✅ Statut assignation mis à jour:', assignmentId, status);
       return true;
     } catch (error) {
       console.error('❌ Erreur mise à jour statut:', error);

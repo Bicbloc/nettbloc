@@ -124,7 +124,6 @@ function GovernessDashboardContent() {
           loadHotels(profile.id);
         }
       } catch (e) {
-        console.warn('Session validation error:', e);
       }
     };
 

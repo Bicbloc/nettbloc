@@ -56,7 +56,6 @@ const Success = () => {
 
             if (!invoiceError && invoiceData?.success) {
               setInvoiceGenerated(true);
-              console.log('Invoice generated:', invoiceData.invoice_number);
             } else {
               console.error('Invoice generation error:', invoiceError);
             }
