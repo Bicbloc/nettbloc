@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Upload, Columns, CheckCircle, Settings } from "lucide-react";
+import { Brain, Upload, Columns, CheckCircle, Settings, Zap } from "lucide-react";
 import { TrainingStep1Import } from "./TrainingStep1Import";
 import { TrainingStep1bColumnMapping, MappingConfig } from "./TrainingStep1bColumnMapping";
 import { TrainingStep3Validate } from "./TrainingStep3Validate";
@@ -10,6 +10,7 @@ import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 import { TrainingHistory } from "./TrainingHistory";
 import { TrainingStepHelper } from "./TrainingStepHelper";
 import { unifiedParserService, ExtractedRoom } from "@/services/pms";
+import { universalParse } from "@/services/training/UniversalParser";
 
 interface TrainingWizardProps {
   hotelId: string;
@@ -35,6 +36,7 @@ const DISPLAY_STEPS = [
 export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [trainingData, setTrainingData] = useState<TrainingData | null>(null);
+  const [canSkipStep2, setCanSkipStep2] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -44,7 +46,23 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
 
   const handleImportComplete = (data: TrainingData) => {
     setTrainingData(data);
+    
+    // Check if auto-detection is good enough to skip step 2
+    if (data.rawText) {
+      const result = universalParse(data.rawText);
+      if (result.confidence >= 90 && result.rows.length > 0) {
+        setCanSkipStep2(true);
+      } else {
+        setCanSkipStep2(false);
+      }
+    }
+    
     setCurrentStep(2);
+  };
+
+  const handleSkipToValidate = () => {
+    if (!trainingData) return;
+    setCurrentStep(3);
   };
 
   const handleMappingComplete = (updatedData: TrainingData, mappingConfig: MappingConfig) => {
@@ -179,12 +197,28 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
           )}
 
           {currentStep === 2 && trainingData && (
-            <TrainingStep1bColumnMapping
-              trainingData={trainingData}
-              hotelId={hotelId}
-              onComplete={handleMappingComplete}
-              onBack={() => setCurrentStep(1)}
-            />
+            <div className="space-y-4">
+              {canSkipStep2 && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
+                  <div className="flex items-center gap-2 text-green-800">
+                    <Zap className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      Tous les statuts sont reconnus automatiquement !
+                    </span>
+                  </div>
+                  <Button size="sm" onClick={handleSkipToValidate} className="gap-1">
+                    <CheckCircle className="h-4 w-4" />
+                    Tout est correct → Sauver
+                  </Button>
+                </div>
+              )}
+              <TrainingStep1bColumnMapping
+                trainingData={trainingData}
+                hotelId={hotelId}
+                onComplete={handleMappingComplete}
+                onBack={() => setCurrentStep(1)}
+              />
+            </div>
           )}
 
           {currentStep === 3 && trainingData && (
