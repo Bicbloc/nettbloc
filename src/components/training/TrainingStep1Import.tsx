@@ -109,7 +109,18 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
       const pmsRooms = detection.adapter.extractRooms(text);
       
       if (pmsRooms.length > 0) {
-        extractedRooms = pmsRooms;
+      extractedRooms = pmsRooms.map(r => ({
+          roomNumber: r.roomNumber,
+          cleaningType: r.cleaningType as any,
+          status: r.status || '',
+          originalText: r.originalText || '',
+          validated: r.validated ?? true,
+          guestName: r.guestName || undefined,
+          arrivalDate: r.arrivalDate || undefined,
+          departureDate: r.departureDate || undefined,
+          roomType: r.roomType || undefined,
+          confidence: r.confidence ?? 0.5,
+        }));
         detectedPmsType = detection.detection.pmsType;
         console.log(`📋 PMS adapter fallback: ${pmsRooms.length} rooms (${detectedPmsType})`);
       }

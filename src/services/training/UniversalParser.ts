@@ -176,11 +176,7 @@ const STATUS_DICTIONARY: Record<string, { type: 'full' | 'quick' | 'none' | 'out
   'DI': { type: 'full', lang: 'opera' },    // Dirty Inspected
   'VP': { type: 'full', lang: 'opera' },    // Vacant Pickup
 
-  // === Fidelio PMS ===
-  'VD': { type: 'full', lang: 'fidelio' },
-  'VC': { type: 'none', lang: 'fidelio' },
-  'OD': { type: 'quick', lang: 'fidelio' },
-  'OC': { type: 'quick', lang: 'fidelio' },
+  // Fidelio shares Opera codes (VD, VC, OD, OC already defined above)
 
   // === Protel PMS ===
   'C/O': { type: 'full', lang: 'protel' },
