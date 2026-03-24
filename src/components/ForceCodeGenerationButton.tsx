@@ -16,7 +16,6 @@ export const ForceCodeGenerationButton: React.FC<ForceCodeGenerationButtonProps>
     setLoading(true);
     
     try {
-      console.log('🔄 Démarrage génération forcée des codes...');
       
       // D'abord, vérifier et corriger les hotel_codes manquants
       await CodeGenerationService.ensureHotelCodesExist();
@@ -24,7 +23,6 @@ export const ForceCodeGenerationButton: React.FC<ForceCodeGenerationButtonProps>
       const results = await CodeGenerationService.forceGenerateAllMissingCodes();
       
       if (results.errors.length > 0) {
-        console.warn('⚠️ Erreurs lors de la génération:', results.errors);
         toast({
           variant: "destructive",
           title: "Génération avec erreurs",

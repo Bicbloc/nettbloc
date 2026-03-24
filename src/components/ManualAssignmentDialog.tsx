@@ -186,7 +186,6 @@ export function ManualAssignmentDialog({
     let totalAssigned = 0;
     for (const housekeeper of housekeeperNames) {
       if (assignments[housekeeper].length > 0) {
-        console.log(`Assigning ${assignments[housekeeper].length} rooms to ${housekeeper}`);
         onAssignRooms(housekeeper, assignments[housekeeper]);
         totalAssigned += assignments[housekeeper].length;
       }

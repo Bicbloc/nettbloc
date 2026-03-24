@@ -63,8 +63,6 @@ export default function ActivateAccount() {
         return;
       }
 
-      console.log("✅ Invitation validated, sub_account:", invitationData.sub_accounts);
-      console.log("✅ Parent hotel:", invitationData.sub_accounts?.hotels);
 
       setInvitation(invitationData);
       setSubAccount(invitationData.sub_accounts);
@@ -107,8 +105,6 @@ export default function ActivateAccount() {
       localStorage.removeItem('nettobloc_hotel_session');
       localStorage.removeItem('selectedHotelId');
       
-      console.log("🔐 Creating sub-account user for hotel_id:", subAccount.hotel_id);
-      console.log("🔐 Parent hotel info:", subAccount.hotels);
       
       // Create Supabase auth user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -138,7 +134,6 @@ export default function ActivateAccount() {
         throw new Error("Échec de la création du compte");
       }
 
-      console.log("✅ Auth user created:", authData.user.id);
 
       // Link the new auth user to the invited sub-account + parent hotel on the server side.
       // This is critical because signUp may not create an immediate session (email confirmation settings).
@@ -157,13 +152,11 @@ export default function ActivateAccount() {
         throw new Error(activationError.message || "Erreur lors de l'activation du sous-compte");
       }
 
-      console.log('✅ Sub-account linked to hotel:', activationData?.hotel);
 
       // Try to sign in immediately (optional). If email confirmation is required, this will fail gracefully.
       if (!authData.session) {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) {
-          console.warn('ℹ️ Immediate sign-in skipped:', signInError.message);
         }
       }
 

@@ -362,7 +362,6 @@ export function SubAccountsManager() {
       await navigator.clipboard.writeText(text);
       toast({ title: "Copié", description: `${label} copié dans le presse-papiers.` });
     } catch (e) {
-      console.warn('Clipboard failed', e);
       // Fallback (older browsers)
       window.prompt(`Copiez ${label} :`, text);
     }

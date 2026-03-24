@@ -40,7 +40,6 @@ export const HousekeeperTeamManager: React.FC<HousekeeperTeamManagerProps> = ({
   }, [hotelId]);
 
   const fetchHousekeepers = async () => {
-    console.log('Fetching housekeepers for hotel:', hotelId);
     try {
       // D'abord, récupérer le rôle "Femme de chambre"
       const { data: roles, error: rolesError } = await supabase
@@ -261,7 +260,6 @@ export const HousekeeperTeamManager: React.FC<HousekeeperTeamManagerProps> = ({
         <HousekeeperAccessCodeGenerator 
           hotelId={hotelId}
           onCodeGenerated={(code, email) => {
-            console.log('Code généré:', code, 'pour email:', email);
             fetchHousekeepers(); // Rafraîchir la liste
           }}
         />

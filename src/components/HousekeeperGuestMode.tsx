@@ -33,7 +33,6 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
 
   const loadGuestModeData = async () => {
     try {
-      console.log('🔍 Debug: Chargement mode invité avec code:', accessCode);
       
       if (!accessCode) {
         console.error('❌ Aucun code d\'accès fourni');
@@ -61,7 +60,6 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         .eq('is_active', true)
         .maybeSingle();
 
-      console.log('🔍 Debug: Données code d\'accès:', codeData, 'Erreur:', codeError);
 
       if (codeError) {
         console.error('❌ Erreur recherche code:', codeError);
@@ -93,7 +91,6 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         return;
       }
 
-      console.log('✅ Hôtel trouvé:', codeData.hotels.name);
       setHotel(codeData.hotels);
       setManagerName('Mode Invité - Personnel d\'entretien');
 
@@ -104,7 +101,6 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
         .eq('hotel_id', codeData.hotels.id)
         .order('room_number');
 
-      console.log('🔍 Debug: Chambres trouvées:', roomsData?.length || 0, 'Erreur:', roomsError);
 
       if (roomsError) {
         console.error('❌ Erreur chargement chambres:', roomsError);
@@ -116,7 +112,6 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
           { number: '201', status: 'to_clean', priority: 'urgent', notes: 'Priorité absolue' },
           { number: '202', status: 'to_clean', priority: 'normal' }
         ];
-        console.log('⚠️ Utilisation des données de fallback');
         setRooms(fallbackRooms);
         toast({
           title: "Données de démonstration",
@@ -124,7 +119,6 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
           variant: "default"
         });
       } else if (!roomsData || roomsData.length === 0) {
-        console.log('⚠️ Aucune chambre configurée dans l\'hôtel');
         // No rooms in hotel, show helpful message
         const emptyStateRooms: Room[] = [
           { number: 'Aucune chambre', status: 'to_clean', priority: 'normal', notes: 'Aucune chambre configurée dans cet hôtel' }
@@ -148,7 +142,6 @@ export const HousekeeperGuestMode: React.FC<GuestModeProps> = ({ accessCode }) =
           cleaningType: room.cleaning_type === 'full' ? 'full' : 'recouche'
         }));
         
-        console.log('✅ Chambres chargées en mode invité:', formattedRooms.length);
         setRooms(formattedRooms);
         toast({
           title: "Mode invité activé",

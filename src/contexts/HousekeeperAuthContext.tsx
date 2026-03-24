@@ -81,18 +81,15 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     }
 
     if (user && !authLoading) {
-      console.log('🔐 Loading housekeeper profile for user:', user.id);
       loadHousekeeperProfile(user);
       
       // Safety timeout - don't block forever if profile load fails
       profileLoadTimeoutRef.current = setTimeout(() => {
         if (profileLoading) {
-          console.warn('⚠️ Profile loading timeout, forcing completion');
           setProfileLoading(false);
         }
       }, 5000);
     } else if (!user && !authLoading) {
-      console.log('🔐 No user, clearing housekeeper data');
       setProfile(null);
       setCurrentHotelSession(null);
     }
@@ -108,21 +105,18 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && user && !authLoading) {
-        console.log('🔄 Page visible, refreshing housekeeper data...');
         loadHousekeeperProfile(user);
       }
     };
 
     const handleOnline = () => {
       if (user && !authLoading) {
-        console.log('🔄 Back online, refreshing housekeeper data...');
         loadHousekeeperProfile(user);
       }
     };
 
     const handleFocus = () => {
       if (user && !authLoading && !profile) {
-        console.log('🔄 Window focused without profile, refreshing...');
         loadHousekeeperProfile(user);
       }
     };
@@ -153,7 +147,6 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
           filter: `housekeeper_profile_id=eq.${profile.id}`
         },
         (payload) => {
-          console.log('🔔 Session update received:', payload);
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             const data = payload.new as any;
             if (data.is_active && new Date(data.expires_at) > new Date()) {
@@ -189,7 +182,6 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
       }
 
       if (profileData) {
-        console.log('✅ Housekeeper profile loaded:', profileData.id);
         setProfile(profileData);
         
         // Load current active hotel session if any
@@ -210,7 +202,6 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
           .maybeSingle();
 
         if (sessionData && !sessionError) {
-          console.log('✅ Active hotel session found:', sessionData.id);
           setCurrentHotelSession({
             ...sessionData,
             hotel: Array.isArray(sessionData.hotels) ? sessionData.hotels[0] : sessionData.hotels,
@@ -218,10 +209,8 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
             rooms_cleaned_today: sessionData.rooms_cleaned_today || 0
           } as HotelSession);
         } else {
-          console.log('ℹ️ No active hotel session');
         }
       } else {
-        console.log('ℹ️ No housekeeper profile found for user');
       }
     } catch (error) {
       console.error('❌ Error in loadHousekeeperProfile:', error);
@@ -298,11 +287,9 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     }
 
     try {
-      console.log('Tentative de connexion avec le code:', accessCode);
       
       // Check if it's a simple hotel code (like HTL002) - make access request
       if (accessCode.length <= 6 && !accessCode.includes('-')) {
-        console.log('Code simple détecté, création de demande d\'accès');
         const requestResult = await requestHotelAccess(accessCode);
         if (requestResult.success) {
           return { success: false, error: "Demande d'accès envoyée. En attente d'approbation de l'admin." };
@@ -312,7 +299,6 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
       }
 
       // First, check if it's a generated access code in housekeeper_access_codes
-      console.log('Recherche du code dans housekeeper_access_codes');
       const { data: accessCodeData, error: codeError } = await supabase
         .from('housekeeper_access_codes')
         .select(`
@@ -329,10 +315,8 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         .is('used_at', null)
         .maybeSingle();
 
-      console.log('Résultat de la recherche:', { accessCodeData, codeError });
 
       if (accessCodeData && !codeError) {
-        console.log('Code trouvé, création de session');
         
         // Mark the code as used
         const { error: updateError } = await supabase
@@ -374,7 +358,6 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
           return { success: false, error: "Erreur lors de la création de la session" };
         }
 
-        console.log('Session créée avec succès:', newSession);
 
         const hotelSession: HotelSession = {
           ...newSession,
@@ -410,7 +393,6 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
         return { success: true, session: hotelSession };
       }
 
-      console.log('Code non trouvé dans housekeeper_access_codes');
       return { success: false, error: "Code d'accès invalide ou déjà utilisé" };
 
     } catch (error) {
@@ -425,14 +407,12 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     }
 
     try {
-      console.log('Recherche hôtel avec code:', hotelCode);
       
       // Find hotel by hotel code via RPC sécurisée (bypass RLS)
       const { data: hotel, error: hotelError } = await supabase
         .rpc('search_hotel_by_code', { p_code: hotelCode })
         .maybeSingle();
 
-      console.log('Résultat recherche hôtel:', { hotel, hotelError });
 
       if (hotelError) {
         console.error('Erreur recherche hôtel:', hotelError);

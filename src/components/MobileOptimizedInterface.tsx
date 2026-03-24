@@ -46,7 +46,6 @@ export const MobileOptimizedInterface: React.FC<MobileOptimizedInterfaceProps> =
         const { storageService } = await import('@/services/storageService');
         const storedHotelId = storageService.recoverHotelId();
         if (storedHotelId) {
-          console.log('🏨 Hôtel restauré depuis le stockage:', storedHotelId);
         } else {
           console.error('❌ Aucun hôtel trouvé dans le stockage');
         }

@@ -224,7 +224,6 @@ export function useRoomDistribution({
   }, [hotelId, housekeepers, cleaningConfig, housekeeperFloorPreferences, housekeeperMaxRoomsOverrides, setRooms, setIsDistributed, calculateHousekeeperLoad]);
 
   const handleRedistribute = useCallback(async (method: RedistributionMethod) => {
-    console.log(`🔄 Redistribution via ${method}`);
     
     if (housekeeperNames.length === 0) {
       toast({
@@ -250,7 +249,6 @@ export function useRoomDistribution({
 
     // Clean old assignments
     if (hotelId) {
-      console.log('🧹 Nettoyage des anciennes assignations...');
       await supabase
         .from('assignments')
         .delete()
@@ -314,7 +312,6 @@ export function useRoomDistribution({
     if (!hotelId) return;
     
     try {
-      console.log('🔑 Génération automatique des codes pour:', housekeeperNames);
       
       for (const housekeeperName of housekeeperNames) {
         const { data: existingHousekeeper } = await supabase
@@ -338,7 +335,6 @@ export function useRoomDistribution({
             continue;
           }
           
-          console.log('✅ Code généré pour', housekeeperName, ':', newCodeData);
           
           if (existingHousekeeper) {
             await supabase

@@ -89,7 +89,6 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non authentifié - veuillez vous reconnecter");
 
-      console.log('🔄 Création tâche inventaire:', {
         hotelId,
         assignedTo: selectedHousekeeper,
         assignedBy: user.id,
@@ -117,7 +116,6 @@ export const LinenTaskAssignment = ({ hotelId }: LinenTaskAssignmentProps) => {
         }
       }
 
-      console.log('✅ Tâche créée:', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["linen-tasks"] });

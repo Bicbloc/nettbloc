@@ -121,7 +121,6 @@ export function StaffTasksList({
         .eq("completion_date", today);
 
       if (error) {
-        console.log("Task completions query error:", error);
         return [];
       }
       return (data || []) as unknown as TaskCompletion[];

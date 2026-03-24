@@ -72,7 +72,6 @@ export function useTranslation() {
     }
     
     if (typeof value !== 'string') {
-      console.warn(`Translation key not found: ${key}`);
       return key;
     }
     

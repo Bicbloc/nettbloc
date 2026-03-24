@@ -88,7 +88,6 @@ export default function NettoCountAuth() {
       try {
         window.grecaptcha.reset(recaptchaWidgetIds.current[tab]);
       } catch (e) {
-        console.log("Could not reset reCAPTCHA:", e);
       }
       return;
     }
@@ -108,7 +107,6 @@ export default function NettoCountAuth() {
       });
       recaptchaWidgetIds.current[tab] = widgetId;
     } catch (e) {
-      console.log("reCAPTCHA already rendered or error:", e);
     }
   }, [recaptchaLoaded]);
 

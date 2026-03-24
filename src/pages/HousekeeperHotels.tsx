@@ -57,13 +57,11 @@ function HousekeeperHotelsContent() {
       setProfile(profileData);
 
       // Charger les hôtels enregistrés via RPC SECURITY DEFINER (bypass RLS)
-      console.log('🔍 Chargement des hôtels approuvés pour:', profileData.id);
       const { data: approvedHotels, error: hotelsError } = await supabase
         .rpc('get_approved_hotels_for_housekeeper' as any, { 
           p_housekeeper_profile_id: profileData.id 
         });
 
-      console.log('📋 Hôtels approuvés trouvés:', approvedHotels);
       if (hotelsError) {
         console.error('❌ Erreur chargement hôtels:', hotelsError);
       }
@@ -139,7 +137,6 @@ function HousekeeperHotelsContent() {
         });
         
         setHotels(sortedHotels);
-        console.log('✅ Comptage assignations final:', assignmentCounts);
       }
 
     } catch (error) {
@@ -228,7 +225,6 @@ function HousekeeperHotelsContent() {
   };
 
   const handleSelectHotel = (hotel: any) => {
-    console.log('🏨 Sélection hôtel:', hotel);
     
     try {
       // 1. SAUVEGARDER D'ABORD le nouvel hôtel (avant de nettoyer)
@@ -253,7 +249,6 @@ function HousekeeperHotelsContent() {
 
       // 4. Vérifier que les données sont bien sauvegardées
       const savedId = localStorage.getItem('selectedHotelId');
-      console.log('✅ Données sauvegardées:', { 
         hotelId: savedId, 
         expected: hotel.id,
         match: savedId === hotel.id 

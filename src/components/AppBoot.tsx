@@ -30,7 +30,6 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
       const storedBuildId = localStorage.getItem(BUILD_ID_KEY);
 
       if (storedBuildId && storedBuildId !== currentBuildId) {
-        console.log('🧹 AppBoot: New build, cleaning cache...');
         VOLATILE_KEYS.forEach(key => {
           try { localStorage.removeItem(key); } catch { /* ignore */ }
         });

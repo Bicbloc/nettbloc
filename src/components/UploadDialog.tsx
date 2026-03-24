@@ -70,7 +70,6 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
         });
         return;
       }
-      console.log("Fichier sélectionné:", file.name);
       setSelectedFile(file);
     }
   };
@@ -87,7 +86,6 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
         });
         return;
       }
-      console.log("Fichier déposé:", file.name);
       setSelectedFile(file);
     }
   };
@@ -108,11 +106,9 @@ export function UploadDialog({ onPdfProcessed, existingHousekeepers = [], hotelI
 
     try {
       setIsUploading(true);
-      console.log("Traitement du fichier:", selectedFile.name, "hotelId:", hotelId, "forceAi:", forceAiExtraction);
       
       // Passer l'option forceAi au service
       const data = await processPdf(selectedFile, hotelId, forceAiExtraction);
-      console.log("Données traitées:", data.length, "chambres", forceAiExtraction ? "(IA forcée)" : "");
       
       setProcessedData(data);
       setShowHousekeeperSetup(true);

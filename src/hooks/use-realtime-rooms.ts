@@ -20,7 +20,6 @@ export function useRealtimeRooms({
 }: UseRealtimeRoomsProps): UseRealtimeRoomsReturn {
   
   const handleRealtimeUpdate = useCallback((table: string, payload: any) => {
-    console.log(`📡 Temps réel [${table}] ${payload.eventType}:`, {
       roomNumber: payload.new?.room_number,
       status: payload.new?.status,
       cleaning_type: payload.new?.cleaning_type,
@@ -39,7 +38,6 @@ export function useRealtimeRooms({
         );
         
         if (existingIndex !== -1) {
-          console.log(`✅ Chambre ${newRecord.room_number} trouvée, mise à jour: ${oldRecord?.status} → ${newRecord.status}, cleaning_type: ${newRecord.cleaning_type}`);
           
           const updatedRooms = prev.map((r, i) => {
             if (i !== existingIndex) return r;
@@ -66,7 +64,6 @@ export function useRealtimeRooms({
             };
           });
           
-          console.log(`📊 Rooms après mise à jour RT:`, updatedRooms.map(r => ({
             number: r.number, 
             status: r.status, 
             cleaningType: r.cleaningType,
@@ -76,7 +73,6 @@ export function useRealtimeRooms({
           return updatedRooms;
         }
         
-        console.log(`⚠️ Chambre ${newRecord.room_number} non trouvée dans la liste locale`);
         return prev;
       });
 
@@ -101,7 +97,6 @@ export function useRealtimeRooms({
     }
     
     if (table === 'assignments' && (eventType === 'INSERT' || eventType === 'UPDATE')) {
-      console.log('✅ Assignment temps réel:', {
         housekeeper: newRecord.housekeeper_name,
         roomId: newRecord.room_id,
         status: newRecord.status

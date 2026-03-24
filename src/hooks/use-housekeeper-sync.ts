@@ -51,13 +51,11 @@ export function useHousekeeperSync() {
               .maybeSingle();
             
             if (doubleCheck) {
-              console.log(`⏭️ Skipping duplicate: ${name}`);
               continue;
             }
             
             const housekeeper = await SupabaseService.createHousekeeper(selectedHotelId, name);
             result.synchronized++;
-            console.log(`✅ Femme de chambre synchronisée: ${name} -> ${housekeeper.access_code}`);
           } catch (error: any) {
             console.error(`Erreur synchronisation ${name}:`, error);
             const errorMsg = error.message || `Erreur synchronisation: ${name}`;
@@ -141,7 +139,6 @@ export function useHousekeeperSync() {
   const triggerSyncIfNeeded = useCallback(async () => {
     const needsSync = await checkForSyncNeeded();
     if (needsSync) {
-      console.log('🔄 Synchronisation déclenchée par événement');
       return await syncHousekeepers();
     }
     return { success: true, synchronized: 0, errors: [] };

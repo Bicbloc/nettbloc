@@ -257,7 +257,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       
       const excludedCount = data.length - filteredData.length;
       if (excludedCount > 0) {
-        console.log(`📋 ${excludedCount} chambres exclues (format ou registre)`);
         toast({
           title: "ℹ️ Chambres filtrées",
           description: `${excludedCount} chambres exclues (format non conforme ou désactivées).`,
@@ -333,7 +332,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         });
       } else {
         // Mode update (upsert)
-        console.log('🔄 Début enregistrement pour', filteredData.length, 'chambres');
         
         // D'abord, récupérer le registre existant pour détecter les nouvelles chambres
         const { data: existingRegistry } = await supabase
@@ -357,7 +355,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             dbCleaningType = 'a_blanc';
           }
           
-          console.log(`📝 Chambre ${roomNumber}: cleaningType=${room.cleaningType} → DB=${dbCleaningType}`);
           
           // IMPORTANT: Le statut "checkout" ne doit JAMAIS être automatique
           // Seul l'admin peut manuellement définir "client sorti"
@@ -421,7 +418,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
           new Map(newRoomsForRegistry.map(r => [r.room_number, r])).values()
         );
 
-        console.log(`📋 ${uniqueNewRooms.length} nouvelles chambres détectées (mode update)`);
 
         // Si des nouvelles chambres sont détectées, demander confirmation
         if (uniqueNewRooms.length > 0) {
@@ -527,11 +523,9 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     
     try {
       setIsLoadingHousekeepers(true);
-      console.log(`🔄 Tentative ${attempt}/2 de chargement des housekeepers...`);
       
       const housekeepersData = await UnifiedHousekeeperService.getCodesForHotel(effectiveHotelId);
       setExistingHousekeepers(housekeepersData);
-      console.log(`✅ ${housekeepersData.length} housekeepers chargés`);
       
       toast({
         title: "Femmes de chambre chargées",
@@ -545,7 +539,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       // Retry avec délai réduit (1s, 2s au lieu de 2s, 4s, 8s)
       if (attempt < 2) {
         const delay = attempt * 1000; // 1s, 2s
-        console.log(`⏳ Nouvelle tentative dans ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return loadExistingHousekeepers(attempt + 1);
       }
@@ -732,9 +725,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             });
         }
       }
-      console.log(`💾 Feedback loop: ${Object.keys(mapping).length} corrections sauvegardées`);
     } catch (err) {
-      console.warn('⚠️ Feedback loop: erreur sauvegarde', err);
     }
   };
 
@@ -861,7 +852,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       // Also update parsedLines
       setParsedLines(prev => prev.filter(l => !excludedRooms.has(l.roomNumber)));
       
-      console.log(`🚫 ${excludedRooms.size} chambres exclues manuellement`);
     }
     
     // Initialiser le mapping automatiquement et passer à l'étape mapping
@@ -2150,7 +2140,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       const housekeeper = existingHousekeepers.find(h => h.name === housekeeperName);
       
       if (!housekeeper || !hotelId) {
-        console.warn('Housekeeper ou hotelId manquant pour créer la tâche d\'inventaire');
         return;
       }
       

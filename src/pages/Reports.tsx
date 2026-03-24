@@ -127,7 +127,6 @@ const Reports = () => {
       });
       
       setReports(transformedReports);
-      console.log(`✅ ${transformedReports.length} rapports chargés`);
     } catch (error) {
       console.error('Erreur:', error);
       toast({

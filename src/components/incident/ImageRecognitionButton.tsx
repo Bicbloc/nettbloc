@@ -56,7 +56,6 @@ export function ImageRecognitionButton({
 
       const imageBase64 = await base64Promise;
 
-      console.log('🔍 Analyzing image with AI...');
 
       const { data, error } = await supabase.functions.invoke('recognize-incident-item', {
         body: { imageBase64 },
@@ -71,7 +70,6 @@ export function ImageRecognitionButton({
         throw new Error(data.error || 'Échec de l\'analyse');
       }
 
-      console.log('✅ Recognition result:', data);
 
       onResult({
         category: data.category,

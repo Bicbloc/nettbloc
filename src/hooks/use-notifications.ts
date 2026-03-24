@@ -50,7 +50,6 @@ export const useNotifications = (hotelId?: string) => {
     // Fallback via storageService
     const stored = storageService.getHotelId();
     if (stored && isValidHotelId(stored)) {
-      console.log('⚠️ useNotifications: Fallback storageService:', stored.slice(0, 8) + '...');
       return stored;
     }
 
@@ -61,7 +60,6 @@ export const useNotifications = (hotelId?: string) => {
     const effectiveHotelId = getEffectiveHotelId();
     
     if (!effectiveHotelId) {
-      console.log('⚠️ Aucun hotelId valide disponible');
       setNotifications([]);
       setHasUnread(false);
       return;
@@ -70,7 +68,6 @@ export const useNotifications = (hotelId?: string) => {
     // Vérifier le cache
     const cached = notificationCache.get(effectiveHotelId);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log('📦 Utilisation du cache pour les notifications');
       setNotifications(cached.data);
       setHasUnread(cached.data.some(n => !n.is_read));
       return;
@@ -78,7 +75,6 @@ export const useNotifications = (hotelId?: string) => {
 
     try {
       setLoading(true);
-      console.log('🔄 Chargement des notifications pour l\'hôtel:', effectiveHotelId.slice(0, 8) + '...');
       
       const { data, error } = await supabase
         .from('notifications')
@@ -92,7 +88,6 @@ export const useNotifications = (hotelId?: string) => {
         throw error;
       }
 
-      console.log(`✅ ${data?.length || 0} notifications chargées`);
       const notifs = data || [];
       
       // Mettre à jour le cache
@@ -139,7 +134,6 @@ export const useNotifications = (hotelId?: string) => {
 
         // S'abonner aux changements
         subscriptionId = realtimeManager.subscribe('notifications', (table, payload) => {
-          console.log('📨 Nouvelle notification:', payload.eventType);
           realtimeConnected = true;
 
           // Invalider le cache
@@ -157,7 +151,6 @@ export const useNotifications = (hotelId?: string) => {
         });
 
         retryCount = 0; // Reset retry count on success
-        console.log('✅ Realtime notifications connected');
       } catch (error) {
         console.error('❌ Failed to setup realtime:', error);
         realtimeConnected = false;
@@ -166,13 +159,11 @@ export const useNotifications = (hotelId?: string) => {
         if (retryCount < MAX_RETRIES) {
           retryCount++;
           const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-          console.log(
             `🔄 Retrying realtime connection in ${delay}ms (attempt ${retryCount}/${MAX_RETRIES})`
           );
           retryTimeout = setTimeout(setupRealtime, delay);
         } else {
           // Fallback sur polling après tous les retries
-          console.log('⚠️ Realtime failed, using polling fallback');
           startPolling();
         }
       }
@@ -181,10 +172,8 @@ export const useNotifications = (hotelId?: string) => {
     const startPolling = () => {
       if (pollingInterval) return;
       
-      console.log('🔄 Démarrage du polling fallback (toutes les 10s)');
       pollingInterval = setInterval(() => {
         if (!realtimeConnected) {
-          console.log('📡 Polling notifications...');
           notificationCache.delete(effectiveHotelId);
           loadNotifications();
         }
@@ -220,7 +209,6 @@ export const useNotifications = (hotelId?: string) => {
     }
 
     try {
-      console.log('➕ Ajout d\'une nouvelle notification...');
       
       const { data, error } = await supabase
         .from('notifications')
@@ -234,7 +222,6 @@ export const useNotifications = (hotelId?: string) => {
 
       if (error) throw error;
 
-      console.log('✅ Notification ajoutée avec succès');
       
       // Invalider le cache
       notificationCache.delete(effectiveHotelId);
@@ -271,7 +258,6 @@ export const useNotifications = (hotelId?: string) => {
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
       
-      console.log('✅ Notification marquée comme lue');
     } catch (error) {
       console.error('❌ Erreur lors du marquage comme lu:', error);
     }
@@ -300,7 +286,6 @@ export const useNotifications = (hotelId?: string) => {
       );
       setHasUnread(false);
       
-      console.log('✅ Toutes les notifications marquées comme lues');
     } catch (error) {
       console.error('❌ Erreur lors du marquage global comme lu:', error);
     }
@@ -325,7 +310,6 @@ export const useNotifications = (hotelId?: string) => {
       setNotifications([]);
       setHasUnread(false);
       
-      console.log('✅ Toutes les notifications supprimées');
     } catch (error) {
       console.error('❌ Erreur lors de la suppression:', error);
     }

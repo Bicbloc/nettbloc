@@ -51,7 +51,6 @@ export function useRoomManagement({ hotelId, rooms, setRooms, housekeepers, refr
   const handleAddRoom = useCallback(async (newRoom: Room) => {
     setRooms(prev => [...prev, newRoom]);
     
-    console.log('✅ Chambre ajoutée:', newRoom.number);
     
     toast({
       title: "Chambre ajoutée",
@@ -73,7 +72,6 @@ export function useRoomManagement({ hotelId, rooms, setRooms, housekeepers, refr
         }));
     });
     
-    console.log('✅ Chambre supprimée:', roomNumber);
     
     toast({
       title: "Chambre supprimée",
@@ -100,7 +98,6 @@ export function useRoomManagement({ hotelId, rooms, setRooms, housekeepers, refr
       return room;
     }));
     
-    console.log('✅ Liaisons de chambres sauvegardées:', roomNumber, linkedRoomNumbers);
   }, []);
 
   const handleGenerateAccessCode = useCallback(async (housekeeperName: string) => {

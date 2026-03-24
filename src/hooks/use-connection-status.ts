@@ -24,7 +24,6 @@ export function useConnectionStatus() {
         if (consecutiveFailures >= 1) {
           setIsSupabaseConnected(false);
         }
-        console.log('💔 Ping failed:', error?.message || 'Unknown error');
         return false;
       }
       
@@ -39,7 +38,6 @@ export function useConnectionStatus() {
       if (consecutiveFailures >= 1) {
         setIsSupabaseConnected(false);
       }
-      console.log('💔 Ping exception:', error);
       return false;
     }
   }, [consecutiveFailures]);

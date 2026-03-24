@@ -48,11 +48,9 @@ export const useRealtimeSync = ({
     const effectiveHotelId = hotelId;
     
     if (!effectiveHotelId || effectiveHotelId.length < 10) {
-      console.log('⚠️ useRealtimeSync: hotelId invalide ou manquant');
       return;
     }
 
-    console.log('🔗 useRealtimeSync: Connexion à', effectiveHotelId.slice(0, 8) + '...');
     realtimeManager.connect(effectiveHotelId);
 
     const subscriptionIds = stableTables.map(table => 

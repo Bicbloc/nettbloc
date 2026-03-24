@@ -32,7 +32,6 @@ export function getHotelCodeForEmail(email: string): string | null {
 export async function saveEmailToSupabase(email: string) {
   try {
     // Just save the email association locally for now since we don't have a specific table for emails
-    console.log("Email saved locally:", email);
     return { success: true, error: null };
   } catch (err) {
     console.error("Error saving email:", err);

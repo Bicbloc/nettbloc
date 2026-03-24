@@ -80,12 +80,10 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
         customMappings = config.status_mappings as unknown as Record<string, string>;
       }
     } catch (e) {
-      console.warn('Could not load hotel config for mappings:', e);
     }
 
     // Use UniversalParser as primary engine
     const universalResult = universalParse(text, customMappings);
-    console.log(`🧠 UniversalParser: ${universalResult.rows.length} rooms, ${universalResult.confidence}% confidence, ${universalResult.unmappedCount} unmapped`);
 
     let extractedRooms = universalResult.rows.map(row => ({
       roomNumber: row.roomNumber,
@@ -104,7 +102,6 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
 
     // Fallback: if UniversalParser found 0 rooms, try PMS-specific adapters
     if (extractedRooms.length === 0) {
-      console.log('⚠️ UniversalParser found 0 rooms, falling back to PMS adapters...');
       const detection = pmsAdapterFactory.detectPms(text);
       const pmsRooms = detection.adapter.extractRooms(text);
       
@@ -122,7 +119,6 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
           confidence: r.confidence ?? 0.5,
         }));
         detectedPmsType = detection.detection.pmsType;
-        console.log(`📋 PMS adapter fallback: ${pmsRooms.length} rooms (${detectedPmsType})`);
       }
     }
 

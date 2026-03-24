@@ -126,7 +126,6 @@ export class MewsAdapter extends PmsAdapter {
     processed = processed.replace(/\n{3,}/g, '\n\n');
     
     // Log pour debug
-    console.log("🔧 MewsAdapter preprocessText: lignes fusionnées");
     
     return processed;
   }
@@ -264,12 +263,10 @@ export class MewsAdapter extends PmsAdapter {
    */
   extractRooms(text: string): ExtractedRoom[] {
     const processedText = this.preprocessText(text);
-    console.log("🔧 Texte pré-traité pour Mews:", processedText.substring(0, 500));
 
     // Extraire la date du rapport depuis le header
     const reportDate = this.extractReportDate(processedText);
     if (reportDate) {
-      console.log(`📅 MewsAdapter: Date du rapport détectée: ${reportDate.toLocaleDateString('fr-FR')}`);
     }
 
     // 1) Extraction standard via le moteur commun (regex + FieldExtractor)
@@ -411,7 +408,6 @@ export class MewsAdapter extends PmsAdapter {
       deduped.push(r);
     }
 
-    console.log(`🏠 MewsAdapter: ${deduped.length} chambres extraites`);
     return deduped;
   }
 
@@ -470,7 +466,6 @@ export class MewsAdapter extends PmsAdapter {
       // Sinon → arrivée
       const isRightSide = timeMatch.index > lineLength * 0.6;
       
-      console.log(`⏰ MEWS Time: "${timeMatch.time}" at pos ${timeMatch.index}/${lineLength} (${(timeMatch.index/lineLength*100).toFixed(0)}%) → ${isRightSide ? 'DÉPART' : 'ARRIVÉE'}`);
       
       return isRightSide 
         ? { arrivalTime: null, departureTime: timeMatch.time, hasDeparture: true, hasArrival: false }
@@ -478,7 +473,6 @@ export class MewsAdapter extends PmsAdapter {
     }
     
     // 2+ horaires : le premier est arrivée, le dernier est départ
-    console.log(`⏰ MEWS Times: ${times.length} found - first="${times[0].time}" (arrivée), last="${times[times.length - 1].time}" (départ)`);
     
     return {
       arrivalTime: times[0].time,
@@ -521,23 +515,19 @@ export class MewsAdapter extends PmsAdapter {
     // Filtrer les types de chambre pour ne garder que les vrais statuts
     const statusTokens = tokens.filter(t => !this.isRoomTypeCode(t));
     
-    console.log(`🔍 MEWS analyzeLineWithDate: tokens=[${tokens.join(', ')}], statusTokens=[${statusTokens.join(', ')}]`);
     
     // PRIORITÉ 1: PRO = propre, pas de nettoyage
     if (statusTokens.some(t => t === 'PRO' || t === 'PROPRE')) {
-      console.log(`✅ MEWS: PRO détecté → Propre, aucun nettoyage`);
       return { status: 'clean', cleaningType: 'none' };
     }
     
     // PRIORITÉ 2: INS = inspecté, pas de nettoyage
     if (statusTokens.some(t => t === 'INS' || t === 'INSPECTED' || t === 'INSPECTÉ')) {
-      console.log(`✅ MEWS: INS détecté → Inspecté, aucun nettoyage`);
       return { status: 'inspected', cleaningType: 'none' };
     }
     
     // PRIORITÉ 3: DEP = départ explicite
     if (statusTokens.some(t => t === 'DEP' || t === 'CHECKOUT' || t === 'DÉPART' || t === 'DEPART')) {
-      console.log(`✅ MEWS: DEP détecté → Départ, à blanc`);
       return { status: 'checkout', cleaningType: 'a_blanc' };
     }
     
@@ -547,7 +537,6 @@ export class MewsAdapter extends PmsAdapter {
 
       // 1) Horaire à droite = départ → À blanc
       if (hasDeparture) {
-        console.log(`✅ MEWS: SAL + Départ détecté (horaire droite) → À blanc`);
         return { status: 'checkout', cleaningType: 'a_blanc' };
       }
 
@@ -555,7 +544,6 @@ export class MewsAdapter extends PmsAdapter {
       const dateMatches = line.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g) || [];
       const hasDateRangeNoTime = dateMatches.length >= 2 && !hasArrival && !hasDeparture;
       if (hasDateRangeNoTime) {
-        console.log(`✅ MEWS: SAL + Dates sans horaire → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
@@ -563,30 +551,25 @@ export class MewsAdapter extends PmsAdapter {
       const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
         upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
       if (nightMatch) {
-        console.log(`✅ MEWS: SAL + Nuit X/Y → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
       // 4) Arrivée seule (horaire gauche) → Recouche
       if (hasArrival && !hasDeparture) {
-        console.log(`✅ MEWS: SAL + Arrivée seule (horaire gauche) → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
       // 5) Occupation (adultes) sans départ → Recouche
       const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
       if (hasOccupancy) {
-        console.log(`✅ MEWS: SAL + Occupation → Recouche`);
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
       // Default SAL sans horaire/date/occupation → À BLANC (chambre vide sale)
-      console.log(`✅ MEWS: SAL seul → Sale, à blanc`);
       return { status: 'dirty', cleaningType: 'a_blanc' };
     }
 
     // Default: unknown
-    console.log(`⚠️ MEWS: Aucun statut reconnu → unknown, à blanc par défaut`);
     return { status: 'unknown', cleaningType: 'a_blanc' };
   }
 }

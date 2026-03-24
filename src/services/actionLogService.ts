@@ -34,7 +34,6 @@ export class ActionLogService {
         return false;
       }
 
-      console.log('✅ Action enregistrée:', entry.actionType, entry.description);
       return true;
     } catch (error) {
       console.error('❌ Erreur ActionLogService.logAction:', error);
@@ -74,7 +73,6 @@ export class ActionLogService {
       const logs = await this.getTodayLogs(hotelId);
       
       if (logs.length === 0) {
-        console.log('📦 Aucun log à archiver');
         return true;
       }
 
@@ -121,7 +119,6 @@ export class ActionLogService {
         // Ne pas échouer, les logs sont déjà archivés
       }
 
-      console.log('✅ Logs archivés avec succès:', logs.length, 'actions');
       return true;
     } catch (error) {
       console.error('❌ Erreur ActionLogService.archiveDailyLogs:', error);

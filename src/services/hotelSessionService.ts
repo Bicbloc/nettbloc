@@ -53,7 +53,6 @@ export class HotelSessionService {
       
       if (!effectiveHotelId) {
         effectiveHotelId = storageService.getHotelId();
-        console.log('🔍 HotelId depuis localStorage:', effectiveHotelId);
       }
       
       // Si toujours pas trouvé, chercher dans le profil via current_hotel_id
@@ -66,7 +65,6 @@ export class HotelSessionService {
         
         if (profile?.current_hotel_id) {
           effectiveHotelId = profile.current_hotel_id;
-          console.log('✅ HotelId trouvé via profiles.current_hotel_id:', effectiveHotelId);
         } else {
           // Fallback: chercher par user_id
           const { data: hotel } = await supabase
@@ -78,7 +76,6 @@ export class HotelSessionService {
           
           if (hotel) {
             effectiveHotelId = hotel.id;
-            console.log('✅ HotelId trouvé via hotels.user_id:', effectiveHotelId);
           }
         }
       }
@@ -102,7 +99,6 @@ export class HotelSessionService {
         .maybeSingle();
 
       if (existingSession?.session_token) {
-        console.log('♻️ Session existante réutilisée:', existingSession.id);
         this.setSessionToken(existingSession.session_token);
 
         // S'assurer que l'hôtel est bien présent en cache pour le reste de l'app
@@ -114,7 +110,6 @@ export class HotelSessionService {
 
         return existingSession.session_token;
       } else if (existingError) {
-        console.warn(
           '⚠️ Vérification session existante échouée (non bloquant):',
           existingError
         );
@@ -142,7 +137,6 @@ export class HotelSessionService {
         previousHousekeeperNames = Array.isArray(activeSession.housekeeper_names)
           ? (activeSession.housekeeper_names as string[])
           : [];
-        console.log(
           "✅ Assignations récupérées de l'ancienne session:",
           Object.keys(previousAssignments).length,
           'chambres'
@@ -150,7 +144,6 @@ export class HotelSessionService {
       }
 
       // 5) Désactiver seulement les sessions actives de CET utilisateur pour cet hôtel
-      console.log('🔄 Désactivation des anciennes sessions (user) pour hôtel:', effectiveHotelId);
       const { error: deactivateError } = await supabase
         .from('hotel_sessions')
         .update({ is_active: false })
@@ -185,7 +178,6 @@ export class HotelSessionService {
         return null;
       }
 
-      console.log('✅ Session créée:', data.id);
 
       // Store session token explicitly
       this.setSessionToken(sessionToken);
@@ -209,7 +201,6 @@ export class HotelSessionService {
     this.sessionToken = token;
     localStorage.setItem('hotel_session_token', token);
     localStorage.setItem('hotelSessionToken', token);
-    console.log('✅ Token de session défini:', token);
   }
 
   // Récupérer le token de session actuel
@@ -240,7 +231,6 @@ export class HotelSessionService {
         }
 
         if (error) {
-          console.warn(
             '⚠️ getSession: échec via session_token, fallback via hotel_id:',
             error
           );
@@ -346,7 +336,6 @@ export class HotelSessionService {
         return false;
       }
 
-      console.log('✅ Assignments persistés via hotel_id');
       return true;
     } catch (err) {
       console.error('Erreur updateHousekeeperAssignments:', err);
@@ -362,7 +351,6 @@ export class HotelSessionService {
     try {
       // Fonction conservée pour compatibilité mais ne fait plus rien
       // car is_distributed n'existe plus dans la table
-      console.log('Session marquée comme distribuée (legacy)');
       return true;
     } catch (err) {
       console.error('Erreur markAsDistributed:', err);
@@ -372,7 +360,6 @@ export class HotelSessionService {
 
   // Mettre à jour le statut d'une chambre (deprecated - les rooms sont maintenant dans la table rooms)
   static async updateRoomStatus(roomNumber: string, newStatus: string): Promise<boolean> {
-    console.warn('updateRoomStatus est deprecated - utilisez la table rooms directement');
     return true;
   }
 
@@ -381,7 +368,6 @@ export class HotelSessionService {
    * Utilisez la table 'rooms' directement
    */
   static updateRoomDataLocal(rooms: any[], hotelId: string): void {
-    console.warn('⚠️ updateRoomDataLocal is deprecated - rooms are now in Supabase table "rooms" only');
     // Ne rien faire - les rooms sont dans Supabase
   }
 
@@ -390,7 +376,6 @@ export class HotelSessionService {
    * Utilisez la table 'rooms' directement
    */
   static restoreRoomDataLocal(hotelId: string): any[] {
-    console.warn('⚠️ restoreRoomDataLocal is deprecated - rooms are now in Supabase table "rooms" only');
     return [];
   }
 

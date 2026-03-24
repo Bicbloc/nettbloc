@@ -27,7 +27,6 @@ export function useSessionTracking() {
         localStorage.removeItem(SESSION_STORAGE_KEY);
       }
     } catch (e) {
-      console.warn('Failed to store session ID:', e);
     }
   }, []);
 
@@ -46,7 +45,6 @@ export function useSessionTracking() {
 
       await query;
     } catch (e) {
-      console.warn('Failed to deactivate old sessions:', e);
     }
   }, []);
 
@@ -54,7 +52,6 @@ export function useSessionTracking() {
   const createOrUpdateSession = useCallback(async (user: { id: string; email?: string }) => {
     // Prevent concurrent creation
     if (isCreatingRef.current) {
-      console.log('🔄 Session creation already in progress, skipping');
       return;
     }
 
@@ -74,7 +71,6 @@ export function useSessionTracking() {
 
         if (!error && existingSession && existingSession.user_id === user.id) {
           // Session exists and belongs to this user - just update activity
-          console.log('✅ Reusing existing session:', storedSessionId);
           sessionIdRef.current = storedSessionId;
           
           await supabase
@@ -98,7 +94,6 @@ export function useSessionTracking() {
 
       if (!findError && userSession) {
         // Found an active session - reuse it
-        console.log('✅ Found active session for user:', userSession.id);
         sessionIdRef.current = userSession.id;
         storeSessionId(userSession.id);
         
@@ -111,7 +106,6 @@ export function useSessionTracking() {
       }
 
       // No valid session found - create new one
-      console.log('➕ Creating new session for user:', user.id);
 
       // First, deactivate ALL old sessions for this user
       await deactivateOldSessions(user.id);
@@ -137,7 +131,6 @@ export function useSessionTracking() {
 
       sessionIdRef.current = newSession.id;
       storeSessionId(newSession.id);
-      console.log('✅ New session created:', newSession.id);
 
     } catch (error) {
       console.error('Session tracking error:', error);
@@ -158,9 +151,7 @@ export function useSessionTracking() {
         .update({ is_active: false })
         .eq('id', sessionId);
       
-      console.log('👋 Session ended:', sessionId);
     } catch (error) {
-      console.warn('Failed to end session:', error);
     } finally {
       sessionIdRef.current = null;
       storeSessionId(null);
@@ -178,7 +169,6 @@ export function useSessionTracking() {
         .update({ last_activity: new Date().toISOString() })
         .eq('id', sessionId);
     } catch (error) {
-      console.warn('Failed to update activity:', error);
     }
   }, []);
 
@@ -212,21 +202,18 @@ export function useSessionTracking() {
       
       // Debounce: ignorer les événements trop rapprochés
       if (now - lastEventTime < EVENT_DEBOUNCE_MS) {
-        console.log('⏭️ Session tracking: événement ignoré (debounce)');
         return;
       }
       lastEventTime = now;
 
       // Ignorer INITIAL_SESSION si on a déjà initialisé via SIGNED_IN
       if (event === 'INITIAL_SESSION' && hasInitialized) {
-        console.log('⏭️ Session tracking: INITIAL_SESSION ignoré (déjà initialisé)');
         return;
       }
 
       // Traiter SIGNED_IN et INITIAL_SESSION de la même manière
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !hasInitialized) {
         hasInitialized = true;
-        console.log('✅ Session tracking: initialisation via', event);
         await createOrUpdateSession(session.user);
         startActivityTracking();
       } else if (event === 'SIGNED_OUT') {
@@ -248,7 +235,6 @@ export function useSessionTracking() {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (isMounted && session?.user && !hasInitialized) {
           hasInitialized = true;
-          console.log('✅ Session tracking: initialisation via getSession');
           createOrUpdateSession(session.user);
           startActivityTracking();
         }

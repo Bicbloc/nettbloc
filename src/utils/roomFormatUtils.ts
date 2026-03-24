@@ -65,18 +65,15 @@ export async function loadHotelRoomFormat(hotelId: string): Promise<RoomFormatCo
       // Load status keywords from detection_rules (for Apaleo)
       if (detectionRules?.statusKeywords && Array.isArray(detectionRules.statusKeywords)) {
         statusKeywords = detectionRules.statusKeywords;
-        console.log(`📝 Mots-clés de statut appris: ${statusKeywords.join(', ')}`);
       }
       
       if (roomFormat) {
-        console.log(`📐 Format de chambre appris pour hotel ${hotelId}: ${roomFormat} (PMS: ${pattern.pms_type})`);
         const config = getRoomFormatConfig(roomFormat);
         config.statusKeywords = statusKeywords;
         return config;
       }
     }
     
-    console.log(`📐 Aucun format de chambre appris pour hotel ${hotelId}, utilisation du format par défaut`);
     return null;
   } catch (error) {
     console.error('Erreur chargement format chambre:', error);
@@ -166,7 +163,6 @@ export function isValidRoomNumber(roomNumber: string, formatConfig: RoomFormatCo
  */
 export function filterRoomsByFormat(rooms: any[], formatConfig: RoomFormatConfig | null): any[] {
   if (!formatConfig) {
-    console.log('📐 Pas de format défini, toutes les chambres acceptées');
     return rooms;
   }
   
@@ -176,12 +172,10 @@ export function filterRoomsByFormat(rooms: any[], formatConfig: RoomFormatConfig
     
     const isValid = isValidRoomNumber(roomNumber, formatConfig);
     if (!isValid) {
-      console.log(`🚫 Chambre ${roomNumber} exclue (ne correspond pas au format ${formatConfig.format})`);
     }
     return isValid;
   });
   
-  console.log(`📐 Filtrage par format ${formatConfig.format}: ${rooms.length} → ${filteredRooms.length} chambres`);
   return filteredRooms;
 }
 
@@ -201,7 +195,6 @@ export async function getInactiveRoomNumbers(hotelId: string): Promise<Set<strin
       inactiveRooms.forEach(r => inactiveSet.add(r.room_number));
     }
     
-    console.log(`🚫 ${inactiveSet.size} chambres désactivées dans le registre`);
     return inactiveSet;
   } catch (error) {
     console.error('Erreur chargement chambres inactives:', error);
@@ -228,11 +221,9 @@ export function filterOutInactiveRooms(rooms: any[], inactiveRoomNumbers: Set<st
     // Comparer avec le numéro normalisé
     const isInactive = normalizedInactive.has(normalizeRoomNumber(roomNumber));
     if (isInactive) {
-      console.log(`🚫 Chambre ${roomNumber} exclue (désactivée dans le registre)`);
     }
     return !isInactive;
   });
   
-  console.log(`📋 Filtrage registre: ${rooms.length} → ${filteredRooms.length} chambres`);
   return filteredRooms;
 }

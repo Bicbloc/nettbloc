@@ -46,7 +46,6 @@ export function useHousekeeperManagement({
         const { SupabaseService } = await import('@/services/supabaseService');
         await SupabaseService.deactivateHousekeeper(housekeeper.id);
         refreshHousekeepers?.();
-        console.log('✅ Femme de chambre désactivée en base:', housekeeperName);
       } catch (error) {
         console.error('❌ Erreur désactivation femme de chambre:', error);
       }

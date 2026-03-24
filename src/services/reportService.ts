@@ -22,7 +22,6 @@ export interface ReportData extends CustomReportFields {
 export async function storeEmailAddress(email: string): Promise<void> {
   try {
     // Just store locally for now since we don't have a specific table for emails
-    console.log("Email stored locally:", email);
   } catch (err) {
     console.error("Error storing email:", err);
     // We don't show errors to the user when saving emails fails
@@ -41,14 +40,12 @@ export async function saveDailyReport(params: {
     const { data: userData } = await supabaseClient.auth.getUser();
     const user = userData?.user;
     if (!user) {
-      console.log("Skipping report archive: no authenticated user");
       return { success: false };
     }
 
     const hotelId = params.hotelId;
     // hotelId is now required — no localStorage fallback
     if (!hotelId) {
-      console.log("Skipping report archive: no hotelId provided");
       return { success: false };
     }
 
@@ -69,7 +66,6 @@ export async function saveDailyReport(params: {
       return { success: false, error };
     }
 
-    console.log('✅ Daily report archived successfully');
     return { success: true };
   } catch (e) {
     console.error('Unexpected error archiving daily report:', e);
@@ -121,7 +117,6 @@ export async function generateReport(
           }
         }
       } catch (e) {
-        console.warn('Could not load daily instructions for PDF:', e);
       }
     }
 
@@ -162,7 +157,6 @@ export async function generateReport(
           is_completed: completedIds.has(t.id)
         }));
       } catch (e) {
-        console.warn('Could not load tasks for PDF:', e);
       }
     }
     
@@ -886,7 +880,6 @@ export async function generateCombinedReport(
           if (dailyInstr.todo_list) customFields.toDoItems = dailyInstr.todo_list.split('\n').filter((l: string) => l.trim());
         }
       } catch (e) {
-        console.warn('Could not load daily instructions for combined PDF:', e);
       }
     }
 

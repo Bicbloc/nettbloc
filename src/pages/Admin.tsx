@@ -136,9 +136,7 @@ const Admin = () => {
 
   // Initialiser l'hôtel de training quand les hotels sont chargés
   useEffect(() => {
-    console.log('📊 Hotels chargés pour entraînement IA:', hotels.length, hotels.map(h => ({ id: h.id, name: h.name })));
     if (hotels.length > 0 && !selectedTrainingHotelId) {
-      console.log('🎯 Sélection automatique du premier hôtel:', hotels[0].id, hotels[0].name);
       setSelectedTrainingHotelId(hotels[0].id);
     }
   }, [hotels, selectedTrainingHotelId]);
@@ -182,7 +180,6 @@ const Admin = () => {
   // Chargement optimisé: hôtels d'abord (pour l'entraînement IA), puis le reste
   const loadAdminDataOptimized = async () => {
     try {
-      console.log('🔄 Chargement optimisé des données admin...');
       
       // 1. Charger les hôtels en PREMIER (critique pour l'entraînement IA)
       const { data: hotelsData, error: hotelsError } = await supabase
@@ -201,7 +198,6 @@ const Admin = () => {
           created_at: hotel.created_at
         }));
         setHotels(basicHotels);
-        console.log('✅ Hôtels chargés:', basicHotels.length);
       }
 
       // 2. Charger le reste des données en parallèle
@@ -215,7 +211,6 @@ const Admin = () => {
 
   const loadAdminData = async () => {
     try {
-      console.log('🔄 Chargement complet des données admin...');
       
       // Vérifier d'abord si l'utilisateur a vraiment les permissions super_admin
       const { data: currentUserRoles, error: roleCheckError } = await supabase
@@ -234,7 +229,6 @@ const Admin = () => {
         throw new Error('Permissions insuffisantes');
       }
 
-      console.log('✅ Permissions super_admin confirmées');
 
       // Charger les utilisateurs avec leurs rôles et profils
       const { data: usersData, error: usersError } = await supabase

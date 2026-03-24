@@ -56,10 +56,8 @@ export class ApaleoAdapter extends PmsAdapter {
   }
 
   extractRooms(text: string): ExtractedRoom[] {
-    console.log('🔍 ApaleoAdapter: Extraction démarrée');
     
     if (this.isSpaceStatusFormat(text)) {
-      console.log('📊 Format Space Status détecté');
       return this.extractFromSpaceStatus(text);
     }
     
@@ -127,11 +125,9 @@ export class ApaleoAdapter extends PmsAdapter {
     
     // Si aucune chambre trouvée avec les patterns stricts, essayer extraction plus permissive
     if (rooms.length === 0) {
-      console.log('⚠️ Aucune chambre avec pattern strict, essai permissif...');
       return this.extractPermissive(text);
     }
     
-    console.log(`✅ ${rooms.length} chambres extraites (Space Status)`);
     return this.deduplicateRooms(rooms);
   }
 
@@ -181,7 +177,6 @@ export class ApaleoAdapter extends PmsAdapter {
       }
     }
     
-    console.log(`✅ ${rooms.length} chambres extraites (permissif)`);
     return rooms;
   }
 

@@ -65,7 +65,6 @@ const EstablishmentAuth = () => {
 
       // L'utilisateur connecté n'est PAS un établissement
       // Déconnecter pour permettre une connexion avec le bon compte
-      console.log('⚠️ Session existante non-établissement détectée, déconnexion...');
       // Nettoyer TOUS les profils locaux d'abord
       localStorage.removeItem('housekeeper_profile');
       localStorage.removeItem('governess_profile');
@@ -73,7 +72,6 @@ const EstablishmentAuth = () => {
       try {
         await supabase.auth.signOut();
       } catch (err) {
-        console.warn('⚠️ Erreur signOut, forçage nettoyage local:', err);
         localStorage.removeItem('sb-rarhqnvvbjzfdevnghnz-auth-token');
       }
       // Petit délai pour laisser le listener auth mettre à jour l'état

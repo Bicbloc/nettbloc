@@ -226,8 +226,6 @@ export function HousekeeperCard({
       });
       
       // Log for debugging
-      console.log(`Étage ${floor} - Chambres trouvées:`, floorRooms.length);
-      console.log("Numéros:", floorRooms.map(r => r.number).join(', '));
       
       // Check if adding all rooms would exceed the limit
       if (rooms.length + floorRooms.length > effectiveMaxRooms) {
@@ -268,7 +266,6 @@ export function HousekeeperCard({
         floorRooms.forEach(room => {
           // If room is already assigned to someone else, we need to force reassign
           if (room.assignedTo && room.assignedTo !== name) {
-            console.log(`Réassignation de chambre ${room.number} de ${room.assignedTo} à ${name}`);
           }
           
           const updatedRoom = { ...room, assignedTo: name };

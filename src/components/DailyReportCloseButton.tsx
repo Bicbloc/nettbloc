@@ -24,7 +24,6 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
     const today = new Date().toISOString().split('T')[0];
 
     try {
-      console.log('🔚 Début de clôture de la journée pour hotel:', hotelId);
 
       // 0. Récupérer les données AVANT archivage pour le PDF
       setClosingStep('Préparation des données...');
@@ -53,7 +52,6 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
 
       // 1. Générer et uploader le PDF de clôture
       setClosingStep('Génération du rapport PDF...');
-      console.log('📄 Génération du rapport PDF...');
       
       let pdfUrl: string | null = null;
       try {
@@ -66,10 +64,8 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
           hotelData?.name
         );
         if (pdfUrl) {
-          console.log('✅ Rapport PDF généré et uploadé');
         }
       } catch (pdfError) {
-        console.warn('⚠️ Erreur génération PDF (non bloquant):', pdfError);
       }
 
       // 2. Vérifier la session actuelle (optionnel - on continue même sans)
@@ -78,21 +74,16 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       
       // 3. Archiver le journal d'actions du jour en premier
       setClosingStep('Archivage du journal d\'actions...');
-      console.log('📦 Archivage du journal d\'actions...');
       try {
         const logsArchived = await ActionLogService.archiveDailyLogs(hotelId);
         if (logsArchived) {
-          console.log('✅ Journal d\'actions archivé');
         }
       } catch (logError) {
-        console.warn('⚠️ Erreur archivage logs (non bloquant):', logError);
       }
 
       // 4. Archiver chambres, assignations, inventaire linge et notifications
       setClosingStep('Archivage des chambres et inventaire...');
-      console.log('📦 Archivage complet en cours...');
       const archiveResult = await RoomArchiveService.archiveAndResetRooms(hotelId);
-      console.log('✅ Archivage complet terminé:', archiveResult);
 
       // 5. Mettre à jour le rapport daily_reports avec l'URL du PDF
       if (pdfUrl) {
@@ -106,22 +97,18 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
       // 6. Désactiver la session actuelle si elle existe
       if (currentToken) {
         setClosingStep('Fermeture de la session...');
-        console.log('🔒 Désactivation de la session actuelle...');
         try {
           await HotelSessionService.deactivateSession(currentToken);
         } catch (sessionError) {
-          console.warn('⚠️ Erreur désactivation session (non bloquant):', sessionError);
         }
       }
 
       // 4. Désactiver la session actuelle si elle existe
       if (currentToken) {
         setClosingStep('Fermeture de la session...');
-        console.log('🔒 Désactivation de la session actuelle...');
         try {
           await HotelSessionService.deactivateSession(currentToken);
         } catch (sessionError) {
-          console.warn('⚠️ Erreur désactivation session (non bloquant):', sessionError);
         }
       }
 
@@ -135,12 +122,10 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
 
       // 6. Créer une nouvelle session pour le lendemain
       setClosingStep('Création de la nouvelle session...');
-      console.log('🆕 Création de la nouvelle session...');
       let newToken: string | null = null;
       try {
         newToken = await HotelSessionService.createSession(hotelId);
       } catch (newSessionError) {
-        console.warn('⚠️ Erreur création nouvelle session:', newSessionError);
       }
 
       // 7. Sauvegarder la nouvelle session
@@ -159,7 +144,6 @@ export function DailyReportCloseButton({ hotelId, onReportClosed }: DailyReportC
         `${archiveResult.linenTasksArchived} inventaire(s) linge`
       ];
       toast.success(`Journée clôturée ! Archivés: ${successParts.join(', ')}`);
-      console.log('✅ Clôture complète terminée');
 
       // 9. Notifier le parent pour rafraîchir l'interface
       if (onReportClosed) {
