@@ -19,6 +19,29 @@ function TechnicianDashboardContent() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { profile, currentHotelSession, loading, signOut } = useTechnicianAuth();
+  const queryClient = useQueryClient();
+
+  // Realtime sync for incidents
+  useEffect(() => {
+    const hotelId = currentHotelSession?.hotel_id;
+    if (!hotelId) return;
+
+    const channel = supabase
+      .channel(`tech-incidents-${hotelId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'incidents',
+        filter: `hotel_id=eq.${hotelId}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['incidents', hotelId] });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentHotelSession?.hotel_id, queryClient]);
+  const { toast } = useToast();
+  const { profile, currentHotelSession, loading, signOut } = useTechnicianAuth();
 
   useEffect(() => {
     if (!loading && !profile) {
