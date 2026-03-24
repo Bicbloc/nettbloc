@@ -1100,7 +1100,7 @@ const HousekeeperWorkContent: React.FC = () => {
         )}
 
         {activeTab === 'instructions' && hotelId && (
-          <InstructionsTabContent hotelId={hotelId} />
+          <DailyInstructionsBanner hotelId={hotelId} />
         )}
 
         {activeTab === 'inventory' && hotelId && (
