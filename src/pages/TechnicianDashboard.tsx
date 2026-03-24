@@ -40,8 +40,6 @@ function TechnicianDashboardContent() {
 
     return () => { supabase.removeChannel(channel); };
   }, [currentHotelSession?.hotel_id, queryClient]);
-  const { toast } = useToast();
-  const { profile, currentHotelSession, loading, signOut } = useTechnicianAuth();
 
   useEffect(() => {
     if (!loading && !profile) {
