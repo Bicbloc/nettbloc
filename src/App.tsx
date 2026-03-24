@@ -1,63 +1,68 @@
 
+import React, { Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
-import EstablishmentAuth from "./pages/EstablishmentAuth";
-import Profile from "./pages/Profile";
-import Reports from "./pages/Reports";
-import Admin from "./pages/Admin";
-import RoomRegistry from "./pages/RoomRegistry";
-import Order from "./pages/Order";
-import Invoices from "./pages/Invoices";
-import PlanSelection from "./pages/PlanSelection";
-import Success from "./pages/Success";
-import Team from "./pages/Team";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { HotelProvider } from "./contexts/HotelContext";
 import { HousekeeperAuthProvider } from "./contexts/HousekeeperAuthContext";
-import HousekeeperAuth from "./pages/HousekeeperAuth";
-import HousekeeperSignup from "./pages/HousekeeperSignup";
-import HousekeeperHotels from "./pages/HousekeeperHotels";
-import GuestMode from "./pages/GuestMode";
-import HousekeeperProfile from "./pages/HousekeeperProfile";
-import TechnicianLogin from "./pages/TechnicianLogin";
-import TechnicianSignup from "./pages/TechnicianSignup";
-import TechnicianDashboard from "./pages/TechnicianDashboard";
-import TechnicianHotels from "./pages/TechnicianHotels";
-import TechnicianWork from "./pages/TechnicianWork";
-import TechnicianProfile from "./pages/TechnicianProfile";
-import GovernessAuth from "./pages/GovernessAuth";
-import GovernessDashboard from "./pages/GovernessDashboard";
-import GovernessHotels from "./pages/GovernessHotels";
 import { TechnicianAuthProvider } from "./contexts/TechnicianAuthContext";
-import { HousekeeperWorkSimple } from "./components/HousekeeperWorkSimple";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { AppBoot } from "./components/AppBoot";
 import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import ResetPassword from "./pages/ResetPassword";
-import LegalPage from "./pages/LegalPage";
-import ActivateAccount from "./pages/ActivateAccount";
 
-// Access Pages
-import HousekeeperAccessPage from "./pages/access/HousekeeperAccessPage";
-import GovernessAccessPage from "./pages/access/GovernessAccessPage";
-import TechnicianAccessPage from "./pages/access/TechnicianAccessPage";
+// Lazy-loaded pages
+const Index = React.lazy(() => import("./pages/Index"));
+const EstablishmentAuth = React.lazy(() => import("./pages/EstablishmentAuth"));
+const Profile = React.lazy(() => import("./pages/Profile"));
+const Reports = React.lazy(() => import("./pages/Reports"));
+const Admin = React.lazy(() => import("./pages/Admin"));
+const RoomRegistry = React.lazy(() => import("./pages/RoomRegistry"));
+const Order = React.lazy(() => import("./pages/Order"));
+const Invoices = React.lazy(() => import("./pages/Invoices"));
+const PlanSelection = React.lazy(() => import("./pages/PlanSelection"));
+const Success = React.lazy(() => import("./pages/Success"));
+const Team = React.lazy(() => import("./pages/Team"));
+const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
+const LegalPage = React.lazy(() => import("./pages/LegalPage"));
+const ActivateAccount = React.lazy(() => import("./pages/ActivateAccount"));
+const HousekeeperAuth = React.lazy(() => import("./pages/HousekeeperAuth"));
+const HousekeeperSignup = React.lazy(() => import("./pages/HousekeeperSignup"));
+const HousekeeperHotels = React.lazy(() => import("./pages/HousekeeperHotels"));
+const GuestMode = React.lazy(() => import("./pages/GuestMode"));
+const HousekeeperProfile = React.lazy(() => import("./pages/HousekeeperProfile"));
+const HousekeeperWorkSimple = React.lazy(() => import("./components/HousekeeperWorkSimple").then(m => ({ default: m.HousekeeperWorkSimple })));
+const TechnicianLogin = React.lazy(() => import("./pages/TechnicianLogin"));
+const TechnicianSignup = React.lazy(() => import("./pages/TechnicianSignup"));
+const TechnicianDashboard = React.lazy(() => import("./pages/TechnicianDashboard"));
+const TechnicianHotels = React.lazy(() => import("./pages/TechnicianHotels"));
+const TechnicianWork = React.lazy(() => import("./pages/TechnicianWork"));
+const TechnicianProfile = React.lazy(() => import("./pages/TechnicianProfile"));
+const GovernessAuth = React.lazy(() => import("./pages/GovernessAuth"));
+const GovernessDashboard = React.lazy(() => import("./pages/GovernessDashboard"));
+const GovernessHotels = React.lazy(() => import("./pages/GovernessHotels"));
+const HousekeeperAccessPage = React.lazy(() => import("./pages/access/HousekeeperAccessPage"));
+const GovernessAccessPage = React.lazy(() => import("./pages/access/GovernessAccessPage"));
+const TechnicianAccessPage = React.lazy(() => import("./pages/access/TechnicianAccessPage"));
+const NettoCountAuth = React.lazy(() => import("./pages/netto-count/NettoCountAuth"));
+const NettoCountSetup = React.lazy(() => import("./pages/netto-count/NettoCountSetup"));
+const NettoCountScan = React.lazy(() => import("./pages/netto-count/NettoCountScan"));
+const NettoCountResults = React.lazy(() => import("./pages/netto-count/NettoCountResults"));
+const NettoCountHistory = React.lazy(() => import("./pages/netto-count/NettoCountHistory"));
 
-// Netto Count App
-import NettoCountAuth from "./pages/netto-count/NettoCountAuth";
-import NettoCountSetup from "./pages/netto-count/NettoCountSetup";
-import NettoCountScan from "./pages/netto-count/NettoCountScan";
-import NettoCountResults from "./pages/netto-count/NettoCountResults";
-import NettoCountHistory from "./pages/netto-count/NettoCountHistory";
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
