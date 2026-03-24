@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Upload, Columns, CheckCircle, Settings } from "lucide-react";
+import { Brain, Upload, Columns, CheckCircle, Settings, Zap } from "lucide-react";
 import { TrainingStep1Import } from "./TrainingStep1Import";
 import { TrainingStep1bColumnMapping, MappingConfig } from "./TrainingStep1bColumnMapping";
 import { TrainingStep3Validate } from "./TrainingStep3Validate";
@@ -10,6 +10,7 @@ import { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
 import { TrainingHistory } from "./TrainingHistory";
 import { TrainingStepHelper } from "./TrainingStepHelper";
 import { unifiedParserService, ExtractedRoom } from "@/services/pms";
+import { universalParse } from "@/services/training/UniversalParser";
 
 interface TrainingWizardProps {
   hotelId: string;
