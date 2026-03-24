@@ -939,36 +939,8 @@ const HousekeeperWorkContent: React.FC = () => {
         onLogout={handleLogout}
       />
 
-      {/* Journal d'activité */}
       {showActivityLog && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
-          <Card className="w-full max-w-md max-h-[60vh] overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between py-3">
-              <CardTitle className="text-lg">Journal d'activité</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowActivityLog(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="overflow-y-auto max-h-[calc(60vh-80px)]">
-              {activityLog.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">Aucune activité</p>
-              ) : (
-                <div className="space-y-2">
-                  {activityLog.map(entry => (
-                    <div key={entry.id} className="flex items-start gap-2 text-sm">
-                      <span className="text-muted-foreground whitespace-nowrap">{entry.time}</span>
-                      <span className={
-                        entry.type === 'success' ? 'text-green-600' :
-                        entry.type === 'warning' ? 'text-yellow-600' :
-                        entry.type === 'error' ? 'text-red-600' : ''
-                      }>{entry.message}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <HousekeeperActivityLog entries={activityLog} onClose={() => setShowActivityLog(false)} />
       )}
 
       <div className="container mx-auto px-4 py-4 space-y-4">
