@@ -41,7 +41,6 @@ const STATUS_DICTIONARY: Record<string, { type: 'full' | 'quick' | 'none' | 'out
   'BLANC': { type: 'full', lang: 'fr' },
   'LIBÉRÉ': { type: 'full', lang: 'fr' },
   'LIBRE': { type: 'full', lang: 'fr' },
-  'VACANT': { type: 'full', lang: 'fr' },
   'RECOUCHE': { type: 'quick', lang: 'fr' },
   'DRAPS': { type: 'quick', lang: 'fr' },
   'OCCUPÉ': { type: 'quick', lang: 'fr' },
