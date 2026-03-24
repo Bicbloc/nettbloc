@@ -31,6 +31,17 @@ interface DailyReportPdfData {
     description: string;
     created_at: string;
   }>;
+  dailyInstructions?: {
+    instructions?: string | null;
+    to_know?: string | null;
+    todo_list?: string | null;
+  } | null;
+  tasks?: Array<{
+    title: string;
+    description?: string | null;
+    assigned_to_name?: string | null;
+    is_completed: boolean;
+  }>;
 }
 
 /**
