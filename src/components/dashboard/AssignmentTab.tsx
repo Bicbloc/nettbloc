@@ -89,17 +89,7 @@ export function AssignmentTab({
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const queryClient = useQueryClient();
   
-  // Auto-refresh every 5 seconds for real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (hotelId) {
-        queryClient.invalidateQueries({ queryKey: ['rooms', hotelId] });
-        queryClient.invalidateQueries({ queryKey: ['assignments', hotelId] });
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [hotelId, queryClient]);
+  // Realtime handles live updates — no polling needed
   
   // Calculate room counts for tabs
   const roomCounts = useMemo(() => {
