@@ -41,16 +41,17 @@ import { useUserTypeGuard } from "@/hooks/use-user-type-guard";
 // Layout components
 import { MainLayout, TabValue } from "@/components/layout";
 
-// Dashboard tab components
-import { OverviewTab } from "@/components/dashboard/OverviewTab";
-import { RoomManagementTab } from "@/components/dashboard/RoomManagementTab";
-import { AssignmentTab } from "@/components/dashboard/AssignmentTab";
-import { AccessCodesTab } from "@/components/dashboard/AccessCodesTab";
-import { LinenTab } from "@/components/dashboard/LinenTab";
-import { IncidentsTab } from "@/components/dashboard/IncidentsTab";
-import { ReportsTab } from "@/components/dashboard/ReportsTab";
-import { TrainingTab } from "@/components/dashboard/TrainingTab";
-import { ArchivesTab } from "@/components/dashboard/ArchivesTab";
+// Dashboard tab components — lazy loaded for code splitting
+import { lazy, Suspense } from "react";
+const OverviewTab = lazy(() => import("@/components/dashboard/OverviewTab").then(m => ({ default: m.OverviewTab })));
+const RoomManagementTab = lazy(() => import("@/components/dashboard/RoomManagementTab").then(m => ({ default: m.RoomManagementTab })));
+const AssignmentTab = lazy(() => import("@/components/dashboard/AssignmentTab").then(m => ({ default: m.AssignmentTab })));
+const AccessCodesTab = lazy(() => import("@/components/dashboard/AccessCodesTab").then(m => ({ default: m.AccessCodesTab })));
+const LinenTab = lazy(() => import("@/components/dashboard/LinenTab").then(m => ({ default: m.LinenTab })));
+const IncidentsTab = lazy(() => import("@/components/dashboard/IncidentsTab").then(m => ({ default: m.IncidentsTab })));
+const ReportsTab = lazy(() => import("@/components/dashboard/ReportsTab").then(m => ({ default: m.ReportsTab })));
+const TrainingTab = lazy(() => import("@/components/dashboard/TrainingTab").then(m => ({ default: m.TrainingTab })));
+const ArchivesTab = lazy(() => import("@/components/dashboard/ArchivesTab").then(m => ({ default: m.ArchivesTab })));
 
 import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
