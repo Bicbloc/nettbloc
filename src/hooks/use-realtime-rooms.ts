@@ -65,12 +65,7 @@ export function useRealtimeRooms({
             };
           });
           
-            number: r.number, 
-            status: r.status, 
-            cleaningType: r.cleaningType,
-            cleaning_type: (r as any).cleaning_type
-          })));
-          
+
           return updatedRooms;
         }
         
