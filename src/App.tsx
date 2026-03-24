@@ -65,19 +65,20 @@ const App = () => (
   <AppBoot>
     <LanguageProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <HotelProvider>
-            <HousekeeperAuthProvider>
-              <TechnicianAuthProvider>
-                <HousekeepingProvider>
-                  <NotificationProvider>
-                    <TooltipProvider>
-                      <Toaster />
-                      <Sonner />
-                      {import.meta.env.DEV && <ConnectionDebugPanel />}
-                      <div className="flex flex-col min-h-screen">
-                        <div className="flex-grow">
-                          <BrowserRouter>
+        <ErrorBoundary>
+          <AuthProvider>
+            <HotelProvider>
+              <HousekeeperAuthProvider>
+                <TechnicianAuthProvider>
+                  <HousekeepingProvider>
+                    <NotificationProvider>
+                      <TooltipProvider>
+                        <Toaster />
+                        <Sonner />
+                        {import.meta.env.DEV && <ConnectionDebugPanel />}
+                        <div className="flex flex-col min-h-screen">
+                          <div className="flex-grow">
+                            <BrowserRouter>
                             <Routes>
                               <Route path="/" element={<Index />} />
                               <Route path="/landing" element={<Landing />} />
