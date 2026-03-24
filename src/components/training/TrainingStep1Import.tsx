@@ -1,14 +1,14 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Sparkles, AlertTriangle, ClipboardPaste, File } from "lucide-react";
-import { pmsAdapterFactory, ExtractedRoom } from "@/services/pms";
+import { Upload, FileText, Sparkles, ClipboardPaste } from "lucide-react";
 import { TrainingData } from "./TrainingWizard";
-import { useExistingTraining } from "./TrainingHistory";
+import { universalParse } from "@/services/training/UniversalParser";
+import { pmsAdapterFactory } from "@/services/pms";
+import { loadHotelReportConfig } from "@/services/reportConfigService";
 import * as pdfjsLib from "pdfjs-dist";
 import Papa from "papaparse";
 
@@ -61,7 +61,6 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
         complete: (results) => {
-          // Convert CSV data back to tab-separated text for uniform processing
           const text = results.data
             .map((row: any) => (Array.isArray(row) ? row.join('\t') : String(row)))
             .join('\n');
@@ -72,31 +71,68 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
     });
   };
 
-  const processText = (text: string, sourceName: string) => {
-    // Auto-detect PMS
-    const detection = pmsAdapterFactory.detectPms(text);
-    const pmsType = detection.detection.pmsType;
-    const extractedRooms = detection.adapter.extractRooms(text);
+  const processText = async (text: string, sourceName: string) => {
+    // Load hotel-specific status mappings for better accuracy
+    let customMappings: Record<string, string> | undefined;
+    try {
+      const config = await loadHotelReportConfig(hotelId);
+      if (config?.status_mappings && typeof config.status_mappings === 'object') {
+        customMappings = config.status_mappings as unknown as Record<string, string>;
+      }
+    } catch (e) {
+      console.warn('Could not load hotel config for mappings:', e);
+    }
 
-    console.log(`🔍 PMS auto-détecté: ${pmsType} (${detection.detection.confidence}), ${extractedRooms.length} chambres`);
+    // Use UniversalParser as primary engine
+    const universalResult = universalParse(text, customMappings);
+    console.log(`🧠 UniversalParser: ${universalResult.rows.length} rooms, ${universalResult.confidence}% confidence, ${universalResult.unmappedCount} unmapped`);
+
+    let extractedRooms = universalResult.rows.map(row => ({
+      roomNumber: row.roomNumber,
+      cleaningType: (row.detectedCleaningType === 'out_of_service' ? 'none' : row.detectedCleaningType === 'unknown' ? 'quick' : row.detectedCleaningType) as any,
+      status: row.statusIndicator || row.cleaningStatus || '',
+      originalText: row.rawLine,
+      validated: row.detectedCleaningType !== 'unknown',
+      guestName: row.guestName || undefined,
+      arrivalDate: row.arrivalDate || undefined,
+      departureDate: row.departureDate || undefined,
+      roomType: row.roomType || undefined,
+      confidence: row.confidence,
+    }));
+
+    let detectedPmsType = 'universal';
+
+    // Fallback: if UniversalParser found 0 rooms, try PMS-specific adapters
+    if (extractedRooms.length === 0) {
+      console.log('⚠️ UniversalParser found 0 rooms, falling back to PMS adapters...');
+      const detection = pmsAdapterFactory.detectPms(text);
+      const pmsRooms = detection.adapter.extractRooms(text);
+      
+      if (pmsRooms.length > 0) {
+        extractedRooms = pmsRooms;
+        detectedPmsType = detection.detection.pmsType;
+        console.log(`📋 PMS adapter fallback: ${pmsRooms.length} rooms (${detectedPmsType})`);
+      }
+    }
 
     const trainingData: TrainingData = {
       reportName: sourceName,
       rawText: text,
       extractedRooms,
-      detectedPmsType: pmsType,
+      detectedPmsType,
       validatedCount: 0,
     };
 
     if (extractedRooms.length === 0) {
       toast({
-        title: "Aucune chambre détectée automatiquement",
-        description: "Passez à l'étape suivante pour configurer manuellement le mapping.",
+        title: "Aucune chambre détectée",
+        description: "Passez à l'étape suivante pour configurer manuellement.",
       });
     } else {
+      const mappedCount = extractedRooms.filter(r => r.validated).length;
       toast({
         title: "Import réussi",
-        description: `${extractedRooms.length} chambres détectées (format: ${pmsType.toUpperCase()})`,
+        description: `${extractedRooms.length} chambres détectées (${mappedCount} avec statut connu, confiance: ${universalResult.confidence}%)`,
       });
     }
 
@@ -125,7 +161,7 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
         return;
       }
 
-      processText(text, file.name);
+      await processText(text, file.name);
     } catch (error) {
       console.error("Erreur lors du traitement:", error);
       toast({
@@ -185,7 +221,6 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
           </TabsTrigger>
         </TabsList>
 
-        {/* File Upload Tab */}
         <TabsContent value="file" className="mt-4">
           <div
             onDragEnter={handleDrag}
@@ -235,7 +270,6 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
           </div>
         </TabsContent>
 
-        {/* Paste Text Tab */}
         <TabsContent value="paste" className="mt-4 space-y-4">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
@@ -261,16 +295,15 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
         </TabsContent>
       </Tabs>
 
-      {/* Tips */}
       <div className="bg-muted/50 rounded-lg p-4 space-y-3">
         <div className="flex items-start gap-3">
           <Sparkles className="w-5 h-5 text-primary mt-0.5" />
           <div>
-            <p className="font-medium">Détection automatique</p>
+            <p className="font-medium">Détection automatique universelle</p>
             <p className="text-sm text-muted-foreground">
-              Le système détecte automatiquement votre PMS (Mews, Opera, Apaleo, Medialog...) 
-              et adapte l'analyse. Si le format n'est pas reconnu, vous pourrez configurer 
-              manuellement le mapping à l'étape suivante.
+              Le système reconnaît automatiquement tous les PMS (Opera, Mews, Apaleo, Protel, Fidelio, Clock...) 
+              et les rapports multilingues (FR, EN, DE, ES, IT, PT). Si le format est reconnu à plus de 90%, 
+              vous pourrez sauver directement.
             </p>
           </div>
         </div>
