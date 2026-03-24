@@ -24,7 +24,7 @@ export function useHousekeeperSync() {
     };
 
     try {
-      const selectedHotelId = localStorage.getItem('selectedHotelId');
+      const selectedHotelId = storageService.getHotelId();
       
       if (!selectedHotelId) {
         result.success = false;
