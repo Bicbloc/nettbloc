@@ -226,12 +226,6 @@ export const useAutoSetup = () => {
   }, [user]);
 
   useEffect(() => {
-      authLoading,
-      isAuthenticated,
-      userId: user?.id,
-      lastUserId,
-      hasAttempted: hasAttemptedSetup.current
-    });
 
     // Attendre que l'auth soit complètement initialisée
     if (authLoading) {

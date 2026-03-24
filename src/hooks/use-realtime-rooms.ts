@@ -93,10 +93,7 @@ export function useRealtimeRooms({
     }
     
     if (table === 'assignments' && (eventType === 'INSERT' || eventType === 'UPDATE')) {
-        housekeeper: newRecord.housekeeper_name,
-        roomId: newRecord.room_id,
-        status: newRecord.status
-      });
+      
       
       // Refresh data if an assignment is completed or modified
       if ((newRecord.status === 'completed' || eventType === 'UPDATE') && hotelId) {

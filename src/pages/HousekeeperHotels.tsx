@@ -249,10 +249,6 @@ function HousekeeperHotelsContent() {
 
       // 4. Vérifier que les données sont bien sauvegardées
       const savedId = localStorage.getItem('selectedHotelId');
-        hotelId: savedId, 
-        expected: hotel.id,
-        match: savedId === hotel.id 
-      });
 
       // 5. Forcer la reconnexion realtime pour le nouvel hôtel
       realtimeManager.disconnect();

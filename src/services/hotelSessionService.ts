@@ -225,9 +225,7 @@ export class HotelSessionService {
         }
 
         if (error) {
-            '⚠️ getSession: échec via session_token, fallback via hotel_id:',
-            error
-          );
+          // Session token lookup failed, falling back to hotel_id
         }
       }
 
