@@ -340,9 +340,6 @@ const HousekeeperWorkContent: React.FC = () => {
   // Charger les données une fois authentifié
   useEffect(() => {
     if (isAuthChecked && housekeeperProfile && hotelId) {
-        profileId: housekeeperProfile.id,
-        hotelId: hotelId
-      });
       loadWorkData();
       loadTasksAndInstructions();
     }
