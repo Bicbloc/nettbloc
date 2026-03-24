@@ -142,6 +142,7 @@ const FORMAT_SIGNATURES: Record<ReportFormat, { patterns: RegExp[]; weight: numb
     { patterns: [/Opera/i, /Oracle/i], weight: 10 },
     { patterns: [/Housekeeping\s+Report/i], weight: 5 },
     { patterns: [/\b(VD|OD|VC|OC)\b/], weight: 8 },
+    { patterns: [/\b(VR|DI)\b/], weight: 5 },
   ],
   generic_table: [
     { patterns: [/chambre|room/i], weight: 2 },
