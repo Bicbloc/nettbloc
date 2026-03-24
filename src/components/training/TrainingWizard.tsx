@@ -197,12 +197,28 @@ export const TrainingWizard = ({ hotelId }: TrainingWizardProps) => {
           )}
 
           {currentStep === 2 && trainingData && (
-            <TrainingStep1bColumnMapping
-              trainingData={trainingData}
-              hotelId={hotelId}
-              onComplete={handleMappingComplete}
-              onBack={() => setCurrentStep(1)}
-            />
+            <div className="space-y-4">
+              {canSkipStep2 && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
+                  <div className="flex items-center gap-2 text-green-800">
+                    <Zap className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      Tous les statuts sont reconnus automatiquement !
+                    </span>
+                  </div>
+                  <Button size="sm" onClick={handleSkipToValidate} className="gap-1">
+                    <CheckCircle className="h-4 w-4" />
+                    Tout est correct → Sauver
+                  </Button>
+                </div>
+              )}
+              <TrainingStep1bColumnMapping
+                trainingData={trainingData}
+                hotelId={hotelId}
+                onComplete={handleMappingComplete}
+                onBack={() => setCurrentStep(1)}
+              />
+            </div>
           )}
 
           {currentStep === 3 && trainingData && (
