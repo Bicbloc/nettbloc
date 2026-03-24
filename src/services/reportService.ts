@@ -356,6 +356,33 @@ function generateReportHTML(data: ReportData, t: ReportTranslations): string {
     }
   }
   
+  // Process assigned tasks
+  let tasksHtml = '';
+  if (data.assignedTasks && data.assignedTasks.length > 0) {
+    const taskRows = data.assignedTasks.map(task => `
+      <tr>
+        <td style="border:1px solid #000; padding:6px;">
+          ${task.is_completed ? '☑' : '☐'} ${task.title}
+          ${task.description ? `<br/><span style="font-size:11px; color:#666;">${task.description}</span>` : ''}
+        </td>
+        <td style="border:1px solid #000; padding:6px; text-align:center;">${task.is_completed ? '✓' : ''}</td>
+      </tr>
+    `).join('');
+    
+    tasksHtml = `
+      <div class="tasks-section" style="margin-top:15px; page-break-inside:avoid;">
+        <h3>✅ ${lang === 'en' ? 'Assigned Tasks' : 'Tâches assignées'}</h3>
+        <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #000;">
+          <tr>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:left;">${lang === 'en' ? 'Task' : 'Tâche'}</th>
+            <th style="background-color:#f2f2f2; border:1px solid #000; text-align:center; width:80px;">${lang === 'en' ? 'Done' : 'Fait'}</th>
+          </tr>
+          ${taskRows}
+        </table>
+      </div>
+    `;
+  }
+
   // Format current date in a readable format (e.g., "jeudi 15 mai 2025")
   const formattedDate = data.currentDate.split(' ').slice(0, 3).join(' ');
   
