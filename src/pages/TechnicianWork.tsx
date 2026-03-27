@@ -12,6 +12,7 @@ import {
   MessageSquare, Filter, ArrowLeft, Package, LayoutGrid
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Map as MapIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { TechnicianSpacesView } from '@/components/technician/TechnicianSpacesView';
 import { TechnicianIncidentActions } from '@/components/technician/TechnicianIncidentActions';
+import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { cn } from '@/lib/utils';
 
 interface Incident {
@@ -73,7 +75,7 @@ function TechnicianWorkContent() {
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'incidents' | 'spaces' | 'report'>('incidents');
+  const [activeTab, setActiveTab] = useState<'incidents' | 'spaces' | 'report' | 'plan'>('incidents');
   
   // Comment dialog
   const [showCommentDialog, setShowCommentDialog] = useState(false);
@@ -437,7 +439,7 @@ function TechnicianWorkContent() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="incidents" className="gap-2">
               <AlertTriangle className="h-4 w-4" />
               <span className="hidden sm:inline">Incidents</span>
@@ -450,6 +452,10 @@ function TechnicianWorkContent() {
             <TabsTrigger value="spaces" className="gap-2">
               <LayoutGrid className="h-4 w-4" />
               <span className="hidden sm:inline">Espaces</span>
+            </TabsTrigger>
+            <TabsTrigger value="plan" className="gap-2">
+              <MapIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Plan</span>
             </TabsTrigger>
             <TabsTrigger value="report" className="gap-2">
               <Wrench className="h-4 w-4" />
@@ -539,6 +545,11 @@ function TechnicianWorkContent() {
                 hotelId={hotel.id} 
               />
             )}
+          </TabsContent>
+
+          {/* Plan Tab */}
+          <TabsContent value="plan">
+            {hotel?.id && <ReadOnlyFloorPlan hotelId={hotel.id} />}
           </TabsContent>
 
           {/* Report Tab */}

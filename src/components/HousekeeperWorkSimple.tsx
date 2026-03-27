@@ -20,6 +20,7 @@ import { RoomStatusTabs, RoomFilterTab, filterRoomsByTab, calculateRoomCounts } 
 import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
 import { StaffTasksList } from './tasks/StaffTasksList';
+import { ReadOnlyFloorPlan } from './registry/ReadOnlyFloorPlan';
 
 interface Room {
   id: string;
@@ -57,7 +58,7 @@ const HousekeeperWorkContent: React.FC = () => {
   const [newRoomsCount, setNewRoomsCount] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
-  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions'>('rooms');
+  const [activeTab, setActiveTab] = useState<'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan'>('rooms');
   const [roomFilterTab, setRoomFilterTab] = useState<RoomFilterTab>('all');
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [hasNewInstructions, setHasNewInstructions] = useState(false);
@@ -1074,6 +1075,13 @@ const HousekeeperWorkContent: React.FC = () => {
 
         {activeTab === 'instructions' && hotelId && (
           <DailyInstructionsBanner hotelId={hotelId} />
+        )}
+
+        {activeTab === 'plan' && hotelId && (
+          <ReadOnlyFloorPlan
+            hotelId={hotelId}
+            highlightedRooms={rooms.map(r => r.room_number)}
+          />
         )}
 
         {activeTab === 'inventory' && hotelId && (

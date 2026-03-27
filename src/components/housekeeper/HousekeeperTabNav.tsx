@@ -1,9 +1,9 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Home, ClipboardList, Info, Package } from 'lucide-react';
+import { Home, ClipboardList, Info, Package, Map } from 'lucide-react';
 
-type TabType = 'rooms' | 'inventory' | 'tasks' | 'instructions';
+type TabType = 'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan';
 
 interface HousekeeperTabNavProps {
   activeTab: TabType;
@@ -27,7 +27,7 @@ export const HousekeeperTabNav: React.FC<HousekeeperTabNavProps> = ({
   onInventoryOpen,
 }) => {
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-5 gap-2">
       <Button
         variant={activeTab === 'rooms' ? 'default' : 'outline'}
         onClick={() => setActiveTab('rooms')}
@@ -90,6 +90,15 @@ export const HousekeeperTabNav: React.FC<HousekeeperTabNavProps> = ({
         <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1 text-[10px] bg-orange-500 text-white">
           📷
         </Badge>
+      </Button>
+
+      <Button
+        variant={activeTab === 'plan' ? 'default' : 'outline'}
+        onClick={() => setActiveTab('plan')}
+        className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
+      >
+        <Map className="h-5 w-5" />
+        <span className="text-xs">Plan</span>
       </Button>
     </div>
   );
