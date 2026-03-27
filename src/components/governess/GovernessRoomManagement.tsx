@@ -627,6 +627,8 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
+      )}
     </div>
   );
 };
