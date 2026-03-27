@@ -90,15 +90,15 @@ export function useUserTypeGuard(expectedType: Exclude<UserType, null>): UserTyp
 
         let detectedType: UserType = null;
 
-        // Check technician first to prevent them from accessing other interfaces
-        if (technicianResult.data) {
+        // Establishment takes priority - check hotel ownership first
+        if (hotelResult.data) {
+          detectedType = 'establishment';
+        } else if (technicianResult.data) {
           detectedType = 'technician';
         } else if (housekeeperResult.data) {
           detectedType = 'housekeeper';
         } else if (governessResult.data) {
           detectedType = 'governess';
-        } else if (hotelResult.data) {
-          detectedType = 'establishment';
         }
 
 
