@@ -12,7 +12,7 @@ import {
   MessageSquare, Filter, ArrowLeft, Package, LayoutGrid
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Map } from 'lucide-react';
+import { Map as MapIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
