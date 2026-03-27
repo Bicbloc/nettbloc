@@ -454,7 +454,7 @@ function TechnicianWorkContent() {
               <span className="hidden sm:inline">Espaces</span>
             </TabsTrigger>
             <TabsTrigger value="plan" className="gap-2">
-              <Map className="h-4 w-4" />
+              <MapIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Plan</span>
             </TabsTrigger>
             <TabsTrigger value="report" className="gap-2">
