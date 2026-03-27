@@ -200,6 +200,18 @@ export function UsersManagementPanel() {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      if (error) throw error;
+      toast({ title: "Email envoyé", description: `Un lien de réinitialisation a été envoyé à ${email}` });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erreur", description: error.message });
+    }
+  };
+
   const toggleSuspend = async (userId: string, suspend: boolean, reason?: string) => {
     try {
       const { error } = await supabase
@@ -634,6 +646,11 @@ export function UsersManagementPanel() {
                           }}>
                             <Eye className="h-4 w-4 mr-2" />
                             Voir détails
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuItem onClick={() => resetPassword(user.email)}>
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Réinitialiser le mot de passe
                           </DropdownMenuItem>
                           
                           {user.user_type === 'establishment' && user.role !== 'super_admin' && (
