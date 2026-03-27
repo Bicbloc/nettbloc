@@ -547,6 +547,11 @@ function TechnicianWorkContent() {
             )}
           </TabsContent>
 
+          {/* Plan Tab */}
+          <TabsContent value="plan">
+            {hotel?.id && <ReadOnlyFloorPlan hotelId={hotel.id} />}
+          </TabsContent>
+
           {/* Report Tab */}
           <TabsContent value="report">
             <Card className="p-4">

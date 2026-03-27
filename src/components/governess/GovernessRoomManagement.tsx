@@ -14,6 +14,8 @@ import {
   MessageSquare, Star, AlertCircle, Filter, ShieldCheck, ShieldX, Package
 } from 'lucide-react';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
+import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
+import { Map } from 'lucide-react';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 
 interface GovernessRoomManagementProps {
@@ -64,6 +66,7 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showPlan, setShowPlan] = useState(false);
   
   // Dialog states
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -385,7 +388,20 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
           <RefreshCw className="h-4 w-4" />
           Actualiser
         </Button>
+        <Button
+          variant={showPlan ? 'default' : 'outline'}
+          onClick={() => setShowPlan(!showPlan)}
+          className="gap-2"
+        >
+          <Map className="h-4 w-4" />
+          Plan
+        </Button>
       </div>
+
+      {showPlan ? (
+        <ReadOnlyFloorPlan hotelId={hotelId} />
+      ) : (
+      <>
 
       {/* Stats rapides */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
