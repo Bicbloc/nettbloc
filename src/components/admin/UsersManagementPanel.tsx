@@ -648,6 +648,11 @@ export function UsersManagementPanel() {
                             Voir détails
                           </DropdownMenuItem>
                           
+                          <DropdownMenuItem onClick={() => resetPassword(user.email)}>
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Réinitialiser le mot de passe
+                          </DropdownMenuItem>
+                          
                           {user.user_type === 'establishment' && user.role !== 'super_admin' && (
                             <>
                               <DropdownMenuSeparator />
