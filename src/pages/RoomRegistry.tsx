@@ -14,15 +14,17 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Search, Edit, Power, PowerOff, Trash2, ClipboardList, Building, Bed, Wrench } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddRoomRegistryDialog } from '@/components/AddRoomRegistryDialog';
 import { EditRoomRegistryDialog } from '@/components/EditRoomRegistryDialog';
 import { SpaceActivityLog } from '@/components/SpaceActivityLog';
+import { FloorPlanView } from '@/components/registry/FloorPlanView';
 import { formatFloorLabel } from '@/utils/floorUtils';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { Edit, ClipboardList, Power, PowerOff } from 'lucide-react';
 
 interface RoomRegistryItem {
   id: string;
@@ -52,6 +54,7 @@ const RoomRegistry = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [activityRoom, setActivityRoom] = useState<RoomRegistryItem | null>(null);
+  const [viewMode, setViewMode] = useState<'plan' | 'table'>('plan');
 
   const { data: hotel } = useQuery({
     queryKey: ['hotel', user?.id],
@@ -165,6 +168,19 @@ const RoomRegistry = () => {
     }
   };
 
+  const handleEdit = (room: RoomRegistryItem) => {
+    setSelectedRoom(room);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleToggleActive = (room: RoomRegistryItem) => {
+    toggleActiveMutation.mutate({ id: room.id, is_active: room.is_active ?? true });
+  };
+
+  const handleViewActivity = (room: RoomRegistryItem) => {
+    setActivityRoom(room);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
@@ -175,9 +191,9 @@ const RoomRegistry = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Registre des Espaces</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">Plan des Espaces</h1>
               <p className="text-sm text-muted-foreground">
-                Chambres, espaces communs et techniques
+                Vue architecturale — chambres, espaces communs et techniques
               </p>
             </div>
           </div>
@@ -219,8 +235,8 @@ const RoomRegistry = () => {
           </Card>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Filters & View Toggle */}
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <Tabs value={categoryFilter} onValueChange={setCategoryFilter} className="w-full sm:w-auto">
             <TabsList className="w-full sm:w-auto grid grid-cols-4">
               <TabsTrigger value="all">Tout</TabsTrigger>
@@ -238,87 +254,114 @@ const RoomRegistry = () => {
               className="pl-10"
             />
           </div>
+          <div className="flex border rounded-lg overflow-hidden shrink-0">
+            <Button
+              variant={viewMode === 'plan' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setViewMode('plan')}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1" />
+              Plan
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setViewMode('table')}
+            >
+              <TableIcon className="h-4 w-4 mr-1" />
+              Liste
+            </Button>
+          </div>
         </div>
 
-        {/* Table */}
-        <Card>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={allFilteredSelected}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead>Nom / N°</TableHead>
-                  <TableHead>Catégorie</TableHead>
-                  <TableHead>Étage</TableHead>
-                  <TableHead className="hidden md:table-cell">Type</TableHead>
-                  <TableHead className="hidden lg:table-cell">Source</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+        {/* Content */}
+        {isLoading ? (
+          <div className="text-center py-16 text-muted-foreground">Chargement...</div>
+        ) : viewMode === 'plan' ? (
+          <FloorPlanView
+            rooms={filteredRooms}
+            onEdit={handleEdit}
+            onToggleActive={handleToggleActive}
+            onViewActivity={handleViewActivity}
+          />
+        ) : (
+          <Card>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">Chargement...</TableCell>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allFilteredSelected}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Nom / N°</TableHead>
+                    <TableHead>Catégorie</TableHead>
+                    <TableHead>Étage</TableHead>
+                    <TableHead className="hidden md:table-cell">Type</TableHead>
+                    <TableHead className="hidden lg:table-cell">Source</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ) : filteredRooms.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">Aucun espace trouvé</TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRooms.map((room) => (
-                    <TableRow key={room.id} className={selectedIds.has(room.id) ? 'bg-muted/50' : ''}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(room.id)}
-                          onCheckedChange={() => toggleSelect(room.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{room.room_number}</TableCell>
-                      <TableCell>{getCategoryBadge(room.space_category)}</TableCell>
-                      <TableCell>{formatFloorLabel(room.floor)}</TableCell>
-                      <TableCell className="hidden md:table-cell">{room.room_type ?? '-'}</TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        {room.source === 'pdf_import' ? (
-                          <Badge variant="outline">PDF</Badge>
-                        ) : room.source === 'manual' ? (
-                          <Badge variant="secondary">Manuel</Badge>
-                        ) : (
-                          <Badge variant="secondary">{room.source || '-'}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {room.is_active ? (
-                          <Badge className="bg-green-500 text-white">Active</Badge>
-                        ) : (
-                          <Badge variant="destructive">Inactive</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => { setSelectedRoom(room); setIsEditDialogOpen(true); }}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => setActivityRoom(room)}>
-                            <ClipboardList className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => toggleActiveMutation.mutate({ id: room.id, is_active: room.is_active ?? true })}>
-                            {room.is_active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-green-500" />}
-                          </Button>
-                        </div>
-                      </TableCell>
+                </TableHeader>
+                <TableBody>
+                  {filteredRooms.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">Aucun espace trouvé</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+                  ) : (
+                    filteredRooms.map((room) => (
+                      <TableRow key={room.id} className={selectedIds.has(room.id) ? 'bg-muted/50' : ''}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(room.id)}
+                            onCheckedChange={() => toggleSelect(room.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{room.room_number}</TableCell>
+                        <TableCell>{getCategoryBadge(room.space_category)}</TableCell>
+                        <TableCell>{formatFloorLabel(room.floor)}</TableCell>
+                        <TableCell className="hidden md:table-cell">{room.room_type ?? '-'}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {room.source === 'pdf_import' ? (
+                            <Badge variant="outline">PDF</Badge>
+                          ) : room.source === 'manual' ? (
+                            <Badge variant="secondary">Manuel</Badge>
+                          ) : (
+                            <Badge variant="secondary">{room.source || '-'}</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {room.is_active ? (
+                            <Badge className="bg-green-500 text-white">Active</Badge>
+                          ) : (
+                            <Badge variant="destructive">Inactive</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(room)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleViewActivity(room)}>
+                              <ClipboardList className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleToggleActive(room)}>
+                              {room.is_active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-green-500" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        )}
 
         {/* Floating bulk action bar */}
         {selectedIds.size > 0 && (
