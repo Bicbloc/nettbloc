@@ -393,7 +393,7 @@ export const GovernessRoomManagement: React.FC<GovernessRoomManagementProps> = (
           onClick={() => setShowPlan(!showPlan)}
           className="gap-2"
         >
-          <Map className="h-4 w-4" />
+          <MapIcon className="h-4 w-4" />
           Plan
         </Button>
       </div>
