@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { ReportLostItemDialog } from '@/components/lost-and-found/ReportLostItemDialog';
 import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
-import { Map } from 'lucide-react';
+import { Map as MapIcon } from 'lucide-react';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 
 interface GovernessRoomManagementProps {
