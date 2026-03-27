@@ -282,6 +282,7 @@ const RoomRegistry = () => {
         ) : viewMode === 'plan' ? (
           <FloorPlanView
             rooms={filteredRooms}
+            hotelId={hotel?.id}
             onEdit={handleEdit}
             onToggleActive={handleToggleActive}
             onViewActivity={handleViewActivity}
