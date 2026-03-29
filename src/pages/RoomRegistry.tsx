@@ -14,7 +14,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Trash2, Building, Bed, Wrench, LayoutGrid, Table as TableIcon, Grid3X3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddRoomRegistryDialog } from '@/components/AddRoomRegistryDialog';
 import { EditRoomRegistryDialog } from '@/components/EditRoomRegistryDialog';
@@ -266,6 +266,15 @@ const RoomRegistry = () => {
               Plan
             </Button>
             <Button
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setViewMode('grid')}
+            >
+              <Grid3X3 className="h-4 w-4 mr-1" />
+              Grille
+            </Button>
+            <Button
               variant={viewMode === 'table' ? 'default' : 'ghost'}
               size="sm"
               className="rounded-none"
@@ -282,6 +291,14 @@ const RoomRegistry = () => {
           <div className="text-center py-16 text-muted-foreground">Chargement...</div>
         ) : viewMode === 'plan' ? (
           <FloorPlanView
+            rooms={filteredRooms}
+            hotelId={hotel?.id}
+            onEdit={handleEdit}
+            onToggleActive={handleToggleActive}
+            onViewActivity={handleViewActivity}
+          />
+        ) : viewMode === 'grid' ? (
+          <FloorPlanGrid
             rooms={filteredRooms}
             hotelId={hotel?.id}
             onEdit={handleEdit}
