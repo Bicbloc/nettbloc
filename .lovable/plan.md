@@ -1,42 +1,64 @@
 
 
-## Plan : Plan architectural accessible à tous les rôles + notifications d'activité sur les espaces
+# Générer un APK pour l'interface Technicien
 
-### Contexte
-Le plan architectural (`FloorPlanView`) n'est actuellement visible que dans le registre admin (`/room-registry`). Les interfaces technicien, gouvernante et femme de chambre n'y ont pas accès. De plus, il n'y a pas de badge de notification sur les espaces pour signaler une activité récente, ni de clic direct pour voir l'historique.
+## Situation actuelle
 
-### Ce qui sera fait
+Capacitor est deja configure dans le projet avec les dependances Android (`@capacitor/android`). La configuration pointe vers `https://nettobloc.bicbloc.eu`.
 
-**1. Créer un composant `ReadOnlyFloorPlan` réutilisable**
-- Adapter `FloorPlanView` en une version lecture seule (sans drag-and-drop, sans edit/toggle active)
-- Chaque cellule d'espace affiche un badge de notification (pastille rouge avec compteur) quand il y a des actions récentes (dernières 24h) via une requête sur `daily_action_logs`
-- Un clic sur un espace ouvre le `SpaceActivityLog` (journal d'activité existant) en mode Sheet
+## Ce qu'il faut faire
 
-**2. Intégrer le plan dans l'interface Femme de chambre**
-- Ajouter un 5e onglet "Plan" dans `HousekeeperTabNav` (icône `Map`)
-- Afficher le `ReadOnlyFloorPlan` filtré sur les espaces de l'hôtel courant
-- Mettre en surbrillance les chambres assignées à la femme de chambre
+Aucune modification de code n'est necessaire dans Lovable. Le projet est deja pret pour generer un APK. Voici les etapes a suivre sur votre machine locale :
 
-**3. Intégrer le plan dans l'interface Gouvernante**
-- Ajouter un onglet/bouton "Plan" dans `GovernessRoomManagement`
-- Afficher le plan complet de l'hôtel avec indicateurs d'activité
+### Etapes pour generer l'APK
 
-**4. Intégrer le plan dans l'interface Technicien**
-- Ajouter un onglet "Plan" dans les tabs de `TechnicianWork`
-- Afficher le plan avec mise en évidence des espaces ayant des incidents actifs
+1. **Exporter vers GitHub** via le bouton "Export to GitHub" dans Lovable
+2. **Cloner le projet** sur votre machine :
+   ```bash
+   git clone <votre-repo-github>
+   cd <nom-du-projet>
+   ```
+3. **Installer les dependances** :
+   ```bash
+   npm install
+   ```
+4. **Ajouter la plateforme Android** :
+   ```bash
+   npx cap add android
+   ```
+5. **Builder le projet** :
+   ```bash
+   npm run build
+   ```
+6. **Synchroniser avec Android** :
+   ```bash
+   npx cap sync android
+   ```
+7. **Generer l'APK** avec Android Studio :
+   ```bash
+   npx cap open android
+   ```
+   Puis dans Android Studio : **Build → Build Bundle(s) / APK(s) → Build APK(s)**
 
-### Fichiers concernés
+### Pre-requis
 
-| Fichier | Action |
-|---|---|
-| `src/components/registry/ReadOnlyFloorPlan.tsx` | **Créer** - Composant plan lecture seule avec badges d'activité et clic → journal |
-| `src/components/housekeeper/HousekeeperTabNav.tsx` | **Modifier** - Ajouter onglet "Plan" |
-| `src/components/HousekeeperWorkSimple.tsx` | **Modifier** - Rendre le contenu du tab "Plan" |
-| `src/components/governess/GovernessRoomManagement.tsx` | **Modifier** - Ajouter vue plan |
-| `src/pages/TechnicianWork.tsx` | **Modifier** - Ajouter tab "Plan" |
+- **Android Studio** installe sur votre machine
+- **Java JDK 17+**
 
-### Detail technique - Badges de notification
-- Requête `daily_action_logs` groupée par `room_number` pour les dernières 24h
-- Affichage d'une pastille rouge avec le nombre d'actions sur chaque cellule d'espace
-- Le clic ouvre `SpaceActivityLog` existant en mode Sheet avec l'historique complet
+### Optionnel - Forcer l'ouverture sur la page technicien
+
+Si vous souhaitez que l'APK ouvre directement l'interface technicien, on peut modifier le `capacitor.config.ts` pour pointer vers `/technician-login` :
+
+```typescript
+server: {
+  url: 'https://nettobloc.bicbloc.eu/technician-login?forceHideBadge=true',
+  cleartext: true
+}
+```
+
+### Important
+
+L'APK genere chargera l'application web depuis votre serveur publie. Il n'embarque pas le code en local — c'est une WebView qui pointe vers votre site. Cela signifie que les mises a jour du site sont automatiquement refletees dans l'APK sans republier.
+
+Pour plus de details, consultez le guide Capacitor : https://docs.lovable.dev/tips-tricks/mobile-development
 
