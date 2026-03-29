@@ -567,6 +567,51 @@ export type Database = {
           },
         ]
       }
+      floor_plan_layouts: {
+        Row: {
+          cells: Json
+          floor_key: string
+          grid_cols: number
+          hotel_id: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cells?: Json
+          floor_key: string
+          grid_cols?: number
+          hotel_id: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cells?: Json
+          floor_key?: string
+          grid_cols?: number
+          hotel_id?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_plan_layouts_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_plan_layouts_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       governess_access_requests: {
         Row: {
           created_at: string | null

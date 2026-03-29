@@ -1,13 +1,14 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Bed, Building, Wrench, Edit, ClipboardList, Power, PowerOff,
   Plus, Trash2, Lock, Unlock, RotateCcw, DoorOpen, Square,
-  Armchair, ArrowUpDown, Droplets, Wifi
+  Armchair, ArrowUpDown, Droplets, Wifi, Save, Loader2
 } from 'lucide-react';
 import { formatFloorLabel } from '@/utils/floorUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface RoomRegistryItem {
   id: string;
@@ -61,7 +62,7 @@ interface GridCell {
 
 interface FloorGridData {
   cols: number;
-  cells: Record<string, GridCell>; // "row-col" -> cell
+  cells: Record<string, GridCell>;
 }
 
 interface FloorPlanGridProps {
@@ -72,7 +73,6 @@ interface FloorPlanGridProps {
   onViewActivity: (room: RoomRegistryItem) => void;
 }
 
-const GRID_STORAGE_KEY = 'floorplan-grid-';
 const DEFAULT_COLS = 10;
 const DEFAULT_ROWS = 4;
 
@@ -91,31 +91,90 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
   onToggleActive,
   onViewActivity,
 }) => {
+  const { toast } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
   const [gridData, setGridData] = useState<Record<string, FloorGridData>>({});
   const [draggedItem, setDraggedItem] = useState<{ type: 'room' | 'marker'; roomId?: string; markerId?: string; fromKey?: string; fromFloor?: string } | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const storageKey = `${GRID_STORAGE_KEY}${hotelId || 'default'}`;
-
-  // Load grid data
+  // Load grid data from Supabase
   useEffect(() => {
+    if (!hotelId) { setIsLoading(false); return; }
+    
+    const loadGridData = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('floor_plan_layouts')
+          .select('floor_key, grid_cols, cells')
+          .eq('hotel_id', hotelId);
+
+        if (error) throw error;
+
+        const loaded: Record<string, FloorGridData> = {};
+        data?.forEach((row: any) => {
+          loaded[row.floor_key] = {
+            cols: row.grid_cols || DEFAULT_COLS,
+            cells: (row.cells as Record<string, GridCell>) || {},
+          };
+        });
+        setGridData(loaded);
+      } catch (err) {
+        console.error('Error loading floor plan:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadGridData();
+  }, [hotelId]);
+
+  // Save grid data to Supabase
+  const saveToDb = useCallback(async () => {
+    if (!hotelId) return;
+    setIsSaving(true);
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) setGridData(JSON.parse(saved));
-    } catch { /* ignore */ }
-  }, [storageKey]);
+      // Upsert each floor
+      for (const [floorKey, floorData] of Object.entries(gridData)) {
+        const { error } = await supabase
+          .from('floor_plan_layouts')
+          .upsert({
+            hotel_id: hotelId,
+            floor_key: floorKey,
+            grid_cols: floorData.cols,
+            cells: floorData.cells as any,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'hotel_id,floor_key' });
 
-  const saveGridData = useCallback((data: Record<string, FloorGridData>) => {
-    setGridData(data);
-    try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch { /* ignore */ }
-  }, [storageKey]);
+        if (error) throw error;
+      }
+      setHasUnsavedChanges(false);
+      toast({ title: 'Plan sauvegardé', description: 'Le plan est visible par toute l\'équipe.' });
+    } catch (err: any) {
+      console.error('Error saving floor plan:', err);
+      toast({ title: 'Erreur', description: 'Impossible de sauvegarder le plan.', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [hotelId, gridData, toast]);
 
-  const resetGrid = useCallback(() => {
-    setGridData({});
-    try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
-  }, [storageKey]);
+  const resetGrid = useCallback(async () => {
+    if (!hotelId) return;
+    setIsSaving(true);
+    try {
+      await supabase.from('floor_plan_layouts').delete().eq('hotel_id', hotelId);
+      setGridData({});
+      setHasUnsavedChanges(false);
+      toast({ title: 'Plan réinitialisé' });
+    } catch {
+      toast({ title: 'Erreur', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [hotelId, toast]);
 
   // Group rooms by floor
   const floorGroups = useMemo(() => {
@@ -144,13 +203,11 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
     const cols = saved?.cols || DEFAULT_COLS;
 
     if (saved && Object.keys(saved.cells).length > 0) {
-      // Find max row
       let maxRow = 0;
       Object.keys(saved.cells).forEach(key => {
         const row = parseInt(key.split('-')[0]);
         if (row > maxRow) maxRow = row;
       });
-      // Check for unplaced rooms
       const placedRoomIds = new Set(
         Object.values(saved.cells).filter(c => c.type === 'room' && c.roomId).map(c => c.roomId!)
       );
@@ -171,12 +228,13 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
     return { grid: { cols, cells }, rows };
   }, [gridData]);
 
+  const updateGridData = useCallback((newData: Record<string, FloorGridData>) => {
+    setGridData(newData);
+    setHasUnsavedChanges(true);
+  }, []);
+
   const handleDragStart = useCallback((type: 'room' | 'marker', id: string, cellKey?: string, floorKey?: string) => {
-    if (type === 'room') {
-      setDraggedItem({ type: 'room', roomId: id, fromKey: cellKey, fromFloor: floorKey });
-    } else {
-      setDraggedItem({ type: 'marker', markerId: id, fromKey: cellKey, fromFloor: floorKey });
-    }
+    setDraggedItem({ type, roomId: type === 'room' ? id : undefined, markerId: type === 'marker' ? id : undefined, fromKey: cellKey, fromFloor: floorKey });
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent, cellKey: string) => {
@@ -188,36 +246,36 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
   const handleDrop = useCallback((e: React.DragEvent, floorKey: string, cellKey: string) => {
     e.preventDefault();
     setDragOverCell(null);
-
     if (!draggedItem) return;
 
     const newGridData = { ...gridData };
     if (!newGridData[floorKey]) {
       newGridData[floorKey] = { cols: DEFAULT_COLS, cells: {} };
     }
+    // Deep copy cells
+    newGridData[floorKey] = { ...newGridData[floorKey], cells: { ...newGridData[floorKey].cells } };
 
     // Remove from old position (same floor only)
     if (draggedItem.fromKey && draggedItem.fromFloor === floorKey) {
-      delete newGridData[floorKey].cells[draggedItem.fromKey];
-    }
-
-    // Check if target cell is occupied
-    const targetCell = newGridData[floorKey].cells[cellKey];
-    if (targetCell && targetCell.type === 'room' && draggedItem.type === 'room' && draggedItem.fromKey && draggedItem.fromFloor === floorKey) {
-      // Swap
-      newGridData[floorKey].cells[draggedItem.fromKey] = targetCell;
+      const targetCell = newGridData[floorKey].cells[cellKey];
+      // Swap if target occupied by a room
+      if (targetCell && targetCell.type === 'room' && draggedItem.type === 'room') {
+        newGridData[floorKey].cells[draggedItem.fromKey] = targetCell;
+      } else {
+        delete newGridData[floorKey].cells[draggedItem.fromKey];
+      }
     }
 
     // Place item
     if (draggedItem.type === 'room') {
       newGridData[floorKey].cells[cellKey] = { type: 'room', roomId: draggedItem.roomId };
-    } else {
+    } else if (draggedItem.type === 'marker') {
       newGridData[floorKey].cells[cellKey] = { type: 'marker', markerId: draggedItem.markerId };
     }
 
-    saveGridData(newGridData);
+    updateGridData(newGridData);
     setDraggedItem(null);
-  }, [draggedItem, gridData, saveGridData]);
+  }, [draggedItem, gridData, updateGridData]);
 
   const handleDragEnd = useCallback(() => {
     setDraggedItem(null);
@@ -229,29 +287,21 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
     if (!newGridData[floorKey]) {
       newGridData[floorKey] = { cols: DEFAULT_COLS, cells: {} };
     }
+    newGridData[floorKey] = { ...newGridData[floorKey], cells: { ...newGridData[floorKey].cells } };
     newGridData[floorKey].cells[cellKey] = { type: 'marker', markerId };
-    saveGridData(newGridData);
-    setSelectedMarker(null);
-  }, [gridData, saveGridData]);
+    updateGridData(newGridData);
+  }, [gridData, updateGridData]);
 
   const clearCell = useCallback((floorKey: string, cellKey: string) => {
     const newGridData = { ...gridData };
     if (newGridData[floorKey]?.cells[cellKey]) {
+      newGridData[floorKey] = { ...newGridData[floorKey], cells: { ...newGridData[floorKey].cells } };
       delete newGridData[floorKey].cells[cellKey];
-      saveGridData(newGridData);
+      updateGridData(newGridData);
     }
-  }, [gridData, saveGridData]);
+  }, [gridData, updateGridData]);
 
-  const addRow = useCallback((floorKey: string) => {
-    const newGridData = { ...gridData };
-    if (!newGridData[floorKey]) {
-      newGridData[floorKey] = { cols: DEFAULT_COLS, cells: {} };
-    }
-    // Just save to trigger re-render with more rows
-    saveGridData(newGridData);
-  }, [gridData, saveGridData]);
-
-  const hasGridData = Object.keys(gridData).length > 0;
+  const hasGridData = Object.keys(gridData).length > 0 && Object.values(gridData).some(g => Object.keys(g.cells).length > 0);
 
   if (rooms.length === 0) {
     return (
@@ -259,6 +309,15 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
         <Building className="h-12 w-12 mx-auto mb-3 opacity-30" />
         <p className="text-lg font-medium">Aucun espace trouvé</p>
         <p className="text-sm">Ajoutez des chambres ou espaces pour voir le plan</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <Loader2 className="h-8 w-8 mx-auto mb-3 animate-spin opacity-50" />
+        <p className="text-sm">Chargement du plan...</p>
       </div>
     );
   }
@@ -276,8 +335,14 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
             {isEditMode ? <Unlock className="h-4 w-4 mr-1.5" /> : <Lock className="h-4 w-4 mr-1.5" />}
             {isEditMode ? 'Mode édition actif' : 'Réorganiser le plan'}
           </Button>
-          {hasGridData && (
-            <Button variant="ghost" size="sm" onClick={resetGrid}>
+          {isEditMode && hasUnsavedChanges && (
+            <Button variant="default" size="sm" onClick={saveToDb} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white">
+              {isSaving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+              Sauvegarder
+            </Button>
+          )}
+          {hasGridData && isEditMode && (
+            <Button variant="ghost" size="sm" onClick={resetGrid} disabled={isSaving}>
               <RotateCcw className="h-4 w-4 mr-1.5" />
               Réinitialiser
             </Button>
@@ -287,7 +352,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
         {/* Marker palette */}
         {isEditMode && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs text-muted-foreground mr-1">Éléments :</span>
+            <span className="text-xs text-muted-foreground mr-1">Dessiner :</span>
             {MARKER_TYPES.map(marker => (
               <Button
                 key={marker.id}
@@ -305,9 +370,15 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
       </div>
 
       {isEditMode && selectedMarker && (
-        <p className="text-xs text-muted-foreground mb-2 bg-muted/50 px-3 py-1.5 rounded-md">
-          Cliquez sur une case vide pour placer un <strong>{MARKER_TYPES.find(m => m.id === selectedMarker)?.label}</strong>. 
-          Glissez les chambres pour les déplacer.
+        <div className="text-xs text-muted-foreground mb-2 bg-accent/50 px-3 py-1.5 rounded-md border border-accent">
+          👆 Cliquez sur une case vide pour placer : <strong>{MARKER_TYPES.find(m => m.id === selectedMarker)?.label}</strong>
+          <Button variant="ghost" size="sm" className="ml-2 h-5 px-1.5 text-xs" onClick={() => setSelectedMarker(null)}>✕ Annuler</Button>
+        </div>
+      )}
+
+      {isEditMode && !selectedMarker && (
+        <p className="text-xs text-muted-foreground mb-2">
+          Glissez les chambres pour les déplacer. Sélectionnez un élément ci-dessus pour le dessiner.
         </p>
       )}
 
@@ -321,7 +392,6 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
             const { grid, rows } = getFloorGrid(floorKey, floorRooms);
             const cols = grid.cols;
 
-            // Find unplaced rooms
             const placedRoomIds = new Set(
               Object.values(grid.cells).filter(c => c.type === 'room' && c.roomId).map(c => c.roomId!)
             );
@@ -348,13 +418,13 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                       const col = idx % cols;
                       const cellKey = `${row}-${col}`;
                       const cell = grid.cells[cellKey];
-                      const isOver = dragOverCell === `${floorKey}-${cellKey}`;
+                      const fullCellKey = `${floorKey}-${cellKey}`;
+                      const isOver = dragOverCell === fullCellKey;
 
                       if (cell?.type === 'room' && cell.roomId) {
                         const room = roomsById.get(cell.roomId);
                         if (!room) return <EmptyCell key={cellKey} cellKey={cellKey} floorKey={floorKey} isEditMode={isEditMode} isOver={isOver} selectedMarker={selectedMarker} onDragOver={handleDragOver} onDrop={handleDrop} onPlaceMarker={placeMarker} />;
 
-                        const isActive = room.is_active ?? true;
                         return (
                           <RoomGridCell
                             key={cellKey}
@@ -539,7 +609,6 @@ const RoomGridCell: React.FC<{
               </div>
             )}
 
-            {/* Clear button in edit mode */}
             {isEditMode && (
               <button
                 onClick={(e) => { e.stopPropagation(); onClear(floorKey, cellKey); }}
@@ -608,6 +677,9 @@ const EmptyCell: React.FC<{
     return <div className="min-h-[52px] rounded-md" />;
   }
 
+  const hasMarkerSelected = !!selectedMarker;
+  const markerInfo = selectedMarker ? MARKER_TYPES.find(m => m.id === selectedMarker) : null;
+
   return (
     <div
       onDragOver={(e) => onDragOver(e, `${floorKey}-${cellKey}`)}
@@ -617,12 +689,15 @@ const EmptyCell: React.FC<{
           onPlaceMarker(floorKey, cellKey, selectedMarker);
         }
       }}
-      className={`min-h-[52px] rounded-md border border-dashed border-foreground/10 transition-all flex items-center justify-center ${
-        isOver ? 'border-primary bg-primary/10 scale-105' : ''
-      } ${selectedMarker ? 'cursor-pointer hover:border-primary/40 hover:bg-primary/5' : ''}`}
+      className={`min-h-[52px] rounded-md border border-dashed transition-all flex flex-col items-center justify-center ${
+        isOver ? 'border-primary bg-primary/10 scale-105' : 'border-foreground/10'
+      } ${hasMarkerSelected ? 'cursor-pointer hover:border-primary/50 hover:bg-accent/30' : ''}`}
     >
-      {selectedMarker && (
-        <Plus className="h-3 w-3 text-muted-foreground/30" />
+      {hasMarkerSelected && markerInfo && (
+        <div className="flex flex-col items-center opacity-30 hover:opacity-60 transition-opacity">
+          {getMarkerIcon(markerInfo.icon, 'h-3 w-3')}
+          <Plus className="h-2 w-2 mt-0.5" />
+        </div>
       )}
     </div>
   );
