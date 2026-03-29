@@ -20,6 +20,7 @@ import { AddRoomRegistryDialog } from '@/components/AddRoomRegistryDialog';
 import { EditRoomRegistryDialog } from '@/components/EditRoomRegistryDialog';
 import { SpaceActivityLog } from '@/components/SpaceActivityLog';
 import { FloorPlanView } from '@/components/registry/FloorPlanView';
+import { FloorPlanGrid } from '@/components/registry/FloorPlanGrid';
 import { formatFloorLabel } from '@/utils/floorUtils';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -54,7 +55,7 @@ const RoomRegistry = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [activityRoom, setActivityRoom] = useState<RoomRegistryItem | null>(null);
-  const [viewMode, setViewMode] = useState<'plan' | 'table'>('plan');
+  const [viewMode, setViewMode] = useState<'plan' | 'table' | 'grid'>('plan');
 
   const { data: hotel } = useQuery({
     queryKey: ['hotel', user?.id],
