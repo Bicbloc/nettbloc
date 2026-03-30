@@ -295,7 +295,9 @@ export class MewsAdapter extends PmsAdapter {
         r.cleaningType = 'a_blanc';
       } else {
         // Utiliser la nouvelle logique améliorée pour SAL
-        const { status, cleaningType } = this.analyzeLineWithDate(rawLine, reportDate);
+        const result = await this.analyzeLineWithDate(rawLine, reportDate);
+        r.status = result.status;
+        r.cleaningType = result.cleaningType;
         r.status = status;
         r.cleaningType = cleaningType;
       }

@@ -590,11 +590,8 @@ class FieldExtractor {
     const names: string[] = [];
     const seen = new Set<string>();
     
-    // Patterns pour trouver tous les noms (Prénom NOM ou NOM Prénom)
     const namePatterns = [
-      // Prénom NOM (ex: "Thierry VIARD", "Ludovica Perillo")
       /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+)\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+)/g,
-      // NOM, Prénom (ex: "Alojayan, Noof")
       /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+),\s*([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+(?:\s+[A-Za-z]+)*)/g,
     ];
     
@@ -604,13 +601,9 @@ class FieldExtractor {
         const name = match[0].replace(/,\s*/, ' ').trim();
         const normalized = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         
-        // Skip ignored names and housekeeper names
         if (this.isIgnoredName(name) || this.isHousekeeperName(name)) continue;
-        
-        // Skip if too short
         if (name.length < 4) continue;
         
-        // Deduplicate
         if (!seen.has(normalized)) {
           seen.add(normalized);
           names.push(name);
@@ -623,4 +616,5 @@ class FieldExtractor {
 }
 
 // Singleton
+export const fieldExtractor = new FieldExtractor();
 export const fieldExtractor = new FieldExtractor();
