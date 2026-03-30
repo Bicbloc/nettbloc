@@ -143,7 +143,7 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
       const mappedCount = extractedRooms.filter(r => r.validated).length;
       toast({
         title: "Import réussi",
-        description: `${extractedRooms.length} chambres détectées (${mappedCount} avec statut connu, confiance: ${universalResult.confidence}%)`,
+        description: `${extractedRooms.length} chambres détectées (${mappedCount} avec statut connu, PMS: ${detectedPmsType})`,
       });
     }
 
