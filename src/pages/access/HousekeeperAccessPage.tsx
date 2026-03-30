@@ -109,27 +109,72 @@ const HousekeeperAccessPage = () => {
       });
       if (error) throw error;
 
-      const nameInitials = request.housekeeper_profiles.name.toUpperCase().slice(0, 3);
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
-      const accessCode = `${request.hotel_code}-${nameInitials}-${randomSuffix}`;
-
-      await supabase.from('housekeepers').upsert({
-        hotel_id: request.hotel_id,
-        name: request.housekeeper_profiles.name,
-        access_code: accessCode,
-        user_id: request.housekeeper_profile_id,
-        is_active: true
-      }, { onConflict: 'hotel_id,user_id' });
-
+      // Insert hotel history
       await supabase.from('housekeeper_hotel_history').insert({
         housekeeper_profile_id: request.housekeeper_profile_id,
         hotel_id: request.hotel_id,
+        started_at: new Date().toISOString(),
         rooms_cleaned: 0
       });
+
+      // Check if housekeeper already exists by user_id
+      const { data: existingByUserId } = await supabase
+        .from('housekeepers')
+        .select('id, name')
+        .eq('hotel_id', request.hotel_id)
+        .eq('user_id', request.housekeeper_profile_id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      // Check if housekeeper exists by name (possibly without user_id)
+      const { data: existingByName } = await supabase
+        .from('housekeepers')
+        .select('id, user_id')
+        .eq('hotel_id', request.hotel_id)
+        .ilike('name', request.housekeeper_profiles.name)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingByUserId) {
+        // Already linked - just update name if different
+        if (existingByUserId.name !== request.housekeeper_profiles.name) {
+          await supabase
+            .from('housekeepers')
+            .update({ name: request.housekeeper_profiles.name, updated_at: new Date().toISOString() })
+            .eq('id', existingByUserId.id);
+        }
+      } else if (existingByName && !existingByName.user_id) {
+        // Name match without user_id - link it
+        await supabase
+          .from('housekeepers')
+          .update({ user_id: request.housekeeper_profile_id, updated_at: new Date().toISOString() })
+          .eq('id', existingByName.id);
+      } else if (!existingByName) {
+        // No match - create new housekeeper entry
+        const nameInitials = request.housekeeper_profiles.name.toUpperCase().slice(0, 3);
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+        const accessCode = `${request.hotel_code}-${nameInitials}-${randomSuffix}`;
+
+        const { error: insertError } = await supabase
+          .from('housekeepers')
+          .insert({
+            hotel_id: request.hotel_id,
+            name: request.housekeeper_profiles.name,
+            access_code: accessCode,
+            user_id: request.housekeeper_profile_id,
+            is_active: true
+          });
+
+        if (insertError) {
+          console.error('Error inserting housekeeper:', insertError);
+          throw new Error('Impossible de créer la femme de chambre');
+        }
+      }
 
       toast.success('Femme de chambre approuvée !');
       loadRequests();
     } catch (error: any) {
+      console.error('Error approving request:', error);
       toast.error(error.message || 'Erreur');
     } finally {
       setProcessingId(null);
