@@ -432,6 +432,9 @@ function parseSection(roomNumber: string, fullText: string, excludeList: string[
   }
   
   // === DETERMINE CLEANING TYPE ===
+  // Count guest names for Mews-style logic
+  const allGuestNames = extractAllGuestNamesFromLine(fullText);
+  
   const { cleaningType, cleaningReason } = determineCleaningType({
     statusCode,
     baseCleaningFromStatus,
@@ -441,7 +444,8 @@ function parseSection(roomNumber: string, fullText: string, excludeList: string[
     checkOutTime,
     isLastNight,
     isFirstNight,
-    fullText: lower
+    fullText: lower,
+    guestNameCount: allGuestNames.length
   });
   
   // === CALCULATE CONFIDENCE ===
@@ -559,13 +563,15 @@ function determineCleaningType(params: {
   isLastNight?: boolean;
   isFirstNight?: boolean;
   fullText: string;
+  guestNameCount?: number;
 }): { cleaningType: 'a_blanc' | 'recouche' | 'none' | 'inspection'; cleaningReason: string } {
   const { 
     statusCode, baseCleaningFromStatus, 
     arrivalDate, departureDate, 
     checkInTime, checkOutTime,
     isLastNight, isFirstNight,
-    fullText 
+    fullText,
+    guestNameCount
   } = params;
   
   // === STATUTS PRIORITAIRES (pas de ménage) ===
