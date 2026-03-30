@@ -507,7 +507,7 @@ export class MewsAdapter extends PmsAdapter {
    * 
    * IMPORTANT: Les types de chambres (CLA, DBL, etc.) sont IGNORÉS car ce ne sont pas des statuts
    */
-  private async analyzeLineWithDate(line: string, reportDate: Date | null): Promise<{ status: string; cleaningType: CleaningType }> {
+  private analyzeLineWithDate(line: string, reportDate: Date | null): { status: string; cleaningType: CleaningType } {
     const upper = line.toUpperCase();
     
     // Extraire les tokens de la ligne pour analyse
@@ -534,8 +534,7 @@ export class MewsAdapter extends PmsAdapter {
     
     // PRIORITÉ 4: SAL = logique basée sur le NOMBRE DE NOMS CLIENTS (règle Mews)
     if (statusTokens.some(t => t === 'SAL' || t === 'SALE' || t === 'DIRTY' || t === 'DIR')) {
-      // Importer le FieldExtractor pour compter les noms clients
-      const { fieldExtractor } = await import('../FieldExtractor');
+      // Compter les noms clients via FieldExtractor (importé en haut du fichier)
       const guestNames = fieldExtractor.extractAllGuestNames(line);
       
       // RÈGLE PRIORITAIRE: nombre de noms clients
