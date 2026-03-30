@@ -580,6 +580,38 @@ class FieldExtractor {
 
     return { cleaningType: 'a_blanc', status: 'unknown', reason: 'Pas de statut clair', confidence: 40 };
   }
+
+  /**
+   * Extrait TOUS les noms de clients distincts d'une ligne (pas les HK)
+   * Utilisé pour la logique Mews: 1 nom = recouche, 2 noms = à blanc
+   */
+  extractAllGuestNames(line: string): string[] {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    
+    const namePatterns = [
+      /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+)\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+)/g,
+      /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+),\s*([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+(?:\s+[A-Za-z]+)*)/g,
+    ];
+    
+    for (const pattern of namePatterns) {
+      let match;
+      while ((match = pattern.exec(line)) !== null) {
+        const name = match[0].replace(/,\s*/, ' ').trim();
+        const normalized = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        
+        if (this.isIgnoredName(name) || this.isHousekeeperName(name)) continue;
+        if (name.length < 4) continue;
+        
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          names.push(name);
+        }
+      }
+    }
+    
+    return names;
+  }
 }
 
 // Singleton

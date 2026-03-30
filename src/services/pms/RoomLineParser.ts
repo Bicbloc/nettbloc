@@ -432,6 +432,9 @@ function parseSection(roomNumber: string, fullText: string, excludeList: string[
   }
   
   // === DETERMINE CLEANING TYPE ===
+  // Count guest names for Mews-style logic
+  const allGuestNames = extractAllGuestNamesFromLine(fullText);
+  
   const { cleaningType, cleaningReason } = determineCleaningType({
     statusCode,
     baseCleaningFromStatus,
@@ -441,7 +444,8 @@ function parseSection(roomNumber: string, fullText: string, excludeList: string[
     checkOutTime,
     isLastNight,
     isFirstNight,
-    fullText: lower
+    fullText: lower,
+    guestNameCount: allGuestNames.length
   });
   
   // === CALCULATE CONFIDENCE ===
@@ -547,6 +551,46 @@ function extractGuestName(text: string, excludeList: string[]): string | undefin
 }
 
 /**
+ * Extrait tous les noms de clients distincts d'une ligne
+ * Réplique la logique de FieldExtractor.extractAllGuestNames pour usage standalone
+ */
+function extractAllGuestNamesFromLine(text: string): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const IGNORE_WORDS = new Set([
+    'adultes', 'adulte', 'enfants', 'enfant', 'nuit', 'night',
+    'hotel', 'room', 'chambre', 'etage', 'floor',
+    'sal', 'ins', 'pro', 'occ', 'arr', 'dep',
+    'dbl', 'sgl', 'tpl', 'fam', 'dup', 'twn', 'kng', 'sui',
+    'standard', 'superior', 'deluxe', 'cardinal', 'resort',
+    'clean', 'dirty', 'propre', 'sale', 'inspected',
+    'responsable', 'espaces', 'statut', 'status'
+  ]);
+  
+  const namePatterns = [
+    /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+)\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+)/g,
+    /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+),\s*([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+(?:\s+[A-Za-z]+)*)/g,
+  ];
+  
+  for (const pattern of namePatterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const name = match[0].replace(/,\s*/, ' ').trim();
+      if (name.length < 4) continue;
+      const normalized = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const words = normalized.split(' ');
+      if (words.some(w => IGNORE_WORDS.has(w))) continue;
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        names.push(name);
+      }
+    }
+  }
+  
+  return names;
+}
+
+/**
  * Détermine le type de nettoyage avec raison
  */
 function determineCleaningType(params: {
@@ -559,13 +603,15 @@ function determineCleaningType(params: {
   isLastNight?: boolean;
   isFirstNight?: boolean;
   fullText: string;
+  guestNameCount?: number;
 }): { cleaningType: 'a_blanc' | 'recouche' | 'none' | 'inspection'; cleaningReason: string } {
   const { 
     statusCode, baseCleaningFromStatus, 
     arrivalDate, departureDate, 
     checkInTime, checkOutTime,
     isLastNight, isFirstNight,
-    fullText 
+    fullText,
+    guestNameCount
   } = params;
   
   // === STATUTS PRIORITAIRES (pas de ménage) ===
@@ -575,6 +621,16 @@ function determineCleaningType(params: {
   
   if (['PRO', 'OOO', 'OOS', 'DND'].includes(statusCode || '')) {
     return { cleaningType: 'none', cleaningReason: `Statut ${statusCode}` };
+  }
+  
+  // === RÈGLE NOMS CLIENTS (logique Mews): 2 noms = à blanc, 1 nom = recouche ===
+  if (guestNameCount !== undefined && guestNameCount > 0 && ['SAL', 'OCC'].includes(statusCode || '')) {
+    if (guestNameCount >= 2) {
+      return { cleaningType: 'a_blanc', cleaningReason: `${guestNameCount} clients détectés (checkout+checkin)` };
+    }
+    if (guestNameCount === 1) {
+      return { cleaningType: 'recouche', cleaningReason: '1 seul client (séjour en cours)' };
+    }
   }
   
   // === RÈGLE PRINCIPALE: 2 DATES = À BLANC ===

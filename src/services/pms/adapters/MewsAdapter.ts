@@ -5,6 +5,7 @@
 
 import { PmsAdapter } from '../PmsAdapter';
 import { PmsConfig, ExtractedRoom, CleaningType, PmsDetectionResult } from '../types';
+import { fieldExtractor } from '../FieldExtractor';
 
 export class MewsAdapter extends PmsAdapter {
   readonly name = 'mews';
@@ -295,9 +296,9 @@ export class MewsAdapter extends PmsAdapter {
         r.cleaningType = 'a_blanc';
       } else {
         // Utiliser la nouvelle logique améliorée pour SAL
-        const { status, cleaningType } = this.analyzeLineWithDate(rawLine, reportDate);
-        r.status = status;
-        r.cleaningType = cleaningType;
+        const analyzed = this.analyzeLineWithDate(rawLine, reportDate);
+        r.status = analyzed.status;
+        r.cleaningType = analyzed.cleaningType;
       }
 
       // Ajustement recouche vs départ via nuit X/Y quand la chambre est sale:
@@ -373,7 +374,7 @@ export class MewsAdapter extends PmsAdapter {
         removed.add(b);
 
         merged.push({
-          roomNumber: `${aRaw}-${bRaw}`,
+          roomNumber: `${aRaw}+${bRaw}`,
           status,
           cleaningType,
           originalText: line.trim(),
@@ -531,41 +532,51 @@ export class MewsAdapter extends PmsAdapter {
       return { status: 'checkout', cleaningType: 'a_blanc' };
     }
     
-    // PRIORITÉ 4: SAL = logique améliorée basée sur la POSITION des horaires + dates sans horaire
+    // PRIORITÉ 4: SAL = logique basée sur le NOMBRE DE NOMS CLIENTS (règle Mews)
     if (statusTokens.some(t => t === 'SAL' || t === 'SALE' || t === 'DIRTY' || t === 'DIR')) {
+      // Compter les noms clients via FieldExtractor (importé en haut du fichier)
+      const guestNames = fieldExtractor.extractAllGuestNames(line);
+      
+      // RÈGLE PRIORITAIRE: nombre de noms clients
+      if (guestNames.length >= 2) {
+        // 2 noms distincts = checkout + checkin → À blanc
+        return { status: 'checkout_arrival', cleaningType: 'a_blanc' };
+      }
+      
+      if (guestNames.length === 1) {
+        // 1 seul nom = client reste → Recouche
+        return { status: 'stayover', cleaningType: 'recouche' };
+      }
+      
+      // 0 noms → fallback sur horaires/dates
       const { hasDeparture, hasArrival } = this.extractTimePositions(line);
 
-      // 1) Horaire à droite = départ → À blanc
       if (hasDeparture) {
         return { status: 'checkout', cleaningType: 'a_blanc' };
       }
 
-      // 2) Dates arrivée+dép. SANS horaire → client encore présent → Recouche (peu importe la nuit)
       const dateMatches = line.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g) || [];
       const hasDateRangeNoTime = dateMatches.length >= 2 && !hasArrival && !hasDeparture;
       if (hasDateRangeNoTime) {
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
-      // 3) Nuit X/Y (y compris X/X) → recouche tant qu'il n'y a pas d'heure de départ
       const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
         upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
       if (nightMatch) {
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
-      // 4) Arrivée seule (horaire gauche) → Recouche
       if (hasArrival && !hasDeparture) {
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
-      // 5) Occupation (adultes) sans départ → Recouche
       const hasOccupancy = /\d+\s*×\s*Adultes/i.test(line);
       if (hasOccupancy) {
         return { status: 'stayover', cleaningType: 'recouche' };
       }
 
-      // Default SAL sans horaire/date/occupation → À BLANC (chambre vide sale)
+      // Default SAL sans nom/horaire/date → À BLANC (chambre vide sale)
       return { status: 'dirty', cleaningType: 'a_blanc' };
     }
 

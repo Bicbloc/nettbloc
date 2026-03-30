@@ -243,14 +243,21 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setUploadProgress(55);
 
     try {
-      // Charger le format appris et les chambres inactives en parallèle
-      const [roomFormatConfig, inactiveRooms] = await Promise.all([
+      // Charger le format appris, les chambres inactives et le registre en parallèle
+      const [roomFormatConfig, inactiveRooms, registryData] = await Promise.all([
         loadHotelRoomFormat(hotelId),
-        getInactiveRoomNumbers(hotelId)
+        getInactiveRoomNumbers(hotelId),
+        supabase.from('hotel_rooms_registry').select('room_number').eq('hotel_id', hotelId!).eq('is_active', true)
       ]);
       
-      // Filtrer les chambres selon le format appris
-      let filteredData = filterRoomsByFormat(data, roomFormatConfig);
+      // Build registry numbers set for format filtering (allows 2-digit rooms in registry)
+      const registryNumbers = new Set<string>();
+      if (registryData.data) {
+        registryData.data.forEach(r => registryNumbers.add(normalizeRoomNumber(r.room_number)));
+      }
+      
+      // Filtrer les chambres selon le format appris (registry rooms always pass)
+      let filteredData = filterRoomsByFormat(data, roomFormatConfig, registryNumbers);
       
       // Filtrer les chambres désactivées dans le registre
       filteredData = filterOutInactiveRooms(filteredData, inactiveRooms);
@@ -1180,8 +1187,16 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                       {isExcluded ? <X className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
                     </button>
                     <Badge variant="outline" className={`font-mono font-bold text-lg px-3 py-1 ${isExcluded ? 'line-through' : ''}`}>
-                      {line.roomNumber}
+                      {line.linkedRooms && line.linkedRooms.length > 1 
+                        ? line.linkedRooms.join('+') 
+                        : line.roomNumber}
                     </Badge>
+                    {line.linkedRooms && line.linkedRooms.length > 1 && (
+                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                        <Plug className="h-3 w-3 mr-1" />
+                        Connectées
+                      </Badge>
+                    )}
                     {line.roomType && (
                       <Badge variant="secondary" className="text-xs">
                         {line.roomType}{line.roomCategory ? `-${line.roomCategory}` : ''}
