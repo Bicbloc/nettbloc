@@ -151,7 +151,7 @@ const STATUS_DICTIONARY: Record<string, { type: 'full' | 'quick' | 'none' | 'out
   // === PMS Standard Codes ===
   'DIR': { type: 'full', lang: 'pms' },
   'DRT': { type: 'full', lang: 'pms' },
-  'SAL': { type: 'full', lang: 'pms' },
+  'SAL': { type: 'full', lang: 'pms' },  // Default full, refined by guest-name logic below
   'INS': { type: 'none', lang: 'pms' },
   'PRO': { type: 'none', lang: 'pms' },
   'CLN': { type: 'none', lang: 'pms' },
