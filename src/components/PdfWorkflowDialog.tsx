@@ -247,7 +247,7 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
       const [roomFormatConfig, inactiveRooms, registryData] = await Promise.all([
         loadHotelRoomFormat(hotelId),
         getInactiveRoomNumbers(hotelId),
-        supabase.from('hotel_rooms_registry').select('room_number').eq('hotel_id', effectiveHotelId!).eq('is_active', true)
+        supabase.from('hotel_rooms_registry').select('room_number').eq('hotel_id', hotelId!).eq('is_active', true)
       ]);
       
       // Build registry numbers set for format filtering (allows 2-digit rooms in registry)
