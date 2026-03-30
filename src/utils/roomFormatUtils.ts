@@ -161,7 +161,11 @@ export function isValidRoomNumber(roomNumber: string, formatConfig: RoomFormatCo
 /**
  * Filter rooms based on the learned format
  */
-export function filterRoomsByFormat(rooms: any[], formatConfig: RoomFormatConfig | null): any[] {
+export function filterRoomsByFormat(
+  rooms: any[], 
+  formatConfig: RoomFormatConfig | null, 
+  registryNumbers?: Set<string>
+): any[] {
   if (!formatConfig) {
     return rooms;
   }
@@ -170,9 +174,12 @@ export function filterRoomsByFormat(rooms: any[], formatConfig: RoomFormatConfig
     const roomNumber = room.roomNumber || room.room_number || room.number;
     if (!roomNumber) return false;
     
-    const isValid = isValidRoomNumber(roomNumber, formatConfig);
-    if (!isValid) {
+    // If room exists in the registry, always accept it (handles 2-digit rooms like "14")
+    if (registryNumbers && registryNumbers.has(normalizeRoomNumber(roomNumber))) {
+      return true;
     }
+    
+    const isValid = isValidRoomNumber(roomNumber, formatConfig);
     return isValid;
   });
   
