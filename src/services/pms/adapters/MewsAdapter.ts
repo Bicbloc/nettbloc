@@ -5,6 +5,7 @@
 
 import { PmsAdapter } from '../PmsAdapter';
 import { PmsConfig, ExtractedRoom, CleaningType, PmsDetectionResult } from '../types';
+import { fieldExtractor } from '../FieldExtractor';
 
 export class MewsAdapter extends PmsAdapter {
   readonly name = 'mews';
