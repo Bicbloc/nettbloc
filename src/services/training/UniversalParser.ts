@@ -207,6 +207,49 @@ const STATUS_DICTIONARY: Record<string, { type: 'full' | 'quick' | 'none' | 'out
   'FR': { type: 'full', lang: 'hogatex' },   // Frei
 };
 
+const GUEST_NAME_IGNORE = new Set([
+  'adultes', 'adulte', 'enfants', 'enfant', 'nuit', 'night',
+  'hotel', 'room', 'chambre', 'etage', 'floor', 'cardinal',
+  'sal', 'ins', 'pro', 'occ', 'arr', 'dep', 'dir',
+  'dbl', 'sgl', 'tpl', 'fam', 'dup', 'twn', 'kng', 'sui',
+  'standard', 'superior', 'deluxe', 'clean', 'dirty', 'propre',
+  'sale', 'inspected', 'responsable', 'espaces', 'statut', 'status',
+  'resort', 'spa',
+]);
+
+const HOUSEKEEPER_NAMES_LOWER = [
+  'axel merle', 'benoit piel', 'benoît piel', 'maly teychenne',
+  'ibrahima assoumani', 'cecile rosset', 'cécile rosset', 'chiara mirante',
+];
+
+/**
+ * Extract all distinct guest names from a line (excluding staff/HK names)
+ */
+function extractGuestNamesFromLine(text: string): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const patterns = [
+    /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+)\s+([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+)/g,
+    /([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇa-zàâäéèêëïîôùûüç'-]+),\s*([A-ZÀÂÄÉÈÊËÏÎÔÙÛÜÇ][a-zàâäéèêëïîôùûüç']+(?:\s+[A-Za-z]+)*)/g,
+  ];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const name = match[0].replace(/,\s*/, ' ').trim();
+      if (name.length < 4) continue;
+      const normalized = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const words = normalized.split(' ');
+      if (words.some(w => GUEST_NAME_IGNORE.has(w))) continue;
+      if (HOUSEKEEPER_NAMES_LOWER.some(hk => normalized.includes(hk))) continue;
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        names.push(name);
+      }
+    }
+  }
+  return names;
+}
+
 /**
  * Fuzzy match: if a word is within 1 edit distance of a known status, match it.
  */
