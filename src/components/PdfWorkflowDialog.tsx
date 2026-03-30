@@ -1180,8 +1180,16 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
                       {isExcluded ? <X className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
                     </button>
                     <Badge variant="outline" className={`font-mono font-bold text-lg px-3 py-1 ${isExcluded ? 'line-through' : ''}`}>
-                      {line.roomNumber}
+                      {line.linkedRooms && line.linkedRooms.length > 1 
+                        ? line.linkedRooms.join('+') 
+                        : line.roomNumber}
                     </Badge>
+                    {line.linkedRooms && line.linkedRooms.length > 1 && (
+                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                        <Plug className="h-3 w-3 mr-1" />
+                        Connectées
+                      </Badge>
+                    )}
                     {line.roomType && (
                       <Badge variant="secondary" className="text-xs">
                         {line.roomType}{line.roomCategory ? `-${line.roomCategory}` : ''}
