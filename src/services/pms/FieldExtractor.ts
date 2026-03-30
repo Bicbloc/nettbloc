@@ -580,7 +580,6 @@ class FieldExtractor {
 
     return { cleaningType: 'a_blanc', status: 'unknown', reason: 'Pas de statut clair', confidence: 40 };
   }
-}
 
   /**
    * Extrait TOUS les noms de clients distincts d'une ligne (pas les HK)
@@ -616,5 +615,4 @@ class FieldExtractor {
 }
 
 // Singleton
-export const fieldExtractor = new FieldExtractor();
 export const fieldExtractor = new FieldExtractor();
