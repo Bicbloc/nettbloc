@@ -243,14 +243,21 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
     setUploadProgress(55);
 
     try {
-      // Charger le format appris et les chambres inactives en parallèle
-      const [roomFormatConfig, inactiveRooms] = await Promise.all([
+      // Charger le format appris, les chambres inactives et le registre en parallèle
+      const [roomFormatConfig, inactiveRooms, registryData] = await Promise.all([
         loadHotelRoomFormat(hotelId),
-        getInactiveRoomNumbers(hotelId)
+        getInactiveRoomNumbers(hotelId),
+        supabase.from('hotel_rooms_registry').select('room_number').eq('hotel_id', effectiveHotelId!).eq('is_active', true)
       ]);
       
-      // Filtrer les chambres selon le format appris
-      let filteredData = filterRoomsByFormat(data, roomFormatConfig);
+      // Build registry numbers set for format filtering (allows 2-digit rooms in registry)
+      const registryNumbers = new Set<string>();
+      if (registryData.data) {
+        registryData.data.forEach(r => registryNumbers.add(normalizeRoomNumber(r.room_number)));
+      }
+      
+      // Filtrer les chambres selon le format appris (registry rooms always pass)
+      let filteredData = filterRoomsByFormat(data, roomFormatConfig, registryNumbers);
       
       // Filtrer les chambres désactivées dans le registre
       filteredData = filterOutInactiveRooms(filteredData, inactiveRooms);
