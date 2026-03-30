@@ -82,31 +82,15 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
     } catch (e) {
     }
 
-    // Use UniversalParser as primary engine
-    const universalResult = universalParse(text, customMappings);
-
-    let extractedRooms = universalResult.rows.map(row => ({
-      roomNumber: row.roomNumber,
-      cleaningType: (row.detectedCleaningType === 'out_of_service' ? 'none' : row.detectedCleaningType === 'unknown' ? 'quick' : row.detectedCleaningType) as any,
-      status: row.statusIndicator || row.cleaningStatus || '',
-      originalText: row.rawLine,
-      validated: row.detectedCleaningType !== 'unknown',
-      guestName: row.guestName || undefined,
-      arrivalDate: row.arrivalDate || undefined,
-      departureDate: row.departureDate || undefined,
-      roomType: row.roomType || undefined,
-      confidence: row.confidence,
-    }));
-
+    // 1) Try PMS-specific detection first (handles Mews guest-name logic, connected rooms, etc.)
+    const detection = pmsAdapterFactory.detectPms(text);
+    let extractedRooms: any[] = [];
     let detectedPmsType = 'universal';
 
-    // Fallback: if UniversalParser found 0 rooms, try PMS-specific adapters
-    if (extractedRooms.length === 0) {
-      const detection = pmsAdapterFactory.detectPms(text);
+    if (detection.detection.confidence >= 50) {
       const pmsRooms = detection.adapter.extractRooms(text);
-      
       if (pmsRooms.length > 0) {
-      extractedRooms = pmsRooms.map(r => ({
+        extractedRooms = pmsRooms.map(r => ({
           roomNumber: r.roomNumber,
           cleaningType: r.cleaningType as any,
           status: r.status || '',
@@ -117,9 +101,29 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
           departureDate: r.departureDate || undefined,
           roomType: r.roomType || undefined,
           confidence: r.confidence ?? 0.5,
+          isConnected: r.isConnected,
+          linkedRooms: r.linkedRooms,
         }));
         detectedPmsType = detection.detection.pmsType;
       }
+    }
+
+    // 2) Fallback to UniversalParser if PMS adapter found nothing
+    if (extractedRooms.length === 0) {
+      const universalResult = universalParse(text, customMappings);
+
+      extractedRooms = universalResult.rows.map(row => ({
+        roomNumber: row.roomNumber,
+        cleaningType: (row.detectedCleaningType === 'out_of_service' ? 'none' : row.detectedCleaningType === 'unknown' ? 'quick' : row.detectedCleaningType) as any,
+        status: row.statusIndicator || row.cleaningStatus || '',
+        originalText: row.rawLine,
+        validated: row.detectedCleaningType !== 'unknown',
+        guestName: row.guestName || undefined,
+        arrivalDate: row.arrivalDate || undefined,
+        departureDate: row.departureDate || undefined,
+        roomType: row.roomType || undefined,
+        confidence: row.confidence,
+      }));
     }
 
     const trainingData: TrainingData = {
@@ -139,7 +143,7 @@ export const TrainingStep1Import = ({ hotelId, onComplete }: TrainingStep1Import
       const mappedCount = extractedRooms.filter(r => r.validated).length;
       toast({
         title: "Import réussi",
-        description: `${extractedRooms.length} chambres détectées (${mappedCount} avec statut connu, confiance: ${universalResult.confidence}%)`,
+        description: `${extractedRooms.length} chambres détectées (${mappedCount} avec statut connu, PMS: ${detectedPmsType})`,
       });
     }
 

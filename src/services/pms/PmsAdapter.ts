@@ -179,12 +179,19 @@ export abstract class PmsAdapter {
       if (n < 1 || n > 9999) return false;
     }
     
-    // Exclure si fait partie d'une heure (HH:MM)
-    if (originalLine.includes(num + ':') || originalLine.includes(':' + num)) return false;
-    
-    // Exclure si fait partie d'une date
-    const dateContext = new RegExp(`\\b${num}[\/\\-\\.]\\d|\\d[\/\\-\\.]${num}\\b`);
-    if (dateContext.test(originalLine)) return false;
+    // Exclure si c'est directement adjacent à ":" (partie d'une heure HH:MM)
+    // Utiliser la position du match dans la ligne pour éviter les faux positifs
+    const numIdx = originalLine.indexOf(num);
+    if (numIdx >= 0) {
+      const charAfter = originalLine[numIdx + num.length];
+      const charBefore = numIdx > 0 ? originalLine[numIdx - 1] : '';
+      if (charAfter === ':' || charBefore === ':') return false;
+      
+      // Exclure si directement adjacent à "/" ou "-" suivi/précédé de chiffres (date context)
+      // But only if the number is PART of the date, not just on the same line
+      if ((charAfter === '/' || charAfter === '-' || charAfter === '.') && /\d/.test(originalLine[numIdx + num.length + 1] || '')) return false;
+      if ((charBefore === '/' || charBefore === '-' || charBefore === '.') && numIdx >= 2 && /\d/.test(originalLine[numIdx - 2] || '')) return false;
+    }
     
     return true;
   }
