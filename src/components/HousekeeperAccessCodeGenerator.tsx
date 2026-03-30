@@ -197,7 +197,14 @@ export const HousekeeperAccessCodeGenerator: React.FC<HousekeeperAccessCodeGener
                 <div>
                   <p className="font-medium">Code généré pour {housekeeperName}</p>
                   <p className="text-2xl font-mono font-bold text-green-800">{generatedCode}</p>
-                  {email && <p className="text-sm text-green-600">Email d'activation envoyé à {email}</p>}
+                  {email && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-sm text-green-600">✉️ Email d'activation envoyé à {email}</p>
+                      <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                        ⚠️ Informez la personne d'aller vérifier sa boîte mail (et ses spams) pour récupérer le code d'accès.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <Button variant="outline" size="sm" onClick={copyToClipboard}>
                   <Copy className="h-4 w-4" />
