@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useHotel } from '@/contexts/HotelContext';
+import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,8 @@ interface RoomRegistryItem {
 
 const RoomRegistry = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { hotelId: ownerHotelId, hotelName: ownerHotelName, isLoading: hotelContextLoading } = useHotel();
+  const { currentHotelSession, loading: housekeeperLoading } = useHousekeeperAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,32 +59,39 @@ const RoomRegistry = () => {
   const [activityRoom, setActivityRoom] = useState<RoomRegistryItem | null>(null);
   const [viewMode, setViewMode] = useState<'plan' | 'table' | 'grid'>('plan');
 
-  const { data: hotel } = useQuery({
-    queryKey: ['hotel', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('hotels')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  const activeHotel = useMemo(() => {
+    if (currentHotelSession?.hotel_id) {
+      return {
+        id: currentHotelSession.hotel_id,
+        name: currentHotelSession.hotel?.name ?? null,
+      };
+    }
+
+    if (!ownerHotelId) {
+      return null;
+    }
+
+    return {
+      id: ownerHotelId,
+      name: ownerHotelName,
+    };
+  }, [currentHotelSession, ownerHotelId, ownerHotelName]);
+
+  const activeHotelId = activeHotel?.id;
+  const isResolvingHotel = (housekeeperLoading || hotelContextLoading) && !activeHotelId;
 
   const { data: rooms, isLoading } = useQuery({
-    queryKey: ['rooms-registry', hotel?.id],
+    queryKey: ['rooms-registry', activeHotelId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hotel_rooms_registry')
         .select('*')
-        .eq('hotel_id', hotel?.id)
+        .eq('hotel_id', activeHotelId)
         .order('room_number', { ascending: true });
       if (error) throw error;
       return data as RoomRegistryItem[];
     },
-    enabled: !!hotel?.id,
+    enabled: !!activeHotelId,
   });
 
   const toggleActiveMutation = useMutation({
@@ -198,7 +207,7 @@ const RoomRegistry = () => {
               </p>
             </div>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto">
+          <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto" disabled={!activeHotelId}>
             <Plus className="h-4 w-4 mr-2" />
             Ajouter un espace
           </Button>
@@ -287,12 +296,16 @@ const RoomRegistry = () => {
         </div>
 
         {/* Content */}
-        {isLoading ? (
+        {isResolvingHotel || isLoading ? (
           <div className="text-center py-16 text-muted-foreground">Chargement...</div>
+        ) : !activeHotelId ? (
+          <Card className="p-8 text-center text-muted-foreground">
+            Aucun hôtel actif trouvé pour afficher le registre des chambres.
+          </Card>
         ) : viewMode === 'plan' ? (
           <FloorPlanView
             rooms={filteredRooms}
-            hotelId={hotel?.id}
+            hotelId={activeHotelId}
             onEdit={handleEdit}
             onToggleActive={handleToggleActive}
             onViewActivity={handleViewActivity}
@@ -300,7 +313,7 @@ const RoomRegistry = () => {
         ) : viewMode === 'grid' ? (
           <FloorPlanGrid
             rooms={filteredRooms}
-            hotelId={hotel?.id}
+            hotelId={activeHotelId}
             onEdit={handleEdit}
             onToggleActive={handleToggleActive}
             onViewActivity={handleViewActivity}
@@ -403,7 +416,7 @@ const RoomRegistry = () => {
       <AddRoomRegistryDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
-        hotelId={hotel?.id}
+        hotelId={activeHotelId}
       />
 
       {selectedRoom && (
@@ -414,11 +427,11 @@ const RoomRegistry = () => {
         />
       )}
 
-      {activityRoom && hotel?.id && (
+      {activityRoom && activeHotelId && (
         <SpaceActivityLog
           open={!!activityRoom}
           onOpenChange={(o) => !o && setActivityRoom(null)}
-          hotelId={hotel.id}
+          hotelId={activeHotelId}
           roomNumber={activityRoom.room_number}
           spaceName={activityRoom.room_number}
         />
