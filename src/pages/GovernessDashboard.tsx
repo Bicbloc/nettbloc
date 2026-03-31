@@ -89,6 +89,7 @@ function GovernessDashboardContent() {
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [hotelCodeError, setHotelCodeError] = useState<string | null>(null);
   const [showLinenScanner, setShowLinenScanner] = useState(false);
+  const [activeTab, setActiveTab] = useState<GovTab>('rooms');
   
   const navigate = useNavigate();
   const { toast } = useToast();
