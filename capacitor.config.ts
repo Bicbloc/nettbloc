@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'nettbloc',
   webDir: 'dist',
   server: {
-    url: 'https://nettobloc.bicbloc.eu?forceHideBadge=true',
+    url: 'https://nettobloc.bicbloc.eu?forceHideBadge=true&mode=staff',
     cleartext: true
   },
   plugins: {
