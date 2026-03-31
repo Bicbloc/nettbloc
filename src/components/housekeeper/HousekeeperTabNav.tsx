@@ -1,7 +1,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Home, ClipboardList, Info, Package, Map } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type TabType = 'rooms' | 'inventory' | 'tasks' | 'instructions' | 'plan';
 
@@ -16,6 +16,14 @@ interface HousekeeperTabNavProps {
   onInventoryOpen: () => void;
 }
 
+const tabs: { key: TabType; label: string; icon: React.ElementType }[] = [
+  { key: 'rooms', label: 'Chambres', icon: Home },
+  { key: 'tasks', label: 'Tâches', icon: ClipboardList },
+  { key: 'instructions', label: 'Consignes', icon: Info },
+  { key: 'inventory', label: 'Inventaire', icon: Package },
+  { key: 'plan', label: 'Plan', icon: Map },
+];
+
 export const HousekeeperTabNav: React.FC<HousekeeperTabNavProps> = ({
   activeTab,
   setActiveTab,
@@ -26,80 +34,81 @@ export const HousekeeperTabNav: React.FC<HousekeeperTabNavProps> = ({
   onInstructionsDismiss,
   onInventoryOpen,
 }) => {
+  const handleTabClick = (key: TabType) => {
+    setActiveTab(key);
+    if (key === 'instructions') onInstructionsDismiss();
+    if (key === 'inventory') onInventoryOpen();
+  };
+
+  const getBadge = (key: TabType) => {
+    if (key === 'rooms' && totalRooms > 0) return totalRooms;
+    if (key === 'tasks' && pendingTasksCount > 0) return pendingTasksCount;
+    return null;
+  };
+
   return (
-    <div className="grid grid-cols-5 gap-2">
-      <Button
-        variant={activeTab === 'rooms' ? 'default' : 'outline'}
-        onClick={() => setActiveTab('rooms')}
-        className="h-14 flex flex-col items-center justify-center gap-1 p-2"
-      >
-        <Home className="h-5 w-5" />
-        <span className="text-xs">Chambres</span>
-        {totalRooms > 0 && (
-          <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px]">
-            {totalRooms}
-          </Badge>
-        )}
-      </Button>
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
+      <div className="grid grid-cols-5 px-2 py-1">
+        {tabs.map(({ key, label, icon: Icon }) => {
+          const isActive = activeTab === key;
+          const badge = getBadge(key);
+          const showPing = key === 'instructions' && hasNewInstructions;
+          const showCameraBadge = key === 'inventory';
 
-      <Button
-        variant={activeTab === 'tasks' ? 'default' : 'outline'}
-        onClick={() => setActiveTab('tasks')}
-        className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
-      >
-        <ClipboardList className="h-5 w-5" />
-        <span className="text-xs">Tâches</span>
-        {pendingTasksCount > 0 && (
-          <Badge
-            variant="destructive"
-            className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-[10px] animate-pulse"
-          >
-            {pendingTasksCount}
-          </Badge>
-        )}
-      </Button>
+          return (
+            <button
+              key={key}
+              onClick={() => handleTabClick(key)}
+              className={cn(
+                "relative flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-200",
+                isActive 
+                  ? "text-primary" 
+                  : "text-muted-foreground"
+              )}
+            >
+              <div className={cn(
+                "relative p-1.5 rounded-xl transition-all duration-200",
+                isActive && "bg-primary/10"
+              )}>
+                <Icon className={cn("h-5 w-5", isActive && "scale-110")} />
+                
+                {badge && (
+                  <span className={cn(
+                    "absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1",
+                    key === 'tasks' 
+                      ? "bg-destructive text-destructive-foreground animate-pulse" 
+                      : "bg-primary text-primary-foreground"
+                  )}>
+                    {badge}
+                  </span>
+                )}
 
-      <Button
-        variant={activeTab === 'instructions' ? 'default' : 'outline'}
-        onClick={() => {
-          setActiveTab('instructions');
-          onInstructionsDismiss();
-        }}
-        className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
-      >
-        <Info className="h-5 w-5" />
-        <span className="text-xs">Consignes</span>
-        {hasNewInstructions && (
-          <>
-            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 animate-ping" />
-            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500" />
-          </>
-        )}
-      </Button>
+                {showPing && (
+                  <>
+                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 animate-ping" />
+                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500" />
+                  </>
+                )}
 
-      <Button
-        variant={activeTab === 'inventory' ? 'default' : 'outline'}
-        onClick={() => {
-          setActiveTab('inventory');
-          onInventoryOpen();
-        }}
-        className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
-      >
-        <Package className="h-5 w-5" />
-        <span className="text-xs">Inventaire</span>
-        <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 px-1 text-[10px] bg-orange-500 text-white">
-          📷
-        </Badge>
-      </Button>
+                {showCameraBadge && (
+                  <span className="absolute -top-1 -right-1 text-[10px]">📷</span>
+                )}
+              </div>
+              
+              <span className={cn(
+                "text-[10px] font-medium transition-all",
+                isActive ? "text-primary" : "text-muted-foreground"
+              )}>
+                {label}
+              </span>
 
-      <Button
-        variant={activeTab === 'plan' ? 'default' : 'outline'}
-        onClick={() => setActiveTab('plan')}
-        className="h-14 flex flex-col items-center justify-center gap-1 p-2 relative"
-      >
-        <Map className="h-5 w-5" />
-        <span className="text-xs">Plan</span>
-      </Button>
+              {isActive && (
+                <div className="absolute -bottom-1 w-5 h-0.5 rounded-full bg-primary" />
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };
