@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { 
   Crown, 
   LogOut, 
@@ -27,7 +27,9 @@ import {
   Package,
   Shirt,
   ClipboardCheck,
-  ArrowLeft
+  ArrowLeft,
+  Info,
+  ClipboardList
 } from 'lucide-react';
 import { GovernessInspectionInterface } from '@/components/governess/GovernessInspectionInterface';
 import { GovernessRoomManagement } from '@/components/governess/GovernessRoomManagement';
@@ -39,9 +41,10 @@ import { LostItemReportWizard } from '@/components/lost-and-found/LostItemReport
 import { LostAndFoundList } from '@/components/lost-and-found/LostAndFoundList';
 import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
 import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
-// Gouvernantes use localStorage auth, not Supabase Auth - no UserTypeGuard needed
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
+
+type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions';
 
 interface GovernessProfile {
   id: string;
