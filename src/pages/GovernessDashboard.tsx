@@ -394,50 +394,84 @@ function GovernessDashboardContent() {
     return null;
   }
 
+  const initials = profile.name.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+
+  const bottomTabs: { key: GovTab; label: string; icon: React.ElementType; badge?: number }[] = [
+    { key: 'rooms', label: 'Chambres', icon: Home },
+    { key: 'inspection', label: 'Contrôle', icon: Eye },
+    { key: 'incidents', label: 'Incidents', icon: AlertTriangle, badge: stats.pendingIncidents },
+    { key: 'staff', label: 'Personnel', icon: Users },
+    { key: 'tasks', label: 'Tâches', icon: ClipboardList },
+  ];
+
+  const secondaryTabs: { key: GovTab; label: string; icon: React.ElementType }[] = [
+    { key: 'lost', label: 'Objets trouvés', icon: Package },
+    { key: 'linen', label: 'Linge', icon: Shirt },
+    { key: 'validate', label: 'Validation', icon: ClipboardCheck },
+    { key: 'instructions', label: 'Consignes', icon: Info },
+    { key: 'logs', label: 'Journal', icon: FileText },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3">
+    <div className="min-h-screen bg-muted/30 pb-20">
+      {/* App Header */}
+      <div className="sticky top-0 z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white safe-area-top">
+        <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/governess/hotels')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Retour</span>
-              </Button>
-              <div className="bg-amber-100 p-2 rounded-full">
-                <Crown className="h-6 w-6 text-amber-600" />
+              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                <span className="font-bold text-base">{initials}</span>
               </div>
-              <div>
-                <h1 className="font-bold text-lg">Gouvernante</h1>
-                <p className="text-sm text-muted-foreground">{profile.name}</p>
+              <div className="min-w-0">
+                <p className="text-white/70 text-xs font-medium">{greeting} 👑</p>
+                <h1 className="font-bold text-base truncate">{profile.name}</h1>
+                {selectedHotel && (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Building2 className="h-3 w-3 text-white/60 flex-shrink-0" />
+                    <span className="text-xs text-white/70 truncate">{selectedHotel.name}</span>
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              {selectedHotel && (
-                <Badge variant="outline" className="hidden sm:flex">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {selectedHotel.name}
-                </Badge>
-              )}
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+                onClick={() => navigate('/governess/hotels')}>
+                <Building2 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10"
+                onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </div>
-      </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+        {/* Secondary tabs - scrollable */}
+        <div className="flex overflow-x-auto gap-1 px-4 pb-2 scrollbar-hide">
+          {secondaryTabs.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all",
+                activeTab === key
+                  ? "bg-white text-amber-700"
+                  : "bg-white/15 text-white/80 hover:bg-white/25"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <main className="px-4 py-4 space-y-4">
         {/* Demandes en attente */}
         {pendingRequests.length > 0 && (
-          <Card className="border-amber-200 bg-amber-50/50">
+          <Card className="border-amber-200 bg-amber-50/50 rounded-2xl">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-600" />
@@ -446,45 +480,33 @@ function GovernessDashboardContent() {
             </CardHeader>
             <CardContent className="space-y-2">
               {pendingRequests.filter(r => r.status === 'pending').map(request => (
-                <div 
-                  key={request.id}
-                  className="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200"
-                >
+                <div key={request.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-amber-200">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-amber-500" />
                     <div>
-                      <p className="font-medium">{request.hotels?.name || request.hotel_code}</p>
+                      <p className="font-medium text-sm">{request.hotels?.name || request.hotel_code}</p>
                       <p className="text-xs text-muted-foreground">
                         Demandé le {new Date(request.requested_at).toLocaleDateString('fr-FR')}
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300">
+                  <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 text-xs">
                     En attente
                   </Badge>
                 </div>
               ))}
               {pendingRequests.filter(r => r.status === 'rejected').map(request => (
-                <div 
-                  key={request.id}
-                  className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-200"
-                >
+                <div key={request.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-red-200">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4 text-red-500" />
                     <div>
-                      <p className="font-medium">{request.hotels?.name || request.hotel_code}</p>
+                      <p className="font-medium text-sm">{request.hotels?.name || request.hotel_code}</p>
                       <p className="text-xs text-muted-foreground">Demande refusée</p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setHotelCodeInput(request.hotel_code);
-                      setIsHotelDialogOpen(true);
-                    }}
-                  >
-                    Refaire une demande
+                  <Button size="sm" variant="outline" className="text-xs rounded-xl"
+                    onClick={() => { setHotelCodeInput(request.hotel_code); setIsHotelDialogOpen(true); }}>
+                    Réessayer
                   </Button>
                 </div>
               ))}
@@ -493,28 +515,24 @@ function GovernessDashboardContent() {
         )}
 
         {hotels.length === 0 && pendingRequests.filter(r => r.status === 'pending').length === 0 ? (
-          <Card className="text-center py-12">
+          <Card className="text-center py-12 rounded-2xl">
             <CardContent>
               <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <h2 className="text-xl font-semibold mb-2">Aucun hôtel assigné</h2>
-              <p className="text-muted-foreground mb-4">
-                Demandez l'accès à un hôtel pour commencer
-              </p>
-              <Button onClick={openHotelAccessDialog}>
+              <p className="text-muted-foreground mb-4">Demandez l'accès à un hôtel pour commencer</p>
+              <Button onClick={openHotelAccessDialog} className="rounded-xl">
                 <Building2 className="h-4 w-4 mr-2" />
-                Demander l'accès à un hôtel
+                Demander l'accès
               </Button>
             </CardContent>
           </Card>
         ) : hotels.length === 0 ? (
-          <Card className="text-center py-8">
+          <Card className="text-center py-8 rounded-2xl">
             <CardContent>
               <Clock className="h-12 w-12 mx-auto text-amber-500 mb-4" />
               <h2 className="text-lg font-semibold mb-2">Demandes en cours</h2>
-              <p className="text-muted-foreground mb-4">
-                Vos demandes sont en attente de validation.
-              </p>
-              <Button variant="outline" onClick={openHotelAccessDialog}>
+              <p className="text-muted-foreground mb-4">Vos demandes sont en attente de validation.</p>
+              <Button variant="outline" onClick={openHotelAccessDialog} className="rounded-xl">
                 <Building2 className="h-4 w-4 mr-2" />
                 Demander accès à un autre hôtel
               </Button>
@@ -522,312 +540,189 @@ function GovernessDashboardContent() {
           </Card>
         ) : (
           <>
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <Card className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="bg-blue-100 p-2 rounded-full">
-                    <Building2 className="h-4 w-4 text-blue-600" />
+            {/* Stats cards */}
+            <div className="grid grid-cols-5 gap-2">
+              {[
+                { value: stats.totalRooms, label: 'Total', color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30', icon: Building2 },
+                { value: stats.cleanRooms, label: 'Propres', color: 'bg-green-100 text-green-600 dark:bg-green-950/30', icon: CheckCircle },
+                { value: stats.inspectedRooms, label: 'Inspectées', color: 'bg-amber-100 text-amber-600 dark:bg-amber-950/30', icon: Eye },
+                { value: stats.pendingIncidents, label: 'Incidents', color: 'bg-red-100 text-red-600 dark:bg-red-950/30', icon: AlertTriangle },
+                { value: stats.lostItems, label: 'Objets', color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/30', icon: Package },
+              ].map(({ value, label, color, icon: StatIcon }) => (
+                <Card key={label} className="p-2 rounded-2xl">
+                  <div className="text-center">
+                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-1", color)}>
+                      <StatIcon className="h-4 w-4" />
+                    </div>
+                    <p className="text-lg font-bold">{value}</p>
+                    <p className="text-[10px] text-muted-foreground">{label}</p>
                   </div>
-                  <div>
-                    <p className="text-xl font-bold">{stats.totalRooms}</p>
-                    <p className="text-xs text-muted-foreground">Chambres</p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="bg-green-100 p-2 rounded-full">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold">{stats.cleanRooms}</p>
-                    <p className="text-xs text-muted-foreground">Propres</p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="bg-amber-100 p-2 rounded-full">
-                    <Eye className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold">{stats.inspectedRooms}</p>
-                    <p className="text-xs text-muted-foreground">Inspectées</p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="bg-red-100 p-2 rounded-full">
-                    <AlertTriangle className="h-4 w-4 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold">{stats.pendingIncidents}</p>
-                    <p className="text-xs text-muted-foreground">Incidents</p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="bg-purple-100 p-2 rounded-full">
-                    <Package className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold">{stats.lostItems}</p>
-                    <p className="text-xs text-muted-foreground">Objets</p>
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              ))}
             </div>
 
-            {/* Consignes du jour */}
-            {selectedHotel && (
-              <DailyInstructionsBanner hotelId={selectedHotel.id} />
-            )}
-
-            {/* Tâches du jour */}
-            {selectedHotel && (
-              <StaffTasksList
-                hotelId={selectedHotel.id}
-                staffType="governess"
-                staffId={profile.id}
-                staffName={profile.name}
-              />
-            )}
-
-            {/* Sélection hôtel */}
+            {/* Hotel selector */}
             {hotels.length > 1 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Sélectionner un hôtel</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {hotels.map(hotel => (
-                      <Button
-                        key={hotel.id}
-                        variant={selectedHotel?.id === hotel.id ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => { setSelectedHotel(hotel); localStorage.setItem('governess_selected_hotel', JSON.stringify(hotel)); }}
-                      >
-                        {hotel.name}
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex overflow-x-auto gap-2 pb-1">
+                {hotels.map(hotel => (
+                  <Button
+                    key={hotel.id}
+                    variant={selectedHotel?.id === hotel.id ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-xl whitespace-nowrap"
+                    onClick={() => { setSelectedHotel(hotel); localStorage.setItem('governess_selected_hotel', JSON.stringify(hotel)); }}
+                  >
+                    {hotel.name}
+                  </Button>
+                ))}
+              </div>
             )}
 
-            {/* Tabs principal */}
+            {/* Tab Content */}
             {selectedHotel && (
-              <Tabs defaultValue="rooms" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 h-auto">
-                  <TabsTrigger value="rooms" className="flex-col gap-1 py-2 text-xs">
-                    <Home className="h-4 w-4" />
-                    <span className="hidden sm:inline">Chambres</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="inspection" className="flex-col gap-1 py-2 text-xs">
-                    <Eye className="h-4 w-4" />
-                    <span className="hidden sm:inline">Inspections</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="incidents" className="flex-col gap-1 py-2 text-xs">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span className="hidden sm:inline">Incidents</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="lost" className="flex-col gap-1 py-2 text-xs">
-                    <Package className="h-4 w-4" />
-                    <span className="hidden sm:inline">Objets</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="linen" className="flex-col gap-1 py-2 text-xs">
-                    <Shirt className="h-4 w-4" />
-                    <span className="hidden sm:inline">Linge</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="staff" className="flex-col gap-1 py-2 text-xs">
-                    <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">Personnel</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="validate" className="flex-col gap-1 py-2 text-xs">
-                    <ClipboardCheck className="h-4 w-4" />
-                    <span className="hidden sm:inline">Validation</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="logs" className="flex-col gap-1 py-2 text-xs">
-                    <FileText className="h-4 w-4" />
-                    <span className="hidden sm:inline">Journal</span>
-                  </TabsTrigger>
-                </TabsList>
+              <>
+                {activeTab === 'rooms' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b">
+                      <h2 className="font-semibold">Gestion des chambres</h2>
+                      <p className="text-xs text-muted-foreground">Visualisez et assignez les chambres</p>
+                    </div>
+                    <div className="p-4">
+                      <GovernessRoomManagement hotelId={selectedHotel.id} governessName={profile.name} />
+                    </div>
+                  </div>
+                )}
 
-                {/* Chambres */}
-                <TabsContent value="rooms">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Gestion des chambres</CardTitle>
-                      <CardDescription>
-                        Visualisez, assignez et suivez toutes les chambres
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <GovernessRoomManagement
-                        hotelId={selectedHotel.id}
-                        governessName={profile.name}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                {/* Inspections */}
-                <TabsContent value="inspection">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle>Inspections des chambres</CardTitle>
-                          <CardDescription>Validez les chambres nettoyées</CardDescription>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={loadStats}>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Actualiser
-                        </Button>
+                {activeTab === 'inspection' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b flex items-center justify-between">
+                      <div>
+                        <h2 className="font-semibold">Inspections</h2>
+                        <p className="text-xs text-muted-foreground">Validez les chambres nettoyées</p>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <GovernessInspectionInterface
-                        hotelId={selectedHotel.id}
-                        governessName={profile.name}
-                        governessId={profile.id}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                      <Button variant="outline" size="sm" onClick={loadStats} className="rounded-xl">
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Actualiser
+                      </Button>
+                    </div>
+                    <div className="p-4">
+                      <GovernessInspectionInterface hotelId={selectedHotel.id} governessName={profile.name} governessId={profile.id} />
+                    </div>
+                  </div>
+                )}
 
-                {/* Incidents */}
-                <TabsContent value="incidents">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                          <CardTitle>Gestion des incidents</CardTitle>
-                          <CardDescription>Signalez et suivez les incidents</CardDescription>
-                        </div>
-                        <IncidentReportWizard 
-                          hotelId={selectedHotel.id}
-                          userType="governess"
-                          userName={profile.name}
-                          userId={profile.id}
-                          onSuccess={loadStats}
-                        />
+                {activeTab === 'incidents' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h2 className="font-semibold">Incidents</h2>
+                        <p className="text-xs text-muted-foreground">Signalez et suivez les incidents</p>
                       </div>
-                    </CardHeader>
-                    <CardContent>
+                      <IncidentReportWizard hotelId={selectedHotel.id} userType="governess" userName={profile.name} userId={profile.id} onSuccess={loadStats} />
+                    </div>
+                    <div className="p-4">
                       <IncidentList hotelId={selectedHotel.id} />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                    </div>
+                  </div>
+                )}
 
-                {/* Objets trouvés */}
-                <TabsContent value="lost">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                          <CardTitle>Objets trouvés</CardTitle>
-                          <CardDescription>Déclarez et gérez les objets perdus</CardDescription>
-                        </div>
-                        <LostItemReportWizard
-                          hotelId={selectedHotel.id}
-                          reporterName={profile.name}
-                          reporterType="governess"
-                          onSuccess={loadStats}
-                        />
+                {activeTab === 'lost' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h2 className="font-semibold">Objets trouvés</h2>
+                        <p className="text-xs text-muted-foreground">Déclarez et gérez les objets perdus</p>
                       </div>
-                    </CardHeader>
-                    <CardContent>
+                      <LostItemReportWizard hotelId={selectedHotel.id} reporterName={profile.name} reporterType="governess" onSuccess={loadStats} />
+                    </div>
+                    <div className="p-4">
                       <LostAndFoundList hotelId={selectedHotel.id} />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                    </div>
+                  </div>
+                )}
 
-                {/* Inventaire Linge */}
-                <TabsContent value="linen">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                          <CardTitle>Inventaire du linge</CardTitle>
-                          <CardDescription>Scanner et compter le linge</CardDescription>
-                        </div>
-                        <Button onClick={() => setShowLinenScanner(true)}>
-                          <Shirt className="h-4 w-4 mr-2" />
-                          Scanner le linge
-                        </Button>
+                {activeTab === 'linen' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h2 className="font-semibold">Inventaire du linge</h2>
+                        <p className="text-xs text-muted-foreground">Scanner et compter le linge</p>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground text-sm mb-4">
-                        Utilisez le scanner IA pour compter automatiquement les piles de linge.
-                      </p>
+                      <Button onClick={() => setShowLinenScanner(true)} className="rounded-xl">
+                        <Shirt className="h-4 w-4 mr-2" />
+                        Scanner
+                      </Button>
+                    </div>
+                    <div className="p-4">
                       {showLinenScanner && (
-                        <LinenQuickInventory
-                          taskId={`temp-governess-${Date.now()}`}
-                          hotelId={selectedHotel.id}
-                          onClose={() => setShowLinenScanner(false)}
-                        />
+                        <LinenQuickInventory taskId={`temp-governess-${Date.now()}`} hotelId={selectedHotel.id} onClose={() => setShowLinenScanner(false)} />
                       )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                    </div>
+                  </div>
+                )}
 
-                {/* Personnel */}
-                <TabsContent value="staff">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Personnel</CardTitle>
-                      <CardDescription>Suivez l'activité des femmes de chambre</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                {activeTab === 'staff' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b">
+                      <h2 className="font-semibold">Personnel</h2>
+                      <p className="text-xs text-muted-foreground">Suivez l'activité des femmes de chambre</p>
+                    </div>
+                    <div className="p-4">
                       <GovernessStaffPanel hotelId={selectedHotel.id} />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                    </div>
+                  </div>
+                )}
 
-                {/* Validation inventaire */}
-                <TabsContent value="validate">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Validation des inventaires</CardTitle>
-                      <CardDescription>Vérifiez et validez les comptages de linge</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <AdminLinenInventory 
-                        hotelId={selectedHotel.id} 
-                        hotelName={selectedHotel.name}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                {activeTab === 'validate' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b">
+                      <h2 className="font-semibold">Validation des inventaires</h2>
+                      <p className="text-xs text-muted-foreground">Vérifiez les comptages de linge</p>
+                    </div>
+                    <div className="p-4">
+                      <AdminLinenInventory hotelId={selectedHotel.id} hotelName={selectedHotel.name} />
+                    </div>
+                  </div>
+                )}
 
-                {/* Journal */}
-                <TabsContent value="logs">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Journal d'actions</CardTitle>
-                      <CardDescription>Historique des actions du personnel</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                {activeTab === 'logs' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b">
+                      <h2 className="font-semibold">Journal d'actions</h2>
+                      <p className="text-xs text-muted-foreground">Historique du personnel</p>
+                    </div>
+                    <div className="p-4">
                       <GovernessActionLog hotelId={selectedHotel.id} />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'tasks' && (
+                  <div className="space-y-4">
+                    <div className="bg-card rounded-2xl p-4 shadow-sm border">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-amber-500 text-white">
+                          <ClipboardList className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h2 className="font-semibold">Tâches du jour</h2>
+                          <p className="text-xs text-muted-foreground">Vos missions assignées</p>
+                        </div>
+                      </div>
+                    </div>
+                    <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
+                  </div>
+                )}
+
+                {activeTab === 'instructions' && (
+                  <DailyInstructionsBanner hotelId={selectedHotel.id} />
+                )}
+              </>
             )}
 
-            {/* Bouton ajouter hôtel */}
-            <div className="text-center">
-              <Button variant="outline" onClick={openHotelAccessDialog}>
+            {/* Add hotel button */}
+            <div className="text-center pt-2">
+              <Button variant="outline" onClick={openHotelAccessDialog} className="rounded-xl">
                 <Building2 className="h-4 w-4 mr-2" />
                 Demander accès à un autre hôtel
               </Button>
@@ -836,9 +731,49 @@ function GovernessDashboardContent() {
         )}
       </main>
 
+      {/* Bottom Nav */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
+        <div className="grid grid-cols-5 px-2 py-1">
+          {bottomTabs.map(({ key, label, icon: Icon, badge }) => {
+            const isActive = activeTab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={cn(
+                  "relative flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-200",
+                  isActive ? "text-amber-600" : "text-muted-foreground"
+                )}
+              >
+                <div className={cn(
+                  "relative p-1.5 rounded-xl transition-all duration-200",
+                  isActive && "bg-amber-100 dark:bg-amber-950/30"
+                )}>
+                  <Icon className={cn("h-5 w-5", isActive && "scale-110")} />
+                  {badge && badge > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 bg-destructive text-destructive-foreground">
+                      {badge}
+                    </span>
+                  )}
+                </div>
+                <span className={cn(
+                  "text-[10px] font-medium",
+                  isActive ? "text-amber-600" : "text-muted-foreground"
+                )}>
+                  {label}
+                </span>
+                {isActive && (
+                  <div className="absolute -bottom-1 w-5 h-0.5 rounded-full bg-amber-500" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Dialog code hôtel */}
       <Dialog open={isHotelDialogOpen} onOpenChange={setIsHotelDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-amber-600" />
@@ -848,7 +783,6 @@ function GovernessDashboardContent() {
               Entrez le code de l'hôtel fourni par l'établissement
             </DialogDescription>
           </DialogHeader>
-          
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="hotel-code">Code hôtel</Label>
@@ -856,44 +790,20 @@ function GovernessDashboardContent() {
                 id="hotel-code"
                 placeholder="Ex: HTL630"
                 value={hotelCodeInput}
-                onChange={(e) => {
-                  setHotelCodeInput(e.target.value.toUpperCase());
-                  setHotelCodeError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isSubmittingCode) {
-                    handleSubmitHotelCode();
-                  }
-                }}
-                className="uppercase"
+                onChange={(e) => { setHotelCodeInput(e.target.value.toUpperCase()); setHotelCodeError(null); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !isSubmittingCode) handleSubmitHotelCode(); }}
+                className="uppercase rounded-xl"
                 autoFocus
               />
-              {hotelCodeError && (
-                <p className="text-sm text-destructive">{hotelCodeError}</p>
-              )}
+              {hotelCodeError && <p className="text-sm text-destructive">{hotelCodeError}</p>}
             </div>
           </div>
-
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsHotelDialogOpen(false)}
-              disabled={isSubmittingCode}
-            >
+            <Button variant="outline" onClick={() => setIsHotelDialogOpen(false)} disabled={isSubmittingCode} className="rounded-xl">
               Annuler
             </Button>
-            <Button
-              onClick={handleSubmitHotelCode}
-              disabled={!hotelCodeInput.trim() || isSubmittingCode}
-            >
-              {isSubmittingCode ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Vérification...
-                </>
-              ) : (
-                'Valider'
-              )}
+            <Button onClick={handleSubmitHotelCode} disabled={!hotelCodeInput.trim() || isSubmittingCode} className="rounded-xl">
+              {isSubmittingCode ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Vérification...</> : 'Valider'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -902,7 +812,6 @@ function GovernessDashboardContent() {
   );
 }
 
-// Gouvernantes use localStorage auth - no Supabase Auth guard needed
 export default function GovernessDashboard() {
   return <GovernessDashboardContent />;
 }
