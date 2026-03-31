@@ -1,41 +1,30 @@
 
 
-## Plan : APK affiche uniquement les logins staff (sans Établissement)
+## Plan : APK affiche directement l'écran de connexion staff (sans landing page)
 
-### Contexte
-Actuellement, l'APK pointe vers `https://nettobloc.bicbloc.eu?forceHideBadge=true`, qui affiche la page `/auth` avec 4 boutons : Établissement, Équipe, Gouvernante, Technicien. L'utilisateur veut que l'APK ne montre **que** les 3 rôles staff.
-
-### Approche
-Puisque l'APK est une WebView qui charge le même site web, on ne peut pas modifier l'APK sans le regénérer. La solution la plus simple est d'utiliser un **paramètre URL** pour indiquer le mode "mobile/staff only" et masquer le bouton Établissement.
+### Problème
+Actuellement, quand l'APK s'ouvre (`/?mode=staff`), l'utilisateur non authentifié est redirigé vers `/landing` (le site vitrine complet). On veut qu'il aille directement à `/auth?mode=staff` (l'écran avec les 3 boutons : Équipe, Gouvernante, Technicien).
 
 ### Modifications
 
-**1. `capacitor.config.ts`** — Ajouter un paramètre `mode=staff` à l'URL :
-```
-url: 'https://nettobloc.bicbloc.eu?forceHideBadge=true&mode=staff'
-```
+**1. `src/pages/Index.tsx`** — Changer la redirection pour les utilisateurs non authentifiés : si `mode=staff` est dans l'URL, rediriger vers `/auth?mode=staff` au lieu de `/landing`.
 
-**2. `src/pages/Auth.tsx`** — Dans l'écran de sélection (`mode === 'select'`), lire le paramètre `mode` depuis l'URL. Si `mode=staff`, masquer le bouton "Établissement" et ne montrer que Équipe, Gouvernante et Technicien.
-
-```typescript
-const searchParams = new URLSearchParams(window.location.search);
-const isStaffMode = searchParams.get('mode') === 'staff';
-```
-
-Puis conditionner l'affichage du bouton Établissement :
 ```tsx
-{!isStaffMode && (
-  <button onClick={() => navigate('/auth/establishment')}>
-    {/* bouton Établissement */}
-  </button>
-)}
+// Ligne ~85-87 actuelle :
+if (!isAuthenticated && !isGuestMode) {
+  return <Navigate to="/landing" replace />;
+}
+
+// Devient :
+if (!isAuthenticated && !isGuestMode) {
+  const isStaffMode = searchParams.get('mode') === 'staff';
+  return <Navigate to={isStaffMode ? "/auth?mode=staff" : "/landing"} replace />;
+}
 ```
+
+**2. `capacitor.config.ts`** — L'URL est déjà correcte (`?mode=staff`), rien à changer.
 
 ### Résultat
-- **Site web** (`nettobloc.bicbloc.eu`) : affiche les 4 options comme avant
-- **APK** (`?mode=staff`) : affiche uniquement Équipe, Gouvernante, Technicien
-- **Pas besoin de regénérer l'APK** si le paramètre est déjà dans l'URL Capacitor actuelle — il suffit de publier le site
-
-### Note importante
-Après publication, il faudra **regénérer l'APK** une seule fois car l'URL dans `capacitor.config.ts` change (ajout de `&mode=staff`).
+- **APK** : ouvre directement l'écran de sélection avec 3 boutons (Équipe, Gouvernante, Technicien)
+- **Site web** : continue de rediriger vers la landing page comme avant
 
