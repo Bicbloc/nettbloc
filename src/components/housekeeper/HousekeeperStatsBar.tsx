@@ -1,8 +1,7 @@
 import React from 'react';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock } from 'lucide-react';
+import { Clock, Play, Square, Timer } from 'lucide-react';
 
 interface Room {
   id: string;
@@ -33,84 +32,106 @@ export const HousekeeperStatsBar: React.FC<HousekeeperStatsBarProps> = ({
   onEndPointage,
   calculateWorkDuration,
 }) => {
+  const remaining = totalRooms - completedRooms;
+  const recouches = rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'recouche' || r.cleaning_type === 'occupied')).length;
+  const departs = rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'depart' || r.cleaning_type === 'checkout' || r.cleaning_type === 'a_blanc')).length;
+
   return (
-    <>
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-primary">{completedRooms}</div>
-          <div className="text-xs text-muted-foreground">Terminées</div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold">{totalRooms - completedRooms}</div>
-          <div className="text-xs text-muted-foreground">Restantes</div>
-        </Card>
-        <Card className="p-3 text-center">
-          <div className="text-2xl font-bold text-green-600">{progressPercent}%</div>
-          <div className="text-xs text-muted-foreground">Progression</div>
-        </Card>
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full bg-muted rounded-full h-3">
-        <div
-          className="bg-gradient-to-r from-primary to-green-500 h-3 rounded-full transition-all duration-500"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-
-      {/* Pointage */}
-      <Card className="p-4">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <span className="font-medium">Pointage</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {!startTime && (
-                <Button size="sm" onClick={onStartPointage}>▶️ Commencer</Button>
-              )}
-              {startTime && !endTime && (
-                <Button size="sm" variant="secondary" onClick={onEndPointage}>⏹️ Terminer</Button>
-              )}
+    <div className="space-y-3">
+      {/* Progress ring + stats */}
+      <div className="bg-card rounded-2xl p-4 shadow-sm border">
+        <div className="flex items-center gap-4">
+          {/* Circular progress */}
+          <div className="relative w-16 h-16 flex-shrink-0">
+            <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--muted))" strokeWidth="5" />
+              <circle 
+                cx="32" cy="32" r="28" fill="none" 
+                stroke="url(#progressGradient)" 
+                strokeWidth="5" 
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 28}`}
+                strokeDashoffset={`${2 * Math.PI * 28 * (1 - progressPercent / 100)}`}
+                className="transition-all duration-700 ease-out"
+              />
+              <defs>
+                <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" />
+                  <stop offset="100%" stopColor="#22c55e" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-sm font-bold">{progressPercent}%</span>
             </div>
           </div>
 
-          {(startTime || endTime) && (
-            <div className="flex flex-wrap gap-2">
-              {startTime && <Badge variant="outline" className="text-sm">🟢 Début: {startTime}</Badge>}
-              {endTime && <Badge variant="outline" className="text-sm">🔴 Fin: {endTime}</Badge>}
+          {/* Stats */}
+          <div className="flex-1 grid grid-cols-3 gap-2">
+            <div className="text-center">
+              <div className="text-xl font-bold text-primary">{completedRooms}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">Faites</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-amber-500">{remaining}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">Restantes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold">{totalRooms}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">Total</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Type breakdown - compact */}
+        {startTime && completedRooms > 0 && (
+          <div className="flex gap-2 mt-3 pt-3 border-t">
+            <div className="flex-1 flex items-center gap-2 bg-blue-50 dark:bg-blue-950/30 rounded-xl px-3 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <span className="text-xs font-medium">{recouches} Rec.</span>
+            </div>
+            <div className="flex-1 flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 rounded-xl px-3 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
+              <span className="text-xs font-medium">{departs} Dép.</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Pointage - compact */}
+      <div className="bg-card rounded-2xl p-3 shadow-sm border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Timer className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <span className="text-sm font-semibold">Pointage</span>
               {startTime && endTime && (
-                <Badge variant="secondary" className="text-sm">⏱️ {calculateWorkDuration(startTime, endTime)}</Badge>
+                <p className="text-xs text-muted-foreground">
+                  {startTime} → {endTime} • {calculateWorkDuration(startTime, endTime)}
+                </p>
+              )}
+              {startTime && !endTime && (
+                <p className="text-xs text-green-600 font-medium">En cours depuis {startTime}</p>
               )}
             </div>
+          </div>
+          
+          {!startTime && (
+            <Button size="sm" onClick={onStartPointage} className="rounded-xl gap-1.5 h-9 bg-green-500 hover:bg-green-600">
+              <Play className="h-3.5 w-3.5" />
+              Commencer
+            </Button>
           )}
-
-          {startTime && (
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t">
-              <div className="text-center p-2 bg-muted/50 rounded-lg">
-                <div className="text-lg font-bold text-primary">
-                  {rooms.filter(r => r.status === 'clean').length}
-                </div>
-                <div className="text-xs text-muted-foreground">Total</div>
-              </div>
-              <div className="text-center p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                <div className="text-lg font-bold text-blue-600">
-                  {rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'recouche' || r.cleaning_type === 'occupied')).length}
-                </div>
-                <div className="text-xs text-muted-foreground">Recouches</div>
-              </div>
-              <div className="text-center p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                <div className="text-lg font-bold text-amber-600">
-                  {rooms.filter(r => r.status === 'clean' && (r.cleaning_type === 'depart' || r.cleaning_type === 'checkout' || r.cleaning_type === 'a_blanc')).length}
-                </div>
-                <div className="text-xs text-muted-foreground">Départs</div>
-              </div>
-            </div>
+          {startTime && !endTime && (
+            <Button size="sm" variant="secondary" onClick={onEndPointage} className="rounded-xl gap-1.5 h-9">
+              <Square className="h-3.5 w-3.5" />
+              Terminer
+            </Button>
           )}
         </div>
-      </Card>
-    </>
+      </div>
+    </div>
   );
 };
