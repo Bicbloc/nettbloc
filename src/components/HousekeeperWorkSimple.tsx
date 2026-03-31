@@ -904,7 +904,7 @@ const HousekeeperWorkContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-muted/30 pb-20">
       <HousekeeperHeader
         hotelName={hotel?.name || 'Mon Hôtel'}
         housekeeperName={housekeeperName}
