@@ -221,6 +221,10 @@ const Auth = () => {
     setMode('select');
   };
 
+  // Detect staff-only mode (used by mobile APK)
+  const urlParams = new URLSearchParams(window.location.search);
+  const isStaffMode = urlParams.get('mode') === 'staff';
+
   // Selection screen
   if (mode === 'select') {
     return (
@@ -239,26 +243,28 @@ const Auth = () => {
 
           {/* Options */}
           <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => navigate('/auth/establishment')}
-              className="w-full p-4 sm:p-5 rounded-xl border-2 border-emerald-200 bg-card hover:bg-emerald-50 hover:border-emerald-400 transition-all text-left group active:scale-[0.98]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
-                    <Building className="h-5 w-5" />
+            {!isStaffMode && (
+              <button
+                type="button"
+                onClick={() => navigate('/auth/establishment')}
+                className="w-full p-4 sm:p-5 rounded-xl border-2 border-emerald-200 bg-card hover:bg-emerald-50 hover:border-emerald-400 transition-all text-left group active:scale-[0.98]"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
+                      <Building className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{language === 'en' ? 'Establishment' : 'Établissement'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {language === 'en' ? 'Manager, supervisor' : 'Gérant, responsable'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">{language === 'en' ? 'Establishment' : 'Établissement'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {language === 'en' ? 'Manager, supervisor' : 'Gérant, responsable'}
-                    </p>
-                  </div>
+                  <ArrowRight className="h-4 w-4 text-emerald-500 group-hover:translate-x-1 transition-transform" />
                 </div>
-                <ArrowRight className="h-4 w-4 text-emerald-500 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </button>
+              </button>
+            )}
 
             <button
               type="button"
