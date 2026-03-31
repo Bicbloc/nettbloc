@@ -83,7 +83,8 @@ const Index = () => {
 
   // Redirection si pas authentifié
   if (!isAuthenticated && !isGuestMode) {
-    return <Navigate to="/landing" replace />;
+    const isStaffMode = searchParams.get('mode') === 'staff';
+    return <Navigate to={isStaffMode ? "/auth?mode=staff" : "/landing"} replace />;
   }
 
   // Vérifier le type d'utilisateur (seulement pour les authentifiés, pas en guest mode)
