@@ -1,30 +1,41 @@
 
 
-## Plan : APK affiche directement l'écran de connexion staff (sans landing page)
+## Probleme
 
-### Problème
-Actuellement, quand l'APK s'ouvre (`/?mode=staff`), l'utilisateur non authentifié est redirigé vers `/landing` (le site vitrine complet). On veut qu'il aille directement à `/auth?mode=staff` (l'écran avec les 3 boutons : Équipe, Gouvernante, Technicien).
+La femme de chambre ne voit pas le plan car la fonction SQL `can_access_hotel()` ne reconnaît pas correctement les femmes de chambre.
 
-### Modifications
+**Cause racine** : dans `can_access_hotel()`, le check housekeeper fait `hp.id = auth.uid()`, mais `housekeeper_profiles.id` est un UUID aléatoire (pas lié à `auth.uid()`). La bonne méthode est de passer par l'email, comme le fait déjà `get_housekeeper_profile_id()`.
 
-**1. `src/pages/Index.tsx`** — Changer la redirection pour les utilisateurs non authentifiés : si `mode=staff` est dans l'URL, rediriger vers `/auth?mode=staff` au lieu de `/landing`.
-
-```tsx
-// Ligne ~85-87 actuelle :
-if (!isAuthenticated && !isGuestMode) {
-  return <Navigate to="/landing" replace />;
-}
-
-// Devient :
-if (!isAuthenticated && !isGuestMode) {
-  const isStaffMode = searchParams.get('mode') === 'staff';
-  return <Navigate to={isStaffMode ? "/auth?mode=staff" : "/landing"} replace />;
-}
+Le code actuel (incorrect) :
+```sql
+EXISTS (
+  SELECT 1 FROM hotel_access_sessions has
+  JOIN housekeeper_profiles hp ON hp.id = has.housekeeper_profile_id
+  WHERE has.hotel_id = p_hotel_id
+  AND has.is_active = true
+  AND has.expires_at > now()
+  AND hp.id = auth.uid()  -- ❌ hp.id ≠ auth.uid()
+)
 ```
 
-**2. `capacitor.config.ts`** — L'URL est déjà correcte (`?mode=staff`), rien à changer.
+## Correction
 
-### Résultat
-- **APK** : ouvre directement l'écran de sélection avec 3 boutons (Équipe, Gouvernante, Technicien)
-- **Site web** : continue de rediriger vers la landing page comme avant
+Mettre a jour la fonction `can_access_hotel()` pour utiliser la jointure email comme `get_housekeeper_profile_id()` :
+
+```sql
+-- User is a housekeeper with active access session
+EXISTS (
+  SELECT 1 FROM hotel_access_sessions has
+  JOIN housekeeper_profiles hp ON hp.id = has.housekeeper_profile_id
+  JOIN auth.users u ON u.email = hp.email
+  WHERE has.hotel_id = p_hotel_id
+  AND has.is_active = true
+  AND has.expires_at > now()
+  AND u.id = auth.uid()
+)
+```
+
+### Fichier modifie
+
+**1 nouvelle migration SQL** — `can_access_hotel` mise a jour avec la jointure correcte par email pour les housekeepers. Aucun changement frontend necessaire.
 
