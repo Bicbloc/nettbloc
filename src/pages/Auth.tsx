@@ -221,6 +221,10 @@ const Auth = () => {
     setMode('select');
   };
 
+  // Detect staff-only mode (used by mobile APK)
+  const urlParams = new URLSearchParams(window.location.search);
+  const isStaffMode = urlParams.get('mode') === 'staff';
+
   // Selection screen
   if (mode === 'select') {
     return (
