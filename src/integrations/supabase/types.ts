@@ -5248,6 +5248,12 @@ export type Database = {
         Args: { p_new_status: string; p_reason?: string; p_user_id: string }
         Returns: boolean
       }
+      check_email_exists_for_role: {
+        Args: { p_email: string }
+        Returns: {
+          found_in: string
+        }[]
+      }
       cleanup_all_housekeepers_for_hotel: {
         Args: { p_hotel_id: string }
         Returns: {

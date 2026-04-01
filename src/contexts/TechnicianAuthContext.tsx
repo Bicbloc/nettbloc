@@ -189,6 +189,11 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
 
       if (authError) throw authError;
 
+      // Vérifier si c'est un utilisateur déjà existant (user_repeated_signup)
+      if (authData.user?.identities && authData.user.identities.length === 0) {
+        return { error: new Error("Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.") };
+      }
+
       return { error: null };
     } catch (error: any) {
       console.error('Signup error:', error);
