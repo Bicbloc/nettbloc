@@ -381,8 +381,22 @@ const HousekeeperWorkContent: React.FC = () => {
           .eq('completion_date', today);
         
         const completedIds = new Set(completions?.map(c => c.task_template_id) || []);
-        const pendingTasks = todaysTasks.filter(t => !completedIds.has(t.id));
-        setPendingTasksCount(pendingTasks.length);
+        const pendingTemplates = todaysTasks.filter(t => !completedIds.has(t.id)).length;
+        
+        // Also count pending manual tasks (tickets)
+        const { data: manualTasks } = await supabase
+          .from('manual_tasks')
+          .select('id, status, assigned_to_name')
+          .eq('hotel_id', hotelId)
+          .eq('task_date', today)
+          .eq('assigned_to_type', 'housekeeper')
+          .in('status', ['pending', 'in_progress']);
+        
+        const pendingManual = (manualTasks || []).filter(t => 
+          !t.assigned_to_name || t.assigned_to_name === housekeeperProfile?.name
+        ).length;
+        
+        setPendingTasksCount(pendingTemplates + pendingManual);
       }
       
       // Charger les instructions
@@ -947,14 +961,27 @@ const HousekeeperWorkContent: React.FC = () => {
         {/* Consignes du jour */}
         {hotelId && <DailyInstructionsBanner hotelId={hotelId} />}
 
-        {/* Tâches du jour */}
-        {hotelId && housekeeperProfile && (
-          <StaffTasksList
-            hotelId={hotelId}
-            staffType="housekeeper"
-            staffId={housekeeperProfile.id}
-            staffName={housekeeperProfile.name}
-          />
+        {/* Bannière tâches disponibles - redirige vers l'onglet tâches */}
+        {pendingTasksCount > 0 && (
+          <Card 
+            className="p-3 cursor-pointer hover:shadow-md transition-shadow bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200"
+            onClick={() => setActiveTab('tasks')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-100 p-2 rounded-full">
+                  <ClipboardList className="h-5 w-5 text-amber-700" />
+                </div>
+                <div>
+                  <span className="font-semibold text-amber-900">
+                    {pendingTasksCount} tâche{pendingTasksCount > 1 ? 's' : ''} disponible{pendingTasksCount > 1 ? 's' : ''}
+                  </span>
+                  <p className="text-xs text-amber-700">Appuyez pour voir vos tâches</p>
+                </div>
+              </div>
+              <Badge className="bg-amber-500 text-white animate-pulse">{pendingTasksCount}</Badge>
+            </div>
+          </Card>
         )}
 
         <HousekeeperStatsBar
