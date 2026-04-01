@@ -153,7 +153,9 @@ export function IncidentReportWizard({
     },
   });
 
-  const { data: categoriesWithItems } = useQuery({
+  const [isInitializingDefaults, setIsInitializingDefaults] = useState(false);
+
+  const { data: categoriesWithItems, refetch: refetchCategories } = useQuery({
     queryKey: ["categories-with-items", hotelId],
     queryFn: async () => {
       const { data: categories, error: catError } = await supabase
@@ -164,6 +166,44 @@ export function IncidentReportWizard({
         .order("display_order");
       
       if (catError) throw catError;
+
+      // Auto-initialize defaults if no categories exist
+      if (!categories || categories.length === 0) {
+        setIsInitializingDefaults(true);
+        try {
+          const { error: rpcError } = await supabase
+            .rpc('create_hotel_incident_defaults', { p_hotel_id: hotelId });
+          
+          if (rpcError) {
+            console.error('Erreur initialisation incidents:', rpcError);
+          } else {
+            // Re-fetch after initialization
+            const { data: newCategories } = await supabase
+              .from("incident_categories")
+              .select("*")
+              .eq("hotel_id", hotelId)
+              .eq("is_active", true)
+              .order("display_order");
+            
+            const { data: newItems } = await supabase
+              .from("incident_items")
+              .select("*")
+              .eq("hotel_id", hotelId)
+              .eq("is_active", true)
+              .order("display_order");
+
+            setIsInitializingDefaults(false);
+            return (newCategories || []).map(cat => ({
+              ...cat,
+              items: (newItems || []).filter(item => item.category_id === cat.id)
+            }));
+          }
+        } catch (e) {
+          console.error('Erreur init defaults:', e);
+        }
+        setIsInitializingDefaults(false);
+        return [];
+      }
 
       const { data: items, error: itemError } = await supabase
         .from("incident_items")
