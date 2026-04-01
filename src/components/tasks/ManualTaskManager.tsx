@@ -778,6 +778,8 @@ export function ManualTaskManager({
         onOpenChange={(open) => { if (!open) setSelectedTask(null); }}
         onValidate={(id) => { validateTask.mutate(id); setSelectedTask(null); }}
         onReject={(id) => { rejectTask.mutate(id); setSelectedTask(null); }}
+        onRemind={(t) => { sendReminder.mutate(t); }}
+        onAdminResolve={(id) => { adminResolve.mutate(id); setSelectedTask(null); }}
       />
     </div>
   );
