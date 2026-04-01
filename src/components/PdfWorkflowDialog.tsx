@@ -377,8 +377,8 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
             floor: room.floor ?? null,
             status: finalStatus,
             room_type: room.type || room.room_type || null,
-            cleaning_priority: room.priority === 'high' ? 2 : 1,
-            notes: room.notes || null,
+            cleaning_priority: 1, // Toujours normal - seul l'admin définit la priorité
+            notes: null, // Toujours vide - seul l'admin ajoute des commentaires
             cleaning_type: dbCleaningType
           };
         }).filter(r => !!r.room_number);
