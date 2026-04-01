@@ -101,11 +101,6 @@ export const useNotifications = (hotelId?: string) => {
       setHasUnread(notifs.some(n => !n.is_read));
     } catch (error) {
       console.error('💥 Erreur critique dans loadNotifications:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur de chargement",
-        description: "Impossible de charger les notifications"
-      });
       setNotifications([]);
       setHasUnread(false);
     } finally {
