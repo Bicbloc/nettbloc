@@ -160,6 +160,7 @@ const t = {
       subtitle: 'Nettobloc is the first intelligent tool ever designed for complete hotel housekeeping management. Simple. Fast. Revolutionary.',
       cta: 'Get started for free',
       ctaSecondary: 'Discover features',
+      ctaDownload: 'Download Android App',
       stats: [
         { value: '10x', label: 'Faster' },
         { value: '1 click', label: 'Distribution' },
