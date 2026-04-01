@@ -43,6 +43,7 @@ import { LinenQuickInventory } from '@/components/linen/LinenQuickInventory';
 import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
+import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 
 type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions';
 
