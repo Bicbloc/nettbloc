@@ -45,5 +45,10 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
+  // Initialiser les notifications natives (APK)
+  useEffect(() => {
+    nativeNotificationService.initialize();
+  }, []);
+
   return <>{children}</>;
 };
