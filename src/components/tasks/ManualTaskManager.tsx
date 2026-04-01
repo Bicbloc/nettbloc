@@ -516,6 +516,7 @@ export function ManualTaskManager({
                     onValidate={() => validateTask.mutate(task.id)}
                     onReject={() => rejectTask.mutate(task.id)}
                     onDelete={() => deleteTask.mutate(task.id)}
+                    onView={() => setSelectedTask(task)}
                   />
                 ))}
               </div>
