@@ -22,6 +22,7 @@ interface RoomsTableProps {
 export const RoomsTable = ({
   rooms,
   housekeeperNames,
+  hotelId,
   onRoomUpdate,
   onRoomUnassign,
   onRoomReassign,
