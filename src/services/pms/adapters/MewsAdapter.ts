@@ -283,11 +283,36 @@ export class MewsAdapter extends PmsAdapter {
       if (timePositions.departureTime) r.departureTime = timePositions.departureTime;
       if (timePositions.arrivalTime) r.arrivalTime = timePositions.arrivalTime;
 
-      // Note: ne pas forcer ici un override global "dates sans horaire".
-      // La logique "dates sans horaire" est déjà gérée dans analyzeLineWithDate() (cas SAL)
-      // et dans UnifiedParserService (pattern-first / règles contextuelles).
+      // RÈGLE PRIORITAIRE #1: Nombre de noms clients (prime sur tout le reste)
+      // 2 noms distincts = à blanc (checkout+checkin)
+      // 1 seul nom = recouche (client reste)
+      const guestNames = fieldExtractor.extractAllGuestNames(rawLine);
+      
+      if (guestNames.length >= 2) {
+        r.status = 'checkout_arrival';
+        r.cleaningType = 'a_blanc';
+        r.guestName = guestNames.join(' / ');
+        continue; // Skip all other rules
+      }
+      
+      if (guestNames.length === 1) {
+        // 1 nom = recouche SAUF si DEP/DIR explicite sans autre client
+        const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);
+        const hasArr = /\bARR\b/.test(upper);
+        
+        if (hasDepOrDirty && hasArr) {
+          // DEP+ARR explicit codes but only 1 name → still à blanc (explicit codes win)
+          r.status = 'checkout_arrival';
+          r.cleaningType = 'a_blanc';
+        } else {
+          r.status = 'stayover';
+          r.cleaningType = 'recouche';
+        }
+        r.guestName = guestNames[0];
+        continue; // Skip other rules
+      }
 
-
+      // RÈGLE #2 (0 noms): Utiliser codes explicites et horaires
       // Détecter checkout+arrival sur la même ligne (priorité)
       const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);
       const hasArr = /\bARR\b/.test(upper);
@@ -295,22 +320,10 @@ export class MewsAdapter extends PmsAdapter {
         r.status = 'checkout_arrival';
         r.cleaningType = 'a_blanc';
       } else {
-        // Utiliser la nouvelle logique améliorée pour SAL
+        // Utiliser la logique basée sur statut/dates/horaires
         const analyzed = this.analyzeLineWithDate(rawLine, reportDate);
         r.status = analyzed.status;
         r.cleaningType = analyzed.cleaningType;
-      }
-
-      // Ajustement recouche vs départ via nuit X/Y quand la chambre est sale:
-      // sans heure de départ, même "4/4" reste une recouche (client encore présent).
-      if (r.currentNight && r.totalNights && (r.status === 'dirty' || r.status === 'stayover')) {
-        if (r.departureTime) {
-          r.status = 'checkout';
-          r.cleaningType = 'a_blanc';
-        } else {
-          r.status = 'stayover';
-          r.cleaningType = 'recouche';
-        }
       }
 
       // Normalisation défensive (éviter undefined)
