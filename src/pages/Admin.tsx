@@ -880,6 +880,10 @@ const Admin = () => {
                 <Gift className="h-4 w-4" />
                 Codes promo
               </TabsTrigger>
+              <TabsTrigger value="phone-orders" className="gap-2">
+                <Smartphone className="h-4 w-4" />
+                Téléphones
+              </TabsTrigger>
             </TabsList>
           </div>
           
