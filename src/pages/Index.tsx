@@ -814,6 +814,8 @@ const IndexDashboard = () => {
             <ManualTaskManager
               hotelId={currentHotelId}
               housekeeperNames={housekeeperNames}
+              governessNames={[]}
+              technicianNames={[]}
             />
           )}
 

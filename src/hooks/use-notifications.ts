@@ -130,7 +130,9 @@ export const useNotifications = (hotelId?: string) => {
         // Connexion au manager centralisé
         const ok = await realtimeManager.connect(effectiveHotelId);
         if (!ok) {
-          throw new Error('Realtime non connecté');
+          console.warn('⚠️ Realtime non connecté, fallback sur polling');
+          startPolling();
+          return;
         }
 
         // S'abonner aux changements
