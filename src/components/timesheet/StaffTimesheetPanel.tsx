@@ -708,8 +708,11 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                   </TableHeader>
                   <TableBody>
                     {timesheets.map(ts => {
-                      const statusInfo = STATUS_LABELS[ts.status] || STATUS_LABELS.pending;
+                      const isActive = !ts.end_time && !!ts.start_time;
+                      const effectiveStatus = isActive ? 'active' : ts.status;
+                      const statusInfo = STATUS_LABELS[effectiveStatus] || STATUS_LABELS.pending;
                       const StatusIcon = statusInfo.icon;
+                      const canValidate = effectiveStatus === 'pending' || effectiveStatus === 'modified';
                       
                       return (
                         <TableRow key={ts.id} className={ts.status === 'pending' ? 'bg-yellow-50/50' : ''}>
