@@ -10,6 +10,7 @@ import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
+import { storageService } from '@/services/storageService';
 
 export default function TechnicianLogin() {
   const [email, setEmail] = useState('');
