@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Crown, Star, Diamond, Zap, Check, X, ArrowRight, Gift, Loader2, Building2, AlertTriangle } from 'lucide-react';
+import { PhoneOrderSection } from '@/components/PhoneOrderSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingConfig } from '@/hooks/use-pricing-config';
@@ -385,6 +386,15 @@ const PlanSelectionContent = () => {
               </Card>
             );
           })}
+        </div>
+
+        {/* Section téléphones dédiés */}
+        <div className="mt-12">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold">📱 Téléphones dédiés</h2>
+            <p className="text-muted-foreground">Équipez vos équipes avec des smartphones prêts à l'emploi</p>
+          </div>
+          <PhoneOrderSection />
         </div>
 
         <div className="text-center mt-8">

@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
-  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell, FileText
+  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell, FileText, Smartphone
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
@@ -42,6 +42,7 @@ import { SupportTicketsPanel } from '@/components/admin/SupportTicketsPanel';
 import { PromoCodesPanel } from '@/components/admin/PromoCodesPanel';
 import { PricingPlansPanel } from '@/components/admin/PricingPlansPanel';
 import { LegalPagesPanel } from '@/components/admin/LegalPagesPanel';
+import { PhoneOrdersPanel } from '@/components/admin/PhoneOrdersPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -880,6 +881,10 @@ const Admin = () => {
                 <Gift className="h-4 w-4" />
                 Codes promo
               </TabsTrigger>
+              <TabsTrigger value="phone-orders" className="gap-2">
+                <Smartphone className="h-4 w-4" />
+                Téléphones
+              </TabsTrigger>
             </TabsList>
           </div>
           
@@ -1241,6 +1246,10 @@ const Admin = () => {
 
         <TabsContent value="promos" className="space-y-4">
           <PromoCodesPanel />
+        </TabsContent>
+
+        <TabsContent value="phone-orders" className="space-y-4">
+          <PhoneOrdersPanel />
         </TabsContent>
 
         <TabsContent value="legal" className="space-y-4">

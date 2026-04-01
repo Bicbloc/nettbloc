@@ -3401,6 +3401,69 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_orders: {
+        Row: {
+          created_at: string
+          daily_housekeepers: number
+          hotel_id: string
+          id: string
+          notes: string | null
+          phone_count: number
+          shipping_address: string | null
+          status: string
+          total_price: number
+          tracking_number: string | null
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_housekeepers?: number
+          hotel_id: string
+          id?: string
+          notes?: string | null
+          phone_count?: number
+          shipping_address?: string | null
+          status?: string
+          total_price?: number
+          tracking_number?: string | null
+          unit_price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_housekeepers?: number
+          hotel_id?: string
+          id?: string
+          notes?: string | null
+          phone_count?: number
+          shipping_address?: string | null
+          status?: string
+          total_price?: number
+          tracking_number?: string | null
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_orders_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phone_orders_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pms_rules: {
         Row: {
           combination_rules: Json | null
