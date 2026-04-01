@@ -178,6 +178,15 @@ export function AssignmentTab({
             <Calendar className="mr-2 h-4 w-4" />
             Redistribuer
           </Button>
+          <Button
+            onClick={() => setShowInspectionDialog(true)}
+            variant="outline"
+            disabled={rooms.length === 0}
+            className="border-primary/50 text-primary"
+          >
+            <ClipboardCheck className="mr-2 h-4 w-4" />
+            Inspection gouv.
+          </Button>
         </div>
       </div>
 
