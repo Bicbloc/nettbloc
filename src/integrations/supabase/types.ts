@@ -4659,6 +4659,58 @@ export type Database = {
           },
         ]
       }
+      task_comments: {
+        Row: {
+          author_name: string
+          author_type: string
+          comment: string
+          created_at: string
+          hotel_id: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          author_name: string
+          author_type?: string
+          comment: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          author_name?: string
+          author_type?: string
+          comment?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "manual_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_completions: {
         Row: {
           completed_at: string
