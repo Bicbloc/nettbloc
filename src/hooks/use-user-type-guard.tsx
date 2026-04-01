@@ -80,9 +80,10 @@ export function useUserTypeGuard(expectedType: Exclude<UserType, null>): UserTyp
         }
 
 
-        // Check all profile types in parallel (including technicians)
-        const [hotelResult, housekeeperResult, governessResult, technicianResult] = await Promise.all([
+        // Check all profile types in parallel (including technicians and sub-accounts)
+        const [hotelResult, subAccountResult, housekeeperResult, governessResult, technicianResult] = await Promise.all([
           supabase.from('hotels').select('id').eq('email', email).maybeSingle(),
+          supabase.from('sub_accounts').select('id').eq('user_id', user.id).eq('is_active', true).maybeSingle(),
           supabase.from('housekeeper_profiles').select('id').eq('email', email).maybeSingle(),
           supabase.from('governess_profiles').select('id').eq('email', email).maybeSingle(),
           supabase.from('technician_profiles').select('id').eq('email', email).maybeSingle()
@@ -90,8 +91,8 @@ export function useUserTypeGuard(expectedType: Exclude<UserType, null>): UserTyp
 
         let detectedType: UserType = null;
 
-        // Establishment takes priority - check hotel ownership first
-        if (hotelResult.data) {
+        // Establishment takes priority - check hotel ownership OR sub-account
+        if (hotelResult.data || subAccountResult.data) {
           detectedType = 'establishment';
         } else if (technicianResult.data) {
           detectedType = 'technician';
