@@ -211,7 +211,7 @@ const IndexDashboard = () => {
   } = useHousekeeping();
 
   // Compute notification counts per sidebar tab from unread notifications
-  const notificationCounts = React.useMemo(() => {
+  const notificationCounts = useMemo(() => {
     const unread = (notifications || []).filter(n => !n.is_read);
     const counts: Partial<Record<TabValue, number>> = {};
     
