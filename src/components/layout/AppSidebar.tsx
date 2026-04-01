@@ -43,7 +43,8 @@ export function AppSidebar({
   onTabChange, 
   isPremium,
   isCollapsed = false,
-  onCollapsedChange 
+  onCollapsedChange,
+  notificationCounts = {}
 }: AppSidebarProps) {
   const { t } = useLanguage();
   const navigate = useNavigate();
