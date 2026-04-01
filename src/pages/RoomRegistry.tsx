@@ -48,6 +48,7 @@ const RoomRegistry = () => {
   const navigate = useNavigate();
   const { hotelId: ownerHotelId, hotelName: ownerHotelName, isLoading: hotelContextLoading } = useHotel();
   const { currentHotelSession, loading: housekeeperLoading } = useHousekeeperAuth();
+  const { currentHotelSession: techHotelSession, loading: techLoading } = useTechnicianAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
