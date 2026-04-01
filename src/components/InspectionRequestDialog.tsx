@@ -72,13 +72,14 @@ export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: 
       // Get room IDs from the database
       const { data: dbRooms, error: fetchError } = await supabase
         .from("rooms")
-        .select("id, number")
+        .select("id, room_number")
         .eq("hotel_id", hotelId)
-        .in("number", roomNumbers);
+        .in("room_number", roomNumbers);
 
       if (fetchError) throw fetchError;
 
       if (dbRooms && dbRooms.length > 0) {
+        const ids = dbRooms.map(r => r.id);
         const { error } = await supabase
           .from("rooms")
           .update({
@@ -87,7 +88,7 @@ export function InspectionRequestDialog({ open, onOpenChange, rooms, hotelId }: 
             inspection_requested_by: "manager",
           })
           .eq("hotel_id", hotelId)
-          .in("id", dbRooms.map(r => r.id));
+          .in("id", ids);
 
         if (error) throw error;
       }
