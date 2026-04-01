@@ -65,14 +65,7 @@ interface TaskTemplate {
   is_one_time: boolean;
 }
 
-const LOCATION_TYPES = [
-  { value: 'room', label: 'Chambre', icon: '🛏️' },
-  { value: 'corridor', label: 'Couloir', icon: '🚪' },
-  { value: 'lobby', label: 'Lobby', icon: '🏨' },
-  { value: 'restaurant', label: 'Restaurant', icon: '🍽️' },
-  { value: 'spa', label: 'Spa/Piscine', icon: '🏊' },
-  { value: 'other', label: 'Autre', icon: '📍' },
-];
+// Removed LOCATION_TYPES - now using registered rooms from hotel_rooms_registry
 
 const PRIORITIES = [
   { value: 'low', label: 'Faible', color: 'bg-gray-100 text-gray-700' },
