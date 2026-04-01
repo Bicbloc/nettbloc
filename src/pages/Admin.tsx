@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   User, Shield, Database, Activity, Trash2, UserPlus, Key, Copy,
   Ban, CheckCircle, AlertTriangle, Monitor, Clock, LogOut, Eye, RefreshCw,
-  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell, FileText
+  Hotel, Users, BarChart3, CreditCard, Calendar, Gift, Bell, FileText, Smartphone
 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import BackButton from '@/components/BackButton';
