@@ -780,6 +780,11 @@ function TaskCard({
         </div>
 
         <div className="flex items-center gap-1">
+          {onView && (
+            <Button size="icon" variant="ghost" className="text-primary" onClick={onView}>
+              <Eye className="h-4 w-4" />
+            </Button>
+          )}
           {task.status === 'completed' && onValidate && (
             <>
               <Button size="icon" variant="ghost" className="text-green-600" onClick={onValidate}>
