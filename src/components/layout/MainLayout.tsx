@@ -37,7 +37,8 @@ export function MainLayout({
   hotelCode,
   currentHotelId,
   subscriptionLoading,
-  onStartWorkflow
+  onStartWorkflow,
+  notificationCounts
 }: MainLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
