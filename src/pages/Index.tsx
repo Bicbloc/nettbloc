@@ -22,30 +22,52 @@ import { DeleteRoomDialog } from "@/components/DeleteRoomDialog";
 import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { cleanupInvalidHotelIds, generateHotelId } from "@/lib/utils";
 import { redistributeRooms } from "@/utils/redistributionUtils";
-import { storageService, type AppPortal } from "@/services/storageService";
-...
-const PORTAL_LABELS: Record<AppPortal, string> = {
-  establishment: 'Établissement',
-  housekeeper: 'Femme de chambre',
-  governess: 'Gouvernante',
-  technician: 'Technicien',
-};
+import { storageService } from "@/services/storageService";
+import { PremiumLimitGuard } from "@/components/PremiumLimitGuard";
+import { useSubscription } from "@/hooks/useSubscription";
+import { HeroHeader } from "@/components/HeroHeader";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import { FirstTimeSetupWizard, useFirstTimeSetup } from "@/components/FirstTimeSetupWizard";
+import { useRoomManagement } from "@/hooks/use-room-management";
+import { useHousekeeperManagement } from "@/hooks/use-housekeeper-management";
+import { useDashboardDialogs } from "@/hooks/use-dashboard-dialogs";
+import { SupabaseService } from "@/services/supabaseService";
+import { AssignmentService } from "@/services/assignmentService";
+import { usePdfWorkflow } from "@/hooks/use-pdf-workflow";
+import { useOnboarding } from "@/hooks/use-onboarding";
+import { OnboardingWizard, TrialExpiryBanner, TrialExpiredBlocker } from "@/components/onboarding";
+import { useUserTypeGuard } from "@/hooks/use-user-type-guard";
 
-const ROOT_PORTAL_ROUTES: Record<AppPortal, string> = {
-  establishment: '/',
-  housekeeper: '/housekeeper/hotels',
-  governess: '/governess/hotels',
-  technician: '/technician/hotels',
-};
+// Layout components
+import { MainLayout, TabValue } from "@/components/layout";
 
-const LogoutButton = ({ className = "text-destructive hover:text-destructive mt-4" }: { className?: string }) => {
+// Dashboard tab components — lazy loaded for code splitting
+const OverviewTab = lazy(() => import("@/components/dashboard/OverviewTab").then(m => ({ default: m.OverviewTab })));
+const RoomManagementTab = lazy(() => import("@/components/dashboard/RoomManagementTab").then(m => ({ default: m.RoomManagementTab })));
+const AssignmentTab = lazy(() => import("@/components/dashboard/AssignmentTab").then(m => ({ default: m.AssignmentTab })));
+const AccessCodesTab = lazy(() => import("@/components/dashboard/AccessCodesTab").then(m => ({ default: m.AccessCodesTab })));
+const LinenTab = lazy(() => import("@/components/dashboard/LinenTab").then(m => ({ default: m.LinenTab })));
+const IncidentsTab = lazy(() => import("@/components/dashboard/IncidentsTab").then(m => ({ default: m.IncidentsTab })));
+const ReportsTab = lazy(() => import("@/components/dashboard/ReportsTab").then(m => ({ default: m.ReportsTab })));
+const TrainingTab = lazy(() => import("@/components/dashboard/TrainingTab").then(m => ({ default: m.TrainingTab })));
+const ArchivesTab = lazy(() => import("@/components/dashboard/ArchivesTab").then(m => ({ default: m.ArchivesTab })));
+
+import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialog";
+import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
+import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
+import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
+import { ManualTaskManager } from "@/components/tasks/ManualTaskManager";
+import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
+import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
+
+const LogoutButton = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   return (
     <Button
       variant="ghost"
       size="sm"
-      className={className}
+      className="text-destructive hover:text-destructive mt-4"
       onClick={async () => {
         await signOut();
         navigate('/auth', { replace: true });
@@ -57,42 +79,17 @@ const LogoutButton = ({ className = "text-destructive hover:text-destructive mt-
   );
 };
 
-const PortalSelectionRequired = ({ matchingTypes }: { matchingTypes: AppPortal[] }) => {
-  const navigate = useNavigate();
-  const profilesLabel = matchingTypes.map((type) => PORTAL_LABELS[type]).join(' • ');
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
-      <div className="w-full max-w-md rounded-2xl border bg-background/95 p-6 shadow-sm text-center space-y-4">
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Choisissez votre portail</h2>
-          <p className="text-sm text-muted-foreground">
-            Plusieurs profils sont liés à cette session. Aucun basculement automatique ne sera fait.
-          </p>
-          {profilesLabel && (
-            <p className="text-xs text-muted-foreground">Profils détectés : {profilesLabel}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => navigate('/auth', { replace: true })}>
-            Choisir le portail
-          </Button>
-          <LogoutButton className="w-full sm:w-auto text-destructive hover:text-destructive" />
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const Index = () => {
   const [searchParams] = useSearchParams();
-  const { isAuthenticated, loading: authLoading, isInitialized } = useAuth();
+  const { isAuthenticated, loading: authLoading, isInitialized, user } = useAuth();
+  const { isHotelReady } = useHotel();
   const { t } = useLanguage();
   const isGuestMode = searchParams.get('mode') === 'guest';
-  const isStaffMode = searchParams.get('mode') === 'staff';
-  const rememberedPortal = storageService.getActivePortal();
 
+  // Vérifier le type d'utilisateur pour les utilisateurs authentifiés (pas en mode invité)
+  const { isLoading: typeCheckLoading, isVerified } = useUserTypeGuard('establishment');
+
+  // Attendre initialisation auth
   if (!isInitialized || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
@@ -104,31 +101,14 @@ const Index = () => {
     );
   }
 
+  // Redirection si pas authentifié
   if (!isAuthenticated && !isGuestMode) {
+    const isStaffMode = searchParams.get('mode') === 'staff';
     return <Navigate to={isStaffMode ? "/auth?mode=staff" : "/landing"} replace />;
   }
 
-  if (isAuthenticated && !isGuestMode) {
-    if (rememberedPortal && rememberedPortal !== 'establishment') {
-      return <Navigate to={ROOT_PORTAL_ROUTES[rememberedPortal]} replace />;
-    }
-
-    if (isStaffMode) {
-      return <Navigate to="/auth?mode=staff" replace />;
-    }
-
-    return <EstablishmentEntry />;
-  }
-
-  return <IndexDashboard />;
-};
-
-const EstablishmentEntry = () => {
-  const { user } = useAuth();
-  const { isHotelReady } = useHotel();
-  const { isLoading: typeCheckLoading, isVerified, matchingTypes, requiresPortalChoice } = useUserTypeGuard('establishment');
-
-  if (user) {
+  // Vérifier le type d'utilisateur (seulement pour les authentifiés, pas en guest mode)
+  if (isAuthenticated && !isGuestMode && user) {
     if (typeCheckLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
@@ -141,28 +121,21 @@ const EstablishmentEntry = () => {
       );
     }
 
-    if (requiresPortalChoice) {
-      return <PortalSelectionRequired matchingTypes={matchingTypes} />;
-    }
-
     if (!isVerified) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-destructive/5 via-background to-destructive/10">
-          <div className="text-center space-y-4 px-4">
-            <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
-            <p className="text-foreground font-medium">Accès établissement non confirmé</p>
-            <p className="text-muted-foreground text-sm">Choisissez votre portail manuellement ou déconnectez-vous.</p>
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-              <Button variant="outline" onClick={() => window.location.assign('/auth')}>Choisir le portail</Button>
-              <LogoutButton className="w-full sm:w-auto text-destructive hover:text-destructive" />
-            </div>
+          <div className="text-center space-y-4">
+            <div className="w-8 h-8 border-4 border-destructive border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-muted-foreground text-sm">Redirection vers votre espace...</p>
+            <LogoutButton />
           </div>
         </div>
       );
     }
   }
 
-  if (!isHotelReady) {
+  // Attendre que l'hôtel soit prêt (pour les utilisateurs authentifiés)
+  if (isAuthenticated && !isHotelReady) {
     return <HotelLoadingScreen />;
   }
 
@@ -189,12 +162,9 @@ const HotelLoadingScreen = () => {
           <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
           <p className="text-foreground font-medium">Impossible de charger l'établissement</p>
           <p className="text-muted-foreground text-sm">Vérifiez votre connexion ou réessayez.</p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button onClick={() => window.location.reload()} variant="outline" className="mt-2">
-              <RefreshCw className="h-4 w-4 mr-2" /> Réessayer
-            </Button>
-            <LogoutButton className="w-full sm:w-auto text-destructive hover:text-destructive" />
-          </div>
+          <Button onClick={() => window.location.reload()} variant="outline" className="mt-2">
+            <RefreshCw className="h-4 w-4 mr-2" /> Réessayer
+          </Button>
         </div>
       </div>
     );
@@ -205,7 +175,6 @@ const HotelLoadingScreen = () => {
       <div className="text-center space-y-4">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-muted-foreground text-sm">{t.common.loadingEstablishment}</p>
-        <LogoutButton />
       </div>
     </div>
   );
