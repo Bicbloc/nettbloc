@@ -845,8 +845,18 @@ function TaskCard({
 
         <div className="flex items-center gap-1">
           {onView && (
-            <Button size="icon" variant="ghost" className="text-primary" onClick={onView}>
+            <Button size="icon" variant="ghost" className="text-primary" onClick={onView} title="Voir détails">
               <Eye className="h-4 w-4" />
+            </Button>
+          )}
+          {onRemind && (task.status === 'pending' || task.status === 'in_progress') && (
+            <Button size="icon" variant="ghost" className="text-amber-500" onClick={onRemind} title="Envoyer un rappel">
+              <Bell className="h-4 w-4" />
+            </Button>
+          )}
+          {onAdminResolve && task.status !== 'validated' && (
+            <Button size="icon" variant="ghost" className="text-green-600" onClick={onAdminResolve} title="Marquer résolu">
+              <ShieldCheck className="h-4 w-4" />
             </Button>
           )}
           {task.status === 'completed' && onValidate && (
