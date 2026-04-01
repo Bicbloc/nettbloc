@@ -318,7 +318,7 @@ export class RoomArchiveService {
             floor: room.floor ?? null,
             status: status,
             room_type: room.type || room.room_type || null,
-            cleaning_priority: room.priority === 'high' ? 2 : 1,
+            cleaning_priority: 1, // Toujours normal - seul l'admin définit la priorité
             notes: null,
             cleaning_type: dbCleaningType // CRUCIAL: Sauvegarder le type de nettoyage IA
           };

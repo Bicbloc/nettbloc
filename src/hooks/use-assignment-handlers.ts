@@ -117,7 +117,7 @@ export const useAssignmentHandlers = ({
               floor: room.floor,
               status: room.status || 'dirty',
               room_type: null,
-              cleaning_priority: room.priority === 'high' ? 2 : 1
+              cleaning_priority: 1 // Toujours normal - seul l'admin définit la priorité
             })
             .select('id')
             .single();
@@ -215,7 +215,7 @@ export const useAssignmentHandlers = ({
             floor: room?.floor,
             status: room?.status || 'dirty',
             room_type: null,
-            cleaning_priority: room?.priority === 'high' ? 2 : 1
+            cleaning_priority: 1 // Toujours normal - seul l'admin définit la priorité
           })
           .select('id')
           .single();

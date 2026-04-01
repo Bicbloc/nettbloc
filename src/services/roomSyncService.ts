@@ -31,8 +31,8 @@ export class RoomSyncService {
       // Construire l'objet de mise à jour avec tous les champs pertinents
       const updateData: any = {
         status: room.status,
-        notes: room.notes || null,
-        cleaning_priority: room.isUrgent ? 10 : (room.notUrgent ? 1 : 5),
+        notes: null, // Toujours vide - seul l'admin ajoute des commentaires
+        cleaning_priority: 1, // Toujours normal - seul l'admin définit la priorité
         is_twin: room.isTwin || false,
         updated_at: new Date().toISOString()
       };
