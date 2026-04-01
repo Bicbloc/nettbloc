@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -133,9 +133,75 @@ export const TrainingStep3Validate = ({
     setRooms(prev => prev.map((r, i) => i === idx ? { ...r, validated: !r.validated } : r));
   };
 
-  const updateCleaningType = (idx: number, type: string) => {
-    setRooms(prev => prev.map((r, i) => i === idx ? { ...r, cleaningType: type as any } : r));
-  };
+  /**
+   * Build a "combination signature" for a room based on its status, date pattern, and guest count.
+   * Rooms with the same signature are considered similar.
+   */
+  const getRoomSignature = useCallback((room: ExtractedRoom): string => {
+    const parts: string[] = [];
+    
+    // Status code (normalized)
+    const status = (room.status || 'unknown').toLowerCase();
+    parts.push(`s:${status}`);
+    
+    // Date pattern: has arrival, has departure, has both
+    const hasArr = !!room.arrivalDate;
+    const hasDep = !!room.departureDate;
+    parts.push(`d:${hasArr ? 'A' : '_'}${hasDep ? 'D' : '_'}`);
+    
+    // Guest name count pattern (0, 1, 2+)
+    const guestName = room.guestName || '';
+    // Count distinct names by looking for "Name Surname" patterns separated by common delimiters
+    const nameSegments = guestName.split(/\s*[\/,&]\s*|\s+(?:et|and|und)\s+/i).filter(s => s.trim().length > 2);
+    const nameCount = nameSegments.length <= 1 ? (guestName.trim() ? '1' : '0') : '2+';
+    parts.push(`g:${nameCount}`);
+    
+    // Night info pattern
+    if (room.currentNight && room.totalNights) {
+      const isLast = room.currentNight >= room.totalNights;
+      parts.push(`n:${isLast ? 'last' : 'mid'}`);
+    }
+    
+    // Time pattern
+    const hasDepTime = !!room.departureTime;
+    const hasArrTime = !!room.arrivalTime;
+    if (hasDepTime || hasArrTime) {
+      parts.push(`t:${hasArrTime ? 'A' : '_'}${hasDepTime ? 'D' : '_'}`);
+    }
+    
+    return parts.join('|');
+  }, []);
+
+  const updateCleaningType = useCallback((idx: number, type: string) => {
+    setRooms(prev => {
+      const targetRoom = prev[idx];
+      const targetSignature = getRoomSignature(targetRoom);
+      
+      // Find all rooms with the same signature and update them
+      let propagatedCount = 0;
+      const updated = prev.map((r, i) => {
+        if (i === idx) return { ...r, cleaningType: type as any };
+        // Only propagate to rooms that still have the SAME cleaning type as the original
+        if (getRoomSignature(r) === targetSignature && r.cleaningType === targetRoom.cleaningType) {
+          propagatedCount++;
+          return { ...r, cleaningType: type as any };
+        }
+        return r;
+      });
+      
+      if (propagatedCount > 0) {
+        // Use setTimeout to avoid state update during render
+        setTimeout(() => {
+          toast({
+            title: `${propagatedCount + 1} chambres mises à jour`,
+            description: `Appliqué à toutes les chambres avec la même combinaison`,
+          });
+        }, 0);
+      }
+      
+      return updated;
+    });
+  }, [getRoomSignature, toast]);
 
   const removeRoom = (idx: number) => {
     setRooms(prev => prev.filter((_, i) => i !== idx));
@@ -324,12 +390,19 @@ export const TrainingStep3Validate = ({
                 <TableHead className="w-20">Chambre</TableHead>
                 <TableHead className="w-28">Nettoyage</TableHead>
                 <TableHead>Statut</TableHead>
+                <TableHead>Dates</TableHead>
                 <TableHead>Client</TableHead>
+                <TableHead className="w-16">Simil.</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedRooms.map(({ room, index }) => (
+              {sortedRooms.map(({ room, index }) => {
+                const sig = getRoomSignature(room);
+                const similarCount = rooms.filter((r, i) => i !== index && getRoomSignature(r) === sig).length;
+                const dateInfo = [room.arrivalDate, room.departureDate].filter(Boolean).join(' → ');
+                
+                return (
                 <TableRow key={index} className={!room.validated ? 'opacity-50' : ''}>
                   <TableCell>
                     <Checkbox
@@ -358,8 +431,18 @@ export const TrainingStep3Validate = ({
                       {room.status || '-'}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-xs truncate max-w-[100px]">
+                    {dateInfo || '-'}
+                  </TableCell>
                   <TableCell className="text-xs truncate max-w-[120px]">
                     {room.guestName || '-'}
+                  </TableCell>
+                  <TableCell className="text-xs text-center">
+                    {similarCount > 0 && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        +{similarCount}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRoom(index)}>
@@ -367,7 +450,8 @@ export const TrainingStep3Validate = ({
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </ScrollArea>
