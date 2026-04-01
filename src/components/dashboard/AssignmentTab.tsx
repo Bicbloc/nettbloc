@@ -365,6 +365,13 @@ export function AssignmentTab({
               });
             }}
           />
+          
+          <InspectionRequestDialog
+            open={showInspectionDialog}
+            onOpenChange={setShowInspectionDialog}
+            rooms={rooms}
+            hotelId={currentHotelId || ''}
+          />
         </div>
         )
       )}
