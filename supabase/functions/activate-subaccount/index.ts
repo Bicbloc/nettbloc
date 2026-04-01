@@ -8,8 +8,9 @@ const corsHeaders = {
 
 interface ActivateRequest {
   invitationCode: string;
-  email: string;
-  password: string;
+  email?: string;
+  password?: string;
+  userId?: string; // legacy field from old client
 }
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
@@ -35,12 +36,17 @@ const handler = async (req: Request): Promise<Response> => {
     const invitationCode = String(body.invitationCode ?? "").trim().toUpperCase();
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "").trim();
+    const legacyUserId = String(body.userId ?? "").trim();
 
-    if (!invitationCode || !email || !password) {
-      return jsonResponse({ error: "Champs requis manquants: code, email, mot de passe" }, 400);
+    // Support both new flow (email+password) and legacy flow (userId)
+    const isNewFlow = !!(email && password);
+    const isLegacyFlow = !!legacyUserId;
+
+    if (!invitationCode || (!isNewFlow && !isLegacyFlow)) {
+      return jsonResponse({ error: "Champs requis manquants: code + (email & mot de passe) ou userId" }, 400);
     }
 
-    if (password.length < 6) {
+    if (isNewFlow && password.length < 6) {
       return jsonResponse({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
     }
 
