@@ -6,9 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface ActivateSubAccountRequest {
+interface ActivateRequest {
   invitationCode: string;
-  userId: string;
+  email: string;
+  password: string;
 }
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
@@ -16,28 +17,6 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders },
   });
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function getAuthUserWithRetry(supabase: ReturnType<typeof createClient>, userId: string, attempts = 5) {
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const { data, error } = await supabase.auth.admin.getUserById(userId);
-
-    if (!error && data?.user) {
-      return data.user;
-    }
-
-    lastError = error ?? new Error("Unable to load auth user");
-
-    if (attempt < attempts) {
-      await wait(250 * attempt);
-    }
-  }
-
-  throw lastError ?? new Error("Unable to load auth user");
-}
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -49,20 +28,25 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("Missing env vars:", { hasUrl: !!supabaseUrl, hasKey: !!supabaseServiceKey });
       return jsonResponse({ error: "Server configuration error" }, 500);
     }
 
-    const body: Partial<ActivateSubAccountRequest> = await req.json();
+    const body: Partial<ActivateRequest> = await req.json();
     const invitationCode = String(body.invitationCode ?? "").trim().toUpperCase();
-    const userId = String(body.userId ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const password = String(body.password ?? "").trim();
 
-    if (!invitationCode || !userId) {
-      return jsonResponse({ error: "Missing required fields: invitationCode, userId" }, 400);
+    if (!invitationCode || !email || !password) {
+      return jsonResponse({ error: "Champs requis manquants: code, email, mot de passe" }, 400);
+    }
+
+    if (password.length < 6) {
+      return jsonResponse({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 1. Find invitation
     const { data: invitation, error: invitationError } = await supabase
       .from("sub_account_invitations")
       .select(
@@ -72,42 +56,47 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (invitationError || !invitation) {
-      return jsonResponse({ error: "Invalid or expired invitation code" }, 404);
+      return jsonResponse({ error: "Code d'invitation invalide ou expiré" }, 404);
     }
 
     const subAccount = (invitation as any).sub_accounts;
     if (!subAccount?.email || !subAccount?.hotel_id) {
-      return jsonResponse({ error: "Invitation is missing sub-account or hotel information" }, 400);
+      return jsonResponse({ error: "Données de sous-compte incomplètes" }, 400);
+    }
+
+    // Verify email matches
+    if (email !== String(subAccount.email).toLowerCase()) {
+      return jsonResponse({ error: "L'email ne correspond pas à l'invitation" }, 400);
     }
 
     if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
-      return jsonResponse({ error: "This invitation has expired" }, 410);
+      return jsonResponse({ error: "Cette invitation a expiré" }, 410);
     }
 
     const hotel = subAccount.hotels;
-    const authUser = await getAuthUserWithRetry(supabase, userId);
 
-    const authEmail = authUser.email?.toLowerCase();
-    const invitedEmail = String(subAccount.email).toLowerCase();
-    if (!authEmail || authEmail !== invitedEmail) {
-      return jsonResponse({ error: "Auth user email does not match invitation email" }, 400);
-    }
-
+    // Already accepted?
     if (invitation.status === "accepted" || invitation.accepted_at) {
-      if (subAccount.user_id === userId) {
-        return jsonResponse({
-          success: true,
-          alreadyActivated: true,
-          hotel: hotel ? { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } : null,
-        });
-      }
-
-      return jsonResponse({ error: "This invitation has already been accepted" }, 409);
+      return jsonResponse({
+        success: true,
+        alreadyActivated: true,
+        hotel: hotel ? { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } : null,
+      });
     }
 
-    const { error: metadataError } = await supabase.auth.admin.updateUserById(userId, {
+    // 2. Create or find auth user via admin API
+    let userId: string;
+
+    // Try to find existing user by email
+    const { data: existingUsers } = await supabase.auth.admin.listUsers({ perPage: 1 });
+    // listUsers doesn't filter by email, so we use a different approach
+    
+    // Try creating the user first
+    const { data: createData, error: createError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm since they have the invitation code
       user_metadata: {
-        ...(authUser.user_metadata ?? {}),
         is_sub_account: true,
         first_name: subAccount.first_name ?? null,
         last_name: subAccount.last_name ?? null,
@@ -115,10 +104,62 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
 
-    if (metadataError) {
-      throw new Error(`Failed to update user metadata: ${metadataError.message}`);
+    if (createError) {
+      const msg = createError.message.toLowerCase();
+      // User already exists - try to update their password and get their ID
+      if (msg.includes("already") || msg.includes("exists") || msg.includes("registered") || msg.includes("duplicate")) {
+        console.log("User already exists, looking up by email...");
+        
+        // Use signInWithPassword won't work without knowing old password
+        // Use admin listUsers to find by email
+        const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+          perPage: 50,
+          page: 1,
+        });
+
+        if (listError) {
+          console.error("Failed to list users:", listError);
+          return jsonResponse({ error: "Impossible de trouver l'utilisateur existant" }, 500);
+        }
+
+        const existingUser = listData?.users?.find(
+          (u: any) => u.email?.toLowerCase() === email
+        );
+
+        if (!existingUser) {
+          return jsonResponse({ error: "Utilisateur introuvable. Contactez l'administrateur." }, 404);
+        }
+
+        userId = existingUser.id;
+
+        // Update password and metadata
+        const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+          password,
+          email_confirm: true,
+          user_metadata: {
+            ...(existingUser.user_metadata ?? {}),
+            is_sub_account: true,
+            first_name: subAccount.first_name ?? null,
+            last_name: subAccount.last_name ?? null,
+            company_name: hotel?.name ?? null,
+          },
+        });
+
+        if (updateError) {
+          console.error("Failed to update existing user:", updateError);
+          return jsonResponse({ error: "Impossible de mettre à jour le compte" }, 500);
+        }
+      } else {
+        console.error("Failed to create user:", createError);
+        return jsonResponse({ error: `Erreur création compte: ${createError.message}` }, 500);
+      }
+    } else {
+      userId = createData.user.id;
     }
 
+    console.log("User ready, userId:", userId);
+
+    // 3. Link sub-account
     const now = new Date().toISOString();
 
     const { error: subUpdateError } = await supabase
@@ -132,9 +173,11 @@ const handler = async (req: Request): Promise<Response> => {
       .eq("id", subAccount.id);
 
     if (subUpdateError) {
-      throw new Error(`Failed to link sub-account: ${subUpdateError.message}`);
+      console.error("Failed to link sub-account:", subUpdateError);
+      return jsonResponse({ error: "Erreur lors de la liaison du sous-compte" }, 500);
     }
 
+    // 4. Create profile
     const { error: profileError } = await supabase.from("profiles").upsert({
       id: userId,
       email: subAccount.email,
@@ -144,9 +187,11 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (profileError) {
-      throw new Error(`Failed to create profile: ${profileError.message}`);
+      console.error("Failed to create profile:", profileError);
+      // Non-blocking - continue
     }
 
+    // 5. Mark invitation as accepted
     const { error: invitationUpdateError } = await supabase
       .from("sub_account_invitations")
       .update({
@@ -157,16 +202,17 @@ const handler = async (req: Request): Promise<Response> => {
       .eq("id", invitation.id);
 
     if (invitationUpdateError) {
-      throw new Error(`Failed to update invitation: ${invitationUpdateError.message}`);
+      console.error("Failed to update invitation:", invitationUpdateError);
     }
 
     return jsonResponse({
       success: true,
+      userId,
       hotel: hotel ? { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } : null,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected server error";
-    console.error("activate-subaccount failed:", message, error instanceof Error ? error.stack : undefined);
+    const message = error instanceof Error ? error.message : "Erreur serveur inattendue";
+    console.error("activate-subaccount failed:", message);
     return jsonResponse({ error: message }, 500);
   }
 };

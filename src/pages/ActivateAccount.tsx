@@ -31,13 +31,11 @@ export default function ActivateAccount() {
       setIsLoading(false);
       return;
     }
-
     void validateCode(initialCode);
   }, [initialCode]);
 
   const validateCode = async (rawCode: string) => {
     const invitationCode = rawCode.trim().toUpperCase();
-
     if (!invitationCode) {
       setError("Veuillez saisir le code reçu par email");
       setInvitation(null);
@@ -95,92 +93,6 @@ export default function ActivateAccount() {
     }
   };
 
-  const resolveAuthUserId = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentUser = sessionData.session?.user;
-
-    if (currentUser?.email?.toLowerCase() === normalizedEmail) {
-      return currentUser.id;
-    }
-
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: subAccount?.first_name,
-          last_name: subAccount?.last_name,
-          is_sub_account: true,
-          company_name: subAccount?.hotels?.name || null,
-        },
-      },
-    });
-
-    if (signUpError) {
-      const signUpMessage = signUpError.message.toLowerCase();
-      const accountAlreadyExists =
-        signUpMessage.includes("already") ||
-        signUpMessage.includes("registered") ||
-        signUpMessage.includes("exists") ||
-        signUpMessage.includes("utilisé");
-
-      if (!accountAlreadyExists) {
-        throw signUpError;
-      }
-
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError || !signInData.user) {
-        throw new Error("Ce compte existe déjà. Connectez-vous avec le mot de passe défini puis relancez l'activation.");
-      }
-
-      return signInData.user.id;
-    }
-
-    if (!signUpData.user) {
-      throw new Error("Échec de la création du compte");
-    }
-
-    return signUpData.user.id;
-  };
-
-  const callActivateSubAccount = async (userId: string) => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-subaccount`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify({
-        invitationCode: activationCode,
-        userId,
-      }),
-    });
-
-    const responseText = await response.text();
-    let payload: any = null;
-
-    try {
-      payload = responseText ? JSON.parse(responseText) : null;
-    } catch {
-      payload = responseText ? { error: responseText } : null;
-    }
-
-    if (!response.ok) {
-      throw new Error(payload?.error || "Erreur lors de l'activation du sous-compte");
-    }
-
-    return payload;
-  };
-
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -208,29 +120,56 @@ export default function ActivateAccount() {
     setError(null);
 
     try {
+      // Clear old session data
       localStorage.removeItem("nettbloc_hotel");
       localStorage.removeItem("nettbloc-hotel");
       localStorage.removeItem("nettobloc_hotel_session");
       localStorage.removeItem("selectedHotelId");
 
-      const userId = await resolveAuthUserId();
-      await callActivateSubAccount(userId);
-
-      const { data: sessionAfterActivation } = await supabase.auth.getSession();
-      const activatedUser = sessionAfterActivation.session?.user;
-
-      if (activatedUser?.email?.toLowerCase() !== email.toLowerCase()) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) {
-          console.warn("Auto sign-in after activation failed:", signInError.message);
+      // Call the edge function which handles everything server-side
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-subaccount`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            invitationCode: activationCode,
+            email,
+            password,
+          }),
         }
+      );
+
+      const responseText = await response.text();
+      let payload: any = null;
+      try {
+        payload = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        payload = responseText ? { error: responseText } : null;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erreur lors de l'activation du sous-compte");
+      }
+
+      // Now sign in with the newly created/updated account
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        console.warn("Auto sign-in failed:", signInError.message);
+        toast.success("Compte activé ! Connectez-vous avec vos identifiants.");
+        setTimeout(() => navigate("/auth/establishment"), 1500);
+        return;
       }
 
       toast.success("Compte activé avec succès !");
-
-      setTimeout(() => {
-        navigate("/auth/establishment");
-      }, 1200);
+      setTimeout(() => navigate("/auth/establishment"), 1200);
     } catch (err: any) {
       console.error("Activation error:", err);
       const message = err?.message || "Erreur lors de l'activation";
