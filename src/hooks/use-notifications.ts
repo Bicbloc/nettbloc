@@ -138,13 +138,19 @@ export const useNotifications = (hotelId?: string) => {
           notificationCache.delete(effectiveHotelId);
           loadNotifications();
 
-          // Toast + notification native pour les nouvelles notifications
+          // Notification pour les nouvelles entrées
           if (payload.eventType === 'INSERT' && payload.new) {
             const newNotif = payload.new as Notification;
-            toast({
-              title: newNotif.title,
-              description: newNotif.description,
-            });
+            
+            // Dispatch staff notification banner (lightweight, dismissible)
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('staff-notification', {
+                  detail: { title: newNotif.title, description: newNotif.description }
+                })
+              );
+            }
+            
             // Notification native APK (son + vibration)
             nativeNotificationService.sendNotification({
               title: newNotif.title,
