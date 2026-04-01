@@ -36,7 +36,8 @@ const STEPS = [
 ];
 
 export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [info, setInfo] = useState<OnboardingInfo>({
