@@ -371,6 +371,48 @@ export function ManualTaskManager({
     },
   });
 
+  // Push reminder mutation
+  const sendReminder = useMutation({
+    mutationFn: async (task: Task) => {
+      if (!task.assigned_to_name) throw new Error("Pas d'assigné");
+      const { error } = await supabase.from("notifications").insert({
+        hotel_id: hotelId,
+        title: `🔔 Rappel : ${task.title}`,
+        description: `Merci de traiter ce ticket rapidement.`,
+        type: 'task_reminder',
+        user_type: task.assigned_to_type === 'housekeeper' ? 'housekeeper' : task.assigned_to_type,
+        housekeeper_name: task.assigned_to_name,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Rappel envoyé", description: "La notification a été envoyée au staff." });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Erreur d'envoi du rappel" });
+    },
+  });
+
+  // Admin resolve (mark as validated directly)
+  const adminResolve = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from("manual_tasks")
+        .update({
+          status: 'validated',
+          validated_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          completed_by_name: 'Admin',
+        })
+        .eq("id", taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manual-tasks", hotelId] });
+      toast({ title: "Ticket marqué comme résolu ✅" });
+    },
+  });
+
   const getAssigneeList = () => {
     switch (newTask.assigned_to_type) {
       case 'housekeeper':
