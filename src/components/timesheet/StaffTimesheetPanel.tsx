@@ -357,6 +357,99 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
     }
   };
 
+  // Handle end shift (admin stops a running timesheet)
+  const handleEndShift = async (timesheet: Timesheet) => {
+    if (!user?.id) return;
+
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('staff_timesheets')
+        .update({
+          end_time: now,
+          status: 'pending',
+          modified_at: now,
+          modified_by: user.id,
+          modified_by_name: currentUserName || 'Admin',
+          notes: (timesheet.notes ? timesheet.notes + '\n' : '') + `Fin de pointage par ${currentUserName || 'Admin'} le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}`,
+        })
+        .eq('id', timesheet.id);
+
+      if (error) throw error;
+
+      // Log to activity journal
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "timesheet_ended_by_admin",
+        description: `Pointage de ${timesheet.staff_name} clôturé par ${currentUserName || 'Admin'}`,
+        actor_name: currentUserName || 'Admin',
+        actor_type: 'admin',
+      }).then(() => {});
+
+      toast({
+        title: "Pointage clôturé",
+        description: `Le pointage de ${timesheet.staff_name} a été terminé par ${currentUserName}`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Erreur fin pointage:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de clôturer le pointage",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle end shift and validate in one step
+  const handleEndAndValidate = async (timesheet: Timesheet) => {
+    if (!user?.id) return;
+
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('staff_timesheets')
+        .update({
+          end_time: now,
+          status: 'validated',
+          validated_at: now,
+          validated_by: user.id,
+          validated_by_name: currentUserName || 'Admin',
+          modified_at: now,
+          modified_by: user.id,
+          modified_by_name: currentUserName || 'Admin',
+          notes: (timesheet.notes ? timesheet.notes + '\n' : '') + `Clôturé et validé par ${currentUserName || 'Admin'} le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}`,
+        })
+        .eq('id', timesheet.id);
+
+      if (error) throw error;
+
+      // Log to activity journal
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "timesheet_ended_validated",
+        description: `Pointage de ${timesheet.staff_name} clôturé et validé par ${currentUserName || 'Admin'}`,
+        actor_name: currentUserName || 'Admin',
+        actor_type: 'admin',
+      }).then(() => {});
+
+      toast({
+        title: "Pointage clôturé et validé",
+        description: `Le pointage de ${timesheet.staff_name} a été terminé et validé`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Erreur fin + validation:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de clôturer et valider le pointage",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Export to CSV
   const exportToCSV = () => {
     if (!timesheets || timesheets.length === 0) return;
