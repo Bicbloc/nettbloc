@@ -295,6 +295,7 @@ export function RoomManagementTab({
                         onReassign={onRoomReassign}
                         allRooms={rooms}
                         housekeeperNames={housekeeperNames}
+                        hotelId={currentHotelId || undefined}
                         compact={true}
                         showActions={true}
                       />

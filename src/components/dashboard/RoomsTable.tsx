@@ -11,6 +11,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface RoomsTableProps {
   rooms: Room[];
   housekeeperNames: string[];
+  hotelId?: string;
   onRoomUpdate: (room: Room) => void;
   onRoomUnassign: (room: Room) => void;
   onRoomReassign: (room: Room, newHousekeeper: string) => void;
@@ -21,6 +22,7 @@ interface RoomsTableProps {
 export const RoomsTable = ({
   rooms,
   housekeeperNames,
+  hotelId,
   onRoomUpdate,
   onRoomUnassign,
   onRoomReassign,
@@ -124,6 +126,7 @@ export const RoomsTable = ({
                   onReassign={onRoomReassign}
                   allRooms={rooms}
                   housekeeperNames={housekeeperNames}
+                  hotelId={hotelId}
                   compact={true}
                   showActions={true}
                 />
