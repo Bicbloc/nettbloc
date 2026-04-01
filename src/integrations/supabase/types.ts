@@ -5293,6 +5293,7 @@ export type Database = {
           hotel_name: string
         }[]
       }
+      get_governess_profile_id: { Args: never; Returns: string }
       get_hotel_for_housekeeper: {
         Args: { p_hotel_id: string; p_housekeeper_profile_id: string }
         Returns: {
@@ -5325,6 +5326,7 @@ export type Database = {
           sub_account_id: string
         }[]
       }
+      get_technician_profile_id: { Args: never; Returns: string }
       get_trial_warning_level: { Args: { p_user_id: string }; Returns: number }
       has_role: {
         Args: {
