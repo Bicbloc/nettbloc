@@ -8,9 +8,16 @@ interface ValidationResult {
   error: string | null;
 }
 
+const ERROR_MESSAGES: Record<UserType, string> = {
+  establishment: "Cette adresse email est déjà utilisée pour un compte établissement. Utilisez une autre adresse.",
+  housekeeper: "Cette adresse email est déjà utilisée pour un compte femme de chambre. Utilisez une autre adresse.",
+  governess: "Cette adresse email est déjà utilisée pour un compte gouvernante. Utilisez une autre adresse.",
+  technician: "Cette adresse email est déjà utilisée pour un compte technicien. Utilisez une autre adresse."
+};
+
 /**
  * Vérifie si un email est déjà utilisé dans une autre interface
- * Chaque email ne peut être associé qu'à UNE SEULE interface
+ * Utilise une fonction SECURITY DEFINER pour contourner les RLS
  */
 export async function validateEmailForUserType(
   email: string, 
@@ -19,96 +26,50 @@ export async function validateEmailForUserType(
   const normalizedEmail = email.trim().toLowerCase();
   
   try {
-    // Vérifier dans les profils établissement (hotels table - user owns hotel)
-    if (intendedType !== 'establishment') {
-      const { data: hotelUser } = await supabase
-        .from('hotels')
-        .select('id, email')
-        .eq('email', normalizedEmail)
-        .maybeSingle();
-      
-      if (hotelUser) {
+    const { data, error } = await supabase.rpc('check_email_exists_for_role', {
+      p_email: normalizedEmail
+    });
+
+    if (error) {
+      console.error('Error checking email role:', error);
+      // En cas d'erreur, on laisse passer pour ne pas bloquer
+      return { isValid: true, existingType: null, error: null };
+    }
+
+    // data est un tableau de { found_in: string }
+    if (data && Array.isArray(data) && data.length > 0) {
+      // Chercher un rôle différent du type voulu
+      const conflictingRole = data.find((row: any) => row.found_in !== intendedType);
+      if (conflictingRole) {
+        const existingType = conflictingRole.found_in as UserType;
         return {
           isValid: false,
-          existingType: 'establishment',
-          error: "Cette adresse email est déjà utilisée pour un compte établissement. Utilisez une autre adresse."
+          existingType,
+          error: ERROR_MESSAGES[existingType] || "Cette adresse est déjà associée à un autre type de compte."
+        };
+      }
+
+      // Si l'email existe déjà pour le même type, c'est OK (re-inscription)
+      const sameType = data.find((row: any) => row.found_in === intendedType);
+      if (sameType) {
+        return {
+          isValid: false,
+          existingType: intendedType,
+          error: `Un compte ${intendedType} existe déjà avec cette adresse. Connectez-vous plutôt.`
         };
       }
     }
 
-    // Vérifier dans les profils femme de chambre
-    if (intendedType !== 'housekeeper') {
-      const { data: housekeeperProfile } = await supabase
-        .from('housekeeper_profiles')
-        .select('id, email')
-        .eq('email', normalizedEmail)
-        .maybeSingle();
-      
-      if (housekeeperProfile) {
-        return {
-          isValid: false,
-          existingType: 'housekeeper',
-          error: "Cette adresse email est déjà utilisée pour un compte femme de chambre. Utilisez une autre adresse."
-        };
-      }
-    }
-
-    // Vérifier dans les profils gouvernante
-    if (intendedType !== 'governess') {
-      const { data: governessProfile } = await supabase
-        .from('governess_profiles')
-        .select('id, email')
-        .eq('email', normalizedEmail)
-        .maybeSingle();
-      
-      if (governessProfile) {
-        return {
-          isValid: false,
-          existingType: 'governess',
-          error: "Cette adresse email est déjà utilisée pour un compte gouvernante. Utilisez une autre adresse."
-        };
-      }
-    }
-
-    // Vérifier dans les profils technicien (si la table existe)
-    if (intendedType !== 'technician') {
-      try {
-        const { data: technicianProfile } = await supabase
-          .from('technician_profiles' as any)
-          .select('id, email')
-          .eq('email', normalizedEmail)
-          .maybeSingle();
-        
-        if (technicianProfile) {
-          return {
-            isValid: false,
-            existingType: 'technician',
-            error: "Cette adresse email est déjà utilisée pour un compte technicien. Utilisez une autre adresse."
-          };
-        }
-      } catch {
-        // Table might not exist, ignore
-      }
-    }
-
-    return {
-      isValid: true,
-      existingType: null,
-      error: null
-    };
+    return { isValid: true, existingType: null, error: null };
   } catch (error: any) {
     console.error('Error validating email type:', error);
-    // En cas d'erreur, on laisse passer pour ne pas bloquer
-    return {
-      isValid: true,
-      existingType: null,
-      error: null
-    };
+    return { isValid: true, existingType: null, error: null };
   }
 }
 
 /**
  * Vérifie qu'un utilisateur connecté accède à la bonne interface
+ * Utilise la fonction SECURITY DEFINER pour contourner les RLS
  */
 export async function validateUserAccessToInterface(
   email: string,
@@ -117,52 +78,25 @@ export async function validateUserAccessToInterface(
   const normalizedEmail = email.trim().toLowerCase();
   
   try {
-    // Vérifier profil établissement
-    const { data: hotelUser } = await supabase
-      .from('hotels')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .maybeSingle();
-    
-    if (hotelUser) {
-      return {
-        allowed: currentInterface === 'establishment',
-        correctInterface: 'establishment'
-      };
+    const { data, error } = await supabase.rpc('check_email_exists_for_role', {
+      p_email: normalizedEmail
+    });
+
+    if (error || !data || !Array.isArray(data) || data.length === 0) {
+      // Aucun profil trouvé - nouvel utilisateur, autoriser
+      return { allowed: true, correctInterface: null };
     }
 
-    // Vérifier profil femme de chambre
-    const { data: housekeeperProfile } = await supabase
-      .from('housekeeper_profiles')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .maybeSingle();
+    // Prendre le premier rôle trouvé comme rôle principal
+    // Priorité: establishment > housekeeper > governess > technician
+    const priority: UserType[] = ['establishment', 'housekeeper', 'governess', 'technician'];
+    const foundRoles = data.map((row: any) => row.found_in as UserType);
     
-    if (housekeeperProfile) {
-      return {
-        allowed: currentInterface === 'housekeeper',
-        correctInterface: 'housekeeper'
-      };
-    }
+    const primaryRole = priority.find(role => foundRoles.includes(role)) || foundRoles[0];
 
-    // Vérifier profil gouvernante
-    const { data: governessProfile } = await supabase
-      .from('governess_profiles')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .maybeSingle();
-    
-    if (governessProfile) {
-      return {
-        allowed: currentInterface === 'governess',
-        correctInterface: 'governess'
-      };
-    }
-
-    // Aucun profil trouvé - nouvel utilisateur
     return {
-      allowed: true,
-      correctInterface: null
+      allowed: primaryRole === currentInterface,
+      correctInterface: primaryRole
     };
   } catch (error) {
     console.error('Error validating interface access:', error);
