@@ -52,6 +52,11 @@ export const FirstTimeSetupWizard = ({
   const [config, setConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   const [isValid, setIsValid] = useState(false);
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth', { replace: true });
+  };
+
   const housekeeperLink = `${window.location.origin}/housekeeper-signup`;
 
   // Validation des champs
