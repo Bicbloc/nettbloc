@@ -497,7 +497,7 @@ export function ManualTaskManager({
                   En attente ({pendingTasks.length})
                 </h4>
                 {pendingTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} />
+                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} onView={() => setSelectedTask(task)} />
                 ))}
               </div>
             )}
