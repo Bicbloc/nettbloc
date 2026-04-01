@@ -138,6 +138,8 @@ export default function TechnicianLogin() {
         description: "Bienvenue"
       });
 
+      storageService.saveActivePortal('technician');
+
       navigate('/technician/hotels');
     } catch (error: any) {
       console.error('Erreur connexion:', error);

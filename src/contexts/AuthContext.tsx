@@ -219,6 +219,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('governess_profile');
       localStorage.removeItem('technician_profile');
       storageService.clearHotel();
+      storageService.clearActivePortal();
       storageService.clearVolatile();
     } catch (e) {
     }

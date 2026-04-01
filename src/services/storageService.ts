@@ -191,6 +191,29 @@ class StorageService {
     localStorage.removeItem('selectedHotelId'); // Backward compat
   }
 
+  // ============ ACTIVE PORTAL ============
+
+  saveActivePortal(portal: AppPortal): void {
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_PORTAL, portal);
+  }
+
+  getActivePortal(): AppPortal | null {
+    const stored = localStorage.getItem(STORAGE_KEYS.ACTIVE_PORTAL);
+    if (
+      stored === 'establishment' ||
+      stored === 'housekeeper' ||
+      stored === 'governess' ||
+      stored === 'technician'
+    ) {
+      return stored;
+    }
+    return null;
+  }
+
+  clearActivePortal(): void {
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_PORTAL);
+  }
+
   // ============ USER PREFERENCES ============
 
   savePreferences(prefs: UserPreferences): void {
