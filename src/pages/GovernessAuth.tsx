@@ -262,11 +262,7 @@ export default function GovernessAuth() {
 
       // Si pas de session = email de confirmation requis
       if (!data.session) {
-        toast({
-          title: "📧 Vérifiez votre boîte mail",
-          description: "Un email de confirmation a été envoyé. Cliquez sur le lien pour activer votre compte. Vérifiez aussi vos spams.",
-          duration: 10000,
-        });
+        setShowEmailConfirmation(true);
       } else {
         // Session immédiate (confirmation email désactivée)
         localStorage.removeItem('housekeeper_profile');
@@ -279,7 +275,6 @@ export default function GovernessAuth() {
         navigate('/governess/hotels');
         return;
       }
-      setIsSignup(false);
 
     } catch (error: any) {
       console.error('Erreur inscription:', error);
