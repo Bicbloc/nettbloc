@@ -46,6 +46,8 @@ export const FirstTimeSetupWizard = ({
   hotelId,
   isPremium = false 
 }: FirstTimeSetupWizardProps) => {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [config, setConfig] = useState<CleaningConfig>(getDefaultCleaningConfig(isPremium));
   const [isValid, setIsValid] = useState(false);
