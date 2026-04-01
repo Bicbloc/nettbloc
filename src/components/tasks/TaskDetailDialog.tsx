@@ -316,24 +316,35 @@ export function TaskDetailDialog({
               </div>
             </div>
 
-            {/* Validate/Reject actions */}
-            {task.status === 'completed' && (onValidate || onReject) && (
-              <>
-                <Separator />
-                <div className="flex gap-2">
-                  {onValidate && (
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onValidate(task.id)}>
-                      <CheckCheck className="h-4 w-4 mr-1" /> Valider
-                    </Button>
-                  )}
-                  {onReject && (
-                    <Button size="sm" variant="outline" className="text-orange-600 border-orange-300" onClick={() => onReject(task.id)}>
-                      <XCircle className="h-4 w-4 mr-1" /> Rejeter
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
+            {/* Admin actions */}
+            <Separator />
+            <div className="flex flex-wrap gap-2">
+              {/* Push reminder */}
+              {onRemind && task.assigned_to_name && (task.status === 'pending' || task.status === 'in_progress') && (
+                <Button size="sm" variant="outline" className="text-amber-600 border-amber-300" onClick={() => onRemind(task)}>
+                  <Bell className="h-4 w-4 mr-1" /> Relancer
+                </Button>
+              )}
+
+              {/* Admin resolve */}
+              {onAdminResolve && task.status !== 'validated' && (
+                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { onAdminResolve(task.id); onOpenChange(false); }}>
+                  <ShieldCheck className="h-4 w-4 mr-1" /> Marquer résolu
+                </Button>
+              )}
+
+              {/* Validate/Reject for completed tasks */}
+              {task.status === 'completed' && onValidate && (
+                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onValidate(task.id)}>
+                  <CheckCheck className="h-4 w-4 mr-1" /> Valider
+                </Button>
+              )}
+              {task.status === 'completed' && onReject && (
+                <Button size="sm" variant="outline" className="text-orange-600 border-orange-300" onClick={() => onReject(task.id)}>
+                  <XCircle className="h-4 w-4 mr-1" /> Rejeter
+                </Button>
+              )}
+            </div>
 
             {/* Comments section */}
             <Separator />
