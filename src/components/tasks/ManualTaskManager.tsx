@@ -721,7 +721,7 @@ function TaskCard({
   return (
     <Card className="p-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
+       <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium">{task.title}</span>
             <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
@@ -773,5 +773,98 @@ function TaskCard({
         </div>
       </div>
     </Card>
+  );
+}
+
+// Space Search Selector Component with search bar and highlighted "Autre"
+function SpaceSearchSelector({
+  options,
+  value,
+  isOther,
+  onSelect,
+  onSelectOther,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  isOther: boolean;
+  onSelect: (value: string) => void;
+  onSelectOther: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filtered = options.filter((o) =>
+    o.value.toLowerCase().includes(search.toLowerCase()) ||
+    o.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const displayLabel = isOther
+    ? '📍 Autre'
+    : options.find((o) => o.value === value)?.label || '';
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          {displayLabel || 'Sélectionner un espace…'}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <div className="flex items-center gap-2 border-b px-3 py-2">
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <input
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            placeholder="Rechercher une chambre…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <ScrollArea className="max-h-[200px]">
+          <div className="p-1">
+            {filtered.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">Aucun résultat</p>
+            )}
+            {filtered.map((option) => (
+              <Button
+                key={option.value}
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 font-normal"
+                onClick={() => {
+                  onSelect(option.value);
+                  setSearch('');
+                  setOpen(false);
+                }}
+              >
+                <Check className={`h-4 w-4 ${value === option.value && !isOther ? 'opacity-100' : 'opacity-0'}`} />
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        </ScrollArea>
+        <div className="border-t p-1">
+          <Button
+            variant={isOther ? "secondary" : "ghost"}
+            size="sm"
+            className="w-full justify-start gap-2 font-medium text-primary"
+            onClick={() => {
+              onSelectOther();
+              setSearch('');
+              setOpen(false);
+            }}
+          >
+            <MapPin className="h-4 w-4" />
+            📍 Autre lieu…
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
