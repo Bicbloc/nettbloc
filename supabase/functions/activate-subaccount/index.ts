@@ -8,8 +8,9 @@ const corsHeaders = {
 
 interface ActivateRequest {
   invitationCode: string;
-  email: string;
-  password: string;
+  email?: string;
+  password?: string;
+  userId?: string; // legacy field from old client
 }
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
@@ -35,12 +36,17 @@ const handler = async (req: Request): Promise<Response> => {
     const invitationCode = String(body.invitationCode ?? "").trim().toUpperCase();
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "").trim();
+    const legacyUserId = String(body.userId ?? "").trim();
 
-    if (!invitationCode || !email || !password) {
-      return jsonResponse({ error: "Champs requis manquants: code, email, mot de passe" }, 400);
+    // Support both new flow (email+password) and legacy flow (userId)
+    const isNewFlow = !!(email && password);
+    const isLegacyFlow = !!legacyUserId;
+
+    if (!invitationCode || (!isNewFlow && !isLegacyFlow)) {
+      return jsonResponse({ error: "Champs requis manquants: code + (email & mot de passe) ou userId" }, 400);
     }
 
-    if (password.length < 6) {
+    if (isNewFlow && password.length < 6) {
       return jsonResponse({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
     }
 
@@ -64,8 +70,9 @@ const handler = async (req: Request): Promise<Response> => {
       return jsonResponse({ error: "Données de sous-compte incomplètes" }, 400);
     }
 
-    // Verify email matches
-    if (email !== String(subAccount.email).toLowerCase()) {
+    // Verify email matches (only for new flow)
+    const subEmail = String(subAccount.email).toLowerCase();
+    if (isNewFlow && email !== subEmail) {
       return jsonResponse({ error: "L'email ne correspond pas à l'invitation" }, 400);
     }
 
@@ -84,80 +91,91 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // 2. Create or find auth user via admin API
-    let userId: string;
+    // 2. Resolve userId
+    let resolvedUserId: string;
 
-    // Try to find existing user by email
-    const { data: existingUsers } = await supabase.auth.admin.listUsers({ perPage: 1 });
-    // listUsers doesn't filter by email, so we use a different approach
-    
-    // Try creating the user first
-    const { data: createData, error: createError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm since they have the invitation code
-      user_metadata: {
-        is_sub_account: true,
-        first_name: subAccount.first_name ?? null,
-        last_name: subAccount.last_name ?? null,
-        company_name: hotel?.name ?? null,
-      },
-    });
-
-    if (createError) {
-      const msg = createError.message.toLowerCase();
-      // User already exists - try to update their password and get their ID
-      if (msg.includes("already") || msg.includes("exists") || msg.includes("registered") || msg.includes("duplicate")) {
-        console.log("User already exists, looking up by email...");
-        
-        // Use signInWithPassword won't work without knowing old password
-        // Use admin listUsers to find by email
-        const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-          perPage: 50,
-          page: 1,
-        });
-
-        if (listError) {
-          console.error("Failed to list users:", listError);
-          return jsonResponse({ error: "Impossible de trouver l'utilisateur existant" }, 500);
+    if (isLegacyFlow) {
+      // Legacy: userId was provided by client-side signUp
+      // Verify user exists
+      try {
+        const { data: authUser, error: authErr } = await supabase.auth.admin.getUserById(legacyUserId);
+        if (authErr || !authUser?.user) {
+          return jsonResponse({ error: "Utilisateur introuvable. Veuillez réessayer." }, 404);
         }
+        resolvedUserId = authUser.user.id;
 
-        const existingUser = listData?.users?.find(
-          (u: any) => u.email?.toLowerCase() === email
-        );
-
-        if (!existingUser) {
-          return jsonResponse({ error: "Utilisateur introuvable. Contactez l'administrateur." }, 404);
-        }
-
-        userId = existingUser.id;
-
-        // Update password and metadata
-        const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-          password,
-          email_confirm: true,
+        // Update metadata
+        await supabase.auth.admin.updateUserById(resolvedUserId, {
           user_metadata: {
-            ...(existingUser.user_metadata ?? {}),
+            ...(authUser.user.user_metadata ?? {}),
             is_sub_account: true,
             first_name: subAccount.first_name ?? null,
             last_name: subAccount.last_name ?? null,
             company_name: hotel?.name ?? null,
           },
         });
-
-        if (updateError) {
-          console.error("Failed to update existing user:", updateError);
-          return jsonResponse({ error: "Impossible de mettre à jour le compte" }, 500);
-        }
-      } else {
-        console.error("Failed to create user:", createError);
-        return jsonResponse({ error: `Erreur création compte: ${createError.message}` }, 500);
+      } catch (e: any) {
+        console.error("Legacy flow - user lookup failed:", e);
+        return jsonResponse({ error: "Utilisateur introuvable" }, 404);
       }
     } else {
-      userId = createData.user.id;
+      // New flow: create user via admin API
+      const { data: createData, error: createError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          is_sub_account: true,
+          first_name: subAccount.first_name ?? null,
+          last_name: subAccount.last_name ?? null,
+          company_name: hotel?.name ?? null,
+        },
+      });
+
+      if (createError) {
+        const msg = createError.message.toLowerCase();
+        if (msg.includes("already") || msg.includes("exists") || msg.includes("registered") || msg.includes("duplicate")) {
+          console.log("User already exists, looking up by email...");
+
+          const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
+            perPage: 50,
+            page: 1,
+          });
+
+          if (listError) {
+            return jsonResponse({ error: "Impossible de trouver l'utilisateur existant" }, 500);
+          }
+
+          const existingUser = listData?.users?.find(
+            (u: any) => u.email?.toLowerCase() === email
+          );
+
+          if (!existingUser) {
+            return jsonResponse({ error: "Utilisateur introuvable. Contactez l'administrateur." }, 404);
+          }
+
+          resolvedUserId = existingUser.id;
+
+          await supabase.auth.admin.updateUserById(resolvedUserId, {
+            password,
+            email_confirm: true,
+            user_metadata: {
+              ...(existingUser.user_metadata ?? {}),
+              is_sub_account: true,
+              first_name: subAccount.first_name ?? null,
+              last_name: subAccount.last_name ?? null,
+              company_name: hotel?.name ?? null,
+            },
+          });
+        } else {
+          return jsonResponse({ error: `Erreur création compte: ${createError.message}` }, 500);
+        }
+      } else {
+        resolvedUserId = createData.user.id;
+      }
     }
 
-    console.log("User ready, userId:", userId);
+    console.log("User ready, userId:", resolvedUserId);
 
     // 3. Link sub-account
     const now = new Date().toISOString();
@@ -165,7 +183,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { error: subUpdateError } = await supabase
       .from("sub_accounts")
       .update({
-        user_id: userId,
+        user_id: resolvedUserId,
         invitation_status: "active",
         is_active: true,
         updated_at: now,
@@ -179,7 +197,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // 4. Create profile
     const { error: profileError } = await supabase.from("profiles").upsert({
-      id: userId,
+      id: resolvedUserId,
       email: subAccount.email,
       current_hotel_id: subAccount.hotel_id,
       onboarding_completed_at: now,
@@ -188,7 +206,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (profileError) {
       console.error("Failed to create profile:", profileError);
-      // Non-blocking - continue
     }
 
     // 5. Mark invitation as accepted
@@ -207,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     return jsonResponse({
       success: true,
-      userId,
+      userId: resolvedUserId,
       hotel: hotel ? { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } : null,
     });
   } catch (error) {
