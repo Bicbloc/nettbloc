@@ -251,7 +251,28 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
         {renderStep()}
 
         <DialogFooter className="flex justify-between">
-          <Button
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await signOut();
+                navigate('/auth', { replace: true });
+              }}
+              className="text-destructive hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              Déconnexion
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setCurrentStep(prev => prev - 1)}
+              disabled={currentStep === 0}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Retour
+            </Button>
+          </div>
             variant="ghost"
             onClick={() => setCurrentStep(prev => prev - 1)}
             disabled={currentStep === 0}
