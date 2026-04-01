@@ -583,30 +583,50 @@ const HousekeeperWorkContent: React.FC = () => {
       }
 
       // hotelData est un tableau, prendre le premier élément
-      const hotel = Array.isArray(hotelData) ? hotelData[0] : hotelData;
+      const hotelResult = Array.isArray(hotelData) ? hotelData[0] : hotelData;
       
-      if (!hotel) {
-        toast({
-          title: "Erreur",
-          description: "Hôtel non trouvé ou accès non autorisé",
-          variant: "destructive"
+      if (!hotelResult) {
+        // Fallback: charger directement depuis la table hotels via le nom stocké
+        const { data: fallbackHotel } = await supabase
+          .from('hotels')
+          .select('id, name, hotel_code, email, address, settings')
+          .eq('id', hotelId)
+          .single();
+        
+        if (!fallbackHotel) {
+          toast({
+            title: "Erreur",
+            description: "Hôtel non trouvé ou accès non autorisé",
+            variant: "destructive"
+          });
+          navigate('/housekeeper/hotels');
+          return;
+        }
+        
+        setHotel(fallbackHotel);
+        setHousekeeper({
+          id: housekeeperProfile.id,
+          name: housekeeperProfile.name,
+          email: housekeeperProfile.email
         });
-        navigate('/housekeeper/hotels');
-        return;
+      } else {
+        setHotel(hotelResult);
+        setHousekeeper({
+          id: housekeeperProfile.id,
+          name: housekeeperProfile.name,
+          email: housekeeperProfile.email
+        });
       }
 
       authResult = {
         success: true,
-        hotel: hotel,
+        hotel: hotelResult,
         user: {
           id: housekeeperProfile.id,
           name: housekeeperProfile.name,
           email: housekeeperProfile.email
         }
       };
-
-      setHotel(authResult.hotel);
-      setHousekeeper(authResult.user);
 
       const housekeeperId = housekeeperProfile?.id;
       const profileName = housekeeperProfile?.name;

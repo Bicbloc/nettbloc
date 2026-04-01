@@ -567,6 +567,17 @@ export function RoomCard({
               <AlertCircle className="h-3 w-3 mr-1" /> {t.rooms.remark}
             </Badge>
           )}
+          {isInProgress && (
+            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 animate-pulse gap-1">
+              <Clock className="h-3 w-3" />
+              {t.rooms.inProgress}
+              {room.cleaningStartedAt && (
+                <span className="font-semibold ml-1">
+                  {getElapsedTime(room.cleaningStartedAt)}
+                </span>
+              )}
+            </Badge>
+          )}
         </div>
         <div className="flex gap-1">
           {getStatusBadge(room.status)}
