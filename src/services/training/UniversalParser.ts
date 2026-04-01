@@ -541,18 +541,16 @@ export function universalParse(
         unmappedCount++;
       }
 
-      // Refine SAL/OCC/DIRTY using guest-name counting (Mews logic)
+      // RÈGLE PRIORITAIRE: Comptage des noms de clients (logique Mews universelle)
+      // S'applique dès qu'une chambre est détectée, pas seulement pour SAL/DIRTY
       // 1 guest name = recouche (staying), 2+ names = à blanc (checkout+checkin)
-      if ((detectedType === 'full' || detectedType === 'quick') && 
-          /\b(SAL|SALE|DIRTY|DIR|OCC)\b/i.test(line)) {
-        const guestNames = extractGuestNamesFromLine(line);
-        if (guestNames.length >= 2) {
-          detectedType = 'full'; // 2 noms = à blanc
-        } else if (guestNames.length === 1) {
-          detectedType = 'quick'; // 1 nom = recouche
-        }
-        // 0 names: keep the detected type as-is
+      const guestNames = extractGuestNamesFromLine(line);
+      if (guestNames.length >= 2) {
+        detectedType = 'full'; // 2 noms = à blanc
+      } else if (guestNames.length === 1) {
+        detectedType = 'quick'; // 1 nom = recouche
       }
+      // 0 names: keep the detected type from status codes
     }
     
     const rawParsedLine: RawParsedLine = {
