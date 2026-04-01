@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { 
   Layers, Bed, UserIcon, Key, AlertTriangle, FileText, 
   Brain, Archive, ClipboardCheck, Package, 
-  ChevronRight, Settings, Repeat, ShoppingCart
+  ChevronRight, Settings, Repeat, ShoppingCart, TicketCheck
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
