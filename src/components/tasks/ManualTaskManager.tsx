@@ -279,6 +279,23 @@ export function ManualTaskManager({
         throw error;
       }
 
+      // Send notification to assigned staff
+      if (task.assigned_to_name) {
+        try {
+          await supabase.from("notifications").insert({
+            hotel_id: hotelId,
+            title: `📋 Nouveau ticket : ${task.title}`,
+            description: `Assigné à ${task.assigned_to_name}${task.location_reference ? ` — ${task.location_reference}` : ''}`,
+            type: 'task_assigned',
+            user_type: task.assigned_to_type,
+            housekeeper_name: task.assigned_to_name,
+            room_number: task.location_reference || null,
+          });
+        } catch (notifError) {
+          console.warn('Notification non envoyée:', notifError);
+        }
+      }
+
       return true;
     },
     onSuccess: () => {
