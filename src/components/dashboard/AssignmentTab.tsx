@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Calendar, Key, UserPlus, RefreshCw } from "lucide-react";
+import { Plus, Calendar, Key, UserPlus, RefreshCw, ClipboardCheck } from "lucide-react";
 import { Room, CleaningConfig } from "@/services/pdfService";
 import { PdfWorkflowDialog } from "@/components/PdfWorkflowDialog";
 import { RedistributionDialog, RedistributionMethod } from "@/components/RedistributionDialog";
