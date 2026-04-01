@@ -915,6 +915,9 @@ const HousekeeperWorkContent: React.FC = () => {
         onLogout={handleLogout}
       />
 
+      {/* Notification banner compacte et glissable */}
+      <StaffNotificationBanner hotelId={hotelId || undefined} />
+
       {showActivityLog && (
         <HousekeeperActivityLog entries={activityLog} onClose={() => setShowActivityLog(false)} />
       )}
