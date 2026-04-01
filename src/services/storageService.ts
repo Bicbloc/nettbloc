@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   HOTEL_SESSION: 'nettobloc_hotel_session',
   USER_PREFERENCES: 'nettobloc_user_prefs',
   ADMIN_TAB: 'nettobloc_admin_tab',
+  ACTIVE_PORTAL: 'nettobloc_active_portal',
   HOUSEKEEPER_PROFILE: 'nettobloc_hk_profile',
   HOUSEKEEPER_SESSION: 'nettobloc_hk_session',
   TECHNICIAN_PROFILE: 'nettobloc_tech_profile',
