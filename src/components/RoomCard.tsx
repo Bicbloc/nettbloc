@@ -805,6 +805,18 @@ export function RoomCard({
           roomNumber={room.number}
         />
       )}
+
+      {showNoteDialog && hotelId && (
+        <EditRoomNoteDialog
+          open={showNoteDialog}
+          onOpenChange={setShowNoteDialog}
+          room={room}
+          hotelId={hotelId}
+          onNoteUpdated={(r, newNote) => {
+            onUpdate({ ...r, notes: newNote || undefined });
+          }}
+        />
+      )}
     </div>
   );
 }
