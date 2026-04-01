@@ -126,6 +126,7 @@ export const RoomsTable = ({
                   onReassign={onRoomReassign}
                   allRooms={rooms}
                   housekeeperNames={housekeeperNames}
+                  hotelId={hotelId}
                   compact={true}
                   showActions={true}
                 />
