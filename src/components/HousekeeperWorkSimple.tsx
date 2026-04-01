@@ -21,6 +21,7 @@ import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
 import { StaffTasksList } from './tasks/StaffTasksList';
 import { ReadOnlyFloorPlan } from './registry/ReadOnlyFloorPlan';
+import { StaffNotificationBanner, dispatchStaffNotification } from './housekeeper/StaffNotificationBanner';
 
 interface Room {
   id: string;
