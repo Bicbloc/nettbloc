@@ -541,7 +541,14 @@ export function ManualTaskManager({
                   En attente ({pendingTasks.length})
                 </h4>
                 {pendingTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} onView={() => setSelectedTask(task)} />
+                  <TaskCard 
+                    key={task.id} 
+                    task={task} 
+                    onDelete={() => deleteTask.mutate(task.id)} 
+                    onView={() => setSelectedTask(task)}
+                    onRemind={task.assigned_to_name ? () => sendReminder.mutate(task) : undefined}
+                    onAdminResolve={() => adminResolve.mutate(task.id)}
+                  />
                 ))}
               </div>
             )}
