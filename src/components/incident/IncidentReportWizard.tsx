@@ -632,7 +632,20 @@ export function IncidentReportWizard({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0">
+      <DialogContent 
+        className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0"
+        onInteractOutside={(e) => {
+          // Prevent dialog from closing when camera/file picker opens on mobile
+          if (isAnalyzing || currentStep === 'analysis') {
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          if (isAnalyzing || currentStep === 'analysis') {
+            e.preventDefault();
+          }
+        }}
+      >
         {/* Header compact */}
         <div className="p-4 border-b bg-muted/30">
           <DialogHeader className="pb-2">
