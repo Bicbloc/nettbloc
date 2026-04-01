@@ -76,3 +76,6 @@ verify_jwt = true
 
 [functions.pms-sync]
 verify_jwt = false
+
+[functions.activate-subaccount]
+verify_jwt = false
