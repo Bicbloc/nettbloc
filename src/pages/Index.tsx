@@ -96,6 +96,7 @@ const Index = () => {
           <div className="text-center space-y-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-muted-foreground text-sm">Vérification des accès...</p>
+            <LogoutButton />
           </div>
         </div>
       );
@@ -107,6 +108,7 @@ const Index = () => {
           <div className="text-center space-y-4">
             <div className="w-8 h-8 border-4 border-destructive border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-muted-foreground text-sm">Redirection vers votre espace...</p>
+            <LogoutButton />
           </div>
         </div>
       );
