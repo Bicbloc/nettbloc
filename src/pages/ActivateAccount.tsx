@@ -1,19 +1,21 @@
-import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 
 export default function ActivateAccount() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const code = searchParams.get("code");
+  const initialCode = useMemo(() => searchParams.get("code")?.trim().toUpperCase() || "", [searchParams]);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [activationCode, setActivationCode] = useState(initialCode);
+  const [isLoading, setIsLoading] = useState(Boolean(initialCode));
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<any>(null);
@@ -25,17 +27,29 @@ export default function ActivateAccount() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (code) {
-      validateCode(code);
-    } else {
-      setError("Code d'activation manquant");
+    if (!initialCode) {
       setIsLoading(false);
+      return;
     }
-  }, [code]);
 
-  const validateCode = async (invitationCode: string) => {
+    void validateCode(initialCode);
+  }, [initialCode]);
+
+  const validateCode = async (rawCode: string) => {
+    const invitationCode = rawCode.trim().toUpperCase();
+
+    if (!invitationCode) {
+      setError("Veuillez saisir le code reçu par email");
+      setInvitation(null);
+      setSubAccount(null);
+      return false;
+    }
+
+    setIsValidatingCode(true);
+    setIsLoading(true);
+    setError(null);
+
     try {
-      // Find invitation with this code in sub_account_invitations table
       const { data: invitationData, error: invitationError } = await supabase
         .from("sub_account_invitations")
         .select("*, sub_accounts(*, hotels(id, name, hotel_code))")
@@ -43,40 +57,142 @@ export default function ActivateAccount() {
         .single();
 
       if (invitationError || !invitationData) {
-        console.error("Invitation lookup error:", invitationError);
+        setInvitation(null);
+        setSubAccount(null);
         setError("Code d'invitation invalide ou expiré");
-        setIsLoading(false);
-        return;
+        return false;
       }
 
-      // Check if already accepted
       if (invitationData.status === "accepted" || invitationData.accepted_at) {
+        setInvitation(null);
+        setSubAccount(null);
         setError("Ce compte a déjà été activé");
-        setIsLoading(false);
-        return;
+        return false;
       }
 
-      // Check expiration
       if (invitationData.expires_at && new Date(invitationData.expires_at) < new Date()) {
+        setInvitation(null);
+        setSubAccount(null);
         setError("Ce code d'invitation a expiré");
-        setIsLoading(false);
-        return;
+        return false;
       }
 
-
+      setActivationCode(invitationCode);
       setInvitation(invitationData);
       setSubAccount(invitationData.sub_accounts);
       setEmail(invitationData.sub_accounts?.email || "");
-      setIsLoading(false);
+      setError(null);
+      return true;
     } catch (err) {
       console.error("Error validating code:", err);
+      setInvitation(null);
+      setSubAccount(null);
       setError("Erreur lors de la validation du code");
+      return false;
+    } finally {
       setIsLoading(false);
+      setIsValidatingCode(false);
     }
+  };
+
+  const resolveAuthUserId = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData.session?.user;
+
+    if (currentUser?.email?.toLowerCase() === normalizedEmail) {
+      return currentUser.id;
+    }
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: subAccount?.first_name,
+          last_name: subAccount?.last_name,
+          is_sub_account: true,
+          company_name: subAccount?.hotels?.name || null,
+        },
+      },
+    });
+
+    if (signUpError) {
+      const signUpMessage = signUpError.message.toLowerCase();
+      const accountAlreadyExists =
+        signUpMessage.includes("already") ||
+        signUpMessage.includes("registered") ||
+        signUpMessage.includes("exists") ||
+        signUpMessage.includes("utilisé");
+
+      if (!accountAlreadyExists) {
+        throw signUpError;
+      }
+
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError || !signInData.user) {
+        throw new Error("Ce compte existe déjà. Connectez-vous avec le mot de passe défini puis relancez l'activation.");
+      }
+
+      return signInData.user.id;
+    }
+
+    if (!signUpData.user) {
+      throw new Error("Échec de la création du compte");
+    }
+
+    return signUpData.user.id;
+  };
+
+  const callActivateSubAccount = async (userId: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-subaccount`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({
+        invitationCode: activationCode,
+        userId,
+      }),
+    });
+
+    const responseText = await response.text();
+    let payload: any = null;
+
+    try {
+      payload = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      payload = responseText ? { error: responseText } : null;
+    }
+
+    if (!response.ok) {
+      throw new Error(payload?.error || "Erreur lors de l'activation du sous-compte");
+    }
+
+    return payload;
   };
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!activationCode.trim()) {
+      toast.error("Veuillez saisir votre code d'invitation");
+      return;
+    }
+
+    if (!subAccount?.id) {
+      toast.error("Veuillez d'abord valider votre code d'invitation");
+      return;
+    }
 
     if (password !== confirmPassword) {
       toast.error("Les mots de passe ne correspondent pas");
@@ -89,86 +205,37 @@ export default function ActivateAccount() {
     }
 
     setIsActivating(true);
+    setError(null);
 
     try {
-      if (!code) {
-        throw new Error("Code d'activation manquant");
-      }
+      localStorage.removeItem("nettbloc_hotel");
+      localStorage.removeItem("nettbloc-hotel");
+      localStorage.removeItem("nettobloc_hotel_session");
+      localStorage.removeItem("selectedHotelId");
 
-      if (!subAccount?.id) {
-        throw new Error("Invitation invalide (sous-compte introuvable)");
-      }
+      const userId = await resolveAuthUserId();
+      await callActivateSubAccount(userId);
 
-      // Clear any existing cache to prevent stale hotel data
-      localStorage.removeItem('nettbloc_hotel');
-      localStorage.removeItem('nettbloc-hotel');
-      localStorage.removeItem('nettobloc_hotel_session');
-      localStorage.removeItem('selectedHotelId');
-      
-      
-      // Create Supabase auth user
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: subAccount.first_name,
-            last_name: subAccount.last_name,
-            is_sub_account: true, // Mark as sub-account to prevent hotel creation
-            company_name: subAccount.hotels?.name || null, // Pass parent hotel name
-          },
-        },
-      });
+      const { data: sessionAfterActivation } = await supabase.auth.getSession();
+      const activatedUser = sessionAfterActivation.session?.user;
 
-      if (signUpError) {
-        // If user already exists, try to sign in
-        if (signUpError.message.includes("already registered")) {
-          toast.error("Cet email est déjà utilisé. Essayez de vous connecter.");
-          setIsActivating(false);
-          return;
-        }
-        throw signUpError;
-      }
-
-      if (!authData.user) {
-        throw new Error("Échec de la création du compte");
-      }
-
-
-      // Link the new auth user to the invited sub-account + parent hotel on the server side.
-      // This is critical because signUp may not create an immediate session (email confirmation settings).
-      const { data: activationData, error: activationError } = await supabase.functions.invoke(
-        'activate-subaccount',
-        {
-          body: {
-            invitationCode: code,
-            userId: authData.user.id,
-          },
-        }
-      );
-
-      if (activationError) {
-        console.error('❌ activate-subaccount error:', activationError);
-        throw new Error(activationError.message || "Erreur lors de l'activation du sous-compte");
-      }
-
-
-      // Try to sign in immediately (optional). If email confirmation is required, this will fail gracefully.
-      if (!authData.session) {
+      if (activatedUser?.email?.toLowerCase() !== email.toLowerCase()) {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) {
+          console.warn("Auto sign-in after activation failed:", signInError.message);
         }
       }
 
       toast.success("Compte activé avec succès !");
 
-      // Redirect to auth page
       setTimeout(() => {
         navigate("/auth/establishment");
-      }, 2000);
+      }, 1200);
     } catch (err: any) {
-      console.error("❌ Activation error:", err);
-      toast.error(err.message || "Erreur lors de l'activation");
+      console.error("Activation error:", err);
+      const message = err?.message || "Erreur lors de l'activation";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsActivating(false);
     }
@@ -176,24 +243,62 @@ export default function ActivateAccount() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (error) {
+  if (!invitation || !subAccount) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <CardTitle className="text-red-600">Erreur</CardTitle>
-            <CardDescription>{error}</CardDescription>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted p-4">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardHeader className="text-center space-y-3">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+              <KeyRound className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle>Activer un sous-compte</CardTitle>
+            <CardDescription>
+              Collez ici le code reçu par email pour continuer l'activation.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate("/auth/establishment")} className="w-full">
-              Retour à la connexion
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="activation-code">Code d'invitation</Label>
+              <Input
+                id="activation-code"
+                value={activationCode}
+                onChange={(e) => setActivationCode(e.target.value.toUpperCase())}
+                placeholder="Ex: AB12CD34"
+                autoCapitalize="characters"
+                autoCorrect="off"
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <Button
+              className="w-full"
+              onClick={() => void validateCode(activationCode)}
+              disabled={isValidatingCode || !activationCode.trim()}
+            >
+              {isValidatingCode ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Vérification...
+                </>
+              ) : (
+                "Continuer"
+              )}
+            </Button>
+
+            <Button variant="ghost" className="w-full" onClick={() => navigate("/auth/establishment")}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Retour à la connexion
             </Button>
           </CardContent>
         </Card>
@@ -202,11 +307,11 @@ export default function ActivateAccount() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted p-4">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="h-8 w-8 text-emerald-600" />
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="h-8 w-8 text-primary" />
           </div>
           <CardTitle>Activez votre compte</CardTitle>
           <CardDescription>
@@ -216,6 +321,11 @@ export default function ActivateAccount() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleActivate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="validated-code">Code d'invitation</Label>
+              <Input id="validated-code" value={activationCode} disabled className="bg-muted" />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" value={email} disabled className="bg-muted" />
@@ -255,6 +365,13 @@ export default function ActivateAccount() {
                 required
               />
             </div>
+
+            {error && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={isActivating}>
               {isActivating ? (
