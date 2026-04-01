@@ -68,6 +68,7 @@ export function MainLayout({
             isPremium={isPremium}
             isCollapsed={isSidebarCollapsed}
             onCollapsedChange={setIsSidebarCollapsed}
+            notificationCounts={notificationCounts}
           />
 
           {/* Main Content */}
