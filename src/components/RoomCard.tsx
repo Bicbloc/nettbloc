@@ -84,7 +84,7 @@ export function RoomCard({
     
     const interval = setInterval(() => {
       setTick(t => t + 1);
-    }, 60000); // Update every minute
+    }, 30000); // Update every 30 seconds
     
     return () => clearInterval(interval);
   }, [room.status, room.cleaningStartedAt]);
@@ -565,6 +565,17 @@ export function RoomCard({
           {room.status === 'needs-attention' && room.remark && (
             <Badge variant="outline" className="bg-red-100 text-red-800">
               <AlertCircle className="h-3 w-3 mr-1" /> {t.rooms.remark}
+            </Badge>
+          )}
+          {isInProgress && (
+            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 animate-pulse gap-1">
+              <Clock className="h-3 w-3" />
+              {t.rooms.inProgress}
+              {room.cleaningStartedAt && (
+                <span className="font-semibold ml-1">
+                  {getElapsedTime(room.cleaningStartedAt)}
+                </span>
+              )}
             </Badge>
           )}
         </div>
