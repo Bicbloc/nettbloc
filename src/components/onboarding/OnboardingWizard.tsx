@@ -11,7 +11,8 @@ import {
   Check, 
   Building2,
   Sparkles,
-  Gift
+  Gift,
+  LogOut
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
