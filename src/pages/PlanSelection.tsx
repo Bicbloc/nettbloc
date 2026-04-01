@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Crown, Star, Diamond, Zap, Check, X, ArrowRight, Gift, Loader2, Building2, AlertTriangle } from 'lucide-react';
+import { PhoneOrderSection } from '@/components/PhoneOrderSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingConfig } from '@/hooks/use-pricing-config';
