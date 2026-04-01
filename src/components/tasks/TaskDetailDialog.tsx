@@ -75,7 +75,7 @@ interface TaskDetailDialogProps {
 }
 
 export function TaskDetailDialog({ 
-  task, hotelId, open, onOpenChange, onValidate, onReject 
+  task, hotelId, open, onOpenChange, onValidate, onReject, onRemind, onAdminResolve
 }: TaskDetailDialogProps) {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
