@@ -27,6 +27,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { CleaningConfig, getDefaultCleaningConfig } from '@/services/pdfService';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FirstTimeSetupWizardProps {
   isOpen: boolean;
