@@ -443,6 +443,7 @@ const HousekeeperWorkContent: React.FC = () => {
         if (isForMe(newRecord)) {
           loadWorkDataRef.current();
           addToActivityLog(`🆕 Nouvelle chambre assignée par le responsable`, 'info');
+          dispatchStaffNotification('🆕 Nouvelle chambre', 'Une chambre vous a été assignée par le responsable');
           setNewRoomsCount(prev => prev + 1);
           setTimeout(() => setNewRoomsCount(0), 5000);
         }
