@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { storageService } from '@/services/storageService';
+import { nativeNotificationService } from '@/services/nativeNotificationService';
 
 // Build ID injected at build time - this will change on each deployment
 declare const __BUILD_ID__: string;
