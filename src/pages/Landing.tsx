@@ -9,7 +9,7 @@ import {
   Sparkles, Zap, Globe, ArrowRight, CheckCircle, Brain, Eye,
   LayoutDashboard, Package, Mail, ChevronDown, Star, Clock,
   Smartphone, MousePointerClick, Bot, Search, ShieldCheck, Brush,
-  Settings, Award, MessageSquareQuote, Building2, Hotel, Crown
+  Settings, Award, MessageSquareQuote, Building2, Hotel, Crown, Download
 } from 'lucide-react';
 
 const t = {
