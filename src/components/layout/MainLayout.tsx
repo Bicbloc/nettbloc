@@ -22,6 +22,7 @@ interface MainLayoutProps {
   currentHotelId: string | null;
   subscriptionLoading: boolean;
   onStartWorkflow: () => void;
+  notificationCounts?: Partial<Record<TabValue, number>>;
 }
 
 export function MainLayout({
