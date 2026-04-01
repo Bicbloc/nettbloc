@@ -35,6 +35,7 @@ interface AppSidebarProps {
   isPremium: boolean;
   isCollapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  notificationCounts?: Partial<Record<TabValue, number>>;
 }
 
 export function AppSidebar({ 
