@@ -57,6 +57,7 @@ export function AppSidebar({
   // Fonctionnalités opérationnelles
   const operationsItems: NavItem[] = [
     { value: 'access-codes', label: t.dashboard.accessCodes, icon: <Key className="h-5 w-5" />, premium: true },
+    { value: 'tickets', label: 'Tickets', icon: <TicketCheck className="h-5 w-5" /> },
     { value: 'incidents', label: t.dashboard.incidents, icon: <AlertTriangle className="h-5 w-5" />, premium: true },
     { value: 'inspections', label: t.dashboard.inspections, icon: <ClipboardCheck className="h-5 w-5" />, premium: true },
   ];
