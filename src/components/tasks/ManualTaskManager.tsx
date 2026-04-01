@@ -96,6 +96,7 @@ export function ManualTaskManager({
 }: ManualTaskManagerProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showTemplatePopover, setShowTemplatePopover] = useState(false);
+  const [staffSearch, setStaffSearch] = useState('');
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -104,6 +105,34 @@ export function ManualTaskManager({
     assigned_to_type: 'housekeeper',
     assigned_to_name: '',
     priority: 'normal',
+  });
+
+  // Fetch technicians from DB
+  const { data: dbTechnicians } = useQuery({
+    queryKey: ["technician-profiles-for-hotel", hotelId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("technician_access_requests")
+        .select("technician_profile_id, technician_profiles(name)")
+        .eq("hotel_id", hotelId)
+        .eq("status", "approved");
+      return (data || []).map((r: any) => r.technician_profiles?.name).filter(Boolean) as string[];
+    },
+    enabled: !!hotelId,
+  });
+
+  // Fetch governesses from DB
+  const { data: dbGovernesses } = useQuery({
+    queryKey: ["governess-profiles-for-hotel", hotelId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("governess_access_requests")
+        .select("governess_profile_id, governess_profiles(name)")
+        .eq("hotel_id", hotelId)
+        .eq("status", "approved");
+      return (data || []).map((r: any) => r.governess_profiles?.name).filter(Boolean) as string[];
+    },
+    enabled: !!hotelId,
   });
 
   const queryClient = useQueryClient();
