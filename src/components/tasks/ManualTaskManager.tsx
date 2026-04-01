@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TaskDetailDialog } from "./TaskDetailDialog";
 import { 
   Plus, 
   Trash2, 
@@ -27,7 +28,8 @@ import {
   Calendar as CalendarIcon,
   Search,
   ChevronsUpDown,
-  Check
+  Check,
+  Eye
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -106,6 +108,7 @@ export function ManualTaskManager({
   const [showTemplatePopover, setShowTemplatePopover] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
   const [newTask, setNewTask] = useState({ ...DEFAULT_NEW_TASK });
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Fetch registered rooms/spaces for location selector
   const { data: registeredRooms } = useQuery({
@@ -274,6 +277,23 @@ export function ManualTaskManager({
 
       if (error) {
         throw error;
+      }
+
+      // Send notification to assigned staff
+      if (task.assigned_to_name) {
+        try {
+          await supabase.from("notifications").insert({
+            hotel_id: hotelId,
+            title: `📋 Nouveau ticket : ${task.title}`,
+            description: `Assigné à ${task.assigned_to_name}${task.location_reference ? ` — ${task.location_reference}` : ''}`,
+            type: 'task_assigned',
+            user_type: task.assigned_to_type,
+            housekeeper_name: task.assigned_to_name,
+            room_number: task.location_reference || null,
+          });
+        } catch (notifError) {
+          console.warn('Notification non envoyée:', notifError);
+        }
       }
 
       return true;
@@ -477,7 +497,7 @@ export function ManualTaskManager({
                   En attente ({pendingTasks.length})
                 </h4>
                 {pendingTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} />
+                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} onView={() => setSelectedTask(task)} />
                 ))}
               </div>
             )}
@@ -496,6 +516,7 @@ export function ManualTaskManager({
                     onValidate={() => validateTask.mutate(task.id)}
                     onReject={() => rejectTask.mutate(task.id)}
                     onDelete={() => deleteTask.mutate(task.id)}
+                    onView={() => setSelectedTask(task)}
                   />
                 ))}
               </div>
@@ -509,7 +530,7 @@ export function ManualTaskManager({
                   Validées ({validatedTasks.length})
                 </h4>
                 {validatedTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} />
+                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} onView={() => setSelectedTask(task)} />
                 ))}
               </div>
             )}
@@ -698,6 +719,15 @@ export function ManualTaskManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Task Detail Dialog */}
+      <TaskDetailDialog
+        task={selectedTask}
+        hotelId={hotelId}
+        open={!!selectedTask}
+        onOpenChange={(open) => { if (!open) setSelectedTask(null); }}
+        onValidate={(id) => { validateTask.mutate(id); setSelectedTask(null); }}
+        onReject={(id) => { rejectTask.mutate(id); setSelectedTask(null); }}
+      />
     </div>
   );
 }
@@ -707,12 +737,14 @@ function TaskCard({
   task, 
   onValidate, 
   onReject,
-  onDelete 
+  onDelete,
+  onView,
 }: { 
   task: Task; 
   onValidate?: () => void;
   onReject?: () => void;
   onDelete: () => void;
+  onView?: () => void;
 }) {
   const statusConfig = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
   const priorityConfig = PRIORITIES.find(p => p.value === task.priority) || PRIORITIES[1];
@@ -757,6 +789,11 @@ function TaskCard({
         </div>
 
         <div className="flex items-center gap-1">
+          {onView && (
+            <Button size="icon" variant="ghost" className="text-primary" onClick={onView}>
+              <Eye className="h-4 w-4" />
+            </Button>
+          )}
           {task.status === 'completed' && onValidate && (
             <>
               <Button size="icon" variant="ghost" className="text-green-600" onClick={onValidate}>
