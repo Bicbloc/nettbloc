@@ -844,25 +844,49 @@ export function IncidentReportWizard({
             {/* STEP: Category */}
             {currentStep === 'category' && (
               <div className="space-y-3">
-                <ScrollArea className="h-[300px] pr-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {categoriesWithItems?.map((category) => (
-                      <Button
-                        key={category.id}
-                        variant={selectedCategoryId === category.id ? "default" : "outline"}
-                        className="h-16 flex-col gap-1 text-left"
-                        onClick={() => {
-                          setSelectedCategoryId(category.id);
-                          setItemSearchQuery("");
-                          form.setValue('item_id', '');
-                        }}
-                      >
-                        <span className="text-xl">{category.icon || "📦"}</span>
-                        <span className="text-xs font-medium text-center">{category.name}</span>
-                      </Button>
-                    ))}
+                {isInitializingDefaults ? (
+                  <div className="text-center py-12 space-y-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+                    <p className="font-medium">Initialisation des catégories...</p>
+                    <p className="text-sm text-muted-foreground">Première utilisation, préparation du catalogue</p>
                   </div>
-                </ScrollArea>
+                ) : !categoriesWithItems || categoriesWithItems.length === 0 ? (
+                  <div className="text-center py-8 space-y-4">
+                    <Layers className="h-12 w-12 text-muted-foreground mx-auto" />
+                    <p className="font-medium">Aucune catégorie disponible</p>
+                    <p className="text-sm text-muted-foreground">Les catégories d'incidents n'ont pas encore été configurées.</p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsInitializingDefaults(true);
+                        refetchCategories().finally(() => setIsInitializingDefaults(false));
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Initialiser les catégories
+                    </Button>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[300px] pr-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {categoriesWithItems.map((category) => (
+                        <Button
+                          key={category.id}
+                          variant={selectedCategoryId === category.id ? "default" : "outline"}
+                          className="h-16 flex-col gap-1 text-left"
+                          onClick={() => {
+                            setSelectedCategoryId(category.id);
+                            setItemSearchQuery("");
+                            form.setValue('item_id', '');
+                          }}
+                        >
+                          <span className="text-xl">{category.icon || "📦"}</span>
+                          <span className="text-xs font-medium text-center">{category.name}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </div>
             )}
 
