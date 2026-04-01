@@ -701,7 +701,7 @@ export function IncidentReportWizard({
                       <p className="text-sm text-muted-foreground mt-1">
                         L'IA identifiera automatiquement le problème
                       </p>
-                      <Input
+                      <input
                         type="file"
                         accept="image/*"
                         capture="environment"
