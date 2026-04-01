@@ -282,13 +282,17 @@ export function ManualTaskManager({
       case 'housekeeper':
         return housekeeperNames;
       case 'governess':
-        return governessNames;
+        return [...new Set([...governessNames, ...(dbGovernesses || [])])];
       case 'technician':
-        return technicianNames;
+        return [...new Set([...technicianNames, ...(dbTechnicians || [])])];
       default:
         return [];
     }
   };
+
+  const filteredAssignees = getAssigneeList().filter(name =>
+    name.toLowerCase().includes(staffSearch.toLowerCase())
+  );
 
   const pendingTasks = tasks?.filter(t => t.status === 'pending' || t.status === 'in_progress') || [];
   const completedTasks = tasks?.filter(t => t.status === 'completed') || [];
