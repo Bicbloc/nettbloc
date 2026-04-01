@@ -21,6 +21,7 @@ export default function GovernessAuth() {
   const [isSignup, setIsSignup] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isRequestingReset, setIsRequestingReset] = useState(false);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
