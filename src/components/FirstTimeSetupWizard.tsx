@@ -21,7 +21,8 @@ import {
   Sparkles,
   AlertCircle,
   MinusSquare,
-  PlusSquare
+  PlusSquare,
+  LogOut
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { CleaningConfig, getDefaultCleaningConfig } from '@/services/pdfService';
