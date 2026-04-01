@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { 
   CalendarIcon, Clock, MapPin, User, Send, Pencil, Save, X,
-  MessageCircle, CheckCheck, XCircle, Loader2
+  MessageCircle, CheckCheck, XCircle, Loader2, Bell, ShieldCheck
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
