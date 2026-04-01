@@ -52,6 +52,8 @@ export interface HousekeeperProfile {
   currentHotelId?: string;
 }
 
+export type AppPortal = 'establishment' | 'housekeeper' | 'governess' | 'technician';
+
 const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 class StorageService {
