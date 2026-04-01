@@ -27,7 +27,9 @@ import {
   Edit2,
   XCircle,
   AlertCircle,
-  User
+  User,
+  StopCircle,
+  PlayCircle
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -72,6 +74,7 @@ const VIEW_MODES = [
 ];
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
+  active: { label: 'En cours', color: 'bg-emerald-100 text-emerald-800', icon: PlayCircle },
   pending: { label: 'En attente', color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle },
   validated: { label: 'Validé', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   modified: { label: 'Modifié', color: 'bg-blue-100 text-blue-800', icon: Edit2 },
@@ -354,6 +357,99 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
     }
   };
 
+  // Handle end shift (admin stops a running timesheet)
+  const handleEndShift = async (timesheet: Timesheet) => {
+    if (!user?.id) return;
+
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('staff_timesheets')
+        .update({
+          end_time: now,
+          status: 'pending',
+          modified_at: now,
+          modified_by: user.id,
+          modified_by_name: currentUserName || 'Admin',
+          notes: (timesheet.notes ? timesheet.notes + '\n' : '') + `Fin de pointage par ${currentUserName || 'Admin'} le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}`,
+        })
+        .eq('id', timesheet.id);
+
+      if (error) throw error;
+
+      // Log to activity journal
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "timesheet_ended_by_admin",
+        description: `Pointage de ${timesheet.staff_name} clôturé par ${currentUserName || 'Admin'}`,
+        actor_name: currentUserName || 'Admin',
+        actor_type: 'admin',
+      }).then(() => {});
+
+      toast({
+        title: "Pointage clôturé",
+        description: `Le pointage de ${timesheet.staff_name} a été terminé par ${currentUserName}`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Erreur fin pointage:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de clôturer le pointage",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle end shift and validate in one step
+  const handleEndAndValidate = async (timesheet: Timesheet) => {
+    if (!user?.id) return;
+
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('staff_timesheets')
+        .update({
+          end_time: now,
+          status: 'validated',
+          validated_at: now,
+          validated_by: user.id,
+          validated_by_name: currentUserName || 'Admin',
+          modified_at: now,
+          modified_by: user.id,
+          modified_by_name: currentUserName || 'Admin',
+          notes: (timesheet.notes ? timesheet.notes + '\n' : '') + `Clôturé et validé par ${currentUserName || 'Admin'} le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}`,
+        })
+        .eq('id', timesheet.id);
+
+      if (error) throw error;
+
+      // Log to activity journal
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "timesheet_ended_validated",
+        description: `Pointage de ${timesheet.staff_name} clôturé et validé par ${currentUserName || 'Admin'}`,
+        actor_name: currentUserName || 'Admin',
+        actor_type: 'admin',
+      }).then(() => {});
+
+      toast({
+        title: "Pointage clôturé et validé",
+        description: `Le pointage de ${timesheet.staff_name} a été terminé et validé`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Erreur fin + validation:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de clôturer et valider le pointage",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Export to CSV
   const exportToCSV = () => {
     if (!timesheets || timesheets.length === 0) return;
@@ -435,17 +531,30 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
   };
 
   const staffSummary = groupByStaff();
-  const pendingCount = timesheets?.filter(t => t.status === 'pending').length || 0;
+  const pendingCount = timesheets?.filter(t => t.status === 'pending' || (!t.end_time && t.start_time)).length || 0;
+  const activeCount = timesheets?.filter(t => !t.end_time && t.start_time).length || 0;
 
   return (
     <div className="space-y-4">
       {/* Pending Alert */}
-      {pendingCount > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-yellow-600" />
-          <span className="text-sm text-yellow-800">
-            <strong>{pendingCount}</strong> pointage{pendingCount > 1 ? 's' : ''} en attente de validation
-          </span>
+      {(pendingCount > 0 || activeCount > 0) && (
+        <div className="space-y-2">
+          {activeCount > 0 && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
+              <PlayCircle className="h-5 w-5 text-emerald-600 animate-pulse" />
+              <span className="text-sm text-emerald-800">
+                <strong>{activeCount}</strong> pointage{activeCount > 1 ? 's' : ''} en cours — vous pouvez y mettre fin
+              </span>
+            </div>
+          )}
+          {timesheets?.filter(t => t.status === 'pending').length! > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                <strong>{timesheets?.filter(t => t.status === 'pending').length}</strong> pointage{(timesheets?.filter(t => t.status === 'pending').length || 0) > 1 ? 's' : ''} en attente de validation
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -599,11 +708,17 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                   </TableHeader>
                   <TableBody>
                     {timesheets.map(ts => {
-                      const statusInfo = STATUS_LABELS[ts.status] || STATUS_LABELS.pending;
+                      const isActive = !ts.end_time && !!ts.start_time;
+                      const effectiveStatus = isActive ? 'active' : ts.status;
+                      const statusInfo = STATUS_LABELS[effectiveStatus] || STATUS_LABELS.pending;
                       const StatusIcon = statusInfo.icon;
+                      const canValidate = effectiveStatus === 'pending' || effectiveStatus === 'modified';
                       
                       return (
-                        <TableRow key={ts.id} className={ts.status === 'pending' ? 'bg-yellow-50/50' : ''}>
+                        <TableRow key={ts.id} className={
+                          isActive ? 'bg-emerald-50/50' : 
+                          ts.status === 'pending' ? 'bg-yellow-50/50' : ''
+                        }>
                           <TableCell className="whitespace-nowrap">
                             {format(parseISO(ts.work_date), 'dd/MM', { locale: fr })}
                           </TableCell>
@@ -613,6 +728,12 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                                 {ts.staff_type === 'housekeeper' ? 'FdC' : ts.staff_type === 'governess' ? 'Gouv' : 'Tech'}
                               </Badge>
                               {ts.staff_name}
+                              {isActive && (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -627,15 +748,27 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span>{formatTime(ts.end_time)}</span>
-                              {ts.original_end_time && ts.original_end_time !== ts.end_time && (
-                                <span className="text-xs text-muted-foreground line-through">
-                                  {formatTime(ts.original_end_time)}
-                                </span>
+                              {isActive ? (
+                                <span className="text-emerald-600 font-medium">En cours...</span>
+                              ) : (
+                                <>
+                                  <span>{formatTime(ts.end_time)}</span>
+                                  {ts.original_end_time && ts.original_end_time !== ts.end_time && (
+                                    <span className="text-xs text-muted-foreground line-through">
+                                      {formatTime(ts.original_end_time)}
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{calculateDuration(ts.start_time, ts.end_time, ts.break_minutes)}</TableCell>
+                          <TableCell>
+                            {isActive ? (
+                              <span className="text-emerald-600 text-sm">⏱ actif</span>
+                            ) : (
+                              calculateDuration(ts.start_time, ts.end_time, ts.break_minutes)
+                            )}
+                          </TableCell>
                           <TableCell className="text-center">
                             <div className="flex flex-col items-center">
                               <span className="font-medium">{ts.rooms_cleaned || 0}</span>
@@ -660,34 +793,59 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(ts)}
-                                title="Modifier"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              {ts.status === 'pending' && (
+                              {isActive ? (
                                 <>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleValidate(ts)}
-                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    title="Valider"
+                                    onClick={() => handleEndShift(ts)}
+                                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                    title="Mettre fin au pointage"
                                   >
-                                    <CheckCircle className="h-4 w-4" />
+                                    <StopCircle className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleReject(ts)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    title="Rejeter"
+                                    onClick={() => handleEndAndValidate(ts)}
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    title="Clôturer et valider"
                                   >
-                                    <XCircle className="h-4 w-4" />
+                                    <CheckCircle className="h-4 w-4" />
                                   </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEdit(ts)}
+                                    title="Modifier"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  {canValidate && (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleValidate(ts)}
+                                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                        title="Valider"
+                                      >
+                                        <CheckCircle className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleReject(ts)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        title="Rejeter"
+                                      >
+                                        <XCircle className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>
