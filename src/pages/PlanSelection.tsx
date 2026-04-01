@@ -388,6 +388,15 @@ const PlanSelectionContent = () => {
           })}
         </div>
 
+        {/* Section téléphones dédiés */}
+        <div className="mt-12">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold">📱 Téléphones dédiés</h2>
+            <p className="text-muted-foreground">Équipez vos équipes avec des smartphones prêts à l'emploi</p>
+          </div>
+          <PhoneOrderSection />
+        </div>
+
         <div className="text-center mt-8">
           <Button variant="ghost" onClick={() => window.location.href = '/'}>
             Retour au tableau de bord
