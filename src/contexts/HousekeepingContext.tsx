@@ -64,6 +64,66 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
     }
   }, [isHotelReady, hotelId]);
 
+  // Realtime: écouter les nouvelles demandes d'accès pour notifier l'admin
+  useEffect(() => {
+    if (!hotelId || !addNotificationFn) return;
+
+    const channel = supabase
+      .channel(`access-requests-${hotelId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'housekeeper_access_requests',
+        filter: `hotel_id=eq.${hotelId}`
+      }, async (payload) => {
+        const request = payload.new as any;
+        if (request.status === 'pending') {
+          // Récupérer le nom du profil
+          const { data: profile } = await supabase
+            .from('housekeeper_profiles')
+            .select('name')
+            .eq('id', request.housekeeper_profile_id)
+            .single();
+          
+          const name = profile?.name || 'Inconnu';
+          await addNotificationFn({
+            title: `Nouvelle demande d'accès`,
+            description: `${name} demande à rejoindre votre établissement`,
+            type: 'access-request',
+            user_type: 'admin',
+          });
+        }
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'governess_access_requests',
+        filter: `hotel_id=eq.${hotelId}`
+      }, async (payload) => {
+        const request = payload.new as any;
+        if (request.status === 'pending') {
+          const { data: profile } = await supabase
+            .from('governess_profiles')
+            .select('name')
+            .eq('id', request.governess_profile_id)
+            .single();
+          
+          const name = profile?.name || 'Inconnu';
+          await addNotificationFn({
+            title: `Nouvelle demande d'accès (Gouvernante)`,
+            description: `${name} demande à rejoindre votre établissement`,
+            type: 'access-request',
+            user_type: 'admin',
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [hotelId, addNotificationFn]);
+
   // Synchronisation via Realtime — plus de polling
   // Les subscriptions Realtime sur rooms et housekeepers gèrent les mises à jour
 
