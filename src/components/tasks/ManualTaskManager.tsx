@@ -100,6 +100,24 @@ export function ManualTaskManager({
     priority: 'normal',
   });
 
+  // Fetch registered rooms/spaces for location selector
+  const { data: registeredRooms } = useQuery({
+    queryKey: ["registered-rooms-for-tasks", hotelId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hotel_rooms_registry")
+        .select("room_number, space_category")
+        .eq("hotel_id", hotelId)
+        .eq("is_active", true)
+        .order("room_number");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!hotelId,
+  });
+
+  const [showCustomLocation, setShowCustomLocation] = useState(false);
+
   // Fetch technicians from DB
   const { data: dbTechnicians } = useQuery({
     queryKey: ["technician-profiles-for-hotel", hotelId],
