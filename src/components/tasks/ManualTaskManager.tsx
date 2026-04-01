@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
@@ -81,6 +81,18 @@ const STATUS_CONFIG = {
   validated: { label: 'Validée', icon: CheckCheck, color: 'bg-green-100 text-green-700' },
 };
 
+const OTHER_LOCATION_VALUE = "__other_location__";
+
+const DEFAULT_NEW_TASK = {
+  title: '',
+  description: '',
+  location_type: 'room',
+  location_reference: '',
+  assigned_to_type: 'housekeeper',
+  assigned_to_name: '',
+  priority: 'normal',
+};
+
 export function ManualTaskManager({
   hotelId,
   housekeeperNames,
@@ -90,15 +102,7 @@ export function ManualTaskManager({
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showTemplatePopover, setShowTemplatePopover] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    location_type: 'room',
-    location_reference: '',
-    assigned_to_type: 'housekeeper',
-    assigned_to_name: '',
-    priority: 'normal',
-  });
+  const [newTask, setNewTask] = useState({ ...DEFAULT_NEW_TASK });
 
   // Fetch registered rooms/spaces for location selector
   const { data: registeredRooms } = useQuery({
@@ -117,6 +121,41 @@ export function ManualTaskManager({
   });
 
   const [showCustomLocation, setShowCustomLocation] = useState(false);
+
+  const registeredLocationOptions = useMemo(() => {
+    const uniqueRooms = new Map<string, { room_number: string; space_category: string | null }>();
+
+    (registeredRooms || []).forEach((room) => {
+      const roomNumber = room.room_number?.trim();
+
+      if (!roomNumber || uniqueRooms.has(roomNumber)) {
+        return;
+      }
+
+      uniqueRooms.set(roomNumber, {
+        room_number: roomNumber,
+        space_category: room.space_category,
+      });
+    });
+
+    return Array.from(uniqueRooms.values())
+      .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true, sensitivity: 'base' }))
+      .map((room) => ({
+        value: room.room_number,
+        label: room.space_category && room.space_category !== 'room'
+          ? `${room.room_number} — ${room.space_category}`
+          : room.room_number,
+      }));
+  }, [registeredRooms]);
+
+  const hasSelectedRegisteredLocation = registeredLocationOptions.some(
+    (option) => option.value === newTask.location_reference
+  );
+
+  const isCustomLocationSelected =
+    showCustomLocation ||
+    newTask.location_type === 'other' ||
+    (!!newTask.location_reference && !hasSelectedRegisteredLocation);
 
   // Fetch technicians from DB
   const { data: dbTechnicians } = useQuery({
@@ -148,6 +187,12 @@ export function ManualTaskManager({
 
   const queryClient = useQueryClient();
   const today = new Date().toISOString().split('T')[0];
+
+  const resetCreateTaskForm = () => {
+    setStaffSearch('');
+    setShowCustomLocation(false);
+    setNewTask({ ...DEFAULT_NEW_TASK });
+  };
 
   // Fetch today's tasks
   const { data: tasks, isLoading } = useQuery({
@@ -220,33 +265,21 @@ export function ManualTaskManager({
         created_by: user?.id || null,
       };
 
-      console.log('Creating task with data:', insertData);
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("manual_tasks")
-        .insert(insertData)
-        .select();
+        .insert(insertData);
 
       if (error) {
-        console.error('Task creation error:', error);
         throw error;
       }
-      console.log('Task created:', data);
-      return data;
+
+      return true;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["manual-tasks", hotelId] });
+      queryClient.invalidateQueries({ queryKey: ["manual-tasks", hotelId, today] });
       toast({ title: "Tâche créée" });
       setShowCreateDialog(false);
-      setStaffSearch('');
-      setNewTask({
-        title: '',
-        description: '',
-        location_type: 'room',
-        location_reference: '',
-        assigned_to_type: 'housekeeper',
-        assigned_to_name: '',
-        priority: 'normal',
-      });
+      resetCreateTaskForm();
     },
     onError: (error: any) => {
       console.error('Task creation failed:', error);
@@ -517,38 +550,48 @@ export function ManualTaskManager({
 
             <div className="space-y-2">
               <Label>Espace *</Label>
-              {registeredRooms && registeredRooms.length > 0 ? (
+              {registeredLocationOptions.length > 0 ? (
                 <>
-                  <ScrollArea className="h-[140px] border rounded-md p-2">
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {registeredRooms.map((room) => (
-                        <Button
-                          key={room.room_number}
-                          variant={newTask.location_reference === room.room_number && !showCustomLocation ? "default" : "outline"}
-                          size="sm"
-                          className="h-9 text-xs font-medium"
-                          onClick={() => {
-                            setNewTask({ ...newTask, location_type: 'room', location_reference: room.room_number });
-                            setShowCustomLocation(false);
-                          }}
-                        >
-                          {room.room_number}
-                        </Button>
-                      ))}
-                      <Button
-                        variant={showCustomLocation ? "default" : "outline"}
-                        size="sm"
-                        className="h-9 text-xs font-medium col-span-2"
-                        onClick={() => {
-                          setShowCustomLocation(true);
-                          setNewTask({ ...newTask, location_type: 'other', location_reference: '' });
-                        }}
-                      >
-                        📍 Autre
-                      </Button>
-                    </div>
-                  </ScrollArea>
-                  {showCustomLocation && (
+                  <Select
+                    value={isCustomLocationSelected ? OTHER_LOCATION_VALUE : hasSelectedRegisteredLocation ? newTask.location_reference : undefined}
+                    onValueChange={(value) => {
+                      if (value === OTHER_LOCATION_VALUE) {
+                        setShowCustomLocation(true);
+                        setNewTask((prev) => ({
+                          ...prev,
+                          location_type: 'other',
+                          location_reference: prev.location_type === 'other' ? prev.location_reference : '',
+                        }));
+                        return;
+                      }
+
+                      setShowCustomLocation(false);
+                      setNewTask((prev) => ({
+                        ...prev,
+                        location_type: 'room',
+                        location_reference: value,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner une chambre ou un espace" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Chambres et espaces enregistrés</SelectLabel>
+                        {registeredLocationOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectItem value={OTHER_LOCATION_VALUE}>Autre…</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {isCustomLocationSelected && (
                     <Input
                       placeholder="Préciser le lieu..."
                       value={newTask.location_reference}
@@ -652,7 +695,10 @@ export function ManualTaskManager({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowCreateDialog(false);
+              resetCreateTaskForm();
+            }}>
               Annuler
             </Button>
             <Button 
