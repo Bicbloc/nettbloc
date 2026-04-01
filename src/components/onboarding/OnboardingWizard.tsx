@@ -264,22 +264,16 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
               <LogOut className="h-4 w-4 mr-1" />
               Déconnexion
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setCurrentStep(prev => prev - 1)}
-              disabled={currentStep === 0}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Retour
-            </Button>
+            {currentStep > 0 && (
+              <Button
+                variant="ghost"
+                onClick={() => setCurrentStep(prev => prev - 1)}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Retour
+              </Button>
+            )}
           </div>
-            variant="ghost"
-            onClick={() => setCurrentStep(prev => prev - 1)}
-            disabled={currentStep === 0}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Retour
-          </Button>
 
           {currentStep < STEPS.length - 1 ? (
             <Button
