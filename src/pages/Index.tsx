@@ -23,7 +23,7 @@ import { LinkRoomsDialog } from "@/components/LinkRoomsDialog";
 import { cleanupInvalidHotelIds, generateHotelId } from "@/lib/utils";
 import { redistributeRooms } from "@/utils/redistributionUtils";
 import { storageService, type AppPortal } from "@/services/storageService";
-...
+
 const PORTAL_LABELS: Record<AppPortal, string> = {
   establishment: 'Établissement',
   housekeeper: 'Femme de chambre',
