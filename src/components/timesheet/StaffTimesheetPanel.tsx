@@ -537,12 +537,24 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
   return (
     <div className="space-y-4">
       {/* Pending Alert */}
-      {pendingCount > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-yellow-600" />
-          <span className="text-sm text-yellow-800">
-            <strong>{pendingCount}</strong> pointage{pendingCount > 1 ? 's' : ''} en attente de validation
-          </span>
+      {(pendingCount > 0 || activeCount > 0) && (
+        <div className="space-y-2">
+          {activeCount > 0 && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
+              <PlayCircle className="h-5 w-5 text-emerald-600 animate-pulse" />
+              <span className="text-sm text-emerald-800">
+                <strong>{activeCount}</strong> pointage{activeCount > 1 ? 's' : ''} en cours — vous pouvez y mettre fin
+              </span>
+            </div>
+          )}
+          {timesheets?.filter(t => t.status === 'pending').length! > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                <strong>{timesheets?.filter(t => t.status === 'pending').length}</strong> pointage{(timesheets?.filter(t => t.status === 'pending').length || 0) > 1 ? 's' : ''} en attente de validation
+              </span>
+            </div>
+          )}
         </div>
       )}
 
