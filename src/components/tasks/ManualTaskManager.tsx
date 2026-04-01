@@ -529,19 +529,49 @@ export function ManualTaskManager({
 
               <div className="space-y-2">
                 <Label>Personne</Label>
-                <Select
-                  value={newTask.assigned_to_name}
-                  onValueChange={(v) => setNewTask({ ...newTask, assigned_to_name: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAssigneeList().map(name => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  placeholder="Rechercher un nom..."
+                  value={newTask.assigned_to_name || staffSearch}
+                  onChange={(e) => {
+                    setStaffSearch(e.target.value);
+                    setNewTask({ ...newTask, assigned_to_name: '' });
+                  }}
+                />
+                {staffSearch && !newTask.assigned_to_name && (
+                  <ScrollArea className="max-h-[120px] border rounded-md">
+                    {filteredAssignees.length > 0 ? (
+                      filteredAssignees.map(name => (
+                        <Button
+                          key={name}
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-left h-auto py-2"
+                          onClick={() => {
+                            setNewTask({ ...newTask, assigned_to_name: name });
+                            setStaffSearch('');
+                          }}
+                        >
+                          {name}
+                        </Button>
+                      ))
+                    ) : (
+                      <p className="p-2 text-sm text-muted-foreground">Aucun résultat</p>
+                    )}
+                  </ScrollArea>
+                )}
+                {newTask.assigned_to_name && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{newTask.assigned_to_name}</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setNewTask({ ...newTask, assigned_to_name: '' })}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 
