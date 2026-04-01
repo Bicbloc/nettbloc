@@ -56,13 +56,19 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Update sub_account with invitation status
-    await supabase
+    const { error: subAccountUpdateError } = await supabase
       .from('sub_accounts')
       .update({ 
         invitation_status: 'pending',
-        invitation_code: invitationCode 
+        invitation_code: invitationCode,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', subAccountId);
+
+    if (subAccountUpdateError) {
+      console.error("Error updating sub-account invitation fields:", subAccountUpdateError);
+      throw new Error(`Failed to update sub-account invitation data: ${subAccountUpdateError.message}`);
+    }
 
     // Build activation URL - ALWAYS use production domain for emails
     const PRODUCTION_DOMAIN = "https://nettobloc.bicbloc.eu";
