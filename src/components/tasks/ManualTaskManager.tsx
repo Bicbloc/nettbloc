@@ -515,34 +515,56 @@ export function ManualTaskManager({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Type de lieu</Label>
-                <Select
-                  value={newTask.location_type}
-                  onValueChange={(v) => setNewTask({ ...newTask, location_type: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LOCATION_TYPES.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.icon} {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Référence lieu</Label>
+            <div className="space-y-2">
+              <Label>Espace *</Label>
+              {registeredRooms && registeredRooms.length > 0 ? (
+                <>
+                  <ScrollArea className="h-[140px] border rounded-md p-2">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {registeredRooms.map((room) => (
+                        <Button
+                          key={room.room_number}
+                          variant={newTask.location_reference === room.room_number && !showCustomLocation ? "default" : "outline"}
+                          size="sm"
+                          className="h-9 text-xs font-medium"
+                          onClick={() => {
+                            setNewTask({ ...newTask, location_type: 'room', location_reference: room.room_number });
+                            setShowCustomLocation(false);
+                          }}
+                        >
+                          {room.room_number}
+                        </Button>
+                      ))}
+                      <Button
+                        variant={showCustomLocation ? "default" : "outline"}
+                        size="sm"
+                        className="h-9 text-xs font-medium col-span-2"
+                        onClick={() => {
+                          setShowCustomLocation(true);
+                          setNewTask({ ...newTask, location_type: 'other', location_reference: '' });
+                        }}
+                      >
+                        📍 Autre
+                      </Button>
+                    </div>
+                  </ScrollArea>
+                  {showCustomLocation && (
+                    <Input
+                      placeholder="Préciser le lieu..."
+                      value={newTask.location_reference}
+                      onChange={(e) => setNewTask({ ...newTask, location_reference: e.target.value })}
+                      className="mt-2"
+                      autoFocus
+                    />
+                  )}
+                </>
+              ) : (
                 <Input
-                  placeholder={newTask.location_type === 'room' ? 'N° chambre' : 'Préciser...'}
+                  placeholder="Chambre ou lieu..."
                   value={newTask.location_reference}
-                  onChange={(e) => setNewTask({ ...newTask, location_reference: e.target.value })}
+                  onChange={(e) => setNewTask({ ...newTask, location_type: 'other', location_reference: e.target.value })}
                 />
-              </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
