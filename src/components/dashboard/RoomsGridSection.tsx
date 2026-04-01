@@ -175,6 +175,7 @@ export function RoomsGridSection({
                 onUpdate={onRoomUpdate}
                 hotelId={hotelId}
                 incidentCount={incidentCounts?.[room.number] || 0}
+                showActions={true}
               />
             ))}
           </div>
