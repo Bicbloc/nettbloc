@@ -452,7 +452,6 @@ export const TrainingStep3Validate = ({
                 </TableRow>
                 );
               })}
-              ))}
             </TableBody>
           </Table>
         </ScrollArea>
