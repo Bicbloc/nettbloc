@@ -85,6 +85,7 @@ export function AppSidebar({
 
   const renderItem = (item: NavItem) => {
     const isActive = activeTab === item.value;
+    const count = notificationCounts[item.value] || 0;
 
     if (isCollapsed) {
       return (
@@ -93,13 +94,18 @@ export function AppSidebar({
           variant={isActive ? "default" : "ghost"}
           size="icon"
           className={cn(
-            "w-full h-10",
+            "w-full h-10 relative",
             isActive && "bg-primary text-primary-foreground"
           )}
           onClick={() => onTabChange(item.value)}
           title={item.label}
         >
           {item.icon}
+          {count > 0 && (
+            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+              {count > 99 ? '99+' : count}
+            </span>
+          )}
         </Button>
       );
     }
@@ -119,7 +125,12 @@ export function AppSidebar({
       >
         {item.icon}
         <span className="flex-1 truncate">{item.label}</span>
-        {item.premium && !isPremium && (
+        {count > 0 && (
+          <Badge className="bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0 h-5 min-w-5 flex items-center justify-center">
+            {count > 99 ? '99+' : count}
+          </Badge>
+        )}
+        {item.premium && !isPremium && count === 0 && (
           <Badge variant="outline" className="text-[10px] px-1 py-0">PRO</Badge>
         )}
       </Button>
