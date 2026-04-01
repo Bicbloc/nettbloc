@@ -60,9 +60,7 @@ export function DashboardHeader({
             </Button>
 
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg">
-                <Building className="h-5 w-5 text-primary-foreground" />
-              </div>
+              <img src="/Nettobloc.png" alt="Nettobloc" className="h-10 w-10 rounded-xl object-contain" />
               <div className="hidden sm:block">
                 <h1 className="text-lg md:text-xl font-display font-bold tracking-tight">
                   Nettobloc
