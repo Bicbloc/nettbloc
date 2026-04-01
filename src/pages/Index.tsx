@@ -809,6 +809,14 @@ const IndexDashboard = () => {
             <TaskTemplateManager hotelId={currentHotelId} />
           )}
 
+          {/* Tickets Tab */}
+          {activeTab === 'tickets' && currentHotelId && (
+            <ManualTaskManager
+              hotelId={currentHotelId}
+              housekeeperNames={housekeeperNames}
+            />
+          )}
+
 
           {/* Inspections Tab */}
           {activeTab === 'inspections' && (
