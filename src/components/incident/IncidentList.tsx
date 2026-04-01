@@ -94,7 +94,19 @@ export function IncidentList({ hotelId }: IncidentListProps) {
       
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Log status change to activity journal
+      const incident = incidents?.find(i => i.id === variables.incidentId);
+      const statusLabels: Record<string, string> = { new: 'Nouveau', in_progress: 'En cours', resolved: 'Résolu' };
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "incident_status_change",
+        description: `Incident "${incident?.title || '?'}" → ${statusLabels[variables.status] || variables.status}`,
+        room_number: incident?.location_reference || null,
+        actor_name: 'Admin',
+        actor_type: 'admin',
+      }).then(() => {});
+
       queryClient.invalidateQueries({ queryKey: ["incidents", hotelId] });
       toast({ title: "Statut mis à jour" });
     },
