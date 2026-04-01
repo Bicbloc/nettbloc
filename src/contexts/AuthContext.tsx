@@ -125,6 +125,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else if (event === 'SIGNED_OUT') {
           stopTokenRefresh();
           storageService.clearHotel();
+          storageService.clearActivePortal();
           window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_OUT));
         }
       }
