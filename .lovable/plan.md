@@ -1,33 +1,25 @@
 
+## Fonctionnalité : Commande de téléphones dédiés (200€/unité)
 
-## Plan: Fix Client-Side Ticket Issues
+### 1. Base de données
+- Créer une table `phone_orders` avec : hotel_id, nombre de femmes de chambre, nombre de téléphones commandés, prix total, statut de suivi (5 statuts), numéro de tracking, adresse de livraison, dates
 
-### Problem Summary
-1. **Realtime notification error** — The `useNotifications` hook throws "Realtime non connecté" on page load because the RealtimeManager hasn't connected yet when the hook first runs. This causes console errors and delays notification updates.
-2. **Missing staff props** — In `Index.tsx`, the `ManualTaskManager` only receives `housekeeperNames` but not `governessNames` or `technicianNames`, so the assignee search only works for housekeepers from props (DB queries inside the component partially compensate).
-3. **Notification hook resilience** — When realtime fails, the hook should not show error toasts to users; it should silently fall back to polling.
+### 2. Image produit
+- Générer une image de smartphone avec coque rigide professionnelle
 
-### Changes
+### 3. Page Plan/Abonnement — Section téléphones
+- Ajouter une section dans la page de sélection de plan
+- Champ : nombre de femmes de chambre actives par jour
+- Calcul automatique : nb téléphones = nb femmes de chambre + 1 (urgence)
+- Affichage du prix total (nb × 200€)
+- Bouton commander (enregistre en base, facturé sur abonnement)
+- Affichage visuel du téléphone avec coque
 
-**1. Fix `useNotifications.ts` — Don't throw on realtime failure**
-- In `setupRealtime`, when `realtimeManager.connect()` returns `false`, start polling immediately instead of throwing and retrying 5 times. Remove the error toast on notification load failure (it's disruptive).
-- This eliminates the console error spam and ensures notifications still load via polling.
+### 4. Suivi client
+- Section "Mes commandes" visible côté client
+- 5 statuts : En attente de paiement → Confirmé → En préparation → Expédié → Livré
 
-**2. Pass all staff names to `ManualTaskManager` in `Index.tsx`**
-- Pass `governessNames` and `technicianNames` props to the ManualTaskManager component in the tickets tab. These lists should already be available from existing queries or can be derived from the same data source used elsewhere in the dashboard.
-
-**3. Add `manual_tasks` to RealtimeManager subscriptions**
-- In `RealtimeManager.ts`, add `'manual_tasks'` to the `tables` array (line 267) so ticket changes trigger real-time UI updates on the client side.
-
-### Technical Details
-
-**File: `src/hooks/use-notifications.ts`**
-- Replace `throw new Error('Realtime non connecté')` with a silent fallback to `startPolling()`.
-- Remove the destructive toast in the `catch` block of `loadNotifications`.
-
-**File: `src/pages/Index.tsx`**
-- Add `governessNames` and `technicianNames` props to the `<ManualTaskManager>` component around line 814-817.
-
-**File: `src/services/RealtimeManager.ts`**
-- Add `'manual_tasks'` to the tables array at line 267.
-
+### 5. Admin — Gestion des commandes
+- Nouvelle section dans le panel admin pour voir toutes les commandes
+- Possibilité de changer le statut de suivi
+- Vue d'ensemble des commandes par hôtel
