@@ -531,7 +531,8 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
   };
 
   const staffSummary = groupByStaff();
-  const pendingCount = timesheets?.filter(t => t.status === 'pending').length || 0;
+  const pendingCount = timesheets?.filter(t => t.status === 'pending' || (!t.end_time && t.start_time)).length || 0;
+  const activeCount = timesheets?.filter(t => !t.end_time && t.start_time).length || 0;
 
   return (
     <div className="space-y-4">
