@@ -22,6 +22,7 @@ interface MainLayoutProps {
   currentHotelId: string | null;
   subscriptionLoading: boolean;
   onStartWorkflow: () => void;
+  notificationCounts?: Partial<Record<TabValue, number>>;
 }
 
 export function MainLayout({
@@ -36,7 +37,8 @@ export function MainLayout({
   hotelCode,
   currentHotelId,
   subscriptionLoading,
-  onStartWorkflow
+  onStartWorkflow,
+  notificationCounts
 }: MainLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -66,6 +68,7 @@ export function MainLayout({
             isPremium={isPremium}
             isCollapsed={isSidebarCollapsed}
             onCollapsedChange={setIsSidebarCollapsed}
+            notificationCounts={notificationCounts}
           />
 
           {/* Main Content */}

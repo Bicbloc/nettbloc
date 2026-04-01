@@ -92,8 +92,9 @@ export const HousekeepingProvider: React.FC<HousekeepingProviderProps> = ({ chil
   useEffect(() => {
     if (isInitialized && housekeeperNames.length > 0) {
       HotelSessionService.updateHousekeeperNames(housekeeperNames);
-      // Créer automatiquement les femmes de chambre dans la base de données
-      syncHousekeepersToDatabase();
+      // NOTE: Ne plus appeler syncHousekeepersToDatabase ici car refreshHousekeepers
+      // ajoute des noms depuis la BD ce qui re-déclenche cet effect et crée des doublons.
+      // La création se fait uniquement via HousekeeperManagement ou handleApproveRequest.
     }
   }, [housekeeperNames, isInitialized]);
 
