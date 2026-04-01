@@ -701,6 +701,7 @@ const IndexDashboard = () => {
         currentHotelId={currentHotelId}
         subscriptionLoading={subscriptionLoading}
         onStartWorkflow={() => setActiveTab('overview')}
+        notificationCounts={notificationCounts}
       >
         {/* Trial expiry banner */}
         {trialWarningLevel > 0 && (
