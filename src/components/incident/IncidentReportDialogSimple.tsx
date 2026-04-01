@@ -329,6 +329,16 @@ export function IncidentReportDialogSimple({
       return incident;
     },
     onSuccess: async (incident) => {
+      // Log to activity journal
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "incident_created",
+        description: `Incident signalé: ${incident.title} (Chambre ${incident.location_reference})`,
+        room_number: incident.location_reference,
+        actor_name: userType === 'admin' ? 'Admin' : 'Utilisateur',
+        actor_type: userType,
+      }).then(() => {});
+
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
       toast({
         title: "✅ Incident signalé",

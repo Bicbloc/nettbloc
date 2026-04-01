@@ -384,6 +384,16 @@ export function LostItemReportWizard({
       if (error) throw error;
     },
     onSuccess: () => {
+      // Log to activity journal
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "lost_item_reported",
+        description: `Objet trouvé signalé: ${objectDescription} (${locationType === 'room' ? 'Chambre ' + roomNumber : locationType})`,
+        room_number: locationType === 'room' ? roomNumber : null,
+        actor_name: reporterName,
+        actor_type: reporterType,
+      }).then(() => {});
+
       toast({
         title: "✅ Objet signalé",
         description: "L'objet trouvé a été enregistré avec succès.",

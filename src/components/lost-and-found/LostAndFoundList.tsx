@@ -143,7 +143,19 @@ export function LostAndFoundList({ hotelId }: LostAndFoundListProps) {
 
       if (historyError) throw historyError;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Log to activity journal
+      const item = items?.find(i => i.id === variables.itemId);
+      const statusLabel = STATUS_OPTIONS.find(s => s.value === variables.newStatus)?.label || variables.newStatus;
+      supabase.from("daily_action_logs").insert({
+        hotel_id: hotelId,
+        action_type: "lost_item_status_change",
+        description: `Objet trouvé "${item?.object_description || '?'}" → ${statusLabel}`,
+        room_number: item?.room_number || null,
+        actor_name: 'Admin',
+        actor_type: 'admin',
+      }).then(() => {});
+
       toast({
         title: "Statut mis à jour",
         description: "Le statut a été modifié avec succès.",
