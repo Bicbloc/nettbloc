@@ -390,12 +390,19 @@ export const TrainingStep3Validate = ({
                 <TableHead className="w-20">Chambre</TableHead>
                 <TableHead className="w-28">Nettoyage</TableHead>
                 <TableHead>Statut</TableHead>
+                <TableHead>Dates</TableHead>
                 <TableHead>Client</TableHead>
+                <TableHead className="w-16">Simil.</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedRooms.map(({ room, index }) => (
+              {sortedRooms.map(({ room, index }) => {
+                const sig = getRoomSignature(room);
+                const similarCount = rooms.filter((r, i) => i !== index && getRoomSignature(r) === sig).length;
+                const dateInfo = [room.arrivalDate, room.departureDate].filter(Boolean).join(' → ');
+                
+                return (
                 <TableRow key={index} className={!room.validated ? 'opacity-50' : ''}>
                   <TableCell>
                     <Checkbox
@@ -424,8 +431,18 @@ export const TrainingStep3Validate = ({
                       {room.status || '-'}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-xs truncate max-w-[100px]">
+                    {dateInfo || '-'}
+                  </TableCell>
                   <TableCell className="text-xs truncate max-w-[120px]">
                     {room.guestName || '-'}
+                  </TableCell>
+                  <TableCell className="text-xs text-center">
+                    {similarCount > 0 && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        +{similarCount}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeRoom(index)}>
@@ -433,6 +450,8 @@ export const TrainingStep3Validate = ({
                     </Button>
                   </TableCell>
                 </TableRow>
+                );
+              })}
               ))}
             </TableBody>
           </Table>
