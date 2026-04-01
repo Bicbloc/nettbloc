@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHotel } from '@/contexts/HotelContext';
 import { useHousekeeperAuth } from '@/contexts/HousekeeperAuthContext';
+import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ const RoomRegistry = () => {
   const navigate = useNavigate();
   const { hotelId: ownerHotelId, hotelName: ownerHotelName, isLoading: hotelContextLoading } = useHotel();
   const { currentHotelSession, loading: housekeeperLoading } = useHousekeeperAuth();
+  const { currentHotelSession: techHotelSession, loading: techLoading } = useTechnicianAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,10 +62,19 @@ const RoomRegistry = () => {
   const [viewMode, setViewMode] = useState<'plan' | 'table' | 'grid'>('plan');
 
   const activeHotel = useMemo(() => {
+    // Check housekeeper session first
     if (currentHotelSession?.hotel_id) {
       return {
         id: currentHotelSession.hotel_id,
         name: currentHotelSession.hotel?.name ?? null,
+      };
+    }
+
+    // Check technician session
+    if (techHotelSession?.hotel_id) {
+      return {
+        id: techHotelSession.hotel_id,
+        name: techHotelSession.hotel_name ?? null,
       };
     }
 
@@ -75,10 +86,10 @@ const RoomRegistry = () => {
       id: ownerHotelId,
       name: ownerHotelName,
     };
-  }, [currentHotelSession, ownerHotelId, ownerHotelName]);
+  }, [currentHotelSession, techHotelSession, ownerHotelId, ownerHotelName]);
 
   const activeHotelId = activeHotel?.id;
-  const isResolvingHotel = (housekeeperLoading || hotelContextLoading) && !activeHotelId;
+  const isResolvingHotel = (housekeeperLoading || hotelContextLoading || techLoading) && !activeHotelId;
 
   const { data: rooms, isLoading } = useQuery({
     queryKey: ['rooms-registry', activeHotelId],

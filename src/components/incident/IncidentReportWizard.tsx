@@ -222,12 +222,51 @@ export function IncidentReportWizard({
     },
   });
 
-  // Handle image selection
+  // Handle image selection - auto-trigger analysis after capture
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedImage(file);
       setImagePreview(URL.createObjectURL(file));
+      // Auto-trigger AI analysis after photo capture (important for APK/mobile)
+      setTimeout(() => {
+        analyzeImageWithFile(file);
+      }, 300);
+    }
+  };
+
+  // Analyze with explicit file param (for auto-trigger after capture)
+  const analyzeImageWithFile = async (file: File) => {
+    setIsAnalyzing(true);
+    setCurrentStep('analysis');
+    
+    try {
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke('recognize-incident-item', {
+        body: { imageBase64: base64.split(',')[1] }
+      });
+
+      if (error) throw error;
+
+      if (data) {
+        setAiSuggestion(data);
+        applyAiSuggestions(data);
+      }
+    } catch (error) {
+      console.error('Erreur analyse IA:', error);
+      toast({
+        title: "Analyse IA indisponible",
+        description: "Vous pouvez remplir le formulaire manuellement",
+        variant: "default",
+      });
+    } finally {
+      setIsAnalyzing(false);
+      setCurrentStep('location');
     }
   };
 
@@ -662,7 +701,7 @@ export function IncidentReportWizard({
                       <p className="text-sm text-muted-foreground mt-1">
                         L'IA identifiera automatiquement le problème
                       </p>
-                      <Input
+                      <input
                         type="file"
                         accept="image/*"
                         capture="environment"
