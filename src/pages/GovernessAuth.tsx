@@ -146,18 +146,7 @@ export default function GovernessAuth() {
     setIsLoading(true);
 
     try {
-      // Vérifier que l'email est bien un compte gouvernante
-      const accessCheck = await validateUserAccessToInterface(email, 'governess');
-      if (!accessCheck.allowed && accessCheck.correctInterface) {
-        toast({
-          variant: "destructive",
-          title: "Mauvaise interface",
-          description: getRedirectMessage(accessCheck.correctInterface, 'fr')
-        });
-        setIsLoading(false);
-        return;
-      }
-
+      // Connexion d'abord, vérification du profil ensuite
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
