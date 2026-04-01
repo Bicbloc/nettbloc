@@ -84,7 +84,7 @@ export function RoomCard({
     
     const interval = setInterval(() => {
       setTick(t => t + 1);
-    }, 60000); // Update every minute
+    }, 30000); // Update every 30 seconds
     
     return () => clearInterval(interval);
   }, [room.status, room.cleaningStartedAt]);
