@@ -10,134 +10,15 @@ import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
-
-export default function TechnicianLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
-  const [isRequestingReset, setIsRequestingReset] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { signIn } = useTechnicianAuth();
-
-  // Detect recovery mode from URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const hash = window.location.hash;
-
-    if (code) {
-      // PKCE flow - exchange code for session
-      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
-        if (!error && data.session) {
-          setIsRecoveryMode(true);
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      });
-    } else if (hash.includes('type=recovery')) {
-      setIsRecoveryMode(true);
-    }
-  }, []);
-
-  const handlePasswordReset = async () => {
-    if (!email) {
-      toast({
-        variant: "destructive",
-        title: "Email requis",
-        description: "Veuillez entrer votre email"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabaseRecovery.auth.resetPasswordForEmail(email, {
-        redirectTo: PASSWORD_RESET_URL,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Email envoyé !",
-        description: "Vérifiez votre boîte de réception pour le lien de réinitialisation"
-      });
-      setIsRequestingReset(false);
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdatePassword = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Mot de passe trop court",
-        description: "Le mot de passe doit contenir au moins 6 caractères"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-
-      if (error) throw error;
-
-      toast({
-        title: "Mot de passe mis à jour !",
-        description: "Vous pouvez maintenant vous connecter avec votre nouveau mot de passe"
-      });
-      setIsRecoveryMode(false);
-      setNewPassword('');
-    } catch (error: any) {
-      console.error('Update password error:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: error.message
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!email.trim() || !password.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Champs requis",
-        description: "Veuillez remplir tous les champs"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { error } = await signIn(email, password);
-
-      if (error) throw error;
-
+import { storageService } from '@/services/storageService';
+...
       toast({
         title: "Connexion réussie ! ✅",
         description: "Bienvenue"
       });
 
-      navigate('/technician/hotels');
+      storageService.saveActivePortal('technician');
+      navigate('/technician/hotels', { replace: true });
     } catch (error: any) {
       console.error('Erreur connexion:', error);
       toast({
