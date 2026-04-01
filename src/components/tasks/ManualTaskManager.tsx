@@ -530,7 +530,7 @@ export function ManualTaskManager({
                   Validées ({validatedTasks.length})
                 </h4>
                 {validatedTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} />
+                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} onView={() => setSelectedTask(task)} />
                 ))}
               </div>
             )}
