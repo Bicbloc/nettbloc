@@ -183,7 +183,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { error: subUpdateError } = await supabase
       .from("sub_accounts")
       .update({
-        user_id: userId,
+        user_id: resolvedUserId,
         invitation_status: "active",
         is_active: true,
         updated_at: now,
@@ -197,7 +197,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // 4. Create profile
     const { error: profileError } = await supabase.from("profiles").upsert({
-      id: userId,
+      id: resolvedUserId,
       email: subAccount.email,
       current_hotel_id: subAccount.hotel_id,
       onboarding_completed_at: now,
@@ -206,7 +206,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (profileError) {
       console.error("Failed to create profile:", profileError);
-      // Non-blocking - continue
     }
 
     // 5. Mark invitation as accepted
@@ -225,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     return jsonResponse({
       success: true,
-      userId,
+      userId: resolvedUserId,
       hotel: hotel ? { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } : null,
     });
   } catch (error) {
