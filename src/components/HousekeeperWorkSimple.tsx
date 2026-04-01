@@ -381,8 +381,22 @@ const HousekeeperWorkContent: React.FC = () => {
           .eq('completion_date', today);
         
         const completedIds = new Set(completions?.map(c => c.task_template_id) || []);
-        const pendingTasks = todaysTasks.filter(t => !completedIds.has(t.id));
-        setPendingTasksCount(pendingTasks.length);
+        const pendingTemplates = todaysTasks.filter(t => !completedIds.has(t.id)).length;
+        
+        // Also count pending manual tasks (tickets)
+        const { data: manualTasks } = await supabase
+          .from('manual_tasks')
+          .select('id, status, assigned_to_name')
+          .eq('hotel_id', hotelId)
+          .eq('task_date', today)
+          .eq('assigned_to_type', 'housekeeper')
+          .in('status', ['pending', 'in_progress']);
+        
+        const pendingManual = (manualTasks || []).filter(t => 
+          !t.assigned_to_name || t.assigned_to_name === housekeeperProfile?.name
+        ).length;
+        
+        setPendingTasksCount(pendingTemplates + pendingManual);
       }
       
       // Charger les instructions
