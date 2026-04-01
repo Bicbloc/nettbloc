@@ -161,6 +161,8 @@ function TechnicianDashboardContent() {
         </div>
       </div>
 
+      <StaffNotificationBanner hotelId={currentHotelSession.hotel_id} />
+
       {/* Content */}
       <div className="px-4 py-4 space-y-4">
         {activeTab === 'incidents' && (
