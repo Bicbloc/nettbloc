@@ -60,6 +60,25 @@ import { ManualTaskManager } from "@/components/tasks/ManualTaskManager";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
+const LogoutButton = () => {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-destructive hover:text-destructive mt-4"
+      onClick={async () => {
+        await signOut();
+        navigate('/auth', { replace: true });
+      }}
+    >
+      <LogOut className="h-4 w-4 mr-1" />
+      Déconnexion
+    </Button>
+  );
+};
+
 const Index = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loading: authLoading, isInitialized, user } = useAuth();
