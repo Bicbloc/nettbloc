@@ -705,7 +705,7 @@ function TaskCard({
             {task.location_reference && (
               <span className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
-                {locationType?.icon} {task.location_reference}
+                {locationLabel} {task.location_reference}
               </span>
             )}
             {task.assigned_to_name && (
