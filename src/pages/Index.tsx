@@ -56,6 +56,7 @@ import { HotelSelectionDialog } from "@/components/dashboard/HotelSelectionDialo
 import { GovernessInspectionInterface } from "@/components/governess/GovernessInspectionInterface";
 import { LostAndFoundTab } from "@/components/dashboard/LostAndFoundTab";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
+import { ManualTaskManager } from "@/components/tasks/ManualTaskManager";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
