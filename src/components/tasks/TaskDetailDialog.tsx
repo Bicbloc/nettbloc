@@ -70,6 +70,8 @@ interface TaskDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   onValidate?: (taskId: string) => void;
   onReject?: (taskId: string) => void;
+  onRemind?: (task: Task) => void;
+  onAdminResolve?: (taskId: string) => void;
 }
 
 export function TaskDetailDialog({ 
