@@ -29,7 +29,9 @@ import {
   Search,
   ChevronsUpDown,
   Check,
-  Eye
+  Eye,
+  Bell,
+  ShieldCheck
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -369,6 +371,48 @@ export function ManualTaskManager({
     },
   });
 
+  // Push reminder mutation
+  const sendReminder = useMutation({
+    mutationFn: async (task: Task) => {
+      if (!task.assigned_to_name) throw new Error("Pas d'assigné");
+      const { error } = await supabase.from("notifications").insert({
+        hotel_id: hotelId,
+        title: `🔔 Rappel : ${task.title}`,
+        description: `Merci de traiter ce ticket rapidement.`,
+        type: 'task_reminder',
+        user_type: task.assigned_to_type === 'housekeeper' ? 'housekeeper' : task.assigned_to_type,
+        housekeeper_name: task.assigned_to_name,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Rappel envoyé", description: "La notification a été envoyée au staff." });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Erreur d'envoi du rappel" });
+    },
+  });
+
+  // Admin resolve (mark as validated directly)
+  const adminResolve = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from("manual_tasks")
+        .update({
+          status: 'validated',
+          validated_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          completed_by_name: 'Admin',
+        })
+        .eq("id", taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manual-tasks", hotelId] });
+      toast({ title: "Ticket marqué comme résolu ✅" });
+    },
+  });
+
   const getAssigneeList = () => {
     switch (newTask.assigned_to_type) {
       case 'housekeeper':
@@ -497,7 +541,14 @@ export function ManualTaskManager({
                   En attente ({pendingTasks.length})
                 </h4>
                 {pendingTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onDelete={() => deleteTask.mutate(task.id)} onView={() => setSelectedTask(task)} />
+                  <TaskCard 
+                    key={task.id} 
+                    task={task} 
+                    onDelete={() => deleteTask.mutate(task.id)} 
+                    onView={() => setSelectedTask(task)}
+                    onRemind={task.assigned_to_name ? () => sendReminder.mutate(task) : undefined}
+                    onAdminResolve={() => adminResolve.mutate(task.id)}
+                  />
                 ))}
               </div>
             )}
@@ -727,6 +778,8 @@ export function ManualTaskManager({
         onOpenChange={(open) => { if (!open) setSelectedTask(null); }}
         onValidate={(id) => { validateTask.mutate(id); setSelectedTask(null); }}
         onReject={(id) => { rejectTask.mutate(id); setSelectedTask(null); }}
+        onRemind={(t) => { sendReminder.mutate(t); }}
+        onAdminResolve={(id) => { adminResolve.mutate(id); setSelectedTask(null); }}
       />
     </div>
   );
@@ -739,12 +792,16 @@ function TaskCard({
   onReject,
   onDelete,
   onView,
+  onRemind,
+  onAdminResolve,
 }: { 
   task: Task; 
   onValidate?: () => void;
   onReject?: () => void;
   onDelete: () => void;
   onView?: () => void;
+  onRemind?: () => void;
+  onAdminResolve?: () => void;
 }) {
   const statusConfig = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
   const priorityConfig = PRIORITIES.find(p => p.value === task.priority) || PRIORITIES[1];
@@ -790,8 +847,18 @@ function TaskCard({
 
         <div className="flex items-center gap-1">
           {onView && (
-            <Button size="icon" variant="ghost" className="text-primary" onClick={onView}>
+            <Button size="icon" variant="ghost" className="text-primary" onClick={onView} title="Voir détails">
               <Eye className="h-4 w-4" />
+            </Button>
+          )}
+          {onRemind && (task.status === 'pending' || task.status === 'in_progress') && (
+            <Button size="icon" variant="ghost" className="text-amber-500" onClick={onRemind} title="Envoyer un rappel">
+              <Bell className="h-4 w-4" />
+            </Button>
+          )}
+          {onAdminResolve && task.status !== 'validated' && (
+            <Button size="icon" variant="ghost" className="text-green-600" onClick={onAdminResolve} title="Marquer résolu">
+              <ShieldCheck className="h-4 w-4" />
             </Button>
           )}
           {task.status === 'completed' && onValidate && (
