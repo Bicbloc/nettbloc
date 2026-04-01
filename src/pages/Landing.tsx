@@ -9,7 +9,7 @@ import {
   Sparkles, Zap, Globe, ArrowRight, CheckCircle, Brain, Eye,
   LayoutDashboard, Package, Mail, ChevronDown, Star, Clock,
   Smartphone, MousePointerClick, Bot, Search, ShieldCheck, Brush,
-  Settings, Award, MessageSquareQuote, Building2, Hotel, Crown
+  Settings, Award, MessageSquareQuote, Building2, Hotel, Crown, Download
 } from 'lucide-react';
 
 const t = {
@@ -23,6 +23,7 @@ const t = {
       subtitle: 'Nettobloc est le premier outil intelligent jamais conçu pour la gestion complète du housekeeping hôtelier. Simple. Rapide. Révolutionnaire.',
       cta: 'Commencer gratuitement',
       ctaSecondary: 'Découvrir les fonctionnalités',
+      ctaDownload: 'Télécharger l\'application Android',
       stats: [
         { value: '10x', label: 'Plus rapide' },
         { value: '1 clic', label: 'Répartition' },
@@ -159,6 +160,7 @@ const t = {
       subtitle: 'Nettobloc is the first intelligent tool ever designed for complete hotel housekeeping management. Simple. Fast. Revolutionary.',
       cta: 'Get started for free',
       ctaSecondary: 'Discover features',
+      ctaDownload: 'Download Android App',
       stats: [
         { value: '10x', label: 'Faster' },
         { value: '1 click', label: 'Distribution' },
@@ -444,6 +446,13 @@ const Landing = () => {
             <Button size="lg" variant="outline" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-base px-8 py-6 gap-2">
               {c.hero.ctaSecondary}<ChevronDown className="w-5 h-5" />
             </Button>
+            <a href="/downloads/nettbloc.apk" download className="inline-flex">
+              <Button size="lg" variant="outline" className="text-base px-8 py-6 gap-2 border-green-500/50 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950">
+                <Download className="w-5 h-5" />
+                {c.hero.ctaDownload}
+                <Smartphone className="w-4 h-4" />
+              </Button>
+            </a>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
             {c.hero.stats.map((stat, i) => (
