@@ -21,6 +21,7 @@ import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { DailyInstructionsBanner } from './housekeeper/DailyInstructionsBanner';
 import { StaffTasksList } from './tasks/StaffTasksList';
 import { ReadOnlyFloorPlan } from './registry/ReadOnlyFloorPlan';
+import { StaffNotificationBanner, dispatchStaffNotification } from './housekeeper/StaffNotificationBanner';
 
 interface Room {
   id: string;
@@ -442,6 +443,7 @@ const HousekeeperWorkContent: React.FC = () => {
         if (isForMe(newRecord)) {
           loadWorkDataRef.current();
           addToActivityLog(`🆕 Nouvelle chambre assignée par le responsable`, 'info');
+          dispatchStaffNotification('🆕 Nouvelle chambre', 'Une chambre vous a été assignée par le responsable');
           setNewRoomsCount(prev => prev + 1);
           setTimeout(() => setNewRoomsCount(0), 5000);
         }
@@ -913,6 +915,9 @@ const HousekeeperWorkContent: React.FC = () => {
         onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
         onLogout={handleLogout}
       />
+
+      {/* Notification banner compacte et glissable */}
+      <StaffNotificationBanner hotelId={hotelId || undefined} />
 
       {showActivityLog && (
         <HousekeeperActivityLog entries={activityLog} onClose={() => setShowActivityLog(false)} />

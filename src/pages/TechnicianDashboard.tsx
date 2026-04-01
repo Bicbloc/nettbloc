@@ -14,6 +14,7 @@ import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 import { cn } from '@/lib/utils';
 
 type TechTab = 'incidents' | 'tasks' | 'instructions' | 'report';
@@ -159,6 +160,8 @@ function TechnicianDashboardContent() {
           </div>
         </div>
       </div>
+
+      <StaffNotificationBanner hotelId={currentHotelSession.hotel_id} />
 
       {/* Content */}
       <div className="px-4 py-4 space-y-4">

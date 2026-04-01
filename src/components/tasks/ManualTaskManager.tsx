@@ -65,14 +65,7 @@ interface TaskTemplate {
   is_one_time: boolean;
 }
 
-const LOCATION_TYPES = [
-  { value: 'room', label: 'Chambre', icon: '🛏️' },
-  { value: 'corridor', label: 'Couloir', icon: '🚪' },
-  { value: 'lobby', label: 'Lobby', icon: '🏨' },
-  { value: 'restaurant', label: 'Restaurant', icon: '🍽️' },
-  { value: 'spa', label: 'Spa/Piscine', icon: '🏊' },
-  { value: 'other', label: 'Autre', icon: '📍' },
-];
+// Removed LOCATION_TYPES - now using registered rooms from hotel_rooms_registry
 
 const PRIORITIES = [
   { value: 'low', label: 'Faible', color: 'bg-gray-100 text-gray-700' },
@@ -106,6 +99,24 @@ export function ManualTaskManager({
     assigned_to_name: '',
     priority: 'normal',
   });
+
+  // Fetch registered rooms/spaces for location selector
+  const { data: registeredRooms } = useQuery({
+    queryKey: ["registered-rooms-for-tasks", hotelId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hotel_rooms_registry")
+        .select("room_number, space_category")
+        .eq("hotel_id", hotelId)
+        .eq("is_active", true)
+        .order("room_number");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!hotelId,
+  });
+
+  const [showCustomLocation, setShowCustomLocation] = useState(false);
 
   // Fetch technicians from DB
   const { data: dbTechnicians } = useQuery({
@@ -504,34 +515,56 @@ export function ManualTaskManager({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Type de lieu</Label>
-                <Select
-                  value={newTask.location_type}
-                  onValueChange={(v) => setNewTask({ ...newTask, location_type: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LOCATION_TYPES.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.icon} {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Référence lieu</Label>
+            <div className="space-y-2">
+              <Label>Espace *</Label>
+              {registeredRooms && registeredRooms.length > 0 ? (
+                <>
+                  <ScrollArea className="h-[140px] border rounded-md p-2">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {registeredRooms.map((room) => (
+                        <Button
+                          key={room.room_number}
+                          variant={newTask.location_reference === room.room_number && !showCustomLocation ? "default" : "outline"}
+                          size="sm"
+                          className="h-9 text-xs font-medium"
+                          onClick={() => {
+                            setNewTask({ ...newTask, location_type: 'room', location_reference: room.room_number });
+                            setShowCustomLocation(false);
+                          }}
+                        >
+                          {room.room_number}
+                        </Button>
+                      ))}
+                      <Button
+                        variant={showCustomLocation ? "default" : "outline"}
+                        size="sm"
+                        className="h-9 text-xs font-medium col-span-2"
+                        onClick={() => {
+                          setShowCustomLocation(true);
+                          setNewTask({ ...newTask, location_type: 'other', location_reference: '' });
+                        }}
+                      >
+                        📍 Autre
+                      </Button>
+                    </div>
+                  </ScrollArea>
+                  {showCustomLocation && (
+                    <Input
+                      placeholder="Préciser le lieu..."
+                      value={newTask.location_reference}
+                      onChange={(e) => setNewTask({ ...newTask, location_reference: e.target.value })}
+                      className="mt-2"
+                      autoFocus
+                    />
+                  )}
+                </>
+              ) : (
                 <Input
-                  placeholder={newTask.location_type === 'room' ? 'N° chambre' : 'Préciser...'}
+                  placeholder="Chambre ou lieu..."
                   value={newTask.location_reference}
-                  onChange={(e) => setNewTask({ ...newTask, location_reference: e.target.value })}
+                  onChange={(e) => setNewTask({ ...newTask, location_type: 'other', location_reference: e.target.value })}
                 />
-              </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -656,7 +689,7 @@ function TaskCard({
 }) {
   const statusConfig = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
   const priorityConfig = PRIORITIES.find(p => p.value === task.priority) || PRIORITIES[1];
-  const locationType = LOCATION_TYPES.find(l => l.value === task.location_type);
+  const locationLabel = task.location_type === 'room' ? '🛏️' : '📍';
 
   return (
     <Card className="p-3">
@@ -672,7 +705,7 @@ function TaskCard({
             {task.location_reference && (
               <span className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
-                {locationType?.icon} {task.location_reference}
+                {locationLabel} {task.location_reference}
               </span>
             )}
             {task.assigned_to_name && (
