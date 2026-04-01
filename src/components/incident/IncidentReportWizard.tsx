@@ -41,7 +41,8 @@ import {
   Tag,
   Users,
   Search,
-  Layers
+  Layers,
+  RefreshCw
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
