@@ -585,9 +585,15 @@ export function RoomCard({
         </div>
       </div>
       
-      {/* Display housekeeper notes/comments */}
-      {room.notes && (
-        <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-md">
+      {/* Display housekeeper notes/comments - clickable to edit */}
+      {room.notes ? (
+        <button 
+          className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-md w-full text-left hover:bg-purple-100 transition-colors cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowNoteDialog(true);
+          }}
+        >
           <div className="flex items-start gap-2">
             <span className="text-lg">💬</span>
             <div>
@@ -595,7 +601,18 @@ export function RoomCard({
               <p className="text-sm text-purple-700 mt-1">{room.notes}</p>
             </div>
           </div>
-        </div>
+        </button>
+      ) : (
+        <button
+          className="mb-3 flex items-center gap-2 text-sm text-muted-foreground hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-md transition-colors w-full"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowNoteDialog(true);
+          }}
+        >
+          <MessageSquare className="h-4 w-4" />
+          {t.rooms.addComment}
+        </button>
       )}
       
       {/* Display remark if present */}
@@ -786,6 +803,18 @@ export function RoomCard({
           onOpenChange={setShowIncidentsDialog}
           hotelId={hotelId}
           roomNumber={room.number}
+        />
+      )}
+
+      {showNoteDialog && hotelId && (
+        <EditRoomNoteDialog
+          open={showNoteDialog}
+          onOpenChange={setShowNoteDialog}
+          room={room}
+          hotelId={hotelId}
+          onNoteUpdated={(r, newNote) => {
+            onUpdate({ ...r, notes: newNote || undefined });
+          }}
         />
       )}
     </div>
