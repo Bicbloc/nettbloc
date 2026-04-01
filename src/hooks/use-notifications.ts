@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
 import { toast } from './use-toast';
 import { realtimeManager } from '@/services/RealtimeManager';
+import { nativeNotificationService } from '@/services/nativeNotificationService';
 
 export interface Notification {
   id: string;
