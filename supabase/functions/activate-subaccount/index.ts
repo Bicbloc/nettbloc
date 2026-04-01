@@ -10,7 +10,7 @@ interface ActivateRequest {
   invitationCode: string;
   email?: string;
   password?: string;
-  userId?: string; // legacy field from old client
+  userId?: string;
 }
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
@@ -18,6 +18,124 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders },
   });
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const buildUserMetadata = (subAccount: any, hotel: any) => ({
+  is_sub_account: true,
+  first_name: subAccount?.first_name ?? null,
+  last_name: subAccount?.last_name ?? null,
+  company_name: hotel?.name ?? null,
+});
+
+const isExistingUserError = (message?: string | null) => {
+  const value = String(message ?? "").toLowerCase();
+  return ["already", "exists", "registered", "duplicate", "taken"].some((token) => value.includes(token));
+};
+
+async function getAuthUserByIdWithRetry(supabase: any, userId: string, attempts = 8) {
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const { data, error } = await supabase.auth.admin.getUserById(userId);
+
+    if (!error && data?.user) {
+      return data.user;
+    }
+
+    lastError = error;
+
+    if (attempt < attempts) {
+      await wait(250 * attempt);
+    }
+  }
+
+  console.warn("getUserById retries exhausted", {
+    userIdPrefix: userId.slice(0, 8),
+    error: lastError?.message ?? null,
+  });
+
+  return null;
+}
+
+async function findAuthUserByEmail(supabase: any, email: string, retries = 3, pages = 20, perPage = 100) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  for (let retry = 1; retry <= retries; retry += 1) {
+    for (let page = 1; page <= pages; page += 1) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+
+      if (error) {
+        throw error;
+      }
+
+      const users = data?.users ?? [];
+      const foundUser = users.find((candidate: any) => candidate.email?.toLowerCase() === normalizedEmail);
+
+      if (foundUser) {
+        return foundUser;
+      }
+
+      if (users.length < perPage) {
+        break;
+      }
+    }
+
+    if (retry < retries) {
+      await wait(300 * retry);
+    }
+  }
+
+  return null;
+}
+
+async function updateAuthUser(supabase: any, userId: string, subAccount: any, hotel: any, password?: string) {
+  const payload: Record<string, unknown> = {
+    email_confirm: true,
+    user_metadata: buildUserMetadata(subAccount, hotel),
+  };
+
+  if (password) {
+    payload.password = password;
+  }
+
+  const { data, error } = await supabase.auth.admin.updateUserById(userId, payload);
+
+  if (error) {
+    throw new Error(`Impossible de mettre à jour le compte: ${error.message}`);
+  }
+
+  return data?.user ?? { id: userId };
+}
+
+async function createOrReuseAuthUser(supabase: any, email: string, password: string, subAccount: any, hotel: any) {
+  const metadata = buildUserMetadata(subAccount, hotel);
+
+  const { data, error } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: metadata,
+  });
+
+  if (!error && data?.user) {
+    return data.user;
+  }
+
+  if (!isExistingUserError(error?.message)) {
+    throw new Error(`Erreur création compte: ${error?.message ?? "inconnue"}`);
+  }
+
+  console.info("createUser indicates existing user, falling back to email lookup", { email });
+
+  const existingUser = await findAuthUserByEmail(supabase, email);
+
+  if (!existingUser) {
+    throw new Error("Utilisateur introuvable. Veuillez réessayer.");
+  }
+
+  return updateAuthUser(supabase, existingUser.id, subAccount, hotel, password);
+}
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -32,34 +150,40 @@ const handler = async (req: Request): Promise<Response> => {
       return jsonResponse({ error: "Server configuration error" }, 500);
     }
 
-    const body: Partial<ActivateRequest> = await req.json();
+    const body: Partial<ActivateRequest> = await req.json().catch(() => ({}));
     const invitationCode = String(body.invitationCode ?? "").trim().toUpperCase();
-    const email = String(body.email ?? "").trim().toLowerCase();
+    const providedEmail = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "").trim();
     const legacyUserId = String(body.userId ?? "").trim();
 
-    // Support both new flow (email+password) and legacy flow (userId)
-    const isNewFlow = !!(email && password);
-    const isLegacyFlow = !!legacyUserId;
+    console.info("activate-subaccount request", {
+      hasInvitationCode: Boolean(invitationCode),
+      hasEmail: Boolean(providedEmail),
+      hasPassword: Boolean(password),
+      hasUserId: Boolean(legacyUserId),
+    });
 
-    if (!invitationCode || (!isNewFlow && !isLegacyFlow)) {
-      return jsonResponse({ error: "Champs requis manquants: code + (email & mot de passe) ou userId" }, 400);
+    if (!invitationCode) {
+      return jsonResponse({ error: "Code d'invitation requis" }, 400);
     }
 
-    if (isNewFlow && password.length < 6) {
+    if (!legacyUserId && (!providedEmail || !password)) {
+      return jsonResponse({ error: "Champs requis manquants: code, email, mot de passe" }, 400);
+    }
+
+    if (password && password.length < 6) {
       return jsonResponse({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Find invitation
     const { data: invitation, error: invitationError } = await supabase
       .from("sub_account_invitations")
       .select(
         "id, status, accepted_at, expires_at, sub_account_id, sub_accounts(id, user_id, email, first_name, last_name, hotel_id, hotels(id, name, hotel_code))",
       )
       .eq("invitation_code", invitationCode)
-      .single();
+      .maybeSingle();
 
     if (invitationError || !invitation) {
       return jsonResponse({ error: "Code d'invitation invalide ou expiré" }, 404);
@@ -70,9 +194,8 @@ const handler = async (req: Request): Promise<Response> => {
       return jsonResponse({ error: "Données de sous-compte incomplètes" }, 400);
     }
 
-    // Verify email matches (only for new flow)
     const subEmail = String(subAccount.email).toLowerCase();
-    if (isNewFlow && email !== subEmail) {
+    if (providedEmail && providedEmail !== subEmail) {
       return jsonResponse({ error: "L'email ne correspond pas à l'invitation" }, 400);
     }
 
@@ -82,102 +205,42 @@ const handler = async (req: Request): Promise<Response> => {
 
     const hotel = subAccount.hotels;
 
-    // Already accepted?
     if (invitation.status === "accepted" || invitation.accepted_at) {
       return jsonResponse({
         success: true,
         alreadyActivated: true,
+        userId: subAccount.user_id ?? null,
         hotel: hotel ? { id: hotel.id, name: hotel.name, hotel_code: hotel.hotel_code } : null,
       });
     }
 
-    // 2. Resolve userId
-    let resolvedUserId: string;
+    let authUser: any = null;
 
-    if (isLegacyFlow) {
-      // Legacy: userId was provided by client-side signUp
-      // Verify user exists
-      try {
-        const { data: authUser, error: authErr } = await supabase.auth.admin.getUserById(legacyUserId);
-        if (authErr || !authUser?.user) {
-          return jsonResponse({ error: "Utilisateur introuvable. Veuillez réessayer." }, 404);
-        }
-        resolvedUserId = authUser.user.id;
-
-        // Update metadata
-        await supabase.auth.admin.updateUserById(resolvedUserId, {
-          user_metadata: {
-            ...(authUser.user.user_metadata ?? {}),
-            is_sub_account: true,
-            first_name: subAccount.first_name ?? null,
-            last_name: subAccount.last_name ?? null,
-            company_name: hotel?.name ?? null,
-          },
-        });
-      } catch (e: any) {
-        console.error("Legacy flow - user lookup failed:", e);
-        return jsonResponse({ error: "Utilisateur introuvable" }, 404);
-      }
-    } else {
-      // New flow: create user via admin API
-      const { data: createData, error: createError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          is_sub_account: true,
-          first_name: subAccount.first_name ?? null,
-          last_name: subAccount.last_name ?? null,
-          company_name: hotel?.name ?? null,
-        },
+    if (legacyUserId) {
+      console.info("legacy activation flow detected", {
+        userIdPrefix: legacyUserId.slice(0, 8),
+        email: subEmail,
       });
 
-      if (createError) {
-        const msg = createError.message.toLowerCase();
-        if (msg.includes("already") || msg.includes("exists") || msg.includes("registered") || msg.includes("duplicate")) {
-          console.log("User already exists, looking up by email...");
+      authUser = await getAuthUserByIdWithRetry(supabase, legacyUserId);
 
-          const { data: listData, error: listError } = await supabase.auth.admin.listUsers({
-            perPage: 50,
-            page: 1,
-          });
-
-          if (listError) {
-            return jsonResponse({ error: "Impossible de trouver l'utilisateur existant" }, 500);
-          }
-
-          const existingUser = listData?.users?.find(
-            (u: any) => u.email?.toLowerCase() === email
-          );
-
-          if (!existingUser) {
-            return jsonResponse({ error: "Utilisateur introuvable. Contactez l'administrateur." }, 404);
-          }
-
-          resolvedUserId = existingUser.id;
-
-          await supabase.auth.admin.updateUserById(resolvedUserId, {
-            password,
-            email_confirm: true,
-            user_metadata: {
-              ...(existingUser.user_metadata ?? {}),
-              is_sub_account: true,
-              first_name: subAccount.first_name ?? null,
-              last_name: subAccount.last_name ?? null,
-              company_name: hotel?.name ?? null,
-            },
-          });
-        } else {
-          return jsonResponse({ error: `Erreur création compte: ${createError.message}` }, 500);
-        }
-      } else {
-        resolvedUserId = createData.user.id;
+      if (!authUser) {
+        console.warn("Legacy userId not found, trying email lookup instead", { email: subEmail });
+        authUser = await findAuthUserByEmail(supabase, subEmail);
       }
+
+      if (authUser) {
+        authUser = await updateAuthUser(supabase, authUser.id, subAccount, hotel, password || undefined);
+      } else if (password) {
+        authUser = await createOrReuseAuthUser(supabase, subEmail, password, subAccount, hotel);
+      } else {
+        return jsonResponse({ error: "Utilisateur introuvable. Veuillez réessayer." }, 404);
+      }
+    } else {
+      authUser = await createOrReuseAuthUser(supabase, subEmail, password, subAccount, hotel);
     }
 
-    console.log("User ready, userId:", resolvedUserId);
-
-    // 3. Link sub-account
+    const resolvedUserId = String(authUser.id);
     const now = new Date().toISOString();
 
     const { error: subUpdateError } = await supabase
@@ -195,7 +258,6 @@ const handler = async (req: Request): Promise<Response> => {
       return jsonResponse({ error: "Erreur lors de la liaison du sous-compte" }, 500);
     }
 
-    // 4. Create profile
     const { error: profileError } = await supabase.from("profiles").upsert({
       id: resolvedUserId,
       email: subAccount.email,
@@ -208,7 +270,6 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Failed to create profile:", profileError);
     }
 
-    // 5. Mark invitation as accepted
     const { error: invitationUpdateError } = await supabase
       .from("sub_account_invitations")
       .update({
@@ -229,7 +290,7 @@ const handler = async (req: Request): Promise<Response> => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur serveur inattendue";
-    console.error("activate-subaccount failed:", message);
+    console.error("activate-subaccount failed:", message, error instanceof Error ? error.stack : undefined);
     return jsonResponse({ error: message }, 500);
   }
 };
