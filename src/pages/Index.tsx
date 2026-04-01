@@ -206,8 +206,39 @@ const IndexDashboard = () => {
     isDistributed,
     setIsDistributed,
     housekeepers,
-    refreshHousekeepers
+    refreshHousekeepers,
+    notifications
   } = useHousekeeping();
+
+  // Compute notification counts per sidebar tab from unread notifications
+  const notificationCounts = React.useMemo(() => {
+    const unread = (notifications || []).filter(n => !n.is_read);
+    const counts: Partial<Record<TabValue, number>> = {};
+    
+    unread.forEach(n => {
+      const type = n.type || '';
+      if (type.includes('cleaning') || type.includes('room-status')) {
+        counts['rooms'] = (counts['rooms'] || 0) + 1;
+      } else if (type.includes('incident')) {
+        counts['incidents'] = (counts['incidents'] || 0) + 1;
+      } else if (type.includes('ticket') || type.includes('task')) {
+        counts['tickets'] = (counts['tickets'] || 0) + 1;
+      } else if (type.includes('staff') || type.includes('access') || type.includes('housekeeper')) {
+        counts['access-codes'] = (counts['access-codes'] || 0) + 1;
+      } else if (type.includes('linen')) {
+        counts['linen'] = (counts['linen'] || 0) + 1;
+      } else if (type.includes('lost')) {
+        counts['lost-found'] = (counts['lost-found'] || 0) + 1;
+      } else if (type.includes('inspection')) {
+        counts['inspections'] = (counts['inspections'] || 0) + 1;
+      } else {
+        // Default: show on overview
+        counts['overview'] = (counts['overview'] || 0) + 1;
+      }
+    });
+    
+    return counts;
+  }, [notifications]);
   
   // hotelId est maintenant fourni par le contexte - pas besoin de useAutoSetup
   // const { hotel, accessCode, isSetupComplete, loading: setupLoading } = useAutoSetup();
