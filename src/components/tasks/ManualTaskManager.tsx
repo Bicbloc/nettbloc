@@ -689,7 +689,7 @@ function TaskCard({
 }) {
   const statusConfig = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
   const priorityConfig = PRIORITIES.find(p => p.value === task.priority) || PRIORITIES[1];
-  const locationType = LOCATION_TYPES.find(l => l.value === task.location_type);
+  const locationLabel = task.location_type === 'room' ? '🛏️' : '📍';
 
   return (
     <Card className="p-3">
