@@ -108,6 +108,7 @@ export function ManualTaskManager({
   const [showTemplatePopover, setShowTemplatePopover] = useState(false);
   const [staffSearch, setStaffSearch] = useState('');
   const [newTask, setNewTask] = useState({ ...DEFAULT_NEW_TASK });
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Fetch registered rooms/spaces for location selector
   const { data: registeredRooms } = useQuery({
