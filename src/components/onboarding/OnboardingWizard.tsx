@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,8 @@ import {
   Check, 
   Building2,
   Sparkles,
-  Gift
+  Gift,
+  LogOut
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,7 +37,8 @@ const STEPS = [
 ];
 
 export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [info, setInfo] = useState<OnboardingInfo>({
@@ -248,14 +251,29 @@ export function OnboardingWizard({ isOpen, onComplete }: OnboardingWizardProps) 
         {renderStep()}
 
         <DialogFooter className="flex justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => setCurrentStep(prev => prev - 1)}
-            disabled={currentStep === 0}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Retour
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await signOut();
+                navigate('/auth', { replace: true });
+              }}
+              className="text-destructive hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              Déconnexion
+            </Button>
+            {currentStep > 0 && (
+              <Button
+                variant="ghost"
+                onClick={() => setCurrentStep(prev => prev - 1)}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Retour
+              </Button>
+            )}
+          </div>
 
           {currentStep < STEPS.length - 1 ? (
             <Button

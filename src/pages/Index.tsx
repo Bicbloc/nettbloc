@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,6 +60,25 @@ import { ManualTaskManager } from "@/components/tasks/ManualTaskManager";
 import { useRoomStats, useRoomHelpers } from "@/hooks/use-room-stats";
 import { useAssignmentHandlers } from "@/hooks/use-assignment-handlers";
 
+const LogoutButton = () => {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-destructive hover:text-destructive mt-4"
+      onClick={async () => {
+        await signOut();
+        navigate('/auth', { replace: true });
+      }}
+    >
+      <LogOut className="h-4 w-4 mr-1" />
+      Déconnexion
+    </Button>
+  );
+};
+
 const Index = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loading: authLoading, isInitialized, user } = useAuth();
@@ -96,6 +115,7 @@ const Index = () => {
           <div className="text-center space-y-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-muted-foreground text-sm">Vérification des accès...</p>
+            <LogoutButton />
           </div>
         </div>
       );
@@ -107,6 +127,7 @@ const Index = () => {
           <div className="text-center space-y-4">
             <div className="w-8 h-8 border-4 border-destructive border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-muted-foreground text-sm">Redirection vers votre espace...</p>
+            <LogoutButton />
           </div>
         </div>
       );

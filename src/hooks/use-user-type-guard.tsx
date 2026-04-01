@@ -89,17 +89,21 @@ export function useUserTypeGuard(expectedType: Exclude<UserType, null>): UserTyp
           supabase.from('technician_profiles').select('id').eq('email', email).maybeSingle()
         ]);
 
+        // Build a set of all matching role types
+        const matchingTypes: UserType[] = [];
+        if (hotelResult.data || subAccountResult.data) matchingTypes.push('establishment');
+        if (technicianResult.data) matchingTypes.push('technician');
+        if (housekeeperResult.data) matchingTypes.push('housekeeper');
+        if (governessResult.data) matchingTypes.push('governess');
+
         let detectedType: UserType = null;
 
-        // Establishment takes priority - check hotel ownership OR sub-account
-        if (hotelResult.data || subAccountResult.data) {
-          detectedType = 'establishment';
-        } else if (technicianResult.data) {
-          detectedType = 'technician';
-        } else if (housekeeperResult.data) {
-          detectedType = 'housekeeper';
-        } else if (governessResult.data) {
-          detectedType = 'governess';
+        // If the expected type is among the matching types, respect it (no redirect)
+        if (matchingTypes.includes(expectedType)) {
+          detectedType = expectedType;
+        } else if (matchingTypes.length > 0) {
+          // User has profiles but NOT the expected one - use priority order
+          detectedType = matchingTypes[0]; // establishment > technician > housekeeper > governess
         }
 
 
