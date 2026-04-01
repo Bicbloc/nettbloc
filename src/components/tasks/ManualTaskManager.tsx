@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
@@ -24,7 +24,10 @@ import {
   XCircle,
   FileText,
   Repeat,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Search,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -552,45 +555,23 @@ export function ManualTaskManager({
               <Label>Espace *</Label>
               {registeredLocationOptions.length > 0 ? (
                 <>
-                  <Select
-                    value={isCustomLocationSelected ? OTHER_LOCATION_VALUE : hasSelectedRegisteredLocation ? newTask.location_reference : undefined}
-                    onValueChange={(value) => {
-                      if (value === OTHER_LOCATION_VALUE) {
-                        setShowCustomLocation(true);
-                        setNewTask((prev) => ({
-                          ...prev,
-                          location_type: 'other',
-                          location_reference: prev.location_type === 'other' ? prev.location_reference : '',
-                        }));
-                        return;
-                      }
-
+                  <SpaceSearchSelector
+                    options={registeredLocationOptions}
+                    value={newTask.location_reference}
+                    isOther={isCustomLocationSelected}
+                    onSelect={(value) => {
                       setShowCustomLocation(false);
+                      setNewTask((prev) => ({ ...prev, location_type: 'room', location_reference: value }));
+                    }}
+                    onSelectOther={() => {
+                      setShowCustomLocation(true);
                       setNewTask((prev) => ({
                         ...prev,
-                        location_type: 'room',
-                        location_reference: value,
+                        location_type: 'other',
+                        location_reference: prev.location_type === 'other' ? prev.location_reference : '',
                       }));
                     }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une chambre ou un espace" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Chambres et espaces enregistrés</SelectLabel>
-                        {registeredLocationOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                      <SelectSeparator />
-                      <SelectGroup>
-                        <SelectItem value={OTHER_LOCATION_VALUE}>Autre…</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  />
                   {isCustomLocationSelected && (
                     <Input
                       placeholder="Préciser le lieu..."
