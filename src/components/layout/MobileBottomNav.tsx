@@ -57,6 +57,7 @@ export function MobileBottomNav({ activeTab, onTabChange, isPremium }: MobileBot
       categoryKey: 'operations',
       items: [
         { value: 'access-codes', labelKey: 'accessCodes', shortLabelKey: 'codes', icon: <Key className="h-5 w-5" />, premium: true },
+        { value: 'tickets', labelKey: 'incidents', shortLabelKey: 'incidents', icon: <TicketCheck className="h-5 w-5" /> },
         { value: 'incidents', labelKey: 'incidents', shortLabelKey: 'incidents', icon: <AlertTriangle className="h-5 w-5" />, premium: true },
         { value: 'inspections', labelKey: 'inspections', shortLabelKey: 'inspections', icon: <ClipboardCheck className="h-5 w-5" />, premium: true },
       ]
