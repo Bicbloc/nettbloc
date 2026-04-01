@@ -41,7 +41,8 @@ import {
   Tag,
   Users,
   Search,
-  Layers
+  Layers,
+  RefreshCw
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
@@ -153,7 +154,9 @@ export function IncidentReportWizard({
     },
   });
 
-  const { data: categoriesWithItems } = useQuery({
+  const [isInitializingDefaults, setIsInitializingDefaults] = useState(false);
+
+  const { data: categoriesWithItems, refetch: refetchCategories } = useQuery({
     queryKey: ["categories-with-items", hotelId],
     queryFn: async () => {
       const { data: categories, error: catError } = await supabase
@@ -164,6 +167,44 @@ export function IncidentReportWizard({
         .order("display_order");
       
       if (catError) throw catError;
+
+      // Auto-initialize defaults if no categories exist
+      if (!categories || categories.length === 0) {
+        setIsInitializingDefaults(true);
+        try {
+          const { error: rpcError } = await supabase
+            .rpc('create_hotel_incident_defaults', { p_hotel_id: hotelId });
+          
+          if (rpcError) {
+            console.error('Erreur initialisation incidents:', rpcError);
+          } else {
+            // Re-fetch after initialization
+            const { data: newCategories } = await supabase
+              .from("incident_categories")
+              .select("*")
+              .eq("hotel_id", hotelId)
+              .eq("is_active", true)
+              .order("display_order");
+            
+            const { data: newItems } = await supabase
+              .from("incident_items")
+              .select("*")
+              .eq("hotel_id", hotelId)
+              .eq("is_active", true)
+              .order("display_order");
+
+            setIsInitializingDefaults(false);
+            return (newCategories || []).map(cat => ({
+              ...cat,
+              items: (newItems || []).filter(item => item.category_id === cat.id)
+            }));
+          }
+        } catch (e) {
+          console.error('Erreur init defaults:', e);
+        }
+        setIsInitializingDefaults(false);
+        return [];
+      }
 
       const { data: items, error: itemError } = await supabase
         .from("incident_items")
@@ -804,25 +845,49 @@ export function IncidentReportWizard({
             {/* STEP: Category */}
             {currentStep === 'category' && (
               <div className="space-y-3">
-                <ScrollArea className="h-[300px] pr-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {categoriesWithItems?.map((category) => (
-                      <Button
-                        key={category.id}
-                        variant={selectedCategoryId === category.id ? "default" : "outline"}
-                        className="h-16 flex-col gap-1 text-left"
-                        onClick={() => {
-                          setSelectedCategoryId(category.id);
-                          setItemSearchQuery("");
-                          form.setValue('item_id', '');
-                        }}
-                      >
-                        <span className="text-xl">{category.icon || "📦"}</span>
-                        <span className="text-xs font-medium text-center">{category.name}</span>
-                      </Button>
-                    ))}
+                {isInitializingDefaults ? (
+                  <div className="text-center py-12 space-y-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+                    <p className="font-medium">Initialisation des catégories...</p>
+                    <p className="text-sm text-muted-foreground">Première utilisation, préparation du catalogue</p>
                   </div>
-                </ScrollArea>
+                ) : !categoriesWithItems || categoriesWithItems.length === 0 ? (
+                  <div className="text-center py-8 space-y-4">
+                    <Layers className="h-12 w-12 text-muted-foreground mx-auto" />
+                    <p className="font-medium">Aucune catégorie disponible</p>
+                    <p className="text-sm text-muted-foreground">Les catégories d'incidents n'ont pas encore été configurées.</p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsInitializingDefaults(true);
+                        refetchCategories().finally(() => setIsInitializingDefaults(false));
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Initialiser les catégories
+                    </Button>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[300px] pr-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {categoriesWithItems.map((category) => (
+                        <Button
+                          key={category.id}
+                          variant={selectedCategoryId === category.id ? "default" : "outline"}
+                          className="h-16 flex-col gap-1 text-left"
+                          onClick={() => {
+                            setSelectedCategoryId(category.id);
+                            setItemSearchQuery("");
+                            form.setValue('item_id', '');
+                          }}
+                        >
+                          <span className="text-xl">{category.icon || "📦"}</span>
+                          <span className="text-xs font-medium text-center">{category.name}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </div>
             )}
 
