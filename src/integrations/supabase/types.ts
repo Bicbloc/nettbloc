@@ -4060,8 +4060,11 @@ export type Database = {
           id: string
           inspected_at: string | null
           inspected_by: string | null
+          inspection_requested_at: string | null
+          inspection_requested_by: string | null
           is_twin: boolean | null
           last_cleaned_at: string | null
+          needs_inspection: boolean | null
           notes: string | null
           room_number: string
           room_type: string | null
@@ -4078,8 +4081,11 @@ export type Database = {
           id?: string
           inspected_at?: string | null
           inspected_by?: string | null
+          inspection_requested_at?: string | null
+          inspection_requested_by?: string | null
           is_twin?: boolean | null
           last_cleaned_at?: string | null
+          needs_inspection?: boolean | null
           notes?: string | null
           room_number: string
           room_type?: string | null
@@ -4096,8 +4102,11 @@ export type Database = {
           id?: string
           inspected_at?: string | null
           inspected_by?: string | null
+          inspection_requested_at?: string | null
+          inspection_requested_by?: string | null
           is_twin?: boolean | null
           last_cleaned_at?: string | null
+          needs_inspection?: boolean | null
           notes?: string | null
           room_number?: string
           room_type?: string | null
