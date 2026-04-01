@@ -146,18 +146,7 @@ export default function GovernessAuth() {
     setIsLoading(true);
 
     try {
-      // Vérifier que l'email est bien un compte gouvernante
-      const accessCheck = await validateUserAccessToInterface(email, 'governess');
-      if (!accessCheck.allowed && accessCheck.correctInterface) {
-        toast({
-          variant: "destructive",
-          title: "Mauvaise interface",
-          description: getRedirectMessage(accessCheck.correctInterface, 'fr')
-        });
-        setIsLoading(false);
-        return;
-      }
-
+      // Connexion d'abord, vérification du profil ensuite
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -252,17 +241,16 @@ export default function GovernessAuth() {
       if (error) throw error;
 
       // Vérifier si c'est un utilisateur déjà existant (user_repeated_signup)
-      // Dans ce cas, data.user existe mais l'identité n'a pas de confirmed_at récent
       if (data.user?.identities && data.user.identities.length === 0) {
         throw new Error("Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.");
       }
 
-      // Créer le profil gouvernante avec l'ID auth pour le lier correctement
+      // Créer le profil gouvernante avec l'ID auth
       const { error: profileError } = await supabase
         .from('governess_profiles')
         .upsert({
           id: data.user?.id,
-          email,
+          email: email.trim().toLowerCase(),
           name,
           is_active: true
         }, { onConflict: 'id' });
@@ -271,10 +259,25 @@ export default function GovernessAuth() {
         console.error('Erreur création profil:', profileError);
       }
 
-      toast({
-        title: "Inscription réussie !",
-        description: "Vous pouvez maintenant vous connecter"
-      });
+      // Si pas de session = email de confirmation requis
+      if (!data.session) {
+        toast({
+          title: "📧 Vérifiez votre boîte mail",
+          description: "Un email de confirmation a été envoyé. Cliquez sur le lien pour activer votre compte. Vérifiez aussi vos spams.",
+          duration: 10000,
+        });
+      } else {
+        // Session immédiate (confirmation email désactivée)
+        localStorage.removeItem('housekeeper_profile');
+        localStorage.removeItem('technician_profile');
+        localStorage.setItem('governess_profile', JSON.stringify({ id: data.user?.id, email, name, is_active: true }));
+        toast({
+          title: "Inscription réussie !",
+          description: `Bienvenue ${name}`
+        });
+        navigate('/governess/hotels');
+        return;
+      }
       setIsSignup(false);
 
     } catch (error: any) {
