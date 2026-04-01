@@ -23,6 +23,7 @@ const t = {
       subtitle: 'Nettobloc est le premier outil intelligent jamais conçu pour la gestion complète du housekeeping hôtelier. Simple. Rapide. Révolutionnaire.',
       cta: 'Commencer gratuitement',
       ctaSecondary: 'Découvrir les fonctionnalités',
+      ctaDownload: 'Télécharger l\'application Android',
       stats: [
         { value: '10x', label: 'Plus rapide' },
         { value: '1 clic', label: 'Répartition' },
