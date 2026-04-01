@@ -719,6 +719,15 @@ export function ManualTaskManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Task Detail Dialog */}
+      <TaskDetailDialog
+        task={selectedTask}
+        hotelId={hotelId}
+        open={!!selectedTask}
+        onOpenChange={(open) => { if (!open) setSelectedTask(null); }}
+        onValidate={(id) => { validateTask.mutate(id); setSelectedTask(null); }}
+        onReject={(id) => { rejectTask.mutate(id); setSelectedTask(null); }}
+      />
     </div>
   );
 }
