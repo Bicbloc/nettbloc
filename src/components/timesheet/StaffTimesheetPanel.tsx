@@ -715,7 +715,10 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                       const canValidate = effectiveStatus === 'pending' || effectiveStatus === 'modified';
                       
                       return (
-                        <TableRow key={ts.id} className={ts.status === 'pending' ? 'bg-yellow-50/50' : ''}>
+                        <TableRow key={ts.id} className={
+                          isActive ? 'bg-emerald-50/50' : 
+                          ts.status === 'pending' ? 'bg-yellow-50/50' : ''
+                        }>
                           <TableCell className="whitespace-nowrap">
                             {format(parseISO(ts.work_date), 'dd/MM', { locale: fr })}
                           </TableCell>
@@ -725,6 +728,12 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                                 {ts.staff_type === 'housekeeper' ? 'FdC' : ts.staff_type === 'governess' ? 'Gouv' : 'Tech'}
                               </Badge>
                               {ts.staff_name}
+                              {isActive && (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -739,15 +748,27 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span>{formatTime(ts.end_time)}</span>
-                              {ts.original_end_time && ts.original_end_time !== ts.end_time && (
-                                <span className="text-xs text-muted-foreground line-through">
-                                  {formatTime(ts.original_end_time)}
-                                </span>
+                              {isActive ? (
+                                <span className="text-emerald-600 font-medium">En cours...</span>
+                              ) : (
+                                <>
+                                  <span>{formatTime(ts.end_time)}</span>
+                                  {ts.original_end_time && ts.original_end_time !== ts.end_time && (
+                                    <span className="text-xs text-muted-foreground line-through">
+                                      {formatTime(ts.original_end_time)}
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{calculateDuration(ts.start_time, ts.end_time, ts.break_minutes)}</TableCell>
+                          <TableCell>
+                            {isActive ? (
+                              <span className="text-emerald-600 text-sm">⏱ actif</span>
+                            ) : (
+                              calculateDuration(ts.start_time, ts.end_time, ts.break_minutes)
+                            )}
+                          </TableCell>
                           <TableCell className="text-center">
                             <div className="flex flex-col items-center">
                               <span className="font-medium">{ts.rooms_cleaned || 0}</span>
@@ -772,34 +793,59 @@ export function StaffTimesheetPanel({ hotelId }: StaffTimesheetPanelProps) {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(ts)}
-                                title="Modifier"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              {ts.status === 'pending' && (
+                              {isActive ? (
                                 <>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleValidate(ts)}
-                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    title="Valider"
+                                    onClick={() => handleEndShift(ts)}
+                                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                    title="Mettre fin au pointage"
                                   >
-                                    <CheckCircle className="h-4 w-4" />
+                                    <StopCircle className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleReject(ts)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    title="Rejeter"
+                                    onClick={() => handleEndAndValidate(ts)}
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    title="Clôturer et valider"
                                   >
-                                    <XCircle className="h-4 w-4" />
+                                    <CheckCircle className="h-4 w-4" />
                                   </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEdit(ts)}
+                                    title="Modifier"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  {canValidate && (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleValidate(ts)}
+                                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                        title="Valider"
+                                      >
+                                        <CheckCircle className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleReject(ts)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        title="Rejeter"
+                                      >
+                                        <XCircle className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>
