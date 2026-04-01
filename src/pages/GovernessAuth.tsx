@@ -251,15 +251,21 @@ export default function GovernessAuth() {
 
       if (error) throw error;
 
+      // Vérifier si c'est un utilisateur déjà existant (user_repeated_signup)
+      // Dans ce cas, data.user existe mais l'identité n'a pas de confirmed_at récent
+      if (data.user?.identities && data.user.identities.length === 0) {
+        throw new Error("Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.");
+      }
+
       // Créer le profil gouvernante avec l'ID auth pour le lier correctement
       const { error: profileError } = await supabase
         .from('governess_profiles')
-        .insert({
+        .upsert({
           id: data.user?.id,
           email,
           name,
           is_active: true
-        });
+        }, { onConflict: 'id' });
 
       if (profileError) {
         console.error('Erreur création profil:', profileError);
