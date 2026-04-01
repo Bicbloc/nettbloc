@@ -19,6 +19,9 @@ interface InvitationRequest {
   hotelName: string;
 }
 
+const INVITATION_RECORD_STATUS = "pending";
+const SUB_ACCOUNT_INVITATION_STATUS = "invited";
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -44,7 +47,7 @@ const handler = async (req: Request): Promise<Response> => {
       .insert({
         sub_account_id: subAccountId,
         invitation_code: invitationCode,
-        status: 'pending',
+        status: INVITATION_RECORD_STATUS,
         sent_at: new Date().toISOString(),
       })
       .select()
@@ -55,11 +58,11 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Failed to create invitation: ${inviteError.message}`);
     }
 
-    // Update sub_account with invitation status
+    // Update sub-account with the allowed invitation status used by the app
     const { error: subAccountUpdateError } = await supabase
       .from('sub_accounts')
-      .update({ 
-        invitation_status: 'pending',
+      .update({
+        invitation_status: SUB_ACCOUNT_INVITATION_STATUS,
         invitation_code: invitationCode,
         updated_at: new Date().toISOString(),
       })
