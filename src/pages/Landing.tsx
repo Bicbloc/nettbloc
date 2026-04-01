@@ -446,6 +446,13 @@ const Landing = () => {
             <Button size="lg" variant="outline" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-base px-8 py-6 gap-2">
               {c.hero.ctaSecondary}<ChevronDown className="w-5 h-5" />
             </Button>
+            <a href="/downloads/nettbloc.apk" download className="inline-flex">
+              <Button size="lg" variant="outline" className="text-base px-8 py-6 gap-2 border-green-500/50 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950">
+                <Download className="w-5 h-5" />
+                {c.hero.ctaDownload}
+                <Smartphone className="w-4 h-4" />
+              </Button>
+            </a>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
             {c.hero.stats.map((stat, i) => (
