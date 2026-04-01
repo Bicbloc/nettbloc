@@ -101,11 +101,6 @@ export const useNotifications = (hotelId?: string) => {
       setHasUnread(notifs.some(n => !n.is_read));
     } catch (error) {
       console.error('💥 Erreur critique dans loadNotifications:', error);
-      toast({
-        variant: "destructive",
-        title: "Erreur de chargement",
-        description: "Impossible de charger les notifications"
-      });
       setNotifications([]);
       setHasUnread(false);
     } finally {
@@ -130,7 +125,9 @@ export const useNotifications = (hotelId?: string) => {
         // Connexion au manager centralisé
         const ok = await realtimeManager.connect(effectiveHotelId);
         if (!ok) {
-          throw new Error('Realtime non connecté');
+          console.warn('⚠️ Realtime non connecté, fallback sur polling');
+          startPolling();
+          return;
         }
 
         // S'abonner aux changements
