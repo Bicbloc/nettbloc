@@ -217,7 +217,7 @@ const IndexDashboard = () => {
     
     unread.forEach(n => {
       const type = n.type || '';
-      if (type.includes('cleaning') || type.includes('room-status')) {
+      if (type.includes('cleaning') || type.includes('room-status') || type.includes('remark')) {
         counts['rooms'] = (counts['rooms'] || 0) + 1;
       } else if (type.includes('incident')) {
         counts['incidents'] = (counts['incidents'] || 0) + 1;
