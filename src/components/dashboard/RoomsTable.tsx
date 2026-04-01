@@ -11,6 +11,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface RoomsTableProps {
   rooms: Room[];
   housekeeperNames: string[];
+  hotelId?: string;
   onRoomUpdate: (room: Room) => void;
   onRoomUnassign: (room: Room) => void;
   onRoomReassign: (room: Room, newHousekeeper: string) => void;
