@@ -7,7 +7,7 @@ import { useState } from "react";
 import { 
   Layers, Bed, UserIcon, MoreHorizontal,
   Key, AlertTriangle, FileText, Brain, Archive, 
-  ClipboardCheck, Package, Repeat
+  ClipboardCheck, Package, Repeat, TicketCheck
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
