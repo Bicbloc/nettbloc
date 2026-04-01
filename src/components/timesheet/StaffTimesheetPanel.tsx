@@ -27,7 +27,9 @@ import {
   Edit2,
   XCircle,
   AlertCircle,
-  User
+  User,
+  StopCircle,
+  PlayCircle
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
