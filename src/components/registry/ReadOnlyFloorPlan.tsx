@@ -55,16 +55,26 @@ export const ReadOnlyFloorPlan: React.FC<ReadOnlyFloorPlanProps> = ({ hotelId, h
   // Load registry rooms
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase
-        .from('hotel_rooms_registry')
-        .select('id, room_number, floor, room_type, building, zone, is_active, space_category')
-        .eq('hotel_id', hotelId)
-        .order('floor', { ascending: false })
-        .order('room_number');
-      if (data) setRooms(data);
+      try {
+        const { data, error } = await supabase
+          .from('hotel_rooms_registry')
+          .select('id, room_number, floor, room_type, building, zone, is_active, space_category')
+          .eq('hotel_id', hotelId)
+          .order('floor', { ascending: false })
+          .order('room_number');
+        if (error) {
+          console.error('❌ ReadOnlyFloorPlan: Error loading rooms registry:', error.message);
+        }
+        if (data) {
+          console.log(`✅ ReadOnlyFloorPlan: Loaded ${data.length} rooms for hotel ${hotelId}`);
+          setRooms(data);
+        }
+      } catch (err) {
+        console.error('❌ ReadOnlyFloorPlan: Exception:', err);
+      }
       setIsLoading(false);
     };
-    load();
+    if (hotelId) load();
   }, [hotelId]);
 
   // Load activity counts (last 24h)

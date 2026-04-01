@@ -228,11 +228,17 @@ export function IncidentReportWizard({
       const file = e.target.files[0];
       setSelectedImage(file);
       setImagePreview(URL.createObjectURL(file));
+      // Ensure dialog stays open after camera returns on mobile
+      setIsOpen(true);
       // Auto-trigger AI analysis after photo capture (important for APK/mobile)
+      // Use longer delay to let mobile WebView stabilize after camera close
       setTimeout(() => {
+        setIsOpen(true); // Re-ensure dialog is open
         analyzeImageWithFile(file);
-      }, 300);
+      }, 500);
     }
+    // Reset input to allow re-selecting same file
+    e.target.value = '';
   };
 
   // Analyze with explicit file param (for auto-trigger after capture)
@@ -632,7 +638,20 @@ export function IncidentReportWizard({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0">
+      <DialogContent 
+        className="w-[95vw] max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0"
+        onInteractOutside={(e) => {
+          // Prevent dialog from closing when camera/file picker opens on mobile
+          if (isAnalyzing || currentStep === 'analysis') {
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          if (isAnalyzing || currentStep === 'analysis') {
+            e.preventDefault();
+          }
+        }}
+      >
         {/* Header compact */}
         <div className="p-4 border-b bg-muted/30">
           <DialogHeader className="pb-2">
