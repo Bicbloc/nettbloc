@@ -29,9 +29,15 @@ export class RoomSyncService {
       const previousStatus = existingRoom.status;
 
       // Construire l'objet de mise à jour avec tous les champs pertinents
+      // Ne jamais écraser automatiquement les notes, la priorité ou le statut 'client sorti'
+      // Priority et checkout sont des actions manuelles du client
+      const safeStatus = ['checkout', 'ready-to-clean'].includes(room.status)
+        ? 'needs-cleaning'
+        : room.status;
+      
       const updateData: any = {
-        status: room.status,
-        notes: null, // Toujours vide - seul l'admin ajoute des commentaires
+        status: safeStatus,
+        // Ne PAS toucher aux notes - elles sont gérées manuellement par le client
         cleaning_priority: 1, // Toujours normal - seul l'admin définit la priorité
         is_twin: room.isTwin || false,
         updated_at: new Date().toISOString()

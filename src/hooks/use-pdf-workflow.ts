@@ -124,15 +124,28 @@ export function usePdfWorkflow({
             normalizedCleaningType = 'none';
           }
           
-          await supabase.from('rooms').upsert({
+          // Ne jamais importer automatiquement le statut 'checkout'/'ready-to-clean' ni la priorité
+          // Ces fonctionnalités sont manuelles pour le client
+          const safeStatus = ['checkout', 'ready-to-clean'].includes(room.status || '')
+            ? 'needs-cleaning'
+            : (room.status || 'needs-cleaning');
+          
+          // Ne pas écraser les notes existantes lors de l'import
+          const upsertData: any = {
             hotel_id: hotelId,
             room_number: room.number,
             floor: room.floor || null,
-            status: room.status || 'needs-cleaning',
+            status: safeStatus,
             cleaning_type: normalizedCleaningType,
             cleaning_priority: 1, // Toujours normal - seul l'admin définit la priorité
-            notes: null // Toujours vide - seul l'admin ajoute des commentaires
-          }, { 
+          };
+          
+          // Pour les nouvelles chambres uniquement, initialiser les notes à null
+          if (!existingRoomNumbers.has(room.number)) {
+            upsertData.notes = null;
+          }
+          
+          await supabase.from('rooms').upsert(upsertData, { 
             onConflict: 'hotel_id,room_number',
             ignoreDuplicates: false 
           });
