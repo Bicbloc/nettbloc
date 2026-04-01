@@ -29,7 +29,9 @@ import {
   Search,
   ChevronsUpDown,
   Check,
-  Eye
+  Eye,
+  Bell,
+  ShieldCheck
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
