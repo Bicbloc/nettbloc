@@ -250,15 +250,14 @@ function applyHotelCombinationRules(
         if (newCleaningType !== room.cleaningType) {
           appliedCount++;
           
-          const newPriority: Room['priority'] = newCleaningType === 'a_blanc' ? 'high' : newCleaningType === 'recouche' ? 'medium' : 'low';
           return {
             ...room,
             cleaningType: newCleaningType as Room['cleaningType'],
-            priority: newPriority,
-            isUrgent: newCleaningType === 'a_blanc',
+            priority: 'normal' as Room['priority'], // Toujours normal - seul l'admin définit la priorité
+            isUrgent: false,
             notUrgent: newCleaningType === 'none',
-            status: newCleaningType === 'none' ? 'clean' : newCleaningType === 'a_blanc' ? 'checkout' : 'stayover',
-            notes: room.notes ? `${room.notes} | Règle: ${rule.rule_name}` : `Règle: ${rule.rule_name}`,
+            status: newCleaningType === 'none' ? 'clean' : 'dirty', // Jamais checkout automatique
+            notes: '', // Toujours vide - seul l'admin ajoute des commentaires
           } as Room;
         }
         break; // Première règle qui matche, on arrête

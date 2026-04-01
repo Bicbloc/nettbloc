@@ -130,8 +130,8 @@ export function usePdfWorkflow({
             floor: room.floor || null,
             status: room.status || 'needs-cleaning',
             cleaning_type: normalizedCleaningType,
-            cleaning_priority: room.isUrgent ? 10 : (room.notUrgent ? 1 : 5),
-            notes: room.notes || null
+            cleaning_priority: 1, // Toujours normal - seul l'admin définit la priorité
+            notes: null // Toujours vide - seul l'admin ajoute des commentaires
           }, { 
             onConflict: 'hotel_id,room_number',
             ignoreDuplicates: false 
