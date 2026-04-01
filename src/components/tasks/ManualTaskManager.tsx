@@ -193,20 +193,40 @@ export function ManualTaskManager({
   // Create task mutation
   const createTask = useMutation({
     mutationFn: async (task: typeof newTask) => {
-      const { error } = await supabase
-        .from("manual_tasks")
-        .insert({
-          hotel_id: hotelId,
-          ...task,
-          task_date: today,
-        });
+      // Get current user for created_by
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const insertData: any = {
+        hotel_id: hotelId,
+        title: task.title,
+        description: task.description || null,
+        location_type: task.location_type,
+        location_reference: task.location_reference || null,
+        assigned_to_type: task.assigned_to_type,
+        assigned_to_name: task.assigned_to_name || null,
+        priority: task.priority || 'normal',
+        task_date: today,
+        created_by: user?.id || null,
+      };
 
-      if (error) throw error;
+      console.log('Creating task with data:', insertData);
+      const { data, error } = await supabase
+        .from("manual_tasks")
+        .insert(insertData)
+        .select();
+
+      if (error) {
+        console.error('Task creation error:', error);
+        throw error;
+      }
+      console.log('Task created:', data);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["manual-tasks", hotelId] });
       toast({ title: "Tâche créée" });
       setShowCreateDialog(false);
+      setStaffSearch('');
       setNewTask({
         title: '',
         description: '',
@@ -217,8 +237,13 @@ export function ManualTaskManager({
         priority: 'normal',
       });
     },
-    onError: () => {
-      toast({ variant: "destructive", title: "Erreur lors de la création" });
+    onError: (error: any) => {
+      console.error('Task creation failed:', error);
+      toast({ 
+        variant: "destructive", 
+        title: "Erreur lors de la création",
+        description: error?.message || "Vérifiez vos permissions."
+      });
     },
   });
 
