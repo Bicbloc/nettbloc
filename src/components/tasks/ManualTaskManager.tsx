@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TaskDetailDialog } from "./TaskDetailDialog";
 import { 
   Plus, 
   Trash2, 
@@ -27,7 +28,8 @@ import {
   Calendar as CalendarIcon,
   Search,
   ChevronsUpDown,
-  Check
+  Check,
+  Eye
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
