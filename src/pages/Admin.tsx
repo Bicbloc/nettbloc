@@ -1248,6 +1248,10 @@ const Admin = () => {
           <PromoCodesPanel />
         </TabsContent>
 
+        <TabsContent value="phone-orders" className="space-y-4">
+          <PhoneOrdersPanel />
+        </TabsContent>
+
         <TabsContent value="legal" className="space-y-4">
           <LegalPagesPanel />
         </TabsContent>
