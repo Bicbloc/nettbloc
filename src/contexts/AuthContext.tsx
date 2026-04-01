@@ -125,10 +125,91 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else if (event === 'SIGNED_OUT') {
           stopTokenRefresh();
           storageService.clearHotel();
-          storageService.clearActivePortal();
           window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_OUT));
         }
-...
+      }
+    );
+
+    // 2. Vérifier la session existante avec try/catch/finally
+    const initSession = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        if (error) {
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          if (currentSession) {
+            startTokenRefresh();
+          }
+        }
+      } catch (err) {
+        console.error('❌ getSession exception:', err);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+          setIsInitialized(true);
+        }
+      }
+    };
+    
+    initSession();
+
+    return () => {
+      mounted = false;
+      stopTokenRefresh();
+      subscription.unsubscribe();
+    };
+  }, [refreshSession, startTokenRefresh, stopTokenRefresh]);
+
+  const signUp = useCallback(async (email: string, password: string, companyName?: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${APP_ORIGIN}/`,
+        data: { company_name: companyName }
+      }
+    });
+
+    // Si Supabase exige la confirmation email, il n'y aura pas de session immédiate.
+    const needsEmailVerification = !error && !data?.session;
+
+    return { error, needsEmailVerification };
+  }, []);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    storageService.cleanupLegacyKeys();
+    
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (error) {
+      return { error, success: false };
+    }
+    
+    // Mise à jour IMMÉDIATE sans attendre onAuthStateChange
+    if (data.session) {
+      setSession(data.session);
+      setUser(data.session.user);
+      setLoading(false);
+      startTokenRefresh();
+      window.dispatchEvent(new CustomEvent(AUTH_EVENTS.SIGNED_IN, { 
+        detail: { userId: data.session.user.id } 
+      }));
+    }
+    
+    return { error: null, success: true };
+  }, [startTokenRefresh]);
+
   const signOut = useCallback(async () => {
     stopTokenRefresh();
     // Nettoyer TOUS les profils de rôles pour éviter les conflits de session
@@ -137,7 +218,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('governess_profile');
       localStorage.removeItem('technician_profile');
       storageService.clearHotel();
-      storageService.clearActivePortal();
       storageService.clearVolatile();
     } catch (e) {
     }
