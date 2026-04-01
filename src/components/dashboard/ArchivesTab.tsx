@@ -131,6 +131,20 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     return availableDates.some(d => isSameDay(d, date));
   };
 
+  const getRoomStatus = (room: any) => {
+    const status = room.status || room.cleaningStatus || '';
+    const cleaned = status === 'clean' || status === 'cleaned' || status === 'done' || status === 'completed' || room.isCleaned === true;
+    const notDone = status === 'dirty' || status === 'pending' || status === 'not_started' || status === 'assigned' || room.isCleaned === false;
+    return { cleaned, notDone };
+  };
+
+  const getRoomBadgeClasses = (room: any) => {
+    const { cleaned, notDone } = getRoomStatus(room);
+    if (cleaned) return 'bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700';
+    if (notDone) return 'bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700';
+    return 'bg-muted text-muted-foreground border-border';
+  };
+
   const renderHousekeeperSummary = (summary: any) => {
     if (!summary) return null;
 
@@ -143,31 +157,61 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
           <Users className="h-4 w-4" />
           Femmes de chambre
         </h4>
-        <div className="grid gap-2">
-          {housekeepers.map((hk: any, index: number) => (
-            <Card key={index} className="p-3 bg-muted/50">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{hk.name || hk.housekeeperName}</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">
-                    {hk.roomsCleaned || hk.completed || 0} chambres
-                  </Badge>
-                  {hk.remarks && hk.remarks.length > 0 && (
-                    <Badge variant="secondary">{hk.remarks.length} remarques</Badge>
-                  )}
-                </div>
-              </div>
-              {hk.rooms && hk.rooms.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {hk.rooms.map((room: any, idx: number) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
-                      {room.number || room.room_number || room}
+        <div className="grid gap-3">
+          {housekeepers.map((hk: any, index: number) => {
+            const rooms = hk.rooms || [];
+            const totalRooms = rooms.length || hk.totalRooms || hk.roomsCleaned || hk.completed || 0;
+            const cleanedCount = rooms.filter((r: any) => getRoomStatus(r).cleaned).length || hk.roomsCleaned || hk.completed || 0;
+            const notDoneCount = rooms.filter((r: any) => getRoomStatus(r).notDone).length || 0;
+            const progressPercent = totalRooms > 0 ? Math.round((cleanedCount / totalRooms) * 100) : 0;
+
+            return (
+              <Card key={index} className="p-4 bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium">{hk.name || hk.housekeeperName}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700">
+                      ✓ {cleanedCount}
                     </Badge>
-                  ))}
+                    {notDoneCount > 0 && (
+                      <Badge className="bg-red-500/15 text-red-700 border-red-300 dark:text-red-400 dark:border-red-700">
+                        ✗ {notDoneCount}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              )}
-            </Card>
-          ))}
+                {/* Progress bar */}
+                <div className="w-full bg-muted rounded-full h-2 mb-2">
+                  <div 
+                    className={cn(
+                      "h-2 rounded-full transition-all",
+                      progressPercent === 100 ? "bg-emerald-500" : progressPercent > 0 ? "bg-amber-500" : "bg-red-400"
+                    )}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Progression : {cleanedCount}/{totalRooms} ({progressPercent}%)
+                </p>
+                {rooms.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {rooms.map((room: any, idx: number) => (
+                      <Badge 
+                        key={idx} 
+                        variant="outline" 
+                        className={cn("text-xs", getRoomBadgeClasses(room))}
+                      >
+                        {room.number || room.room_number || room}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {hk.remarks && hk.remarks.length > 0 && (
+                  <Badge variant="secondary" className="mt-2">{hk.remarks.length} remarques</Badge>
+                )}
+              </Card>
+            );
+          })}
         </div>
       </div>
     );
@@ -179,18 +223,38 @@ export const ArchivesTab: React.FC<ArchivesTabProps> = ({ currentHotelId }) => {
     const rooms = Array.isArray(roomData) ? roomData : roomData.rooms || [];
     if (rooms.length === 0) return null;
 
+    const cleanedRooms = rooms.filter((r: any) => getRoomStatus(r).cleaned);
+    const notDoneRooms = rooms.filter((r: any) => getRoomStatus(r).notDone);
+    const otherRooms = rooms.filter((r: any) => !getRoomStatus(r).cleaned && !getRoomStatus(r).notDone);
+
     return (
       <div className="space-y-3">
         <h4 className="font-medium flex items-center gap-2">
           <Home className="h-4 w-4" />
           Chambres ({rooms.length})
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="flex flex-wrap gap-2 mb-3">
+          <div className="flex items-center gap-1 text-xs">
+            <span className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-400" />
+            Nettoyées ({cleanedRooms.length})
+          </div>
+          <div className="flex items-center gap-1 text-xs">
+            <span className="w-3 h-3 rounded bg-red-500/30 border border-red-400" />
+            Non effectuées ({notDoneRooms.length})
+          </div>
+          {otherRooms.length > 0 && (
+            <div className="flex items-center gap-1 text-xs">
+              <span className="w-3 h-3 rounded bg-muted border border-border" />
+              Autre ({otherRooms.length})
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
           {rooms.map((room: any, index: number) => (
             <Badge 
               key={index} 
-              variant={room.status === 'clean' ? 'default' : 'secondary'}
-              className="justify-center py-1"
+              variant="outline"
+              className={cn("justify-center py-1.5", getRoomBadgeClasses(room))}
             >
               {room.number || room.room_number}
             </Badge>
