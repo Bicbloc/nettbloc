@@ -21,6 +21,7 @@ export default function GovernessAuth() {
   const [isSignup, setIsSignup] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isRequestingReset, setIsRequestingReset] = useState(false);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -261,11 +262,7 @@ export default function GovernessAuth() {
 
       // Si pas de session = email de confirmation requis
       if (!data.session) {
-        toast({
-          title: "📧 Vérifiez votre boîte mail",
-          description: "Un email de confirmation a été envoyé. Cliquez sur le lien pour activer votre compte. Vérifiez aussi vos spams.",
-          duration: 10000,
-        });
+        setShowEmailConfirmation(true);
       } else {
         // Session immédiate (confirmation email désactivée)
         localStorage.removeItem('housekeeper_profile');
@@ -278,7 +275,6 @@ export default function GovernessAuth() {
         navigate('/governess/hotels');
         return;
       }
-      setIsSignup(false);
 
     } catch (error: any) {
       console.error('Erreur inscription:', error);
@@ -291,6 +287,60 @@ export default function GovernessAuth() {
       setIsLoading(false);
     }
   };
+
+  // Email confirmation screen
+  if (showEmailConfirmation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-600 via-orange-600 to-red-700 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-500/20 rounded-full blur-3xl" />
+        </div>
+
+        <div className="w-full max-w-md relative z-10 animate-fade-in">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-4 shadow-2xl border border-white/30">
+              <Mail className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Vérifiez votre email</h1>
+            <p className="text-white/80">Un lien d'activation vous a été envoyé</p>
+          </div>
+
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardContent className="pt-6 space-y-4">
+              <div className="text-center space-y-3">
+                <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Mail className="h-8 w-8 text-amber-600" />
+                </div>
+                <p className="text-base font-medium">
+                  Un email a été envoyé à <span className="font-bold text-amber-700">{email}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Cliquez sur le lien dans l'email pour activer votre compte gouvernante.
+                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                  <strong>💡 Astuce :</strong> Si vous ne trouvez pas l'email, vérifiez votre dossier <strong>Spam</strong> ou <strong>Indésirables</strong>.
+                </div>
+              </div>
+
+              <div className="pt-2 space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setShowEmailConfirmation(false);
+                    setIsSignup(false);
+                  }}
+                >
+                  Retour à la connexion
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   // Recovery mode - show new password form
   if (isRecoveryMode) {
