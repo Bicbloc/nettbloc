@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/storageService';
 import { toast } from './use-toast';
 import { realtimeManager } from '@/services/RealtimeManager';
+import { nativeNotificationService } from '@/services/nativeNotificationService';
 
 export interface Notification {
   id: string;
@@ -140,12 +141,17 @@ export const useNotifications = (hotelId?: string) => {
           notificationCache.delete(effectiveHotelId);
           loadNotifications();
 
-          // Toast uniquement pour les nouvelles notifications
+          // Toast + notification native pour les nouvelles notifications
           if (payload.eventType === 'INSERT' && payload.new) {
             const newNotif = payload.new as Notification;
             toast({
               title: newNotif.title,
               description: newNotif.description,
+            });
+            // Notification native APK (son + vibration)
+            nativeNotificationService.sendNotification({
+              title: newNotif.title,
+              body: newNotif.description,
             });
           }
         });

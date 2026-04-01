@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { storageService } from '@/services/storageService';
+import { nativeNotificationService } from '@/services/nativeNotificationService';
 
 // Build ID injected at build time - this will change on each deployment
 declare const __BUILD_ID__: string;
@@ -42,6 +43,11 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('❌ AppBoot error:', error);
     }
+  }, []);
+
+  // Initialiser les notifications natives (APK)
+  useEffect(() => {
+    nativeNotificationService.initialize();
   }, []);
 
   return <>{children}</>;
