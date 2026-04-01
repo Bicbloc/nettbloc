@@ -547,6 +547,15 @@ export const FirstTimeSetupWizard = ({
         {renderStepContent()}
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button 
+            variant="ghost"
+            onClick={handleLogout}
+            className="w-full sm:w-auto text-destructive hover:text-destructive"
+          >
+            <LogOut className="h-4 w-4 mr-1" />
+            Déconnexion
+          </Button>
+
           {currentStep > 0 && (
             <Button 
               variant="outline" 
