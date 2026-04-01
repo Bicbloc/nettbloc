@@ -1,16 +1,32 @@
 import { useCallback } from 'react';
+import { nativeNotificationService } from '@/services/nativeNotificationService';
 
-// Notification sounds disabled
 export const useNotificationSound = () => {
-  const noOp = useCallback(() => {
-    // Sons désactivés
+  const playNotificationSound = useCallback(() => {
+    nativeNotificationService.vibrate('medium');
+  }, []);
+
+  const playSuccess = useCallback(() => {
+    nativeNotificationService.notificationHaptic('success');
+  }, []);
+
+  const playWarning = useCallback(() => {
+    nativeNotificationService.notificationHaptic('warning');
+  }, []);
+
+  const playError = useCallback(() => {
+    nativeNotificationService.notificationHaptic('error');
+  }, []);
+
+  const playInfo = useCallback(() => {
+    nativeNotificationService.vibrate('light');
   }, []);
 
   return {
-    playNotificationSound: noOp,
-    playSuccess: noOp,
-    playWarning: noOp,
-    playError: noOp,
-    playInfo: noOp
+    playNotificationSound,
+    playSuccess,
+    playWarning,
+    playError,
+    playInfo
   };
 };
