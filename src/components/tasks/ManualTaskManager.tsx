@@ -790,12 +790,16 @@ function TaskCard({
   onReject,
   onDelete,
   onView,
+  onRemind,
+  onAdminResolve,
 }: { 
   task: Task; 
   onValidate?: () => void;
   onReject?: () => void;
   onDelete: () => void;
   onView?: () => void;
+  onRemind?: () => void;
+  onAdminResolve?: () => void;
 }) {
   const statusConfig = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
   const priorityConfig = PRIORITIES.find(p => p.value === task.priority) || PRIORITIES[1];
