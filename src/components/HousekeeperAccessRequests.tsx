@@ -195,6 +195,22 @@ export const HousekeeperAccessRequests = () => {
           });
       }
 
+      // Créer une notification pour l'admin
+      try {
+        await supabase.from('notifications').insert({
+          hotel_id: request.hotel_id,
+          title: `Nouveau personnel: ${request.housekeeper_profiles.name}`,
+          description: `${request.housekeeper_profiles.name} a été approuvé(e) et est maintenant disponible pour la distribution des chambres.`,
+          type: 'staff-approved',
+          housekeeper_name: request.housekeeper_profiles.name,
+          is_read: false,
+          user_type: 'admin',
+          user_id: user?.id
+        });
+      } catch (notifError) {
+        console.error('Erreur notification:', notifError);
+      }
+
       toast.success('Demande approuvée !');
       await refreshHousekeepers();
       loadRequests();
