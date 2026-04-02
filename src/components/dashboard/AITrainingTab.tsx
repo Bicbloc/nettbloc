@@ -40,22 +40,25 @@ interface AITrainingTabProps {
 }
 
 const getRoomSignature = (room: ParsedRoom): string => {
-  const hasArr = !!room.departureDate || room.status?.toLowerCase().includes('arr');
-  const hasDep = !!room.departureDate || room.status?.toLowerCase().includes('dep') || room.status?.toLowerCase().includes('out');
-  const nightNum = room.nightInfo ? parseInt(room.nightInfo) : 0;
+  const reason = (room.reason || '').toLowerCase();
+  const status = (room.status || '').toLowerCase();
+  const hasArr = reason.includes('arriv') || status.includes('arr') || !!room.departureDate;
+  const hasDep = reason.includes('départ') || reason.includes('depart') || status.includes('dep') || status.includes('out') || !!room.departureDate;
   const multiGuest = room.guestName?.includes('/') || room.guestName?.includes('+') || room.guestName?.includes('&');
-  const guestCount = multiGuest ? 'multiple' : room.guestName ? 'single' : 'unknown';
-  return `${hasArr ? 'A' : '-'}|${hasDep ? 'D' : '-'}|${guestCount}|${nightNum > 0 ? 'N' + nightNum : 'N?'}`;
+  const guestCount = multiGuest ? 'multiple' : room.guestName ? 'single' : 'empty';
+  const hasArrivalTime = /\d{1,2}:\d{2}/.test(reason) && hasArr;
+  return `${hasArr ? 'A' : '-'}|${hasDep ? 'D' : '-'}|${guestCount}|${hasArrivalTime ? 'T' : '-'}`;
 };
 
 const getSignatureLabel = (sig: string): string => {
-  const [arr, dep, guests, night] = sig.split('|');
+  const [arr, dep, guests, time] = sig.split('|');
   const parts: string[] = [];
   if (arr === 'A') parts.push('arrivée');
   if (dep === 'D') parts.push('départ');
   if (guests === 'single') parts.push('1 client');
   if (guests === 'multiple') parts.push('clients multiples');
-  if (night !== 'N?') parts.push(night.replace('N', '') + ' nuit(s)');
+  if (guests === 'empty') parts.push('chambre vide');
+  if (time === 'T') parts.push('heure arrivée');
   return parts.length > 0 ? parts.join(' + ') : 'profil inconnu';
 };
 

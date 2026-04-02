@@ -127,20 +127,20 @@ INSTRUCTION CRITIQUE: Les exemples ci-dessus sont la RÉFÉRENCE ABSOLUE. Identi
 
 RÈGLES DE DÉTECTION PAR DÉFAUT (utilisées si aucun exemple ne correspond):
 
-RÈGLE PRINCIPALE: La DATE DE DÉPART prime TOUJOURS sur Nuit X/Y.
-- Si date départ > date rapport → le client est ENCORE LÀ → recouche
-- Si date départ ≤ date rapport → le client est PARTI → a_blanc
-- Nuit X/Y n'est qu'un indicateur secondaire (utiliser seulement si pas de date de départ)
+NE PAS comparer les dates avec la date du jour. Les règles sont basées uniquement sur la PRÉSENCE de dates et le nombre de clients.
 
-PRIORITÉ 1: Nombre de noms clients
-  - 2+ noms distincts → a_blanc (checkout + checkin)
-  - 1 nom + date départ ≤ ${reportDate} → a_blanc
-  - 1 nom + date départ > ${reportDate} → recouche (même si Nuit X/Y où X==Y)
-  - 1 nom sans info date → recouche (par défaut)
+PRIORITÉ 1: 1 seul client avec date d'arrivée ET date de départ → TOUJOURS recouche
+  - Peu importe le statut (PRO, DIR, INS, SAL), si 1 client a une date d'arrivée et une date de départ → recouche
 
-PRIORITÉ 2: 0 noms (chambre vide)
-  - PRO/INS sans client → none
-  - SAL/DIR sans client → a_blanc
+PRIORITÉ 2: 2+ noms distincts → a_blanc (checkout + checkin)
+
+PRIORITÉ 3: Chambre vide (0 noms/clients)
+  - INS/PRO sans client → none (propre, rien à faire)
+  - SAL sans client → a_blanc
+
+PRIORITÉ 4: SAL + 1 client en arrivée (nouveau client) → a_blanc
+
+PRIORITÉ 5: Client en séjour avec heure d'arrivée visible (format Mews) → a_blanc peu importe le statut
 
 ### RAPPORT ###
 ${text.substring(0, 12000)}
