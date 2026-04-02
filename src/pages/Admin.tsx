@@ -43,6 +43,7 @@ import { PromoCodesPanel } from '@/components/admin/PromoCodesPanel';
 import { PricingPlansPanel } from '@/components/admin/PricingPlansPanel';
 import { LegalPagesPanel } from '@/components/admin/LegalPagesPanel';
 import { PhoneOrdersPanel } from '@/components/admin/PhoneOrdersPanel';
+import { InvoicesPanel } from '@/components/admin/InvoicesPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
