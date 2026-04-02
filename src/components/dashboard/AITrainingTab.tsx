@@ -24,9 +24,40 @@ interface ParsedRoom {
   status?: string;
 }
 
+interface RoomSignature {
+  hasArrival: boolean;
+  hasDeparture: boolean;
+  guestCount: 'single' | 'multiple' | 'unknown';
+}
+
+interface PropagationCandidate {
+  roomNumber: string;
+  currentType: string;
+}
+
 interface AITrainingTabProps {
   currentHotelId: string | null;
 }
+
+const getRoomSignature = (room: ParsedRoom): string => {
+  const hasArr = !!room.departureDate || room.status?.toLowerCase().includes('arr');
+  const hasDep = !!room.departureDate || room.status?.toLowerCase().includes('dep') || room.status?.toLowerCase().includes('out');
+  const nightNum = room.nightInfo ? parseInt(room.nightInfo) : 0;
+  const multiGuest = room.guestName?.includes('/') || room.guestName?.includes('+') || room.guestName?.includes('&');
+  const guestCount = multiGuest ? 'multiple' : room.guestName ? 'single' : 'unknown';
+  return `${hasArr ? 'A' : '-'}|${hasDep ? 'D' : '-'}|${guestCount}|${nightNum > 0 ? 'N' + nightNum : 'N?'}`;
+};
+
+const getSignatureLabel = (sig: string): string => {
+  const [arr, dep, guests, night] = sig.split('|');
+  const parts: string[] = [];
+  if (arr === 'A') parts.push('arrivée');
+  if (dep === 'D') parts.push('départ');
+  if (guests === 'single') parts.push('1 client');
+  if (guests === 'multiple') parts.push('clients multiples');
+  if (night !== 'N?') parts.push(night.replace('N', '') + ' nuit(s)');
+  return parts.length > 0 ? parts.join(' + ') : 'profil inconnu';
+};
 
 export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
   const [step, setStep] = useState<'upload' | 'review' | 'saved'>('upload');
@@ -36,6 +67,13 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
   const [corrections, setCorrections] = useState<Record<string, 'a_blanc' | 'recouche' | 'none'>>({});
   const [savedExamples, setSavedExamples] = useState<TrainingExample[]>([]);
   const [reportText, setReportText] = useState('');
+  const [propagationDialog, setPropagationDialog] = useState<{
+    open: boolean;
+    roomNumber: string;
+    newType: 'a_blanc' | 'recouche' | 'none';
+    signature: string;
+    similarRooms: PropagationCandidate[];
+  } | null>(null);
 
   // Load existing training examples
   const loadExisting = useCallback(async () => {
