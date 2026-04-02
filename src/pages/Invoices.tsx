@@ -57,25 +57,17 @@ const InvoicesContent = () => {
 
   const handleDownloadInvoice = async (invoice: Invoice) => {
     try {
-      if (invoice.pdf_url) {
-        // pdf_url stores the storage path
-        const { data, error } = await supabase.storage
-          .from('invoices')
-          .createSignedUrl(invoice.pdf_url, 3600);
-        if (error) throw error;
-        window.open(data.signedUrl, '_blank');
+      const { data, error } = await supabase.functions.invoke('generate-invoice', {
+        body: { invoiceId: invoice.id },
+      });
+      if (error) throw error;
+      if (data?.pdf_url) {
+        window.open(data.pdf_url, '_blank');
+        loadInvoices();
       } else {
-        // Generate PDF on the fly
-        const { data, error } = await supabase.functions.invoke('generate-invoice', {
-          body: { invoiceId: invoice.id },
-        });
-        if (error) throw error;
-        if (data?.pdf_url) {
-          window.open(data.pdf_url, '_blank');
-          loadInvoices(); // Refresh to show pdf_url
-        }
+        throw new Error('Aucune URL reçue');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Download error:', error);
     }
   };
