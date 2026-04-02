@@ -45,12 +45,23 @@ export default function ResetPassword() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+    let sub: { unsubscribe: () => void } | null = null;
+
+    const tryReady = () => {
+      if (!cancelled) {
+        window.history.replaceState({}, document.title, "/reset-password");
+        setStep("ready");
+      }
+    };
+
     const run = async () => {
       const searchParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "");
+      const hashParams = new URLSearchParams(
+        window.location.hash.startsWith("#") ? window.location.hash.slice(1) : ""
+      );
 
       const code = searchParams.get("code");
-      const type = hashParams.get("type") ?? searchParams.get("type");
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
 
@@ -60,80 +71,64 @@ export default function ResetPassword() {
           access_token: accessToken,
           refresh_token: refreshToken,
         });
-
         if (error) {
           console.error("Reset password: setSession error", error);
           setStep("invalid");
           return;
         }
-
-        // Clean URL (avoid leaking tokens)
-        window.history.replaceState({}, document.title, "/reset-password");
-        setStep("ready");
+        tryReady();
         return;
       }
 
-      // 2) PKCE format: ?code=... (may fail if code_verifier missing)
+      // 2) PKCE format: ?code=...
       if (code) {
         try {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            console.error("Reset password: exchangeCodeForSession error", error);
-            // Don't immediately fail - check if session was set anyway
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData.session) {
-              window.history.replaceState({}, document.title, "/reset-password");
-              setStep("ready");
-              return;
-            }
-            setStep("invalid");
-            return;
-          }
-          window.history.replaceState({}, document.title, "/reset-password");
-          setStep("ready");
-          return;
+          if (!error) { tryReady(); return; }
+          console.error("Reset password: exchangeCodeForSession error", error);
         } catch (e) {
           console.error("Reset password: code exchange exception", e);
-          // Check session as fallback
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData.session) {
-            window.history.replaceState({}, document.title, "/reset-password");
-            setStep("ready");
-            return;
-          }
-          setStep("invalid");
-          return;
         }
-      }
-
-      // 3) Check for existing session (user may already be logged in from the link)
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        setStep("ready");
+        // Fallback: session may have been set despite exchange error
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) { tryReady(); return; }
+        if (!cancelled) setStep("invalid");
         return;
       }
 
-      // 4) Listen for auth state change (Supabase may auto-detect the token)
+      // 3) Check for existing session (main client may have already consumed URL tokens)
+      const { data } = await supabase.auth.getSession();
+      if (data.session) { tryReady(); return; }
+
+      // 4) Listen for auth state change + poll with retries
+      //    The main supabase client (detectSessionInUrl) may have consumed hash tokens
+      //    and fired SIGNED_IN before this listener was set up. Poll to cover this gap.
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (cancelled) return;
         if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
-          window.history.replaceState({}, document.title, "/reset-password");
-          setStep("ready");
+          tryReady();
         }
       });
+      sub = subscription;
 
-      // Wait a moment for potential auto-detection
-      setTimeout(async () => {
-        const { data: checkData } = await supabase.auth.getSession();
-        if (checkData.session) {
-          setStep("ready");
-        } else if (step === "checking") {
-          setStep("invalid");
-        }
-        subscription.unsubscribe();
-      }, 2000);
+      // Poll session every 500ms for up to 5 seconds to handle race conditions
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        if (cancelled) return;
+        const { data: pollData } = await supabase.auth.getSession();
+        if (pollData.session) { tryReady(); return; }
+      }
+
+      // All attempts exhausted
+      if (!cancelled) setStep("invalid");
     };
 
     void run();
+
+    return () => {
+      cancelled = true;
+      sub?.unsubscribe();
+    };
   }, []);
 
   const handleUpdatePassword = async () => {
