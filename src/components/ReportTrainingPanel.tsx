@@ -1,5 +1,5 @@
-import { TrainingWizard } from "./training";
+import { AITrainingTab } from "./dashboard/AITrainingTab";
 
 export const ReportTrainingPanel = ({ hotelId }: { hotelId: string }) => {
-  return <TrainingWizard hotelId={hotelId} />;
+  return <AITrainingTab currentHotelId={hotelId} />;
 };
