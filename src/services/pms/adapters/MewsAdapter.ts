@@ -594,21 +594,21 @@ export class MewsAdapter extends PmsAdapter {
         return { status: 'checkout_arrival', cleaningType: 'a_blanc' };
       }
       if (guestNames.length === 1) {
-        // 1 nom: vérifier Nuit X/Y et date départ
+        // 1 nom: PRIORITÉ date de départ > Nuit X/Y
+        const departureDateResult = this.extractDepartureDate(line);
+        if (departureDateResult && reportDate) {
+          if (departureDateResult <= reportDate) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        }
+        // Fallback: Nuit X/Y (seulement si pas de date de départ)
         const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
           upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
         if (nightMatch) {
           const current = parseInt(nightMatch[1], 10);
           const total = parseInt(nightMatch[2], 10);
           if (current >= total) {
-            return { status: 'checkout', cleaningType: 'a_blanc' };
-          }
-          return { status: 'stayover', cleaningType: 'recouche' };
-        }
-        // Vérifier date de départ vs date rapport
-        const departureDateResult = this.extractDepartureDate(line);
-        if (departureDateResult && reportDate) {
-          if (departureDateResult <= reportDate) {
             return { status: 'checkout', cleaningType: 'a_blanc' };
           }
           return { status: 'stayover', cleaningType: 'recouche' };
