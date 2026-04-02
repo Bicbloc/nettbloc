@@ -219,22 +219,35 @@ export function UsersManagementPanel() {
     setIsDeleting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Non authentifié');
+      if (!session?.access_token) throw new Error('Non authentifié');
 
-      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
-        body: { userId: user.id, email: user.email },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ userId: user.id, email: user.email }),
+        }
+      );
 
-      if (error) throw error;
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result?.error || `Erreur ${response.status}`);
+      }
 
       toast({
         title: "Utilisateur supprimé ✅",
-        description: `${user.email} supprimé de : ${data.deleted_from?.join(', ') || 'aucune table'}`,
+        description: `${user.email} supprimé de : ${result.deleted_from?.join(', ') || 'aucune table'}`,
       });
       setDeletingUser(null);
       loadUsers();
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Erreur", description: error.message });
+      toast({ variant: 'destructive', title: 'Erreur', description: error.message });
     } finally {
       setIsDeleting(false);
     }
