@@ -806,6 +806,37 @@ export function UsersManagementPanel() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">⚠️ Suppression complète</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Vous êtes sur le point de supprimer <strong>{deletingUser?.email}</strong> ({deletingUser?.user_type}).</p>
+              <p>Cela supprimera :</p>
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                <li>Le compte d'authentification</li>
+                <li>Le profil utilisateur</li>
+                <li>Les hôtels associés (si établissement)</li>
+                <li>Les profils staff (femme de chambre, gouvernante, technicien)</li>
+                <li>Les sessions et données liées</li>
+              </ul>
+              <p className="font-semibold text-destructive">Cette action est irréversible !</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingUser && deleteUserCompletely(deletingUser)}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Suppression...' : 'Supprimer définitivement'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
