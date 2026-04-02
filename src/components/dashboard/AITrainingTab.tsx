@@ -2,13 +2,14 @@
  * Nouveau système d'entraînement IA simplifié
  * Flow: Upload PDF → IA parse → Corriger les chambres → Sauvegarder les exemples
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Brain, Upload, CheckCircle, AlertCircle, Loader2, Sparkles, Save, Trash2, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Brain, Upload, CheckCircle, AlertCircle, Loader2, Sparkles, Save, Trash2, FileText, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { loadTrainingExamples, saveTrainingExamples, type TrainingExample } from "@/services/trainingExamplesService";
