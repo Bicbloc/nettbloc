@@ -736,15 +736,92 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
     // Reset coverage metadata
     lastCoverageMetadata = null;
 
-    // ===== PHASE 0: Vérifier d'abord si l'hôtel a un modèle entraîné =====
+    // ===== PHASE 0: Vérifier si l'hôtel a des exemples d'entraînement IA =====
+    if (hotelId) {
+      try {
+        const { loadTrainingExamples } = await import('@/services/trainingExamplesService');
+        const trainingExamples = await loadTrainingExamples(hotelId);
+        
+        if (trainingExamples.length > 0) {
+          // Utiliser l'edge function parse-report avec les exemples d'entraînement
+          const today = new Date().toISOString().split('T')[0];
+          const { data, error } = await supabase.functions.invoke('parse-report', {
+            body: {
+              text: fullText,
+              hotelId,
+              reportDate: today,
+              trainingExamples,
+            },
+          });
+          
+          if (!error && data?.rooms?.length > 0) {
+            const rooms: Room[] = data.rooms.map((r: any) => ({
+              number: r.roomNumber,
+              status: r.cleaningType === 'none' ? 'clean' : 'needs-cleaning',
+              cleaningType: r.cleaningType === 'a_blanc' ? 'full' : r.cleaningType === 'recouche' ? 'quick' : 'none',
+              floor: r.roomNumber?.length > 0 ? parseInt(r.roomNumber[0]) || 0 : 0,
+              isTwin: false,
+              guestName: r.guestName || '',
+              arrivalDate: r.arrivalDate || '',
+              departureDate: r.departureDate || '',
+              cleaningReason: r.reason || '',
+            }));
+            
+            lastCoverageMetadata = {
+              phase0RoomCount: 0,
+              trainedModelRoomCount: rooms.length,
+              finalRoomCount: rooms.length,
+              supplementedByTraining: 0,
+              trainedModelUsed: true,
+              formatDetected: 'ai_training',
+              formatConfidence: 95,
+              trainedPatternCount: trainingExamples.length,
+              missingFromPhase0: [],
+              missingFromTraining: [],
+              perPatternStats: [],
+            };
+            
+            lastParsedLines = rooms.map(room => ({
+              roomNumber: room.number,
+              rawText: `${room.number} ${room.cleaningType}`,
+              fullText: `${room.number} ${room.cleaningType}`,
+              cleaningType: room.cleaningType === 'full' ? 'a_blanc' : room.cleaningType === 'quick' ? 'recouche' : 'none',
+              cleaningReason: room.cleaningReason || '',
+              statusCode: '',
+              statusLabel: room.cleaningReason || '',
+              roomType: '',
+              guestName: room.guestName || '',
+              arrivalDate: room.arrivalDate || '',
+              departureDate: room.departureDate || '',
+              checkInTime: '',
+              checkOutTime: '',
+              confidence: 90,
+              linkedRooms: [],
+              notes: [],
+              isLastNight: false,
+              isFirstNight: false,
+            } as RoomLine));
+            
+            toast({
+              title: "Extraction via modèle IA entraîné",
+              description: `${rooms.length} chambres extraites avec votre modèle personnalisé`,
+            });
+            
+            return rooms;
+          }
+        }
+      } catch (err) {
+        console.warn('AI training model fallback:', err);
+      }
+    }
+
+    // ===== PHASE 0b-legacy: Vérifier si l'hôtel a un ancien modèle entraîné =====
     let useTrainedModel = false;
     
     if (hotelId) {
       try {
-        // Check if hotel has trained patterns via unifiedParserService
         await unifiedParserService.loadHotelPatterns(hotelId);
         const patternCount = unifiedParserService.getLearnedPatternCount();
-        
         if (patternCount > 0) {
           useTrainedModel = true;
         }
@@ -752,9 +829,7 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
       }
     }
     
-    // ===== Si modèle entraîné existe, l'utiliser en PRIORITÉ ABSOLUE =====
     if (useTrainedModel && hotelId) {
-      
       try {
         await unifiedParserService.loadHotelPatterns(hotelId);
         const trainedResult = await unifiedParserService.parseReportHybrid(fullText, hotelId, false);
@@ -763,7 +838,6 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
           let rooms = propagateLinkedRooms(convertExtractedRoomsToRooms(trainedResult.rooms));
           const trainedPatternCount = unifiedParserService.getLearnedPatternCount();
           
-          // Build coverage metadata
           lastCoverageMetadata = {
             phase0RoomCount: 0,
             trainedModelRoomCount: rooms.length,
@@ -778,16 +852,13 @@ export async function processPdf(file: File, hotelId?: string, forceAi: boolean 
             perPatternStats: [],
           };
           
-          // Appliquer les règles de combinaison
           const combinationRules = await loadHotelCombinationRules(hotelId);
           if (combinationRules.length > 0) {
             rooms = applyHotelCombinationRules(rooms, combinationRules, []);
           }
           
-          // Post-extraction filter: reject 1-digit rooms + floor coherence
           rooms = applyFloorCoherenceFilterRooms(rooms);
           
-          // Créer des RoomLines pour la prévisualisation
           lastParsedLines = rooms.map(room => ({
             roomNumber: room.number,
             rawText: `${room.number} ${room.cleaningType}`,
