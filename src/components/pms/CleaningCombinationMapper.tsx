@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Plus, Check, X, Minus, Pencil, Sparkles, FileText, ChevronDown, Search, AlertCircle, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { RuleTestPanel } from '@/components/training/RuleTestPanel';
+
 import { 
   Tooltip,
   TooltipContent,
