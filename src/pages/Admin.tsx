@@ -108,6 +108,7 @@ const Admin = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [checkedUserId, setCheckedUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [accessCodes, setAccessCodes] = useState<HousekeeperAccessCode[]>([]);
@@ -145,11 +146,22 @@ const Admin = () => {
   
   // Vérifier les permissions super admin
   useEffect(() => {
+    let isActive = true;
+
+    const resetPermissionState = (isLoading: boolean) => {
+      if (!isActive) return;
+      setIsSuperAdmin(false);
+      setCheckedUserId(null);
+      setLoadingData(isLoading);
+    };
+
     const checkSuperAdminRole = async () => {
       if (!user) {
-        setLoadingData(false);
+        resetPermissionState(false);
         return;
       }
+
+      resetPermissionState(true);
 
       try {
         const { data, error } = await supabase
@@ -159,8 +171,15 @@ const Admin = () => {
           .eq('role', 'super_admin')
           .maybeSingle();
 
-        if (!error && data) {
-          setIsSuperAdmin(true);
+        if (!isActive) {
+          return;
+        }
+
+        const hasSuperAdminRole = !error && !!data;
+        setIsSuperAdmin(hasSuperAdminRole);
+        setCheckedUserId(user.id);
+
+        if (hasSuperAdminRole) {
           setLoadingData(false); // Afficher l'UI immédiatement
           // Charger les données en arrière-plan de façon optimisée
           loadAdminDataOptimized();
@@ -169,14 +188,28 @@ const Admin = () => {
         }
       } catch (error) {
         console.error('Erreur vérification role:', error);
+        if (!isActive) {
+          return;
+        }
+        setIsSuperAdmin(false);
+        setCheckedUserId(user.id);
         setLoadingData(false);
       }
     };
 
-    if (!loading) {
-      checkSuperAdminRole();
+    if (loading) {
+      resetPermissionState(true);
+      return () => {
+        isActive = false;
+      };
     }
-  }, [user, loading]);
+
+    checkSuperAdminRole();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.id, loading]);
 
   // Chargement optimisé: hôtels d'abord (pour l'entraînement IA), puis le reste
   const loadAdminDataOptimized = async () => {
@@ -722,7 +755,9 @@ const Admin = () => {
     }
   };
 
-  if (loading || loadingData) {
+  const isPermissionCheckPending = !!user && checkedUserId !== user.id;
+
+  if (loading || loadingData || isPermissionCheckPending) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
