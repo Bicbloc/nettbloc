@@ -1,10 +1,2 @@
-export { TrainingWizard } from "./TrainingWizard";
-export { TrainingStep1Import } from "./TrainingStep1Import";
-export { TrainingStep1bColumnMapping } from "./TrainingStep1bColumnMapping";
-export { TrainingStep3Validate } from "./TrainingStep3Validate";
-export { AdvancedSettingsDrawer } from "./AdvancedSettingsDrawer";
-export { TrainingHistory, useExistingTraining } from "./TrainingHistory";
-export { LinePatternMapper } from "./LinePatternMapper";
-export { ExclusionListManager } from "./ExclusionListManager";
-export { ColumnBasedMappingStep } from "./ColumnBasedMappingStep";
-export { AdvancedMappingStep } from "./AdvancedMappingStep";
+// Training module - simplified to AI-based training
+export { AITrainingTab } from '@/components/dashboard/AITrainingTab';

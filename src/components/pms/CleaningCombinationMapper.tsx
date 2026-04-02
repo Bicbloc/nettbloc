@@ -615,8 +615,6 @@ export const CleaningCombinationMapper = ({ hotelId }: CleaningCombinationMapper
           </div>
         )}
 
-        {/* Panel de test des règles en direct */}
-        <RuleTestPanel hotelId={hotelId} rules={rules} />
 
         {/* Training Report Lines Panel */}
         <Collapsible open={linesOpen} onOpenChange={setLinesOpen}>
