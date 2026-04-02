@@ -138,15 +138,21 @@ serve(async (req: Request) => {
     }
 
     if (targetUserId) {
-      // 1. Find all hotels owned by this user
-      const { data: userHotels } = await adminClient
+      const { data: userHotels, error: userHotelsError } = await adminClient
         .from("hotels")
         .select("id")
         .eq("user_id", targetUserId);
 
-      const hotelIds = userHotels?.map((h) => h.id) || [];
+      if (userHotelsError) {
+        console.error("User hotels lookup error:", userHotelsError);
+        return new Response(JSON.stringify({ error: "Impossible de récupérer les hôtels liés" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      // 2. Delete hotel-dependent data (order matters for FK constraints)
+      const hotelIds = userHotels?.map((h) => h.id) ?? [];
+
       if (hotelIds.length > 0) {
         const hotelDependentTables = [
           "housekeeper_access_codes",
@@ -183,6 +189,7 @@ serve(async (req: Request) => {
           "housekeeper_achievements",
           "housekeeper_levels",
           "sub_accounts",
+          "phone_orders",
         ] as const;
 
         for (const table of hotelDependentTables) {
@@ -194,15 +201,25 @@ serve(async (req: Request) => {
 
           if (error) {
             console.error(`Delete error in ${table}:`, error);
-            // Continue instead of failing - some tables may not exist or have no data
-          } else if (data?.length) {
+            continue;
+          }
+
+          if (data?.length) {
             deletedFrom.push(`${table} (${data.length})`);
           }
         }
       }
 
-      // 3. Delete user-level tables
-      const userIdTables = [
+      const userReferenceTables = [
+        { table: "user_sessions", column: "user_id" },
+        { table: "notifications", column: "user_id" },
+        { table: "password_reset_logs", column: "user_id" },
+        { table: "promo_code_uses", column: "user_id" },
+        { table: "phone_orders", column: "user_id" },
+        { table: "housekeepers", column: "user_id" },
+        { table: "sub_accounts", column: "user_id" },
+        { table: "sub_accounts", column: "parent_user_id" },
+        { table: "sub_accounts", column: "created_by" },
         { table: "hotel_sessions", column: "user_id" },
         { table: "hotel_users", column: "user_id" },
         { table: "hotels", column: "user_id" },
@@ -210,7 +227,7 @@ serve(async (req: Request) => {
         { table: "user_roles", column: "user_id" },
       ] as const;
 
-      for (const { table, column } of userIdTables) {
+      for (const { table, column } of userReferenceTables) {
         const { data, error } = await adminClient
           .from(table)
           .delete()
@@ -218,7 +235,7 @@ serve(async (req: Request) => {
           .select("id");
 
         if (error) {
-          console.error(`Delete error in ${table}:`, error);
+          console.error(`Delete error in ${table}.${column}:`, error);
           return new Response(JSON.stringify({ error: `Erreur suppression ${table}` }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -226,20 +243,27 @@ serve(async (req: Request) => {
         }
 
         if (data?.length) {
-          deletedFrom.push(`${table} (${data.length})`);
+          deletedFrom.push(`${table}.${column} (${data.length})`);
         }
       }
 
       const { error: deleteAuthError } = await adminClient.auth.admin.deleteUser(targetUserId);
       if (deleteAuthError) {
         console.error("Auth delete error:", deleteAuthError);
-        return new Response(JSON.stringify({ error: "Erreur suppression auth.users" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
 
-      deletedFrom.push("auth.users");
+        const { error: softDeleteError } = await adminClient.auth.admin.deleteUser(targetUserId, true);
+        if (softDeleteError) {
+          console.error("Auth soft delete error:", softDeleteError);
+          return new Response(JSON.stringify({ error: softDeleteError.message || deleteAuthError.message || "Erreur suppression auth.users" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        deletedFrom.push("auth.users (soft deleted)");
+      } else {
+        deletedFrom.push("auth.users");
+      }
     }
 
     const { error: auditError } = await adminClient.from("admin_audit_log").insert({
