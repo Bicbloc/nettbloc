@@ -55,6 +55,31 @@ const InvoicesContent = () => {
     }
   };
 
+  const handleDownloadInvoice = async (invoice: Invoice) => {
+    try {
+      if (invoice.pdf_url) {
+        // pdf_url stores the storage path
+        const { data, error } = await supabase.storage
+          .from('invoices')
+          .createSignedUrl(invoice.pdf_url, 3600);
+        if (error) throw error;
+        window.open(data.signedUrl, '_blank');
+      } else {
+        // Generate PDF on the fly
+        const { data, error } = await supabase.functions.invoke('generate-invoice', {
+          body: { invoiceId: invoice.id },
+        });
+        if (error) throw error;
+        if (data?.pdf_url) {
+          window.open(data.pdf_url, '_blank');
+          loadInvoices(); // Refresh to show pdf_url
+        }
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+    }
+  };
+
   const formatAmount = (cents: number) => {
     return (cents / 100).toFixed(2).replace('.', ',') + ' €';
   };
@@ -151,15 +176,13 @@ const InvoicesContent = () => {
                     </TableCell>
                     <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                     <TableCell>
-                      {invoice.pdf_url && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(invoice.pdf_url!, '_blank')}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadInvoice(invoice)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
