@@ -170,12 +170,17 @@ export default function Order() {
         return;
       }
 
-      // Call the parse-report edge function with extracted text
+      // Load training examples for this hotel
+      const { loadTrainingExamples } = await import('@/services/trainingExamplesService');
+      const trainingExamples = hotelId ? await loadTrainingExamples(hotelId) : [];
+
+      // Call the parse-report edge function with extracted text + training
       const { data, error } = await supabase.functions.invoke('parse-report', {
         body: {
           text: fullText,
           hotelId,
           reportDate: format(selectedDate, 'yyyy-MM-dd'),
+          trainingExamples: trainingExamples.length > 0 ? trainingExamples : undefined,
         },
       });
 
