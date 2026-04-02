@@ -296,19 +296,55 @@ export class MewsAdapter extends PmsAdapter {
       }
       
       if (guestNames.length === 1) {
-        // 1 nom = recouche SAUF si DEP/DIR explicite sans autre client
-        const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);
+        r.guestName = guestNames[0];
+        
+        // 1 nom: vérifier date départ vs date rapport et Nuit X/Y
+        const hasDepOrDirtyCode = /\b(DEP|DIR)\b/.test(upper);
         const hasArr = /\bARR\b/.test(upper);
         
-        if (hasDepOrDirty && hasArr) {
-          // DEP+ARR explicit codes but only 1 name → still à blanc (explicit codes win)
+        if (hasDepOrDirtyCode && hasArr) {
           r.status = 'checkout_arrival';
           r.cleaningType = 'a_blanc';
+        } else if (hasDepOrDirtyCode) {
+          r.status = 'checkout';
+          r.cleaningType = 'a_blanc';
         } else {
-          r.status = 'stayover';
-          r.cleaningType = 'recouche';
+          // Vérifier Nuit X/Y
+          const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+            upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+          if (nightMatch) {
+            const current = parseInt(nightMatch[1], 10);
+            const total = parseInt(nightMatch[2], 10);
+            if (current >= total) {
+              // Dernière nuit → à blanc
+              r.status = 'checkout';
+              r.cleaningType = 'a_blanc';
+            } else {
+              r.status = 'stayover';
+              r.cleaningType = 'recouche';
+            }
+          } else if (reportDate) {
+            // Vérifier date de départ vs date du rapport
+            const departureDateResult = this.extractDepartureDate(rawLine);
+            if (departureDateResult) {
+              if (departureDateResult <= reportDate) {
+                r.status = 'checkout';
+                r.cleaningType = 'a_blanc';
+              } else {
+                r.status = 'stayover';
+                r.cleaningType = 'recouche';
+              }
+            } else {
+              // 1 nom sans info date → recouche par défaut
+              r.status = 'stayover';
+              r.cleaningType = 'recouche';
+            }
+          } else {
+            // Pas de date rapport → recouche par défaut
+            r.status = 'stayover';
+            r.cleaningType = 'recouche';
+          }
         }
-        r.guestName = guestNames[0];
         continue; // Skip other rules
       }
 
