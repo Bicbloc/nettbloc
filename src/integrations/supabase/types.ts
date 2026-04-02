@@ -2283,6 +2283,7 @@ export type Database = {
           customer_company_name: string | null
           customer_email: string
           customer_siret: string | null
+          hotel_id: string | null
           id: string
           invoice_date: string
           invoice_number: string
@@ -2312,6 +2313,7 @@ export type Database = {
           customer_company_name?: string | null
           customer_email: string
           customer_siret?: string | null
+          hotel_id?: string | null
           id?: string
           invoice_date?: string
           invoice_number: string
@@ -2341,6 +2343,7 @@ export type Database = {
           customer_company_name?: string | null
           customer_email?: string
           customer_siret?: string | null
+          hotel_id?: string | null
           id?: string
           invoice_date?: string
           invoice_number?: string
@@ -2361,7 +2364,22 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoices_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_stats_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       legal_pages: {
         Row: {
