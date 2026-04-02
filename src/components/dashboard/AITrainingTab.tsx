@@ -528,6 +528,55 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Propagation Dialog */}
+      <Dialog open={!!propagationDialog?.open} onOpenChange={(open) => { if (!open) setPropagationDialog(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Appliquer aux chambres similaires ?
+            </DialogTitle>
+            <DialogDescription>
+              {propagationDialog && (
+                <>
+                  La chambre <strong>{propagationDialog.roomNumber}</strong> a le profil : <Badge variant="outline" className="mx-1">{getSignatureLabel(propagationDialog.signature)}</Badge>.
+                  <br />
+                  <strong>{propagationDialog.similarRooms.length}</strong> autre(s) chambre(s) ont le même profil.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {propagationDialog && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Appliquer <Badge className={cleaningTypeLabel(propagationDialog.newType).className}>
+                  {cleaningTypeLabel(propagationDialog.newType).label}
+                </Badge> à toutes ces chambres :
+              </p>
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                {propagationDialog.similarRooms.map(r => (
+                  <Badge key={r.roomNumber} variant="outline" className="text-sm">
+                    {r.roomNumber}
+                    <span className="ml-1 text-muted-foreground">
+                      ({cleaningTypeLabel(r.currentType).label})
+                    </span>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPropagationDialog(null)}>
+              Non, juste cette chambre
+            </Button>
+            <Button onClick={handlePropagate} className="gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Appliquer à toutes ({propagationDialog?.similarRooms.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
