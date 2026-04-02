@@ -2,13 +2,14 @@
  * Nouveau système d'entraînement IA simplifié
  * Flow: Upload PDF → IA parse → Corriger les chambres → Sauvegarder les exemples
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Brain, Upload, CheckCircle, AlertCircle, Loader2, Sparkles, Save, Trash2, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Brain, Upload, CheckCircle, AlertCircle, Loader2, Sparkles, Save, Trash2, FileText, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { loadTrainingExamples, saveTrainingExamples, type TrainingExample } from "@/services/trainingExamplesService";
@@ -23,9 +24,40 @@ interface ParsedRoom {
   status?: string;
 }
 
+interface RoomSignature {
+  hasArrival: boolean;
+  hasDeparture: boolean;
+  guestCount: 'single' | 'multiple' | 'unknown';
+}
+
+interface PropagationCandidate {
+  roomNumber: string;
+  currentType: string;
+}
+
 interface AITrainingTabProps {
   currentHotelId: string | null;
 }
+
+const getRoomSignature = (room: ParsedRoom): string => {
+  const hasArr = !!room.departureDate || room.status?.toLowerCase().includes('arr');
+  const hasDep = !!room.departureDate || room.status?.toLowerCase().includes('dep') || room.status?.toLowerCase().includes('out');
+  const nightNum = room.nightInfo ? parseInt(room.nightInfo) : 0;
+  const multiGuest = room.guestName?.includes('/') || room.guestName?.includes('+') || room.guestName?.includes('&');
+  const guestCount = multiGuest ? 'multiple' : room.guestName ? 'single' : 'unknown';
+  return `${hasArr ? 'A' : '-'}|${hasDep ? 'D' : '-'}|${guestCount}|${nightNum > 0 ? 'N' + nightNum : 'N?'}`;
+};
+
+const getSignatureLabel = (sig: string): string => {
+  const [arr, dep, guests, night] = sig.split('|');
+  const parts: string[] = [];
+  if (arr === 'A') parts.push('arrivée');
+  if (dep === 'D') parts.push('départ');
+  if (guests === 'single') parts.push('1 client');
+  if (guests === 'multiple') parts.push('clients multiples');
+  if (night !== 'N?') parts.push(night.replace('N', '') + ' nuit(s)');
+  return parts.length > 0 ? parts.join(' + ') : 'profil inconnu';
+};
 
 export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
   const [step, setStep] = useState<'upload' | 'review' | 'saved'>('upload');
@@ -35,6 +67,13 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
   const [corrections, setCorrections] = useState<Record<string, 'a_blanc' | 'recouche' | 'none'>>({});
   const [savedExamples, setSavedExamples] = useState<TrainingExample[]>([]);
   const [reportText, setReportText] = useState('');
+  const [propagationDialog, setPropagationDialog] = useState<{
+    open: boolean;
+    roomNumber: string;
+    newType: 'a_blanc' | 'recouche' | 'none';
+    signature: string;
+    similarRooms: PropagationCandidate[];
+  } | null>(null);
 
   // Load existing training examples
   const loadExisting = useCallback(async () => {
@@ -122,7 +161,51 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
   };
 
   const handleCorrection = (roomNumber: string, newType: 'a_blanc' | 'recouche' | 'none') => {
+    const room = parsedRooms.find(r => r.roomNumber === roomNumber);
+    if (!room) return;
+
+    const sig = getRoomSignature(room);
+    // Find similar rooms with same signature but different type
+    const similar = parsedRooms.filter(r => {
+      if (r.roomNumber === roomNumber) return false;
+      const effectiveType = corrections[r.roomNumber] || r.cleaningType;
+      if (effectiveType === newType) return false; // already correct
+      return getRoomSignature(r) === sig;
+    });
+
+    // Apply correction to this room immediately
     setCorrections(prev => ({ ...prev, [roomNumber]: newType }));
+
+    // If there are similar rooms, show propagation dialog
+    if (similar.length > 0) {
+      setPropagationDialog({
+        open: true,
+        roomNumber,
+        newType,
+        signature: sig,
+        similarRooms: similar.map(r => ({
+          roomNumber: r.roomNumber,
+          currentType: corrections[r.roomNumber] || r.cleaningType,
+        })),
+      });
+    }
+  };
+
+  const handlePropagate = () => {
+    if (!propagationDialog) return;
+    const { newType, similarRooms } = propagationDialog;
+    setCorrections(prev => {
+      const updated = { ...prev };
+      for (const r of similarRooms) {
+        updated[r.roomNumber] = newType;
+      }
+      return updated;
+    });
+    toast({
+      title: "Propagation appliquée",
+      description: `${similarRooms.length} chambre(s) corrigée(s) en ${newType === 'a_blanc' ? 'à blanc' : newType === 'recouche' ? 'recouche' : 'propre'}`,
+    });
+    setPropagationDialog(null);
   };
 
   const getEffectiveType = (room: ParsedRoom) => {
@@ -354,6 +437,8 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
                 const effectiveType = getEffectiveType(room);
                 const isCorrected = corrections[room.roomNumber] !== undefined;
                 const info = cleaningTypeLabel(effectiveType);
+                const sig = getRoomSignature(room);
+                const similarCount = parsedRooms.filter(r => r.roomNumber !== room.roomNumber && getRoomSignature(r) === sig).length;
 
                 return (
                   <div
@@ -382,6 +467,9 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
                       {room.nightInfo && <p>🌙 Nuit {room.nightInfo}</p>}
                       {room.status && <p>📋 {room.status}</p>}
                       <p className="text-muted-foreground/60 italic">{room.reason}</p>
+                      {similarCount > 0 && (
+                        <p className="text-primary/70 font-medium">🔗 {similarCount} chambre(s) similaire(s)</p>
+                      )}
                     </div>
                     {isCorrected && (
                       <Badge className="mt-2 bg-primary/10 text-primary text-xs">
@@ -445,6 +533,55 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Propagation Dialog */}
+      <Dialog open={!!propagationDialog?.open} onOpenChange={(open) => { if (!open) setPropagationDialog(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Appliquer aux chambres similaires ?
+            </DialogTitle>
+            <DialogDescription>
+              {propagationDialog && (
+                <>
+                  La chambre <strong>{propagationDialog.roomNumber}</strong> a le profil : <Badge variant="outline" className="mx-1">{getSignatureLabel(propagationDialog.signature)}</Badge>.
+                  <br />
+                  <strong>{propagationDialog.similarRooms.length}</strong> autre(s) chambre(s) ont le même profil.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {propagationDialog && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Appliquer <Badge className={cleaningTypeLabel(propagationDialog.newType).className}>
+                  {cleaningTypeLabel(propagationDialog.newType).label}
+                </Badge> à toutes ces chambres :
+              </p>
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                {propagationDialog.similarRooms.map(r => (
+                  <Badge key={r.roomNumber} variant="outline" className="text-sm">
+                    {r.roomNumber}
+                    <span className="ml-1 text-muted-foreground">
+                      ({cleaningTypeLabel(r.currentType).label})
+                    </span>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPropagationDialog(null)}>
+              Non, juste cette chambre
+            </Button>
+            <Button onClick={handlePropagate} className="gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Appliquer à toutes ({propagationDialog?.similarRooms.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
