@@ -274,6 +274,8 @@ function extractReportDateFromText(text: string): Date | null {
   return null;
 }
 
+/**
+ * Fuzzy match: if a word is within 1 edit distance of a known status, match it.
  */
 function fuzzyMatchStatus(
   value: string,
