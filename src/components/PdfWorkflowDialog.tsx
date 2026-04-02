@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { processPdf, getLastParsedLines, getLastCoverageMetadata, CoverageMetadata } from "@/services/pdfService";
-import { TrainingCoverageReport } from "@/components/TrainingCoverageReport";
+
 import { FileUp, Users, ArrowRight, CheckCircle, X, Search, Loader2, RefreshCw, AlertTriangle, Replace, RotateCcw, Plug, Clock, Eye, Brain, Calendar, User, Home, Sparkles, Map as MapIcon, Zap, Settings2, UserCheck, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -1296,10 +1296,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         </div>
       </ScrollArea>
 
-      {/* Training coverage report */}
-      {coverageMetadata && (
-        <TrainingCoverageReport coverage={coverageMetadata} />
-      )}
 
       {/* Bouton Entraîner — TOUJOURS visible */}
       <Alert className={`${
