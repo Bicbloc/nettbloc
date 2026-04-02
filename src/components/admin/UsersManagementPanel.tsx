@@ -212,6 +212,34 @@ export function UsersManagementPanel() {
     }
   };
 
+  const [deletingUser, setDeletingUser] = useState<AllUser | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteUserCompletely = async (user: AllUser) => {
+    setIsDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Non authentifié');
+
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { userId: user.id, email: user.email },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Utilisateur supprimé ✅",
+        description: `${user.email} supprimé de : ${data.deleted_from?.join(', ') || 'aucune table'}`,
+      });
+      setDeletingUser(null);
+      loadUsers();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erreur", description: error.message });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const toggleSuspend = async (userId: string, suspend: boolean, reason?: string) => {
     try {
       const { error } = await supabase
