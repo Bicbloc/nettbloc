@@ -161,7 +161,51 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
   };
 
   const handleCorrection = (roomNumber: string, newType: 'a_blanc' | 'recouche' | 'none') => {
+    const room = parsedRooms.find(r => r.roomNumber === roomNumber);
+    if (!room) return;
+
+    const sig = getRoomSignature(room);
+    // Find similar rooms with same signature but different type
+    const similar = parsedRooms.filter(r => {
+      if (r.roomNumber === roomNumber) return false;
+      const effectiveType = corrections[r.roomNumber] || r.cleaningType;
+      if (effectiveType === newType) return false; // already correct
+      return getRoomSignature(r) === sig;
+    });
+
+    // Apply correction to this room immediately
     setCorrections(prev => ({ ...prev, [roomNumber]: newType }));
+
+    // If there are similar rooms, show propagation dialog
+    if (similar.length > 0) {
+      setPropagationDialog({
+        open: true,
+        roomNumber,
+        newType,
+        signature: sig,
+        similarRooms: similar.map(r => ({
+          roomNumber: r.roomNumber,
+          currentType: corrections[r.roomNumber] || r.cleaningType,
+        })),
+      });
+    }
+  };
+
+  const handlePropagate = () => {
+    if (!propagationDialog) return;
+    const { newType, similarRooms } = propagationDialog;
+    setCorrections(prev => {
+      const updated = { ...prev };
+      for (const r of similarRooms) {
+        updated[r.roomNumber] = newType;
+      }
+      return updated;
+    });
+    toast({
+      title: "Propagation appliquée",
+      description: `${similarRooms.length} chambre(s) corrigée(s) en ${newType === 'a_blanc' ? 'à blanc' : newType === 'recouche' ? 'recouche' : 'propre'}`,
+    });
+    setPropagationDialog(null);
   };
 
   const getEffectiveType = (room: ParsedRoom) => {
