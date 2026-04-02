@@ -53,7 +53,7 @@ const getRoomSignature = (room: ParsedRoom): string => {
 };
 
 const getSignatureLabel = (sig: string): string => {
-  const [arr, dep, guests, time] = sig.split('|');
+  const [arr, dep, guests, time, roomStatus] = sig.split('|');
   const parts: string[] = [];
   if (arr === 'A') parts.push('arrivée');
   if (dep === 'D') parts.push('départ');
@@ -61,6 +61,7 @@ const getSignatureLabel = (sig: string): string => {
   if (guests === 'multiple') parts.push('clients multiples');
   if (guests === 'empty') parts.push('chambre vide');
   if (time === 'T') parts.push('heure arrivée');
+  if (roomStatus && roomStatus !== '-') parts.push(`statut ${roomStatus}`);
   return parts.length > 0 ? parts.join(' + ') : 'profil inconnu';
 };
 
