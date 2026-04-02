@@ -251,7 +251,29 @@ function extractGuestNamesFromLine(text: string): string[] {
 }
 
 /**
- * Fuzzy match: if a word is within 1 edit distance of a known status, match it.
+ * Extract report date from text header (e.g., "Statut des espaces - 29/03/2026")
+ */
+function extractReportDateFromText(text: string): Date | null {
+  // Pattern: "DD/MM/YYYY" in the first few lines
+  const headerLines = text.split('\n').slice(0, 10).join(' ');
+  
+  // Try "Statut des espaces - DD/MM/YYYY"
+  const pattern1 = /Statut des espaces\s*[-–]\s*(\d{2})\/(\d{2})\/(\d{4})/i;
+  let match = headerLines.match(pattern1);
+  if (match) {
+    return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+  }
+  
+  // Try any date in header
+  const pattern2 = /\b(\d{2})\/(\d{2})\/(\d{4})\b/;
+  match = headerLines.match(pattern2);
+  if (match) {
+    return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+  }
+  
+  return null;
+}
+
  */
 function fuzzyMatchStatus(
   value: string,
