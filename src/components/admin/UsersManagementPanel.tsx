@@ -212,6 +212,34 @@ export function UsersManagementPanel() {
     }
   };
 
+  const [deletingUser, setDeletingUser] = useState<AllUser | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteUserCompletely = async (user: AllUser) => {
+    setIsDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Non authentifié');
+
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { userId: user.id, email: user.email },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Utilisateur supprimé ✅",
+        description: `${user.email} supprimé de : ${data.deleted_from?.join(', ') || 'aucune table'}`,
+      });
+      setDeletingUser(null);
+      loadUsers();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erreur", description: error.message });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const toggleSuspend = async (userId: string, suspend: boolean, reason?: string) => {
     try {
       const { error } = await supabase
@@ -705,6 +733,14 @@ export function UsersManagementPanel() {
                                   </>
                                 )}
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setDeletingUser(user)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Supprimer complètement
+                              </DropdownMenuItem>
                             </>
                           )}
                         </DropdownMenuContent>
@@ -770,6 +806,37 @@ export function UsersManagementPanel() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">⚠️ Suppression complète</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Vous êtes sur le point de supprimer <strong>{deletingUser?.email}</strong> ({deletingUser?.user_type}).</p>
+              <p>Cela supprimera :</p>
+              <ul className="list-disc pl-5 text-sm space-y-1">
+                <li>Le compte d'authentification</li>
+                <li>Le profil utilisateur</li>
+                <li>Les hôtels associés (si établissement)</li>
+                <li>Les profils staff (femme de chambre, gouvernante, technicien)</li>
+                <li>Les sessions et données liées</li>
+              </ul>
+              <p className="font-semibold text-destructive">Cette action est irréversible !</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingUser && deleteUserCompletely(deletingUser)}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Suppression...' : 'Supprimer définitivement'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
