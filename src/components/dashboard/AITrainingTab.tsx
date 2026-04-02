@@ -38,12 +38,18 @@ interface AITrainingTabProps {
 const getRoomSignature = (room: ParsedRoom): string => {
   const reason = (room.reason || '').toLowerCase();
   const status = (room.status || '').toLowerCase();
-  const hasArr = reason.includes('arriv') || status.includes('arr') || !!room.departureDate;
-  const hasDep = reason.includes('départ') || reason.includes('depart') || status.includes('dep') || status.includes('out') || !!room.departureDate;
+  const hasArr = reason.includes('arriv') || status.includes('arr');
+  const hasDep = reason.includes('départ') || reason.includes('depart') || status.includes('dep') || status.includes('out');
   const multiGuest = room.guestName?.includes('/') || room.guestName?.includes('+') || room.guestName?.includes('&');
   const guestCount = multiGuest ? 'multiple' : room.guestName ? 'single' : 'empty';
   const hasArrivalTime = /\d{1,2}:\d{2}/.test(reason) && hasArr;
-  return `${hasArr ? 'A' : '-'}|${hasDep ? 'D' : '-'}|${guestCount}|${hasArrivalTime ? 'T' : '-'}`;
+  // Detect room status keywords (INS/PRO/SAL/DIR)
+  const roomStatus = status.includes('ins') || reason.includes('ins') ? 'INS' 
+    : status.includes('pro') || reason.includes('pro') ? 'PRO'
+    : status.includes('sal') || reason.includes('sal') ? 'SAL'
+    : status.includes('dir') || reason.includes('dir') ? 'DIR'
+    : '-';
+  return `${hasArr ? 'A' : '-'}|${hasDep ? 'D' : '-'}|${guestCount}|${hasArrivalTime ? 'T' : '-'}|${roomStatus}`;
 };
 
 const getSignatureLabel = (sig: string): string => {
