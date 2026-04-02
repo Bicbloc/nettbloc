@@ -566,8 +566,38 @@ export class MewsAdapter extends PmsAdapter {
     const statusTokens = tokens.filter(t => !this.isRoomTypeCode(t));
     
     
-    // PRIORITÉ 1: PRO = propre, pas de nettoyage
+    // PRIORITÉ 1: PRO/PROPRE — vérifier s'il y a un client associé
+    // PRO avec client parti = à blanc, PRO sans client = propre (none)
     if (statusTokens.some(t => t === 'PRO' || t === 'PROPRE')) {
+      // Compter les noms clients
+      const guestNames = fieldExtractor.extractAllGuestNames(line);
+      if (guestNames.length >= 2) {
+        return { status: 'checkout_arrival', cleaningType: 'a_blanc' };
+      }
+      if (guestNames.length === 1) {
+        // 1 nom: vérifier Nuit X/Y et date départ
+        const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+          upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+        if (nightMatch) {
+          const current = parseInt(nightMatch[1], 10);
+          const total = parseInt(nightMatch[2], 10);
+          if (current >= total) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        }
+        // Vérifier date de départ vs date rapport
+        const departureDateResult = this.extractDepartureDate(line);
+        if (departureDateResult && reportDate) {
+          if (departureDateResult <= reportDate) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        }
+        // 1 nom sans info date → recouche
+        return { status: 'stayover', cleaningType: 'recouche' };
+      }
+      // 0 noms → propre
       return { status: 'clean', cleaningType: 'none' };
     }
     
