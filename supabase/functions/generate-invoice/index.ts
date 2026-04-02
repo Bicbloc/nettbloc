@@ -359,7 +359,49 @@ serve(async (req) => {
         });
       }
 
-      const pdfBytes = buildInvoicePdf(invoice);
+      // Enrich invoice with hotel info for PDF
+      let hotelName = '';
+      let hotelAddress = '';
+      let hotelSiret = '';
+      if (invoice.hotel_id) {
+        const { data: hotel } = await supabaseAdmin
+          .from('hotels')
+          .select('name, address')
+          .eq('id', invoice.hotel_id)
+          .maybeSingle();
+        if (hotel) {
+          hotelName = hotel.name || '';
+          hotelAddress = hotel.address || '';
+        }
+      } else if (invoice.user_id) {
+        const { data: hotel } = await supabaseAdmin
+          .from('hotels')
+          .select('name, address')
+          .eq('user_id', invoice.user_id)
+          .maybeSingle();
+        if (hotel) {
+          hotelName = hotel.name || '';
+          hotelAddress = hotel.address || '';
+        }
+      }
+      // Fetch billing SIRET from profile
+      if (invoice.user_id) {
+        const { data: prof } = await supabaseAdmin
+          .from('profiles')
+          .select('billing_siret')
+          .eq('id', invoice.user_id)
+          .maybeSingle();
+        if (prof?.billing_siret) hotelSiret = prof.billing_siret;
+      }
+
+      const enrichedInvoice = {
+        ...invoice,
+        _hotel_name: hotelName,
+        _hotel_address: hotelAddress,
+        _hotel_siret: hotelSiret || invoice.customer_siret || '',
+      };
+
+      const pdfBytes = buildInvoicePdf(enrichedInvoice);
       // Always regenerate and overwrite storage
       const storagePath = `${invoice.user_id}/${invoice.invoice_number}.pdf`;
 
