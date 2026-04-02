@@ -18,116 +18,300 @@ const logStep = (step: string, details?: any) => {
   console.log(`[GENERATE-INVOICE] ${step}${detailsStr}`);
 };
 
+// ---------------------------------------------------------------------------
+// WinAnsiEncoding helper – maps common French characters to their byte values
+// ---------------------------------------------------------------------------
+function pdfEncode(text: string): Uint8Array {
+  const winAnsi: Record<number, number> = {
+    8217: 146, // '
+    8216: 145, // '
+    8220: 147, // "
+    8221: 148, // "
+    8211: 150, // –
+    8212: 151, // —
+    8230: 133, // …
+    8364: 128, // €
+    338: 140,  // Œ
+    339: 156,  // œ
+  };
+  const bytes: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 256) {
+      bytes.push(code);
+    } else if (winAnsi[code] !== undefined) {
+      bytes.push(winAnsi[code]);
+    } else {
+      bytes.push(63); // '?'
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+// Escape a string for use inside a PDF (...) literal
+function pdfEsc(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+// ---------------------------------------------------------------------------
+// Professional invoice PDF builder
+// ---------------------------------------------------------------------------
 function buildInvoicePdf(invoice: any): Uint8Array {
-  const amountHt = (invoice.amount_ht / 100).toFixed(2);
-  const tvaAmount = (invoice.tva_amount / 100).toFixed(2);
-  const amountTtc = (invoice.amount_ttc / 100).toFixed(2);
+  const PAGE_W = 595;
+  const PAGE_H = 842;
+  const ML = 50;  // margin left
+  const MR = 50;  // margin right
+  const CW = PAGE_W - ML - MR; // content width = 495
 
-  const sellerName = invoice.seller_name || 'BicBloc';
-  const sellerSiret = invoice.seller_siret || '97864605700015';
-  const sellerAddress = invoice.seller_address || '60 RUE FRANCOIS IER, 75008 PARIS';
-  const sellerEmail = invoice.seller_email || 'support@bicbloc.eu';
+  const amountHt  = (invoice.amount_ht / 100).toFixed(2).replace('.', ',');
+  const tvaAmount = (invoice.tva_amount / 100).toFixed(2).replace('.', ',');
+  const amountTtc = (invoice.amount_ttc / 100).toFixed(2).replace('.', ',');
+  const tvaRate   = invoice.tva_rate || 20;
 
-  const customerName = invoice.customer_company_name || invoice.customer_email || 'Client';
-  const customerEmail = invoice.customer_billing_email || invoice.customer_email || '';
+  const sellerName    = invoice.seller_name || 'BicBloc';
+  const sellerSiret   = invoice.seller_siret || '97864605700015';
+  const sellerAddress = invoice.seller_address || '60 RUE FRANCOIS 1ER, 75008 PARIS';
+  const sellerEmail   = invoice.seller_email || 'support@bicbloc.eu';
+
+  const customerName    = invoice.customer_company_name || invoice.customer_email || 'Client';
+  const customerEmail   = invoice.customer_billing_email || invoice.customer_email || '';
   const customerAddress = invoice.customer_address || '';
-  const customerSiret = invoice.customer_siret || '';
+  const customerSiret   = invoice.customer_siret || '';
 
   const invoiceDate = invoice.invoice_date || new Date().toISOString().split('T')[0];
   const periodStart = invoice.period_start || '';
-  const periodEnd = invoice.period_end || '';
+  const periodEnd   = invoice.period_end || '';
+  const designation = invoice.plan_name || invoice.plan_type || 'Abonnement';
+  const statusLabel = invoice.status === 'paid' ? 'Pay\u00e9e' : invoice.status;
 
-  const lines: string[] = [];
-  lines.push(`FACTURE N° ${invoice.invoice_number}`);
-  lines.push('');
-  lines.push(`Date : ${invoiceDate}`);
+  // Build content stream using PDF operators
+  const ops: string[] = [];
+
+  // Helper: draw text
+  const text = (x: number, y: number, s: string, font = '/F1', size = 10) => {
+    ops.push(`BT ${font} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${pdfEsc(s)}) Tj ET`);
+  };
+  // Helper: right-aligned text
+  const textR = (xRight: number, y: number, s: string, font = '/F1', size = 10) => {
+    // Approximate width: size * 0.5 per char (Helvetica average)
+    const approxW = s.length * size * 0.5;
+    text(xRight - approxW, y, s, font, size);
+  };
+  // Helper: rectangle (stroke)
+  const rect = (x: number, y: number, w: number, h: number) => {
+    ops.push(`${x} ${y} ${w} ${h} re S`);
+  };
+  // Helper: filled rectangle
+  const rectFill = (x: number, y: number, w: number, h: number, r: number, g: number, b: number) => {
+    ops.push(`q ${r} ${g} ${b} rg ${x} ${y} ${w} ${h} re f Q`);
+  };
+  // Helper: line
+  const line = (x1: number, y1: number, x2: number, y2: number) => {
+    ops.push(`${x1} ${y1} m ${x2} ${y2} l S`);
+  };
+
+  let y = PAGE_H - 50;
+
+  // --- Header: Company name + FACTURE title ---
+  ops.push('0.2 0.4 0.8 rg'); // blue color
+  text(ML, y, sellerName, '/F2', 22);
+  ops.push('0 0 0 rg'); // back to black
+
+  text(ML + 300, y, 'FACTURE', '/F2', 22);
+  y -= 30;
+
+  // Invoice number & date
+  ops.push('0.4 0.4 0.4 rg');
+  text(ML + 300, y, `N\u00b0 ${invoice.invoice_number}`, '/F1', 11);
+  y -= 16;
+  text(ML + 300, y, `Date : ${invoiceDate}`, '/F1', 10);
   if (periodStart && periodEnd) {
-    lines.push(`Période : ${periodStart} - ${periodEnd}`);
+    y -= 14;
+    text(ML + 300, y, `P\u00e9riode : ${periodStart} au ${periodEnd}`, '/F1', 10);
   }
-  lines.push('');
-  lines.push('--- VENDEUR ---');
-  lines.push(sellerName);
-  lines.push(`SIRET : ${sellerSiret}`);
-  lines.push(sellerAddress);
-  lines.push(`Email : ${sellerEmail}`);
-  lines.push('');
-  lines.push('--- CLIENT ---');
-  lines.push(customerName);
-  if (customerSiret) lines.push(`SIRET : ${customerSiret}`);
-  if (customerAddress) lines.push(customerAddress);
-  if (customerEmail) lines.push(`Email : ${customerEmail}`);
-  lines.push('');
-  lines.push('--- DÉTAILS ---');
-  lines.push(`Désignation : ${invoice.plan_name || invoice.plan_type}`);
-  lines.push(`Montant HT  : ${amountHt} EUR`);
-  lines.push(`TVA (${invoice.tva_rate || 20}%) : ${tvaAmount} EUR`);
-  lines.push(`Montant TTC : ${amountTtc} EUR`);
-  lines.push('');
-  lines.push(`Statut : ${invoice.status === 'paid' ? 'Payée' : invoice.status}`);
+  ops.push('0 0 0 rg');
+
+  // --- Seller info block ---
+  y -= 40;
+  const sellerY = y;
+  rectFill(ML, y - 75, 220, 80, 0.95, 0.95, 0.97);
+  rect(ML, y - 75, 220, 80);
+  ops.push('0.2 0.2 0.2 rg');
+  text(ML + 8, y - 2, '\u00c9metteur', '/F2', 10);
+  ops.push('0 0 0 rg');
+  text(ML + 8, y - 16, sellerName, '/F2', 9);
+  text(ML + 8, y - 28, `SIRET : ${sellerSiret}`, '/F1', 8);
+  text(ML + 8, y - 40, sellerAddress, '/F1', 8);
+  text(ML + 8, y - 52, `Email : ${sellerEmail}`, '/F1', 8);
+
+  // --- Client info block ---
+  rectFill(ML + 260, sellerY - 75, 235, 80, 0.95, 0.97, 0.95);
+  rect(ML + 260, sellerY - 75, 235, 80);
+  ops.push('0.2 0.2 0.2 rg');
+  text(ML + 268, sellerY - 2, 'Client', '/F2', 10);
+  ops.push('0 0 0 rg');
+  text(ML + 268, sellerY - 16, customerName, '/F2', 9);
+  let cy = sellerY - 28;
+  if (customerSiret) { text(ML + 268, cy, `SIRET : ${customerSiret}`, '/F1', 8); cy -= 12; }
+  if (customerAddress) { text(ML + 268, cy, customerAddress, '/F1', 8); cy -= 12; }
+  if (customerEmail) { text(ML + 268, cy, `Email : ${customerEmail}`, '/F1', 8); }
+
+  // --- Table header ---
+  y = sellerY - 105;
+  const tableX = ML;
+  const colWidths = [265, 60, 80, 90]; // designation, qty, unit price HT, total HT
+  const tableW = colWidths.reduce((a, b) => a + b, 0);
+  const rowH = 24;
+
+  // Table header background
+  rectFill(tableX, y - rowH, tableW, rowH, 0.15, 0.3, 0.6);
+
+  // Table header text (white)
+  ops.push('1 1 1 rg');
+  const headers = ['D\u00e9signation', 'Qt\u00e9', 'P.U. HT', 'Total HT'];
+  let hx = tableX + 6;
+  for (let i = 0; i < headers.length; i++) {
+    text(hx, y - 16, headers[i], '/F2', 9);
+    hx += colWidths[i];
+  }
+  ops.push('0 0 0 rg');
+
+  // Table body row
+  y -= rowH;
+  rect(tableX, y - rowH, tableW, rowH);
+  // Vertical lines for header and body
+  let lx = tableX;
+  for (let i = 0; i < colWidths.length; i++) {
+    line(lx, y, lx, y - rowH);
+    lx += colWidths[i];
+  }
+  line(lx, y, lx, y - rowH); // right edge
+
+  // Row content
+  text(tableX + 6, y - 16, designation, '/F1', 9);
+  text(tableX + colWidths[0] + 20, y - 16, '1', '/F1', 9);
+  textR(tableX + colWidths[0] + colWidths[1] + colWidths[2] - 6, y - 16, `${amountHt} \u20ac`, '/F1', 9);
+  textR(tableX + tableW - 6, y - 16, `${amountHt} \u20ac`, '/F1', 9);
+
+  // --- Totals section ---
+  y -= rowH + 20;
+  const totX = tableX + 280;
+  const totW = tableW - 280;
+
+  // Sub-total HT
+  rectFill(totX, y - 22, totW, 22, 0.96, 0.96, 0.96);
+  text(totX + 6, y - 15, 'Total HT', '/F2', 9);
+  textR(totX + totW - 6, y - 15, `${amountHt} \u20ac`, '/F1', 10);
+  y -= 22;
+
+  // TVA
+  rectFill(totX, y - 22, totW, 22, 0.96, 0.96, 0.96);
+  text(totX + 6, y - 15, `TVA (${tvaRate}%)`, '/F1', 9);
+  textR(totX + totW - 6, y - 15, `${tvaAmount} \u20ac`, '/F1', 10);
+  y -= 22;
+
+  // Total TTC
+  rectFill(totX, y - 26, totW, 26, 0.15, 0.3, 0.6);
+  ops.push('1 1 1 rg');
+  text(totX + 6, y - 18, 'Total TTC', '/F2', 11);
+  textR(totX + totW - 6, y - 18, `${amountTtc} \u20ac`, '/F2', 12);
+  ops.push('0 0 0 rg');
+
+  // --- Payment info ---
+  y -= 55;
+  rectFill(ML, y - 50, CW, 50, 0.97, 0.97, 1);
+  rect(ML, y - 50, CW, 50);
+  text(ML + 8, y - 14, 'Informations de paiement', '/F2', 10);
+  text(ML + 8, y - 28, `Statut : ${statusLabel}`, '/F1', 9);
   if (invoice.payment_reference) {
-    lines.push(`Référence paiement : ${invoice.payment_reference}`);
+    text(ML + 8, y - 40, `R\u00e9f\u00e9rence : ${invoice.payment_reference}`, '/F1', 9);
+  }
+  if (invoice.payment_method) {
+    const methodLabel = invoice.payment_method === 'gocardless_direct_debit' ? 'Pr\u00e9l\u00e8vement SEPA (GoCardless)' :
+                        invoice.payment_method === 'card' ? 'Carte bancaire' : invoice.payment_method;
+    text(ML + 250, y - 28, `Mode : ${methodLabel}`, '/F1', 9);
   }
 
-  const textContent = lines.join('\n');
+  // --- Footer ---
+  ops.push('0.5 0.5 0.5 rg');
+  line(ML, 60, PAGE_W - MR, 60);
+  text(ML, 45, `${sellerName} - SIRET ${sellerSiret} - ${sellerAddress}`, '/F1', 7);
+  text(ML, 35, 'TVA non applicable, art. 293 B du CGI (sauf indication contraire)', '/F1', 7);
+  ops.push('0 0 0 rg');
 
-  // Build a minimal valid PDF with the text content
-  const encoder = new TextEncoder();
-  const streamLines = textContent.split('\n');
+  // Set line width
+  ops.unshift('0.5 w');
 
-  // Build page content stream
-  let contentStream = 'BT\n/F1 11 Tf\n';
-  let y = 780;
-  for (const line of streamLines) {
-    // Escape PDF special chars
-    const safe = line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-    contentStream += `1 0 0 1 50 ${y} Tm\n(${safe}) Tj\n`;
-    y -= 16;
-    if (y < 40) break;
+  // Encode content stream with WinAnsi
+  const contentStr = ops.join('\n') + '\n';
+  const contentBytes = pdfEncode(contentStr);
+  const contentLen = contentBytes.length;
+
+  // ---- Build PDF structure ----
+  // We'll build objects manually and track offsets
+  const parts: Uint8Array[] = [];
+  const offsets: number[] = [];
+  let pos = 0;
+
+  const addRaw = (s: string) => {
+    const b = pdfEncode(s);
+    parts.push(b);
+    pos += b.length;
+  };
+  const addBytes = (b: Uint8Array) => {
+    parts.push(b);
+    pos += b.length;
+  };
+
+  addRaw('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n');
+
+  // obj 1: Catalog
+  offsets.push(pos);
+  addRaw('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+  // obj 2: Pages
+  offsets.push(pos);
+  addRaw('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+  // obj 3: Page
+  offsets.push(pos);
+  addRaw(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}]\n   /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>\nendobj\n`);
+
+  // obj 4: Content stream
+  offsets.push(pos);
+  addRaw(`4 0 obj\n<< /Length ${contentLen} >>\nstream\n`);
+  addBytes(contentBytes);
+  addRaw('endstream\nendobj\n');
+
+  // obj 5: Font Helvetica
+  offsets.push(pos);
+  addRaw('5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n');
+
+  // obj 6: Font Helvetica-Bold
+  offsets.push(pos);
+  addRaw('6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n');
+
+  // xref
+  const xrefPos = pos;
+  const numObjs = offsets.length + 1; // including obj 0
+  addRaw(`xref\n0 ${numObjs}\n0000000000 65535 f \n`);
+  for (const off of offsets) {
+    addRaw(`${String(off).padStart(10, '0')} 00000 n \n`);
   }
-  contentStream += 'ET\n';
 
-  const streamBytes = encoder.encode(contentStream);
+  // trailer
+  addRaw(`trailer\n<< /Size ${numObjs} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF\n`);
 
-  const pdf = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
+  // Concatenate all parts
+  const totalLen = parts.reduce((s, p) => s + p.length, 0);
+  const result = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.length;
+  }
 
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842]
-   /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
-endobj
-
-4 0 obj
-<< /Length ${streamBytes.length} >>
-stream
-${contentStream}endstream
-endobj
-
-5 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
-endobj
-
-xref
-0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000266 00000 n 
-${String(300 + streamBytes.length).padStart(10, '0')} 00000 n 
-
-trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-${360 + streamBytes.length}
-%%EOF`;
-
-  return encoder.encode(pdf);
+  return result;
 }
 
 serve(async (req) => {
@@ -173,27 +357,26 @@ serve(async (req) => {
       }
 
       const pdfBytes = buildInvoicePdf(invoice);
-      const storagePath = invoice.pdf_url || `${invoice.user_id}/${invoice.invoice_number}.pdf`;
+      // Always regenerate and overwrite storage
+      const storagePath = `${invoice.user_id}/${invoice.invoice_number}.pdf`;
 
-      if (!invoice.pdf_url) {
-        const { error: uploadErr } = await supabaseAdmin.storage
-          .from('invoices')
-          .upload(storagePath, pdfBytes, {
-            contentType: 'application/pdf',
-            upsert: true,
-          });
+      const { error: uploadErr } = await supabaseAdmin.storage
+        .from('invoices')
+        .upload(storagePath, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true,
+        });
 
-        if (uploadErr) {
-          logStep("Upload error", uploadErr);
-          throw new Error(`Upload failed: ${uploadErr.message}`);
-        }
-
-        // Save path in DB
-        await supabaseAdmin
-          .from('invoices')
-          .update({ pdf_url: storagePath })
-          .eq('id', invoiceId);
+      if (uploadErr) {
+        logStep("Upload error", uploadErr);
+        throw new Error(`Upload failed: ${uploadErr.message}`);
       }
+
+      // Save path in DB
+      await supabaseAdmin
+        .from('invoices')
+        .update({ pdf_url: storagePath })
+        .eq('id', invoiceId);
 
       if (returnBlob) {
         return new Response(pdfBytes, {
