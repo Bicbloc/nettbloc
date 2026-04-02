@@ -148,6 +148,7 @@ serve(async (req) => {
     // ---- MODE 1: Download / generate PDF for an existing invoice ----
     if (body.invoiceId) {
       const { invoiceId } = body;
+      const returnBlob = body.returnBlob === true;
       logStep("PDF download requested", { invoiceId });
 
       const { data: invoice, error: fetchErr } = await supabaseAdmin
@@ -161,7 +162,7 @@ serve(async (req) => {
       }
 
       // If PDF already exists in storage, return a signed URL
-      if (invoice.pdf_url) {
+      if (invoice.pdf_url && !returnBlob) {
         const { data: signed, error: signErr } = await supabaseAdmin.storage
           .from('invoices')
           .createSignedUrl(invoice.pdf_url, 3600);
@@ -171,27 +172,38 @@ serve(async (req) => {
         });
       }
 
-      // Generate PDF bytes
       const pdfBytes = buildInvoicePdf(invoice);
-      const storagePath = `${invoice.user_id}/${invoice.invoice_number}.pdf`;
+      const storagePath = invoice.pdf_url || `${invoice.user_id}/${invoice.invoice_number}.pdf`;
 
-      const { error: uploadErr } = await supabaseAdmin.storage
-        .from('invoices')
-        .upload(storagePath, pdfBytes, {
-          contentType: 'application/pdf',
-          upsert: true,
-        });
+      if (!invoice.pdf_url) {
+        const { error: uploadErr } = await supabaseAdmin.storage
+          .from('invoices')
+          .upload(storagePath, pdfBytes, {
+            contentType: 'application/pdf',
+            upsert: true,
+          });
 
-      if (uploadErr) {
-        logStep("Upload error", uploadErr);
-        throw new Error(`Upload failed: ${uploadErr.message}`);
+        if (uploadErr) {
+          logStep("Upload error", uploadErr);
+          throw new Error(`Upload failed: ${uploadErr.message}`);
+        }
+
+        // Save path in DB
+        await supabaseAdmin
+          .from('invoices')
+          .update({ pdf_url: storagePath })
+          .eq('id', invoiceId);
       }
 
-      // Save path in DB
-      await supabaseAdmin
-        .from('invoices')
-        .update({ pdf_url: storagePath })
-        .eq('id', invoiceId);
+      if (returnBlob) {
+        return new Response(pdfBytes, {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${invoice.invoice_number}.pdf"`,
+          },
+        });
+      }
 
       // Return signed URL
       const { data: signed2, error: signErr2 } = await supabaseAdmin.storage
