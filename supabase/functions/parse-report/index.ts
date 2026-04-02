@@ -1,6 +1,6 @@
 /**
- * Edge function simplifiée pour le parsing IA des rapports
- * Utilisée uniquement en fallback quand le parsing local échoue
+ * Edge function pour le parsing IA des rapports avec apprentissage par exemples
+ * Utilise le few-shot learning : l'hôtel fournit des exemples, l'IA généralise
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -46,13 +46,64 @@ const extractionTool = {
   }
 };
 
+interface TrainingExample {
+  roomNumber: string;
+  cleaningType: "a_blanc" | "recouche" | "none";
+  reason: string;
+  pattern?: string; // description du pattern détecté
+}
+
+function buildTrainingSection(examples: TrainingExample[]): string {
+  if (!examples || examples.length === 0) return '';
+  
+  const grouped: Record<string, TrainingExample[]> = {
+    a_blanc: [],
+    recouche: [],
+    none: [],
+  };
+  
+  for (const ex of examples) {
+    if (grouped[ex.cleaningType]) {
+      grouped[ex.cleaningType].push(ex);
+    }
+  }
+  
+  let section = `\n### EXEMPLES D'ENTRAÎNEMENT DE L'HÔTEL ###
+Ces exemples montrent comment CET hôtel classe ses chambres. Utilise ces patterns pour classifier toutes les chambres similaires.\n`;
+
+  if (grouped.recouche.length > 0) {
+    section += `\nExemples de RECOUCHE (client reste) :\n`;
+    for (const ex of grouped.recouche) {
+      section += `- Chambre ${ex.roomNumber} → recouche : ${ex.reason}\n`;
+    }
+  }
+  
+  if (grouped.a_blanc.length > 0) {
+    section += `\nExemples de À BLANC (nettoyage complet) :\n`;
+    for (const ex of grouped.a_blanc) {
+      section += `- Chambre ${ex.roomNumber} → a_blanc : ${ex.reason}\n`;
+    }
+  }
+  
+  if (grouped.none.length > 0) {
+    section += `\nExemples de PROPRE (pas de nettoyage) :\n`;
+    for (const ex of grouped.none) {
+      section += `- Chambre ${ex.roomNumber} → none : ${ex.reason}\n`;
+    }
+  }
+  
+  section += `\nIMPORTANT: Applique ces mêmes patterns à TOUTES les chambres qui présentent des caractéristiques similaires. Par exemple, si une chambre avec 1 seul client et une date de départ future est classée recouche, TOUTES les chambres avec 1 seul client et date de départ future doivent aussi être recouche.\n`;
+  
+  return section;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { text, reportDate, hotelId } = await req.json();
+    const { text, reportDate, hotelId, trainingExamples } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -63,38 +114,40 @@ serve(async (req) => {
       throw new Error("No text provided");
     }
 
+    const trainingSection = buildTrainingSection(trainingExamples || []);
+    const hasTraining = trainingExamples && trainingExamples.length > 0;
+
     const prompt = `Analyse ce rapport d'hôtel et extrais TOUTES les chambres.
 
 ### DATE DU RAPPORT: ${reportDate || 'non spécifiée'} ###
 
-RÈGLES DE DÉTECTION (par ordre de priorité):
+${hasTraining ? `${trainingSection}
 
-PRIORITÉ 1: Nombre de noms clients sur la ligne
-  - 2+ noms distincts → a_blanc (checkout + checkin, un client part et un arrive)
-  - 1 nom + date départ ≤ ${reportDate} → a_blanc (client part aujourd'hui ou déjà parti)
-  - 1 nom + date départ > ${reportDate} → recouche (client reste, même si Nuit X/Y où X==Y)
-  - 1 nom + Nuit X/Y SANS date de départ visible: X >= Y → a_blanc, X < Y → recouche
-  - 1 nom sans info date ni nuit → recouche (par défaut)
+INSTRUCTION CRITIQUE: Les exemples ci-dessus sont la RÉFÉRENCE ABSOLUE. Identifie le PATTERN de chaque exemple (nombre de clients, dates, statut) et applique-le à toutes les chambres qui partagent le même pattern. Les exemples de l'hôtel PRIMENT sur les règles par défaut.` : ''}
 
-IMPORTANT: La DATE DE DÉPART prime TOUJOURS sur Nuit X/Y. Exemple: Nuit 3/3 avec départ 30/03 et rapport 29/03 = recouche car le client est encore là ce soir.
+RÈGLES DE DÉTECTION PAR DÉFAUT (utilisées si aucun exemple ne correspond):
+
+RÈGLE PRINCIPALE: La DATE DE DÉPART prime TOUJOURS sur Nuit X/Y.
+- Si date départ > date rapport → le client est ENCORE LÀ → recouche
+- Si date départ ≤ date rapport → le client est PARTI → a_blanc
+- Nuit X/Y n'est qu'un indicateur secondaire (utiliser seulement si pas de date de départ)
+
+PRIORITÉ 1: Nombre de noms clients
+  - 2+ noms distincts → a_blanc (checkout + checkin)
+  - 1 nom + date départ ≤ ${reportDate} → a_blanc
+  - 1 nom + date départ > ${reportDate} → recouche (même si Nuit X/Y où X==Y)
+  - 1 nom sans info date → recouche (par défaut)
 
 PRIORITÉ 2: 0 noms (chambre vide)
-  - PRO/INS sans client associé → none (propre, pas de nettoyage)
-  - SAL/DIR sans client → a_blanc (chambre vide sale)
-
-ATTENTION: PRO (propre) avec un nom de client dont la date de départ ≤ date rapport = a_blanc (le client est parti, la chambre doit être nettoyée à fond même si marquée propre)
-
-MOTS-CLÉS:
-- À BLANC: parti, départ, checkout, dir, dep, 2 noms différents
-- RECOUCHE: recouche, stayover, sal + 1 seul nom, séjour en cours
-- PROPRE: propre, clean, ins, contrôlé (SEULEMENT si 0 noms clients)
+  - PRO/INS sans client → none
+  - SAL/DIR sans client → a_blanc
 
 ### RAPPORT ###
-${text.substring(0, 8000)}
+${text.substring(0, 12000)}
 
-Extrais chaque chambre avec son type de nettoyage et justifie ta décision.`;
+Extrais chaque chambre avec son type de nettoyage et justifie ta décision en référençant l'exemple d'entraînement ou la règle utilisée.`;
 
-    console.log("Calling AI for report parsing, text length:", text.length);
+    console.log("Calling AI for report parsing, text length:", text.length, "training examples:", trainingExamples?.length || 0);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -103,7 +156,7 @@ Extrais chaque chambre avec son type de nettoyage et justifie ta décision.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [{ role: "user", content: prompt }],
         tools: [extractionTool],
         tool_choice: { type: "function", function: { name: "extract_rooms" } }
