@@ -134,13 +134,17 @@ PRIORITÉ 1: 1 seul client avec date d'arrivée ET date de départ → TOUJOURS 
 
 PRIORITÉ 2: 2+ noms distincts → a_blanc (checkout + checkin)
 
-PRIORITÉ 3: Chambre vide (0 noms/clients)
+PRIORITÉ 3: INS ou PRO + client en arrivée UNIQUEMENT (pas de date de départ) → TOUJOURS none (propre)
+  - Exemple: "217 DBL INS - 10:42 2× Adultes Anja Odenthal 03/04/2026" → none (propre)
+  - Le client arrive dans une chambre déjà propre, rien à faire
+
+PRIORITÉ 4: Chambre vide (0 noms/clients)
   - INS/PRO sans client → none (propre, rien à faire)
   - SAL sans client → a_blanc
 
-PRIORITÉ 4: SAL + 1 client en arrivée (nouveau client) → a_blanc
+PRIORITÉ 5: SAL + 1 client en arrivée (nouveau client) → a_blanc
 
-PRIORITÉ 5: Client en séjour avec heure d'arrivée visible (format Mews) → a_blanc peu importe le statut
+PRIORITÉ 6: Client en séjour avec heure d'arrivée visible (format Mews) → a_blanc peu importe le statut
 
 ### RAPPORT ###
 ${text.substring(0, 12000)}
