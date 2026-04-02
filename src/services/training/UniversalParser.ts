@@ -251,6 +251,30 @@ function extractGuestNamesFromLine(text: string): string[] {
 }
 
 /**
+ * Extract report date from text header (e.g., "Statut des espaces - 29/03/2026")
+ */
+function extractReportDateFromText(text: string): Date | null {
+  // Pattern: "DD/MM/YYYY" in the first few lines
+  const headerLines = text.split('\n').slice(0, 10).join(' ');
+  
+  // Try "Statut des espaces - DD/MM/YYYY"
+  const pattern1 = /Statut des espaces\s*[-–]\s*(\d{2})\/(\d{2})\/(\d{4})/i;
+  let match = headerLines.match(pattern1);
+  if (match) {
+    return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+  }
+  
+  // Try any date in header
+  const pattern2 = /\b(\d{2})\/(\d{2})\/(\d{4})\b/;
+  match = headerLines.match(pattern2);
+  if (match) {
+    return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+  }
+  
+  return null;
+}
+
+/**
  * Fuzzy match: if a word is within 1 edit distance of a known status, match it.
  */
 function fuzzyMatchStatus(
@@ -541,16 +565,46 @@ export function universalParse(
         unmappedCount++;
       }
 
-      // RÈGLE PRIORITAIRE: Comptage des noms de clients (logique Mews universelle)
-      // S'applique dès qu'une chambre est détectée, pas seulement pour SAL/DIRTY
-      // 1 guest name = recouche (staying), 2+ names = à blanc (checkout+checkin)
+      // RÈGLE PRIORITAIRE: Comptage des noms de clients + logique dates
+      // S'applique dès qu'une chambre est détectée
       const guestNames = extractGuestNamesFromLine(line);
       if (guestNames.length >= 2) {
         detectedType = 'full'; // 2 noms = à blanc
       } else if (guestNames.length === 1) {
-        detectedType = 'quick'; // 1 nom = recouche
+        // 1 nom: vérifier Nuit X/Y et dates de départ
+        const lineUpper = line.toUpperCase();
+        const nightMatch = lineUpper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+          lineUpper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+        if (nightMatch) {
+          const current = parseInt(nightMatch[1], 10);
+          const total = parseInt(nightMatch[2], 10);
+          if (current >= total) {
+            detectedType = 'full'; // Dernière nuit → à blanc
+          } else {
+            detectedType = 'quick'; // Séjour en cours → recouche
+          }
+        } else {
+          // Vérifier dates de départ sur la ligne
+          const dateMatches = line.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g);
+          const reportDateFromHeader = extractReportDateFromText(text);
+          if (dateMatches && dateMatches.length >= 1 && reportDateFromHeader) {
+            // Prendre la dernière date comme date de départ
+            const lastDate = dateMatches[dateMatches.length > 1 ? 1 : 0];
+            const [day, month, year] = lastDate.split('/').map(Number);
+            const depDate = new Date(year, month - 1, day);
+            if (depDate <= reportDateFromHeader) {
+              detectedType = 'full'; // Départ <= date rapport → à blanc
+            } else {
+              detectedType = 'quick'; // Départ futur → recouche
+            }
+          } else {
+            detectedType = 'quick'; // 1 nom sans info date → recouche par défaut
+          }
+        }
+      } else if (detectedType === 'none') {
+        // 0 noms + PRO/INS → none (propre), garder tel quel
       }
-      // 0 names: keep the detected type from status codes
+      // 0 names + autre statut: keep the detected type from status codes
     }
     
     const rawParsedLine: RawParsedLine = {

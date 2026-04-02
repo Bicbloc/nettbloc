@@ -296,19 +296,55 @@ export class MewsAdapter extends PmsAdapter {
       }
       
       if (guestNames.length === 1) {
-        // 1 nom = recouche SAUF si DEP/DIR explicite sans autre client
-        const hasDepOrDirty = /\b(DEP|DIR)\b/.test(upper);
+        r.guestName = guestNames[0];
+        
+        // 1 nom: vérifier date départ vs date rapport et Nuit X/Y
+        const hasDepOrDirtyCode = /\b(DEP|DIR)\b/.test(upper);
         const hasArr = /\bARR\b/.test(upper);
         
-        if (hasDepOrDirty && hasArr) {
-          // DEP+ARR explicit codes but only 1 name → still à blanc (explicit codes win)
+        if (hasDepOrDirtyCode && hasArr) {
           r.status = 'checkout_arrival';
           r.cleaningType = 'a_blanc';
+        } else if (hasDepOrDirtyCode) {
+          r.status = 'checkout';
+          r.cleaningType = 'a_blanc';
         } else {
-          r.status = 'stayover';
-          r.cleaningType = 'recouche';
+          // Vérifier Nuit X/Y
+          const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+            upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+          if (nightMatch) {
+            const current = parseInt(nightMatch[1], 10);
+            const total = parseInt(nightMatch[2], 10);
+            if (current >= total) {
+              // Dernière nuit → à blanc
+              r.status = 'checkout';
+              r.cleaningType = 'a_blanc';
+            } else {
+              r.status = 'stayover';
+              r.cleaningType = 'recouche';
+            }
+          } else if (reportDate) {
+            // Vérifier date de départ vs date du rapport
+            const departureDateResult = this.extractDepartureDate(rawLine);
+            if (departureDateResult) {
+              if (departureDateResult <= reportDate) {
+                r.status = 'checkout';
+                r.cleaningType = 'a_blanc';
+              } else {
+                r.status = 'stayover';
+                r.cleaningType = 'recouche';
+              }
+            } else {
+              // 1 nom sans info date → recouche par défaut
+              r.status = 'stayover';
+              r.cleaningType = 'recouche';
+            }
+          } else {
+            // Pas de date rapport → recouche par défaut
+            r.status = 'stayover';
+            r.cleaningType = 'recouche';
+          }
         }
-        r.guestName = guestNames[0];
         continue; // Skip other rules
       }
 
@@ -496,7 +532,25 @@ export class MewsAdapter extends PmsAdapter {
     };
   }
 
-  // Types de chambres configurés par les hôtels (à ignorer lors de l'analyse de statut)
+  /**
+   * Extrait la date de départ d'une ligne (premier DD/MM/YYYY trouvé comme date de départ)
+   * Dans les rapports Mews, la 2e date est généralement la date de départ
+   */
+  private extractDepartureDate(line: string): Date | null {
+    const dateMatches = line.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g);
+    if (!dateMatches || dateMatches.length < 2) {
+      // S'il n'y a qu'une seule date et un statut PRO/SAL, c'est probablement la date de départ
+      if (dateMatches && dateMatches.length === 1) {
+        const [day, month, year] = dateMatches[0].split('/').map(Number);
+        return new Date(year, month - 1, day);
+      }
+      return null;
+    }
+    // La 2e date est généralement la date de départ
+    const [day, month, year] = dateMatches[1].split('/').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
   private readonly roomTypeCodes = [
     'CLA', 'DBL', 'SGL', 'TWN', 'TPL', 'TRP', 'QUA', 'FAM', 'SUI', 'STD', 'SUP',
     'JUN', 'KING', 'QUEEN', 'DELUXE', 'STANDARD', 'SUPERIOR', 'CLASSIC', 'CLASSIQUE'
@@ -530,8 +584,38 @@ export class MewsAdapter extends PmsAdapter {
     const statusTokens = tokens.filter(t => !this.isRoomTypeCode(t));
     
     
-    // PRIORITÉ 1: PRO = propre, pas de nettoyage
+    // PRIORITÉ 1: PRO/PROPRE — vérifier s'il y a un client associé
+    // PRO avec client parti = à blanc, PRO sans client = propre (none)
     if (statusTokens.some(t => t === 'PRO' || t === 'PROPRE')) {
+      // Compter les noms clients
+      const guestNames = fieldExtractor.extractAllGuestNames(line);
+      if (guestNames.length >= 2) {
+        return { status: 'checkout_arrival', cleaningType: 'a_blanc' };
+      }
+      if (guestNames.length === 1) {
+        // 1 nom: vérifier Nuit X/Y et date départ
+        const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+          upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+        if (nightMatch) {
+          const current = parseInt(nightMatch[1], 10);
+          const total = parseInt(nightMatch[2], 10);
+          if (current >= total) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        }
+        // Vérifier date de départ vs date rapport
+        const departureDateResult = this.extractDepartureDate(line);
+        if (departureDateResult && reportDate) {
+          if (departureDateResult <= reportDate) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        }
+        // 1 nom sans info date → recouche
+        return { status: 'stayover', cleaningType: 'recouche' };
+      }
+      // 0 noms → propre
       return { status: 'clean', cleaningType: 'none' };
     }
     
