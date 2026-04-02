@@ -15,9 +15,10 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify caller is super_admin
+    // Verify caller identity using anon client
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
@@ -26,9 +27,13 @@ serve(async (req: Request) => {
       });
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user: callerUser }, error: authError } = await supabase.auth.getUser(token);
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: callerUser }, error: authError } = await anonClient.auth.getUser();
+    
     if (authError || !callerUser) {
+      console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -36,7 +41,7 @@ serve(async (req: Request) => {
     }
 
     // Check super_admin role
-    const { data: callerProfile } = await supabase
+    const { data: callerProfile } = await supabaseAdmin
       .from("profiles")
       .select("role")
       .eq("id", callerUser.id)
@@ -57,27 +62,27 @@ serve(async (req: Request) => {
       });
     }
 
-    // Resolve email to userId if needed
     let targetUserId = userId;
     let targetEmail = email;
 
+    // Resolve userId from email if needed
     if (!targetUserId && targetEmail) {
-      const { data: { users } } = await supabase.auth.admin.listUsers();
-      const found = users?.find((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase());
-      if (found) {
-        targetUserId = found.id;
+      const { data: { users }, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+      if (!listErr && users) {
+        const found = users.find((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase());
+        if (found) targetUserId = found.id;
       }
     }
 
     if (targetUserId && !targetEmail) {
-      const { data: { user: targetUser } } = await supabase.auth.admin.getUserById(targetUserId);
+      const { data: { user: targetUser } } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
       targetEmail = targetUser?.email;
     }
 
     const deletedFrom: string[] = [];
     const normalizedEmail = targetEmail?.toLowerCase();
 
-    // 1. Delete from all profile/data tables using email
+    // 1. Delete from email-based profile tables
     if (normalizedEmail) {
       const emailTables = [
         { table: "housekeeper_profiles", column: "email" },
@@ -87,7 +92,7 @@ serve(async (req: Request) => {
       ];
 
       for (const { table, column } of emailTables) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from(table)
           .delete()
           .ilike(column, normalizedEmail)
@@ -99,7 +104,7 @@ serve(async (req: Request) => {
       }
     }
 
-    // 2. Delete from tables using user_id
+    // 2. Delete from user_id-based tables
     if (targetUserId) {
       const userIdTables = [
         { table: "hotels", column: "user_id" },
@@ -109,7 +114,7 @@ serve(async (req: Request) => {
       ];
 
       for (const { table, column } of userIdTables) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from(table)
           .delete()
           .eq(column, targetUserId)
@@ -121,7 +126,7 @@ serve(async (req: Request) => {
       }
 
       // 3. Delete auth user
-      const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(targetUserId);
+      const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
       if (!deleteAuthError) {
         deletedFrom.push("auth.users");
       } else {
@@ -130,20 +135,19 @@ serve(async (req: Request) => {
     }
 
     // Log the action
-    await supabase.from("admin_audit_log").insert({
+    await supabaseAdmin.from("admin_audit_log").insert({
       admin_user_id: callerUser.id,
       action: "complete_user_deletion",
       target_user_id: targetUserId || null,
-      details: {
-        email: normalizedEmail,
-        deleted_from: deletedFrom,
-      },
+      details: { email: normalizedEmail, deleted_from: deletedFrom },
     });
+
+    console.log("User deleted:", normalizedEmail, "from:", deletedFrom);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Utilisateur supprimé complètement`,
+        message: "Utilisateur supprimé complètement",
         deleted_from: deletedFrom,
       }),
       {
