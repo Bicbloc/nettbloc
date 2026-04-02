@@ -571,31 +571,33 @@ export function universalParse(
       if (guestNames.length >= 2) {
         detectedType = 'full'; // 2 noms = à blanc
       } else if (guestNames.length === 1) {
-        // 1 nom: vérifier Nuit X/Y et dates de départ
+        // 1 nom: PRIORITÉ date de départ > Nuit X/Y
         const lineUpper = line.toUpperCase();
-        const nightMatch = lineUpper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
-          lineUpper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
-        if (nightMatch) {
-          const current = parseInt(nightMatch[1], 10);
-          const total = parseInt(nightMatch[2], 10);
-          if (current >= total) {
-            detectedType = 'full'; // Dernière nuit → à blanc
+        const dateMatches = line.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g);
+        const reportDateFromHeader = extractReportDateFromText(text);
+        
+        // Vérifier date de départ d'abord (vérité absolue)
+        if (dateMatches && dateMatches.length >= 1 && reportDateFromHeader) {
+          // Prendre la dernière date comme date de départ
+          const lastDate = dateMatches[dateMatches.length > 1 ? 1 : 0];
+          const [day, month, year] = lastDate.split('/').map(Number);
+          const depDate = new Date(year, month - 1, day);
+          if (depDate <= reportDateFromHeader) {
+            detectedType = 'full'; // Départ <= date rapport → à blanc
           } else {
-            detectedType = 'quick'; // Séjour en cours → recouche
+            detectedType = 'quick'; // Départ futur → recouche
           }
         } else {
-          // Vérifier dates de départ sur la ligne
-          const dateMatches = line.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g);
-          const reportDateFromHeader = extractReportDateFromText(text);
-          if (dateMatches && dateMatches.length >= 1 && reportDateFromHeader) {
-            // Prendre la dernière date comme date de départ
-            const lastDate = dateMatches[dateMatches.length > 1 ? 1 : 0];
-            const [day, month, year] = lastDate.split('/').map(Number);
-            const depDate = new Date(year, month - 1, day);
-            if (depDate <= reportDateFromHeader) {
-              detectedType = 'full'; // Départ <= date rapport → à blanc
+          // Fallback: Nuit X/Y (seulement si pas de date de départ)
+          const nightMatch = lineUpper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+            lineUpper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+          if (nightMatch) {
+            const current = parseInt(nightMatch[1], 10);
+            const total = parseInt(nightMatch[2], 10);
+            if (current >= total) {
+              detectedType = 'full'; // Dernière nuit → à blanc
             } else {
-              detectedType = 'quick'; // Départ futur → recouche
+              detectedType = 'quick'; // Séjour en cours → recouche
             }
           } else {
             detectedType = 'quick'; // 1 nom sans info date → recouche par défaut

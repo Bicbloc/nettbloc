@@ -642,7 +642,25 @@ export class MewsAdapter extends PmsAdapter {
       }
       
       if (guestNames.length === 1) {
-        // 1 seul nom = client reste → Recouche
+        // 1 nom: vérifier date de départ d'abord, puis Nuit X/Y
+        const depDate = this.extractDepartureDate(line);
+        if (depDate && reportDate) {
+          if (depDate <= reportDate) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        }
+        const nightMatch = upper.match(/NUIT\s*(\d+)\s*[\/\\]\s*(\d+)/i) ||
+          upper.match(/(\d+)\s*[\/\\]\s*(\d+)\s*NUIT/i);
+        if (nightMatch) {
+          const current = parseInt(nightMatch[1], 10);
+          const total = parseInt(nightMatch[2], 10);
+          if (current >= total) {
+            return { status: 'checkout', cleaningType: 'a_blanc' };
+          }
+          return { status: 'stayover', cleaningType: 'recouche' };
+        }
+        // 1 nom sans info → recouche par défaut
         return { status: 'stayover', cleaningType: 'recouche' };
       }
       

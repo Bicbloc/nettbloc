@@ -72,10 +72,11 @@ RÈGLES DE DÉTECTION (par ordre de priorité):
 PRIORITÉ 1: Nombre de noms clients sur la ligne
   - 2+ noms distincts → a_blanc (checkout + checkin, un client part et un arrive)
   - 1 nom + date départ ≤ ${reportDate} → a_blanc (client part aujourd'hui ou déjà parti)
-  - 1 nom + date départ > ${reportDate} → recouche (client reste)
-  - 1 nom + Nuit X/Y où X == Y → a_blanc (dernière nuit, client part demain)
-  - 1 nom + Nuit X/Y où X < Y → recouche (séjour en cours)
-  - 1 nom sans info date → recouche (par défaut)
+  - 1 nom + date départ > ${reportDate} → recouche (client reste, même si Nuit X/Y où X==Y)
+  - 1 nom + Nuit X/Y SANS date de départ visible: X >= Y → a_blanc, X < Y → recouche
+  - 1 nom sans info date ni nuit → recouche (par défaut)
+
+IMPORTANT: La DATE DE DÉPART prime TOUJOURS sur Nuit X/Y. Exemple: Nuit 3/3 avec départ 30/03 et rapport 29/03 = recouche car le client est encore là ce soir.
 
 PRIORITÉ 2: 0 noms (chambre vide)
   - PRO/INS sans client associé → none (propre, pas de nettoyage)
