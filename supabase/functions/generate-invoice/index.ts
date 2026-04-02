@@ -115,7 +115,9 @@ function buildInvoicePdf(invoice: any): Uint8Array {
 
   // --- Header: Company name + FACTURE title ---
   ops.push('0.2 0.4 0.8 rg'); // blue color
-  text(ML, y, sellerName, '/F2', 22);
+  text(ML, y, 'Nettobloc', '/F2', 22);
+  ops.push('0.5 0.5 0.5 rg');
+  text(ML + 120, y + 2, 'by bicbloc', '/F1', 10);
   ops.push('0 0 0 rg'); // back to black
 
   text(ML + 300, y, 'FACTURE', '/F2', 22);
