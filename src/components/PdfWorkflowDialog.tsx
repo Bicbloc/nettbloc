@@ -1296,10 +1296,6 @@ export function PdfWorkflowDialog({ onWorkflowComplete, hotelId }: PdfWorkflowDi
         </div>
       </ScrollArea>
 
-      {/* Training coverage report */}
-      {coverageMetadata && (
-        <TrainingCoverageReport coverage={coverageMetadata} />
-      )}
 
       {/* Bouton Entraîner — TOUJOURS visible */}
       <Alert className={`${
