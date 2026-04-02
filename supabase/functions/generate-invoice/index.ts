@@ -73,10 +73,11 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   const sellerAddress = invoice.seller_address || '60 RUE FRANCOIS 1ER, 75008 PARIS';
   const sellerEmail   = invoice.seller_email || 'support@bicbloc.eu';
 
-  const customerName    = invoice.customer_company_name || invoice.customer_email || 'Client';
-  const customerEmail   = invoice.customer_billing_email || invoice.customer_email || '';
-  const customerAddress = invoice.customer_address || '';
-  const customerSiret   = invoice.customer_siret || '';
+  // Client: prefer hotel info passed in enriched invoice
+  const customerHotelName = invoice._hotel_name || invoice.customer_company_name || '';
+  const customerEmail     = invoice.customer_billing_email || invoice.customer_email || '';
+  const customerAddress   = invoice._hotel_address || invoice.customer_address || '';
+  const customerSiret     = invoice._hotel_siret || invoice.customer_siret || '';
 
   const invoiceDate = invoice.invoice_date || new Date().toISOString().split('T')[0];
   const periodStart = invoice.period_start || '';
@@ -131,33 +132,35 @@ function buildInvoicePdf(invoice: any): Uint8Array {
   }
   ops.push('0 0 0 rg');
 
-  // --- Seller info block ---
-  y -= 40;
+  // --- Seller info (no frame) ---
+  y -= 35;
   const sellerY = y;
-  rectFill(ML, y - 75, 220, 80, 0.95, 0.95, 0.97);
-  rect(ML, y - 75, 220, 80);
-  ops.push('0.2 0.2 0.2 rg');
-  text(ML + 8, y - 2, '\u00c9metteur', '/F2', 10);
+  ops.push('0.3 0.3 0.3 rg');
+  text(ML, y, '\u00c9metteur', '/F2', 10);
   ops.push('0 0 0 rg');
-  text(ML + 8, y - 16, sellerName, '/F2', 9);
-  text(ML + 8, y - 28, `SIRET : ${sellerSiret}`, '/F1', 8);
-  text(ML + 8, y - 40, sellerAddress, '/F1', 8);
-  text(ML + 8, y - 52, `Email : ${sellerEmail}`, '/F1', 8);
+  y -= 14;
+  text(ML, y, sellerName, '/F2', 9);
+  y -= 12;
+  text(ML, y, `SIRET : ${sellerSiret}`, '/F1', 8);
+  y -= 12;
+  text(ML, y, sellerAddress, '/F1', 8);
+  y -= 12;
+  text(ML, y, `Email : ${sellerEmail}`, '/F1', 8);
 
-  // --- Client info block ---
-  rectFill(ML + 260, sellerY - 75, 235, 80, 0.95, 0.97, 0.95);
-  rect(ML + 260, sellerY - 75, 235, 80);
-  ops.push('0.2 0.2 0.2 rg');
-  text(ML + 268, sellerY - 2, 'Client', '/F2', 10);
+  // --- Client info (no frame, right side) ---
+  const clientX = ML + 300;
+  let cy = sellerY;
+  ops.push('0.3 0.3 0.3 rg');
+  text(clientX, cy, 'Factur\u00e9 \u00e0', '/F2', 10);
   ops.push('0 0 0 rg');
-  text(ML + 268, sellerY - 16, customerName, '/F2', 9);
-  let cy = sellerY - 28;
-  if (customerSiret) { text(ML + 268, cy, `SIRET : ${customerSiret}`, '/F1', 8); cy -= 12; }
-  if (customerAddress) { text(ML + 268, cy, customerAddress, '/F1', 8); cy -= 12; }
-  if (customerEmail) { text(ML + 268, cy, `Email : ${customerEmail}`, '/F1', 8); }
+  cy -= 14;
+  if (customerHotelName) { text(clientX, cy, customerHotelName, '/F2', 9); cy -= 12; }
+  if (customerSiret) { text(clientX, cy, `SIRET : ${customerSiret}`, '/F1', 8); cy -= 12; }
+  if (customerAddress) { text(clientX, cy, customerAddress, '/F1', 8); cy -= 12; }
+  if (customerEmail) { text(clientX, cy, `Email : ${customerEmail}`, '/F1', 8); cy -= 12; }
 
   // --- Table header ---
-  y = sellerY - 105;
+  y = Math.min(y, cy) - 30;
   const tableX = ML;
   const colWidths = [265, 60, 80, 90]; // designation, qty, unit price HT, total HT
   const tableW = colWidths.reduce((a, b) => a + b, 0);
@@ -356,7 +359,49 @@ serve(async (req) => {
         });
       }
 
-      const pdfBytes = buildInvoicePdf(invoice);
+      // Enrich invoice with hotel info for PDF
+      let hotelName = '';
+      let hotelAddress = '';
+      let hotelSiret = '';
+      if (invoice.hotel_id) {
+        const { data: hotel } = await supabaseAdmin
+          .from('hotels')
+          .select('name, address')
+          .eq('id', invoice.hotel_id)
+          .maybeSingle();
+        if (hotel) {
+          hotelName = hotel.name || '';
+          hotelAddress = hotel.address || '';
+        }
+      } else if (invoice.user_id) {
+        const { data: hotel } = await supabaseAdmin
+          .from('hotels')
+          .select('name, address')
+          .eq('user_id', invoice.user_id)
+          .maybeSingle();
+        if (hotel) {
+          hotelName = hotel.name || '';
+          hotelAddress = hotel.address || '';
+        }
+      }
+      // Fetch billing SIRET from profile
+      if (invoice.user_id) {
+        const { data: prof } = await supabaseAdmin
+          .from('profiles')
+          .select('billing_siret')
+          .eq('id', invoice.user_id)
+          .maybeSingle();
+        if (prof?.billing_siret) hotelSiret = prof.billing_siret;
+      }
+
+      const enrichedInvoice = {
+        ...invoice,
+        _hotel_name: hotelName,
+        _hotel_address: hotelAddress,
+        _hotel_siret: hotelSiret || invoice.customer_siret || '',
+      };
+
+      const pdfBytes = buildInvoicePdf(enrichedInvoice);
       // Always regenerate and overwrite storage
       const storagePath = `${invoice.user_id}/${invoice.invoice_number}.pdf`;
 
