@@ -437,6 +437,8 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
                 const effectiveType = getEffectiveType(room);
                 const isCorrected = corrections[room.roomNumber] !== undefined;
                 const info = cleaningTypeLabel(effectiveType);
+                const sig = getRoomSignature(room);
+                const similarCount = parsedRooms.filter(r => r.roomNumber !== room.roomNumber && getRoomSignature(r) === sig).length;
 
                 return (
                   <div
