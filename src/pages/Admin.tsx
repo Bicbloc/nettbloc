@@ -920,6 +920,10 @@ const Admin = () => {
                 <Smartphone className="h-4 w-4" />
                 Téléphones
               </TabsTrigger>
+              <TabsTrigger value="invoices" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Factures
+              </TabsTrigger>
             </TabsList>
           </div>
           
@@ -1285,6 +1289,10 @@ const Admin = () => {
 
         <TabsContent value="phone-orders" className="space-y-4">
           <PhoneOrdersPanel />
+        </TabsContent>
+
+        <TabsContent value="invoices" className="space-y-4">
+          <InvoicesPanel />
         </TabsContent>
 
         <TabsContent value="legal" className="space-y-4">
