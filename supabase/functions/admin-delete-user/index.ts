@@ -138,6 +138,70 @@ serve(async (req: Request) => {
     }
 
     if (targetUserId) {
+      // 1. Find all hotels owned by this user
+      const { data: userHotels } = await adminClient
+        .from("hotels")
+        .select("id")
+        .eq("user_id", targetUserId);
+
+      const hotelIds = userHotels?.map((h) => h.id) || [];
+
+      // 2. Delete hotel-dependent data (order matters for FK constraints)
+      if (hotelIds.length > 0) {
+        const hotelDependentTables = [
+          "housekeeper_access_codes",
+          "housekeeper_invitations",
+          "hotel_access_sessions",
+          "housekeeper_access_requests",
+          "assignments",
+          "housekeepers",
+          "rooms",
+          "daily_action_logs",
+          "daily_instructions",
+          "daily_reports",
+          "daily_governess_assignments",
+          "hotel_rooms_registry",
+          "hotel_cleaning_rules",
+          "hotel_combination_rules",
+          "hotel_detection_rules",
+          "hotel_report_configs",
+          "hotel_pms_configs",
+          "connected_room_rules",
+          "floor_plan_layouts",
+          "activities",
+          "notifications",
+          "incidents",
+          "incident_categories",
+          "staff_roles",
+          "manual_tasks",
+          "linen_inventory",
+          "lost_and_found_items",
+          "archived_daily_logs",
+          "governess_access_requests",
+          "governess_hotel_sessions",
+          "technician_access_requests",
+          "housekeeper_achievements",
+          "housekeeper_levels",
+          "sub_accounts",
+        ] as const;
+
+        for (const table of hotelDependentTables) {
+          const { data, error } = await adminClient
+            .from(table)
+            .delete()
+            .in("hotel_id", hotelIds)
+            .select("id");
+
+          if (error) {
+            console.error(`Delete error in ${table}:`, error);
+            // Continue instead of failing - some tables may not exist or have no data
+          } else if (data?.length) {
+            deletedFrom.push(`${table} (${data.length})`);
+          }
+        }
+      }
+
+      // 3. Delete user-level tables
       const userIdTables = [
         { table: "hotel_sessions", column: "user_id" },
         { table: "hotel_users", column: "user_id" },
