@@ -80,13 +80,51 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
           return;
         }
 
-        const [hotelResult, subAccountResult, housekeeperResult, governessResult, technicianResult] = await Promise.all([
+        const [hotelResult, subAccountResult, initialHousekeeperResult, governessResult, technicianResult] = await Promise.all([
           supabase.from('hotels').select('id').eq('email', email).maybeSingle(),
           supabase.from('sub_accounts').select('id').eq('user_id', user.id).eq('is_active', true).maybeSingle(),
           supabase.from('housekeeper_profiles').select('id').eq('email', email).maybeSingle(),
           supabase.from('governess_profiles').select('id').eq('email', email).maybeSingle(),
           supabase.from('technician_profiles').select('id').eq('email', email).maybeSingle(),
         ]);
+
+        let housekeeperResult = initialHousekeeperResult;
+        const canRepairHousekeeperProfile =
+          !housekeeperResult.data &&
+          expectedType === 'housekeeper' &&
+          user.user_metadata?.user_type === 'housekeeper';
+
+        if (canRepairHousekeeperProfile) {
+          const fallbackName =
+            user.user_metadata?.name?.trim() ||
+            email.split('@')[0] ||
+            'Femme de chambre';
+
+          const { error: repairError } = await supabase
+            .from('housekeeper_profiles')
+            .upsert(
+              {
+                id: user.id,
+                email,
+                name: fallbackName,
+                phone: user.user_metadata?.phone ?? null,
+                is_active: true,
+                total_rooms_cleaned: 0,
+                total_hotels_worked: 0,
+              },
+              { onConflict: 'id' }
+            );
+
+          if (repairError) {
+            console.error('❌ Error repairing housekeeper profile:', repairError);
+          } else {
+            housekeeperResult = await supabase
+              .from('housekeeper_profiles')
+              .select('id')
+              .eq('email', email)
+              .maybeSingle();
+          }
+        }
 
         const matchedTypes: AppPortal[] = [];
         if (hotelResult.data || subAccountResult.data) matchedTypes.push('establishment');

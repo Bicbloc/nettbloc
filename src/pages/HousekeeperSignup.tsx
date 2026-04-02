@@ -16,75 +16,143 @@ export default function HousekeeperSignup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim() || !email.trim() || !password) {
-      toast({ variant: "destructive", title: "Champs requis", description: "Veuillez remplir tous les champs" });
+    const normalizedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+
+    if (!trimmedName || !normalizedEmail || !password) {
+      toast({ variant: 'destructive', title: 'Champs requis', description: 'Veuillez remplir tous les champs' });
       return;
     }
 
     if (password.length < 6) {
-      toast({ variant: "destructive", title: "Mot de passe trop court", description: "Le mot de passe doit contenir au moins 6 caractères" });
+      toast({ variant: 'destructive', title: 'Mot de passe trop court', description: 'Le mot de passe doit contenir au moins 6 caractères' });
       return;
     }
 
     if (password !== confirmPassword) {
-      toast({ variant: "destructive", title: "Mots de passe différents", description: "Les mots de passe ne correspondent pas" });
+      toast({ variant: 'destructive', title: 'Mots de passe différents', description: 'Les mots de passe ne correspondent pas' });
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const validation = await validateEmailForUserType(email, 'housekeeper');
+      const validation = await validateEmailForUserType(normalizedEmail, 'housekeeper');
       if (!validation.isValid) {
-        toast({ variant: "destructive", title: "Email déjà utilisé", description: validation.error || "Cette adresse est déjà associée à un autre type de compte." });
+        toast({ variant: 'destructive', title: 'Email déjà utilisé', description: validation.error || 'Cette adresse est déjà associée à un autre type de compte.' });
         if (validation.existingType) {
-          toast({ title: "Redirection", description: `Connectez-vous sur ${validation.existingType === 'establishment' ? "l'interface Établissement" : "l'interface appropriée"}.` });
+          toast({ title: 'Redirection', description: `Connectez-vous sur ${validation.existingType === 'establishment' ? "l'interface Établissement" : "l'interface appropriée"}.` });
         }
         setIsLoading(false);
         return;
       }
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email, password,
+        email: normalizedEmail,
+        password,
         options: {
           emailRedirectTo: `${APP_ORIGIN}/housekeeper/hotels`,
-          data: { name, user_type: 'housekeeper' }
+          data: { name: trimmedName, user_type: 'housekeeper' }
         }
       });
 
       if (authError) throw authError;
-      if (!authData.user) throw new Error("Erreur lors de la création du compte");
+      if (!authData.user) throw new Error('Erreur lors de la création du compte');
 
-      const { error: profileError } = await supabase
-        .from('housekeeper_profiles')
-        .insert({ id: authData.user.id, name, email, is_active: true, total_rooms_cleaned: 0, total_hotels_worked: 0 });
+      if (authData.user.identities && authData.user.identities.length === 0) {
+        throw new Error('Un compte existe déjà avec cet email. Connectez-vous ou utilisez une autre adresse.');
+      }
 
-      if (profileError) console.error('Erreur création profil:', profileError);
+      if (authData.session) {
+        const { error: profileError } = await supabase
+          .from('housekeeper_profiles')
+          .upsert(
+            {
+              id: authData.user.id,
+              name: trimmedName,
+              email: normalizedEmail,
+              is_active: true,
+              total_rooms_cleaned: 0,
+              total_hotels_worked: 0,
+            },
+            { onConflict: 'id' }
+          );
 
-      toast({ title: "Inscription réussie ! 🎉", description: "Connectez-vous avec votre email et ajoutez le code de votre hôtel" });
-      navigate('/housekeeper/auth');
+        if (profileError) {
+          console.error('Erreur création profil housekeeper:', profileError);
+        }
+
+        toast({ title: 'Inscription réussie ! 🎉', description: 'Connectez-vous avec votre email et ajoutez le code de votre hôtel' });
+        navigate('/housekeeper/hotels');
+        return;
+      }
+
+      setShowEmailConfirmation(true);
+      setEmail(normalizedEmail);
     } catch (error: any) {
       console.error('Erreur inscription:', error);
-      toast({ variant: "destructive", title: "Erreur d'inscription", description: error.message || "Une erreur est survenue" });
+      toast({ variant: 'destructive', title: "Erreur d'inscription", description: error.message || 'Une erreur est survenue' });
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (showEmailConfirmation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-20 right-10 w-72 h-72 bg-violet-400/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 left-10 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl" />
+
+        <div className="w-full max-w-md relative z-10 animate-fade-in">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm mb-4 shadow-2xl border border-white/30">
+              <Mail className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Vérifiez votre email</h1>
+            <p className="text-white/80">Un lien d'activation vous a été envoyé</p>
+          </div>
+
+          <Card className="bg-white/95 backdrop-blur-sm shadow-2xl border-0">
+            <CardContent className="pt-6 space-y-4">
+              <div className="text-center space-y-3">
+                <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mail className="h-8 w-8 text-primary" />
+                </div>
+                <p className="text-base font-medium">
+                  Un email a été envoyé à <span className="font-bold text-primary">{email}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Cliquez sur le lien dans l'email pour activer votre compte femme de chambre.
+                </p>
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm text-foreground">
+                  <strong>💡 Astuce :</strong> si vous ne trouvez pas l'email, vérifiez aussi votre dossier <strong>Spam</strong> ou <strong>Indésirables</strong>.
+                </div>
+              </div>
+
+              <Button variant="outline" className="w-full" onClick={() => navigate('/housekeeper/auth')}>
+                Retour à la connexion
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative blur circles */}
       <div className="absolute top-20 right-10 w-72 h-72 bg-violet-400/20 rounded-full blur-3xl" />
       <div className="absolute bottom-20 left-10 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl" />
 
-      {/* Back button */}
       <div className="absolute top-4 left-4 z-20">
         <Link to="/housekeeper/auth">
           <Button variant="ghost" size="icon" className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm">
@@ -94,7 +162,6 @@ export default function HousekeeperSignup() {
       </div>
 
       <div className="w-full max-w-md space-y-6 relative z-10">
-        {/* External header */}
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
             <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
@@ -105,7 +172,6 @@ export default function HousekeeperSignup() {
           <p className="text-white/80 text-sm sm:text-base">Inscrivez-vous pour gérer vos services dans plusieurs hôtels</p>
         </div>
 
-        {/* Glassmorphic card */}
         <Card className="bg-white/95 backdrop-blur-sm shadow-2xl border-0">
           <CardContent className="pt-6">
             <form onSubmit={handleSignup} className="space-y-4">
