@@ -3,15 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Download, ArrowLeft, Building2 } from 'lucide-react';
+import { FileText, Download, Building2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
 import BackButton from '@/components/BackButton';
 import { BillingInfoForm } from '@/components/billing/BillingInfoForm';
 import { SubAccountGuard } from '@/components/SubAccountGuard';
+import { downloadInvoicePdf } from '@/utils/invoiceDownload';
 
 interface Invoice {
   id: string;
@@ -28,7 +28,6 @@ interface Invoice {
 
 const InvoicesContent = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -57,16 +56,8 @@ const InvoicesContent = () => {
 
   const handleDownloadInvoice = async (invoice: Invoice) => {
     try {
-      const { data, error } = await supabase.functions.invoke('generate-invoice', {
-        body: { invoiceId: invoice.id },
-      });
-      if (error) throw error;
-      if (data?.pdf_url) {
-        window.open(data.pdf_url, '_blank');
-        loadInvoices();
-      } else {
-        throw new Error('Aucune URL reçue');
-      }
+      await downloadInvoicePdf(invoice.id, invoice.invoice_number);
+      loadInvoices();
     } catch (error: any) {
       console.error('Download error:', error);
     }

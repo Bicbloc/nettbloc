@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { downloadInvoicePdf } from '@/utils/invoiceDownload';
 
 interface AdminInvoice {
   id: string;
@@ -155,16 +156,8 @@ export const InvoicesPanel = () => {
   const handleDownload = async (invoice: AdminInvoice) => {
     setDownloadingId(invoice.id);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-invoice', {
-        body: { invoiceId: invoice.id },
-      });
-      if (error) throw error;
-      if (data?.pdf_url) {
-        window.open(data.pdf_url, '_blank');
-        loadData();
-      } else {
-        throw new Error('Aucune URL de téléchargement reçue');
-      }
+      await downloadInvoicePdf(invoice.id, invoice.invoice_number);
+      await loadData();
     } catch (error: any) {
       console.error('Download error:', error);
       toast({ title: 'Erreur', description: error.message || 'Impossible de télécharger la facture', variant: 'destructive' });
