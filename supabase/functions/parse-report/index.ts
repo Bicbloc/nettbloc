@@ -67,18 +67,26 @@ serve(async (req) => {
 
 ### DATE DU RAPPORT: ${reportDate || 'non spécifiée'} ###
 
-RÈGLES DE DÉTECTION:
-1. Si DATE_DÉPART == ${reportDate} → a_blanc (départ aujourd'hui)
-2. Si DATE_DÉPART > ${reportDate} → recouche (client reste)
-3. Nuit X/Y où X == Y → a_blanc (dernière nuit)
-4. Nuit X/Y où X < Y → recouche (séjour en cours)
-5. PARTI + ARRIVÉE même chambre → a_blanc
-6. Hors service/OOO → none
+RÈGLES DE DÉTECTION (par ordre de priorité):
+
+PRIORITÉ 1: Nombre de noms clients sur la ligne
+  - 2+ noms distincts → a_blanc (checkout + checkin, un client part et un arrive)
+  - 1 nom + date départ ≤ ${reportDate} → a_blanc (client part aujourd'hui ou déjà parti)
+  - 1 nom + date départ > ${reportDate} → recouche (client reste)
+  - 1 nom + Nuit X/Y où X == Y → a_blanc (dernière nuit, client part demain)
+  - 1 nom + Nuit X/Y où X < Y → recouche (séjour en cours)
+  - 1 nom sans info date → recouche (par défaut)
+
+PRIORITÉ 2: 0 noms (chambre vide)
+  - PRO/INS sans client associé → none (propre, pas de nettoyage)
+  - SAL/DIR sans client → a_blanc (chambre vide sale)
+
+ATTENTION: PRO (propre) avec un nom de client dont la date de départ ≤ date rapport = a_blanc (le client est parti, la chambre doit être nettoyée à fond même si marquée propre)
 
 MOTS-CLÉS:
-- À BLANC: parti, départ, checkout, dir, dep
-- RECOUCHE: recouche, stayover, sal, séjour
-- PROPRE: propre, clean, ins, contrôlé
+- À BLANC: parti, départ, checkout, dir, dep, 2 noms différents
+- RECOUCHE: recouche, stayover, sal + 1 seul nom, séjour en cours
+- PROPRE: propre, clean, ins, contrôlé (SEULEMENT si 0 noms clients)
 
 ### RAPPORT ###
 ${text.substring(0, 8000)}

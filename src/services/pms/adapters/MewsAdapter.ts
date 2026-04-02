@@ -532,7 +532,25 @@ export class MewsAdapter extends PmsAdapter {
     };
   }
 
-  // Types de chambres configurés par les hôtels (à ignorer lors de l'analyse de statut)
+  /**
+   * Extrait la date de départ d'une ligne (premier DD/MM/YYYY trouvé comme date de départ)
+   * Dans les rapports Mews, la 2e date est généralement la date de départ
+   */
+  private extractDepartureDate(line: string): Date | null {
+    const dateMatches = line.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g);
+    if (!dateMatches || dateMatches.length < 2) {
+      // S'il n'y a qu'une seule date et un statut PRO/SAL, c'est probablement la date de départ
+      if (dateMatches && dateMatches.length === 1) {
+        const [day, month, year] = dateMatches[0].split('/').map(Number);
+        return new Date(year, month - 1, day);
+      }
+      return null;
+    }
+    // La 2e date est généralement la date de départ
+    const [day, month, year] = dateMatches[1].split('/').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
   private readonly roomTypeCodes = [
     'CLA', 'DBL', 'SGL', 'TWN', 'TPL', 'TRP', 'QUA', 'FAM', 'SUI', 'STD', 'SUP',
     'JUN', 'KING', 'QUEEN', 'DELUXE', 'STANDARD', 'SUPERIOR', 'CLASSIC', 'CLASSIQUE'
