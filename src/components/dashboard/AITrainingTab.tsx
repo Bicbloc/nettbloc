@@ -470,6 +470,7 @@ export function AITrainingTab({ currentHotelId }: AITrainingTabProps) {
                       {similarCount > 0 && (
                         <p className="text-primary/70 font-medium">🔗 {similarCount} chambre(s) similaire(s)</p>
                       )}
+                    </div>
                     {isCorrected && (
                       <Badge className="mt-2 bg-primary/10 text-primary text-xs">
                         ✏️ Corrigé
