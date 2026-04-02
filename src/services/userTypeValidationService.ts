@@ -87,10 +87,17 @@ export async function validateUserAccessToInterface(
       return { allowed: true, correctInterface: null };
     }
 
-    // Prendre le premier rôle trouvé comme rôle principal
-    // Priorité: establishment > housekeeper > governess > technician
     const priority: UserType[] = ['establishment', 'housekeeper', 'governess', 'technician'];
-    const foundRoles = data.map((row: any) => row.found_in as UserType);
+    const foundRoles = Array.from(new Set(data.map((row: any) => row.found_in as UserType)));
+
+    // Si l'interface courante fait partie des rôles détectés, on l'autorise.
+    // Cela évite de bloquer les utilisateurs multi-profils sur une priorité arbitraire.
+    if (foundRoles.includes(currentInterface)) {
+      return {
+        allowed: true,
+        correctInterface: currentInterface
+      };
+    }
     
     const primaryRole = priority.find(role => foundRoles.includes(role)) || foundRoles[0];
 

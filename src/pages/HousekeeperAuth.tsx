@@ -10,8 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseRecovery } from '@/integrations/supabase/recoveryClient';
 import BackButton from '@/components/BackButton';
 import { retryQuery } from '@/services/queryUtils';
+import { storageService } from '@/services/storageService';
 import { useTranslation } from '@/contexts/LanguageContext';
-import { validateUserAccessToInterface, getRedirectMessage } from '@/services/userTypeValidationService';
 import { PASSWORD_RESET_URL } from '@/constants/appUrl';
 
 export default function HousekeeperAuth() {
@@ -137,8 +137,9 @@ export default function HousekeeperAuth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
     
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       toast({
         variant: "destructive",
         title: t.auth.requiredFields,
@@ -152,31 +153,19 @@ export default function HousekeeperAuth() {
     setIsLoading(true);
 
     try {
-      // Vérifier que l'email est bien un compte femme de chambre
-      const accessCheck = await validateUserAccessToInterface(email, 'housekeeper');
-      if (!accessCheck.allowed && accessCheck.correctInterface) {
-        toast({
-          variant: "destructive",
-          title: language === 'en' ? "Wrong interface" : "Mauvaise interface",
-          description: getRedirectMessage(accessCheck.correctInterface, language === 'en' ? 'en' : 'fr')
-        });
-        setIsLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password
       });
 
       if (error) throw error;
 
       if (data.user) {
-        const profileResult = await retryQuery(async () => {
+        let profileResult = await retryQuery(async () => {
           const profileQuery = supabase
             .from('housekeeper_profiles')
             .select('*')
-            .eq('email', data.user.email)
+            .eq('email', normalizedEmail)
             .maybeSingle();
           return await profileQuery;
         });
@@ -185,21 +174,73 @@ export default function HousekeeperAuth() {
           throw profileResult.error;
         }
 
-        if (profileResult.data) {
+        let profileData = profileResult.data;
+
+        const canRepairProfile = !profileData && data.user.user_metadata?.user_type === 'housekeeper';
+
+        if (canRepairProfile) {
+          const fallbackName =
+            data.user.user_metadata?.name?.trim() ||
+            normalizedEmail.split('@')[0] ||
+            'Femme de chambre';
+
+          const { error: repairError } = await supabase
+            .from('housekeeper_profiles')
+            .upsert(
+              {
+                id: data.user.id,
+                email: normalizedEmail,
+                name: fallbackName,
+                phone: data.user.user_metadata?.phone ?? null,
+                is_active: true,
+                total_rooms_cleaned: 0,
+                total_hotels_worked: 0,
+              },
+              { onConflict: 'id' }
+            );
+
+          if (repairError) {
+            throw repairError;
+          }
+
+          profileResult = await retryQuery(async () => {
+            const profileQuery = supabase
+              .from('housekeeper_profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .maybeSingle();
+            return await profileQuery;
+          });
+
+          if (profileResult.error) {
+            throw profileResult.error;
+          }
+
+          profileData = profileResult.data;
+        }
+
+        if (profileData) {
           // Nettoyer les profils d'autres rôles pour éviter les conflits
           localStorage.removeItem('governess_profile');
           localStorage.removeItem('technician_profile');
-          localStorage.setItem('housekeeper_profile', JSON.stringify(profileResult.data));
+          storageService.saveActivePortal('housekeeper');
+          storageService.saveHousekeeperProfile({
+            id: profileData.id,
+            name: profileData.name,
+            email: profileData.email,
+          });
+          localStorage.setItem('housekeeper_profile', JSON.stringify(profileData));
           
           toast({
             title: t.auth.loginSuccess,
-            description: `${language === 'en' ? 'Welcome' : 'Bienvenue'} ${profileResult.data.name}`
+            description: `${language === 'en' ? 'Welcome' : 'Bienvenue'} ${profileData.name}`
           });
           navigate('/housekeeper/hotels');
         } else {
-          throw new Error(language === 'en' 
-            ? "Housekeeper profile not found. Please create an account first."
-            : "Profil femme de chambre non trouvé. Créez d'abord un compte.");
+          await supabase.auth.signOut();
+          throw new Error(language === 'en'
+            ? "This account is not linked to a housekeeper profile."
+            : "Ce compte n'est pas lié à un profil femme de chambre.");
         }
       }
     } catch (error: any) {
