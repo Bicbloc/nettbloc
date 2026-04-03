@@ -202,20 +202,36 @@ export function ManualTaskManager({
     setNewTask({ ...DEFAULT_NEW_TASK });
   };
 
-  // Fetch today's tasks
+  // Fetch all active tasks + validated ones from today
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["manual-tasks", hotelId, today],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Get all non-validated tasks (they should always be visible)
+      const { data: activeTasks, error: activeError } = await supabase
         .from("manual_tasks")
         .select("*")
         .eq("hotel_id", hotelId)
-        .eq("task_date", today)
+        .in("status", ["pending", "in_progress", "completed"])
         .order("priority", { ascending: false })
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      return data as Task[];
+      if (activeError) throw activeError;
+
+      // Also get today's validated tasks so they remain visible until end of day
+      const { data: validatedToday, error: validatedError } = await supabase
+        .from("manual_tasks")
+        .select("*")
+        .eq("hotel_id", hotelId)
+        .eq("status", "validated")
+        .eq("task_date", today)
+        .order("created_at", { ascending: false });
+
+      if (validatedError) throw validatedError;
+
+      // Merge and deduplicate
+      const allTasks = [...(activeTasks || []), ...(validatedToday || [])];
+      const uniqueTasks = Array.from(new Map(allTasks.map(t => [t.id, t])).values());
+      return uniqueTasks as Task[];
     },
   });
 
