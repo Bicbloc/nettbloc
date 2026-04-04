@@ -720,6 +720,18 @@ function GovernessDashboardContent() {
                   </div>
                 )}
 
+                {activeTab === 'plan' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b">
+                      <h2 className="font-semibold">Plan des étages</h2>
+                      <p className="text-xs text-muted-foreground">Visualisez la disposition des chambres</p>
+                    </div>
+                    <div className="p-4">
+                      <ReadOnlyFloorPlan hotelId={selectedHotel.id} />
+                    </div>
+                  </div>
+                )}
+
                 {activeTab === 'instructions' && (
                   <DailyInstructionsBanner hotelId={selectedHotel.id} />
                 )}
