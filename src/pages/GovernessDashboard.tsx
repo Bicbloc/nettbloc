@@ -413,6 +413,7 @@ function GovernessDashboardContent() {
     { key: 'lost', label: 'Objets trouvés', icon: Package },
     { key: 'linen', label: 'Linge', icon: Shirt },
     { key: 'validate', label: 'Validation', icon: ClipboardCheck },
+    { key: 'plan', label: 'Plan', icon: LayoutGrid },
     { key: 'instructions', label: 'Consignes', icon: Info },
     { key: 'logs', label: 'Journal', icon: FileText },
   ];
