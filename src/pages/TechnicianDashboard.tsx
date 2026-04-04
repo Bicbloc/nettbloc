@@ -119,6 +119,7 @@ function TechnicianDashboardContent() {
     { key: 'incidents', label: 'Incidents', icon: AlertTriangle },
     { key: 'report', label: 'Signaler', icon: Plus },
     { key: 'tasks', label: 'Tâches', icon: ClipboardList },
+    { key: 'plan', label: 'Plan', icon: LayoutGrid },
     { key: 'instructions', label: 'Consignes', icon: Info },
   ];
 
