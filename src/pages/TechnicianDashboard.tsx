@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, LogOut, Building2, AlertTriangle, ArrowLeft, Plus, ListChecks, Info, ClipboardList } from 'lucide-react';
+import { Wrench, LogOut, Building2, AlertTriangle, ArrowLeft, Plus, ListChecks, Info, ClipboardList, LayoutGrid } from 'lucide-react';
 import { IncidentList } from '@/components/incident/IncidentList';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
