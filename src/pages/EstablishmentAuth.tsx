@@ -44,21 +44,16 @@ const EstablishmentAuth = () => {
         return;
       }
 
-      // Vérifier si c'est un compte établissement
+      // Vérifier si c'est un compte établissement via RPC sécurisée
       const email = user.email?.trim().toLowerCase();
       if (!email) {
         setIsCheckingAccess(false);
         return;
       }
 
-      const { data: hotelData } = await supabase
-        .from('hotels')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
+      const accessCheck = await validateUserAccessToInterface(email, 'establishment');
 
-      if (hotelData) {
-        // C'est bien un établissement, rediriger vers le dashboard
+      if (accessCheck.allowed) {
         navigate('/', { replace: true });
         return;
       }

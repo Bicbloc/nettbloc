@@ -80,17 +80,24 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
           return;
         }
 
-        const [hotelResult, subAccountResult, initialHousekeeperResult, governessResult, technicianResult] = await Promise.all([
-          supabase.from('hotels').select('id').eq('email', email).maybeSingle(),
-          supabase.from('sub_accounts').select('id').eq('user_id', user.id).eq('is_active', true).maybeSingle(),
-          supabase.from('housekeeper_profiles').select('id').eq('email', email).maybeSingle(),
-          supabase.from('governess_profiles').select('id').eq('email', email).maybeSingle(),
-          supabase.from('technician_profiles').select('id').eq('email', email).maybeSingle(),
-        ]);
+        const { data: roleRows, error: roleError } = await supabase.rpc('check_email_exists_for_role', {
+          p_email: email,
+        });
 
-        let housekeeperResult = initialHousekeeperResult;
+        if (roleError) {
+          throw roleError;
+        }
+
+        const matchedTypes: AppPortal[] = Array.from(
+          new Set(
+            (roleRows ?? [])
+              .map((row: any) => row.found_in as AppPortal | null)
+              .filter((value): value is AppPortal => value !== null)
+          )
+        );
+
         const canRepairHousekeeperProfile =
-          !housekeeperResult.data &&
+          !matchedTypes.includes('housekeeper') &&
           expectedType === 'housekeeper' &&
           user.user_metadata?.user_type === 'housekeeper';
 
@@ -118,19 +125,9 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
           if (repairError) {
             console.error('❌ Error repairing housekeeper profile:', repairError);
           } else {
-            housekeeperResult = await supabase
-              .from('housekeeper_profiles')
-              .select('id')
-              .eq('email', email)
-              .maybeSingle();
+            matchedTypes.push('housekeeper');
           }
         }
-
-        const matchedTypes: AppPortal[] = [];
-        if (hotelResult.data || subAccountResult.data) matchedTypes.push('establishment');
-        if (technicianResult.data) matchedTypes.push('technician');
-        if (housekeeperResult.data) matchedTypes.push('housekeeper');
-        if (governessResult.data) matchedTypes.push('governess');
 
         const rememberedPortal = storageService.getActivePortal();
         const needsExplicitChoice =

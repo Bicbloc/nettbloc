@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import Index from "./pages/Index";
 import { HousekeepingProvider } from "./contexts/HousekeepingContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { HotelProvider } from "./contexts/HotelContext";
@@ -20,7 +21,6 @@ import { ConnectionDebugPanel } from "./components/debug/ConnectionDebugPanel";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
 // Lazy-loaded pages
-const Index = React.lazy(() => import("./pages/Index"));
 const EstablishmentAuth = React.lazy(() => import("./pages/EstablishmentAuth"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const Reports = React.lazy(() => import("./pages/Reports"));
