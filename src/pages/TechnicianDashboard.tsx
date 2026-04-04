@@ -18,7 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 import { cn } from '@/lib/utils';
 
-type TechTab = 'incidents' | 'tasks' | 'instructions' | 'report';
+type TechTab = 'incidents' | 'tasks' | 'instructions' | 'report' | 'plan';
 
 function TechnicianDashboardContent() {
   const navigate = useNavigate();
