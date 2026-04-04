@@ -44,6 +44,8 @@ import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
+import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
+import { LayoutGrid } from 'lucide-react';
 
 type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions' | 'plan';
 
