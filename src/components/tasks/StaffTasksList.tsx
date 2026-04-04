@@ -104,12 +104,19 @@ export function StaffTasksList({
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["staff-tasks", hotelId, staffType, staffId, today],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("task_templates")
         .select("*")
         .eq("hotel_id", hotelId)
-        .eq("is_active", true)
-        .eq("assigned_to_type", staffType);
+        .eq("is_active", true);
+
+      // Governess and technician see ALL task types (global view)
+      // Housekeepers only see tasks assigned to their type
+      if (staffType === 'housekeeper') {
+        query = query.eq("assigned_to_type", staffType);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
