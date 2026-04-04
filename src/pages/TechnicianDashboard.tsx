@@ -234,6 +234,25 @@ function TechnicianDashboardContent() {
           </div>
         )}
 
+        {activeTab === 'plan' && currentHotelSession && (
+          <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+            <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-500 text-white">
+                  <LayoutGrid className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-semibold">Plan des étages</h2>
+                  <p className="text-xs text-muted-foreground">Disposition des chambres</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <ReadOnlyFloorPlan hotelId={currentHotelSession.hotel_id} />
+            </div>
+          </div>
+        )}
+
         {activeTab === 'instructions' && (
           <DailyInstructionsBanner hotelId={currentHotelSession.hotel_id} />
         )}
