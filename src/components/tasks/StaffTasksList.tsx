@@ -143,17 +143,43 @@ export function StaffTasksList({
       let query = supabase
         .from("manual_tasks")
         .select("*")
+        .eq("hotel_id", hotelId);
+
+      // Governess and technician see ALL tickets globally
+      // Housekeepers only see tasks assigned to their type
+      if (staffType === 'housekeeper') {
+        query = query.eq("assigned_to_type", staffType);
+      }
+
+      // Show active tasks (any date) + validated today only
+      const { data: activeTasks } = await query
+        .in("status", ["pending", "in_progress", "completed"])
+        .order("priority", { ascending: false });
+
+      let query2 = supabase
+        .from("manual_tasks")
+        .select("*")
         .eq("hotel_id", hotelId)
-        .eq("task_date", today)
-        .eq("assigned_to_type", staffType);
+        .eq("status", "validated")
+        .eq("task_date", today);
 
-      const { data, error } = await query.order("priority", { ascending: false });
+      if (staffType === 'housekeeper') {
+        query2 = query2.eq("assigned_to_type", staffType);
+      }
 
-      if (error) throw error;
+      const { data: validatedToday } = await query2.order("priority", { ascending: false });
+
+      const allTasks = [...(activeTasks || []), ...(validatedToday || [])];
+      const seen = new Set<string>();
+      const unique = allTasks.filter(t => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
 
       // Filter: show tasks assigned to this person OR unassigned
-      return (data || []).filter((t: ManualTask) => {
-        if (!t.assigned_to_name) return true; // unassigned = visible to all
+      return unique.filter((t: ManualTask) => {
+        if (!t.assigned_to_name) return true;
         return t.assigned_to_name === staffName;
       }) as ManualTask[];
     },
