@@ -44,8 +44,10 @@ import { AdminLinenInventory } from '@/components/linen/AdminLinenInventory';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
+import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
+import { LayoutGrid } from 'lucide-react';
 
-type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions';
+type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions' | 'plan';
 
 interface GovernessProfile {
   id: string;
@@ -411,6 +413,7 @@ function GovernessDashboardContent() {
     { key: 'lost', label: 'Objets trouvés', icon: Package },
     { key: 'linen', label: 'Linge', icon: Shirt },
     { key: 'validate', label: 'Validation', icon: ClipboardCheck },
+    { key: 'plan', label: 'Plan', icon: LayoutGrid },
     { key: 'instructions', label: 'Consignes', icon: Info },
     { key: 'logs', label: 'Journal', icon: FileText },
   ];
@@ -714,6 +717,18 @@ function GovernessDashboardContent() {
                       </div>
                     </div>
                     <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
+                  </div>
+                )}
+
+                {activeTab === 'plan' && (
+                  <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="p-4 border-b">
+                      <h2 className="font-semibold">Plan des étages</h2>
+                      <p className="text-xs text-muted-foreground">Visualisez la disposition des chambres</p>
+                    </div>
+                    <div className="p-4">
+                      <ReadOnlyFloorPlan hotelId={selectedHotel.id} />
+                    </div>
                   </div>
                 )}
 

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, LogOut, Building2, AlertTriangle, ArrowLeft, Plus, ListChecks, Info, ClipboardList } from 'lucide-react';
+import { Wrench, LogOut, Building2, AlertTriangle, ArrowLeft, Plus, ListChecks, Info, ClipboardList, LayoutGrid } from 'lucide-react';
 import { IncidentList } from '@/components/incident/IncidentList';
 import { IncidentReportWizard } from '@/components/incident/IncidentReportWizard';
 import { useTechnicianAuth } from '@/contexts/TechnicianAuthContext';
@@ -13,11 +13,12 @@ import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { supabase } from '@/integrations/supabase/client';
+import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { useQueryClient } from '@tanstack/react-query';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 import { cn } from '@/lib/utils';
 
-type TechTab = 'incidents' | 'tasks' | 'instructions' | 'report';
+type TechTab = 'incidents' | 'tasks' | 'instructions' | 'report' | 'plan';
 
 function TechnicianDashboardContent() {
   const navigate = useNavigate();
@@ -118,6 +119,7 @@ function TechnicianDashboardContent() {
     { key: 'incidents', label: 'Incidents', icon: AlertTriangle },
     { key: 'report', label: 'Signaler', icon: Plus },
     { key: 'tasks', label: 'Tâches', icon: ClipboardList },
+    { key: 'plan', label: 'Plan', icon: LayoutGrid },
     { key: 'instructions', label: 'Consignes', icon: Info },
   ];
 
@@ -232,6 +234,25 @@ function TechnicianDashboardContent() {
           </div>
         )}
 
+        {activeTab === 'plan' && currentHotelSession && (
+          <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
+            <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-500 text-white">
+                  <LayoutGrid className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-semibold">Plan des étages</h2>
+                  <p className="text-xs text-muted-foreground">Disposition des chambres</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <ReadOnlyFloorPlan hotelId={currentHotelSession.hotel_id} />
+            </div>
+          </div>
+        )}
+
         {activeTab === 'instructions' && (
           <DailyInstructionsBanner hotelId={currentHotelSession.hotel_id} />
         )}
@@ -239,7 +260,7 @@ function TechnicianDashboardContent() {
 
       {/* Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-area-bottom">
-        <div className="grid grid-cols-4 px-2 py-1">
+        <div className="grid grid-cols-5 px-2 py-1">
           {tabs.map(({ key, label, icon: Icon }) => {
             const isActive = activeTab === key;
             return (

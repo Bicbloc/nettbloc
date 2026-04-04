@@ -542,20 +542,6 @@ export default function HousekeeperAuth() {
                   {t.auth.signup}
                 </Button>
                 
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {language === 'en' ? 'Access code provided by your hotel?' : "Code d'accès fourni par votre hôtel ?"}
-                  </p>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onClick={() => navigate('/housekeeper/hotels')}
-                    className="text-primary hover:text-primary/80 font-medium"
-                  >
-                    {language === 'en' ? 'Quick login with code' : 'Connexion rapide avec code'}
-                    <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
               </div>
             </div>
           </CardContent>
