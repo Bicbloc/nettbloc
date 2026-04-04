@@ -13,6 +13,7 @@ import { UserTypeGuard } from '@/hooks/use-user-type-guard';
 import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { supabase } from '@/integrations/supabase/client';
+import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
 import { useQueryClient } from '@tanstack/react-query';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 import { cn } from '@/lib/utils';
