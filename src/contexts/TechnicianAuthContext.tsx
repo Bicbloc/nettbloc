@@ -58,13 +58,19 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const isTechnicianRoute = () =>
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/technician');
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
+
+      if (session?.user && isTechnicianRoute()) {
         loadTechnicianProfile(session.user.id);
       } else {
+        setProfile(null);
+        setCurrentHotelSession(null);
         setLoading(false);
       }
     });
@@ -72,7 +78,8 @@ export const TechnicianAuthProvider = ({ children }: { children: React.ReactNode
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
+
+      if (session?.user && isTechnicianRoute()) {
         setTimeout(() => {
           loadTechnicianProfile(session.user.id);
         }, 0);

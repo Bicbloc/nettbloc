@@ -73,17 +73,20 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
   const [profileLoading, setProfileLoading] = useState(false);
   const profileLoadTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  // Charger le profil housekeeper quand l'utilisateur change
+  const isHousekeeperRoute = () =>
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/housekeeper');
+
+  // Charger le profil housekeeper seulement sur le portail housekeeper
   useEffect(() => {
-    // Clear any pending timeout
     if (profileLoadTimeoutRef.current) {
       clearTimeout(profileLoadTimeoutRef.current);
     }
 
-    if (user && !authLoading) {
+    const shouldLoadHousekeeperProfile = isHousekeeperRoute();
+
+    if (user && !authLoading && shouldLoadHousekeeperProfile) {
       loadHousekeeperProfile(user);
-      
-      // Safety timeout - don't block forever if profile load fails
+
       profileLoadTimeoutRef.current = setTimeout(() => {
         if (profileLoading) {
           setProfileLoading(false);
@@ -92,6 +95,11 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
     } else if (!user && !authLoading) {
       setProfile(null);
       setCurrentHotelSession(null);
+      setProfileLoading(false);
+    } else if (user && !authLoading && !shouldLoadHousekeeperProfile) {
+      setProfile(null);
+      setCurrentHotelSession(null);
+      setProfileLoading(false);
     }
 
     return () => {
@@ -103,6 +111,8 @@ export const HousekeeperAuthProvider = ({ children }: { children: React.ReactNod
 
   // Auto-refresh on visibility change and online status
   useEffect(() => {
+    if (!isHousekeeperRoute()) return;
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && user && !authLoading) {
         loadHousekeeperProfile(user);
