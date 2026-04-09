@@ -142,12 +142,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // 2. Vérifier la session existante avec try/catch/finally
     const initSession = async () => {
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (!mounted) return;
+        
+        sessionRestoredFromGetSession = true;
         
         if (error) {
           setSession(null);
@@ -163,6 +164,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (err) {
         console.error('❌ getSession exception:', err);
         if (mounted) {
+          sessionRestoredFromGetSession = true;
           setSession(null);
           setUser(null);
         }
