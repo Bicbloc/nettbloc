@@ -25,7 +25,32 @@ function HousekeeperHotelsContent() {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkUser();
+    // Handle email confirmation token exchange before checking user
+    const handleTokenExchange = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const hash = window.location.hash;
+      
+      // PKCE flow: ?code=...
+      if (code) {
+        try {
+          await supabase.auth.exchangeCodeForSession(code);
+          // Clean URL after exchange
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (err) {
+          console.error('Token exchange error:', err);
+        }
+      }
+      // Legacy hash flow: #access_token=...
+      else if (hash.includes('access_token')) {
+        // detectSessionInUrl handles this, but give it time
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      checkUser();
+    };
+    
+    handleTokenExchange();
   }, []);
 
   const checkUser = async () => {
@@ -37,20 +62,79 @@ function HousekeeperHotelsContent() {
         return;
       }
 
+      const userEmail = session.user.email?.trim().toLowerCase();
+
       // Charger le profil par email
       const { data: profileData, error: profileError } = await supabase
         .from('housekeeper_profiles')
         .select('*')
-        .eq('email', session.user.email)
+        .eq('email', userEmail)
         .maybeSingle();
 
-      if (profileError || !profileData) {
+      // Auto-create profile if missing (e.g. after email confirmation)
+      if (!profileData && !profileError) {
+        const meta = session.user.user_metadata || {};
+        const isHousekeeper = meta.user_type === 'housekeeper';
+        
+        if (isHousekeeper || !meta.user_type) {
+          const fallbackName = meta.name?.trim() || userEmail?.split('@')[0] || 'Femme de chambre';
+          
+          const { data: newProfile, error: createError } = await supabase
+            .from('housekeeper_profiles')
+            .upsert(
+              {
+                id: session.user.id,
+                email: userEmail,
+                name: fallbackName,
+                phone: meta.phone ?? null,
+                is_active: true,
+                total_rooms_cleaned: 0,
+                total_hotels_worked: 0,
+              },
+              { onConflict: 'id' }
+            )
+            .select('*')
+            .single();
+
+          if (createError) {
+            console.error('Error creating housekeeper profile:', createError);
+            toast({
+              variant: "destructive",
+              title: "Erreur",
+              description: "Impossible de créer votre profil. Veuillez réessayer."
+            });
+            navigate('/housekeeper/auth');
+            return;
+          }
+
+          toast({
+            title: "Compte activé ! 🎉",
+            description: `Bienvenue ${newProfile.name} ! Ajoutez le code de votre hôtel pour commencer.`
+          });
+
+          setProfile(newProfile);
+          setHotels([]);
+          setIsLoading(false);
+          return;
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Mauvaise interface",
+            description: "Ce compte n'est pas un compte femme de chambre."
+          });
+          navigate('/housekeeper/auth');
+          return;
+        }
+      }
+
+      if (profileError) {
+        console.error('Profile load error:', profileError);
         toast({
           variant: "destructive",
-          title: "Profil non trouvé",
-          description: "Veuillez créer un compte"
+          title: "Erreur",
+          description: "Impossible de charger votre profil."
         });
-        navigate('/housekeeper/signup');
+        navigate('/housekeeper/auth');
         return;
       }
 
