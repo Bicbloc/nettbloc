@@ -104,14 +104,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+    let sessionRestoredFromGetSession = false;
 
     // 1. Configurer le listener EN PREMIER
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         if (!mounted) return;
 
+        // Ne pas traiter INITIAL_SESSION ici - on laisse getSession() gérer
+        // la restauration initiale pour éviter les race conditions
+        if (event === 'INITIAL_SESSION') {
+          // Si getSession a déjà restauré la session, ignorer
+          if (sessionRestoredFromGetSession) return;
+          // Sinon, mettre à jour l'état mais NE PAS marquer comme initialisé
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          return;
+        }
 
-        // Mise à jour synchrone de l'état (y compris INITIAL_SESSION)
+        // Pour les autres événements, mise à jour synchrone
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         setLoading(false);
