@@ -5484,6 +5484,10 @@ export type Database = {
         Returns: boolean
       }
       is_hotel_owner: { Args: { _hotel_id: string }; Returns: boolean }
+      is_housekeeper_for_hotel: {
+        Args: { _hotel_id: string }
+        Returns: boolean
+      }
       is_technician_for_hotel: { Args: { _hotel_id: string }; Returns: boolean }
       log_activity: {
         Args: {
