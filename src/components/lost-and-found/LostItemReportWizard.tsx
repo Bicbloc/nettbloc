@@ -588,20 +588,17 @@ export function LostItemReportWizard({
                       </Button>
                     </div>
                   ) : (
-                    <label className="cursor-pointer block">
+                    <NativeCameraInput
+                      onCapture={handleImageCapture}
+                      source="camera"
+                      className="cursor-pointer block w-full"
+                    >
                       <Camera className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
                       <p className="font-medium">Photographiez l'objet</p>
                       <p className="text-sm text-muted-foreground mt-1">
                         L'IA identifiera automatiquement l'objet
                       </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={handleImageSelect}
-                      />
-                    </label>
+                    </NativeCameraInput>
                   )}
                 </Card>
 
