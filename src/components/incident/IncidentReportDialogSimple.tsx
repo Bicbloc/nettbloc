@@ -36,6 +36,7 @@ import { AlertTriangle, Camera, X, Sparkles, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIncidentDefaults } from "@/hooks/use-incident-defaults";
 import { ImageRecognitionButton } from "./ImageRecognitionButton";
+import { NativeCameraInput } from "@/components/NativeCameraInput";
 
 const incidentSchema = z.object({
   title: z.string().min(3, "Le titre doit contenir au moins 3 caractères"),
@@ -365,6 +366,10 @@ export function IncidentReportDialogSimple({
     }
   };
 
+  const handleImageCapture = (file: File) => {
+    setSelectedImages((prev) => [...prev, file]);
+  };
+
   const removeImage = (index: number) => {
     setSelectedImages(selectedImages.filter((_, i) => i !== index));
   };
@@ -418,19 +423,16 @@ export function IncidentReportDialogSimple({
                       </Button>
                     </div>
                   ))}
-                  <label className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent hover:border-primary transition-all active:scale-95">
+                  <NativeCameraInput
+                    onCapture={handleImageCapture}
+                    source="prompt"
+                    className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent hover:border-primary transition-all active:scale-95"
+                  >
                     <div className="text-center">
                       <Camera className="h-5 w-5 mx-auto text-muted-foreground" />
                       <span className="text-[10px] text-muted-foreground">Photo</span>
                     </div>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={handleImageSelect}
-                    />
-                  </label>
+                  </NativeCameraInput>
                 </div>
 
                 {/* AI Recognition Button - Auto-trigger on image */}
