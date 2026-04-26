@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeCameraInput } from "@/components/NativeCameraInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -200,14 +201,18 @@ export function LostItemReportWizard({
   // Handle image selection - auto-trigger analysis after capture
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      // Auto-trigger AI analysis after photo capture (important for APK/mobile)
-      setTimeout(() => {
-        analyzeImageWithFile(file);
-      }, 300);
+      handleImageCapture(e.target.files[0]);
     }
+    e.target.value = '';
+  };
+
+  // Used by native camera (APK) — accepts a File directly
+  const handleImageCapture = (file: File) => {
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+    setTimeout(() => {
+      analyzeImageWithFile(file);
+    }, 300);
   };
 
   // Analyze with explicit file param (for auto-trigger after capture)
