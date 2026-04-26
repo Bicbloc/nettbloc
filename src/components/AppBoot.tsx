@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { storageService } from '@/services/storageService';
 import { nativeNotificationService } from '@/services/nativeNotificationService';
+import { nativeCameraService } from '@/services/nativeCameraService';
 
 // Build ID injected at build time - this will change on each deployment
 declare const __BUILD_ID__: string;
@@ -45,9 +46,13 @@ export const AppBoot = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Initialiser les notifications natives (APK)
+  // Initialiser les permissions natives (APK) : notifications + caméra
   useEffect(() => {
     nativeNotificationService.initialize();
+    // Pré-demander la permission caméra côté APK pour éviter le blocage au 1er usage
+    if (nativeCameraService.isNative) {
+      nativeCameraService.requestPermissions().catch(() => { /* silent */ });
+    }
   }, []);
 
   return <>{children}</>;
