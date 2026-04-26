@@ -21,8 +21,10 @@ class NativeNotificationService {
 
     try {
       const permStatus = await LocalNotifications.checkPermissions();
-      if (permStatus.display === 'prompt' || permStatus.display === 'prompt-with-rationale') {
-        await LocalNotifications.requestPermissions();
+      console.log('📱 Notification permission status:', permStatus.display);
+      if (permStatus.display !== 'granted') {
+        const result = await LocalNotifications.requestPermissions();
+        console.log('📱 Notification permission result:', result.display);
       }
       this.initialized = true;
       console.log('📱 Native notifications initialized');

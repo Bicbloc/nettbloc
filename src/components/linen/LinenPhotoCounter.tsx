@@ -5,6 +5,7 @@ import { Camera, Upload, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { nativeCameraService } from "@/services/nativeCameraService";
 
 interface LinenPhotoCounterProps {
   linenTypeId: string;
@@ -82,7 +83,20 @@ export const LinenPhotoCounter = ({
     <div className="space-y-4">
       <div className="flex gap-2">
         <Button
-          onClick={() => cameraInputRef.current?.click()}
+          onClick={async () => {
+            if (nativeCameraService.isNative) {
+              try {
+                const file = await nativeCameraService.takePhoto('camera');
+                if (file) await handleFileSelect(file);
+              } catch (e: any) {
+                if (!String(e?.message || '').includes('cancelled')) {
+                  toast.error(e?.message || "Impossible d'ouvrir l'appareil photo");
+                }
+              }
+            } else {
+              cameraInputRef.current?.click();
+            }
+          }}
           variant="outline"
           className="flex-1"
           disabled={isCounting}
@@ -92,7 +106,20 @@ export const LinenPhotoCounter = ({
           {isCounting ? "Analyse..." : "Prendre une photo"}
         </Button>
         <Button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={async () => {
+            if (nativeCameraService.isNative) {
+              try {
+                const file = await nativeCameraService.takePhoto('photos');
+                if (file) await handleFileSelect(file);
+              } catch (e: any) {
+                if (!String(e?.message || '').includes('cancelled')) {
+                  toast.error(e?.message || "Impossible d'accéder à la galerie");
+                }
+              }
+            } else {
+              fileInputRef.current?.click();
+            }
+          }}
           variant="outline"
           className="flex-1"
           disabled={isCounting}

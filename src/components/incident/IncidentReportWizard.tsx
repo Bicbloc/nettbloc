@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { NativeCameraInput } from "@/components/NativeCameraInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -267,19 +268,20 @@ export function IncidentReportWizard({
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      // Ensure dialog stays open after camera returns on mobile
-      setIsOpen(true);
-      // Auto-trigger AI analysis after photo capture (important for APK/mobile)
-      // Use longer delay to let mobile WebView stabilize after camera close
-      setTimeout(() => {
-        setIsOpen(true); // Re-ensure dialog is open
-        analyzeImageWithFile(file);
-      }, 500);
+      handleImageCapture(file);
     }
-    // Reset input to allow re-selecting same file
     e.target.value = '';
+  };
+
+  // Used by native camera (APK) — same flow as handleImageSelect but accepts a File directly
+  const handleImageCapture = (file: File) => {
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+    setIsOpen(true);
+    setTimeout(() => {
+      setIsOpen(true);
+      analyzeImageWithFile(file);
+    }, 500);
   };
 
   // Analyze with explicit file param (for auto-trigger after capture)
@@ -765,20 +767,17 @@ export function IncidentReportWizard({
                       </Button>
                     </div>
                   ) : (
-                    <label className="cursor-pointer block">
+                    <NativeCameraInput
+                      onCapture={handleImageCapture}
+                      source="camera"
+                      className="cursor-pointer block w-full"
+                    >
                       <Camera className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
                       <p className="font-medium">Prenez une photo</p>
                       <p className="text-sm text-muted-foreground mt-1">
                         L'IA identifiera automatiquement le problème
                       </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={handleImageSelect}
-                      />
-                    </label>
+                    </NativeCameraInput>
                   )}
                 </Card>
 
