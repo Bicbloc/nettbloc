@@ -750,16 +750,17 @@ function TechnicianIncidentCard({
         {/* Quick Action Buttons */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t">
           <Button
-            variant={incident.status === 'resolved' ? 'default' : 'outline'}
+            variant={incident.status === 'pending_validation' || incident.status === 'resolved' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => onStatusChange(incident.id, 'resolved')}
+            onClick={() => onStatusChange(incident.id, 'pending_validation')}
+            disabled={incident.status === 'resolved'}
             className={cn(
               "gap-1",
-              incident.status === 'resolved' && "bg-green-600 hover:bg-green-700"
+              (incident.status === 'pending_validation' || incident.status === 'resolved') && "bg-purple-600 hover:bg-purple-700"
             )}
           >
             <CheckCircle className="h-4 w-4" />
-            Résolu
+            {incident.status === 'resolved' ? 'Validé' : incident.status === 'pending_validation' ? 'À valider' : 'Terminé'}
           </Button>
 
           <Button
