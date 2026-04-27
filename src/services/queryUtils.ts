@@ -1,5 +1,3 @@
-import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
-
 export class QueryTimeoutError extends Error {
   constructor(message = 'Query timeout exceeded') {
     super(message);
