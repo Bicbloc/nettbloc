@@ -716,7 +716,9 @@ function GovernessDashboardContent() {
                         </div>
                       </div>
                     </div>
-                    <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
+                    <ScrollArea className="h-[calc(100vh-280px)] pr-3">
+                      <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
+                    </ScrollArea>
                   </div>
                 )}
 
