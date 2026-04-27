@@ -85,6 +85,12 @@ const STATUS_CONFIG = {
     bg: "bg-yellow-100 dark:bg-yellow-900/30",
     label: "En cours" 
   },
+  pending_validation: {
+    icon: Clock,
+    color: "text-purple-500",
+    bg: "bg-purple-100 dark:bg-purple-900/30",
+    label: "À valider"
+  },
   resolved: { 
     icon: CheckCircle2, 
     color: "text-green-500", 
@@ -207,13 +213,14 @@ export function IncidentCardModern({
           {/* Quick Actions */}
           <div className="flex flex-col gap-2">
             <Select value={status} onValueChange={onStatusChange}>
-              <SelectTrigger className="w-[140px] h-9">
+              <SelectTrigger className="w-[150px] h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="new">📌 Nouveau</SelectItem>
                 <SelectItem value="in_progress">⏳ En cours</SelectItem>
-                <SelectItem value="resolved">✅ Résolu</SelectItem>
+                <SelectItem value="pending_validation">🕓 À valider</SelectItem>
+                <SelectItem value="resolved">✅ Validé</SelectItem>
               </SelectContent>
             </Select>
             <Select value={priority} onValueChange={onPriorityChange}>
