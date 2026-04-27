@@ -657,7 +657,8 @@ function TechnicianIncidentCard({
   const statusConfig: Record<string, { color: string; label: string; emoji: string }> = {
     new: { color: 'border-destructive/50 bg-destructive/10 text-destructive', label: 'Nouveau', emoji: '📌' },
     in_progress: { color: 'border-amber-500/50 bg-amber-100 text-amber-700', label: 'En cours', emoji: '⏳' },
-    resolved: { color: 'border-green-500/50 bg-green-100 text-green-700', label: 'Résolu', emoji: '✅' },
+    pending_validation: { color: 'border-purple-500/50 bg-purple-100 text-purple-700', label: 'À valider par l\'établissement', emoji: '🕓' },
+    resolved: { color: 'border-green-500/50 bg-green-100 text-green-700', label: 'Validé / Résolu', emoji: '✅' },
     postponed: { color: 'border-purple-500/50 bg-purple-100 text-purple-700', label: 'Reporté', emoji: '📅' },
     parts_ordered: { color: 'border-blue-500/50 bg-blue-100 text-blue-700', label: 'Pièce commandée', emoji: '📦' },
   };
@@ -750,16 +751,17 @@ function TechnicianIncidentCard({
         {/* Quick Action Buttons */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t">
           <Button
-            variant={incident.status === 'resolved' ? 'default' : 'outline'}
+            variant={incident.status === 'pending_validation' || incident.status === 'resolved' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => onStatusChange(incident.id, 'resolved')}
+            onClick={() => onStatusChange(incident.id, 'pending_validation')}
+            disabled={incident.status === 'resolved'}
             className={cn(
               "gap-1",
-              incident.status === 'resolved' && "bg-green-600 hover:bg-green-700"
+              (incident.status === 'pending_validation' || incident.status === 'resolved') && "bg-purple-600 hover:bg-purple-700"
             )}
           >
             <CheckCircle className="h-4 w-4" />
-            Résolu
+            {incident.status === 'resolved' ? 'Validé' : incident.status === 'pending_validation' ? 'À valider' : 'Terminé'}
           </Button>
 
           <Button

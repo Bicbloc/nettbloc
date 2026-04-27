@@ -83,13 +83,25 @@ export function IncidentList({ hotelId }: IncidentListProps) {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ incidentId, status }: { incidentId: string; status: string }) => {
+      const userResp = await supabase.auth.getUser();
+      const userId = userResp.data.user?.id;
+
+      const updates: any = { status };
+      if (status === "resolved") {
+        updates.resolved_at = new Date().toISOString();
+        updates.resolved_by = userId;
+      } else if (status === "pending_validation") {
+        // Staff marks done — awaiting establishment validation
+        updates.resolved_at = null;
+        updates.resolved_by = null;
+      } else {
+        updates.resolved_at = null;
+        updates.resolved_by = null;
+      }
+
       const { error } = await supabase
         .from("incidents")
-        .update({ 
-          status,
-          resolved_at: status === "resolved" ? new Date().toISOString() : null,
-          resolved_by: status === "resolved" ? (await supabase.auth.getUser()).data.user?.id : null
-        })
+        .update(updates)
         .eq("id", incidentId);
       
       if (error) throw error;
@@ -97,7 +109,12 @@ export function IncidentList({ hotelId }: IncidentListProps) {
     onSuccess: (_, variables) => {
       // Log status change to activity journal
       const incident = incidents?.find(i => i.id === variables.incidentId);
-      const statusLabels: Record<string, string> = { new: 'Nouveau', in_progress: 'En cours', resolved: 'Résolu' };
+      const statusLabels: Record<string, string> = { 
+        new: 'Nouveau', 
+        in_progress: 'En cours', 
+        pending_validation: 'En attente de validation',
+        resolved: 'Validé / Résolu' 
+      };
       supabase.from("daily_action_logs").insert({
         hotel_id: hotelId,
         action_type: "incident_status_change",
@@ -267,6 +284,7 @@ export function IncidentList({ hotelId }: IncidentListProps) {
                 <SelectItem value="all">Tous statuts</SelectItem>
                 <SelectItem value="new">📌 Nouveau</SelectItem>
                 <SelectItem value="in_progress">⏳ En cours</SelectItem>
+                <SelectItem value="pending_validation">🕓 À valider</SelectItem>
                 <SelectItem value="resolved">✅ Résolu</SelectItem>
               </SelectContent>
             </Select>
