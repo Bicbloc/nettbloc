@@ -99,7 +99,7 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
         const canRepairHousekeeperProfile =
           !matchedTypes.includes('housekeeper') &&
           expectedType === 'housekeeper' &&
-          user.user_metadata?.user_type === 'housekeeper';
+          (user.user_metadata?.user_type === 'housekeeper' || user.user_metadata?.role === 'housekeeper');
 
         if (canRepairHousekeeperProfile) {
           const fallbackName =
@@ -126,6 +126,70 @@ export function useUserTypeGuard(expectedType: AppPortal): UserTypeGuardResult {
             console.error('❌ Error repairing housekeeper profile:', repairError);
           } else {
             matchedTypes.push('housekeeper');
+          }
+        }
+
+        const canRepairTechnicianProfile =
+          !matchedTypes.includes('technician') &&
+          expectedType === 'technician' &&
+          (user.user_metadata?.role === 'technician' || user.user_metadata?.user_type === 'technician');
+
+        if (canRepairTechnicianProfile) {
+          const fallbackName =
+            user.user_metadata?.name?.trim() ||
+            email.split('@')[0] ||
+            'Technicien';
+
+          const { error: repairError } = await supabase
+            .from('technician_profiles')
+            .upsert(
+              {
+                id: user.id,
+                email,
+                name: fallbackName,
+                phone: user.user_metadata?.phone ?? null,
+                is_active: true,
+                specialties: [],
+                certifications: [],
+              },
+              { onConflict: 'id' }
+            );
+
+          if (repairError) {
+            console.error('❌ Error repairing technician profile:', repairError);
+          } else {
+            matchedTypes.push('technician');
+          }
+        }
+
+        const canRepairGovernessProfile =
+          !matchedTypes.includes('governess') &&
+          expectedType === 'governess' &&
+          (user.user_metadata?.role === 'governess' || user.user_metadata?.user_type === 'governess');
+
+        if (canRepairGovernessProfile) {
+          const fallbackName =
+            user.user_metadata?.name?.trim() ||
+            email.split('@')[0] ||
+            'Gouvernante';
+
+          const { error: repairError } = await supabase
+            .from('governess_profiles')
+            .upsert(
+              {
+                id: user.id,
+                email,
+                name: fallbackName,
+                phone: user.user_metadata?.phone ?? null,
+                is_active: true,
+              },
+              { onConflict: 'id' }
+            );
+
+          if (repairError) {
+            console.error('❌ Error repairing governess profile:', repairError);
+          } else {
+            matchedTypes.push('governess');
           }
         }
 
