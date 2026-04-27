@@ -14,20 +14,29 @@ import { IncidentKanbanView } from "./IncidentKanbanView";
 
 interface IncidentListProps {
   hotelId: string;
+  defaultFilterStatus?: string;
+  sortByPriority?: boolean;
 }
 
-export function IncidentList({ hotelId }: IncidentListProps) {
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPriority = false }: IncidentListProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<File[]>([]);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>(defaultFilterStatus);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
   const { data: incidents, isLoading } = useQuery({
-    queryKey: ["incidents", hotelId, filterStatus, filterPriority],
+    queryKey: ["incidents", hotelId, filterStatus, filterPriority, sortByPriority],
     queryFn: async () => {
       let query = supabase
         .from("incidents")
@@ -53,7 +62,9 @@ export function IncidentList({ hotelId }: IncidentListProps) {
         .eq("hotel_id", hotelId)
         .order("created_at", { ascending: false });
 
-      if (filterStatus !== "all") {
+      if (filterStatus === "unresolved") {
+        query = query.in("status", ["new", "in_progress", "pending_validation"]);
+      } else if (filterStatus !== "all") {
         query = query.eq("status", filterStatus);
       }
 
@@ -63,6 +74,14 @@ export function IncidentList({ hotelId }: IncidentListProps) {
 
       const { data, error } = await query;
       if (error) throw error;
+      if (sortByPriority && data) {
+        return [...data].sort((a: any, b: any) => {
+          const pa = PRIORITY_ORDER[a.priority] ?? 99;
+          const pb = PRIORITY_ORDER[b.priority] ?? 99;
+          if (pa !== pb) return pa - pb;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+      }
       return data;
     },
   });
