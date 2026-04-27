@@ -38,6 +38,14 @@ const COLUMNS = [
     borderColor: 'border-yellow-500/30'
   },
   { 
+    id: 'pending_validation', 
+    title: 'À valider', 
+    icon: Clock, 
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-500/10',
+    borderColor: 'border-purple-500/30'
+  },
+  { 
     id: 'resolved', 
     title: 'Résolu', 
     icon: CheckCircle2, 
@@ -63,6 +71,7 @@ export function IncidentKanbanView({
     const groups: Record<string, any[]> = {
       new: [],
       in_progress: [],
+      pending_validation: [],
       resolved: [],
     };
 
