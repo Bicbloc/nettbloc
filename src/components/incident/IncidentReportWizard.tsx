@@ -430,6 +430,52 @@ export function IncidentReportWizard({
       }
     }
 
+    // Auto-assign role based on category
+    if (staffRoles && result.category) {
+      const cat = result.category.toLowerCase();
+      // Categories handled by housekeeping staff
+      const housekeepingKeywords = ['ménage', 'menage', 'linge', 'literie', 'salle de bain', 'office', 'lingerie'];
+      // Categories handled by technical staff
+      const technicalKeywords = [
+        'plomberie', 'électr', 'electr', 'climatisation', 'chauffage',
+        'serrurerie', 'menuiserie', 'fenêtre', 'fenetre', 'mobilier',
+        'revêtement', 'revetement', 'sécurité', 'securite', 'multimédia',
+        'multimedia', 'tv', 'téléphonie', 'telephonie', 'électroménager',
+        'electromenager', 'minibar', 'douche', 'baignoire', 'lavabo',
+        'éclairage', 'eclairage', 'sanitaires', 'extérieur', 'exterieur',
+        'locaux techniques', 'ascenseur'
+      ];
+
+      const isHousekeeping = housekeepingKeywords.some(k => cat.includes(k));
+      const isTechnical = technicalKeywords.some(k => cat.includes(k));
+
+      let targetRole: any = null;
+      if (isHousekeeping) {
+        // Prefer "Femme de chambre" then "Équipier" then "Agent d'Entretien"
+        targetRole =
+          staffRoles.find((r: any) => /femme de chambre/i.test(r.name)) ||
+          staffRoles.find((r: any) => /équipier|equipier/i.test(r.name)) ||
+          staffRoles.find((r: any) => /agent.*entretien/i.test(r.name));
+      } else if (isTechnical) {
+        // Prefer specialized roles, fallback to generic technician
+        if (/plomberie/.test(cat)) {
+          targetRole = staffRoles.find((r: any) => /plombier/i.test(r.name));
+        } else if (/électr|electr/.test(cat)) {
+          targetRole = staffRoles.find((r: any) => /électricien|electricien/i.test(r.name));
+        } else if (/menuiserie|fenêtre|fenetre|porte|mobilier/.test(cat)) {
+          targetRole = staffRoles.find((r: any) => /menuisier/i.test(r.name));
+        }
+        targetRole = targetRole ||
+          staffRoles.find((r: any) => /^technicien$/i.test(r.name)) ||
+          staffRoles.find((r: any) => /technicien/i.test(r.name)) ||
+          staffRoles.find((r: any) => /responsable technique/i.test(r.name));
+      }
+
+      if (targetRole) {
+        form.setValue('assigned_to_role_id', targetRole.id);
+      }
+    }
+
     // Match problem type
     let foundType = false;
     if (types && result.problem_type) {
