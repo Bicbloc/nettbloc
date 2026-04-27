@@ -19,6 +19,7 @@ interface IncidentListProps {
 }
 
 const PRIORITY_ORDER: Record<string, number> = {
+  urgent: 0,
   critical: 0,
   high: 1,
   medium: 2,
