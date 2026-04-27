@@ -176,13 +176,17 @@ function TechnicianDashboardContent() {
                     <AlertTriangle className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="font-semibold">Incidents</h2>
-                    <p className="text-xs text-muted-foreground">Tous les incidents de l'hôtel</p>
+                    <h2 className="font-semibold">Incidents à résoudre</h2>
+                    <p className="text-xs text-muted-foreground">Triés par niveau d'urgence</p>
                   </div>
                 </div>
               </div>
               <div className="p-4">
-                <IncidentList hotelId={currentHotelSession.hotel_id} />
+                <IncidentList 
+                  hotelId={currentHotelSession.hotel_id}
+                  defaultFilterStatus="unresolved"
+                  sortByPriority
+                />
               </div>
             </div>
           </div>
