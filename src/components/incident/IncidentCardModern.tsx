@@ -307,6 +307,28 @@ export function IncidentCardModern({
           </div>
         )}
 
+        {/* Validation banner */}
+        {status === 'pending_validation' && (
+          <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+            <div className="text-sm">
+              <p className="font-semibold text-purple-700 dark:text-purple-300">
+                🕓 En attente de validation
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Le personnel a marqué cet incident comme traité. Validez pour clôturer.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white gap-2"
+              onClick={() => onStatusChange('resolved')}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Valider
+            </Button>
+          </div>
+        )}
+
         {/* Footer Actions */}
         <div className="flex items-center justify-between pt-2 border-t">
           <Button 
