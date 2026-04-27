@@ -45,6 +45,7 @@ import { StaffTasksList } from '@/components/tasks/StaffTasksList';
 import { DailyInstructionsBanner } from '@/components/housekeeper/DailyInstructionsBanner';
 import { StaffNotificationBanner } from '@/components/housekeeper/StaffNotificationBanner';
 import { ReadOnlyFloorPlan } from '@/components/registry/ReadOnlyFloorPlan';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { LayoutGrid } from 'lucide-react';
 
 type GovTab = 'rooms' | 'inspection' | 'incidents' | 'lost' | 'linen' | 'staff' | 'validate' | 'logs' | 'tasks' | 'instructions' | 'plan';
@@ -716,7 +717,9 @@ function GovernessDashboardContent() {
                         </div>
                       </div>
                     </div>
-                    <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
+                    <ScrollArea className="h-[calc(100vh-280px)] pr-3">
+                      <StaffTasksList hotelId={selectedHotel.id} staffType="governess" staffId={profile.id} staffName={profile.name} />
+                    </ScrollArea>
                   </div>
                 )}
 
