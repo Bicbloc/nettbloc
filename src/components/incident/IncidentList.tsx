@@ -302,6 +302,7 @@ export function IncidentList({ hotelId, defaultFilterStatus = "all", sortByPrior
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous statuts</SelectItem>
+                <SelectItem value="unresolved">🔥 À résoudre</SelectItem>
                 <SelectItem value="new">📌 Nouveau</SelectItem>
                 <SelectItem value="in_progress">⏳ En cours</SelectItem>
                 <SelectItem value="pending_validation">🕓 À valider</SelectItem>
