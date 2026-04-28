@@ -685,9 +685,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Chambres non assignées": "Unassigned rooms",
   "Chambres non assignée": "Unassigned rooms",
   "chambres non assignées": "unassigned rooms",
-  "Non assigné": "Unassigned",
-  "Non assignée": "Unassigned",
-  "Non assignées": "Unassigned",
   "Charge de travail": "Workload",
   "charge de travail": "workload",
   "Charge de travail à blanc": "Checkout clean workload",
@@ -701,7 +698,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Chaque colonne affiche le code d'accès spécifique à chaque room attendant pour l'interface mobile.":
     "Each column shows the access code specific to each room attendant for the mobile interface.",
   "Gérer les demandes d'accès": "Manage access requests",
-  "Demandes d'accès": "Access requests",
   "Demandes": "Requests",
   "Demande": "Request",
 
@@ -709,16 +705,12 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Gestion des incidents": "Incident management",
   "Gérer les incidents, le personnel et l'inventaire": "Manage incidents, staff and inventory",
   "Liste des incidents": "Incident list",
-  "Tableau de bord": "Dashboard",
-  "Inventaire": "Inventory",
   "Permissions": "Permissions",
   "Imprimer rapport": "Print report",
   "Imprimer le rapport": "Print report",
   "À traiter": "To process",
   "à traiter": "to process",
-  "Nouveau": "New",
   "Nouveaux": "New",
-  "Nouvelle": "New",
   "Nouvelles": "New",
   "Taux de résolution": "Resolution rate",
   "Taux de résolutions": "Resolution rate",
@@ -726,7 +718,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Temps médian": "Median time",
   "Résolus": "Resolved",
   "résolus": "resolved",
-  "Résolu": "Resolved",
   "Délai de résolution": "Resolution time",
   "Incidents des 30 derniers jours": "Incidents in the last 30 days",
   "30 derniers jours": "Last 30 days",
@@ -754,8 +745,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
 
   // Lost & found
   "Gérez les objets trouvés et leur restitution aux clients": "Manage lost items and their return to guests",
-  "Objets trouvés": "Lost & found",
-  "Objet trouvé": "Lost item",
   "Signaler un objet trouvé": "Report a lost item",
   "Tous les statuts": "All statuses",
   "Total objets": "Total items",
@@ -796,7 +785,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Consignes": "Instructions",
   "Consigne": "Instruction",
   "À savoir": "To know",
-  "À faire": "To do",
   "À-faire": "To do",
   "To-do du jour": "To-do of the day",
   "To-do du day": "To-do of the day",
@@ -808,14 +796,10 @@ export const FR_EN_PHRASES: Record<string, string> = {
     "Manage your notification preferences to stay informed of your property's activity.",
   "Gérez vos préférences de notifications pour rester informé de l'activité de votre establishment.":
     "Manage your notification preferences to stay informed of your property's activity.",
-  "Préférences": "Preferences",
   "Préférence": "Preference",
   "Les paramètres avancés sont accessibles depuis le tableau de bord principal.":
     "Advanced settings are available from the main dashboard.",
   "Paramètres avancés": "Advanced settings",
-  "Paramètres": "Settings",
-  "Déconnexion": "Logout",
-  "Se déconnecter": "Log out",
   "Vous serez redirigé vers la page de connexion.": "You will be redirected to the login page.",
 
   // Billing
@@ -823,10 +807,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Historique de facturation et informations comptables": "Billing history and accounting information",
   "History de facturation et informations comptables": "Billing history and accounting information",
   "Ces informations apparaîtront sur vos factures": "This information will appear on your invoices",
-  "Modifier": "Edit",
-  "Établissement": "Establishment",
-  "Hôtel": "Hotel",
-  "Adresse": "Address",
   "Email comptabilité": "Accounting email",
   "Email comptable": "Accounting email",
   "Coordonnées du fournisseur": "Supplier details",
@@ -837,12 +817,9 @@ export const FR_EN_PHRASES: Record<string, string> = {
     "Import today's PDF to automatically calculate the number of room attendants",
   "Importez le PDF du day pour calculer automatiquement le nombre de room attendants":
     "Import today's PDF to automatically calculate the number of room attendants",
-  "Recommandation": "Recommendation",
-  "femmes de chambre": "room attendants",
   "(estimation basée sur": "(estimate based on",
   "estimation basée sur": "estimate based on",
   "Informations de l'hôtel": "Hotel information",
-  "Enregistrer": "Save",
   "Ces informations seront pré-remplies pour vos prochaines commandes":
     "This information will be pre-filled for your next orders",
   "Email du fournisseur (enregistré)": "Supplier email (saved)",
@@ -886,13 +863,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   // Generic leftovers
   "du jour": "of the day",
   "du day": "of the day",
-  "jour": "day",
-  "jours": "days",
-  "semaine": "week",
-  "semaines": "weeks",
-  "mois": "month",
-  "année": "year",
-  "années": "years",
   "hôtel": "hotel",
   "établissement (établissement)": "establishment (property)",
   "établissement (property)": "establishment (property)",
@@ -903,9 +873,7 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Inspecté": "Inspected",
   "Inspectés": "Inspected",
   "Validées": "Validated",
-  "Validée": "Validated",
   "Validés": "Validated",
-  "Validé": "Validated",
   "À reprendre": "To redo",
   "à reprendre": "to redo",
   "À Blanc": "Checkout clean",
@@ -916,7 +884,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "Temps estimé:": "Estimated time:",
   "Pointages": "Time entries",
   "pointages": "time entries",
-  "Pointage": "Time tracking",
 
   // Relative time
   "il y a 1 jour": "1 day ago",
@@ -927,10 +894,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "il y a une heure": "an hour ago",
   "il y a": "ago",
   "Il y a": "Ago",
-  "minutes": "minutes",
-  "minute": "minute",
-  "heures": "hours",
-  "heure": "hour",
   "secondes": "seconds",
 
   // Completion / actions
@@ -946,7 +909,6 @@ export const FR_EN_PHRASES: Record<string, string> = {
   "(by)": "(by)",
   "par ": "by ",
   "Par ": "By ",
-  "Par:": "By:",
   "par:": "by:",
 
   // Room status
